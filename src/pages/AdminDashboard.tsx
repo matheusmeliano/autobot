@@ -89,7 +89,7 @@ export default function AdminDashboard() {
             
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">
               Para receber as notificações no seu WhatsApp, siga estes 3 passos simples:<br/><br/>
-              1. Adicione o número <strong className="text-white">+34 699 15 36 59</strong> aos seus contatos (como CallMeBot).<br/>
+              1. Adicione o número <strong className="text-white">+34 644 78 33 97</strong> aos seus contatos (como CallMeBot).<br/>
               2. Envie a seguinte mensagem pelo WhatsApp para esse contato:<br/>
               <code className="bg-gray-700 px-1 py-0.5 rounded text-green-400 mt-1 inline-block">I allow callmebot to send me messages</code><br/>
               3. O bot responderá com a sua <strong>API Key</strong>. Cole ela no campo abaixo!
