@@ -7,9 +7,9 @@ import { LogOut, MessageSquare, Phone } from 'lucide-react';
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState<any[]>([]);
-  const [zapiUrl, setZapiUrl] = useState('');
-  const [zapiToken, setZapiToken] = useState('');
-  const [zapiPhone, setZapiPhone] = useState('');
+  const [zapiUrl, setZapiUrl] = useState('https://api.z-api.io/instances/3F164C8A1B93C20D0787667E5D6D48C0/token/3D8FCF7021EAF473D498C56D/send-text');
+  const [zapiToken, setZapiToken] = useState('F85308586a9354c43b7dc0df4876c5d11S');
+  const [zapiPhone, setZapiPhone] = useState('556596933336');
   const [filterModel, setFilterModel] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedLead, setSelectedLead] = useState<any>(null);

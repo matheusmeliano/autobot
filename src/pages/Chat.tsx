@@ -138,15 +138,15 @@ export default function Chat() {
             if (nivelInteresse === 'morno' || nivelInteresse === 'quente') {
               const { data: configs } = await supabase.from('configuracoes').select('*').in('chave', ['zapi_url', 'zapi_token', 'zapi_phone']);
               
-              const zapiUrl = configs?.find(c => c.chave === 'zapi_url')?.valor || '';
-              const zapiToken = configs?.find(c => c.chave === 'zapi_token')?.valor || '';
-              const zapiPhone = configs?.find(c => c.chave === 'zapi_phone')?.valor || '';
+              const zapiUrl = configs?.find(c => c.chave === 'zapi_url')?.valor || 'https://api.z-api.io/instances/3F164C8A1B93C20D0787667E5D6D48C0/token/3D8FCF7021EAF473D498C56D/send-text';
+              const zapiToken = configs?.find(c => c.chave === 'zapi_token')?.valor || 'F85308586a9354c43b7dc0df4876c5d11S';
+              const zapiPhone = configs?.find(c => c.chave === 'zapi_phone')?.valor || '556596933336';
 
               if (zapiUrl && zapiPhone) {
                 try {
                   const messageText = `🚨 *Novo lead qualificado no WeBooter!*\nAcesse o painel: https://traewebooter6uef.vercel.app/admin\n\n👤 *Nome:* ${leadToSave.nome}\n📱 *WhatsApp:* ${leadToSave.telefone}\n🎯 *Objetivo na música:* ${leadToSave.objetivo}\n📅 *Disponibilidade:* ${finalData.tempo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo Identificado:* ${leadToSave.modelo_indicado.toUpperCase()}`;
                   
-                  fetch('/api/notify', {
+                  await fetch('/api/notify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
