@@ -16,7 +16,7 @@ type Message = {
   time: Date;
 };
 
-type BotState = 'greeting' | 'ask_name' | 'ask_objective' | 'ask_flexibility' | 'ask_time' | 'finished';
+type BotState = 'greeting' | 'ask_name' | 'ask_phone' | 'ask_objective' | 'ask_flexibility' | 'ask_time' | 'finished';
 
 const INITIAL_MESSAGE: Message = {
   id: '1',
@@ -31,6 +31,7 @@ export default function Chat() {
   const [botState, setBotState] = useState<BotState>('ask_name');
   const [leadData, setLeadData] = useState({
     nome: '',
+    telefone: '',
     objetivo: '',
     flexibilidade: '',
     tempo: '',
@@ -56,9 +57,16 @@ export default function Chat() {
     switch (botState) {
       case 'ask_name':
         setLeadData((prev) => ({ ...prev, nome: userInput }));
+        setBotState('ask_phone');
+        setTimeout(() => {
+          addMessage('bot', `Prazer, ${userInput}! Qual o seu número de WhatsApp com DDD? (ex: 65 99999-9999)`);
+        }, 1000);
+        break;
+      case 'ask_phone':
+        setLeadData((prev) => ({ ...prev, telefone: userInput }));
         setBotState('ask_objective');
         setTimeout(() => {
-          addMessage('bot', `Prazer, ${userInput}! Qual seu principal objetivo?`);
+          addMessage('bot', 'Anotado! Qual seu principal objetivo na música hoje?');
         }, 1000);
         break;
       case 'ask_objective':
@@ -72,7 +80,7 @@ export default function Chat() {
         setLeadData((prev) => ({ ...prev, flexibilidade: userInput }));
         setBotState('ask_time');
         setTimeout(() => {
-          addMessage('bot', 'Certo. Quanto tempo você tem disponível por semana?');
+          addMessage('bot', 'Certo. Quanto tempo você tem disponível e qual dia da semana exatamente você está disponível para as aulas?');
         }, 1000);
         break;
       case 'ask_time':
@@ -115,7 +123,7 @@ export default function Chat() {
             
             const leadToSave = {
               nome: finalData.nome,
-              telefone: 'Não informado',
+              telefone: finalData.telefone || 'Não informado',
               modelo_indicado: modeloIndicado,
               objetivo: finalData.objetivo,
               nivel_interesse: nivelInteresse,
@@ -136,7 +144,7 @@ export default function Chat() {
 
               if (zapiUrl && zapiPhone) {
                 try {
-                  const messageText = `🚨 *Novo lead qualificado no WeBooter!*\nAcesse o painel: https://traewebooter6uef.vercel.app/admin\n\n👤 *Nome:* ${leadToSave.nome}\n🎯 *Objetivo:* ${leadToSave.objetivo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo:* ${leadToSave.modelo_indicado.toUpperCase()}`;
+                  const messageText = `🚨 *Novo lead qualificado no WeBooter!*\nAcesse o painel: https://traewebooter6uef.vercel.app/admin\n\n👤 *Nome:* ${leadToSave.nome}\n📱 *WhatsApp:* ${leadToSave.telefone}\n🎯 *Objetivo na música:* ${leadToSave.objetivo}\n📅 *Disponibilidade:* ${finalData.tempo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo Identificado:* ${leadToSave.modelo_indicado.toUpperCase()}`;
                   
                   fetch('/api/notify', {
                     method: 'POST',
