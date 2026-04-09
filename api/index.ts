@@ -26,18 +26,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid CallMeBot URL' });
     }
 
-    // A URL original do banco de dados vem com o &text=This+is+a+Test.
-    // O Chat.tsx adiciona um novo parâmetro 'text', mas como já existe um na string original,
-    // pode estar gerando duplicação e o CallMeBot está pegando o primeiro (This is a Test).
+    // O CallMeBot pode falhar se passarmos caracteres que ele não espera ou URLs não encodadas corretamente.
     // Precisamos limpar a URL original ou garantir que usamos os dados corretos
     const parsedOriginalUrl = new URL(url);
     const { messageText } = req.body; // Recebemos o texto explicitamente agora
 
     if (messageText) {
-      parsedOriginalUrl.searchParams.set('text', messageText);
+      // Em vez de deixar o objeto URL encodar (o que pode bugar o formato pro CallMeBot),
+      // forçamos o encodeURIComponent manualmente
+      parsedOriginalUrl.searchParams.set('text', encodeURIComponent(messageText));
     }
 
-    const finalUrlToFetch = parsedOriginalUrl.toString();
+    // Algumas implementações do `URL.toString()` encodam duplamente se já fizermos o `encodeURIComponent`.
+    // O CallMeBot é muito chato com isso. A forma mais segura é extrair os componentes
+    const phone = parsedOriginalUrl.searchParams.get('phone');
+    const apikey = parsedOriginalUrl.searchParams.get('apikey');
+    
+    if (!phone || !apikey) {
+      return res.status(400).json({ error: 'URL do CallMeBot incompleta (falta phone ou apikey)' });
+    }
+
+    // Montando a URL exata do jeito que o CallMeBot quer:
+    // https://api.callmebot.com/whatsapp.php?phone=XXXXX&text=YYYYY&apikey=ZZZZZ
+    const finalUrlToFetch = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(messageText || 'Novo Lead')}&apikey=${apikey}`;
+
     console.log('Enviando para CallMeBot:', finalUrlToFetch);
 
     const response = await fetch(finalUrlToFetch);
