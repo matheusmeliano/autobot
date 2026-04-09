@@ -26,9 +26,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid CallMeBot URL' });
     }
 
-    console.log('Enviando para CallMeBot:', url);
+    // A URL original do banco de dados vem com o &text=This+is+a+Test.
+    // O Chat.tsx adiciona um novo parâmetro 'text', mas como já existe um na string original,
+    // pode estar gerando duplicação e o CallMeBot está pegando o primeiro (This is a Test).
+    // Precisamos limpar a URL original ou garantir que usamos os dados corretos
+    const parsedOriginalUrl = new URL(url);
+    const { messageText } = req.body; // Recebemos o texto explicitamente agora
 
-    const response = await fetch(url);
+    if (messageText) {
+      parsedOriginalUrl.searchParams.set('text', messageText);
+    }
+
+    const finalUrlToFetch = parsedOriginalUrl.toString();
+    console.log('Enviando para CallMeBot:', finalUrlToFetch);
+
+    const response = await fetch(finalUrlToFetch);
     const text = await response.text();
 
     console.log('Resposta CallMeBot:', text);

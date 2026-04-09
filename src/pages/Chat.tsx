@@ -136,16 +136,14 @@ export default function Chat() {
                 try {
                   const messageText = `🚨 *Novo lead qualificado no WeBooter!*\nAcesse agora o painel e faça o atendimento enquanto ele ainda está engajado.\n\n👤 *Nome:* ${leadToSave.nome}\n🎯 *Objetivo:* ${leadToSave.objetivo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo:* ${leadToSave.modelo_indicado.toUpperCase()}`;
                   
-                  // Pegamos a URL configurada pelo admin, alteramos apenas o parâmetro "text"
-                  const urlObj = new URL(callmebotUrlConfig);
-                  urlObj.searchParams.set('text', messageText);
-                  const finalUrl = urlObj.toString();
-                  
-                  // Usando o nosso próprio proxy backend na Vercel para evitar bloqueios de navegador (CORS)
+                  // Enviamos a URL limpa (salva no painel) + o texto que queremos para o backend da Vercel
                   fetch('/api/notify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: finalUrl })
+                    body: JSON.stringify({ 
+                      url: callmebotUrlConfig,
+                      messageText: messageText
+                    })
                   })
                   .then(async (res) => {
                     const data = await res.json();
@@ -155,7 +153,7 @@ export default function Chat() {
                   .catch(err => console.error('Erro na notificação via backend:', err));
                   
                 } catch (e) {
-                  console.error('Erro ao montar URL:', e);
+                  console.error('Erro ao chamar notificação:', e);
                 }
               } else {
                 console.log('CallMeBot não configurado ou URL inválida.');
