@@ -146,14 +146,15 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs mb-1 text-gray-300">Client-Token (Opcional na Z-API)</label>
+                <label className="block text-xs mb-1 text-gray-300">Client-Token (Z-API)</label>
                 <input 
                   type="text" 
                   value={zapiToken}
                   onChange={(e) => setZapiToken(e.target.value)}
-                  placeholder="Deixe em branco se não ativou a segurança extra"
+                  placeholder="Ex: Seu Client-Token que está no menu Segurança"
                   className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
                 />
+                <p className="text-[10px] text-gray-500 mt-1">Vá no painel da Z-API: Instância &gt; Segurança &gt; Client-Token</p>
               </div>
 
               <div>
