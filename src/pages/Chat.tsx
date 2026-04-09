@@ -128,32 +128,28 @@ export default function Chat() {
             if (error) throw error;
 
             if (nivelInteresse === 'morno' || nivelInteresse === 'quente') {
-              const { data: configs } = await supabase.from('configuracoes').select('*').in('chave', ['whatsapp_numero', 'callmebot_api_key']);
+              const { data: configs } = await supabase.from('configuracoes').select('*').eq('chave', 'callmebot_url');
               
-              const targetNumber = configs?.find(c => c.chave === 'whatsapp_numero')?.valor || '';
-              const apiKey = configs?.find(c => c.chave === 'callmebot_api_key')?.valor || '';
+              const callmebotUrlConfig = configs?.[0]?.valor || '';
 
-              if (targetNumber && apiKey) {
-                // Formatar número para o padrão CallMeBot (apenas números, com DDI)
-                // Ex: de "65 9985-1142" para "556599851142"
-                let formattedNumber = targetNumber.replace(/\D/g, '');
-                // Se não começar com 55 (DDI do Brasil) e tiver 10 ou 11 dígitos, adicionamos o 55
-                if (formattedNumber.length >= 10 && formattedNumber.length <= 11 && !formattedNumber.startsWith('55')) {
-                  formattedNumber = '55' + formattedNumber;
+              if (callmebotUrlConfig && callmebotUrlConfig.includes('api.callmebot.com')) {
+                try {
+                  const messageText = `🚨 *Novo lead qualificado no WeBooter!*\nAcesse agora o painel e faça o atendimento enquanto ele ainda está engajado.\n\n👤 *Nome:* ${leadToSave.nome}\n🎯 *Objetivo:* ${leadToSave.objetivo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo:* ${leadToSave.modelo_indicado.toUpperCase()}`;
+                  
+                  // Pegamos a URL configurada pelo admin, alteramos apenas o parâmetro "text"
+                  const urlObj = new URL(callmebotUrlConfig);
+                  urlObj.searchParams.set('text', messageText);
+                  const finalUrl = urlObj.toString();
+                  
+                  // Usamos mode: 'no-cors' para que o navegador não bloqueie a requisição
+                  fetch(finalUrl, { mode: 'no-cors' })
+                    .then(() => console.log('Notificação CallMeBot enviada (no-cors)'))
+                    .catch(console.error);
+                } catch (e) {
+                  console.error('URL do CallMeBot inválida:', e);
                 }
-
-                const messageText = encodeURIComponent(`🚨 *Novo lead qualificado no WeBooter!*\nAcesse agora o painel e faça o atendimento enquanto ele ainda está engajado.\n\n👤 *Nome:* ${leadToSave.nome}\n🎯 *Objetivo:* ${leadToSave.objetivo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo:* ${leadToSave.modelo_indicado.toUpperCase()}`);
-                
-                const callMeBotUrl = `https://api.callmebot.com/whatsapp.php?phone=${formattedNumber}&text=${messageText}&apikey=${apiKey}`;
-                
-                fetch(callMeBotUrl)
-                  .then(response => {
-                     if (!response.ok) console.error('Erro ao enviar notificação via CallMeBot');
-                     else console.log('Notificação CallMeBot enviada com sucesso!');
-                  })
-                  .catch(console.error);
               } else {
-                console.log('CallMeBot não configurado (Número ou API Key ausente).');
+                console.log('CallMeBot não configurado ou URL inválida.');
               }
             }
 

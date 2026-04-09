@@ -7,8 +7,7 @@ import { LogOut, MessageSquare, Phone } from 'lucide-react';
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState<any[]>([]);
-  const [forwardNumber, setForwardNumber] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [callmebotUrl, setCallmebotUrl] = useState('');
   const [filterModel, setFilterModel] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -42,19 +41,21 @@ export default function AdminDashboard() {
   const fetchConfig = async () => {
     const { data } = await supabase.from('configuracoes').select('*');
     if (data) {
-      const num = data.find(c => c.chave === 'whatsapp_numero');
-      const key = data.find(c => c.chave === 'callmebot_api_key');
-      if (num) setForwardNumber(num.valor);
-      if (key) setApiKey(key.valor);
+      const url = data.find(c => c.chave === 'callmebot_url');
+      if (url) setCallmebotUrl(url.valor);
     }
   };
 
   const handleUpdateConfig = async () => {
+    if (callmebotUrl && !callmebotUrl.includes('api.callmebot.com')) {
+      alert('Por favor, insira uma URL válida do CallMeBot!');
+      return;
+    }
+    
     await supabase.from('configuracoes').upsert([
-      { chave: 'whatsapp_numero', valor: forwardNumber },
-      { chave: 'callmebot_api_key', valor: apiKey }
+      { chave: 'callmebot_url', valor: callmebotUrl }
     ], { onConflict: 'chave' });
-    alert('Configurações atualizadas com sucesso!');
+    alert('Configuração atualizada com sucesso!');
   };
 
   const updateLeadStatus = async (id: string, status: string) => {
@@ -92,38 +93,27 @@ export default function AdminDashboard() {
               1. Adicione o número <strong className="text-white">+34 644 78 33 97</strong> aos seus contatos (como CallMeBot).<br/>
               2. Envie a seguinte mensagem pelo WhatsApp para esse contato:<br/>
               <code className="bg-gray-700 px-1 py-0.5 rounded text-green-400 mt-1 inline-block">I allow callmebot to send me messages</code><br/>
-              3. O bot responderá com a sua <strong>API Key</strong>. Cole ela no campo abaixo!
+              3. O bot responderá com uma <strong>URL de teste</strong>. Cole essa URL completa no campo abaixo!
             </p>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs mb-1 text-gray-300">Seu Número de WhatsApp</label>
+                <label className="block text-xs mb-1 text-gray-300">URL do CallMeBot (Completa)</label>
                 <input 
                   type="text" 
-                  value={forwardNumber}
-                  onChange={(e) => setForwardNumber(e.target.value)}
-                  placeholder="Ex: +556599851142"
+                  value={callmebotUrl}
+                  onChange={(e) => setCallmebotUrl(e.target.value)}
+                  placeholder="Ex: https://api.callmebot.com/whatsapp.php?phone=...&text=...&apikey=..."
                   className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">Coloque o código do país (+55) junto com o DDD e o número.</p>
-              </div>
-
-              <div>
-                <label className="block text-xs mb-1 text-gray-300">CallMeBot API Key</label>
-                <input 
-                  type="text" 
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Ex: 123456"
-                  className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
-                />
+                <p className="text-[10px] text-gray-500 mt-1">Cole exatamente o link que o CallMeBot enviou no seu WhatsApp.</p>
               </div>
 
               <button 
                 onClick={handleUpdateConfig}
                 className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white py-2 px-3 rounded text-sm transition-colors mt-2"
               >
-                Salvar Configurações
+                Salvar Configuração
               </button>
             </div>
           </div>
