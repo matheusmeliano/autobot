@@ -53,18 +53,50 @@ export default function AdminDashboard() {
     }
   };
 
+  const [isTesting, setIsTesting] = useState(false);
+
   const handleUpdateConfig = async () => {
-    if (!zapiUrl || !zapiToken || !zapiPhone) {
-      alert('Por favor, preencha todos os campos da Z-API!');
+    if (!zapiUrl || !zapiPhone) {
+      alert('Por favor, preencha a URL da Instância e o Seu Número!');
       return;
     }
     
     await supabase.from('configuracoes').upsert([
       { chave: 'zapi_url', valor: zapiUrl },
-      { chave: 'zapi_token', valor: zapiToken },
+      { chave: 'zapi_token', valor: zapiToken || '' },
       { chave: 'zapi_phone', valor: zapiPhone }
     ], { onConflict: 'chave' });
     alert('Configurações da Z-API salvas com sucesso!');
+  };
+
+  const handleTestZapi = async () => {
+    if (!zapiUrl || !zapiPhone) {
+      alert('Salve as configurações primeiro antes de testar.');
+      return;
+    }
+    setIsTesting(true);
+    try {
+      const res = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: zapiUrl,
+          token: zapiToken || '',
+          phone: zapiPhone,
+          messageText: '🤖 Teste de conexão WeBooter -> Z-API concluído com sucesso!'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Mensagem enviada com sucesso! Verifique seu WhatsApp.');
+      } else {
+        alert('Erro ao enviar: ' + (data.error || JSON.stringify(data)));
+      }
+    } catch (err: any) {
+      alert('Erro ao conectar com o servidor: ' + err.message);
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const updateLeadStatus = async (id: string, status: string) => {
@@ -114,12 +146,12 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs mb-1 text-gray-300">Client-Token (Z-API)</label>
+                <label className="block text-xs mb-1 text-gray-300">Client-Token (Opcional na Z-API)</label>
                 <input 
                   type="text" 
                   value={zapiToken}
                   onChange={(e) => setZapiToken(e.target.value)}
-                  placeholder="Ex: F9A8B7C6D5E4F3..."
+                  placeholder="Deixe em branco se não ativou a segurança extra"
                   className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
                 />
               </div>
@@ -136,12 +168,22 @@ export default function AdminDashboard() {
                 <p className="text-[10px] text-gray-500 mt-1">Apenas números, com código do país (Ex: 55) e DDD.</p>
               </div>
 
-              <button 
-                onClick={handleUpdateConfig}
-                className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white py-2 px-3 rounded text-sm transition-colors mt-2"
-              >
-                Salvar Configurações
-              </button>
+              <div className="flex gap-2 mt-4">
+                <button 
+                  onClick={handleUpdateConfig}
+                  className="flex-1 bg-[#128C7E] hover:bg-[#075E54] text-white py-2 px-3 rounded text-sm transition-colors"
+                >
+                  Salvar Configurações
+                </button>
+                
+                <button 
+                  onClick={handleTestZapi}
+                  disabled={isTesting}
+                  className="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm transition-colors disabled:opacity-50"
+                >
+                  {isTesting ? 'Testando...' : 'Testar Notificação'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

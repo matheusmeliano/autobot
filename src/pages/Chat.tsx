@@ -134,7 +134,7 @@ export default function Chat() {
               const zapiToken = configs?.find(c => c.chave === 'zapi_token')?.valor || '';
               const zapiPhone = configs?.find(c => c.chave === 'zapi_phone')?.valor || '';
 
-              if (zapiUrl && zapiToken && zapiPhone) {
+              if (zapiUrl && zapiPhone) {
                 try {
                   const messageText = `🚨 *Novo lead qualificado no WeBooter!*\nAcesse o painel: https://traewebooter6uef.vercel.app/admin\n\n👤 *Nome:* ${leadToSave.nome}\n🎯 *Objetivo:* ${leadToSave.objetivo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo:* ${leadToSave.modelo_indicado.toUpperCase()}`;
                   
