@@ -7,7 +7,9 @@ import { LogOut, MessageSquare, Phone } from 'lucide-react';
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState<any[]>([]);
-  const [callmebotUrl, setCallmebotUrl] = useState('');
+  const [zapiUrl, setZapiUrl] = useState('');
+  const [zapiToken, setZapiToken] = useState('');
+  const [zapiPhone, setZapiPhone] = useState('');
   const [filterModel, setFilterModel] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -41,21 +43,28 @@ export default function AdminDashboard() {
   const fetchConfig = async () => {
     const { data } = await supabase.from('configuracoes').select('*');
     if (data) {
-      const url = data.find(c => c.chave === 'callmebot_url');
-      if (url) setCallmebotUrl(url.valor);
+      const url = data.find(c => c.chave === 'zapi_url');
+      const token = data.find(c => c.chave === 'zapi_token');
+      const phone = data.find(c => c.chave === 'zapi_phone');
+      
+      if (url) setZapiUrl(url.valor);
+      if (token) setZapiToken(token.valor);
+      if (phone) setZapiPhone(phone.valor);
     }
   };
 
   const handleUpdateConfig = async () => {
-    if (callmebotUrl && !callmebotUrl.includes('api.callmebot.com')) {
-      alert('Por favor, insira uma URL válida do CallMeBot!');
+    if (!zapiUrl || !zapiToken || !zapiPhone) {
+      alert('Por favor, preencha todos os campos da Z-API!');
       return;
     }
     
     await supabase.from('configuracoes').upsert([
-      { chave: 'callmebot_url', valor: callmebotUrl }
+      { chave: 'zapi_url', valor: zapiUrl },
+      { chave: 'zapi_token', valor: zapiToken },
+      { chave: 'zapi_phone', valor: zapiPhone }
     ], { onConflict: 'chave' });
-    alert('Configuração atualizada com sucesso!');
+    alert('Configurações da Z-API salvas com sucesso!');
   };
 
   const updateLeadStatus = async (id: string, status: string) => {
@@ -85,35 +94,53 @@ export default function AdminDashboard() {
         <div className="flex-1 px-4 space-y-4">
           <div className="bg-gray-800 p-4 rounded-lg">
             <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider flex items-center">
-              <Phone size={16} className="mr-2" /> WhatsApp Notificações (CallMeBot)
+              <Phone size={16} className="mr-2" /> WhatsApp (Z-API)
             </h3>
             
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-              Para receber as notificações no seu WhatsApp, siga estes 3 passos simples:<br/><br/>
-              1. Adicione o número <strong className="text-white">+34 644 78 33 97</strong> aos seus contatos (como CallMeBot).<br/>
-              2. Envie a seguinte mensagem pelo WhatsApp para esse contato:<br/>
-              <code className="bg-gray-700 px-1 py-0.5 rounded text-green-400 mt-1 inline-block">I allow callmebot to send me messages</code><br/>
-              3. O bot responderá com uma <strong>URL de teste</strong>. Cole essa URL completa no campo abaixo!
+              Configure sua integração com a Z-API para receber os leads diretamente no seu WhatsApp.
             </p>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs mb-1 text-gray-300">URL do CallMeBot (Completa)</label>
+                <label className="block text-xs mb-1 text-gray-300">URL da Instância (Z-API)</label>
                 <input 
                   type="text" 
-                  value={callmebotUrl}
-                  onChange={(e) => setCallmebotUrl(e.target.value)}
-                  placeholder="Ex: https://api.callmebot.com/whatsapp.php?phone=...&text=...&apikey=..."
+                  value={zapiUrl}
+                  onChange={(e) => setZapiUrl(e.target.value)}
+                  placeholder="Ex: https://api.z-api.io/instances/SUA_INSTANCIA/token/SEU_TOKEN"
                   className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">Cole exatamente o link que o CallMeBot enviou no seu WhatsApp.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs mb-1 text-gray-300">Client-Token (Z-API)</label>
+                <input 
+                  type="text" 
+                  value={zapiToken}
+                  onChange={(e) => setZapiToken(e.target.value)}
+                  placeholder="Ex: F9A8B7C6D5E4F3..."
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs mb-1 text-gray-300">Seu Número de WhatsApp (Destino)</label>
+                <input 
+                  type="text" 
+                  value={zapiPhone}
+                  onChange={(e) => setZapiPhone(e.target.value)}
+                  placeholder="Ex: 5565999999999"
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">Apenas números, com código do país (Ex: 55) e DDD.</p>
               </div>
 
               <button 
                 onClick={handleUpdateConfig}
                 className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white py-2 px-3 rounded text-sm transition-colors mt-2"
               >
-                Salvar Configuração
+                Salvar Configurações
               </button>
             </div>
           </div>

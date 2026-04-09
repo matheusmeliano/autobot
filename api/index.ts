@@ -20,53 +20,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { url } = req.body;
+    const { url, token, phone, messageText } = req.body;
     
-    if (!url || !url.includes('api.callmebot.com')) {
-      return res.status(400).json({ error: 'Invalid CallMeBot URL' });
+    if (!url || !token || !phone) {
+      return res.status(400).json({ error: 'Parâmetros da Z-API incompletos.' });
     }
 
-    // O CallMeBot pode falhar se passarmos caracteres que ele não espera ou URLs não encodadas corretamente.
-    // Precisamos limpar a URL original ou garantir que usamos os dados corretos
-    const parsedOriginalUrl = new URL(url);
-    const { messageText } = req.body; // Recebemos o texto explicitamente agora
-
-    if (messageText) {
-      // Em vez de deixar o objeto URL encodar (o que pode bugar o formato pro CallMeBot),
-      // forçamos o encodeURIComponent manualmente
-      parsedOriginalUrl.searchParams.set('text', encodeURIComponent(messageText));
+    // A Z-API requer que o endpoint de envio de texto seja chamado
+    // Ex: https://api.z-api.io/instances/SUA_INSTANCIA/token/SEU_TOKEN/send-text
+    // O usuário geralmente copia apenas até o token, então garantimos que termine com /send-text
+    let fetchUrl = url;
+    if (!fetchUrl.endsWith('/send-text')) {
+      if (fetchUrl.endsWith('/')) {
+        fetchUrl += 'send-text';
+      } else {
+        fetchUrl += '/send-text';
+      }
     }
 
-    // Algumas implementações do `URL.toString()` encodam duplamente se já fizermos o `encodeURIComponent`.
-    // O CallMeBot é muito chato com isso. A forma mais segura é extrair os componentes
-    const phone = parsedOriginalUrl.searchParams.get('phone');
-    const apikey = parsedOriginalUrl.searchParams.get('apikey');
-    
-    if (!phone || !apikey) {
-      return res.status(400).json({ error: 'URL do CallMeBot incompleta (falta phone ou apikey)' });
-    }
+    console.log('Enviando para Z-API:', fetchUrl);
 
-    // O CallMeBot espera os espaços como `+` ou `%20`.
-    // Vamos encodar o texto inteiro com encodeURIComponent, que converte os espaços em %20.
-    // Isso é o padrão universal para URLs.
-    const encodedText = encodeURIComponent(messageText || 'Novo Lead WeBooter');
-    
-    // Montando a URL exata do jeito que o CallMeBot quer:
-    // https://api.callmebot.com/whatsapp.php?phone=XXXXX&text=YYYYY&apikey=ZZZZZ
-    const finalUrlToFetch = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodedText}&apikey=${apikey}`;
+    const response = await fetch(fetchUrl, {
+      method: 'POST',
+      headers: {
+        'Client-Token': token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        phone: phone, // número de destino
+        message: messageText || 'Novo Lead WeBooter'
+      })
+    });
 
-    console.log('Enviando para CallMeBot:', finalUrlToFetch);
+    const responseData = await response.json().catch(() => null);
 
-    const response = await fetch(finalUrlToFetch);
-    const text = await response.text();
-
-    console.log('Resposta CallMeBot:', text);
+    console.log('Resposta Z-API:', responseData);
 
     if (!response.ok) {
-      throw new Error(`CallMeBot erro: ${text}`);
+      throw new Error(`Z-API erro: ${JSON.stringify(responseData)}`);
     }
 
-    return res.status(200).json({ success: true, text });
+    return res.status(200).json({ success: true, data: responseData });
   } catch (error: any) {
     console.error('Erro na API:', error);
     return res.status(500).json({ error: error.message });

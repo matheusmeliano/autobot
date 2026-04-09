@@ -128,28 +128,30 @@ export default function Chat() {
             if (error) throw error;
 
             if (nivelInteresse === 'morno' || nivelInteresse === 'quente') {
-              const { data: configs } = await supabase.from('configuracoes').select('*').eq('chave', 'callmebot_url');
+              const { data: configs } = await supabase.from('configuracoes').select('*').in('chave', ['zapi_url', 'zapi_token', 'zapi_phone']);
               
-              const callmebotUrlConfig = configs?.[0]?.valor || '';
+              const zapiUrl = configs?.find(c => c.chave === 'zapi_url')?.valor || '';
+              const zapiToken = configs?.find(c => c.chave === 'zapi_token')?.valor || '';
+              const zapiPhone = configs?.find(c => c.chave === 'zapi_phone')?.valor || '';
 
-              if (callmebotUrlConfig && callmebotUrlConfig.includes('api.callmebot.com')) {
+              if (zapiUrl && zapiToken && zapiPhone) {
                 try {
-                  // Simplificando MUITO a mensagem. Se for longa ou complexa demais, o CallMeBot não aceita
-                  const messageText = `Lead: ${leadToSave.nome} - Modelo: ${leadToSave.modelo_indicado}`;
+                  const messageText = `🚨 *Novo lead qualificado no WeBooter!*\nAcesse o painel: https://traewebooter6uef.vercel.app/admin\n\n👤 *Nome:* ${leadToSave.nome}\n🎯 *Objetivo:* ${leadToSave.objetivo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo:* ${leadToSave.modelo_indicado.toUpperCase()}`;
                   
-                  // Enviamos a URL limpa (salva no painel) + o texto que queremos para o backend da Vercel
                   fetch('/api/notify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                      url: callmebotUrlConfig,
+                      url: zapiUrl,
+                      token: zapiToken,
+                      phone: zapiPhone,
                       messageText: messageText
                     })
                   })
                   .then(async (res) => {
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Erro no envio');
-                    console.log('Notificação CallMeBot enviada com sucesso pelo backend:', data);
+                    console.log('Notificação Z-API enviada com sucesso pelo backend:', data);
                   })
                   .catch(err => console.error('Erro na notificação via backend:', err));
                   
@@ -157,7 +159,7 @@ export default function Chat() {
                   console.error('Erro ao chamar notificação:', e);
                 }
               } else {
-                console.log('CallMeBot não configurado ou URL inválida.');
+                console.log('Z-API não configurada (URL, Token ou Número ausente).');
               }
             }
 
