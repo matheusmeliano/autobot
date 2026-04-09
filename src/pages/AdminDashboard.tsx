@@ -55,29 +55,32 @@ export default function AdminDashboard() {
 
   const checkWhatsappStatus = async () => {
     try {
-      const res = await fetch('/api/whatsapp/status');
+      const res = await fetch('https://autobot-backend-wq1s.onrender.com/api/whatsapp/status');
       const data = await res.json();
       if (data.success) {
         setWhatsappStatus({ connected: data.connected, qrCode: data.qrCode });
+        // Se houver qrCode ou estiver conectado, podemos parar o loading de 'Gerando QR Code'
         if (data.qrCode || data.connected) {
           setIsConnecting(false);
         }
       }
     } catch (e) {
       console.error(e);
+      // Se der erro contínuo na checagem, a gente desliga o botão de conectando pra não ficar preso
+      setIsConnecting(false);
     }
   };
 
   const handleConnectWhatsapp = async () => {
     try {
       setIsConnecting(true);
-      await fetch('/api/whatsapp/connect', { method: 'POST' });
-      // Poll immediately and then interval takes over
-      setTimeout(checkWhatsappStatus, 2000);
+      await fetch('https://autobot-backend-wq1s.onrender.com/api/whatsapp/connect', { method: 'POST' });
+      // Poll a bit later to give Puppeteer time to spin up on the free Render instance
+      setTimeout(checkWhatsappStatus, 3000);
     } catch (e) {
       console.error(e);
       setIsConnecting(false);
-      alert('Erro ao tentar conectar com o WhatsApp. Verifique se o backend está rodando.');
+      alert('Erro ao tentar conectar com o WhatsApp. Verifique se o backend no Render está online.');
     }
   };
 

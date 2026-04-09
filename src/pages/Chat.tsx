@@ -136,7 +136,7 @@ export default function Chat() {
               const targetNumber = targetNumConfig?.valor || '65 9985-1142';
 
               // Call backend API to send message
-              fetch('/api/whatsapp/send-lead', {
+              fetch('https://autobot-backend-wq1s.onrender.com/api/whatsapp/send-lead', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ lead: leadToSave, targetNumber })
