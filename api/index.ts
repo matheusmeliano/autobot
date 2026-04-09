@@ -46,11 +46,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'URL do CallMeBot incompleta (falta phone ou apikey)' });
     }
 
-    // Montando a URL exata do jeito que o CallMeBot quer:
     // O CallMeBot espera os espaços como `+` ou `%20`.
-    // `encodeURIComponent` converte espaços para `%20`, que funciona na maioria das vezes.
-    // Se ainda estiver dando problema, a gente força a substituição de `%20` para `+`.
-    const encodedText = encodeURIComponent(messageText || 'Novo Lead').replace(/%20/g, '+');
+    // Vamos encodar o texto inteiro com encodeURIComponent, que converte os espaços em %20.
+    // Isso é o padrão universal para URLs.
+    const encodedText = encodeURIComponent(messageText || 'Novo Lead WeBooter');
+    
+    // Montando a URL exata do jeito que o CallMeBot quer:
+    // https://api.callmebot.com/whatsapp.php?phone=XXXXX&text=YYYYY&apikey=ZZZZZ
     const finalUrlToFetch = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodedText}&apikey=${apikey}`;
 
     console.log('Enviando para CallMeBot:', finalUrlToFetch);

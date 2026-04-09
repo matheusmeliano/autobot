@@ -134,8 +134,8 @@ export default function Chat() {
 
               if (callmebotUrlConfig && callmebotUrlConfig.includes('api.callmebot.com')) {
                 try {
-                  // Limpando um pouco os emojis e o excesso de caracteres especiais pra evitar que o CallMeBot corte a mensagem
-                  const messageText = `Novo lead no WeBooter!\n\nNome: ${leadToSave.nome}\nObjetivo: ${leadToSave.objetivo}\nInteresse: ${leadToSave.nivel_interesse.toUpperCase()}\nModelo: ${leadToSave.modelo_indicado.toUpperCase()}`;
+                  // Simplificando MUITO a mensagem. Se for longa ou complexa demais, o CallMeBot não aceita
+                  const messageText = `Lead: ${leadToSave.nome} - Modelo: ${leadToSave.modelo_indicado}`;
                   
                   // Enviamos a URL limpa (salva no painel) + o texto que queremos para o backend da Vercel
                   fetch('/api/notify', {
