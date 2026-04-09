@@ -127,24 +127,34 @@ export default function Chat() {
             
             if (error) throw error;
 
-            // Check if WhatsApp is connected
-            const { data: config } = await supabase.from('configuracoes').select('*').eq('chave', 'whatsapp_conectado').single();
-            const isConnected = config?.valor === 'true';
+            if (nivelInteresse === 'morno' || nivelInteresse === 'quente') {
+              const { data: configs } = await supabase.from('configuracoes').select('*').in('chave', ['whatsapp_numero', 'callmebot_api_key']);
+              
+              const targetNumber = configs?.find(c => c.chave === 'whatsapp_numero')?.valor || '';
+              const apiKey = configs?.find(c => c.chave === 'callmebot_api_key')?.valor || '';
 
-            if (isConnected && (nivelInteresse === 'morno' || nivelInteresse === 'quente')) {
-              const { data: targetNumConfig } = await supabase.from('configuracoes').select('*').eq('chave', 'whatsapp_numero').single();
-              const targetNumber = targetNumConfig?.valor || '65 9985-1142';
+              if (targetNumber && apiKey) {
+                // Formatar número para o padrão CallMeBot (apenas números, com DDI)
+                // Ex: de "65 9985-1142" para "556599851142"
+                let formattedNumber = targetNumber.replace(/\D/g, '');
+                // Se não começar com 55 (DDI do Brasil) e tiver 10 ou 11 dígitos, adicionamos o 55
+                if (formattedNumber.length >= 10 && formattedNumber.length <= 11 && !formattedNumber.startsWith('55')) {
+                  formattedNumber = '55' + formattedNumber;
+                }
 
-              // Call backend API to send message
-              fetch('https://autobot-backend-wq1s.onrender.com/api/whatsapp/send-lead', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lead: leadToSave, targetNumber })
-              }).catch(console.error);
-            }
-
-            if (!isConnected) {
-              console.log('Bot is offline, could not forward lead.');
+                const messageText = encodeURIComponent(`🚨 *Novo lead qualificado no WeBooter!*\nAcesse agora o painel e faça o atendimento enquanto ele ainda está engajado.\n\n👤 *Nome:* ${leadToSave.nome}\n🎯 *Objetivo:* ${leadToSave.objetivo}\n⭐ *Interesse:* ${leadToSave.nivel_interesse.toUpperCase()}\n📚 *Modelo:* ${leadToSave.modelo_indicado.toUpperCase()}`);
+                
+                const callMeBotUrl = `https://api.callmebot.com/whatsapp.php?phone=${formattedNumber}&text=${messageText}&apikey=${apiKey}`;
+                
+                fetch(callMeBotUrl)
+                  .then(response => {
+                     if (!response.ok) console.error('Erro ao enviar notificação via CallMeBot');
+                     else console.log('Notificação CallMeBot enviada com sucesso!');
+                  })
+                  .catch(console.error);
+              } else {
+                console.log('CallMeBot não configurado (Número ou API Key ausente).');
+              }
             }
 
           } catch (error) {

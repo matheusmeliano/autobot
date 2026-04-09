@@ -2,15 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
-import { LogOut, Settings, MessageSquare, Phone, QrCode, RefreshCw } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { LogOut, MessageSquare, Phone } from 'lucide-react';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState<any[]>([]);
-  const [whatsappStatus, setWhatsappStatus] = useState({ connected: false, qrCode: null as string | null });
-  const [isConnecting, setIsConnecting] = useState(false);
   const [forwardNumber, setForwardNumber] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [filterModel, setFilterModel] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -23,9 +21,6 @@ export default function AdminDashboard() {
     
     fetchLeads();
     fetchConfig();
-    checkWhatsappStatus();
-
-    const interval = setInterval(checkWhatsappStatus, 5000);
 
     const leadsSubscription = supabase
       .channel('leads_channel')
@@ -35,7 +30,6 @@ export default function AdminDashboard() {
       .subscribe();
 
     return () => {
-      clearInterval(interval);
       supabase.removeChannel(leadsSubscription);
     };
   }, [navigate]);
@@ -49,44 +43,18 @@ export default function AdminDashboard() {
     const { data } = await supabase.from('configuracoes').select('*');
     if (data) {
       const num = data.find(c => c.chave === 'whatsapp_numero');
+      const key = data.find(c => c.chave === 'callmebot_api_key');
       if (num) setForwardNumber(num.valor);
+      if (key) setApiKey(key.valor);
     }
   };
 
-  const checkWhatsappStatus = async () => {
-    try {
-      const res = await fetch('https://autobot-backend-wq1s.onrender.com/api/whatsapp/status');
-      const data = await res.json();
-      if (data.success) {
-        setWhatsappStatus({ connected: data.connected, qrCode: data.qrCode });
-        // Se houver qrCode ou estiver conectado, podemos parar o loading de 'Gerando QR Code'
-        if (data.qrCode || data.connected) {
-          setIsConnecting(false);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      // Se der erro contínuo na checagem, a gente desliga o botão de conectando pra não ficar preso
-      setIsConnecting(false);
-    }
-  };
-
-  const handleConnectWhatsapp = async () => {
-    try {
-      setIsConnecting(true);
-      await fetch('https://autobot-backend-wq1s.onrender.com/api/whatsapp/connect', { method: 'POST' });
-      // Poll a bit later to give Puppeteer time to spin up on the free Render instance
-      setTimeout(checkWhatsappStatus, 3000);
-    } catch (e) {
-      console.error(e);
-      setIsConnecting(false);
-      alert('Erro ao tentar conectar com o WhatsApp. Verifique se o backend no Render está online.');
-    }
-  };
-
-  const handleUpdateNumber = async () => {
-    await supabase.from('configuracoes').update({ valor: forwardNumber }).eq('chave', 'whatsapp_numero');
-    alert('Número atualizado com sucesso!');
+  const handleUpdateConfig = async () => {
+    await supabase.from('configuracoes').upsert([
+      { chave: 'whatsapp_numero', valor: forwardNumber },
+      { chave: 'callmebot_api_key', valor: apiKey }
+    ], { onConflict: 'chave' });
+    alert('Configurações atualizadas com sucesso!');
   };
 
   const updateLeadStatus = async (id: string, status: string) => {
@@ -116,58 +84,48 @@ export default function AdminDashboard() {
         <div className="flex-1 px-4 space-y-4">
           <div className="bg-gray-800 p-4 rounded-lg">
             <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider flex items-center">
-              <Phone size={16} className="mr-2" /> WhatsApp Status
+              <Phone size={16} className="mr-2" /> WhatsApp Notificações (CallMeBot)
             </h3>
-            <div className="flex items-center mb-4">
-              <div className={`w-3 h-3 rounded-full mr-2 ${whatsappStatus.connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm">{whatsappStatus.connected ? 'Conectado' : 'Desconectado'}</span>
-            </div>
             
-            {!whatsappStatus.connected && !whatsappStatus.qrCode && (
-              <button 
-                onClick={handleConnectWhatsapp}
-                disabled={isConnecting}
-                className={`w-full py-2 px-3 rounded text-sm transition-colors text-white ${
-                  isConnecting ? 'bg-gray-600 cursor-not-allowed' : 'bg-[#128C7E] hover:bg-[#075E54]'
-                }`}
-              >
-                {isConnecting ? 'Gerando QR Code...' : 'Conectar WhatsApp'}
-              </button>
-            )}
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+              Para receber as notificações no seu WhatsApp, siga estes 3 passos simples:<br/><br/>
+              1. Adicione o número <strong className="text-white">+34 699 15 36 59</strong> aos seus contatos (como CallMeBot).<br/>
+              2. Envie a seguinte mensagem pelo WhatsApp para esse contato:<br/>
+              <code className="bg-gray-700 px-1 py-0.5 rounded text-green-400 mt-1 inline-block">I allow callmebot to send me messages</code><br/>
+              3. O bot responderá com a sua <strong>API Key</strong>. Cole ela no campo abaixo!
+            </p>
 
-            {whatsappStatus.qrCode && !whatsappStatus.connected && (
-              <div className="bg-white p-2 rounded flex flex-col items-center mt-2">
-                <p className="text-xs text-gray-500 mb-2 text-center">Escaneie o QR Code</p>
-                <QRCodeSVG value={whatsappStatus.qrCode} size={150} />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs mb-1 text-gray-300">Seu Número de WhatsApp</label>
+                <input 
+                  type="text" 
+                  value={forwardNumber}
+                  onChange={(e) => setForwardNumber(e.target.value)}
+                  placeholder="Ex: +556599851142"
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">Coloque o código do país (+55) junto com o DDD e o número.</p>
               </div>
-            )}
-            
-            <p className="text-[10px] text-gray-500 mt-3 text-center leading-tight">
-              ⚠️ Você deve conectar seu WhatsApp para a notificação funcionar!
-            </p>
-          </div>
 
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider flex items-center">
-              <Settings size={16} className="mr-2" /> Configuração
-            </h3>
-            <p className="text-xs text-gray-500 mb-3">
-              Número que receberá as notificações de novos leads.
-            </p>
-            <label className="block text-xs mb-1">Número de Notificação</label>
-            <input 
-              type="text" 
-              value={forwardNumber}
-              onChange={(e) => setForwardNumber(e.target.value)}
-              placeholder="Ex: 65 9985-1142"
-              className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm mb-2"
-            />
-            <button 
-              onClick={handleUpdateNumber}
-              className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white py-2 px-3 rounded text-sm transition-colors border border-transparent"
-            >
-              Salvar Número
-            </button>
+              <div>
+                <label className="block text-xs mb-1 text-gray-300">CallMeBot API Key</label>
+                <input 
+                  type="text" 
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Ex: 123456"
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 text-sm"
+                />
+              </div>
+
+              <button 
+                onClick={handleUpdateConfig}
+                className="w-full bg-[#128C7E] hover:bg-[#075E54] text-white py-2 px-3 rounded text-sm transition-colors mt-2"
+              >
+                Salvar Configurações
+              </button>
+            </div>
           </div>
         </div>
 
