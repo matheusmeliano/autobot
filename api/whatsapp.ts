@@ -1,7 +1,8 @@
 import pkg from '@whiskeysockets/baileys';
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, Browsers } = pkg;
 import QRCode from 'qrcode';
-import { Boom } from 'pino';
+import pino from 'pino';
+import { Boom } from '@hapi/boom';
 import { supabase } from './supabase.js';
 
 let client: ReturnType<typeof makeWASocket> | null = null;
@@ -31,7 +32,7 @@ export const initWhatsAppClient = async () => {
   client = makeWASocket({
     auth: state,
     printQRInTerminal: false,
-    logger: Boom.child({ level: 'silent' }), // Suppress excessive logs
+    logger: pino({ level: 'silent' }), // Suppress excessive logs
     browser: Browsers.macOS('Desktop'),
     syncFullHistory: false
   });
