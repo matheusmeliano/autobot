@@ -141,12 +141,21 @@ export default function Chat() {
                   urlObj.searchParams.set('text', messageText);
                   const finalUrl = urlObj.toString();
                   
-                  // Usamos mode: 'no-cors' para que o navegador não bloqueie a requisição
-                  fetch(finalUrl, { mode: 'no-cors' })
-                    .then(() => console.log('Notificação CallMeBot enviada (no-cors)'))
-                    .catch(console.error);
+                  // Usando o nosso próprio proxy backend na Vercel para evitar bloqueios de navegador (CORS)
+                  fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: finalUrl })
+                  })
+                  .then(async (res) => {
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Erro no envio');
+                    console.log('Notificação CallMeBot enviada com sucesso pelo backend:', data);
+                  })
+                  .catch(err => console.error('Erro na notificação via backend:', err));
+                  
                 } catch (e) {
-                  console.error('URL do CallMeBot inválida:', e);
+                  console.error('Erro ao montar URL:', e);
                 }
               } else {
                 console.log('CallMeBot não configurado ou URL inválida.');
