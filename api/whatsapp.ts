@@ -1,4 +1,5 @@
-import makeWASocket, { DisconnectReason, useMultiFileAuthState, Browsers } from '@whiskeysockets/baileys';
+import pkg from '@whiskeysockets/baileys';
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, Browsers } = pkg;
 import QRCode from 'qrcode';
 import { Boom } from 'pino';
 import { supabase } from './supabase.js';
