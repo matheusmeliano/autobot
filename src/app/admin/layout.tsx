@@ -5,6 +5,8 @@ import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { Logo } from "@/components/ui/Logo";
 import { logoutAction } from "@/app/app/actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({
   children,
 }: {
