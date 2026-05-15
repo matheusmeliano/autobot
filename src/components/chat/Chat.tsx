@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Send, Lock } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -128,6 +128,15 @@ export default function Chat() {
             status: "novo",
             conversa: fullConversation,
           };
+
+          let supabase = null as ReturnType<typeof createSupabaseBrowserClient> | null;
+          try {
+            supabase = createSupabaseBrowserClient();
+          } catch {
+            supabase = null;
+          }
+
+          if (!supabase) return;
 
           const { error } = await supabase.from("leads").insert([leadToSave]);
           if (error) throw error;
@@ -327,4 +336,3 @@ export default function Chat() {
     </div>
   );
 }
-
