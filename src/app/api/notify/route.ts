@@ -46,8 +46,8 @@ export async function POST(req: Request) {
         "Access-Control-Allow-Origin": "*",
       },
     });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Erro interno";
+  } catch (err: any) {
+    const message = err?.message ?? "Erro interno";
     return Response.json({ error: message }, { status: 500 });
   }
 }

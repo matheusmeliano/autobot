@@ -1,16 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-type ScheduleRowDb = {
-  id: string;
-  debtor_id: string;
-  template_id: string | null;
-  data_envio: string;
-  status: string;
-  created_at: string;
-  debtors: { nome: string } | null;
-  message_templates: { nome: string } | null;
-};
-
 export async function GET() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const { data } = await supabase
@@ -20,7 +9,7 @@ export async function GET() {
     .limit(200);
 
   const rows =
-    ((data ?? []) as ScheduleRowDb[]).map((r) => ({
+    (data ?? []).map((r: any) => ({
       id: r.id,
       debtor_id: r.debtor_id,
       template_id: r.template_id,

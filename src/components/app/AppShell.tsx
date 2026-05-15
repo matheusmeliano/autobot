@@ -2,49 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { AppNav } from "@/components/app/AppNav";
 import { logoutAction } from "@/app/app/actions";
 import { Logo } from "@/components/ui/Logo";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useSessionStore } from "@/lib/app/sessionStore";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [email, setEmail] = useState<string>("");
-  const setStoreEmail = useSessionStore((s) => s.setEmail);
-  const pathname = usePathname();
-  const router = useRouter();
 
   useEffect(() => {
     let active = true;
     supabase.auth.getUser().then(({ data }) => {
       if (!active) return;
-      const next = data.user?.email ?? "";
-      setEmail(next);
-      setStoreEmail(next);
+      setEmail(data.user?.email ?? "");
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      const next = session?.user?.email ?? "";
-      setEmail(next);
-      setStoreEmail(next);
+      setEmail(session?.user?.email ?? "");
     });
 
     return () => {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [supabase, setStoreEmail]);
-
-  useEffect(() => {
-    router.prefetch("/app/dashboard");
-    router.prefetch("/app/clientes");
-    router.prefetch("/app/cobrancas");
-    router.prefetch("/app/agenda");
-  }, [router]);
+  }, [supabase]);
 
   const showAdmin = isGlobalAdminEmail(email);
 
@@ -108,15 +91,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
           ) : null}
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18 }}
-            className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl min-[1201px]:p-6"
-          >
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl min-[1201px]:p-6">
             {children}
-          </motion.div>
+          </div>
         </div>
       </div>
 

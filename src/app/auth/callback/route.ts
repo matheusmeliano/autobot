@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
@@ -19,10 +18,7 @@ export async function GET(request: NextRequest) {
         await supabase.auth.signOut();
       }
     } else if (tokenHash && type) {
-      await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: type as EmailOtpType,
-      });
+      await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as any });
       if (isLoginReturn) {
         await supabase.auth.signOut();
       }

@@ -1,5 +1,51 @@
-import { ClientesPageClient } from "@/app/app/clientes/ClientesPageClient";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsClient";
+import Link from "next/link";
 
 export default async function ClientesPage() {
-  return <ClientesPageClient />;
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("debtors")
+    .select("id, nome, telefone, valor, vencimento, pix_key, observacoes, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) {
+    return (
+      <div>
+        <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
+          CLIENTES
+        </div>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
+          Clientes e devedores
+        </h1>
+        <div className="mt-2 text-sm text-white/60">
+          A tabela ainda não existe no Supabase ou o RLS ainda não foi aplicado.
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <div className="text-sm font-semibold">Como corrigir</div>
+          <div className="mt-2 text-sm text-white/60">
+            Rode a migration SQL de SaaS no Supabase e recarregue esta página.
+          </div>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/app/dashboard"
+              className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
+            >
+              Voltar para o painel
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+            >
+              Ir para a página inicial
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <DebtorsClient initial={(data ?? []) as DebtorRow[]} />;
 }

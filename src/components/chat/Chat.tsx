@@ -159,14 +159,13 @@ export default function Chat() {
             }
           }
         } catch {
-          void 0;
         }
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       addMessage(
         "bot",
         `Oops, erro técnico: ${
-          error instanceof Error ? error.message : "Falha na conexão com a IA"
+          error.message || "Falha na conexão com a IA"
         }. Verifique o console ou a configuração da API.`
       );
     } finally {
@@ -328,3 +327,4 @@ export default function Chat() {
     </div>
   );
 }
+

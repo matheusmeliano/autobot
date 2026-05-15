@@ -1,16 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-type ChargeRowDb = {
-  id: string;
-  debtor_id: string;
-  mensagem: string | null;
-  status: string;
-  enviada_em: string | null;
-  tentativa: number;
-  created_at: string;
-  debtors: { nome: string } | null;
-};
-
 export async function GET() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const { data } = await supabase
@@ -20,7 +9,7 @@ export async function GET() {
     .limit(200);
 
   const rows =
-    ((data ?? []) as ChargeRowDb[]).map((r) => ({
+    (data ?? []).map((r: any) => ({
       id: r.id,
       debtor_id: r.debtor_id,
       mensagem: r.mensagem,

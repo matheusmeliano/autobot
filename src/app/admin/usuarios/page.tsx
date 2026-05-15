@@ -2,23 +2,6 @@ import { AdminUsersClient, type AdminUserRow } from "@/components/admin/AdminUse
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizePlan } from "@/lib/plans";
 
-type ProfileRow = {
-  user_id: string;
-  nome: string | null;
-  email: string | null;
-  plano: string | null;
-  created_at: string | null;
-};
-
-type SubscriptionRow = {
-  id: string;
-  user_id: string;
-  plano: string | null;
-  status: string | null;
-  vencimento: string | null;
-  created_at: string;
-};
-
 export default async function AdminUsuariosPage() {
   const supabase = createSupabaseAdminClient();
   const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
@@ -36,47 +19,37 @@ export default async function AdminUsuariosPage() {
     .select("id, user_id, plano, status, vencimento, created_at")
     .in("user_id", ids);
 
-  const profileById = new Map<string, ProfileRow>();
-  for (const p of (profiles ?? []) as ProfileRow[]) {
-    profileById.set(p.user_id, p);
-  }
-
-  const subById = new Map<string, SubscriptionRow>();
-  for (const s of (subs ?? []) as SubscriptionRow[]) {
+  const profileById = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
+  const subById = new Map<string, any>();
+  (subs ?? []).forEach((s: any) => {
     const prev = subById.get(s.user_id);
-    if (
-      !prev ||
-      new Date(s.created_at).getTime() > new Date(prev.created_at).getTime()
-    ) {
+    if (!prev || new Date(s.created_at).getTime() > new Date(prev.created_at).getTime()) {
       subById.set(s.user_id, s);
     }
-  }
+  });
 
   const today = new Date().toISOString().slice(0, 10);
-  const expiredSubs = Array.from(subById.values()).filter((s) => {
+  const expiredSubs = Array.from(subById.values()).filter((s: any) => {
     const p = profileById.get(s.user_id);
-    const planSub = normalizePlan(s.plano);
-    const planProfile = normalizePlan(p?.plano);
-    const status = (s.status ?? "").toLowerCase();
+    const planSub = normalizePlan(s?.plano ?? null);
+    const planProfile = normalizePlan(p?.plano ?? null);
+    const status = (s?.status ?? "").toLowerCase();
     return (
       planSub === "teste" &&
       planProfile === "teste" &&
       status === "ativo" &&
-      typeof s.vencimento === "string" &&
+      typeof s?.vencimento === "string" &&
       s.vencimento < today
     );
   });
 
   if (expiredSubs.length) {
     await Promise.all(
-      expiredSubs.map((s) =>
-        supabase
-          .from("subscriptions")
-          .update({ status: "cancelado" })
-          .eq("id", s.id),
+      expiredSubs.map((s: any) =>
+        supabase.from("subscriptions").update({ status: "cancelado" }).eq("id", s.id),
       ),
     );
-    expiredSubs.forEach((s) => {
+    expiredSubs.forEach((s: any) => {
       const current = subById.get(s.user_id);
       if (current?.id === s.id) {
         subById.set(s.user_id, { ...current, status: "cancelado" });
@@ -87,15 +60,11 @@ export default async function AdminUsuariosPage() {
   const initial: AdminUserRow[] = users.map((u) => {
     const p = profileById.get(u.id);
     const s = subById.get(u.id);
-    const meta = (u.user_metadata ?? null) as Record<string, unknown> | null;
-    const metaName = typeof meta?.name === "string" ? meta.name : null;
-    const confirmedAt = (u as { email_confirmed_at?: string | null })
-      .email_confirmed_at;
     return {
       id: u.id,
       email: u.email ?? p?.email ?? "-",
-      nome: p?.nome ?? metaName ?? "-",
-      email_confirmado: Boolean(confirmedAt),
+      nome: p?.nome ?? (u.user_metadata as any)?.name ?? "-",
+      email_confirmado: Boolean((u as any).email_confirmed_at),
       plano: normalizePlan(s?.plano ?? p?.plano ?? "teste"),
       assinatura_status: s?.status ?? "-",
       vencimento: s?.vencimento ?? null,

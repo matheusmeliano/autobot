@@ -1,14 +1,6 @@
 "use client";
 
-import dynamic from "next/dynamic";
-
-const ReportsChart = dynamic(
-  () => import("./ReportsChart").then((m) => m.ReportsChart),
-  {
-    ssr: false,
-    loading: () => <div className="mt-4 h-48 rounded-xl bg-white/[0.02]" />,
-  },
-);
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 export type ReportStats = {
   totalCharges: number;
@@ -66,7 +58,36 @@ export function ReportsClient({
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="text-sm font-semibold">Cobranças criadas (30 dias)</div>
-        <ReportsChart chart={chart} />
+        <div className="mt-4 h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chart}>
+              <defs>
+                <linearGradient id="repValue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="name"
+                tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "rgba(15, 23, 42, 0.9)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  borderRadius: 12,
+                }}
+                labelStyle={{ color: "rgba(255,255,255,0.7)" }}
+                itemStyle={{ color: "white" }}
+                formatter={(v: any) => [v, "Quantidade"]}
+                labelFormatter={(l: any) => `Data: ${l}`}
+              />
+              <Area type="monotone" dataKey="value" stroke="rgb(16 185 129)" strokeWidth={2} fill="url(#repValue)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

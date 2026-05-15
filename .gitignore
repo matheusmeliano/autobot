@@ -8,18 +8,15 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-.next
-.vercel
-out
 dist
 dist-ssr
-.turbo
-coverage
+.next
+.vercel
 *.local
 .env
 .env.*
-Senha Painel de Controle.txt
 Acessos Plataformas.txt
+Senha Painel de Controle.txt
 
 # Editor directories and files
 .vscode/*

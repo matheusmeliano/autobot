@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   Shield,
   Zap,
+  Bot,
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { Logo } from "@/components/ui/Logo";
@@ -281,8 +282,8 @@ export function Landing() {
                             }}
                             labelStyle={{ color: "rgba(255,255,255,0.7)" }}
                             itemStyle={{ color: "white" }}
-                            formatter={(v: number | string) => [v, "Quantidade"]}
-                            labelFormatter={(l: number | string) => `Dia: ${l}`}
+                            formatter={(v: any) => [v, "Quantidade"]}
+                            labelFormatter={(l: any) => `Dia: ${l}`}
                           />
                           <Area
                             type="monotone"

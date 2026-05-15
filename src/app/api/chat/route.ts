@@ -1,22 +1,4 @@
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-
-type LeadData = {
-  nome?: string;
-  telefone?: string;
-  objetivo?: string;
-  flexibilidade?: string;
-};
-
-type IncomingMessage = {
-  sender: "bot" | "user";
-  text: string;
-};
-
-type Payload = {
-  messages: IncomingMessage[];
-  leadData?: LeadData;
-};
 
 export async function OPTIONS() {
   return new Response(null, {
@@ -36,7 +18,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "OPENAI_API_KEY não configurada" }, { status: 500 });
     }
 
-    const body = (await req.json().catch(() => null)) as Payload | null;
+    const body = await req.json().catch(() => null);
     if (!body?.messages || !Array.isArray(body.messages)) {
       return Response.json({ error: "Mensagens não encontradas" }, { status: 400 });
     }
@@ -76,18 +58,15 @@ flexibilidade: ${leadData.flexibilidade || ""}
 `;
 
     const openai = new OpenAI({ apiKey });
-    const messages: ChatCompletionMessageParam[] = [
-      { role: "system", content: systemPrompt },
-      ...body.messages.map(
-        (m): ChatCompletionMessageParam => ({
-          role: m.sender === "bot" ? "assistant" : "user",
-          content: m.text,
-        }),
-      ),
-    ];
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo-1106",
-      messages,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...body.messages.map((m: any) => ({
+          role: m.sender === "bot" ? "assistant" : "user",
+          content: m.text,
+        })),
+      ],
       response_format: { type: "json_object" },
       temperature: 0.5,
     });
@@ -102,8 +81,8 @@ flexibilidade: ${leadData.flexibilidade || ""}
         "Access-Control-Allow-Origin": "*",
       },
     });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Erro interno";
+  } catch (err: any) {
+    const message = err?.message ?? "Erro interno";
     return Response.json({ error: message }, { status: 500 });
   }
 }
