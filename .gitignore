@@ -18,6 +18,8 @@ coverage
 *.local
 .env
 .env.*
+Senha Painel de Controle.txt
+Acessos Plataformas.txt
 
 # Editor directories and files
 .vscode/*

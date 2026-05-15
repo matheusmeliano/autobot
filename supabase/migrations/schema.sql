@@ -55,3 +55,4 @@ CREATE POLICY "Leads update access" ON leads FOR UPDATE USING (true);
 
 CREATE POLICY "Configuracoes read access" ON configuracoes FOR SELECT USING (true);
 CREATE POLICY "Configuracoes update access" ON configuracoes FOR UPDATE USING (true);
+CREATE POLICY "Configuracoes insert access" ON configuracoes FOR INSERT WITH CHECK (true);

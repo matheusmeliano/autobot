@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       headers,
       body: JSON.stringify({
         phone: cleanPhone, // número de destino limpo
-        message: messageText || 'Novo Lead WeBooter'
+        message: messageText || 'Novo Lead AutoBot'
       })
     });
 

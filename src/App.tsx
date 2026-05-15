@@ -18,8 +18,17 @@ function App() {
       <Routes>
         <Route path="/" element={<Chat />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={<Navigate to="/painel" replace />} />
         <Route 
-          path="/admin" 
+          path="/painel" 
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/integracao" 
           element={
             <ProtectedRoute>
               <AdminDashboard />
