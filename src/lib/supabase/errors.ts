@@ -18,8 +18,17 @@ export function supabaseErrorToPt(message: string) {
     return "Email ou senha incorretos.";
   }
 
-  if (m.includes("user already registered")) {
-    return "Este email já está cadastrado.";
+  if (
+    m.includes("user already registered") ||
+    m.includes("already registered") ||
+    m.includes("already been registered") ||
+    (m.includes("user") && m.includes("already") && m.includes("exists")) ||
+    (m.includes("email") && m.includes("already") && m.includes("registered")) ||
+    (m.includes("email") && m.includes("already") && m.includes("in use")) ||
+    (m.includes("duplicate") && m.includes("key")) ||
+    (m.includes("unique") && m.includes("constraint"))
+  ) {
+    return "Este e-mail já está cadastrado.";
   }
 
   if (m.includes("email not confirmed")) {
