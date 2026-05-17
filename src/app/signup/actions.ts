@@ -51,9 +51,41 @@ export async function signupAction(formData: FormData) {
     return { ok: false, error: "Não foi possível finalizar o cadastro." };
   }
 
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
+
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? null;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE ??
+    process.env.SUPABASE_SERVICE ??
+    null;
+
+  if (url && serviceKey) {
+    const admin = createClient(url, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("user_id")
+      .ilike("email", normalizedEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingProfile?.user_id) {
+      return { ok: false, error: "Este e-mail já possui cadastro. Faça login." };
+    }
+  }
+
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
+    email: normalizedEmail,
     password: parsed.data.password,
     options: {
       data: parsed.data.name ? { name: parsed.data.name } : undefined,
@@ -67,55 +99,48 @@ export async function signupAction(formData: FormData) {
     return { ok: false, error: supabaseErrorToPt(error.message) };
   }
 
+  if ((data.user?.identities?.length ?? 0) === 0) {
+    return { ok: false, error: "Este e-mail já possui cadastro. Faça login." };
+  }
+
   const userId = data.user?.id ?? null;
-  if (userId) {
-    const url =
-      process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? null;
-    const serviceKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ??
-      process.env.SUPABASE_SERVICE_KEY ??
-      process.env.SUPABASE_SERVICE_ROLE ??
-      process.env.SUPABASE_SERVICE ??
-      null;
+  if (userId && url && serviceKey) {
+    const admin = createClient(url, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
 
-    if (url && serviceKey) {
-      const admin = createClient(url, serviceKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
+    const vencimento = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    await admin.from("profiles").upsert(
+      {
+        user_id: userId,
+        email: normalizedEmail,
+        nome: parsed.data.name ?? "",
+        plano: "teste",
+      },
+      { onConflict: "user_id" },
+    );
+
+    const { data: existingSub } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!existingSub?.id) {
+      await admin.from("subscriptions").insert({
+        user_id: userId,
+        plano: "teste",
+        status: "ativo",
+        vencimento,
       });
-
-      const vencimento = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
-
-      await admin.from("profiles").upsert(
-        {
-          user_id: userId,
-          email: parsed.data.email,
-          nome: parsed.data.name ?? "",
-          plano: "teste",
-        },
-        { onConflict: "user_id" },
-      );
-
-      const { data: existingSub } = await admin
-        .from("subscriptions")
-        .select("id")
-        .eq("user_id", userId)
-        .limit(1)
-        .maybeSingle();
-
-      if (!existingSub?.id) {
-        await admin.from("subscriptions").insert({
-          user_id: userId,
-          plano: "teste",
-          status: "ativo",
-          vencimento,
-        });
-      }
     }
   }
 
