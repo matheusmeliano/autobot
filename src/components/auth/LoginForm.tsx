@@ -19,6 +19,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const didShowConfirmed = useRef(false);
+  const didShowLinkNotice = useRef(false);
   const {
     register,
     handleSubmit,
@@ -36,6 +37,20 @@ export function LoginForm() {
     }
   }, [router, searchParams]);
 
+  useEffect(() => {
+    if (didShowLinkNotice.current) return;
+    if (searchParams?.get("link") === "1") {
+      didShowLinkNotice.current = true;
+      toast.message("Faça login para continuar.");
+      const next = searchParams?.get("next");
+      if (next) {
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
+      } else {
+        router.replace("/login");
+      }
+    }
+  }, [router, searchParams]);
+
   const onSubmit = handleSubmit(async (values) => {
     const formData = new FormData();
     formData.append("email", values.email);
@@ -47,7 +62,9 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/app");
+    const next = searchParams?.get("next");
+    const nextUrl = next && next.startsWith("/") ? next : "/app";
+    router.push(nextUrl);
     router.refresh();
   });
 
