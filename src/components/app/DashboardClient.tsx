@@ -74,7 +74,7 @@ export function DashboardClient({
             PAINEL
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight min-[1201px]:text-3xl">
-            Bem-vindo(a)
+            Seja Bem-vindo(a)
           </h1>
           <div className="mt-2 text-sm text-white/60">{email}</div>
         </div>
