@@ -20,15 +20,19 @@ export async function middleware(request: NextRequest) {
   if (!url || !anonKey) {
     const pathname = request.nextUrl.pathname;
     if (pathname === "/app" || pathname.startsWith("/app/")) {
+      const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/login";
       redirectUrl.search = "";
+      redirectUrl.searchParams.set("next", next);
       return NextResponse.redirect(redirectUrl);
     }
     if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+      const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/login";
       redirectUrl.search = "";
+      redirectUrl.searchParams.set("next", next);
       return NextResponse.redirect(redirectUrl);
     }
     return NextResponse.next();
@@ -78,9 +82,11 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/app" || pathname.startsWith("/app/")) {
     if (!user) {
+      const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/login";
       redirectUrl.search = "";
+      redirectUrl.searchParams.set("next", next);
       response = NextResponse.redirect(redirectUrl);
       cookiesToReplay.forEach(({ name, value, options }) => {
         response.cookies.set(name, value, options);
@@ -93,6 +99,10 @@ export async function middleware(request: NextRequest) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = user ? "/app" : "/login";
       redirectUrl.search = "";
+      if (!user) {
+        const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+        redirectUrl.searchParams.set("next", next);
+      }
       response = NextResponse.redirect(redirectUrl);
       cookiesToReplay.forEach(({ name, value, options }) => {
         response.cookies.set(name, value, options);
