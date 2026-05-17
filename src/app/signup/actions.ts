@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
+import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 
 const schema = z.object({
   email: z.string().email(),
@@ -24,28 +25,7 @@ export async function signupAction(formData: FormData) {
   }
 
   const hdrs = await headers();
-  const origin = hdrs.get("origin");
-  const forwardedProto = hdrs.get("x-forwarded-proto");
-  const host =
-    hdrs.get("x-forwarded-host") ??
-    hdrs.get("host") ??
-    hdrs.get("x-forwarded-server");
-
-  const baseUrl = (() => {
-    const envUrl =
-      process.env.NEXT_PUBLIC_SITE_URL ??
-      process.env.SITE_URL ??
-      process.env.NEXT_PUBLIC_APP_URL;
-
-    const raw =
-      envUrl ??
-      origin ??
-      (host ? `${forwardedProto ?? "http"}://${host}` : null) ??
-      (process.env.NODE_ENV !== "production" ? "http://localhost:3000" : null);
-
-    if (!raw) return null;
-    return raw.replace("0.0.0.0", "localhost");
-  })();
+  const baseUrl = resolveBaseUrlFromHeaders(hdrs);
 
   if (!baseUrl) {
     return { ok: false, error: "Não foi possível finalizar o cadastro." };
