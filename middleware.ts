@@ -18,6 +18,19 @@ export async function middleware(request: NextRequest) {
   const anonKey = getSupabaseAnonKey();
 
   if (!url || !anonKey) {
+    const pathname = request.nextUrl.pathname;
+    if (pathname === "/app" || pathname.startsWith("/app/")) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
+    if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
     return NextResponse.next();
   }
 

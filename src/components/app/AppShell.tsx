@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppNav } from "@/components/app/AppNav";
 import { logoutAction } from "@/app/app/actions";
 import { Logo } from "@/components/ui/Logo";
@@ -9,18 +10,27 @@ import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [email, setEmail] = useState<string>("");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
     let active = true;
     supabase.auth.getUser().then(({ data }) => {
       if (!active) return;
       setEmail(data.user?.email ?? "");
+      setIsAuthed(Boolean(data.user));
+      setAuthChecked(true);
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user?.email ?? "");
+      setIsAuthed(Boolean(session?.user));
+      setAuthChecked(true);
     });
 
     return () => {
@@ -29,7 +39,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
+  useEffect(() => {
+    if (!authChecked) return;
+    if (isAuthed) return;
+
+    const qs = searchParams?.toString();
+    const next = `${pathname}${qs ? `?${qs}` : ""}`;
+    router.replace(`/login?next=${encodeURIComponent(next)}`);
+  }, [authChecked, isAuthed, pathname, router, searchParams]);
+
   const showAdmin = isGlobalAdminEmail(email);
+
+  if (authChecked && !isAuthed) return null;
 
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
