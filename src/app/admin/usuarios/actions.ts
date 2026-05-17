@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { normalizePlan } from "@/lib/plans";
@@ -37,7 +37,13 @@ export async function updateUserAdminAction(input: unknown) {
     return { ok: false as const, error: "Dados inválidos." };
   }
 
-  const supabase = createSupabaseAdminClient();
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error: "Configuração do servidor incompleta. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+    };
+  }
   const payload = parsed.data;
   const plano = normalizePlan(payload.plano);
 
@@ -111,7 +117,13 @@ export async function resetPasswordAdminAction(input: unknown) {
     return { ok: false as const, error: "Senha inválida." };
   }
 
-  const supabase = createSupabaseAdminClient();
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error: "Configuração do servidor incompleta. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+    };
+  }
   const { error } = await supabase.auth.admin.updateUserById(parsed.data.id, {
     password: parsed.data.password,
   });
@@ -129,7 +141,13 @@ export async function deleteUserAdminAction(id: string) {
 
   if (!id) return { ok: false as const, error: "ID inválido." };
 
-  const supabase = createSupabaseAdminClient();
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error: "Configuração do servidor incompleta. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+    };
+  }
   const { data: target } = await supabase.auth.admin.getUserById(id);
   if (isGlobalAdminEmail(target.user?.email)) {
     return { ok: false as const, error: "Não é possível excluir este admin." };

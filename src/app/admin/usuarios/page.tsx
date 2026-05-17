@@ -1,10 +1,35 @@
 import { AdminUsersClient, type AdminUserRow } from "@/components/admin/AdminUsersClient";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizePlan } from "@/lib/plans";
 
 export default async function AdminUsuariosPage() {
-  const supabase = createSupabaseAdminClient();
-  const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return (
+      <div className="space-y-3">
+        <div className="text-lg font-semibold">Configuração necessária</div>
+        <div className="text-sm text-white/70">
+          Para abrir o painel de usuários, configure na Vercel a variável{" "}
+          <span className="font-semibold text-white">SUPABASE_SERVICE_ROLE_KEY</span>.
+        </div>
+        <div className="text-sm text-white/55">
+          Vercel → Project → Settings → Environment Variables → adicione{" "}
+          <span className="font-semibold text-white">SUPABASE_SERVICE_ROLE_KEY</span>{" "}
+          (Production/Preview/Development) e redeploy.
+        </div>
+      </div>
+    );
+  }
+
+  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+  if (error) {
+    return (
+      <div className="space-y-3">
+        <div className="text-lg font-semibold">Não foi possível carregar usuários</div>
+        <div className="text-sm text-white/70">{error.message}</div>
+      </div>
+    );
+  }
 
   const users = data.users ?? [];
   const ids = users.map((u) => u.id);

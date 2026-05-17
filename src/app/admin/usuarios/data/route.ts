@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan } from "@/lib/plans";
 
@@ -13,8 +13,15 @@ export async function GET() {
     return new Response("Acesso negado.", { status: 403 });
   }
 
-  const supabase = createSupabaseAdminClient();
-  const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return new Response("Configuração do servidor incompleta.", { status: 500 });
+  }
+
+  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+  if (error) {
+    return new Response(error.message, { status: 500 });
+  }
 
   const users = data.users ?? [];
   const ids = users.map((u) => u.id);

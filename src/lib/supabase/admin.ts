@@ -29,3 +29,15 @@ export function createSupabaseAdminClient() {
   });
 }
 
+export function tryCreateSupabaseAdminClient() {
+  const url = getSupabaseUrl();
+  const serviceKey = getSupabaseServiceKey();
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
