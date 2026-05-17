@@ -26,16 +26,30 @@ export function resolveBaseUrlFromHeaders(hdrs: Headers) {
   const env = normalize(envUrl);
   const org = normalize(origin);
   const byHost = normalize(host ? `${forwardedProto ?? "http"}://${host}` : null);
+  const vercelHost = normalize(
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ??
+      process.env.VERCEL_URL ??
+      null
+  );
+
+  const ensureProtocol = (value: string | null) => {
+    if (!value) return null;
+    if (/^https?:\/\//i.test(value)) return value;
+    return `https://${value}`;
+  };
 
   if (env && !isLocal(env)) return env;
   if (org && !isLocal(org)) return org;
   if (byHost && !isLocal(byHost)) return byHost;
+  if (vercelHost && !isLocal(ensureProtocol(vercelHost))) {
+    return ensureProtocol(vercelHost);
+  }
 
   return (
     env ??
     org ??
     byHost ??
+    (vercelHost ? ensureProtocol(vercelHost) : null) ??
     (process.env.NODE_ENV !== "production" ? "http://localhost:3000" : null)
   );
 }
-
