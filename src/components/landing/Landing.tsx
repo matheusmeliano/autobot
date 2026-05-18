@@ -116,7 +116,7 @@ export function Landing() {
                 href="/signup"
                 className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
               >
-                Começar agora <ArrowRight className="h-4 w-4" />
+                Fazer o teste <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
