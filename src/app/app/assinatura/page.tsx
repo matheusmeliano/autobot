@@ -114,14 +114,14 @@ export default async function AssinaturaPage() {
         </div>
 
         <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
               <div className="text-sm font-semibold">Pro</div>
               <div className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
                 R$ 99/mês
               </div>
             </div>
-            <div className="shrink-0 rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
+            <div className="shrink-0 whitespace-nowrap rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
               Mais escolhido
             </div>
           </div>
