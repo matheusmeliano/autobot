@@ -79,9 +79,9 @@ export default async function AssinaturaPage() {
       <div className="mt-12 grid gap-4 md:grid-cols-3">
         <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <div className="text-sm font-semibold">Básico</div>
-              <div className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
+              <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
                 R$ 49/mês
               </div>
             </div>
@@ -117,7 +117,7 @@ export default async function AssinaturaPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold">Pro</div>
-              <div className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
+              <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
                 R$ 99/mês
               </div>
             </div>
@@ -154,9 +154,9 @@ export default async function AssinaturaPage() {
 
         <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <div className="text-sm font-semibold">Vitalício</div>
-              <div className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
+              <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
                 R$ 2.490/único
               </div>
             </div>
