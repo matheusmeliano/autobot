@@ -45,7 +45,6 @@ export function MercadoPagoSubscribeButton(props: {
   useEffect(() => {
     if (!open) return;
     if (!mounted) return;
-    if (method !== "card") return;
     if (!publicKey) {
       toast.error(
         "Configuração incompleta. Defina NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY na Vercel.",
@@ -71,6 +70,7 @@ export function MercadoPagoSubscribeButton(props: {
 
     const init = async () => {
       try {
+        if (controllerRef.current) return;
         await loadMercadoPagoSdk();
         if (cancelled) return;
         for (let i = 0; i < 10; i++) {
@@ -174,7 +174,7 @@ export function MercadoPagoSubscribeButton(props: {
       cancelled = true;
       cleanupBrick();
     };
-  }, [open, mounted, method, publicKey, props.amount, props.plan, props.userEmail, ids]);
+  }, [open, mounted, publicKey, props.amount, props.plan, props.userEmail, ids]);
 
   useEffect(() => {
     if (!open) {
@@ -186,39 +186,51 @@ export function MercadoPagoSubscribeButton(props: {
     }
     if (!mounted) return;
     if (method !== "pix") return;
-    if (pix || pixLoading) return;
 
-    setPixLoading(true);
-    setPixError(null);
-    fetch("/api/billing/mercadopago/pix", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan: props.plan }),
-    })
-      .then(async (r) => ({
-        ok: r.ok,
-        b: await r.json().catch(() => null),
-      }))
-      .then(({ ok, b }) => {
-        if (!ok || !b?.ok) {
-          const msg = (b?.error as string | undefined) ?? "Falha ao gerar PIX.";
+    const ctrl = new AbortController();
+    let active = true;
+
+    const startPix = async () => {
+      if (!active) return;
+      if (pixLoading) return;
+      setPixLoading(true);
+      setPixError(null);
+      try {
+        const res = await fetch("/api/billing/mercadopago/pix", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: props.plan }),
+          signal: ctrl.signal,
+        });
+        const body = (await res.json().catch(() => null)) as any;
+        if (!res.ok || !body?.ok) {
+          const msg = (body?.error as string | undefined) ?? "Falha ao gerar PIX.";
           toast.error(msg);
           setPixError(msg);
           return;
         }
         setPix({
-          id: String(b.id),
-          status: b.status ?? null,
-          qr_code: b.qr_code ?? null,
-          qr_code_base64: b.qr_code_base64 ?? null,
-          ticket_url: b.ticket_url ?? null,
+          id: String(body.id),
+          status: body.status ?? null,
+          qr_code: body.qr_code ?? null,
+          qr_code_base64: body.qr_code_base64 ?? null,
+          ticket_url: body.ticket_url ?? null,
         });
-      })
-      .catch(() => {
+      } catch (e) {
+        if ((e as any)?.name === "AbortError") return;
         toast.error("Falha ao gerar PIX.");
         setPixError("Falha ao gerar PIX.");
-      })
-      .finally(() => setPixLoading(false));
+      } finally {
+        setPixLoading(false);
+      }
+    };
+
+    if (!pix && !pixError) startPix();
+
+    return () => {
+      active = false;
+      ctrl.abort();
+    };
   }, [open, mounted, method, pix, pixLoading, props.plan]);
 
   function onClick() {
@@ -297,15 +309,16 @@ export function MercadoPagoSubscribeButton(props: {
               </button>
             </div>
 
-            {method === "card" ? (
-              <div
-                id={ids.brick}
-                className={[
-                  "mp-brick-wrapper mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3",
-                  loading ? "pointer-events-none opacity-80" : "",
-                ].join(" ")}
-              />
-            ) : (
+            <div
+              id={ids.brick}
+              className={[
+                "mp-brick-wrapper mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3",
+                method === "card" ? "" : "hidden",
+                loading ? "pointer-events-none opacity-80" : "",
+              ].join(" ")}
+            />
+
+            {method === "pix" ? (
               <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-sm font-semibold text-white/85">
                   Pague com PIX (pagamento único)
@@ -347,12 +360,10 @@ export function MercadoPagoSubscribeButton(props: {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-4 text-sm text-white/60">
-                    Não foi possível gerar o PIX. Tente novamente.
-                  </div>
+                  <div className="mt-4 text-sm text-white/60">Gerando QR Code...</div>
                 )}
               </div>
-            )}
+            ) : null}
       </AppModal>
     </>
   );
