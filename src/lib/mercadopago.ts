@@ -135,6 +135,43 @@ export async function createMercadoPagoPixPayment(input: {
   });
 }
 
+export async function createMercadoPagoCardPayment(input: {
+  amount: number;
+  token: string;
+  paymentMethodId: string;
+  issuerId: string;
+  installments: number;
+  payerEmail: string;
+  identificationType: string;
+  identificationNumber: string;
+  description: string;
+  notificationUrl: string;
+  externalReference: string;
+  metadata?: Record<string, unknown>;
+}) {
+  return mpFetch<{ id: number; status?: string }>(`/v1/payments`, {
+    method: "POST",
+    body: JSON.stringify({
+      transaction_amount: input.amount,
+      token: input.token,
+      payment_method_id: input.paymentMethodId,
+      issuer_id: input.issuerId,
+      installments: input.installments,
+      description: input.description,
+      payer: {
+        email: input.payerEmail,
+        identification: {
+          type: input.identificationType,
+          number: input.identificationNumber,
+        },
+      },
+      notification_url: input.notificationUrl,
+      external_reference: input.externalReference,
+      metadata: input.metadata ?? undefined,
+    }),
+  });
+}
+
 export async function getMercadoPagoPayment(id: string) {
   return mpFetch<{
     id: number;

@@ -81,6 +81,8 @@ export function MercadoPagoSubscribeButton(props: {
           customization: {
             paymentMethods: {
               creditCard: "all",
+              minInstallments: 1,
+              maxInstallments: 1,
             },
             visual: {
               style: {
@@ -112,22 +114,10 @@ export function MercadoPagoSubscribeButton(props: {
                 }
                 setLoading(true);
                 loadingRef.current = true;
-                const token = formData?.token ?? null;
-                if (!token) {
-                  toast.error("Não foi possível validar o cartão.");
-                  setLoading(false);
-                  loadingRef.current = false;
-                  reject(new Error("Missing token"));
-                  return;
-                }
-
-                fetch("/api/billing/mercadopago/subscribe", {
+                fetch("/api/billing/mercadopago/card", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    plan: props.plan,
-                    card_token_id: token,
-                  }),
+                  body: JSON.stringify({ plan: props.plan, formData }),
                 })
                   .then(async (r) => ({
                     ok: r.ok,
@@ -140,9 +130,7 @@ export function MercadoPagoSubscribeButton(props: {
                       return;
                     }
 
-                    toast.success(
-                      "Assinatura criada. Pode levar alguns minutos para ativar.",
-                    );
+                    toast.success("Pagamento criado. Pode levar alguns minutos para confirmar.");
                     setOpen(false);
                     window.location.reload();
                     resolve();
@@ -295,7 +283,7 @@ export function MercadoPagoSubscribeButton(props: {
               <div
                 id={ids.brick}
                 className={[
-                  "mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3",
+                  "mp-brick-wrapper mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3",
                   loading ? "pointer-events-none opacity-80" : "",
                 ].join(" ")}
               />

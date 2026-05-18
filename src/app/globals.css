@@ -22,3 +22,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+.mp-brick-wrapper [class*="value-prop"] {
+  display: none !important;
+}
