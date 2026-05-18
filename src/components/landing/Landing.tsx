@@ -164,15 +164,9 @@ export function Landing() {
                 >
                   <Link
                     href="/signup"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
                   >
                     Começar agora <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link
-                    href="/chat"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
-                  >
-                    Ver demonstração
                   </Link>
                 </motion.div>
 
@@ -572,18 +566,12 @@ export function Landing() {
                     Mais consistência, menos fricção, mais recebimentos.
                   </div>
                 </div>
-                <div className="flex flex-col gap-3 sm:flex-row md:justify-end">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Link
                     href="/signup"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-white/90"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-white/90"
                   >
                     Começar gratuitamente <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link
-                    href="/chat"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
-                  >
-                    Ver demonstração
                   </Link>
                 </div>
               </div>
