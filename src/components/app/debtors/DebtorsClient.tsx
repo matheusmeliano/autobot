@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { Portal } from "@/components/ui/Portal";
+import { AppModal } from "@/components/app/AppModal";
 import {
   createDebtorAction,
   deleteDebtorAction,
@@ -250,30 +250,25 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
         </div>
       </div>
 
-      {open ? (
-        <Portal>
-          <div className="fixed inset-0 z-[100] overflow-y-auto">
-            <div className="fixed inset-0 bg-black/50" onClick={close} />
-            <div className="flex min-h-full items-center justify-center px-4 py-10">
-              <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#070A10] p-5 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.9)]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold">
-                      {editing ? "Editar cliente" : "Novo cliente"}
-                    </div>
-                    <div className="mt-1 text-xs text-white/55">
-                      Campos essenciais para cobrança automática.
-                    </div>
-                  </div>
-                  <button
-                    onClick={close}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+      <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[100]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold">
+              {editing ? "Editar cliente" : "Novo cliente"}
+            </div>
+            <div className="mt-1 text-xs text-white/55">
+              Campos essenciais para cobrança automática.
+            </div>
+          </div>
+          <button
+            onClick={close}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-                <form onSubmit={onSubmit} className="mt-4 grid gap-3">
+        <form onSubmit={onSubmit} className="mt-4 grid gap-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
                       <div className="text-xs font-semibold text-white/60">Nome</div>
@@ -373,12 +368,8 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                   >
                     {editing ? "Salvar alterações" : "Criar cliente"}
                   </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      ) : null}
+        </form>
+      </AppModal>
     </div>
   );
 }

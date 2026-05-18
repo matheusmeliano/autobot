@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Portal } from "@/components/ui/Portal";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { AppModal } from "@/components/app/AppModal";
 import {
   BadgeCheck,
   BarChart3,
@@ -48,15 +48,6 @@ export function AppNav({
     const moreItems = useMemo(() => navItems.slice(3), [navItems]);
     const plusActive = openMore || moreItems.some((i) => i.href === pathname);
 
-    useEffect(() => {
-      if (!openMore) return;
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = prev;
-      };
-    }, [openMore]);
-
     return (
       <>
         <nav
@@ -99,55 +90,48 @@ export function AppNav({
           ) : null}
         </nav>
 
-        {openMore ? (
-          <Portal>
-            <div className="fixed inset-0 z-[110]">
-              <button
-                type="button"
-                aria-label="Fechar"
-                onClick={() => setOpenMore(false)}
-                className="absolute inset-0 bg-black/60"
-              />
+        <AppModal
+          open={openMore}
+          onClose={() => setOpenMore(false)}
+          position="bottom"
+          zIndexClass="z-[110]"
+          panelClassName="shadow-[0_-30px_90px_-40px_rgba(0,0,0,0.9)]"
+        >
+          <div className="flex items-center justify-between px-2 py-2">
+            <div className="text-sm font-semibold text-white/85">Mais</div>
+            <button
+              type="button"
+              onClick={() => setOpenMore(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-              <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-2xl border border-white/10 bg-[#070A10]/95 p-2 shadow-[0_-30px_90px_-40px_rgba(0,0,0,0.9)] backdrop-blur-xl pb-safe">
-                <div className="flex items-center justify-between px-2 py-2">
-                  <div className="text-sm font-semibold text-white/85">Mais</div>
-                  <button
-                    type="button"
-                    onClick={() => setOpenMore(false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06]"
-                    aria-label="Fechar"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 px-2 pb-2">
-                  {moreItems.map((item) => {
-                    const active = pathname === item.href;
-                    const Icon = item.icon;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setOpenMore(false)}
-                        className={[
-                          "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold",
-                          active
-                            ? "bg-white/[0.08] text-white"
-                            : "border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.06]",
-                        ].join(" ")}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </Portal>
-        ) : null}
+          <div className="grid grid-cols-2 gap-2 px-2 pb-2">
+            {moreItems.map((item) => {
+              const active = pathname === item.href;
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpenMore(false)}
+                  className={[
+                    "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold",
+                    active
+                      ? "bg-white/[0.08] text-white"
+                      : "border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.06]",
+                  ].join(" ")}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </AppModal>
       </>
     );
   }

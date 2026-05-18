@@ -4,6 +4,7 @@ import Script from "next/script";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import { AppModal } from "@/components/app/AppModal";
 
 export function MercadoPagoSubscribeButton(props: {
   plan: "basico" | "pro";
@@ -152,9 +153,12 @@ export function MercadoPagoSubscribeButton(props: {
         {props.children}
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#070A10] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)]">
+      <AppModal
+        open={open}
+        onClose={() => setOpen(false)}
+        zIndexClass="z-[60]"
+        size="lg"
+      >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
@@ -227,9 +231,7 @@ export function MercadoPagoSubscribeButton(props: {
                 {loading ? "Processando..." : "Confirmar assinatura"}
               </button>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </AppModal>
     </>
   );
 }
