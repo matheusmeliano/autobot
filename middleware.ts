@@ -117,7 +117,6 @@ export async function middleware(request: NextRequest) {
       return response;
     }
     const redirectUrl = request.nextUrl.clone();
-    const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/app";
     redirectUrl.search = "";
     response = NextResponse.redirect(redirectUrl);
@@ -160,5 +159,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
 };
