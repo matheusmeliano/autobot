@@ -4,7 +4,7 @@ import { useState } from "react";
 import { modalToast } from "@/lib/modalToast";
 
 export function MercadoPagoCheckoutButton(props: {
-  plan: "basico" | "pro";
+  plan: "basico" | "pro" | "vitalicio";
   disabled?: boolean;
   className: string;
   children: React.ReactNode;
@@ -31,7 +31,10 @@ export function MercadoPagoCheckoutButton(props: {
         return;
       }
 
-      window.location.href = url;
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        modalToast.error("Seu navegador bloqueou a abertura do checkout. Permita pop-ups e tente novamente.");
+      }
     } catch {
       modalToast.error("Falha ao iniciar checkout.");
     } finally {

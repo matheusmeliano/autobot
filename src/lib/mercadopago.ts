@@ -183,7 +183,12 @@ export async function createMercadoPagoCheckoutPreference(input: {
   successUrl: string;
   failureUrl: string;
   pendingUrl: string;
+  installments?: number;
+  excludedPaymentTypes?: string[];
 }) {
+  const excludedPaymentTypes =
+    input.excludedPaymentTypes ?? ["debit_card", "prepaid_card", "ticket", "atm"];
+
   return mpFetch<{
     id: string;
     init_point: string;
@@ -210,8 +215,8 @@ export async function createMercadoPagoCheckoutPreference(input: {
       notification_url: input.notificationUrl,
       external_reference: input.externalReference,
       payment_methods: {
-        installments: 1,
-        excluded_payment_types: [{ id: "debit_card" }, { id: "prepaid_card" }, { id: "ticket" }, { id: "atm" }],
+        installments: input.installments ?? 1,
+        excluded_payment_types: excludedPaymentTypes.map((id) => ({ id })),
       },
     }),
   });

@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
 import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
+import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
 
 export default async function AssinaturaPage() {
   const supabase = await createSupabaseServerClient();
@@ -190,13 +191,13 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <button
-              type="button"
-              disabled
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 opacity-60"
+            <MercadoPagoCheckoutButton
+              plan="vitalicio"
+              disabled={plan === "vitalicio"}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
             >
-              {plan === "vitalicio" ? "Plano atual" : "Em breve"}
-            </button>
+              {plan === "vitalicio" ? "Plano atual" : "Comprar vitalício"}
+            </MercadoPagoCheckoutButton>
           </div>
         </div>
       </div>

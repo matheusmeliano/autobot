@@ -179,7 +179,6 @@ export async function POST(req: Request) {
     const payment = await getMercadoPagoPayment(dataId);
     const statusRaw = String(payment.status ?? "").toLowerCase();
     const status = statusRaw === "approved" ? "ativo" : "cancelado";
-    const vencimento = status === "ativo" ? addDaysISO(30) : null;
 
     const metadata = payment.metadata ?? {};
     const planSlug = (metadata as any)?.plan_slug as "basico" | "pro" | undefined;
@@ -199,7 +198,12 @@ export async function POST(req: Request) {
         ? (payment.external_reference.split(":")[1] as any)
         : null);
 
-    if (userId && (plan === "basico" || plan === "pro")) {
+    const vencimento =
+      status === "ativo" && (plan === "basico" || plan === "pro")
+        ? addDaysISO(30)
+        : null;
+
+    if (userId && (plan === "basico" || plan === "pro" || plan === "vitalicio")) {
       if (status === "ativo") {
         await admin.from("profiles").update({ plano: plan }).eq("user_id", userId);
       }

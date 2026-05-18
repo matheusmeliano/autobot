@@ -6,17 +6,19 @@ import { createMercadoPagoCheckoutPreference } from "@/lib/mercadopago";
 export const runtime = "nodejs";
 
 const schema = z.object({
-  plan: z.enum(["basico", "pro"]),
+  plan: z.enum(["basico", "pro", "vitalicio"]),
 });
 
-const planAmount: Record<"basico" | "pro", number> = {
+const planAmount: Record<"basico" | "pro" | "vitalicio", number> = {
   basico: 49,
   pro: 99,
+  vitalicio: 2490,
 };
 
-const planTitle: Record<"basico" | "pro", string> = {
+const planTitle: Record<"basico" | "pro" | "vitalicio", string> = {
   basico: "Plano Básico - AutoBot (30 dias)",
   pro: "Plano Pro - AutoBot (30 dias)",
+  vitalicio: "Plano Vitalício - AutoBot",
 };
 
 function errorToUserMessage(err: unknown) {
@@ -56,6 +58,7 @@ export async function POST(req: Request) {
     const pendingUrl = `${base}?checkout=pending`;
 
     const plan = parsed.data.plan;
+    const isVitalicio = plan === "vitalicio";
     const pref = await createMercadoPagoCheckoutPreference({
       amount: planAmount[plan],
       title: planTitle[plan],
@@ -65,6 +68,10 @@ export async function POST(req: Request) {
       successUrl,
       failureUrl,
       pendingUrl,
+      installments: isVitalicio ? 3 : 1,
+      excludedPaymentTypes: isVitalicio
+        ? ["debit_card", "prepaid_card"]
+        : ["debit_card", "prepaid_card", "ticket", "atm"],
     });
 
     return NextResponse.json({ ok: true, init_point: pref.init_point, preference_id: pref.id });
@@ -72,4 +79,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: errorToUserMessage(err) }, { status: 500 });
   }
 }
-
