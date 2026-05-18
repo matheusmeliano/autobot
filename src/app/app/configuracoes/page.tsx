@@ -1,5 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
+import { isGlobalAdminEmail } from "@/lib/auth/admin";
+import { ChangePasswordForm } from "@/components/app/ChangePasswordForm";
 
 function dateTimeBR(v?: string | null) {
   if (!v) return "-";
@@ -15,6 +17,8 @@ export default async function ConfiguracoesPage() {
     .from("profiles")
     .select("nome, email, plano, created_at")
     .maybeSingle();
+
+  const showPassword = !isGlobalAdminEmail(profile?.email);
 
   return (
     <div>
@@ -54,6 +58,23 @@ export default async function ConfiguracoesPage() {
           </div>
         </div>
       </div>
+
+      {showPassword ? (
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
+            SEGURANÇA
+          </div>
+          <div className="mt-2 text-lg font-semibold tracking-tight">
+            Redefinir senha
+          </div>
+          <div className="mt-1 text-sm text-white/60">
+            Defina uma nova senha para sua conta.
+          </div>
+          <div className="mt-4">
+            <ChangePasswordForm />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
