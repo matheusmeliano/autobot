@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Portal } from "@/components/ui/Portal";
 
 type ModalPosition = "center" | "bottom";
@@ -30,19 +30,21 @@ export function AppModal({
   panelClassName?: string;
 }) {
   const [present, setPresent] = useState(open);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(open);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    setPresent(true);
+    setVisible(true);
+  }, [open]);
 
   useEffect(() => {
-    if (open) {
-      setPresent(true);
-      const t = window.setTimeout(() => setVisible(true), 10);
-      return () => window.clearTimeout(t);
-    }
-
+    if (open) return;
+    if (!present) return;
     setVisible(false);
     const t = window.setTimeout(() => setPresent(false), 220);
     return () => window.clearTimeout(t);
-  }, [open]);
+  }, [open, present]);
 
   useEffect(() => {
     if (!present) return;
