@@ -72,6 +72,7 @@ export function AppModal({
   const centerPanel = [
     panelBase,
     SIZE_CLASS[size],
+    "max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain",
     "p-5 sm:p-6",
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",

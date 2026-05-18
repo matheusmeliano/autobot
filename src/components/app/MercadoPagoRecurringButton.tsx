@@ -9,6 +9,7 @@ import { loadMercadoPagoSdk } from "@/lib/mercadopago-sdk";
 export function MercadoPagoRecurringButton(props: {
   plan: "basico" | "pro";
   amount: number;
+  userEmail?: string | null;
   disabled?: boolean;
   className: string;
   children: React.ReactNode;
@@ -71,6 +72,7 @@ export function MercadoPagoRecurringButton(props: {
         controllerRef.current = await bricksBuilder.create("cardPayment", containerId, {
           initialization: {
             amount: props.amount,
+            payer: props.userEmail ? { email: props.userEmail } : undefined,
           },
           customization: {
             paymentMethods: {
@@ -212,6 +214,7 @@ export function MercadoPagoRecurringButton(props: {
         <div
           id={ids.brick}
           className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+          style={{ colorScheme: "dark" }}
         />
 
         <button
@@ -226,4 +229,3 @@ export function MercadoPagoRecurringButton(props: {
     </>
   );
 }
-
