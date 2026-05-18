@@ -14,6 +14,7 @@ export function MercadoPagoCheckoutButton(props: {
   async function onClick() {
     if (props.disabled || loading) return;
     setLoading(true);
+    const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
     try {
       const res = await fetch("/api/billing/mercadopago/checkout", {
         method: "POST",
@@ -31,12 +32,14 @@ export function MercadoPagoCheckoutButton(props: {
         return;
       }
 
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        modalToast.error("Seu navegador bloqueou a abertura do checkout. Permita pop-ups e tente novamente.");
+      if (popup && !popup.closed) {
+        popup.location.href = url;
+      } else {
+        window.location.href = url;
       }
     } catch {
       modalToast.error("Falha ao iniciar checkout.");
+      if (popup && !popup.closed) popup.close();
     } finally {
       setLoading(false);
     }
