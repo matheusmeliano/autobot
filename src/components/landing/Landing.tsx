@@ -441,7 +441,7 @@ export function Landing() {
               description="Comece no plano Básico e evolua conforme aumentar o volume de cobranças e a operação."
             />
 
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
+            <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
               {[
                 {
                   name: "Básico",
