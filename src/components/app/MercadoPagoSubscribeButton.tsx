@@ -28,8 +28,6 @@ export function MercadoPagoSubscribeButton(props: {
       expirationDate: `mp-expirationDate-${suffix}`,
       securityCode: `mp-securityCode-${suffix}`,
       cardholderName: `mp-cardholderName-${suffix}`,
-      issuer: `mp-issuer-${suffix}`,
-      installments: `mp-installments-${suffix}`,
       identificationType: `mp-identificationType-${suffix}`,
       identificationNumber: `mp-identificationNumber-${suffix}`,
       cardholderEmail: `mp-cardholderEmail-${suffix}`,
@@ -68,8 +66,6 @@ export function MercadoPagoSubscribeButton(props: {
         expirationDate: { id: ids.expirationDate, placeholder: "MM/AA" },
         securityCode: { id: ids.securityCode, placeholder: "CVV" },
         cardholderName: { id: ids.cardholderName, placeholder: "Nome no cartão" },
-        issuer: { id: ids.issuer, placeholder: "Banco" },
-        installments: { id: ids.installments, placeholder: "Parcelas" },
         identificationType: { id: ids.identificationType, placeholder: "Documento" },
         identificationNumber: {
           id: ids.identificationNumber,
@@ -198,16 +194,6 @@ export function MercadoPagoSubscribeButton(props: {
                   className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-white/35"
                   placeholder="Nome no cartão"
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <select
-                    id={ids.issuer}
-                    className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white/85 [color-scheme:dark]"
-                  />
-                  <select
-                    id={ids.installments}
-                    className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white/85 [color-scheme:dark]"
-                  />
-                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <select
                     id={ids.identificationType}
