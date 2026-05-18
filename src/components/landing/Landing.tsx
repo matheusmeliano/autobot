@@ -632,9 +632,9 @@ export function Landing() {
                     <a className="block hover:text-white" href="#">
                       Instagram
                     </a>
-                    <a className="block hover:text-white" href="#">
+                    <Link className="block hover:text-white" href="/linkedin">
                       LinkedIn
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>
