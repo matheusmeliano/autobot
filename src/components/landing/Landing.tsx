@@ -160,7 +160,7 @@ export function Landing() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.55, delay: 0.15 }}
-                  className="mt-8 flex flex-col gap-3 sm:flex-row"
+                  className="mt-8 flex flex-col gap-2 sm:flex-row"
                 >
                   <Link
                     href="/signup"
@@ -168,6 +168,9 @@ export function Landing() {
                   >
                     Começar gratuitamente <ArrowRight className="h-4 w-4" />
                   </Link>
+                  <div className="text-center text-xs font-medium text-white/55 sm:text-left">
+                    Comece no teste grátis de 7 dias.
+                  </div>
                 </motion.div>
 
                 <div className="mt-10 grid gap-4 sm:grid-cols-2">
