@@ -91,20 +91,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.replace(`/login?next=${encodeURIComponent(next)}`);
   }, [authChecked, isAuthed, pathname, router, searchParams]);
 
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!isAuthed) return;
+    if (!restricted) return;
+
+    const currentPath = pathname ?? "";
+    if (currentPath === "/app/assinatura" || currentPath.startsWith("/app/assinatura/")) {
+      return;
+    }
+
+    router.replace("/app/assinatura?blocked=1");
+  }, [authChecked, isAuthed, pathname, restricted, router]);
+
   const showAdmin = isGlobalAdminEmail(email);
 
   if (authChecked && !isAuthed) return null;
 
   const currentPath = pathname ?? "";
-  if (restricted && currentPath !== "/app/assinatura" && !currentPath.startsWith("/app/assinatura/")) {
-    const qs = searchParams?.toString();
-    router.replace(
-      `/app/assinatura?blocked=1${
-        qs ? `&from=${encodeURIComponent(`${currentPath}?${qs}`)}` : ""
-      }`,
-    );
-    return null;
-  }
+  const shouldHoldRender =
+    restricted &&
+    currentPath !== "/app/assinatura" &&
+    !currentPath.startsWith("/app/assinatura/");
+  if (shouldHoldRender) return null;
 
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
