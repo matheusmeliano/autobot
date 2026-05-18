@@ -94,18 +94,18 @@ export function AppModal({
           aria-label="Fechar"
           onClick={onClose}
           className={[
-            "absolute inset-0 bg-black/60",
+            "absolute inset-0 z-0 bg-black/60",
             "transition-opacity duration-200 ease-out",
             visible ? "opacity-100" : "opacity-0",
           ].join(" ")}
         />
 
         {position === "center" ? (
-          <div className="flex min-h-full items-center justify-center px-4 py-10">
+          <div className="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
             <div className={centerPanel}>{children}</div>
           </div>
         ) : (
-          <div className="absolute inset-x-0 bottom-0 px-2 pb-safe">
+          <div className="absolute inset-x-0 bottom-0 z-10 px-2 pb-safe">
             <div className={bottomPanel}>{children}</div>
           </div>
         )}
