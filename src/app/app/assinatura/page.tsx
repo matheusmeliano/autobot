@@ -105,10 +105,10 @@ export default async function AssinaturaPage() {
             <input type="hidden" name="plano" value="basico" />
             <button
               type="submit"
-              disabled={plan === "basico"}
+              disabled={plan === "basico" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
             >
-              {plan === "basico" ? "Plano atual" : "Escolher"}
+              {plan === "basico" ? "Plano atual" : plan === "vitalicio" ? "Indisponível" : "Escolher"}
             </button>
           </form>
         </div>
@@ -144,10 +144,10 @@ export default async function AssinaturaPage() {
             <input type="hidden" name="plano" value="pro" />
             <button
               type="submit"
-              disabled={plan === "pro"}
+              disabled={plan === "pro" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
             >
-              {plan === "pro" ? "Plano atual" : "Escolher"}
+              {plan === "pro" ? "Plano atual" : plan === "vitalicio" ? "Indisponível" : "Escolher"}
             </button>
           </form>
         </div>
