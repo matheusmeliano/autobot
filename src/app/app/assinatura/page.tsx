@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
-import { changePlanAction } from "@/app/app/assinatura/actions";
+import { MercadoPagoSubscribeButton } from "@/components/app/MercadoPagoSubscribeButton";
 
 export default async function AssinaturaPage() {
   const supabase = await createSupabaseServerClient();
@@ -101,16 +101,19 @@ export default async function AssinaturaPage() {
               <div className="min-w-0">Templates básicos</div>
             </li>
           </ul>
-          <form action={changePlanAction} className="mt-6">
-            <input type="hidden" name="plano" value="basico" />
-            <button
-              type="submit"
+          <div className="mt-6">
+            <MercadoPagoSubscribeButton
+              plan="basico"
               disabled={plan === "basico" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
             >
-              {plan === "basico" ? "Plano atual" : plan === "vitalicio" ? "Indisponível" : "Escolher"}
-            </button>
-          </form>
+              {plan === "basico"
+                ? "Plano atual"
+                : plan === "vitalicio"
+                  ? "Indisponível"
+                  : "Assinar"}
+            </MercadoPagoSubscribeButton>
+          </div>
         </div>
 
         <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
@@ -140,16 +143,19 @@ export default async function AssinaturaPage() {
               <div className="min-w-0">Relatórios completos</div>
             </li>
           </ul>
-          <form action={changePlanAction} className="mt-6">
-            <input type="hidden" name="plano" value="pro" />
-            <button
-              type="submit"
+          <div className="mt-6">
+            <MercadoPagoSubscribeButton
+              plan="pro"
               disabled={plan === "pro" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
             >
-              {plan === "pro" ? "Plano atual" : plan === "vitalicio" ? "Indisponível" : "Escolher"}
-            </button>
-          </form>
+              {plan === "pro"
+                ? "Plano atual"
+                : plan === "vitalicio"
+                  ? "Indisponível"
+                  : "Assinar"}
+            </MercadoPagoSubscribeButton>
+          </div>
         </div>
 
         <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
@@ -172,16 +178,15 @@ export default async function AssinaturaPage() {
               <div className="min-w-0">Sem mensalidades. Seu para sempre!</div>
             </li>
           </ul>
-          <form action={changePlanAction} className="mt-6">
-            <input type="hidden" name="plano" value="vitalicio" />
+          <div className="mt-6">
             <button
-              type="submit"
-              disabled={plan === "vitalicio"}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+              type="button"
+              disabled
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 opacity-60"
             >
-              {plan === "vitalicio" ? "Plano atual" : "Escolher"}
+              Em breve
             </button>
-          </form>
+          </div>
         </div>
       </div>
     </div>
