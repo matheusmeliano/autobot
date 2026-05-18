@@ -201,7 +201,7 @@ export function MercadoPagoSubscribeButton(props: {
                 <div className="grid grid-cols-2 gap-3">
                   <select
                     id={ids.identificationType}
-                    className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white/85 [color-scheme:dark]"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white/85 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                   />
                   <input
                     id={ids.identificationNumber}

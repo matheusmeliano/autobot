@@ -267,7 +267,7 @@ export function SchedulesClient({
                   Cliente
                 </div>
                 <select
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                   {...register("debtor_id", { required: true })}
                 >
                   <option value="">Selecione...</option>
@@ -284,7 +284,7 @@ export function SchedulesClient({
                   Template (Mensagens)
                 </div>
                 <select
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                   {...register("template_id")}
                 >
                   <option value="">Sem template</option>
