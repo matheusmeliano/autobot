@@ -71,8 +71,6 @@ export function MercadoPagoSubscribeButton(props: {
           customization: {
             paymentMethods: {
               creditCard: "all",
-              debitCard: "all",
-              prepaidCard: "all",
             },
             visual: {
               style: {
