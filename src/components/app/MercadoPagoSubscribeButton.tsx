@@ -17,22 +17,26 @@ export function MercadoPagoSubscribeButton(props: {
   const publicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? "";
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const loadingRef = useRef(false);
   const [mounted, setMounted] = useState(false);
 
   const ids = useMemo(() => {
-    const suffix = `${props.plan}-${Math.random().toString(16).slice(2)}`;
+    const suffix = `${props.plan}-${attempt}-${Math.random().toString(16).slice(2)}`;
     return {
       form: `mp-form-${suffix}`,
       cardNumber: `mp-cardNumber-${suffix}`,
       expirationDate: `mp-expirationDate-${suffix}`,
       securityCode: `mp-securityCode-${suffix}`,
       cardholderName: `mp-cardholderName-${suffix}`,
+      issuer: `mp-issuer-${suffix}`,
+      installments: `mp-installments-${suffix}`,
       identificationType: `mp-identificationType-${suffix}`,
       identificationNumber: `mp-identificationNumber-${suffix}`,
       cardholderEmail: `mp-cardholderEmail-${suffix}`,
     };
-  }, [props.plan]);
+  }, [props.plan, attempt]);
 
   useEffect(() => {
     setMounted(true);
@@ -45,7 +49,9 @@ export function MercadoPagoSubscribeButton(props: {
       toast.error(
         "Configuração incompleta. Defina NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY na Vercel.",
       );
-      setOpen(false);
+      setInitError(
+        "Configuração incompleta. Defina NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY na Vercel.",
+      );
       return;
     }
 
@@ -54,6 +60,7 @@ export function MercadoPagoSubscribeButton(props: {
 
     const init = async () => {
       try {
+        setInitError(null);
         await loadMercadoPagoSdk();
         if (cancelled) return;
         await new Promise<void>((r) => window.requestAnimationFrame(() => r()));
@@ -75,6 +82,8 @@ export function MercadoPagoSubscribeButton(props: {
               id: ids.cardholderName,
               placeholder: "Nome no cartão",
             },
+            issuer: { id: ids.issuer, placeholder: "Banco" },
+            installments: { id: ids.installments, placeholder: "Parcelas" },
             identificationType: {
               id: ids.identificationType,
               placeholder: "Documento",
@@ -88,8 +97,7 @@ export function MercadoPagoSubscribeButton(props: {
           callbacks: {
             onFormMounted: (error: any) => {
               if (error) {
-                toast.error("Falha ao carregar o formulário do cartão.");
-                setOpen(false);
+                setInitError("Falha ao carregar o formulário do cartão.");
               }
             },
             onSubmit: async (event: any) => {
@@ -138,10 +146,9 @@ export function MercadoPagoSubscribeButton(props: {
           },
         });
       } catch {
-        toast.error(
-          "Falha ao carregar o Mercado Pago. Desative bloqueadores (AdBlock) e recarregue a página.",
+        setInitError(
+          "Falha ao carregar o Mercado Pago. Toque em “Tentar novamente”. Se persistir, recarregue a página.",
         );
-        setOpen(false);
       }
     };
 
@@ -204,6 +211,19 @@ export function MercadoPagoSubscribeButton(props: {
               banco.
             </div>
 
+            {initError ? (
+              <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">
+                <div>{initError}</div>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90"
+                  onClick={() => setAttempt((v) => v + 1)}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : null}
+
             <form id={ids.form} className="mt-4 space-y-3">
               <div className="grid grid-cols-1 gap-3">
                 <div id={ids.cardNumber} className="h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2" />
@@ -215,6 +235,18 @@ export function MercadoPagoSubscribeButton(props: {
                   id={ids.cardholderName}
                   className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-white/35"
                   placeholder="Nome no cartão"
+                />
+                <select
+                  id={ids.issuer}
+                  className="hidden"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+                <select
+                  id={ids.installments}
+                  className="hidden"
+                  tabIndex={-1}
+                  aria-hidden="true"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <select
@@ -243,7 +275,7 @@ export function MercadoPagoSubscribeButton(props: {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !!initError}
                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
               >
                 {loading ? "Processando..." : "Confirmar assinatura"}
