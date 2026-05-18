@@ -26,6 +26,7 @@ export function MercadoPagoSubscribeButton(props: {
     ticket_url: string | null;
   } | null>(null);
   const [pixLoading, setPixLoading] = useState(false);
+  const [pixError, setPixError] = useState<string | null>(null);
   const loadingRef = useRef(false);
   const [mounted, setMounted] = useState(false);
   const controllerRef = useRef<any>(null);
@@ -53,12 +54,25 @@ export function MercadoPagoSubscribeButton(props: {
     }
 
     let cancelled = false;
+    const containerId = ids.brick;
+
+    const cleanupBrick = () => {
+      try {
+        const ctrl = controllerRef.current;
+        ctrl?.unmount?.();
+        ctrl?.destroy?.();
+      } catch {}
+      controllerRef.current = null;
+      try {
+        const el = document.getElementById(containerId);
+        if (el) el.innerHTML = "";
+      } catch {}
+    };
 
     const init = async () => {
       try {
         await loadMercadoPagoSdk();
         if (cancelled) return;
-        const containerId = ids.brick;
         for (let i = 0; i < 10; i++) {
           if (cancelled) return;
           if (document.getElementById(containerId)) break;
@@ -69,6 +83,8 @@ export function MercadoPagoSubscribeButton(props: {
 
         const w = window as any;
         if (!w?.MercadoPago) throw new Error("SDK missing");
+
+        cleanupBrick();
 
         const mp = new w.MercadoPago(publicKey, { locale: "pt-BR" });
         const bricksBuilder = mp.bricks();
@@ -156,10 +172,7 @@ export function MercadoPagoSubscribeButton(props: {
 
     return () => {
       cancelled = true;
-      try {
-        controllerRef.current?.unmount?.();
-      } catch {}
-      controllerRef.current = null;
+      cleanupBrick();
     };
   }, [open, mounted, method, publicKey, props.amount, props.plan, props.userEmail, ids]);
 
@@ -167,6 +180,7 @@ export function MercadoPagoSubscribeButton(props: {
     if (!open) {
       setPix(null);
       setPixLoading(false);
+      setPixError(null);
       setMethod("card");
       return;
     }
@@ -175,6 +189,7 @@ export function MercadoPagoSubscribeButton(props: {
     if (pix || pixLoading) return;
 
     setPixLoading(true);
+    setPixError(null);
     fetch("/api/billing/mercadopago/pix", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -186,7 +201,9 @@ export function MercadoPagoSubscribeButton(props: {
       }))
       .then(({ ok, b }) => {
         if (!ok || !b?.ok) {
-          toast.error(b?.error ?? "Falha ao gerar PIX.");
+          const msg = (b?.error as string | undefined) ?? "Falha ao gerar PIX.";
+          toast.error(msg);
+          setPixError(msg);
           return;
         }
         setPix({
@@ -199,6 +216,7 @@ export function MercadoPagoSubscribeButton(props: {
       })
       .catch(() => {
         toast.error("Falha ao gerar PIX.");
+        setPixError("Falha ao gerar PIX.");
       })
       .finally(() => setPixLoading(false));
   }, [open, mounted, method, pix, pixLoading, props.plan]);
@@ -298,6 +316,10 @@ export function MercadoPagoSubscribeButton(props: {
 
                 {pixLoading ? (
                   <div className="mt-4 text-sm text-white/60">Gerando QR Code...</div>
+                ) : pixError ? (
+                  <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">
+                    {pixError}
+                  </div>
                 ) : pix?.qr_code_base64 ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-[220px,1fr] sm:items-start">
                     <img
