@@ -47,6 +47,11 @@ export async function updateUserAdminAction(input: unknown) {
   const payload = parsed.data;
   const plano = normalizePlan(payload.plano);
 
+  const { data: target } = await supabase.auth.admin.getUserById(payload.id);
+  if (isGlobalAdminEmail(target.user?.email)) {
+    return { ok: false as const, error: "Não é possível editar este admin." };
+  }
+
   const { error: profileError } = await supabase
     .from("profiles")
     .upsert(

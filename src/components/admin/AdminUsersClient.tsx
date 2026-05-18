@@ -280,13 +280,15 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                           : dateBR(r.vencimento)}
                     </div>
                     <div className="col-span-2 flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditModal(r)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
-                        title="Editar"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
+                      {!isSelfAdmin(r.email) ? (
+                        <button
+                          onClick={() => openEditModal(r)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => openPasswordModal(r)}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
