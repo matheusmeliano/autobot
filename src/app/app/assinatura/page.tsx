@@ -1,13 +1,12 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
-import { MercadoPagoSubscribeButton } from "@/components/app/MercadoPagoSubscribeButton";
+import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
 
 export default async function AssinaturaPage() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const userEmail = user?.email ?? "";
   const { data, error } = await supabase
     .from("subscriptions")
     .select("plano, status, vencimento, created_at")
@@ -106,10 +105,8 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <MercadoPagoSubscribeButton
+            <MercadoPagoCheckoutButton
               plan="basico"
-              amount={49}
-              userEmail={userEmail}
               disabled={plan === "basico" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
             >
@@ -118,7 +115,7 @@ export default async function AssinaturaPage() {
                 : plan === "vitalicio"
                   ? "Indisponível"
                   : "Assinar"}
-            </MercadoPagoSubscribeButton>
+            </MercadoPagoCheckoutButton>
           </div>
         </div>
 
@@ -150,10 +147,8 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <MercadoPagoSubscribeButton
+            <MercadoPagoCheckoutButton
               plan="pro"
-              amount={99}
-              userEmail={userEmail}
               disabled={plan === "pro" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
             >
@@ -162,7 +157,7 @@ export default async function AssinaturaPage() {
                 : plan === "vitalicio"
                   ? "Indisponível"
                   : "Assinar"}
-            </MercadoPagoSubscribeButton>
+            </MercadoPagoCheckoutButton>
           </div>
         </div>
 

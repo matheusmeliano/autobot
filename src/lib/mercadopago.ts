@@ -174,6 +174,49 @@ export async function createMercadoPagoCardPayment(input: {
   });
 }
 
+export async function createMercadoPagoCheckoutPreference(input: {
+  amount: number;
+  title: string;
+  payerEmail: string;
+  notificationUrl: string;
+  externalReference: string;
+  successUrl: string;
+  failureUrl: string;
+  pendingUrl: string;
+}) {
+  return mpFetch<{
+    id: string;
+    init_point: string;
+    sandbox_init_point?: string;
+  }>(`/checkout/preferences`, {
+    method: "POST",
+    headers: { "X-Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({
+      items: [
+        {
+          title: input.title,
+          quantity: 1,
+          unit_price: input.amount,
+          currency_id: "BRL",
+        },
+      ],
+      payer: { email: input.payerEmail },
+      back_urls: {
+        success: input.successUrl,
+        failure: input.failureUrl,
+        pending: input.pendingUrl,
+      },
+      auto_return: "approved",
+      notification_url: input.notificationUrl,
+      external_reference: input.externalReference,
+      payment_methods: {
+        installments: 1,
+        excluded_payment_types: [{ id: "debit_card" }, { id: "prepaid_card" }, { id: "ticket" }, { id: "atm" }],
+      },
+    }),
+  });
+}
+
 export async function getMercadoPagoPayment(id: string) {
   return mpFetch<{
     id: number;

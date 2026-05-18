@@ -211,7 +211,7 @@ export async function POST(req: Request) {
         vencimento,
         provider: "mercadopago",
         provider_plan_id: null,
-        provider_subscription_id: `pix:${payment.id}`,
+        provider_subscription_id: `payment:${payment.id}`,
         provider_status: payment.status ?? null,
       });
     }
