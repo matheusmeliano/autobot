@@ -7,7 +7,11 @@ export default async function AssinaturaPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { data, error } = await supabase
+  const { data: profile } = user?.id
+    ? await supabase.from("profiles").select("plano").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+
+  const { data: subscription, error } = await supabase
     .from("subscriptions")
     .select("plano, status, vencimento, created_at")
     .order("created_at", { ascending: false })
@@ -30,10 +34,10 @@ export default async function AssinaturaPage() {
     );
   }
 
-  const plan = normalizePlan(data?.plano ?? "teste");
-  const rawStatus = String(data?.status ?? "").toLowerCase();
+  const plan = normalizePlan(profile?.plano ?? subscription?.plano ?? "teste");
+  const rawStatus = String(subscription?.status ?? "").toLowerCase();
   const status = rawStatus === "pausado" || rawStatus === "past_due" ? "cancelado" : rawStatus;
-  const vencimento = data?.vencimento ?? null;
+  const vencimento = subscription?.vencimento ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const isExpired =
     typeof vencimento === "string" &&
