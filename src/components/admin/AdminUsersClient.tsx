@@ -54,6 +54,11 @@ function normalizeStatus(v?: string | null): "ativo" | "cancelado" {
   return "ativo";
 }
 
+function statusLabel(v: "ativo" | "cancelado") {
+  if (v === "ativo") return "Ativo";
+  return "Cancelado";
+}
+
 export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [isPending, startTransition] = useTransition();
@@ -264,7 +269,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                               : "border-rose-400/30 bg-rose-400/10 text-rose-200",
                           ].join(" ")}
                         >
-                          {normalizeStatus(r.assinatura_status)}
+                          {statusLabel(normalizeStatus(r.assinatura_status))}
                         </span>
                       )}
                     </div>
@@ -373,10 +378,10 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                     {...editForm.register("assinatura_status", { required: true })}
                   >
                     <option value="ativo" className="bg-[#070A10] text-white">
-                      ativo
+                      Ativo
                     </option>
                     <option value="cancelado" className="bg-[#070A10] text-white">
-                      cancelado
+                      Cancelado
                     </option>
                   </select>
                 </div>
