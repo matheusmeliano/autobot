@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     const pref = await createMercadoPagoCheckoutPreference({
       amount: planAmount[plan],
       title: planTitle[plan],
-      payerEmail: user.email,
+      payerEmail: isVitalicio ? undefined : user.email,
       notificationUrl,
       externalReference: `${user.id}:${plan}`,
       successUrl: isVitalicio ? undefined : successUrl,

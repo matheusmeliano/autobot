@@ -177,7 +177,7 @@ export async function createMercadoPagoCardPayment(input: {
 export async function createMercadoPagoCheckoutPreference(input: {
   amount: number;
   title: string;
-  payerEmail: string;
+  payerEmail?: string;
   notificationUrl: string;
   externalReference: string;
   successUrl?: string;
@@ -207,7 +207,7 @@ export async function createMercadoPagoCheckoutPreference(input: {
           currency_id: "BRL",
         },
       ],
-      payer: { email: input.payerEmail },
+      payer: input.payerEmail ? { email: input.payerEmail } : undefined,
       back_urls: hasBackUrls
         ? {
             success: input.successUrl!,
