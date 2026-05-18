@@ -3,6 +3,11 @@ import { DashboardClient } from "@/components/app/DashboardClient";
 
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const email = user?.email ?? "";
+  const userId = user?.id ?? null;
 
   const now = new Date();
   const start7 = new Date(now);
@@ -10,7 +15,7 @@ export default async function DashboardPage() {
   start7.setHours(0, 0, 0, 0);
   const start7Iso = start7.toISOString();
 
-  const [totalRes, sentRes, chartRes, whatsappRes] = await Promise.all([
+  const [totalRes, sentRes, chartRes, whatsappRes, profileRes] = await Promise.all([
     supabase
       .from("charges")
       .select("id", { count: "exact", head: true }),
@@ -20,6 +25,9 @@ export default async function DashboardPage() {
       .in("status", ["enviada", "paga"]),
     supabase.from("charges").select("created_at").gte("created_at", start7Iso),
     supabase.from("whatsapp_instances").select("status").maybeSingle(),
+    userId
+      ? supabase.from("profiles").select("nome").eq("user_id", userId).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const stats = {
@@ -43,5 +51,12 @@ export default async function DashboardPage() {
     value: chartRows.filter((c) => c.created_at.slice(0, 10) === d.key).length,
   }));
 
-  return <DashboardClient email="" stats={stats} chart={chart} />;
+  return (
+    <DashboardClient
+      email={email}
+      name={(profileRes as any)?.data?.nome ?? ""}
+      stats={stats}
+      chart={chart}
+    />
+  );
 }

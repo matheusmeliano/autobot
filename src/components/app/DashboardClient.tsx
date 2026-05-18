@@ -42,10 +42,12 @@ function Card({
 
 export function DashboardClient({
   email,
+  name,
   stats,
   chart,
 }: {
   email: string;
+  name?: string;
   stats: StatPack;
   chart: ChartPoint[];
 }) {
@@ -61,6 +63,9 @@ export function DashboardClient({
     currency: "BRL",
   });
 
+  const cleanedName = (name ?? "").trim();
+  const greeting = cleanedName ? `Bem-vindo(a) ${cleanedName}!` : "Bem-vindo(a)!";
+
   return (
     <div>
       <motion.div
@@ -74,7 +79,7 @@ export function DashboardClient({
             PAINEL
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight min-[1201px]:text-3xl">
-            Seja Bem-vindo(a)
+            {greeting}
           </h1>
           <div className="mt-2 text-sm text-white/60">{email}</div>
         </div>
