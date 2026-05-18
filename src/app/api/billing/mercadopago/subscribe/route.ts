@@ -18,7 +18,7 @@ const planAmount: Record<"basico" | "pro", number> = {
   pro: 99,
 };
 
-async function getOrCreatePlanId(slug: "basico" | "pro") {
+async function getOrCreatePlanId(slug: "basico" | "pro", backUrl: string) {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("billing_plans")
@@ -42,6 +42,7 @@ async function getOrCreatePlanId(slug: "basico" | "pro") {
   const created = await createMercadoPagoPlan({
     slug,
     amount: planAmount[slug],
+    backUrl,
   });
 
   const insertRes = await admin.from("billing_plans").insert({
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
     const notificationUrl = `${origin}/api/webhooks/mercadopago`;
     const backUrl = `${origin}/app/assinatura?mp=1`;
 
-    const planId = await getOrCreatePlanId(parsed.data.plan);
+    const planId = await getOrCreatePlanId(parsed.data.plan, backUrl);
 
     const created = await createMercadoPagoPreapproval({
       planId,

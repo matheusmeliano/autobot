@@ -40,11 +40,13 @@ async function mpFetch<T>(path: string, init?: RequestInit) {
 export async function createMercadoPagoPlan(input: {
   slug: MercadoPagoPlanSlug;
   amount: number;
+  backUrl: string;
 }) {
   return mpFetch<{ id: string }>(`/preapproval_plan`, {
     method: "POST",
     body: JSON.stringify({
       reason: input.slug === "basico" ? "Plano Básico - AutoBot" : "Plano Pro - AutoBot",
+      back_url: input.backUrl,
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",
