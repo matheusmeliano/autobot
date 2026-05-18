@@ -76,7 +76,7 @@ export default async function AssinaturaPage() {
         </div>
       </div>
 
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
         <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
