@@ -81,7 +81,7 @@ export default async function AssinaturaPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Básico</div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <div className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
                 R$ 49/mês
               </div>
             </div>
@@ -117,7 +117,7 @@ export default async function AssinaturaPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Pro</div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <div className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
                 R$ 99/mês
               </div>
             </div>
@@ -156,7 +156,7 @@ export default async function AssinaturaPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Vitalício</div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <div className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
                 R$ 2.490/único
               </div>
             </div>
