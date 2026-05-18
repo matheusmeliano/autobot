@@ -103,6 +103,47 @@ export async function getMercadoPagoAuthorizedPayment(id: string) {
   }>(`/authorized_payments/${encodeURIComponent(id)}`, { method: "GET" });
 }
 
+export async function createMercadoPagoPixPayment(input: {
+  amount: number;
+  payerEmail: string;
+  description: string;
+  notificationUrl: string;
+  externalReference: string;
+  metadata?: Record<string, unknown>;
+}) {
+  return mpFetch<{
+    id: number;
+    status?: string;
+    point_of_interaction?: {
+      transaction_data?: {
+        qr_code?: string;
+        qr_code_base64?: string;
+        ticket_url?: string;
+      };
+    };
+  }>(`/v1/payments`, {
+    method: "POST",
+    body: JSON.stringify({
+      transaction_amount: input.amount,
+      description: input.description,
+      payment_method_id: "pix",
+      payer: { email: input.payerEmail },
+      notification_url: input.notificationUrl,
+      external_reference: input.externalReference,
+      metadata: input.metadata ?? undefined,
+    }),
+  });
+}
+
+export async function getMercadoPagoPayment(id: string) {
+  return mpFetch<{
+    id: number;
+    status?: string;
+    external_reference?: string;
+    metadata?: Record<string, unknown> | null;
+  }>(`/v1/payments/${encodeURIComponent(id)}`, { method: "GET" });
+}
+
 function parseMercadoPagoSignature(signature: string | null) {
   if (!signature) return null;
   const parts = signature.split(",").map((p) => p.trim());

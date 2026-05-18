@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   getMercadoPagoAuthorizedPayment,
+  getMercadoPagoPayment,
   getMercadoPagoPreapproval,
   getMercadoPagoWebhookSecret,
   validateMercadoPagoWebhook,
@@ -170,6 +171,50 @@ export async function POST(req: Request) {
       provider_subscription_id: preapprovalId,
       provider_status: payment.status ?? null,
     });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (type === "payment") {
+    const payment = await getMercadoPagoPayment(dataId);
+    const statusRaw = String(payment.status ?? "").toLowerCase();
+    const status = statusRaw === "approved" ? "ativo" : "cancelado";
+    const vencimento = status === "ativo" ? addDaysISO(30) : null;
+
+    const metadata = payment.metadata ?? {};
+    const planSlug = (metadata as any)?.plan_slug as "basico" | "pro" | undefined;
+    const userIdFromMeta = (metadata as any)?.user_id as string | undefined;
+
+    const userId =
+      userIdFromMeta ??
+      (typeof payment.external_reference === "string" &&
+      payment.external_reference.includes(":")
+        ? payment.external_reference.split(":")[0]
+        : payment.external_reference ?? null);
+
+    const plan =
+      planSlug ??
+      (typeof payment.external_reference === "string" &&
+      payment.external_reference.includes(":")
+        ? (payment.external_reference.split(":")[1] as any)
+        : null);
+
+    if (userId && (plan === "basico" || plan === "pro")) {
+      if (status === "ativo") {
+        await admin.from("profiles").update({ plano: plan }).eq("user_id", userId);
+      }
+
+      await admin.from("subscriptions").insert({
+        user_id: userId,
+        plano: plan,
+        status,
+        vencimento,
+        provider: "mercadopago",
+        provider_plan_id: null,
+        provider_subscription_id: `pix:${payment.id}`,
+        provider_status: payment.status ?? null,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   }

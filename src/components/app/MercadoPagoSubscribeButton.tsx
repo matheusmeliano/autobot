@@ -17,6 +17,15 @@ export function MercadoPagoSubscribeButton(props: {
   const publicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? "";
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [method, setMethod] = useState<"card" | "pix">("card");
+  const [pix, setPix] = useState<{
+    id: string;
+    status: string | null;
+    qr_code: string | null;
+    qr_code_base64: string | null;
+    ticket_url: string | null;
+  } | null>(null);
+  const [pixLoading, setPixLoading] = useState(false);
   const loadingRef = useRef(false);
   const [mounted, setMounted] = useState(false);
   const controllerRef = useRef<any>(null);
@@ -35,6 +44,7 @@ export function MercadoPagoSubscribeButton(props: {
   useEffect(() => {
     if (!open) return;
     if (!mounted) return;
+    if (method !== "card") return;
     if (!publicKey) {
       toast.error(
         "Configuração incompleta. Defina NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY na Vercel.",
@@ -163,7 +173,47 @@ export function MercadoPagoSubscribeButton(props: {
       } catch {}
       controllerRef.current = null;
     };
-  }, [open, mounted, publicKey, props.amount, props.plan, props.userEmail, ids]);
+  }, [open, mounted, method, publicKey, props.amount, props.plan, props.userEmail, ids]);
+
+  useEffect(() => {
+    if (!open) {
+      setPix(null);
+      setPixLoading(false);
+      setMethod("card");
+      return;
+    }
+    if (!mounted) return;
+    if (method !== "pix") return;
+    if (pix || pixLoading) return;
+
+    setPixLoading(true);
+    fetch("/api/billing/mercadopago/pix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan: props.plan }),
+    })
+      .then(async (r) => ({
+        ok: r.ok,
+        b: await r.json().catch(() => null),
+      }))
+      .then(({ ok, b }) => {
+        if (!ok || !b?.ok) {
+          toast.error(b?.error ?? "Falha ao gerar PIX.");
+          return;
+        }
+        setPix({
+          id: String(b.id),
+          status: b.status ?? null,
+          qr_code: b.qr_code ?? null,
+          qr_code_base64: b.qr_code_base64 ?? null,
+          ticket_url: b.ticket_url ?? null,
+        });
+      })
+      .catch(() => {
+        toast.error("Falha ao gerar PIX.");
+      })
+      .finally(() => setPixLoading(false));
+  }, [open, mounted, method, pix, pixLoading, props.plan]);
 
   function onClick() {
     if (props.disabled || loading) return;
@@ -214,13 +264,85 @@ export function MercadoPagoSubscribeButton(props: {
               banco.
             </div>
 
-            <div
-              id={ids.brick}
-              className={[
-                "mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3",
-                loading ? "pointer-events-none opacity-80" : "",
-              ].join(" ")}
-            />
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMethod("card")}
+                className={[
+                  "inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-white/10 px-3 text-sm font-semibold",
+                  method === "card"
+                    ? "bg-white text-black"
+                    : "bg-white/[0.04] text-white/80 hover:bg-white/[0.06]",
+                ].join(" ")}
+              >
+                Cartão
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod("pix")}
+                className={[
+                  "inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-white/10 px-3 text-sm font-semibold",
+                  method === "pix"
+                    ? "bg-white text-black"
+                    : "bg-white/[0.04] text-white/80 hover:bg-white/[0.06]",
+                ].join(" ")}
+              >
+                PIX
+              </button>
+            </div>
+
+            {method === "card" ? (
+              <div
+                id={ids.brick}
+                className={[
+                  "mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3",
+                  loading ? "pointer-events-none opacity-80" : "",
+                ].join(" ")}
+              />
+            ) : (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-sm font-semibold text-white/85">
+                  Pague com PIX (pagamento único)
+                </div>
+                <div className="mt-1 text-sm text-white/60">
+                  Após pagar, a liberação pode levar alguns minutos para confirmar.
+                </div>
+
+                {pixLoading ? (
+                  <div className="mt-4 text-sm text-white/60">Gerando QR Code...</div>
+                ) : pix?.qr_code_base64 ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[220px,1fr] sm:items-start">
+                    <img
+                      src={`data:image/png;base64,${pix.qr_code_base64}`}
+                      alt="QR Code PIX"
+                      className="h-[220px] w-[220px] rounded-xl border border-white/10 bg-white"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
+                        COPIA E COLA
+                      </div>
+                      <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs text-white/80 break-all">
+                        {pix.qr_code ?? ""}
+                      </div>
+                      {pix.ticket_url ? (
+                        <a
+                          href={pix.ticket_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90"
+                        >
+                          Abrir página do PIX
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 text-sm text-white/60">
+                    Não foi possível gerar o PIX. Tente novamente.
+                  </div>
+                )}
+              </div>
+            )}
       </AppModal>
     </>
   );
