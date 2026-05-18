@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       successUrl: isVitalicio ? undefined : successUrl,
       failureUrl: isVitalicio ? undefined : failureUrl,
       pendingUrl: isVitalicio ? undefined : pendingUrl,
-      installments: isVitalicio ? 3 : 1,
+      installments: 1,
       excludedPaymentTypes: isVitalicio
         ? ["debit_card", "prepaid_card"]
         : ["debit_card", "prepaid_card", "ticket", "atm"],
