@@ -40,6 +40,11 @@ export function MercadoPagoSubscribeButton(props: {
   }, []);
 
   useEffect(() => {
+    const w = window as any;
+    if (!sdkReady && w?.MercadoPago) setSdkReady(true);
+  }, [sdkReady]);
+
+  useEffect(() => {
     if (!open) return;
     if (!mounted) return;
     if (!sdkReady) return;
@@ -57,73 +62,79 @@ export function MercadoPagoSubscribeButton(props: {
       return;
     }
 
-    const mp = new w.MercadoPago(publicKey);
-    const cardForm = mp.cardForm({
-      amount: String(props.amount),
-      iframe: true,
-      form: {
-        id: ids.form,
-        cardNumber: { id: ids.cardNumber, placeholder: "Número do cartão" },
-        expirationDate: { id: ids.expirationDate, placeholder: "MM/AA" },
-        securityCode: { id: ids.securityCode, placeholder: "CVV" },
-        cardholderName: { id: ids.cardholderName, placeholder: "Nome no cartão" },
-        identificationType: { id: ids.identificationType, placeholder: "Documento" },
-        identificationNumber: {
-          id: ids.identificationNumber,
-          placeholder: "Número do documento",
+    let cardForm: any = null;
+    try {
+      const mp = new w.MercadoPago(publicKey);
+      cardForm = mp.cardForm({
+        amount: String(props.amount),
+        iframe: true,
+        form: {
+          id: ids.form,
+          cardNumber: { id: ids.cardNumber, placeholder: "Número do cartão" },
+          expirationDate: { id: ids.expirationDate, placeholder: "MM/AA" },
+          securityCode: { id: ids.securityCode, placeholder: "CVV" },
+          cardholderName: { id: ids.cardholderName, placeholder: "Nome no cartão" },
+          identificationType: { id: ids.identificationType, placeholder: "Documento" },
+          identificationNumber: {
+            id: ids.identificationNumber,
+            placeholder: "Número do documento",
+          },
+          cardholderEmail: { id: ids.cardholderEmail, placeholder: "E-mail" },
         },
-        cardholderEmail: { id: ids.cardholderEmail, placeholder: "E-mail" },
-      },
-      callbacks: {
-        onFormMounted: (error: any) => {
-          if (error) {
-            toast.error("Falha ao carregar o formulário do cartão.");
-            setOpen(false);
-          }
-        },
-        onSubmit: async (event: any) => {
-          event.preventDefault();
-          if (loadingRef.current) return;
-          setLoading(true);
-          loadingRef.current = true;
-          try {
-            const data = cardForm.getCardFormData();
-            const token = data?.token ?? null;
-            if (!token) {
-              toast.error("Não foi possível validar o cartão.");
-              return;
+        callbacks: {
+          onFormMounted: (error: any) => {
+            if (error) {
+              toast.error("Falha ao carregar o formulário do cartão.");
+              setOpen(false);
             }
+          },
+          onSubmit: async (event: any) => {
+            event.preventDefault();
+            if (loadingRef.current) return;
+            setLoading(true);
+            loadingRef.current = true;
+            try {
+              const data = cardForm.getCardFormData();
+              const token = data?.token ?? null;
+              if (!token) {
+                toast.error("Não foi possível validar o cartão.");
+                return;
+              }
 
-            const res = await fetch("/api/billing/mercadopago/subscribe", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                plan: props.plan,
-                card_token_id: token,
-              }),
-            });
+              const res = await fetch("/api/billing/mercadopago/subscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  plan: props.plan,
+                  card_token_id: token,
+                }),
+              });
 
-            const body = (await res.json().catch(() => null)) as
-              | { ok?: true; error?: string }
-              | null;
+              const body = (await res.json().catch(() => null)) as
+                | { ok?: true; error?: string }
+                | null;
 
-            if (!res.ok || !body?.ok) {
-              toast.error(body?.error ?? "Falha ao iniciar pagamento.");
-              return;
+              if (!res.ok || !body?.ok) {
+                toast.error(body?.error ?? "Falha ao iniciar pagamento.");
+                return;
+              }
+
+              toast.success("Assinatura criada. Pode levar alguns minutos para ativar.");
+              setOpen(false);
+              window.location.reload();
+            } catch {
+              toast.error("Falha ao iniciar pagamento.");
+            } finally {
+              setLoading(false);
+              loadingRef.current = false;
             }
-
-            toast.success("Assinatura criada. Pode levar alguns minutos para ativar.");
-            setOpen(false);
-            window.location.reload();
-          } catch {
-            toast.error("Falha ao iniciar pagamento.");
-          } finally {
-            setLoading(false);
-            loadingRef.current = false;
-          }
+          },
         },
-      },
-    });
+      });
+    } catch {
+      toast.error("Falha ao carregar o Mercado Pago. Recarregue a página e tente novamente.");
+      setOpen(false);
+    }
 
     return () => {
       try {
