@@ -180,6 +180,11 @@ export function MercadoPagoSubscribeButton(props: {
             <div className="mt-3 text-sm text-white/60">
               Sua assinatura será cobrada automaticamente todo mês.
             </div>
+            <div className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+              Alguns bancos exigem que o cartão esteja habilitado para compras online e
+              cobranças recorrentes. Se falhar, tente outro cartão ou libere no app do
+              banco.
+            </div>
 
             <form id={ids.form} className="mt-4 space-y-3">
               <div className="grid grid-cols-1 gap-3">
@@ -212,6 +217,12 @@ export function MercadoPagoSubscribeButton(props: {
                     id={ids.identificationNumber}
                     className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-white/35"
                     placeholder="CPF"
+                    inputMode="numeric"
+                    maxLength={11}
+                    onInput={(e) => {
+                      const el = e.currentTarget;
+                      el.value = el.value.replace(/\D/g, "").slice(0, 11);
+                    }}
                   />
                 </div>
                 <input
