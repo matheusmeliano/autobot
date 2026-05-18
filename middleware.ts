@@ -80,20 +80,23 @@ export async function middleware(request: NextRequest) {
         .maybeSingle();
 
       const plan = normalizePlan(sub?.plano ?? "teste");
-      const status = String(sub?.status ?? "").toLowerCase();
+      const rawStatus = String(sub?.status ?? "").toLowerCase();
+      const status = rawStatus === "pausado" || rawStatus === "past_due" ? "cancelado" : rawStatus;
       const vencimento = sub?.vencimento ?? null;
       const today = new Date().toISOString().slice(0, 10);
-      const isExpiredTrial =
-        plan === "teste" &&
+      const isExpired =
         typeof vencimento === "string" &&
         vencimento.length >= 10 &&
         vencimento.slice(0, 10) < today;
 
-      if (isExpiredTrial && sub?.id && status !== "cancelado") {
+      if (isExpired && sub?.id && status !== "cancelado") {
         await supabase.from("subscriptions").update({ status: "cancelado" }).eq("id", sub.id);
       }
 
-      const isBlocked = plan === "teste" && (status === "cancelado" || isExpiredTrial);
+      const isBlocked =
+        status === "cancelado" ||
+        (plan !== "vitalicio" && isExpired) ||
+        (plan === "teste" && isExpired);
       if (isBlocked) {
         if (request.method !== "GET" && request.method !== "HEAD") {
           return new Response("Acesso bloqueado.", { status: 403 });

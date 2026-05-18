@@ -27,7 +27,7 @@ type EditValues = {
   id: string;
   nome: string;
   plano: PlanKey;
-  assinatura_status: "ativo" | "pausado" | "cancelado";
+  assinatura_status: "ativo" | "cancelado";
   vencimento?: string;
 };
 
@@ -43,13 +43,14 @@ function dateBR(v: string | null) {
   return d.toLocaleDateString("pt-BR");
 }
 
-function normalizeStatus(v?: string | null): "ativo" | "pausado" | "cancelado" {
+function normalizeStatus(v?: string | null): "ativo" | "cancelado" {
   const s = (v ?? "").trim().toLowerCase();
-  if (s === "ativo" || s === "pausado" || s === "cancelado") return s;
+  if (s === "ativo" || s === "cancelado") return s;
   if (s === "active") return "ativo";
   if (s === "trial") return "ativo";
-  if (s === "past_due") return "pausado";
+  if (s === "past_due") return "cancelado";
   if (s === "canceled") return "cancelado";
+  if (s === "pausado") return "cancelado";
   return "ativo";
 }
 
@@ -260,9 +261,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                             "inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold",
                             normalizeStatus(r.assinatura_status) === "ativo"
                               ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                              : normalizeStatus(r.assinatura_status) === "pausado"
-                                ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                                : "border-rose-400/30 bg-rose-400/10 text-rose-200",
+                              : "border-rose-400/30 bg-rose-400/10 text-rose-200",
                           ].join(" ")}
                         >
                           {normalizeStatus(r.assinatura_status)}
@@ -375,9 +374,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                   >
                     <option value="ativo" className="bg-[#070A10] text-white">
                       ativo
-                    </option>
-                    <option value="pausado" className="bg-[#070A10] text-white">
-                      pausado
                     </option>
                     <option value="cancelado" className="bg-[#070A10] text-white">
                       cancelado

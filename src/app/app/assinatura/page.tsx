@@ -28,15 +28,15 @@ export default async function AssinaturaPage() {
   }
 
   const plan = normalizePlan(data?.plano ?? "teste");
-  const status = String(data?.status ?? "").toLowerCase();
+  const rawStatus = String(data?.status ?? "").toLowerCase();
+  const status = rawStatus === "pausado" || rawStatus === "past_due" ? "cancelado" : rawStatus;
   const vencimento = data?.vencimento ?? null;
   const today = new Date().toISOString().slice(0, 10);
-  const isExpiredTrial =
-    plan === "teste" &&
+  const isExpired =
     typeof vencimento === "string" &&
     vencimento.length >= 10 &&
     vencimento.slice(0, 10) < today;
-  const isBlocked = plan === "teste" && (status === "cancelado" || isExpiredTrial);
+  const isBlocked = status === "cancelado" || (plan !== "vitalicio" && isExpired);
 
   return (
     <div>

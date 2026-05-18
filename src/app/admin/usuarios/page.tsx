@@ -58,13 +58,15 @@ export default async function AdminUsuariosPage() {
     const p = profileById.get(s.user_id);
     const planSub = normalizePlan(s?.plano ?? null);
     const planProfile = normalizePlan(p?.plano ?? null);
-    const status = (s?.status ?? "").toLowerCase();
+    const rawStatus = (s?.status ?? "").toLowerCase();
+    const status = rawStatus === "pausado" || rawStatus === "past_due" ? "cancelado" : rawStatus;
+    const vencimento = typeof s?.vencimento === "string" ? s.vencimento : null;
     return (
-      planSub === "teste" &&
-      planProfile === "teste" &&
       status === "ativo" &&
-      typeof s?.vencimento === "string" &&
-      s.vencimento < today
+      vencimento &&
+      vencimento < today &&
+      ((planSub === "teste" && planProfile === "teste") ||
+        (planSub !== "vitalicio" && planSub !== "teste"))
     );
   });
 

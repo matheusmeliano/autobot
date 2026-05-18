@@ -24,7 +24,7 @@ const updateSchema = z.object({
   id: z.string().min(1),
   nome: z.string().min(1).max(120),
   plano: z.enum(["teste", "basico", "pro", "vitalicio"]),
-  assinatura_status: z.enum(["ativo", "pausado", "cancelado"]),
+  assinatura_status: z.enum(["ativo", "cancelado"]),
   vencimento: z.string().optional(),
 });
 
