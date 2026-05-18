@@ -7,6 +7,8 @@ import {
   validateMercadoPagoWebhook,
 } from "@/lib/mercadopago";
 
+export const runtime = "nodejs";
+
 function addDaysISO(days: number) {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + days);
@@ -174,4 +176,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true });
 }
-

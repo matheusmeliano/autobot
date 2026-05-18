@@ -25,7 +25,10 @@ export function MercadoPagoSubscribeButton(props: {
         | null;
 
       if (!res.ok || !data?.init_point) {
-        toast.error(data?.error ?? "Falha ao iniciar pagamento.");
+        toast.error(
+          data?.error ??
+            "Falha ao iniciar pagamento. Verifique configuração do Mercado Pago na Vercel e a migration de pagamentos no Supabase.",
+        );
         return;
       }
 
@@ -48,4 +51,3 @@ export function MercadoPagoSubscribeButton(props: {
     </button>
   );
 }
-
