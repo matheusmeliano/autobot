@@ -97,6 +97,9 @@ function errorToUserMessage(err: unknown) {
     null;
 
   if (mpMsg) {
+    if (mpMsg.includes("CC_VAL_433")) {
+      return "Mercado Pago: validação do cartão falhou. Se você estiver testando, use credenciais TEST e cartão de teste. Se for cartão real, confira os dados, limite e se o cartão está habilitado para compras online.";
+    }
     return `Mercado Pago: ${mpMsg}`;
   }
 
