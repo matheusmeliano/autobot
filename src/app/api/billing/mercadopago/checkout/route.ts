@@ -32,6 +32,64 @@ function errorToUserMessage(err: unknown) {
   return "Falha ao iniciar checkout.";
 }
 
+async function createPreferenceForPlan(req: Request, plan: "basico" | "pro" | "vitalicio") {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.id || !user.email) {
+    return { error: "Sem sessão." as const, status: 401 as const };
+  }
+
+  const reqUrl = new URL(req.url);
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? reqUrl.origin;
+  const notificationUrl = `${origin}/api/webhooks/mercadopago`;
+
+  const base = `${origin}/app/assinatura`;
+  const successUrl = `${base}?checkout=success`;
+  const failureUrl = `${base}?checkout=failure`;
+  const pendingUrl = `${base}?checkout=pending`;
+
+  const isVitalicio = plan === "vitalicio";
+  const pref = await createMercadoPagoCheckoutPreference({
+    amount: planAmount[plan],
+    title: planTitle[plan],
+    payerEmail: isVitalicio ? undefined : user.email,
+    notificationUrl,
+    externalReference: `${user.id}:${plan}`,
+    successUrl: isVitalicio ? undefined : successUrl,
+    failureUrl: isVitalicio ? undefined : failureUrl,
+    pendingUrl: isVitalicio ? undefined : pendingUrl,
+    installments: 1,
+    excludedPaymentTypes: isVitalicio
+      ? ["debit_card", "prepaid_card"]
+      : ["debit_card", "prepaid_card", "ticket", "atm"],
+  });
+
+  return { pref };
+}
+
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const plan = url.searchParams.get("plan");
+    const parsed = schema.safeParse({ plan });
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
+    }
+
+    const result = await createPreferenceForPlan(req, parsed.data.plan);
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    return NextResponse.redirect(result.pref.init_point, { status: 307 });
+  } catch (err) {
+    return NextResponse.json({ error: errorToUserMessage(err) }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const parsed = schema.safeParse(await req.json().catch(() => null));
@@ -39,41 +97,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
     }
 
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user?.id || !user.email) {
-      return NextResponse.json({ error: "Sem sessão." }, { status: 401 });
+    const result = await createPreferenceForPlan(req, parsed.data.plan);
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    const reqUrl = new URL(req.url);
-    const origin = process.env.NEXT_PUBLIC_SITE_URL ?? reqUrl.origin;
-    const notificationUrl = `${origin}/api/webhooks/mercadopago`;
-
-    const base = `${origin}/app/assinatura`;
-    const successUrl = `${base}?checkout=success`;
-    const failureUrl = `${base}?checkout=failure`;
-    const pendingUrl = `${base}?checkout=pending`;
-
-    const plan = parsed.data.plan;
-    const isVitalicio = plan === "vitalicio";
-    const pref = await createMercadoPagoCheckoutPreference({
-      amount: planAmount[plan],
-      title: planTitle[plan],
-      payerEmail: isVitalicio ? undefined : user.email,
-      notificationUrl,
-      externalReference: `${user.id}:${plan}`,
-      successUrl: isVitalicio ? undefined : successUrl,
-      failureUrl: isVitalicio ? undefined : failureUrl,
-      pendingUrl: isVitalicio ? undefined : pendingUrl,
-      installments: 1,
-      excludedPaymentTypes: isVitalicio
-        ? ["debit_card", "prepaid_card"]
-        : ["debit_card", "prepaid_card", "ticket", "atm"],
-    });
-
+    const pref = result.pref;
     return NextResponse.json({ ok: true, init_point: pref.init_point, preference_id: pref.id });
   } catch (err) {
     return NextResponse.json({ error: errorToUserMessage(err) }, { status: 500 });
