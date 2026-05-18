@@ -337,7 +337,7 @@ export function Landing() {
               description="Tudo que você precisa para cobrar com consistência: automação, templates e visibilidade do que foi enviado e do que foi pago."
             />
 
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
+            <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
               {[
                 {
                   icon: <Zap className="h-5 w-5" />,
