@@ -123,6 +123,7 @@ export async function createMercadoPagoPixPayment(input: {
     };
   }>(`/v1/payments`, {
     method: "POST",
+    headers: { "X-Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify({
       transaction_amount: input.amount,
       description: input.description,
@@ -151,6 +152,7 @@ export async function createMercadoPagoCardPayment(input: {
 }) {
   return mpFetch<{ id: number; status?: string }>(`/v1/payments`, {
     method: "POST",
+    headers: { "X-Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify({
       transaction_amount: input.amount,
       token: input.token,
