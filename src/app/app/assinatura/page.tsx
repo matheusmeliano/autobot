@@ -200,6 +200,19 @@ export default async function AssinaturaPage() {
           </div>
         </div>
       </div>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
+        Está com problemas com a assinatura mensal?{" "}
+        <a
+          href="https://wa.me/5565996933336"
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-white underline decoration-white/20 underline-offset-4 hover:decoration-white/40"
+        >
+          Entre em contato
+        </a>{" "}
+        que ajudaremos você.
+      </div>
     </div>
   );
 }
