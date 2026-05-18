@@ -435,7 +435,7 @@ export function Landing() {
             <SectionTitle
               eyebrow="PLANOS"
               title="Um plano para cada fase."
-              description="Comece no teste grátis de 7 dias e evolua conforme sua operação crescer."
+              description="Comece com o teste gratuito de 7 dias e evolua para o plano ideal conforme aumentar o volume de cobranças e a sua operação."
             />
 
             <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
