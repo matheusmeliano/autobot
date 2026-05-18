@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
+import { changePlanAction } from "@/app/app/assinatura/actions";
 
 export default async function AssinaturaPage() {
   const supabase = await createSupabaseServerClient();
@@ -26,6 +27,17 @@ export default async function AssinaturaPage() {
     );
   }
 
+  const plan = normalizePlan(data?.plano ?? "teste");
+  const status = String(data?.status ?? "").toLowerCase();
+  const vencimento = data?.vencimento ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const isExpiredTrial =
+    plan === "teste" &&
+    typeof vencimento === "string" &&
+    vencimento.length >= 10 &&
+    vencimento.slice(0, 10) < today;
+  const isBlocked = plan === "teste" && (status === "cancelado" || isExpiredTrial);
+
   return (
     <div>
       <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
@@ -38,18 +50,135 @@ export default async function AssinaturaPage() {
         Aqui você acompanha seu plano e o status da sua assinatura.
       </div>
 
+      {isBlocked ? (
+        <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <div className="font-semibold">Seu teste gratuito terminou.</div>
+          <div className="mt-1 text-amber-100/90">
+            Para reativar o acesso completo, escolha um plano abaixo. Assim que
+            ativar, todas as funcionalidades do sistema serão liberadas
+            novamente.
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Plano</div>
           <div className="mt-2 text-xl font-semibold tracking-tight">
-            {planLabel(normalizePlan(data?.plano))}
+            {planLabel(plan)}
           </div>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Vencimento</div>
           <div className="mt-2 text-xl font-semibold tracking-tight">
-            {data?.vencimento ?? "-"}
+            {plan === "vitalicio" ? "-" : vencimento ?? "-"}
           </div>
+        </div>
+      </div>
+
+      <div className="mt-12 grid gap-4 md:grid-cols-3">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm font-semibold">Básico</div>
+              <div className="mt-2 text-3xl font-semibold tracking-tight">
+                R$ 49/mês
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 flex-1 space-y-3 text-sm text-white/70">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              1 instância WhatsApp
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              Agendamentos
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              Templates básicos
+            </div>
+          </div>
+          <form action={changePlanAction} className="mt-8">
+            <input type="hidden" name="plano" value="basico" />
+            <button
+              type="submit"
+              disabled={plan === "basico"}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+            >
+              {plan === "basico" ? "Plano atual" : "Escolher"}
+            </button>
+          </form>
+        </div>
+
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_0_1px_rgba(99,102,241,0.28),0_40px_100px_-40px_rgba(99,102,241,0.7)] ring-1 ring-indigo-400/30 backdrop-blur-xl">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm font-semibold">Pro</div>
+              <div className="mt-2 text-3xl font-semibold tracking-tight">
+                R$ 99/mês
+              </div>
+            </div>
+            <div className="rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
+              Mais escolhido
+            </div>
+          </div>
+          <div className="mt-6 flex-1 space-y-3 text-sm text-white/70">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              Tudo do Básico
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              Retentativas inteligentes
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              Relatórios completos
+            </div>
+          </div>
+          <form action={changePlanAction} className="mt-8">
+            <input type="hidden" name="plano" value="pro" />
+            <button
+              type="submit"
+              disabled={plan === "pro"}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+            >
+              {plan === "pro" ? "Plano atual" : "Escolher"}
+            </button>
+          </form>
+        </div>
+
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-sm font-semibold">Vitalício</div>
+              <div className="mt-2 text-3xl font-semibold tracking-tight">
+                R$ 2.490/único
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 flex-1 space-y-3 text-sm text-white/70">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              Tudo do Básico e Pro
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+              Sem mensalidades. Seu para sempre!
+            </div>
+          </div>
+          <form action={changePlanAction} className="mt-8">
+            <input type="hidden" name="plano" value="vitalicio" />
+            <button
+              type="submit"
+              disabled={plan === "vitalicio"}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+            >
+              {plan === "vitalicio" ? "Plano atual" : "Escolher"}
+            </button>
+          </form>
         </div>
       </div>
     </div>

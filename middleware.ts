@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
+import { normalizePlan } from "@/lib/plans";
 
 function getSupabaseUrl() {
   return process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
@@ -67,10 +68,52 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const confirmed = request.nextUrl.searchParams.get("confirmed");
+
+  if (user && (pathname === "/app" || pathname.startsWith("/app/"))) {
+    const allowAssinatura = pathname === "/app/assinatura" || pathname.startsWith("/app/assinatura/");
+    if (!allowAssinatura) {
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("id, plano, status, vencimento, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const plan = normalizePlan(sub?.plano ?? "teste");
+      const status = String(sub?.status ?? "").toLowerCase();
+      const vencimento = sub?.vencimento ?? null;
+      const today = new Date().toISOString().slice(0, 10);
+      const isExpiredTrial =
+        plan === "teste" &&
+        typeof vencimento === "string" &&
+        vencimento.length >= 10 &&
+        vencimento.slice(0, 10) < today;
+
+      if (isExpiredTrial && sub?.id && status !== "cancelado") {
+        await supabase.from("subscriptions").update({ status: "cancelado" }).eq("id", sub.id);
+      }
+
+      const isBlocked = plan === "teste" && (status === "cancelado" || isExpiredTrial);
+      if (isBlocked) {
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          return new Response("Acesso bloqueado.", { status: 403 });
+        }
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = "/app/assinatura";
+        redirectUrl.search = "";
+        redirectUrl.searchParams.set("blocked", "1");
+        response = NextResponse.redirect(redirectUrl);
+        cookiesToReplay.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
+      }
+    }
+  }
   if (user && (pathname === "/login" || pathname === "/signup")) {
     if (pathname === "/login" && confirmed === "1") {
       return response;
     }
+    const redirectUrl = request.nextUrl.clone();
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/app";
     redirectUrl.search = "";

@@ -30,13 +30,22 @@ const NAV_ITEMS = [
   { href: "/app/configuracoes", label: "Configurações", icon: Settings },
 ];
 
-export function AppNav({ variant }: { variant: "sidebar" | "bottom" }) {
+export function AppNav({
+  variant,
+  restricted,
+}: {
+  variant: "sidebar" | "bottom";
+  restricted?: boolean;
+}) {
   const pathname = usePathname();
+  const navItems = restricted
+    ? NAV_ITEMS.filter((i) => i.href === "/app/assinatura")
+    : NAV_ITEMS;
 
   if (variant === "bottom") {
     const [openMore, setOpenMore] = useState(false);
-    const items = NAV_ITEMS.slice(0, 3);
-    const moreItems = useMemo(() => NAV_ITEMS.slice(3), []);
+    const items = navItems.slice(0, 3);
+    const moreItems = useMemo(() => navItems.slice(3), [navItems]);
     const plusActive = openMore || moreItems.some((i) => i.href === pathname);
 
     useEffect(() => {
@@ -50,7 +59,12 @@ export function AppNav({ variant }: { variant: "sidebar" | "bottom" }) {
 
     return (
       <>
-        <nav className="grid grid-cols-4 gap-1 px-2 pb-safe">
+        <nav
+          className={[
+            "grid gap-1 px-2 pb-safe",
+            restricted ? "grid-cols-1" : "grid-cols-4",
+          ].join(" ")}
+        >
           {items.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
@@ -68,19 +82,21 @@ export function AppNav({ variant }: { variant: "sidebar" | "bottom" }) {
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setOpenMore(true)}
-            className={[
-              "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold",
-              plusActive
-                ? "bg-white/[0.08] text-white"
-                : "text-white/60 hover:bg-white/[0.06] hover:text-white/85",
-            ].join(" ")}
-          >
-            <Plus className="h-4 w-4" />
-            Mais
-          </button>
+          {!restricted && moreItems.length ? (
+            <button
+              type="button"
+              onClick={() => setOpenMore(true)}
+              className={[
+                "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold",
+                plusActive
+                  ? "bg-white/[0.08] text-white"
+                  : "text-white/60 hover:bg-white/[0.06] hover:text-white/85",
+              ].join(" ")}
+            >
+              <Plus className="h-4 w-4" />
+              Mais
+            </button>
+          ) : null}
         </nav>
 
         {openMore ? (
@@ -138,7 +154,7 @@ export function AppNav({ variant }: { variant: "sidebar" | "bottom" }) {
 
   return (
     <nav className="flex flex-col gap-1">
-      {NAV_ITEMS.map((item) => {
+      {navItems.map((item) => {
         const active = pathname === item.href;
         const Icon = item.icon;
         return (

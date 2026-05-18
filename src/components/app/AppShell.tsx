@@ -8,6 +8,7 @@ import { logoutAction } from "@/app/app/actions";
 import { Logo } from "@/components/ui/Logo";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { normalizePlan } from "@/lib/plans";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -17,6 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState<string>("");
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
+  const [restricted, setRestricted] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -41,16 +43,65 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!authChecked) return;
+    if (!isAuthed) return;
+
+    let active = true;
+    (async () => {
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("id, plano, status, vencimento, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const plan = normalizePlan(sub?.plano ?? "teste");
+      const status = String(sub?.status ?? "").toLowerCase();
+      const vencimento = sub?.vencimento ?? null;
+      const today = new Date().toISOString().slice(0, 10);
+      const isExpiredTrial =
+        plan === "teste" &&
+        typeof vencimento === "string" &&
+        vencimento.length >= 10 &&
+        vencimento.slice(0, 10) < today;
+
+      if (isExpiredTrial && sub?.id && status !== "cancelado") {
+        await supabase.from("subscriptions").update({ status: "cancelado" }).eq("id", sub.id);
+      }
+
+      const isBlocked = plan === "teste" && (status === "cancelado" || isExpiredTrial);
+      if (!active) return;
+      setRestricted(isBlocked);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [authChecked, isAuthed, supabase]);
+
+  useEffect(() => {
+    if (!authChecked) return;
     if (isAuthed) return;
 
     const qs = searchParams?.toString();
-    const next = `${pathname}${qs ? `?${qs}` : ""}`;
+    const safePath = pathname ?? "/app";
+    const next = `${safePath}${qs ? `?${qs}` : ""}`;
     router.replace(`/login?next=${encodeURIComponent(next)}`);
   }, [authChecked, isAuthed, pathname, router, searchParams]);
 
   const showAdmin = isGlobalAdminEmail(email);
 
   if (authChecked && !isAuthed) return null;
+
+  const currentPath = pathname ?? "";
+  if (restricted && currentPath !== "/app/assinatura" && !currentPath.startsWith("/app/assinatura/")) {
+    const qs = searchParams?.toString();
+    router.replace(
+      `/app/assinatura?blocked=1${
+        qs ? `&from=${encodeURIComponent(`${currentPath}?${qs}`)}` : ""
+      }`,
+    );
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
@@ -87,7 +138,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="mt-4">
-              <AppNav variant="sidebar" />
+              <AppNav variant="sidebar" restricted={restricted} />
             </div>
 
             <form action={logoutAction} className="mt-4">
@@ -102,16 +153,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="w-full pb-16 min-[1201px]:pb-6">
-          {showAdmin ? (
-            <div className="mb-4 flex justify-end min-[1201px]:hidden">
+          <div className="mb-4 flex items-center justify-between gap-2 min-[1201px]:hidden">
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="rounded-xl px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.06] hover:text-white/85"
+              >
+                Sair
+              </button>
+            </form>
+            {showAdmin ? (
               <Link
                 href="/admin"
                 className="rounded-xl px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.06] hover:text-white/85"
               >
                 Admin
               </Link>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl min-[1201px]:p-6">
             {children}
           </div>
@@ -119,7 +178,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-[#070A10]/80 backdrop-blur-xl min-[1201px]:hidden">
-        <AppNav variant="bottom" />
+        <AppNav variant="bottom" restricted={restricted} />
       </div>
     </div>
   );
