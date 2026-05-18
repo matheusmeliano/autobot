@@ -479,14 +479,14 @@ export function Landing() {
                   ].join(" ")}
                 >
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-sm font-semibold">{plan.name}</div>
-                      <div className="mt-2 text-3xl font-semibold tracking-tight">
+                      <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,1.875rem)] font-semibold tracking-tight leading-none">
                         {plan.price}
                       </div>
                     </div>
                     {plan.highlight ? (
-                      <div className="rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
+                      <div className="shrink-0 whitespace-nowrap rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
                         Mais escolhido
                       </div>
                     ) : null}
