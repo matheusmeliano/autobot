@@ -77,104 +77,107 @@ export default async function AssinaturaPage() {
       </div>
 
       <div className="mt-12 grid gap-4 md:grid-cols-3">
-        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-          <div className="flex items-start justify-between">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Básico</div>
-              <div className="mt-2 text-3xl font-semibold tracking-tight">
+              <div className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
                 R$ 49/mês
               </div>
             </div>
           </div>
-          <div className="mt-6 flex-1 space-y-3 text-sm text-white/70">
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              1 instância WhatsApp
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              Agendamentos
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              Templates básicos
-            </div>
-          </div>
-          <form action={changePlanAction} className="mt-8">
+          <div className="mt-6 h-px bg-white/10" />
+          <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">1 instância WhatsApp</div>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Agendamentos</div>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Templates básicos</div>
+            </li>
+          </ul>
+          <form action={changePlanAction} className="mt-6">
             <input type="hidden" name="plano" value="basico" />
             <button
               type="submit"
               disabled={plan === "basico"}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
             >
               {plan === "basico" ? "Plano atual" : "Escolher"}
             </button>
           </form>
         </div>
 
-        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-          <div className="flex items-start justify-between">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Pro</div>
-              <div className="mt-2 text-3xl font-semibold tracking-tight">
+              <div className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
                 R$ 99/mês
               </div>
             </div>
-            <div className="rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
+            <div className="shrink-0 rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
               Mais escolhido
             </div>
           </div>
-          <div className="mt-6 flex-1 space-y-3 text-sm text-white/70">
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              Tudo do Básico
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              Retentativas inteligentes
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              Relatórios completos
-            </div>
-          </div>
-          <form action={changePlanAction} className="mt-8">
+          <div className="mt-6 h-px bg-white/10" />
+          <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Tudo do Básico</div>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Retentativas inteligentes</div>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Relatórios completos</div>
+            </li>
+          </ul>
+          <form action={changePlanAction} className="mt-6">
             <input type="hidden" name="plano" value="pro" />
             <button
               type="submit"
               disabled={plan === "pro"}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
             >
               {plan === "pro" ? "Plano atual" : "Escolher"}
             </button>
           </form>
         </div>
 
-        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-          <div className="flex items-start justify-between">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-6">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Vitalício</div>
-              <div className="mt-2 text-3xl font-semibold tracking-tight">
+              <div className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
                 R$ 2.490/único
               </div>
             </div>
           </div>
-          <div className="mt-6 flex-1 space-y-3 text-sm text-white/70">
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              Tudo do Básico e Pro
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
-              Sem mensalidades. Seu para sempre!
-            </div>
-          </div>
-          <form action={changePlanAction} className="mt-8">
+          <div className="mt-6 h-px bg-white/10" />
+          <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Tudo do Básico e Pro</div>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Sem mensalidades. Seu para sempre!</div>
+            </li>
+          </ul>
+          <form action={changePlanAction} className="mt-6">
             <input type="hidden" name="plano" value="vitalicio" />
             <button
               type="submit"
               disabled={plan === "vitalicio"}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
             >
               {plan === "vitalicio" ? "Plano atual" : "Escolher"}
             </button>
