@@ -520,7 +520,7 @@ export function Landing() {
             <SectionTitle
               eyebrow="FAQ"
               title="Perguntas frequentes."
-              description="Respostas rápidas para você começar com segurança."
+              description="Respostas rápidas e suporte pensado para você começar com segurança, testar a plataforma e evoluir sua operação com mais confiança."
             />
 
             <div className="mt-12 grid gap-4 md:grid-cols-2">
