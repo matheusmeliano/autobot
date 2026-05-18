@@ -180,14 +180,16 @@ export async function createMercadoPagoCheckoutPreference(input: {
   payerEmail: string;
   notificationUrl: string;
   externalReference: string;
-  successUrl: string;
-  failureUrl: string;
-  pendingUrl: string;
+  successUrl?: string;
+  failureUrl?: string;
+  pendingUrl?: string;
   installments?: number;
   excludedPaymentTypes?: string[];
 }) {
   const excludedPaymentTypes =
     input.excludedPaymentTypes ?? ["debit_card", "prepaid_card", "ticket", "atm"];
+
+  const hasBackUrls = Boolean(input.successUrl && input.failureUrl && input.pendingUrl);
 
   return mpFetch<{
     id: string;
@@ -206,12 +208,14 @@ export async function createMercadoPagoCheckoutPreference(input: {
         },
       ],
       payer: { email: input.payerEmail },
-      back_urls: {
-        success: input.successUrl,
-        failure: input.failureUrl,
-        pending: input.pendingUrl,
-      },
-      auto_return: "approved",
+      back_urls: hasBackUrls
+        ? {
+            success: input.successUrl!,
+            failure: input.failureUrl!,
+            pending: input.pendingUrl!,
+          }
+        : undefined,
+      auto_return: hasBackUrls ? "approved" : undefined,
       notification_url: input.notificationUrl,
       external_reference: input.externalReference,
       payment_methods: {

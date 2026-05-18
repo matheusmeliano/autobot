@@ -189,6 +189,12 @@ export default async function AssinaturaPage() {
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
               <div className="min-w-0">Sem mensalidades. Seu para sempre!</div>
             </li>
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">
+                À vista no cartão ou até 3x sem juros. PIX e boleto.
+              </div>
+            </li>
           </ul>
           <div className="mt-6">
             <MercadoPagoCheckoutButton

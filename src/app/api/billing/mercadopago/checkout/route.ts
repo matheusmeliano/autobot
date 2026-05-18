@@ -65,9 +65,9 @@ export async function POST(req: Request) {
       payerEmail: user.email,
       notificationUrl,
       externalReference: `${user.id}:${plan}`,
-      successUrl,
-      failureUrl,
-      pendingUrl,
+      successUrl: isVitalicio ? undefined : successUrl,
+      failureUrl: isVitalicio ? undefined : failureUrl,
+      pendingUrl: isVitalicio ? undefined : pendingUrl,
       installments: isVitalicio ? 3 : 1,
       excludedPaymentTypes: isVitalicio
         ? ["debit_card", "prepaid_card"]
