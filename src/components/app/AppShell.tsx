@@ -122,9 +122,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="absolute right-[-220px] top-[140px] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.12),rgba(16,185,129,0)_55%)]" />
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-7xl gap-6 px-4 py-6 min-[1201px]:px-6">
-        <aside className="hidden w-72 shrink-0 min-[1201px]:block">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+      <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-0">
+        <aside className="hidden w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:block min-[1201px]:h-[calc(100vh-3rem)]">
+          <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Logo />
@@ -149,7 +149,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 flex-1">
               <AppNav variant="sidebar" restricted={restricted} />
             </div>
 
