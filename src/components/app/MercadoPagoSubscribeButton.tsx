@@ -1,10 +1,10 @@
 "use client";
 
-import Script from "next/script";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { loadMercadoPagoSdk } from "@/lib/mercadopago-sdk";
 
 export function MercadoPagoSubscribeButton(props: {
   plan: "basico" | "pro";
@@ -19,7 +19,6 @@ export function MercadoPagoSubscribeButton(props: {
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
   const [mounted, setMounted] = useState(false);
-  const [sdkReady, setSdkReady] = useState(false);
 
   const ids = useMemo(() => {
     const suffix = `${props.plan}-${Math.random().toString(16).slice(2)}`;
@@ -40,14 +39,8 @@ export function MercadoPagoSubscribeButton(props: {
   }, []);
 
   useEffect(() => {
-    const w = window as any;
-    if (!sdkReady && w?.MercadoPago) setSdkReady(true);
-  }, [sdkReady]);
-
-  useEffect(() => {
     if (!open) return;
     if (!mounted) return;
-    if (!sdkReady) return;
     if (!publicKey) {
       toast.error(
         "Configuração incompleta. Defina NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY na Vercel.",
@@ -55,93 +48,112 @@ export function MercadoPagoSubscribeButton(props: {
       setOpen(false);
       return;
     }
-    const w = window as any;
-    if (!w.MercadoPago) {
-      toast.error("Falha ao carregar o Mercado Pago.");
-      setOpen(false);
-      return;
-    }
 
     let cardForm: any = null;
-    try {
-      const mp = new w.MercadoPago(publicKey);
-      cardForm = mp.cardForm({
-        amount: String(props.amount),
-        iframe: true,
-        form: {
-          id: ids.form,
-          cardNumber: { id: ids.cardNumber, placeholder: "Número do cartão" },
-          expirationDate: { id: ids.expirationDate, placeholder: "MM/AA" },
-          securityCode: { id: ids.securityCode, placeholder: "CVV" },
-          cardholderName: { id: ids.cardholderName, placeholder: "Nome no cartão" },
-          identificationType: { id: ids.identificationType, placeholder: "Documento" },
-          identificationNumber: {
-            id: ids.identificationNumber,
-            placeholder: "Número do documento",
+    let cancelled = false;
+
+    const init = async () => {
+      try {
+        await loadMercadoPagoSdk();
+        if (cancelled) return;
+        await new Promise<void>((r) => window.requestAnimationFrame(() => r()));
+        if (cancelled) return;
+
+        const w = window as any;
+        if (!w?.MercadoPago) throw new Error("SDK missing");
+
+        const mp = new w.MercadoPago(publicKey);
+        cardForm = mp.cardForm({
+          amount: String(props.amount),
+          iframe: true,
+          form: {
+            id: ids.form,
+            cardNumber: { id: ids.cardNumber, placeholder: "Número do cartão" },
+            expirationDate: { id: ids.expirationDate, placeholder: "MM/AA" },
+            securityCode: { id: ids.securityCode, placeholder: "CVV" },
+            cardholderName: {
+              id: ids.cardholderName,
+              placeholder: "Nome no cartão",
+            },
+            identificationType: {
+              id: ids.identificationType,
+              placeholder: "Documento",
+            },
+            identificationNumber: {
+              id: ids.identificationNumber,
+              placeholder: "Número do documento",
+            },
+            cardholderEmail: { id: ids.cardholderEmail, placeholder: "E-mail" },
           },
-          cardholderEmail: { id: ids.cardholderEmail, placeholder: "E-mail" },
-        },
-        callbacks: {
-          onFormMounted: (error: any) => {
-            if (error) {
-              toast.error("Falha ao carregar o formulário do cartão.");
-              setOpen(false);
-            }
-          },
-          onSubmit: async (event: any) => {
-            event.preventDefault();
-            if (loadingRef.current) return;
-            setLoading(true);
-            loadingRef.current = true;
-            try {
-              const data = cardForm.getCardFormData();
-              const token = data?.token ?? null;
-              if (!token) {
-                toast.error("Não foi possível validar o cartão.");
-                return;
+          callbacks: {
+            onFormMounted: (error: any) => {
+              if (error) {
+                toast.error("Falha ao carregar o formulário do cartão.");
+                setOpen(false);
               }
+            },
+            onSubmit: async (event: any) => {
+              event.preventDefault();
+              if (loadingRef.current) return;
+              setLoading(true);
+              loadingRef.current = true;
+              try {
+                const data = cardForm.getCardFormData();
+                const token = data?.token ?? null;
+                if (!token) {
+                  toast.error("Não foi possível validar o cartão.");
+                  return;
+                }
 
-              const res = await fetch("/api/billing/mercadopago/subscribe", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  plan: props.plan,
-                  card_token_id: token,
-                }),
-              });
+                const res = await fetch("/api/billing/mercadopago/subscribe", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    plan: props.plan,
+                    card_token_id: token,
+                  }),
+                });
 
-              const body = (await res.json().catch(() => null)) as
-                | { ok?: true; error?: string }
-                | null;
+                const body = (await res.json().catch(() => null)) as
+                  | { ok?: true; error?: string }
+                  | null;
 
-              if (!res.ok || !body?.ok) {
-                toast.error(body?.error ?? "Falha ao iniciar pagamento.");
-                return;
+                if (!res.ok || !body?.ok) {
+                  toast.error(body?.error ?? "Falha ao iniciar pagamento.");
+                  return;
+                }
+
+                toast.success(
+                  "Assinatura criada. Pode levar alguns minutos para ativar.",
+                );
+                setOpen(false);
+                window.location.reload();
+              } catch {
+                toast.error("Falha ao iniciar pagamento.");
+              } finally {
+                setLoading(false);
+                loadingRef.current = false;
               }
-
-              toast.success("Assinatura criada. Pode levar alguns minutos para ativar.");
-              setOpen(false);
-              window.location.reload();
-            } catch {
-              toast.error("Falha ao iniciar pagamento.");
-            } finally {
-              setLoading(false);
-              loadingRef.current = false;
-            }
+            },
           },
-        },
-      });
-    } catch {
-      toast.error("Falha ao carregar o Mercado Pago. Recarregue a página e tente novamente.");
-      setOpen(false);
-    }
+        });
+      } catch {
+        toast.error(
+          "Falha ao carregar o Mercado Pago. Desative bloqueadores (AdBlock) e recarregue a página.",
+        );
+        setOpen(false);
+      }
+    };
+
+    init();
 
     return () => {
+      cancelled = true;
       try {
         cardForm?.unmount?.();
       } catch {}
     };
-  }, [open, mounted, sdkReady, publicKey, props.amount, props.plan, ids]);
+  }, [open, mounted, publicKey, props.amount, props.plan, ids]);
 
   function onClick() {
     if (props.disabled || loading) return;
@@ -150,11 +162,6 @@ export function MercadoPagoSubscribeButton(props: {
 
   return (
     <>
-      <Script
-        src="https://sdk.mercadopago.com/js/v2"
-        strategy="afterInteractive"
-        onLoad={() => setSdkReady(true)}
-      />
       <button
         type="button"
         disabled={props.disabled || loading}
