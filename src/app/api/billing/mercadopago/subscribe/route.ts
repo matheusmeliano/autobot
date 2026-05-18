@@ -25,6 +25,23 @@ const planAmount: Record<"basico" | "pro", number> = {
   pro: 99,
 };
 
+function getMercadoPagoErrorMessage(err: unknown) {
+  const body = (err as any)?.body;
+  return (
+    (typeof body?.message === "string" && body.message) ||
+    (typeof body?.error === "string" && body.error) ||
+    (typeof body?.cause?.[0]?.description === "string" && body.cause[0].description) ||
+    null
+  );
+}
+
+function isInactiveTemplateError(err: unknown) {
+  const mpMsg = getMercadoPagoErrorMessage(err);
+  if (!mpMsg) return false;
+  return mpMsg.toLowerCase().includes("cannot create a new preapproval") &&
+    mpMsg.toLowerCase().includes("cancelled/inactive template");
+}
+
 async function getOrCreatePlanId(slug: "basico" | "pro", backUrl: string) {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
@@ -74,6 +91,39 @@ async function getOrCreatePlanId(slug: "basico" | "pro", backUrl: string) {
   return created.id;
 }
 
+async function replacePlanId(slug: "basico" | "pro", backUrl: string) {
+  const admin = createSupabaseAdminClient();
+  const created = await createMercadoPagoPlan({
+    slug,
+    amount: planAmount[slug],
+    backUrl,
+  });
+
+  const upsertRes = await admin.from("billing_plans").upsert(
+    {
+      provider: "mercadopago",
+      slug,
+      provider_plan_id: created.id,
+      amount_cents: planAmount[slug] * 100,
+      currency: "BRL",
+      interval: "month",
+      interval_count: 1,
+    },
+    { onConflict: "provider,slug" },
+  );
+  if (upsertRes.error) {
+    const msg = String(upsertRes.error.message ?? "");
+    if (msg.toLowerCase().includes("does not exist")) {
+      const e = new Error("MIGRATION_NOT_APPLIED");
+      (e as any).details = upsertRes.error;
+      throw e;
+    }
+    throw upsertRes.error;
+  }
+
+  return created.id;
+}
+
 function errorToUserMessage(err: unknown) {
   const message = err instanceof Error ? err.message : "";
 
@@ -89,16 +139,14 @@ function errorToUserMessage(err: unknown) {
     return "Configuração do Supabase incompleta na Vercel. Configure SUPABASE_SERVICE_ROLE_KEY e faça redeploy.";
   }
 
-  const body = (err as any)?.body;
-  const mpMsg =
-    (typeof body?.message === "string" && body.message) ||
-    (typeof body?.error === "string" && body.error) ||
-    (typeof body?.cause?.[0]?.description === "string" && body.cause[0].description) ||
-    null;
+  const mpMsg = getMercadoPagoErrorMessage(err);
 
   if (mpMsg) {
     if (mpMsg.includes("CC_VAL_433")) {
       return "Mercado Pago: validação do cartão falhou. Se você estiver testando, use credenciais TEST e cartão de teste. Se for cartão real, confira os dados, limite e se o cartão está habilitado para compras online.";
+    }
+    if (mpMsg.toLowerCase().includes("cannot create a new preapproval") && mpMsg.toLowerCase().includes("cancelled/inactive template")) {
+      return "Mercado Pago: o plano de assinatura foi desativado. Tente novamente em alguns segundos.";
     }
     return `Mercado Pago: ${mpMsg}`;
   }
@@ -130,18 +178,34 @@ export async function POST(req: Request) {
     const notificationUrl = `${origin}/api/webhooks/mercadopago`;
     const backUrl = `${origin}/app/assinatura?mp=1`;
 
-    const planId = await getOrCreatePlanId(parsed.data.plan, backUrl);
+    let planId = await getOrCreatePlanId(parsed.data.plan, backUrl);
 
-    const created = await createMercadoPagoPreapproval({
-      planId,
-      payerEmail: user.email,
-      backUrl,
-      externalReference: user.id,
-      notificationUrl,
-      cardTokenId: parsed.data.card_token_id,
-      reason:
-        parsed.data.plan === "basico" ? "Plano Básico - AutoBot" : "Plano Pro - AutoBot",
-    });
+    let created;
+    try {
+      created = await createMercadoPagoPreapproval({
+        planId,
+        payerEmail: user.email,
+        backUrl,
+        externalReference: user.id,
+        notificationUrl,
+        cardTokenId: parsed.data.card_token_id,
+        reason:
+          parsed.data.plan === "basico" ? "Plano Básico - AutoBot" : "Plano Pro - AutoBot",
+      });
+    } catch (err) {
+      if (!isInactiveTemplateError(err)) throw err;
+      planId = await replacePlanId(parsed.data.plan, backUrl);
+      created = await createMercadoPagoPreapproval({
+        planId,
+        payerEmail: user.email,
+        backUrl,
+        externalReference: user.id,
+        notificationUrl,
+        cardTokenId: parsed.data.card_token_id,
+        reason:
+          parsed.data.plan === "basico" ? "Plano Básico - AutoBot" : "Plano Pro - AutoBot",
+      });
+    }
 
     const admin = createSupabaseAdminClient();
     const createdStatus = String(created.status ?? "").toLowerCase();
