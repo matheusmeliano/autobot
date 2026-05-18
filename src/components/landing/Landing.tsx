@@ -166,7 +166,7 @@ export function Landing() {
                     href="/signup"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
                   >
-                    Começar agora <ArrowRight className="h-4 w-4" />
+                    Começar gratuitamente <ArrowRight className="h-4 w-4" />
                   </Link>
                 </motion.div>
 
