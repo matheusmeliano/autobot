@@ -32,9 +32,9 @@ function errorToUserMessage(err: unknown) {
   return "Falha ao iniciar checkout.";
 }
 
-async function handleCheckout(req: Request, input: unknown) {
+export async function POST(req: Request) {
   try {
-    const parsed = schema.safeParse(input);
+    const parsed = schema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
     }
@@ -78,24 +78,4 @@ async function handleCheckout(req: Request, input: unknown) {
   } catch (err) {
     return NextResponse.json({ error: errorToUserMessage(err) }, { status: 500 });
   }
-}
-
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
-  return handleCheckout(req, body);
-}
-
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const plan = url.searchParams.get("plan");
-  const res = await handleCheckout(req, { plan });
-  if (!res.ok) return res;
-  const data = (await res.json().catch(() => null)) as
-    | { ok?: true; init_point?: string }
-    | null;
-  const initPoint = data?.init_point ?? null;
-  if (!data?.ok || !initPoint) {
-    return NextResponse.json({ error: "Falha ao iniciar checkout." }, { status: 500 });
-  }
-  return NextResponse.redirect(initPoint, { status: 302 });
 }

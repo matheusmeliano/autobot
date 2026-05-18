@@ -15,19 +15,32 @@ export function MercadoPagoCheckoutButton(props: {
     if (props.disabled || loading) return;
     setLoading(true);
     try {
-      const a = document.createElement("a");
-      a.href = `/api/billing/mercadopago/checkout?plan=${encodeURIComponent(props.plan)}`;
-      a.target = "_blank";
-      a.rel = "noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const res = await fetch("/api/billing/mercadopago/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: props.plan }),
+      });
+
+      const body = (await res.json().catch(() => null)) as
+        | { ok?: true; init_point?: string; error?: string }
+        | null;
+
+      const url = body?.init_point ?? null;
+      if (!res.ok || !body?.ok || !url) {
+        modalToast.error(body?.error ?? "Falha ao iniciar checkout.");
+        return;
+      }
+
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        modalToast.error("Seu navegador bloqueou a abertura do checkout. Permita pop-ups e tente novamente.");
+      }
     } catch {
-      if (opened && !opened.closed) opened.close();
       modalToast.error("Falha ao iniciar checkout.");
     } finally {
       setLoading(false);
     }
+  }
 
   return (
     <button
