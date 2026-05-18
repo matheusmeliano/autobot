@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { Key, Pencil, Trash2, X } from "lucide-react";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
-import { Portal } from "@/components/ui/Portal";
+import { AppModal } from "@/components/app/AppModal";
 import {
   deleteUserAdminAction,
   resetPasswordAdminAction,
@@ -319,207 +319,174 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         </div>
       </div>
 
-      {openEdit ? (
-        <Portal>
-          <div className="fixed inset-0 z-[100] overflow-y-auto">
-            <div className="fixed inset-0 bg-black/50" onClick={closeEdit} />
-            <div className="flex min-h-full items-center justify-center px-4 py-10">
-              <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#070A10] p-5 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.9)]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold">Editar usuário</div>
-                    <div className="mt-1 text-xs text-white/55">
-                      {editing?.email ?? ""}
-                    </div>
-                  </div>
-                  <button
-                    onClick={closeEdit}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+      <AppModal open={openEdit} onClose={closeEdit} size="md" zIndexClass="z-[100]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold">Editar usuário</div>
+            <div className="mt-1 text-xs text-white/55">{editing?.email ?? ""}</div>
+          </div>
+          <button
+            onClick={closeEdit}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-                <form onSubmit={saveEdit} className="mt-5 space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-white/60">Nome</label>
-                <input
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder="Nome do usuário"
-                  {...editForm.register("nome", { required: true })}
-                />
-              </div>
+        <form onSubmit={saveEdit} className="mt-5 space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-white/60">Nome</label>
+            <input
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              placeholder="Nome do usuário"
+              {...editForm.register("nome", { required: true })}
+            />
+          </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold text-white/60">Plano</label>
-                  <select
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
-                    {...editForm.register("plano", { required: true })}
-                  >
-                      <option value="teste" className="bg-[#070A10] text-white">
-                        Teste
-                      </option>
-                      <option value="basico" className="bg-[#070A10] text-white">
-                        Básico
-                      </option>
-                      <option value="pro" className="bg-[#070A10] text-white">
-                        Pro
-                      </option>
-                      <option value="vitalicio" className="bg-[#070A10] text-white">
-                        Vitalício
-                      </option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-white/60">Status</label>
-                  <select
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
-                    {...editForm.register("assinatura_status", { required: true })}
-                  >
-                    <option value="ativo" className="bg-[#070A10] text-white">
-                      Ativo
-                    </option>
-                    <option value="cancelado" className="bg-[#070A10] text-white">
-                      Cancelado
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-white/60">
-                  Vencimento
-                </label>
-                {currentPlan === "vitalicio" ? (
-                  <div className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-white/70">
-                    -
-                  </div>
-                ) : (
-                  <input
-                    type="date"
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                    {...editForm.register("vencimento")}
-                  />
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={editForm.formState.isSubmitting}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold text-white/60">Plano</label>
+              <select
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                {...editForm.register("plano", { required: true })}
               >
-                {editForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
-              </button>
-                </form>
-              </div>
+                <option value="teste" className="bg-[#070A10] text-white">
+                  Teste
+                </option>
+                <option value="basico" className="bg-[#070A10] text-white">
+                  Básico
+                </option>
+                <option value="pro" className="bg-[#070A10] text-white">
+                  Pro
+                </option>
+                <option value="vitalicio" className="bg-[#070A10] text-white">
+                  Vitalício
+                </option>
+              </select>
             </div>
-          </div>
-        </Portal>
-      ) : null}
-
-      {openPassword ? (
-        <Portal>
-          <div className="fixed inset-0 z-[100] overflow-y-auto">
-            <div className="fixed inset-0 bg-black/50" onClick={closePassword} />
-            <div className="flex min-h-full items-center justify-center px-4 py-10">
-              <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#070A10] p-5 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.9)]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold">Redefinir senha</div>
-                    <div className="mt-1 text-xs text-white/55">
-                      {editing?.email ?? ""}
-                    </div>
-                  </div>
-                  <button
-                    onClick={closePassword}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <form onSubmit={savePassword} className="mt-5 space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-white/60">
-                  Nova senha
-                </label>
-                <input
-                  type="password"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder="Mínimo 8 caracteres"
-                  {...passForm.register("password", { required: true, minLength: 8 })}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={passForm.formState.isSubmitting}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+            <div>
+              <label className="text-xs font-semibold text-white/60">Status</label>
+              <select
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                {...editForm.register("assinatura_status", { required: true })}
               >
-                {passForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
-              </button>
-                </form>
-              </div>
+                <option value="ativo" className="bg-[#070A10] text-white">
+                  Ativo
+                </option>
+                <option value="cancelado" className="bg-[#070A10] text-white">
+                  Cancelado
+                </option>
+              </select>
             </div>
           </div>
-        </Portal>
-      ) : null}
 
-      {openDelete ? (
-        <Portal>
-          <div className="fixed inset-0 z-[100] overflow-y-auto">
-            <div className="fixed inset-0 bg-black/50" onClick={closeDelete} />
-            <div className="flex min-h-full items-center justify-center px-4 py-10">
-              <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#070A10] p-5 shadow-[0_40px_120px_-60px_rgba(0,0,0,0.9)]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold">Excluir usuário</div>
-                    <div className="mt-1 truncate text-xs text-white/55">
-                      {deleting?.email ?? ""}
-                    </div>
-                  </div>
-                  <button
-                    onClick={closeDelete}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="mt-5 text-sm text-white/80">
-                  Você tem certeza que deseja excluir esse usuário?
-                </div>
-                <div className="mt-1 text-xs text-white/55">
-                  Essa ação não pode ser desfeita.
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={closeDelete}
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || !deleting}
-                    onClick={() => {
-                      if (!deleting) return;
-                      closeDelete();
-                      remove(deleting);
-                    }}
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-500/90 disabled:opacity-60"
-                  >
-                    Excluir
-                  </button>
-                </div>
+          <div>
+            <label className="text-xs font-semibold text-white/60">Vencimento</label>
+            {currentPlan === "vitalicio" ? (
+              <div className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-white/70">
+                -
               </div>
-            </div>
+            ) : (
+              <input
+                type="date"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                {...editForm.register("vencimento")}
+              />
+            )}
           </div>
-        </Portal>
-      ) : null}
+
+          <button
+            type="submit"
+            disabled={editForm.formState.isSubmitting}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {editForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
+          </button>
+        </form>
+      </AppModal>
+
+      <AppModal open={openPassword} onClose={closePassword} size="md" zIndexClass="z-[100]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold">Redefinir senha</div>
+            <div className="mt-1 text-xs text-white/55">{editing?.email ?? ""}</div>
+          </div>
+          <button
+            onClick={closePassword}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={savePassword} className="mt-5 space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-white/60">Nova senha</label>
+            <input
+              type="password"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              placeholder="Mínimo 8 caracteres"
+              {...passForm.register("password", { required: true, minLength: 8 })}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={passForm.formState.isSubmitting}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {passForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
+          </button>
+        </form>
+      </AppModal>
+
+      <AppModal
+        open={openDelete}
+        onClose={closeDelete}
+        size="md"
+        zIndexClass="z-[100]"
+        panelClassName="max-w-md p-5 sm:p-5"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold">Excluir usuário</div>
+            <div className="mt-1 truncate text-xs text-white/55">{deleting?.email ?? ""}</div>
+          </div>
+          <button
+            onClick={closeDelete}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 text-sm text-white/80">
+          Você tem certeza que deseja excluir esse usuário?
+        </div>
+        <div className="mt-1 text-xs text-white/55">Essa ação não pode ser desfeita.</div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={closeDelete}
+            className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={isPending || !deleting}
+            onClick={() => {
+              if (!deleting) return;
+              closeDelete();
+              remove(deleting);
+            }}
+            className="inline-flex w-full items-center justify-center rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-500/90 disabled:opacity-60"
+          >
+            Excluir
+          </button>
+        </div>
+      </AppModal>
     </div>
   );
 }
