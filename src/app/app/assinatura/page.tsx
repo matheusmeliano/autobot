@@ -112,7 +112,7 @@ export default async function AssinaturaPage() {
           </form>
         </div>
 
-        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_0_1px_rgba(99,102,241,0.28),0_40px_100px_-40px_rgba(99,102,241,0.7)] ring-1 ring-indigo-400/30 backdrop-blur-xl">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
           <div className="flex items-start justify-between">
             <div>
               <div className="text-sm font-semibold">Pro</div>
