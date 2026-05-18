@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { Key, Pencil, Trash2, X } from "lucide-react";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
+import { modalToast } from "@/lib/modalToast";
 import {
   deleteUserAdminAction,
   resetPasswordAdminAction,
@@ -100,7 +100,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     startTransition(async () => {
       const r = await fetch("/admin/usuarios/data", { cache: "no-store" });
       if (!r.ok) {
-        toast.error("Falha ao carregar usuários.");
+        modalToast.error("Falha ao carregar usuários.");
         return;
       }
       const json = (await r.json()) as AdminUserRow[];
@@ -166,11 +166,11 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     });
 
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao salvar.");
+      modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
 
-    toast.success("Usuário atualizado.");
+    modalToast.success("Usuário atualizado.");
     closeEdit();
     refresh();
   });
@@ -178,10 +178,10 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const savePassword = passForm.handleSubmit(async (values) => {
     const res = await resetPasswordAdminAction(values);
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao redefinir.");
+      modalToast.error(res.error ?? "Falha ao redefinir.");
       return;
     }
-    toast.success("Senha redefinida.");
+    modalToast.success("Senha redefinida.");
     closePassword();
   });
 
@@ -189,10 +189,10 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     startTransition(async () => {
       const res = await deleteUserAdminAction(row.id);
       if (!res.ok) {
-        toast.error(res.error ?? "Falha ao excluir.");
+        modalToast.error(res.error ?? "Falha ao excluir.");
         return;
       }
-      toast.success("Conta excluída.");
+      modalToast.success("Conta excluída.");
       setRows((prev) => prev.filter((r) => r.id !== row.id));
     });
   };

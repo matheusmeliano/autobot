@@ -3,9 +3,9 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
+import { modalToast } from "@/lib/modalToast";
 
 type FormValues = {
   password: string;
@@ -27,10 +27,10 @@ export function ChangePasswordForm() {
   const onSubmit = handleSubmit(async (values) => {
     const { error } = await supabase.auth.updateUser({ password: values.password });
     if (error) {
-      toast.error(supabaseErrorToPt(error.message));
+      modalToast.error(supabaseErrorToPt(error.message));
       return;
     }
-    toast.success("Senha atualizada com sucesso.");
+    modalToast.success("Senha atualizada com sucesso.");
     reset({ password: "", confirm: "" });
   });
 
@@ -84,4 +84,3 @@ export function ChangePasswordForm() {
     </form>
   );
 }
-

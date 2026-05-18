@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { modalToast } from "@/lib/modalToast";
 import {
   createTemplateAction,
   deleteTemplateAction,
@@ -78,11 +78,11 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
       : await createTemplateAction(payload);
 
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao salvar.");
+      modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
 
-    toast.success(editing ? "Template atualizado." : "Template criado.");
+    modalToast.success(editing ? "Template atualizado." : "Template criado.");
 
     startTransition(async () => {
       const r = await fetch("/app/mensagens/data", { cache: "no-store" });
@@ -96,10 +96,10 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
     startTransition(async () => {
       const res = await deleteTemplateAction(id);
       if (!res.ok) {
-        toast.error(res.error ?? "Falha ao excluir.");
+        modalToast.error(res.error ?? "Falha ao excluir.");
         return;
       }
-      toast.success("Template excluído.");
+      modalToast.success("Template excluído.");
       setRows((prev) => prev.filter((r) => r.id !== id));
     });
   };

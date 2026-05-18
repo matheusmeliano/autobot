@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { loginAction } from "@/app/login/actions";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { modalToast } from "@/lib/modalToast";
 
 type FormValues = {
   email: string;
@@ -32,7 +32,7 @@ export function LoginForm() {
     if (didShowConfirmed.current) return;
     if (searchParams?.get("confirmed") === "1") {
       didShowConfirmed.current = true;
-      toast.success("E-mail confirmado!");
+      modalToast.success("E-mail confirmado!");
       router.replace("/login");
     }
   }, [router, searchParams]);
@@ -41,7 +41,7 @@ export function LoginForm() {
     if (didShowLinkNotice.current) return;
     if (searchParams?.get("link") === "1") {
       didShowLinkNotice.current = true;
-      toast.message("Faça login para continuar.");
+      modalToast.info("Faça login para continuar.");
       const next = searchParams?.get("next");
       if (next) {
         router.replace(`/login?next=${encodeURIComponent(next)}`);
@@ -58,7 +58,7 @@ export function LoginForm() {
 
     const res = await loginAction(formData);
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao entrar.");
+      modalToast.error(res.error ?? "Falha ao entrar.");
       return;
     }
 

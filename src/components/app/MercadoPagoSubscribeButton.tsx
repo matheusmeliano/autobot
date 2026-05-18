@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { loadMercadoPagoSdk } from "@/lib/mercadopago-sdk";
+import { modalToast } from "@/lib/modalToast";
 
 export function MercadoPagoSubscribeButton(props: {
   plan: "basico" | "pro";
@@ -46,7 +46,7 @@ export function MercadoPagoSubscribeButton(props: {
     if (!open) return;
     if (!mounted) return;
     if (!publicKey) {
-      toast.error(
+      modalToast.error(
         "Configuração incompleta. Defina NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY na Vercel.",
       );
       return;
@@ -120,7 +120,7 @@ export function MercadoPagoSubscribeButton(props: {
           callbacks: {
             onReady: () => {},
             onError: () => {
-              toast.error("Falha ao carregar o formulário do cartão.");
+              modalToast.error("Falha ao carregar o formulário do cartão.");
             },
             onSubmit: ({ formData }: any) => {
               return new Promise<void>((resolve, reject) => {
@@ -141,18 +141,20 @@ export function MercadoPagoSubscribeButton(props: {
                   }))
                   .then(({ ok, b }) => {
                     if (!ok || !b?.ok) {
-                      toast.error(b?.error ?? "Falha ao iniciar pagamento.");
+                      modalToast.error(b?.error ?? "Falha ao iniciar pagamento.");
                       reject(new Error("Subscribe failed"));
                       return;
                     }
 
-                    toast.success("Pagamento criado. Pode levar alguns minutos para confirmar.");
+                    modalToast.success(
+                      "Pagamento criado. Pode levar alguns minutos para confirmar.",
+                    );
                     setOpen(false);
                     window.location.reload();
                     resolve();
                   })
                   .catch(() => {
-                    toast.error("Falha ao iniciar pagamento.");
+                    modalToast.error("Falha ao iniciar pagamento.");
                     reject(new Error("Request failed"));
                   })
                   .finally(() => {
@@ -164,7 +166,7 @@ export function MercadoPagoSubscribeButton(props: {
           },
         });
       } catch {
-        toast.error("Falha ao carregar o Mercado Pago.");
+        modalToast.error("Falha ao carregar o Mercado Pago.");
       }
     };
 
@@ -205,7 +207,7 @@ export function MercadoPagoSubscribeButton(props: {
         const body = (await res.json().catch(() => null)) as any;
         if (!res.ok || !body?.ok) {
           const msg = (body?.error as string | undefined) ?? "Falha ao gerar PIX.";
-          toast.error(msg);
+          modalToast.error(msg);
           setPixError(msg);
           return;
         }
@@ -218,7 +220,7 @@ export function MercadoPagoSubscribeButton(props: {
         });
       } catch (e) {
         if ((e as any)?.name === "AbortError") return;
-        toast.error("Falha ao gerar PIX.");
+        modalToast.error("Falha ao gerar PIX.");
         setPixError("Falha ao gerar PIX.");
       } finally {
         setPixLoading(false);

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { forgotPasswordAction } from "@/app/esqueci-senha/actions";
+import { modalToast } from "@/lib/modalToast";
 
 type FormValues = {
   email: string;
@@ -25,11 +25,11 @@ export function ForgotPasswordForm() {
 
     const res = await forgotPasswordAction(formData);
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao enviar link.");
+      modalToast.error(res.error ?? "Falha ao enviar link.");
       return;
     }
 
-    toast.success("Link enviado para seu email.");
+    modalToast.success("Link enviado para seu email.");
   });
 
   return (

@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { modalToast } from "@/lib/modalToast";
 import {
   createScheduleAction,
   deleteScheduleAction,
@@ -111,7 +111,7 @@ export function SchedulesClient({
 
   const onSubmit = handleSubmit(async (values) => {
     if (!values.debtor_id) {
-      toast.error("Selecione um cliente.");
+      modalToast.warning("Selecione um cliente.");
       return;
     }
 
@@ -128,11 +128,11 @@ export function SchedulesClient({
       : await createScheduleAction(payload);
 
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao salvar.");
+      modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
 
-    toast.success(editing ? "Agendamento atualizado." : "Agendamento criado.");
+    modalToast.success(editing ? "Agendamento atualizado." : "Agendamento criado.");
     refresh();
     close();
   });
@@ -141,10 +141,10 @@ export function SchedulesClient({
     startTransition(async () => {
       const res = await deleteScheduleAction(id);
       if (!res.ok) {
-        toast.error(res.error ?? "Falha ao excluir.");
+        modalToast.error(res.error ?? "Falha ao excluir.");
         return;
       }
-      toast.success("Agendamento excluído.");
+      modalToast.success("Agendamento excluído.");
       setRows((prev) => prev.filter((r) => r.id !== id));
     });
   };

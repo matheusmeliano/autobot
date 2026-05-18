@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { modalToast } from "@/lib/modalToast";
 
 type FormValues = {
   password: string;
@@ -76,24 +76,24 @@ export function ResetPasswordForm() {
       const supabase = createSupabaseBrowserClient();
       const { error } = await supabase.auth.updateUser({ password: values.password });
       if (error) {
-        toast.error(supabaseErrorToPt(error.message));
+        modalToast.error(supabaseErrorToPt(error.message));
         return;
       }
 
-      toast.success("Senha atualizada com sucesso.");
+      modalToast.success("Senha atualizada com sucesso.");
       router.push("/app");
       router.refresh();
     },
     (errors) => {
       if (errors.password?.message) {
-        toast.error(String(errors.password.message));
+        modalToast.error(String(errors.password.message));
         return;
       }
       if (errors.confirm?.message) {
-        toast.error(String(errors.confirm.message));
+        modalToast.error(String(errors.confirm.message));
         return;
       }
-      toast.error("Confira os campos.");
+      modalToast.warning("Confira os campos.");
     },
   );
 

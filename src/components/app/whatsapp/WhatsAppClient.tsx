@@ -1,8 +1,8 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { upsertWhatsAppInstanceAction } from "@/app/app/whatsapp/actions";
+import { modalToast } from "@/lib/modalToast";
 
 type InstanceRow = {
   instance_id: string | null;
@@ -37,10 +37,10 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
       phone: values.phone || undefined,
     });
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao salvar.");
+      modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
-    toast.success("Configuração salva.");
+    modalToast.success("Configuração salva.");
   });
 
   const statusLabel =

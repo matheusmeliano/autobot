@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { loadMercadoPagoSdk } from "@/lib/mercadopago-sdk";
+import { modalToast } from "@/lib/modalToast";
 
 export function MercadoPagoRecurringButton(props: {
   plan: "basico" | "pro";
@@ -39,7 +39,7 @@ export function MercadoPagoRecurringButton(props: {
     }
 
     if (!publicKey) {
-      toast.error(
+      modalToast.error(
         "Configuração incompleta. Defina NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY na Vercel.",
       );
       setOpen(false);
@@ -107,12 +107,12 @@ export function MercadoPagoRecurringButton(props: {
             },
             onError: () => {
               setReady(false);
-              toast.error("Falha ao carregar o formulário do cartão.");
+              modalToast.error("Falha ao carregar o formulário do cartão.");
             },
           },
         });
       } catch {
-        toast.error("Falha ao carregar o Mercado Pago.");
+        modalToast.error("Falha ao carregar o Mercado Pago.");
         setOpen(false);
       }
     };
@@ -127,7 +127,7 @@ export function MercadoPagoRecurringButton(props: {
   async function confirm() {
     if (loading) return;
     if (!controllerRef.current?.getFormData) {
-      toast.error("Formulário ainda não está pronto.");
+      modalToast.warning("Formulário ainda não está pronto.");
       return;
     }
 
@@ -136,7 +136,7 @@ export function MercadoPagoRecurringButton(props: {
       const formData = await controllerRef.current.getFormData();
       const token = formData?.token ?? null;
       if (!token) {
-        toast.error("Não foi possível validar o cartão.");
+        modalToast.error("Não foi possível validar o cartão.");
         return;
       }
 
@@ -154,15 +154,15 @@ export function MercadoPagoRecurringButton(props: {
         | null;
 
       if (!res.ok || !body?.ok) {
-        toast.error(body?.error ?? "Falha ao iniciar assinatura.");
+        modalToast.error(body?.error ?? "Falha ao iniciar assinatura.");
         return;
       }
 
-      toast.success("Assinatura mensal criada. Pode levar alguns minutos para ativar.");
+      modalToast.success("Assinatura mensal criada. Pode levar alguns minutos para ativar.");
       setOpen(false);
       window.location.reload();
     } catch {
-      toast.error("Falha ao iniciar assinatura.");
+      modalToast.error("Falha ao iniciar assinatura.");
     } finally {
       setLoading(false);
     }

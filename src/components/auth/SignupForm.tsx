@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { signupAction } from "@/app/signup/actions";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { modalToast } from "@/lib/modalToast";
 
 type FormValues = {
   name: string;
@@ -35,12 +35,12 @@ export function SignupForm() {
 
       const res = await signupAction(formData);
       if (!res.ok) {
-        toast.error(res.error ?? "Falha ao criar conta.");
+        modalToast.error(res.error ?? "Falha ao criar conta.");
         return;
       }
 
       if (res.needsEmailConfirmation) {
-      toast.success("Confirme seu email para entrar.");
+        modalToast.success("Confirme seu email para entrar.");
         router.push("/login");
         return;
       }
@@ -50,10 +50,10 @@ export function SignupForm() {
     },
     (errors) => {
       if (errors.password?.message) {
-        toast.error(String(errors.password.message));
+        modalToast.error(String(errors.password.message));
         return;
       }
-      toast.error("Confira os campos.");
+      modalToast.warning("Confira os campos.");
     },
   );
 

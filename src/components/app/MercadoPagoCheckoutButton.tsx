@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { modalToast } from "@/lib/modalToast";
 
 export function MercadoPagoCheckoutButton(props: {
   plan: "basico" | "pro";
@@ -27,13 +27,13 @@ export function MercadoPagoCheckoutButton(props: {
 
       const url = body?.init_point ?? null;
       if (!res.ok || !body?.ok || !url) {
-        toast.error(body?.error ?? "Falha ao iniciar checkout.");
+        modalToast.error(body?.error ?? "Falha ao iniciar checkout.");
         return;
       }
 
       window.location.href = url;
     } catch {
-      toast.error("Falha ao iniciar checkout.");
+      modalToast.error("Falha ao iniciar checkout.");
     } finally {
       setLoading(false);
     }
@@ -50,4 +50,3 @@ export function MercadoPagoCheckoutButton(props: {
     </button>
   );
 }
-

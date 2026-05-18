@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { modalToast } from "@/lib/modalToast";
 import {
   createDebtorAction,
   deleteDebtorAction,
@@ -132,11 +132,11 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
       : await createDebtorAction(payload);
 
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao salvar.");
+      modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
 
-    toast.success(editing ? "Cliente atualizado." : "Cliente criado.");
+    modalToast.success(editing ? "Cliente atualizado." : "Cliente criado.");
 
     startTransition(async () => {
       const r = await fetch("/app/clientes/data", { cache: "no-store" });
@@ -150,10 +150,10 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
     startTransition(async () => {
       const res = await deleteDebtorAction(id);
       if (!res.ok) {
-        toast.error(res.error ?? "Falha ao excluir.");
+        modalToast.error(res.error ?? "Falha ao excluir.");
         return;
       }
-      toast.success("Cliente excluído.");
+      modalToast.success("Cliente excluído.");
       setRows((prev) => prev.filter((r) => r.id !== id));
     });
   };

@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
+import { modalToast } from "@/lib/modalToast";
 import {
   createChargeAction,
   deleteChargeAction,
@@ -89,11 +89,11 @@ export function ChargesClient({
 
   const onSubmit = handleSubmit(async (values) => {
     if (!values.debtor_id) {
-      toast.error("Selecione um cliente.");
+      modalToast.warning("Selecione um cliente.");
       return;
     }
     if (!values.mensagem.trim()) {
-      toast.error("Mensagem obrigatória.");
+      modalToast.warning("Mensagem obrigatória.");
       return;
     }
 
@@ -103,10 +103,10 @@ export function ChargesClient({
       status: "pendente",
     });
     if (!res.ok) {
-      toast.error(res.error ?? "Falha ao criar cobrança.");
+      modalToast.error(res.error ?? "Falha ao criar cobrança.");
       return;
     }
-    toast.success("Cobrança criada (pendente).");
+    modalToast.success("Cobrança criada (pendente).");
     reset({ debtor_id: "", template_id: "", mensagem: "" });
     refresh();
   });
@@ -115,10 +115,10 @@ export function ChargesClient({
     startTransition(async () => {
       const res = await deleteChargeAction(id);
       if (!res.ok) {
-        toast.error(res.error ?? "Falha ao excluir.");
+        modalToast.error(res.error ?? "Falha ao excluir.");
         return;
       }
-      toast.success("Cobrança excluída.");
+      modalToast.success("Cobrança excluída.");
       setRows((prev) => prev.filter((r) => r.id !== id));
     });
   };
@@ -127,10 +127,10 @@ export function ChargesClient({
     startTransition(async () => {
       const res = await updateChargeStatusAction(id, status);
       if (!res.ok) {
-        toast.error(res.error ?? "Falha ao atualizar status.");
+        modalToast.error(res.error ?? "Falha ao atualizar status.");
         return;
       }
-      toast.success("Status atualizado.");
+      modalToast.success("Status atualizado.");
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
     });
   };
