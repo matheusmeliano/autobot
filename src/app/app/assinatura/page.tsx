@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
-import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
+import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
 
 export default async function AssinaturaPage() {
   const supabase = await createSupabaseServerClient();
@@ -105,8 +105,9 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <MercadoPagoCheckoutButton
+            <MercadoPagoRecurringButton
               plan="basico"
+              amount={49}
               disabled={plan === "basico" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
             >
@@ -115,7 +116,7 @@ export default async function AssinaturaPage() {
                 : plan === "vitalicio"
                   ? "Indisponível"
                   : "Assinar"}
-            </MercadoPagoCheckoutButton>
+            </MercadoPagoRecurringButton>
           </div>
         </div>
 
@@ -147,8 +148,9 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <MercadoPagoCheckoutButton
+            <MercadoPagoRecurringButton
               plan="pro"
+              amount={99}
               disabled={plan === "pro" || plan === "vitalicio"}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
             >
@@ -157,7 +159,7 @@ export default async function AssinaturaPage() {
                 : plan === "vitalicio"
                   ? "Indisponível"
                   : "Assinar"}
-            </MercadoPagoCheckoutButton>
+            </MercadoPagoRecurringButton>
           </div>
         </div>
 
