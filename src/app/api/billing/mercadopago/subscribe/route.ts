@@ -9,8 +9,15 @@ import {
 
 export const runtime = "nodejs";
 
+function addDaysISO(days: number) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 const schema = z.object({
   plan: z.enum(["basico", "pro"]),
+  card_token_id: z.string().min(1),
 });
 
 const planAmount: Record<"basico" | "pro", number> = {
@@ -100,7 +107,10 @@ export async function POST(req: Request) {
   try {
     const parsed = schema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
-      return NextResponse.json({ error: "Plano inválido." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Dados inválidos. Verifique os dados do cartão." },
+        { status: 400 },
+      );
     }
 
     const supabase = await createSupabaseServerClient();
@@ -125,9 +135,19 @@ export async function POST(req: Request) {
       backUrl,
       externalReference: user.id,
       notificationUrl,
+      cardTokenId: parsed.data.card_token_id,
+      reason:
+        parsed.data.plan === "basico" ? "Plano Básico - AutoBot" : "Plano Pro - AutoBot",
     });
 
     const admin = createSupabaseAdminClient();
+    const createdStatus = String(created.status ?? "").toLowerCase();
+    const appStatus =
+      createdStatus === "authorized" || createdStatus === "active"
+        ? "ativo"
+        : "cancelado";
+    const vencimento = appStatus === "ativo" ? addDaysISO(30) : null;
+
     const upsertRes = await admin.from("billing_subscriptions").upsert(
       {
         user_id: user.id,
@@ -152,15 +172,24 @@ export async function POST(req: Request) {
       throw upsertRes.error;
     }
 
-    const initPoint = created.init_point ?? created.sandbox_init_point ?? null;
-    if (!initPoint) {
-      return NextResponse.json(
-        { error: "Checkout não retornou link." },
-        { status: 502 },
-      );
-    }
+    await admin
+      .from("profiles")
+      .update({ plano: parsed.data.plan })
+      .eq("user_id", user.id);
 
-    return NextResponse.json({ init_point: initPoint });
+    await admin.from("subscriptions").insert({
+      user_id: user.id,
+      plano: parsed.data.plan,
+      status: appStatus,
+      vencimento,
+      provider: "mercadopago",
+      provider_plan_id: planId,
+      provider_subscription_id: created.id,
+      provider_status: created.status ?? null,
+      updated_at: new Date().toISOString(),
+    });
+
+    return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json(
       { error: errorToUserMessage(err) },

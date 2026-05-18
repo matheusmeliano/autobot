@@ -63,6 +63,8 @@ export async function createMercadoPagoPreapproval(input: {
   backUrl: string;
   externalReference: string;
   notificationUrl: string;
+  cardTokenId: string;
+  reason: string;
 }) {
   return mpFetch<{ id: string; init_point?: string; sandbox_init_point?: string; status?: string }>(
     `/preapproval`,
@@ -70,10 +72,13 @@ export async function createMercadoPagoPreapproval(input: {
       method: "POST",
       body: JSON.stringify({
         preapproval_plan_id: input.planId,
+        reason: input.reason,
         payer_email: input.payerEmail,
         back_url: input.backUrl,
         external_reference: input.externalReference,
         notification_url: input.notificationUrl,
+        card_token_id: input.cardTokenId,
+        status: "authorized",
       }),
     },
   );
