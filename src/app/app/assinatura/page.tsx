@@ -191,7 +191,7 @@ export default async function AssinaturaPage() {
               disabled
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 opacity-60"
             >
-              Em breve
+              {plan === "vitalicio" ? "Plano atual" : "Em breve"}
             </button>
           </div>
         </div>
