@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Calendar, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import {
@@ -167,6 +167,7 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DebtorRow | null>(null);
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>("desconhecida");
+  const vencimentoInputRef = useRef<HTMLInputElement | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -196,6 +197,12 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
       status: "ativo",
     },
   });
+
+  const vencimentoField = register("vencimento");
+  const openVencimentoPicker = () => {
+    vencimentoInputRef.current?.showPicker?.();
+    vencimentoInputRef.current?.focus();
+  };
 
   const close = () => {
     setOpen(false);
@@ -462,11 +469,27 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                       <div className="text-xs font-semibold text-white/60">
                         Vencimento
                       </div>
-                      <input
-                        type="date"
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                        {...register("vencimento")}
-                      />
+                      <div className="relative mt-2">
+                        <input
+                          type="date"
+                          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                          {...vencimentoField}
+                          onFocus={openVencimentoPicker}
+                          onClick={openVencimentoPicker}
+                          ref={(el) => {
+                            vencimentoField.ref(el);
+                            vencimentoInputRef.current = el;
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={openVencimentoPicker}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
+                          aria-label="Selecionar vencimento"
+                        >
+                          <Calendar className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
