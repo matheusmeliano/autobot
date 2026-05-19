@@ -75,8 +75,14 @@ async function sendZapiText(params: {
 }
 
 export async function GET(req: Request) {
+  const deployment = {
+    env: process.env.VERCEL_ENV ?? null,
+    commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    ref: process.env.VERCEL_GIT_COMMIT_REF ?? null,
+  };
+
   if (!isAuthorized(req)) {
-    return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    return Response.json({ ok: false, error: "unauthorized", deployment }, { status: 401 });
   }
 
   const supabase = createSupabaseAdminClient();
@@ -93,7 +99,7 @@ export async function GET(req: Request) {
     .limit(100);
 
   if (error) {
-    return Response.json({ ok: false, error: error.message }, { status: 500 });
+    return Response.json({ ok: false, error: error.message, deployment }, { status: 500 });
   }
 
   const results: Array<{ id: string; ok: boolean; error?: string }> = [];
@@ -176,7 +182,13 @@ export async function GET(req: Request) {
     }
   }
 
-  return Response.json({ ok: true, now: nowIso, found: schedules?.length ?? 0, results });
+  return Response.json({
+    ok: true,
+    now: nowIso,
+    found: schedules?.length ?? 0,
+    results,
+    deployment,
+  });
 }
 
 export async function POST(req: Request) {
