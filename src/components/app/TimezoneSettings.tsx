@@ -40,12 +40,20 @@ export function TimezoneSettings({ initialTimeZone }: { initialTimeZone: BrazilT
 
   return (
     <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="text-sm font-semibold">Fuso horário</div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold text-white/90">Fuso horário</div>
+          <div className="mt-1 text-xs text-white/55">
+            Usado para validar e exibir datas/horários dos agendamentos.
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
         <select
           value={timeZone}
           onChange={(e) => setTimeZone(e.target.value as BrazilTimeZone)}
-          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+          className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none focus:border-white/20 focus:ring-2 focus:ring-white/10 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
         >
           {options.map((o) => (
             <option key={o.tz} value={o.tz}>
@@ -57,7 +65,7 @@ export function TimezoneSettings({ initialTimeZone }: { initialTimeZone: BrazilT
           type="button"
           onClick={save}
           disabled={isPending}
-          className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-6 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60 md:w-auto"
         >
           Salvar
         </button>
@@ -65,4 +73,3 @@ export function TimezoneSettings({ initialTimeZone }: { initialTimeZone: BrazilT
     </div>
   );
 }
-
