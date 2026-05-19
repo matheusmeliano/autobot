@@ -14,9 +14,13 @@ function labelForTimeZone(tz: BrazilTimeZone) {
   return tz;
 }
 
-export function TimezoneSettings({ initialTimeZone }: { initialTimeZone: BrazilTimeZone }) {
+export function TimezoneSettings({
+  initialTimeZone,
+}: {
+  initialTimeZone: BrazilTimeZone | null;
+}) {
   const [isPending, startTransition] = useTransition();
-  const [timeZone, setTimeZone] = useState<BrazilTimeZone>(initialTimeZone);
+  const [timeZone, setTimeZone] = useState<BrazilTimeZone | "">(initialTimeZone ?? "");
 
   const options = useMemo(
     () =>
@@ -28,6 +32,10 @@ export function TimezoneSettings({ initialTimeZone }: { initialTimeZone: BrazilT
   );
 
   const save = () => {
+    if (!timeZone) {
+      modalToast.error("Selecione seu fuso horário para continuar.");
+      return;
+    }
     startTransition(async () => {
       const res = await updateTimezoneAction({ timezone: timeZone });
       if (!res.ok) {
@@ -52,9 +60,13 @@ export function TimezoneSettings({ initialTimeZone }: { initialTimeZone: BrazilT
       <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
         <select
           value={timeZone}
-          onChange={(e) => setTimeZone(e.target.value as BrazilTimeZone)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setTimeZone(v ? (v as BrazilTimeZone) : "");
+          }}
           className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none focus:border-white/20 focus:ring-2 focus:ring-white/10 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
         >
+          <option value="">Selecione seu fuso horário</option>
           {options.map((o) => (
             <option key={o.tz} value={o.tz}>
               {o.label}
@@ -64,7 +76,7 @@ export function TimezoneSettings({ initialTimeZone }: { initialTimeZone: BrazilT
         <button
           type="button"
           onClick={save}
-          disabled={isPending}
+          disabled={isPending || !timeZone}
           className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-6 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60 md:w-auto"
         >
           Salvar

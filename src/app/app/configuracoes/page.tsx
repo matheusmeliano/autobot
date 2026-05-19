@@ -21,10 +21,8 @@ export default async function ConfiguracoesPage() {
     .maybeSingle();
 
   const showPassword = !isGlobalAdminEmail(profile?.email);
-  const tz =
-    BRAZIL_TIMEZONES.includes((profile as any)?.timezone)
-      ? ((profile as any).timezone as BrazilTimeZone)
-      : "America/Sao_Paulo";
+  const tzRaw = (profile as any)?.timezone;
+  const tz = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
 
   return (
     <div>

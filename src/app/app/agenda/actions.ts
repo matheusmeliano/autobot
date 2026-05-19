@@ -27,7 +27,13 @@ export async function createScheduleAction(input: unknown) {
 
   const { data: profile } = await supabase.from("profiles").select("timezone").maybeSingle();
   const tzRaw = (profile as any)?.timezone;
-  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : "America/Sao_Paulo";
+  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : null;
+  if (!timeZone) {
+    return {
+      ok: false,
+      error: "Selecione e salve seu fuso horário em Configurações antes de criar agendamentos.",
+    };
+  }
 
   let dataEnvioIso: string;
   try {
@@ -62,7 +68,13 @@ export async function updateScheduleAction(input: unknown) {
   const { id, ...data } = parsed.data;
   const { data: profile } = await supabase.from("profiles").select("timezone").maybeSingle();
   const tzRaw = (profile as any)?.timezone;
-  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : "America/Sao_Paulo";
+  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : null;
+  if (!timeZone) {
+    return {
+      ok: false,
+      error: "Selecione e salve seu fuso horário em Configurações antes de editar agendamentos.",
+    };
+  }
 
   let dataEnvioIso: string;
   try {

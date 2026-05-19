@@ -88,7 +88,7 @@ export function SchedulesClient({
   initial: ScheduleRow[];
   debtors: DebtorOption[];
   templates: TemplateOption[];
-  timeZone: BrazilTimeZone;
+  timeZone: BrazilTimeZone | null;
 }) {
   const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState<ScheduleRow[]>(initial);
@@ -97,6 +97,7 @@ export function SchedulesClient({
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const timeInputRef = useRef<HTMLInputElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -132,6 +133,12 @@ export function SchedulesClient({
   };
 
   const openCreate = () => {
+    if (!timeZone) {
+      modalToast.error(
+        "Você precisa selecionar e salvar seu fuso horário em Configurações antes de criar um agendamento.",
+      );
+      return;
+    }
     close();
     setOpen(true);
   };
@@ -139,7 +146,7 @@ export function SchedulesClient({
   const openEdit = (row: ScheduleRow) => {
     setEditing(row);
     setOpen(true);
-    const dt = splitDateTimeForInput(row.data_envio, timeZone);
+    const dt = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
     reset({
       id: row.id,
       debtor_id: row.debtor_id,
@@ -158,6 +165,12 @@ export function SchedulesClient({
     });
 
   const onSubmit = handleSubmit(async (values) => {
+    if (!timeZone) {
+      modalToast.error(
+        "Selecione e salve seu fuso horário em Configurações antes de criar/editar agendamentos.",
+      );
+      return;
+    }
     if (!values.debtor_id) {
       modalToast.warning("Selecione um cliente.");
       return;
@@ -181,7 +194,7 @@ export function SchedulesClient({
         const iso = zonedDateTimeToUtcIso({
           date: values.data_envio_date,
           time: values.data_envio_time,
-          timeZone,
+          timeZone: effectiveTimeZone,
         });
         if (new Date(iso).getTime() < Date.now()) {
           modalToast.warning("Escolha um horário igual ou superior ao horário atual.");
@@ -295,10 +308,10 @@ export function SchedulesClient({
                       {r.template_nome ?? "-"}
                     </div>
                     <div className="col-span-2 whitespace-nowrap text-center text-white/60">
-                      {dateBR(r.data_envio, timeZone)}
+                      {dateBR(r.data_envio, effectiveTimeZone)}
                     </div>
                     <div className="col-span-2 whitespace-nowrap text-center text-white/60">
-                      {timeBR(r.data_envio, timeZone)}
+                      {timeBR(r.data_envio, effectiveTimeZone)}
                     </div>
                     <div className="col-span-1 flex justify-center">
                       <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">

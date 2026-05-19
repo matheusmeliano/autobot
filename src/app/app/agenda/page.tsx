@@ -58,8 +58,7 @@ export default async function AgendaPage() {
     })) ?? [];
 
   const tzRaw = (profileRes as any)?.data?.timezone;
-  const timeZone =
-    BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : "America/Sao_Paulo";
+  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
 
   return (
     <SchedulesClient
