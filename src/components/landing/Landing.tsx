@@ -413,7 +413,7 @@ export function Landing() {
                   step: "04",
                   title: "Envio automático",
                   description:
-                    "Agende cobranças, retentativas e acompanhe logs e histórico.",
+                    "Agende cobranças e acompanhe em tempo real.",
                 },
               ].map((item) => (
                 <GlassCard key={item.step} className="p-5">
