@@ -319,10 +319,10 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
         <div className="overflow-x-auto">
           <div className="min-w-[820px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
-              <div className="col-span-4">Nome</div>
+              <div className="col-span-3">Nome</div>
               <div className="col-span-2 text-center">Telefone</div>
               <div className="col-span-2 text-center">Valor</div>
-              <div className="col-span-1 text-center">Vencimento</div>
+              <div className="col-span-2 text-center">Vencimento</div>
               <div className="col-span-1 text-center">Status</div>
               <div className="col-span-2 text-right">Ações</div>
             </div>
@@ -338,12 +338,12 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                     key={r.id}
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
-                    <div className="col-span-4 truncate font-semibold">{r.nome}</div>
+                    <div className="col-span-3 truncate font-semibold">{r.nome}</div>
                     <div className="col-span-2 truncate text-center text-white/60">
                       {r.telefone ?? "-"}
                     </div>
                     <div className="col-span-2 text-center">{money(r.valor)}</div>
-                    <div className="col-span-1 text-center text-white/60">
+                    <div className="col-span-2 text-center text-white/60">
                       {dateBR(r.vencimento)}
                     </div>
                     <div className="col-span-1 flex justify-center">
