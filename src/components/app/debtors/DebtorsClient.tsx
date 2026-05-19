@@ -108,12 +108,16 @@ function maskPhone(v: string) {
 }
 
 function maskPixPhone(v: string) {
-  const d = digitsOnly(v);
+  const raw = v.trimStart();
+  if (!raw.startsWith("+")) return v;
+  const d = digitsOnly(raw);
   if (!d.startsWith("55")) return v;
   const local = d.slice(2);
+  if (!local) return "+55";
+  if (local.length <= 2) return `+55 ${local}`;
   const dd = local.slice(0, 2);
   const rest = local.slice(2);
-  if (!dd) return v;
+  if (!rest) return `+55 (${dd})`;
   if (rest.length <= 4) return `+55 (${dd}) ${rest}`;
   if (rest.length <= 8) return `+55 (${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
   return `+55 (${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
@@ -127,7 +131,7 @@ function detectPixKeyType(raw: string): PixKeyType {
   if (v.includes("@")) return "email";
   if (isUuidLike(v)) return "aleatoria";
   const d = digitsOnly(v);
-  if (v.startsWith("+55") && d.startsWith("55") && (d.length === 12 || d.length === 13)) {
+  if (v.startsWith("+55") && d.startsWith("55")) {
     return "telefone";
   }
   if (d.length === 14) return "cnpj";
