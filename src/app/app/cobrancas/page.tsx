@@ -32,9 +32,6 @@ export default async function CobrancasPage() {
   if (chargesRes.error || debtorsRes.error || templatesRes.error) {
     return (
       <div>
-        <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-          COBRANÇAS
-        </div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
           Cobranças
         </h1>
