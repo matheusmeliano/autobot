@@ -54,9 +54,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
   return (
     <div>
       <div>
-        <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-          WHATSAPP
-        </div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
           Integração Z-API
         </h1>
@@ -70,9 +67,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
           <div className="text-xs font-semibold text-white/55">Status</div>
           <div className="mt-2 text-xl font-semibold tracking-tight">
             {statusLabel}
-          </div>
-          <div className="mt-2 text-xs text-white/45">
-            QRCode + status real via Z-API.
           </div>
         </div>
         <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
