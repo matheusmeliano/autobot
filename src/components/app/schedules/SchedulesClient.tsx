@@ -153,9 +153,6 @@ export function SchedulesClient({
     <div>
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-            AGENDA
-          </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
             Agendamentos
           </h1>
