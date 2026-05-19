@@ -109,7 +109,7 @@ function maskPhone(v: string) {
 
 function maskPixPhone(v: string) {
   const d = digitsOnly(v);
-  if (!d.startsWith("55")) return v;
+  if (!d.startsWith("55")) return maskPhone(v);
   const local = d.slice(2);
   const dd = local.slice(0, 2);
   const rest = local.slice(2);
@@ -129,7 +129,17 @@ function detectPixKeyType(raw: string): PixKeyType {
   const d = digitsOnly(v);
   if (d.startsWith("55") && (d.length === 12 || d.length === 13)) return "telefone";
   if (d.length === 14) return "cnpj";
-  if (d.length === 11) return "cpf";
+  if (
+    (v.startsWith("+") || /[()+\s-]/.test(v)) &&
+    (d.length === 10 || d.length === 11)
+  ) {
+    return "telefone";
+  }
+  if (d.length === 11) {
+    if (d[2] === "9") return "telefone";
+    return "cpf";
+  }
+  if (d.length === 10) return "telefone";
   return "desconhecida";
 }
 
@@ -147,7 +157,13 @@ function normalizePixKeyForSave(raw: string) {
   const type = detectPixKeyType(raw);
   if (type === "email") return raw.trim().toLowerCase();
   if (type === "aleatoria") return raw.trim();
-  if (type === "cpf" || type === "cnpj" || type === "telefone") return digitsOnly(raw);
+  if (type === "cpf" || type === "cnpj") return digitsOnly(raw);
+  if (type === "telefone") {
+    const d = digitsOnly(raw);
+    if (d.startsWith("55")) return d;
+    if (d.length === 10 || d.length === 11) return `55${d}`;
+    return d;
+  }
   return raw.trim();
 }
 
