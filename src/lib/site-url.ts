@@ -38,9 +38,9 @@ export function resolveBaseUrlFromHeaders(hdrs: Headers) {
     return `https://${value}`;
   };
 
-  if (env && !isLocal(env)) return env;
   if (org && !isLocal(org)) return org;
   if (byHost && !isLocal(byHost)) return byHost;
+  if (env && !isLocal(env)) return env;
   if (vercelHost && !isLocal(ensureProtocol(vercelHost))) {
     return ensureProtocol(vercelHost);
   }
