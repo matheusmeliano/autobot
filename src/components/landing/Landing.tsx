@@ -594,8 +594,7 @@ export function Landing() {
                     </div>
                   </Link>
                   <div className="mt-3 max-w-sm text-sm text-white/55">
-                    Plataforma SaaS que automatiza cobranças via WhatsApp com
-                    geração de PIX integrada.
+                    Plataforma SaaS que automatiza cobranças via WhatsApp.
                   </div>
                   <div className="mt-4 text-xs text-white/35">
                     © {new Date().getFullYear()} AutoBot. Todos os direitos
