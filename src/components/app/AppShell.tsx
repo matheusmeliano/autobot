@@ -208,6 +208,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-[#070A10]/80 backdrop-blur-xl min-[1201px]:hidden">
         <AppNav variant="bottom" restricted={restricted} />
       </div>
+
+      <div className="fixed bottom-20 right-4 z-40 text-xs text-white/50 min-[1201px]:bottom-4">
+        Desenvolvido pela{" "}
+        <a
+          href="#"
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-white/70 hover:text-white"
+        >
+          HEYBROTHERS
+        </a>
+        .
+      </div>
     </div>
   );
 }

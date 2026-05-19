@@ -82,6 +82,19 @@ export function Landing() {
         <div className="absolute left-[-240px] top-[520px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),rgba(59,130,246,0)_55%)]" />
       </div>
 
+      <div className="fixed bottom-4 right-4 z-40 text-xs text-white/50">
+        Desenvolvido pela{" "}
+        <a
+          href="#"
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-white/70 hover:text-white"
+        >
+          HEYBROTHERS
+        </a>
+        .
+      </div>
+
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#070A10]/60 backdrop-blur-xl">
         <Container>
           <div className="flex h-16 items-center justify-between">
