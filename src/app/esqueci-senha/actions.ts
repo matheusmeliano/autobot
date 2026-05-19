@@ -19,6 +19,8 @@ export async function forgotPasswordAction(formData: FormData) {
     return { ok: false, error: "Email inválido." };
   }
 
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
+
   const hdrs = await headers();
   const baseUrl = resolveBaseUrlFromHeaders(hdrs);
 
@@ -27,13 +29,26 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(
       "/redefinir-senha"
     )}`,
   });
 
   if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    const isUserNotFound =
+      msg.includes("user_not_found") ||
+      msg.includes("user not found") ||
+      (msg.includes("not found") && msg.includes("user")) ||
+      (msg.includes("email") && msg.includes("not found")) ||
+      (msg.includes("email") && msg.includes("does not exist")) ||
+      (msg.includes("email") && msg.includes("doesn't exist")) ||
+      (msg.includes("no user") && msg.includes("email"));
+
+    if (isUserNotFound) {
+      return { ok: true };
+    }
     return { ok: false, error: supabaseErrorToPt(error.message) };
   }
 

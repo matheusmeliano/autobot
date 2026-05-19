@@ -9,15 +9,16 @@ function getParam(
   return v;
 }
 
-export default function HomePage({
+export default async function HomePage({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const code = getParam(searchParams?.code);
-  const tokenHash = getParam(searchParams?.token_hash);
-  const type = getParam(searchParams?.type);
-  const next = getParam(searchParams?.next);
+  const sp = searchParams ? await searchParams : undefined;
+  const code = getParam(sp?.code);
+  const tokenHash = getParam(sp?.token_hash);
+  const type = getParam(sp?.type);
+  const next = getParam(sp?.next);
 
   if (code || tokenHash) {
     const qp = new URLSearchParams();
