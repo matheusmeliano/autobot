@@ -109,8 +109,8 @@ export async function createScheduleAction(input: unknown) {
     return { ok: false, error: "Data/hora inválida." };
   }
 
-  if (new Date(dataEnvioIso).getTime() < Date.now()) {
-    return { ok: false, error: "Escolha um horário igual ou superior ao horário atual." };
+  if (new Date(dataEnvioIso).getTime() < Date.now() + 3 * 60 * 1000) {
+    return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
   }
 
   const { error } = await supabase.from("schedules").insert({
@@ -148,6 +148,10 @@ export async function updateScheduleAction(input: unknown) {
     });
   } catch {
     return { ok: false, error: "Data/hora inválida." };
+  }
+
+  if (new Date(dataEnvioIso).getTime() < Date.now() + 3 * 60 * 1000) {
+    return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
   }
 
   const { error } = await supabase

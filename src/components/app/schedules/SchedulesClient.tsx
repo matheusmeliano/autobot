@@ -203,21 +203,19 @@ export function SchedulesClient({
       status: values.status || "agendado",
     };
 
-    if (!values.id) {
-      try {
-        const iso = zonedDateTimeToUtcIso({
-          date: values.data_envio_date,
-          time: values.data_envio_time,
-          timeZone: effectiveTimeZone,
-        });
-        if (new Date(iso).getTime() < Date.now()) {
-          modalToast.warning("Escolha um horário igual ou superior ao horário atual.");
-          return;
-        }
-      } catch {
-        modalToast.warning("Data/hora inválida.");
+    try {
+      const iso = zonedDateTimeToUtcIso({
+        date: values.data_envio_date,
+        time: values.data_envio_time,
+        timeZone: effectiveTimeZone,
+      });
+      if (new Date(iso).getTime() < Date.now() + 3 * 60 * 1000) {
+        modalToast.warning("Escolha um horário futuro válido (mínimo +3 minutos).");
         return;
       }
+    } catch {
+      modalToast.warning("Data/hora inválida.");
+      return;
     }
 
     const res = editing
