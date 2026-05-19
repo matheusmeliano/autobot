@@ -72,9 +72,6 @@ export function DashboardClient({
         className="flex flex-col justify-between gap-4 min-[1201px]:flex-row min-[1201px]:items-end"
       >
         <div>
-          <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-            PAINEL
-          </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight min-[1201px]:text-3xl">
             {greeting}
           </h1>
@@ -92,7 +89,7 @@ export function DashboardClient({
         </div>
       </motion.div>
 
-      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-4">
+      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-3">
         <Card
           title="Total recebido (mês)"
           value={money}
