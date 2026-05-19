@@ -203,12 +203,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {children}
           </div>
           <div className="mt-3 flex justify-end text-xs text-white/35">
-            Desenvolvido pela{" "}
+            Desenvolvido pela
             <a
               href="#"
               target="_blank"
               rel="noreferrer"
-              className="font-semibold text-white/60 hover:text-white"
+              className="ml-1 font-semibold text-white/60 hover:text-white"
             >
               HEYBROTHERS
             </a>
