@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Calendar, Clock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
@@ -95,8 +95,9 @@ export function SchedulesClient({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
-  const timeInputRef = useRef<HTMLInputElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const timePickerRef = useRef<HTMLDivElement | null>(null);
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
 
   const filtered = useMemo(() => {
@@ -109,6 +110,8 @@ export function SchedulesClient({
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
@@ -120,9 +123,12 @@ export function SchedulesClient({
     },
   });
 
+  const timeValue = watch("data_envio_time");
+
   const close = () => {
     setOpen(false);
     setEditing(null);
+    setTimePickerOpen(false);
     reset({
       debtor_id: "",
       template_id: "",
@@ -244,9 +250,23 @@ export function SchedulesClient({
     dateInputRef.current?.focus();
   };
   const openTimePicker = () => {
-    timeInputRef.current?.showPicker?.();
-    timeInputRef.current?.focus();
+    setTimePickerOpen(true);
   };
+
+  useEffect(() => {
+    if (!timePickerOpen) return;
+    const onPointerDown = (e: Event) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (!timePickerRef.current?.contains(t)) setTimePickerOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [timePickerOpen]);
 
   return (
     <div>
@@ -346,7 +366,7 @@ export function SchedulesClient({
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[100]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold">
+            <div className="text-sm font-semibold text-white/90">
               {editing ? "Editar agendamento" : "Novo agendamento"}
             </div>
             <div className="mt-1 text-xs text-white/55">
@@ -428,26 +448,92 @@ export function SchedulesClient({
                   <div className="text-xs font-semibold text-white/60">
                     Hora
                   </div>
-                  <div className="relative mt-2">
+                  <div className="relative mt-2" ref={timePickerRef}>
+                    <input type="hidden" {...timeField} />
                     <input
-                      type="time"
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
-                      {...timeField}
+                      type="text"
+                      readOnly
+                      value={timeValue || ""}
+                      placeholder="--:--"
                       onFocus={openTimePicker}
                       onClick={openTimePicker}
-                      ref={(el) => {
-                        timeField.ref(el);
-                        timeInputRef.current = el;
-                      }}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
                     />
                     <button
                       type="button"
                       onClick={openTimePicker}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/55 hover:text-white/80"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
                       aria-label="Selecionar hora"
                     >
                       <Clock className="h-4 w-4" />
                     </button>
+                    {timePickerOpen ? (
+                      <div className="absolute right-0 mt-2 w-[260px] rounded-xl border border-white/10 bg-[#070A10] p-2 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.9)]">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                            {Array.from({ length: 24 }).map((_, i) => {
+                              const h = String(i).padStart(2, "0");
+                              const selected =
+                                typeof timeValue === "string" && timeValue.slice(0, 2) === h;
+                              return (
+                                <button
+                                  key={h}
+                                  type="button"
+                                  onClick={() => {
+                                    const m =
+                                      typeof timeValue === "string" && timeValue.length >= 5
+                                        ? timeValue.slice(3, 5)
+                                        : "00";
+                                    setValue("data_envio_time", `${h}:${m}`, {
+                                      shouldDirty: true,
+                                      shouldTouch: true,
+                                      shouldValidate: true,
+                                    });
+                                  }}
+                                  className={[
+                                    "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
+                                    selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                                  ].join(" ")}
+                                >
+                                  {h}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                            {Array.from({ length: 60 }).map((_, i) => {
+                              const m = String(i).padStart(2, "0");
+                              const selected =
+                                typeof timeValue === "string" && timeValue.slice(3, 5) === m;
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => {
+                                    const h =
+                                      typeof timeValue === "string" && timeValue.length >= 2
+                                        ? timeValue.slice(0, 2)
+                                        : "00";
+                                    setValue("data_envio_time", `${h}:${m}`, {
+                                      shouldDirty: true,
+                                      shouldTouch: true,
+                                      shouldValidate: true,
+                                    });
+                                    setTimePickerOpen(false);
+                                  }}
+                                  className={[
+                                    "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
+                                    selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                                  ].join(" ")}
+                                >
+                                  {m}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

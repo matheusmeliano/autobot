@@ -379,7 +379,7 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[100]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold">
+            <div className="text-sm font-semibold text-white/90">
               {editing ? "Editar cliente" : "Novo cliente"}
             </div>
             <div className="mt-1 text-xs text-white/55">
