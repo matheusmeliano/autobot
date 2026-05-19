@@ -51,12 +51,9 @@ export function DashboardClient({
   stats: StatPack;
   chart: ChartPoint[];
 }) {
-  const statusLabel =
-    stats.whatsappStatus === "connected"
-      ? "conectado"
-      : stats.whatsappStatus === "configured"
-        ? "configurado"
-        : "Desconectado";
+  const isConnected =
+    stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
+  const statusLabel = isConnected ? "Conectado" : "Desconectado";
 
   const money = stats.totalReceived.toLocaleString("pt-BR", {
     style: "currency",
@@ -88,11 +85,7 @@ export function DashboardClient({
           <span
             className={[
               "h-2 w-2 rounded-full shadow-[0_0_0_4px_rgba(16,185,129,0.12)]",
-              statusLabel === "conectado"
-                ? "bg-emerald-400"
-                : statusLabel === "configurado"
-                  ? "bg-indigo-300"
-                  : "bg-white/30",
+              statusLabel === "Conectado" ? "bg-emerald-400" : "bg-white/30",
             ].join(" ")}
           />
           WhatsApp: {statusLabel}

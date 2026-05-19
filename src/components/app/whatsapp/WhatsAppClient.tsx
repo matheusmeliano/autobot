@@ -43,12 +43,9 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
     modalToast.success("Configuração salva.");
   });
 
-  const statusLabel =
-    initial?.status === "connected"
-      ? "conectado"
-      : initial?.status === "configured"
-        ? "configurado"
-        : "Desconectado";
+  const isConnected =
+    initial?.status === "connected" || initial?.status === "configured";
+  const statusLabel = isConnected ? "Conectado" : "Desconectado";
 
   return (
     <div>
