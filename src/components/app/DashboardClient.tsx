@@ -11,6 +11,13 @@ type StatPack = {
   whatsappStatus: string;
 };
 
+type ActivityRow = {
+  id: string;
+  debtorName: string;
+  status: string;
+  createdAt: string;
+};
+
 type ChartPoint = { name: string; value: number };
 
 function Card({
@@ -40,16 +47,37 @@ function Card({
   );
 }
 
+function dateTimeBR(v: string) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(d);
+}
+
+function statusToLabel(status: string) {
+  const s = status.trim().toLowerCase();
+  if (s === "paga" || s === "paid") return "Pago";
+  if (s === "enviada" || s === "sent") return "Enviado";
+  if (s === "falha" || s === "failed") return "Falha";
+  if (s === "pendente" || s === "pending") return "Pendente";
+  return status;
+}
+
 export function DashboardClient({
   email,
   name,
   stats,
   chart,
+  activities,
 }: {
   email: string;
   name?: string;
   stats: StatPack;
   chart: ChartPoint[];
+  activities: ActivityRow[];
 }) {
   const isConnected =
     stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
@@ -151,19 +179,45 @@ export function DashboardClient({
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-2">
           <div className="text-sm font-semibold">Atividades</div>
           <div className="mt-1 text-xs text-white/45">
-            Execuções, retentativas e logs aparecem aqui
+            Histórico de clientes cobrados recentemente.
           </div>
           <div className="mt-4 space-y-3">
-            {[
-              { title: "Envio agendado", desc: "Nenhum agendamento criado ainda" },
-              { title: "Cobrança", desc: "Nenhuma cobrança enviada ainda" },
-              { title: "WhatsApp", desc: "Instância não conectada" },
-            ].map((i) => (
-              <div key={i.title} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                <div className="text-xs font-semibold">{i.title}</div>
-                <div className="mt-1 text-xs text-white/55">{i.desc}</div>
+            {activities.length ? (
+              activities.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold">{item.debtorName}</div>
+                      <div className="mt-1 text-xs text-white/55">
+                        {statusToLabel(item.status)} • {dateTimeBR(item.createdAt)}
+                      </div>
+                    </div>
+                    <span
+                      className={[
+                        "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
+                        item.status.toLowerCase() === "paga"
+                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                          : item.status.toLowerCase() === "falha"
+                            ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                            : "border-white/10 bg-white/[0.04] text-white/70",
+                      ].join(" ")}
+                    >
+                      {statusToLabel(item.status)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                <div className="text-xs font-semibold">Nenhuma cobrança ainda</div>
+                <div className="mt-1 text-xs text-white/55">
+                  Quando você enviar cobranças, elas aparecem aqui.
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
