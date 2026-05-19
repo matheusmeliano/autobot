@@ -65,8 +65,8 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 min-[1201px]:grid-cols-3">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Status</div>
           <div className="mt-2 text-xl font-semibold tracking-tight">
             {statusLabel}
@@ -75,15 +75,15 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
             QRCode + status real via Z-API.
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Instance ID</div>
-          <div className="mt-2 truncate text-sm font-semibold text-white/80">
+          <div className="mt-2 min-w-0 truncate text-sm font-semibold text-white/80">
             {initial?.instance_id ?? "-"}
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Número</div>
-          <div className="mt-2 truncate text-sm font-semibold text-white/80">
+          <div className="mt-2 min-w-0 truncate text-sm font-semibold text-white/80">
             {initial?.phone ?? "-"}
           </div>
         </div>
