@@ -173,7 +173,7 @@ export function SchedulesClient({
 
   const refresh = () =>
     startTransition(async () => {
-      const r = await fetch("/app/agenda/data", { cache: "no-store" });
+      const r = await fetch("/app/agendar/data", { cache: "no-store" });
       const json = (await r.json()) as ScheduleRow[];
       setRows(json);
     });

@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { href: "/app/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/app/clientes", label: "Clientes", icon: CircleUserRound },
   { href: "/app/mensagens", label: "Mensagens", icon: MessageSquareText },
-  { href: "/app/agenda", label: "Agendar", icon: CalendarDays },
+  { href: "/app/agendar", label: "Agendar", icon: CalendarDays },
   { href: "/app/whatsapp", label: "WhatsApp", icon: Smartphone },
   { href: "/app/assinatura", label: "Assinatura", icon: BadgeCheck },
   { href: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
