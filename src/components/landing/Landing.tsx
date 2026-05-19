@@ -531,7 +531,7 @@ export function Landing() {
                 },
                 {
                   q: "Funciona com qualquer WhatsApp?",
-                  a: "Funciona com WhatsApp comum. A conexão é feita via Z-API (conforme seu plano).",
+                  a: "Funciona com WhatsApp comum. A conexão é feita via Z-API.",
                 },
                 {
                   q: "Posso cancelar quando quiser?",
