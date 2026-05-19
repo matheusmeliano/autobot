@@ -26,8 +26,7 @@ export type ChargeRow = {
 
 type FormValues = {
   debtor_id: string;
-  template_id?: string;
-  mensagem: string;
+  template_id: string;
 };
 
 function dateBR(v: string | null) {
@@ -58,27 +57,16 @@ export function ChargesClient({
     reset,
     formState: { isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { debtor_id: "", template_id: "", mensagem: "" },
+    defaultValues: { debtor_id: "", template_id: "" },
   });
 
   const selectedTemplateId = watch("template_id");
-  const selectedDebtorId = watch("debtor_id");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) => r.debtor_nome.toLowerCase().includes(q));
   }, [query, rows]);
-
-  const applyTemplate = (templateId?: string) => {
-    if (!templateId) return;
-    const t = templates.find((x) => x.id === templateId);
-    if (!t) return;
-    const debtor = debtors.find((d) => d.id === selectedDebtorId);
-    const pix = debtor?.pix_key ?? "{pix}";
-    const msg = t.conteudo.split("{pix}").join(pix);
-    setValue("mensagem", msg);
-  };
 
   const refresh = () =>
     startTransition(async () => {
@@ -92,14 +80,24 @@ export function ChargesClient({
       modalToast.warning("Selecione um cliente.");
       return;
     }
-    if (!values.mensagem.trim()) {
-      modalToast.warning("Mensagem obrigatória.");
+    if (!values.template_id) {
+      modalToast.warning("Selecione um template.");
       return;
     }
 
+    const t = templates.find((x) => x.id === values.template_id);
+    if (!t) {
+      modalToast.error("Template inválido.");
+      return;
+    }
+
+    const debtor = debtors.find((d) => d.id === values.debtor_id);
+    const pix = debtor?.pix_key ?? "{pix}";
+    const mensagem = t.conteudo.split("{pix}").join(pix);
+
     const res = await createChargeAction({
       debtor_id: values.debtor_id,
-      mensagem: values.mensagem,
+      mensagem,
       status: "pendente",
     });
     if (!res.ok) {
@@ -107,7 +105,7 @@ export function ChargesClient({
       return;
     }
     modalToast.success("Cobrança criada (pendente).");
-    reset({ debtor_id: "", template_id: "", mensagem: "" });
+    reset({ debtor_id: "", template_id: "" });
     refresh();
   });
 
@@ -172,15 +170,11 @@ export function ChargesClient({
               </div>
               <select
                 className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                {...register("template_id")}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setValue("template_id", v);
-                  applyTemplate(v);
-                }}
+                {...register("template_id", { required: true })}
+                onChange={(e) => setValue("template_id", e.target.value)}
                 value={selectedTemplateId ?? ""}
               >
-                <option value="">Sem template</option>
+                <option value="">Selecione...</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.nome}
@@ -188,16 +182,6 @@ export function ChargesClient({
                 ))}
               </select>
             </div>
-          </div>
-
-          <div>
-            <div className="text-xs font-semibold text-white/60">Mensagem</div>
-            <textarea
-              rows={5}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-              placeholder="Digite ou use um template..."
-              {...register("mensagem", { required: true })}
-            />
           </div>
 
           <button
