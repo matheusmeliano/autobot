@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Clock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Calendar, Clock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -96,6 +96,7 @@ export function SchedulesClient({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const timeInputRef = useRef<HTMLInputElement | null>(null);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -223,7 +224,12 @@ export function SchedulesClient({
     });
   };
 
+  const dateField = register("data_envio_date", { required: true });
   const timeField = register("data_envio_time", { required: true });
+  const openDatePicker = () => {
+    dateInputRef.current?.showPicker?.();
+    dateInputRef.current?.focus();
+  };
   const openTimePicker = () => {
     timeInputRef.current?.showPicker?.();
     timeInputRef.current?.focus();
@@ -383,11 +389,27 @@ export function SchedulesClient({
                   <div className="text-xs font-semibold text-white/60">
                     Data
                   </div>
-                  <input
-                    type="date"
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:[filter:invert(1)]"
-                    {...register("data_envio_date", { required: true })}
-                  />
+                  <div className="relative mt-2">
+                    <input
+                      type="date"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                      {...dateField}
+                      onFocus={openDatePicker}
+                      onClick={openDatePicker}
+                      ref={(el) => {
+                        dateField.ref(el);
+                        dateInputRef.current = el;
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={openDatePicker}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
+                      aria-label="Selecionar data"
+                    >
+                      <Calendar className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-white/60">
