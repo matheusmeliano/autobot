@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Clock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import {
@@ -58,6 +58,7 @@ export function SchedulesClient({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
+  const timeInputRef = useRef<HTMLInputElement | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -150,17 +151,24 @@ export function SchedulesClient({
     close();
   });
 
-  const remove = (id: string) => {
+  const remove = async (row: ScheduleRow) => {
+    const confirmed = await modalToast.confirm(
+      `Tem certeza que deseja excluir o agendamento do cliente "${row.debtor_nome}"?`,
+      { title: "Excluir agendamento", confirmText: "Excluir", cancelText: "Cancelar" },
+    );
+    if (!confirmed) return;
     startTransition(async () => {
-      const res = await deleteScheduleAction(id);
+      const res = await deleteScheduleAction(row.id);
       if (!res.ok) {
         modalToast.error(res.error ?? "Falha ao excluir.");
         return;
       }
       modalToast.success("Agendamento excluído.");
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
     });
   };
+
+  const timeField = register("data_envio_time", { required: true });
 
   return (
     <div>
@@ -237,7 +245,7 @@ export function SchedulesClient({
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => remove(r.id)}
+                        onClick={() => remove(r)}
                         disabled={isPending}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Excluir"
@@ -322,11 +330,28 @@ export function SchedulesClient({
                   <div className="text-xs font-semibold text-white/60">
                     Hora
                   </div>
-                  <input
-                    type="time"
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                    {...register("data_envio_time", { required: true })}
-                  />
+                  <div className="relative mt-2">
+                    <input
+                      type="time"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
+                      {...timeField}
+                      ref={(el) => {
+                        timeField.ref(el);
+                        timeInputRef.current = el;
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        timeInputRef.current?.showPicker?.();
+                        timeInputRef.current?.focus();
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/55 hover:text-white/80"
+                      aria-label="Selecionar hora"
+                    >
+                      <Clock className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
