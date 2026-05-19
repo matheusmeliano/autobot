@@ -28,19 +28,43 @@ async function sendZapiText(params: {
   phone: string;
   message: string;
 }) {
-  const url = `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}/token/${encodeURIComponent(params.token)}/send-text`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone: normalizePhone(params.phone), message: params.message }),
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
+  const body = JSON.stringify({ phone: normalizePhone(params.phone), message: params.message });
+  const baseUrl = `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}`;
+  const urlWithTokenInPath = `${baseUrl}/token/${encodeURIComponent(params.token)}/send-text`;
+  const urlWithHeader = `${baseUrl}/send-text`;
+
+  const trySend = async (url: string, includeHeaderToken: boolean) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(includeHeaderToken ? { "Client-Token": params.token } : {}),
+      },
+      body,
+    });
+    const data = await response.json().catch(() => null);
+    return { response, data };
+  };
+
+  const first = await trySend(urlWithTokenInPath, true);
+  if (first.response.ok) return first.data;
+
+  const errText = JSON.stringify(first.data ?? "");
+  const shouldRetry =
+    first.response.status === 400 &&
+    /client-token/i.test(errText);
+
+  if (shouldRetry) {
+    const second = await trySend(urlWithHeader, true);
+    if (second.response.ok) return second.data;
     throw new Error(
-      `Falha ao enviar: ${response.status} ${JSON.stringify(data) ?? ""}`.trim(),
+      `Falha ao enviar: ${second.response.status} ${JSON.stringify(second.data) ?? ""}`.trim(),
     );
   }
-  return data;
+
+  throw new Error(
+    `Falha ao enviar: ${first.response.status} ${JSON.stringify(first.data) ?? ""}`.trim(),
+  );
 }
 
 export async function GET(req: Request) {
@@ -56,7 +80,7 @@ export async function GET(req: Request) {
     .select(
       "id, user_id, debtor_id, template_id, data_envio, status, debtors(nome, telefone, pix_key), message_templates(conteudo)",
     )
-    .eq("status", "agendado")
+    .in("status", ["agendado", "pausado"])
     .lte("data_envio", nowIso)
     .order("data_envio", { ascending: true })
     .limit(100);
@@ -85,7 +109,7 @@ export async function GET(req: Request) {
         .from("schedules")
         .update({ status: "executando" })
         .eq("id", scheduleId)
-        .eq("status", "agendado")
+        .in("status", ["agendado", "pausado"])
         .select("id")
         .maybeSingle();
 
@@ -135,7 +159,11 @@ export async function GET(req: Request) {
         tipo: "agenda_falha",
         descricao: `Falha ao executar agendamento ${scheduleId}: ${msg}`,
       });
-      await supabase.from("schedules").update({ status: "pausado" }).eq("id", scheduleId);
+      const retryAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+      await supabase
+        .from("schedules")
+        .update({ status: "agendado", data_envio: retryAt })
+        .eq("id", scheduleId);
       results.push({ id: scheduleId, ok: false, error: msg });
     }
   }
@@ -146,4 +174,3 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   return GET(req);
 }
-
