@@ -385,7 +385,7 @@ export function SchedulesClient({
                   </div>
                   <input
                     type="date"
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:invert"
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:[filter:invert(1)]"
                     {...register("data_envio_date", { required: true })}
                   />
                 </div>
