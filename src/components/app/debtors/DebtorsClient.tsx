@@ -308,42 +308,19 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <div className="text-xs font-semibold text-white/60">
-                        Chave PIX (recebimento)
-                      </div>
-                      <div className="mt-1 text-[11px] font-semibold text-white/45">
-                        Chave que será enviada ao cliente para pagamento.
-                      </div>
-                      <input
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                        placeholder="Sua chave PIX (CPF, email, telefone ou aleatória)"
-                        {...register("pix_key")}
-                      />
+                  <div>
+                    <input type="hidden" {...register("status")} />
+                    <div className="text-xs font-semibold text-white/60">
+                      Chave PIX (recebimento)
                     </div>
-                    <div>
-                      <div className="text-xs font-semibold text-white/60">
-                        Status
-                      </div>
-                      <select
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
-                        {...register("status")}
-                      >
-                        <option className="bg-[#070A10] text-white" value="ativo">
-                          ativo
-                        </option>
-                        <option className="bg-[#070A10] text-white" value="inativo">
-                          inativo
-                        </option>
-                        <option
-                          className="bg-[#070A10] text-white"
-                          value="inadimplente"
-                        >
-                          inadimplente
-                        </option>
-                      </select>
+                    <div className="mt-1 text-[11px] font-semibold text-white/45">
+                      Chave que será enviada ao cliente para pagamento.
                     </div>
+                    <input
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                      placeholder="Sua chave PIX (CPF, email, telefone ou aleatória)"
+                      {...register("pix_key")}
+                    />
                   </div>
 
                   <div>
