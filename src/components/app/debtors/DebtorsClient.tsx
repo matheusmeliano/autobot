@@ -313,18 +313,18 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03]">
-        <div className="px-4 pt-3 text-center text-[11px] font-semibold text-white/45 sm:hidden">
+        <div className="px-4 pt-3 text-center text-[11px] font-semibold text-white/45 min-[1201px]:hidden">
           Role para o lado.
         </div>
         <div className="overflow-x-auto">
-          <div className="min-w-[760px]">
+          <div className="min-w-[820px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
               <div className="col-span-4">Nome</div>
-              <div className="col-span-2">Telefone</div>
-              <div className="col-span-2">Valor</div>
-              <div className="col-span-2">Vencimento</div>
-              <div className="col-span-1">Status</div>
-              <div className="col-span-1 text-right">Ações</div>
+              <div className="col-span-2 text-center">Telefone</div>
+              <div className="col-span-2 text-center">Valor</div>
+              <div className="col-span-1 text-center">Vencimento</div>
+              <div className="col-span-1 text-center">Status</div>
+              <div className="col-span-2 text-right">Ações</div>
             </div>
 
             {filtered.length === 0 ? (
@@ -339,15 +339,19 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
                     <div className="col-span-4 truncate font-semibold">{r.nome}</div>
-                    <div className="col-span-2 text-white/60">{r.telefone ?? "-"}</div>
-                    <div className="col-span-2">{money(r.valor)}</div>
-                    <div className="col-span-2 text-white/60">{dateBR(r.vencimento)}</div>
-                    <div className="col-span-1">
+                    <div className="col-span-2 truncate text-center text-white/60">
+                      {r.telefone ?? "-"}
+                    </div>
+                    <div className="col-span-2 text-center">{money(r.valor)}</div>
+                    <div className="col-span-1 text-center text-white/60">
+                      {dateBR(r.vencimento)}
+                    </div>
+                    <div className="col-span-1 flex justify-center">
                       <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">
                         {r.status}
                       </span>
                     </div>
-                    <div className="col-span-1 flex justify-end gap-2">
+                    <div className="col-span-2 flex justify-end gap-2">
                       <button
                         onClick={() => openEdit(r)}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
