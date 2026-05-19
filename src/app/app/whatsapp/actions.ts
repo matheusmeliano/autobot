@@ -31,6 +31,18 @@ export async function upsertWhatsAppInstanceAction(input: unknown) {
     { onConflict: "user_id" }
   );
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    const msg = error.message ?? "";
+    const missingClientToken =
+      /client_token/i.test(msg) && /column/i.test(msg);
+    if (missingClientToken) {
+      return {
+        ok: false,
+        error:
+          "Rode a migration para adicionar a coluna client_token em whatsapp_instances e tente novamente.",
+      };
+    }
+    return { ok: false, error: msg };
+  }
   return { ok: true };
 }
