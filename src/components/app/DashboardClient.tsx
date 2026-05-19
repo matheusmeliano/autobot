@@ -1,13 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowUpRight, MessageSquareText, WalletCards } from "lucide-react";
+import { BadgeCheck, CalendarDays, MessageSquareText } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 type StatPack = {
-  totalReceived: number;
-  chargesSent: number;
-  messages: number;
+  schedulesMonth: number;
+  schedulesExecuted: number;
+  templates: number;
   whatsappStatus: string;
 };
 
@@ -83,11 +83,6 @@ export function DashboardClient({
     stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
 
-  const money = stats.totalReceived.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-
   const cleanedName = (name ?? "").trim();
   const greeting = cleanedName ? `Bem-vindo(a) ${cleanedName}!` : "Bem-vindo(a)!";
 
@@ -119,20 +114,20 @@ export function DashboardClient({
 
       <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-3">
         <Card
-          title="Total recebido (mês)"
-          value={money}
+          title="Agendamentos (mês)"
+          value={String(stats.schedulesMonth)}
           subtitle=""
-          icon={<ArrowUpRight className="h-5 w-5" />}
+          icon={<CalendarDays className="h-5 w-5" />}
         />
         <Card
-          title="Cobranças enviadas"
-          value={String(stats.chargesSent)}
+          title="Executados"
+          value={String(stats.schedulesExecuted)}
           subtitle=""
-          icon={<WalletCards className="h-5 w-5" />}
+          icon={<BadgeCheck className="h-5 w-5" />}
         />
         <Card
-          title="Mensagens"
-          value={String(stats.messages)}
+          title="Templates"
+          value={String(stats.templates)}
           subtitle=""
           icon={<MessageSquareText className="h-5 w-5" />}
         />
@@ -140,9 +135,9 @@ export function DashboardClient({
 
       <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-3">
-          <div className="text-sm font-semibold">Cobranças criadas (7 dias)</div>
+          <div className="text-sm font-semibold">Agendamentos criados (7 dias)</div>
           <div className="mt-1 text-xs text-white/45">
-            Dados reais das cobranças cadastradas.
+            Dados reais dos agendamentos cadastrados.
           </div>
           <div className="mt-4 h-40">
             <ResponsiveContainer width="100%" height="100%">

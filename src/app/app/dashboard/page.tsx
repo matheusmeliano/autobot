@@ -14,7 +14,12 @@ export default async function DashboardPage() {
       <DashboardClient
         email={email}
         name=""
-        stats={{ totalReceived: 0, chargesSent: 0, messages: 0, whatsappStatus: "disconnected" }}
+        stats={{
+          schedulesMonth: 0,
+          schedulesExecuted: 0,
+          templates: 0,
+          whatsappStatus: "disconnected",
+        }}
         chart={[]}
         activities={[]}
       />
@@ -22,30 +27,38 @@ export default async function DashboardPage() {
   }
 
   const now = new Date();
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  startMonth.setHours(0, 0, 0, 0);
+  const startMonthIso = startMonth.toISOString();
   const start7 = new Date(now);
   start7.setDate(now.getDate() - 6);
   start7.setHours(0, 0, 0, 0);
   const start7Iso = start7.toISOString();
 
   const [
-    totalRes,
-    sentRes,
+    schedulesMonthRes,
+    schedulesExecutedRes,
+    templatesRes,
     chartRes,
     whatsappRes,
     profileRes,
     activitiesRes,
   ] = await Promise.all([
     supabase
-      .from("charges")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
-    supabase
-      .from("charges")
+      .from("schedules")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
-      .in("status", ["enviada", "paga"]),
+      .gte("created_at", startMonthIso),
     supabase
-      .from("charges")
+      .from("schedules")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "executado"),
+    supabase
+      .from("message_templates")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("schedules")
       .select("created_at")
       .eq("user_id", userId)
       .gte("created_at", start7Iso),
@@ -60,9 +73,9 @@ export default async function DashboardPage() {
   ]);
 
   const stats = {
-    totalReceived: 0,
-    chargesSent: sentRes.count ?? 0,
-    messages: totalRes.count ?? 0,
+    schedulesMonth: schedulesMonthRes.count ?? 0,
+    schedulesExecuted: schedulesExecutedRes.count ?? 0,
+    templates: templatesRes.count ?? 0,
     whatsappStatus: whatsappRes.data?.status ?? "disconnected",
   };
 
