@@ -539,7 +539,7 @@ export function Landing() {
                 },
                 {
                   q: "Tem teste grátis?",
-                  a: "Podemos habilitar período de trial no plano Pro (configurável).",
+                  a: "Assim que o cadastro for concluído, seu período de teste gratuito de 7 dias será ativado automaticamente.",
                 },
               ].map((item) => (
                 <GlassCard key={item.q} className="p-5">
