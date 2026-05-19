@@ -29,7 +29,8 @@ type FormValues = {
   id?: string;
   debtor_id: string;
   template_id?: string;
-  data_envio: string;
+  data_envio_date: string;
+  data_envio_time: string;
   status: string;
 };
 
@@ -73,7 +74,8 @@ export function SchedulesClient({
     defaultValues: {
       debtor_id: "",
       template_id: "",
-      data_envio: "",
+      data_envio_date: "",
+      data_envio_time: "",
       status: "agendado",
     },
   });
@@ -84,7 +86,8 @@ export function SchedulesClient({
     reset({
       debtor_id: "",
       template_id: "",
-      data_envio: "",
+      data_envio_date: "",
+      data_envio_time: "",
       status: "agendado",
     });
   };
@@ -101,7 +104,8 @@ export function SchedulesClient({
       id: row.id,
       debtor_id: row.debtor_id,
       template_id: row.template_id ?? "",
-      data_envio: row.data_envio.slice(0, 16),
+      data_envio_date: row.data_envio.slice(0, 10),
+      data_envio_time: row.data_envio.slice(11, 16),
       status: row.status,
     });
   };
@@ -118,13 +122,18 @@ export function SchedulesClient({
       modalToast.warning("Selecione um cliente.");
       return;
     }
+    if (!values.data_envio_date || !values.data_envio_time) {
+      modalToast.warning("Selecione a data e a hora.");
+      return;
+    }
 
+    const dataEnvio = `${values.data_envio_date}T${values.data_envio_time}`;
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       debtor_id: values.debtor_id,
       template_id: values.template_id ? values.template_id : undefined,
-      data_envio: values.data_envio,
-      status: values.status,
+      data_envio: dataEnvio,
+      status: values.status || "agendado",
     };
 
     const res = editing
@@ -263,6 +272,7 @@ export function SchedulesClient({
         </div>
 
         <form onSubmit={onSubmit} className="mt-4 grid gap-3">
+              <input type="hidden" {...register("status")} />
               <div>
                 <div className="text-xs font-semibold text-white/60">
                   Cliente
@@ -300,35 +310,23 @@ export function SchedulesClient({
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <div className="text-xs font-semibold text-white/60">
-                    Data/Hora
+                    Data
                   </div>
                   <input
-                    type="datetime-local"
+                    type="date"
                     className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                    {...register("data_envio", { required: true })}
+                    {...register("data_envio_date", { required: true })}
                   />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-white/60">
-                    Status
+                    Hora
                   </div>
-                  <select
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
-                    {...register("status")}
-                  >
-                    <option className="bg-[#070A10] text-white" value="agendado">
-                      agendado
-                    </option>
-                    <option className="bg-[#070A10] text-white" value="pausado">
-                      pausado
-                    </option>
-                    <option className="bg-[#070A10] text-white" value="executado">
-                      executado
-                    </option>
-                    <option className="bg-[#070A10] text-white" value="cancelado">
-                      cancelado
-                    </option>
-                  </select>
+                  <input
+                    type="time"
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                    {...register("data_envio_time", { required: true })}
+                  />
                 </div>
               </div>
 
