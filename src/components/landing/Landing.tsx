@@ -395,7 +395,7 @@ export function Landing() {
                   step: "01",
                   title: "Conecte seu WhatsApp (Via Z-API)",
                   description:
-                    "Escaneie o QR Code e acompanhe a conexão em tempo real.",
+                    "Escaneie o QR Code com segurança e total estabilidade.",
                 },
                 {
                   step: "02",
