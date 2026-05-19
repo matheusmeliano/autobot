@@ -3,6 +3,16 @@ import { normalizePlan, planLabel } from "@/lib/plans";
 import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
 import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
 
+function dateBR(v: string | null) {
+  if (!v) return "-";
+  const s = v.slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
+}
+
 export default async function AssinaturaPage() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -79,7 +89,7 @@ export default async function AssinaturaPage() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Vencimento</div>
           <div className="mt-2 text-xl font-semibold tracking-tight">
-            {plan === "vitalicio" ? "-" : vencimento ?? "-"}
+            {plan === "vitalicio" ? "-" : dateBR(vencimento)}
           </div>
         </div>
       </div>

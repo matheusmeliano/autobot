@@ -38,9 +38,12 @@ type PasswordValues = {
 
 function dateBR(v: string | null) {
   if (!v) return "-";
+  const s = v.slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return d.toLocaleDateString("pt-BR");
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
 }
 
 function normalizeStatus(v?: string | null): "ativo" | "cancelado" {
