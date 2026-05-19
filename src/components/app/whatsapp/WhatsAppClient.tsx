@@ -98,7 +98,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div>
+            <div className="md:col-span-2">
               <div className="text-xs font-semibold text-white/60">
                 Client-Token
               </div>
