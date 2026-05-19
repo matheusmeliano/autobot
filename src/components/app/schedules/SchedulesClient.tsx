@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
-import { Calendar, Clock, Pencil, Plus, Trash2, X, Zap } from "lucide-react";
+import { Calendar, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -475,11 +475,10 @@ export function SchedulesClient({
                       <button
                         onClick={() => triggerNow(r)}
                         disabled={isPending || triggeringId === r.id || String(r.status ?? "") === "executado"}
-                        className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Disparar agora"
                       >
-                        <Zap className="h-4 w-4" />
-                        Disparar agora
+                        <Send className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => openEdit(r)}
