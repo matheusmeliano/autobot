@@ -54,7 +54,7 @@ export function ReportsClient({
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="text-sm font-semibold">Cobranças criadas (30 dias)</div>
+        <div className="text-sm font-semibold">Agendamentos criados (30 dias)</div>
         <div className="mt-4 h-48">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chart}>
