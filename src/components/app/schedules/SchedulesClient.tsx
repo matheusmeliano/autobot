@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
+import { createPortal } from "react-dom";
 import { Calendar, Clock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
@@ -98,6 +99,11 @@ export function SchedulesClient({
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement | null>(null);
+  const timePickerPanelRef = useRef<HTMLDivElement | null>(null);
+  const timeInputBoxRef = useRef<HTMLInputElement | null>(null);
+  const [timePickerPos, setTimePickerPos] = useState<{ left: number; top: number } | null>(
+    null,
+  );
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
 
   const filtered = useMemo(() => {
@@ -250,15 +256,43 @@ export function SchedulesClient({
     dateInputRef.current?.focus();
   };
   const openTimePicker = () => {
+    const rect = timeInputBoxRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const pickerWidth = 260;
+    const pickerHeight = 256;
+    const gap = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const left = Math.max(gap, Math.min(rect.right - pickerWidth, vw - pickerWidth - gap));
+    const belowTop = rect.bottom + gap;
+    const shouldOpenAbove = vh - rect.bottom < pickerHeight + gap && rect.top > pickerHeight + gap;
+    const top = shouldOpenAbove ? Math.max(gap, rect.top - gap - pickerHeight) : belowTop;
+
+    setTimePickerPos({ left, top });
     setTimePickerOpen(true);
   };
+
+  useLayoutEffect(() => {
+    if (!timePickerOpen) return;
+    const onUpdate = () => openTimePicker();
+    window.addEventListener("resize", onUpdate);
+    window.addEventListener("scroll", onUpdate, true);
+    return () => {
+      window.removeEventListener("resize", onUpdate);
+      window.removeEventListener("scroll", onUpdate, true);
+    };
+  }, [timePickerOpen]);
 
   useEffect(() => {
     if (!timePickerOpen) return;
     const onPointerDown = (e: Event) => {
       const t = e.target as Node | null;
       if (!t) return;
-      if (!timePickerRef.current?.contains(t)) setTimePickerOpen(false);
+      if (timePickerRef.current?.contains(t)) return;
+      if (timePickerPanelRef.current?.contains(t)) return;
+      setTimePickerOpen(false);
     };
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("touchstart", onPointerDown);
@@ -270,6 +304,80 @@ export function SchedulesClient({
 
   return (
     <div>
+      {timePickerOpen && timePickerPos
+        ? createPortal(
+            <div
+              ref={timePickerPanelRef}
+              className="fixed z-[220] w-[260px] rounded-xl border border-white/10 bg-[#070A10] p-2 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.9)]"
+              style={{ left: timePickerPos.left, top: timePickerPos.top }}
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                  {Array.from({ length: 24 }).map((_, i) => {
+                    const h = String(i).padStart(2, "0");
+                    const selected =
+                      typeof timeValue === "string" && timeValue.slice(0, 2) === h;
+                    return (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => {
+                          const m =
+                            typeof timeValue === "string" && timeValue.length >= 5
+                              ? timeValue.slice(3, 5)
+                              : "00";
+                          setValue("data_envio_time", `${h}:${m}`, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          });
+                        }}
+                        className={[
+                          "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
+                          selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                        ].join(" ")}
+                      >
+                        {h}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                  {Array.from({ length: 60 }).map((_, i) => {
+                    const m = String(i).padStart(2, "0");
+                    const selected =
+                      typeof timeValue === "string" && timeValue.slice(3, 5) === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          const h =
+                            typeof timeValue === "string" && timeValue.length >= 2
+                              ? timeValue.slice(0, 2)
+                              : "00";
+                          setValue("data_envio_time", `${h}:${m}`, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          });
+                          setTimePickerOpen(false);
+                        }}
+                        className={[
+                          "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
+                          selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                        ].join(" ")}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
@@ -457,6 +565,7 @@ export function SchedulesClient({
                       placeholder="--:--"
                       onFocus={openTimePicker}
                       onClick={openTimePicker}
+                      ref={timeInputBoxRef}
                       className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
                     />
                     <button
@@ -467,73 +576,6 @@ export function SchedulesClient({
                     >
                       <Clock className="h-4 w-4" />
                     </button>
-                    {timePickerOpen ? (
-                      <div className="absolute right-0 mt-2 w-[260px] rounded-xl border border-white/10 bg-[#070A10] p-2 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.9)]">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
-                            {Array.from({ length: 24 }).map((_, i) => {
-                              const h = String(i).padStart(2, "0");
-                              const selected =
-                                typeof timeValue === "string" && timeValue.slice(0, 2) === h;
-                              return (
-                                <button
-                                  key={h}
-                                  type="button"
-                                  onClick={() => {
-                                    const m =
-                                      typeof timeValue === "string" && timeValue.length >= 5
-                                        ? timeValue.slice(3, 5)
-                                        : "00";
-                                    setValue("data_envio_time", `${h}:${m}`, {
-                                      shouldDirty: true,
-                                      shouldTouch: true,
-                                      shouldValidate: true,
-                                    });
-                                  }}
-                                  className={[
-                                    "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
-                                    selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
-                                  ].join(" ")}
-                                >
-                                  {h}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
-                            {Array.from({ length: 60 }).map((_, i) => {
-                              const m = String(i).padStart(2, "0");
-                              const selected =
-                                typeof timeValue === "string" && timeValue.slice(3, 5) === m;
-                              return (
-                                <button
-                                  key={m}
-                                  type="button"
-                                  onClick={() => {
-                                    const h =
-                                      typeof timeValue === "string" && timeValue.length >= 2
-                                        ? timeValue.slice(0, 2)
-                                        : "00";
-                                    setValue("data_envio_time", `${h}:${m}`, {
-                                      shouldDirty: true,
-                                      shouldTouch: true,
-                                      shouldValidate: true,
-                                    });
-                                    setTimePickerOpen(false);
-                                  }}
-                                  className={[
-                                    "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
-                                    selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
-                                  ].join(" ")}
-                                >
-                                  {m}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               </div>
