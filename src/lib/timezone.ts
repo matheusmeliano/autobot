@@ -54,10 +54,20 @@ export function zonedDateTimeToUtcIso({ date, time, timeZone }: ZonedDateTimeInp
 export const BRAZIL_TIMEZONES = [
   "America/Noronha",
   "America/Sao_Paulo",
+  "America/Araguaina",
+  "America/Bahia",
+  "America/Belem",
+  "America/Fortaleza",
+  "America/Maceio",
+  "America/Recife",
+  "America/Santarem",
+  "America/Boa_Vista",
+  "America/Campo_Grande",
   "America/Cuiaba",
+  "America/Porto_Velho",
   "America/Manaus",
+  "America/Eirunepe",
   "America/Rio_Branco",
 ] as const;
 
 export type BrazilTimeZone = (typeof BRAZIL_TIMEZONES)[number];
-

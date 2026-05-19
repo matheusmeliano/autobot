@@ -6,11 +6,22 @@ import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 import { updateTimezoneAction } from "@/app/app/configuracoes/actions";
 
 function labelForTimeZone(tz: BrazilTimeZone) {
-  if (tz === "America/Sao_Paulo") return "Brasília (GMT-3)";
-  if (tz === "America/Cuiaba") return "Cuiabá (GMT-4)";
-  if (tz === "America/Manaus") return "Manaus (GMT-4)";
-  if (tz === "America/Rio_Branco") return "Rio Branco (GMT-5)";
   if (tz === "America/Noronha") return "Fernando de Noronha (GMT-2)";
+  if (tz === "America/Sao_Paulo") return "Brasília (GMT-3)";
+  if (tz === "America/Araguaina") return "Araguaína (GMT-3)";
+  if (tz === "America/Bahia") return "Salvador (GMT-3)";
+  if (tz === "America/Belem") return "Belém (GMT-3)";
+  if (tz === "America/Fortaleza") return "Fortaleza (GMT-3)";
+  if (tz === "America/Maceio") return "Maceió (GMT-3)";
+  if (tz === "America/Recife") return "Recife (GMT-3)";
+  if (tz === "America/Santarem") return "Santarém (GMT-3)";
+  if (tz === "America/Boa_Vista") return "Boa Vista (GMT-4)";
+  if (tz === "America/Campo_Grande") return "Campo Grande (GMT-4)";
+  if (tz === "America/Cuiaba") return "Cuiabá (GMT-4)";
+  if (tz === "America/Porto_Velho") return "Porto Velho (GMT-4)";
+  if (tz === "America/Manaus") return "Manaus (GMT-4)";
+  if (tz === "America/Eirunepe") return "Eirunepé (GMT-5)";
+  if (tz === "America/Rio_Branco") return "Rio Branco (GMT-5)";
   return tz;
 }
 
