@@ -63,6 +63,24 @@ function timeBR(v: string) {
   }).format(d);
 }
 
+function splitDateTimeForInput(v: string) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return { date: "", time: "" };
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+  return { date, time };
+}
+
 export function SchedulesClient({
   initial,
   debtors,
@@ -120,12 +138,13 @@ export function SchedulesClient({
   const openEdit = (row: ScheduleRow) => {
     setEditing(row);
     setOpen(true);
+    const dt = splitDateTimeForInput(row.data_envio);
     reset({
       id: row.id,
       debtor_id: row.debtor_id,
       template_id: row.template_id ?? "",
-      data_envio_date: row.data_envio.slice(0, 10),
-      data_envio_time: row.data_envio.slice(11, 16),
+      data_envio_date: dt.date,
+      data_envio_time: dt.time,
       status: row.status,
     });
   };
@@ -147,7 +166,9 @@ export function SchedulesClient({
       return;
     }
 
-    const dataEnvio = `${values.data_envio_date}T${values.data_envio_time}`;
+    const dataEnvio = new Date(
+      `${values.data_envio_date}T${values.data_envio_time}`,
+    ).toISOString();
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       debtor_id: values.debtor_id,
