@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { Logo } from "@/components/ui/Logo";
+import { Portal } from "@/components/ui/Portal";
 
 const chartData = [
   { name: "Seg", value: 12 },
@@ -82,18 +83,20 @@ export function Landing() {
         <div className="absolute left-[-240px] top-[520px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),rgba(59,130,246,0)_55%)]" />
       </div>
 
-      <div className="fixed bottom-4 right-4 z-40 text-xs text-white/50">
-        Desenvolvido pela{" "}
-        <a
-          href="#"
-          target="_blank"
-          rel="noreferrer"
-          className="font-semibold text-white/70 hover:text-white"
-        >
-          HEYBROTHERS
-        </a>
-        .
-      </div>
+      <Portal>
+        <div className="pointer-events-auto fixed bottom-4 right-4 z-[100] text-xs text-white/50">
+          Desenvolvido pela{" "}
+          <a
+            href="#"
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold text-white/70 hover:text-white"
+          >
+            HEYBROTHERS
+          </a>
+          .
+        </div>
+      </Portal>
 
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#070A10]/60 backdrop-blur-xl">
         <Container>

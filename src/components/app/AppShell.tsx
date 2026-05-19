@@ -9,6 +9,7 @@ import { Logo } from "@/components/ui/Logo";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { normalizePlan } from "@/lib/plans";
+import { Portal } from "@/components/ui/Portal";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -209,18 +210,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <AppNav variant="bottom" restricted={restricted} />
       </div>
 
-      <div className="fixed bottom-20 right-4 z-40 text-xs text-white/50 min-[1201px]:bottom-4">
-        Desenvolvido pela{" "}
-        <a
-          href="#"
-          target="_blank"
-          rel="noreferrer"
-          className="font-semibold text-white/70 hover:text-white"
-        >
-          HEYBROTHERS
-        </a>
-        .
-      </div>
+      <Portal>
+        <div className="pointer-events-auto fixed bottom-20 right-4 z-[100] text-xs text-white/50 min-[1201px]:bottom-4">
+          Desenvolvido pela{" "}
+          <a
+            href="#"
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold text-white/70 hover:text-white"
+          >
+            HEYBROTHERS
+          </a>
+          .
+        </div>
+      </Portal>
     </div>
   );
 }
