@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Calendar, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Calendar, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -32,6 +33,7 @@ type FormValues = {
   debtor_id: string;
   template_id?: string;
   data_envio_date: string;
+  data_envio_time: string;
   status: string;
 };
 
@@ -99,6 +101,13 @@ export function SchedulesClient({
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const timePickerRef = useRef<HTMLDivElement | null>(null);
+  const timePickerPanelRef = useRef<HTMLDivElement | null>(null);
+  const timeInputBoxRef = useRef<HTMLInputElement | null>(null);
+  const [timePickerPos, setTimePickerPos] = useState<{ left: number; top: number } | null>(
+    null,
+  );
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const missingTimeZone = !timeZone;
   const missingWhatsApp = !whatsappConfigured;
@@ -127,23 +136,30 @@ export function SchedulesClient({
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
       debtor_id: "",
       template_id: "",
       data_envio_date: "",
+      data_envio_time: "",
       status: "agendado",
     },
   });
 
+  const timeValue = watch("data_envio_time");
+
   const close = () => {
     setOpen(false);
     setEditing(null);
+    setTimePickerOpen(false);
     reset({
       debtor_id: "",
       template_id: "",
       data_envio_date: "",
+      data_envio_time: "",
       status: "agendado",
     });
   };
@@ -172,6 +188,7 @@ export function SchedulesClient({
       debtor_id: row.debtor_id,
       template_id: row.template_id ?? "",
       data_envio_date: dt.date,
+      data_envio_time: dt.time,
       status: row.status,
     });
   };
@@ -193,8 +210,8 @@ export function SchedulesClient({
       modalToast.warning("Selecione um cliente.");
       return;
     }
-    if (!values.data_envio_date) {
-      modalToast.warning("Selecione a data.");
+    if (!values.data_envio_date || !values.data_envio_time) {
+      modalToast.warning("Selecione a data e a hora.");
       return;
     }
 
@@ -203,13 +220,14 @@ export function SchedulesClient({
       debtor_id: values.debtor_id,
       template_id: values.template_id ? values.template_id : undefined,
       data_envio_date: values.data_envio_date,
+      data_envio_time: values.data_envio_time,
       status: values.status || "agendado",
     };
 
     try {
       const iso = zonedDateTimeToUtcIso({
         date: values.data_envio_date,
-        time: "10:00",
+        time: values.data_envio_time,
         timeZone: effectiveTimeZone,
       });
       if (new Date(iso).getTime() < Date.now() + 3 * 60 * 1000) {
@@ -277,17 +295,138 @@ export function SchedulesClient({
   };
 
   const dateField = register("data_envio_date", { required: true });
+  const timeField = register("data_envio_time", { required: true });
   const openDatePicker = () => {
     dateInputRef.current?.showPicker?.();
     dateInputRef.current?.focus();
   };
+  const openTimePicker = () => {
+    const rect = timeInputBoxRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const pickerWidth = 260;
+    const pickerHeight = 256;
+    const gap = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const left = Math.max(gap, Math.min(rect.right - pickerWidth, vw - pickerWidth - gap));
+    const belowTop = rect.bottom + gap;
+    const shouldOpenAbove = vh - rect.bottom < pickerHeight + gap && rect.top > pickerHeight + gap;
+    const top = shouldOpenAbove ? Math.max(gap, rect.top - gap - pickerHeight) : belowTop;
+
+    setTimePickerPos({ left, top });
+    setTimePickerOpen(true);
+  };
+
+  useLayoutEffect(() => {
+    if (!timePickerOpen) return;
+    const onUpdate = () => openTimePicker();
+    window.addEventListener("resize", onUpdate);
+    window.addEventListener("scroll", onUpdate, true);
+    return () => {
+      window.removeEventListener("resize", onUpdate);
+      window.removeEventListener("scroll", onUpdate, true);
+    };
+  }, [timePickerOpen]);
+
+  useEffect(() => {
+    if (!timePickerOpen) return;
+    const onPointerDown = (e: Event) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (timePickerRef.current?.contains(t)) return;
+      if (timePickerPanelRef.current?.contains(t)) return;
+      setTimePickerOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [timePickerOpen]);
 
   return (
     <div>
-          <div className="mt-2 text-sm text-white/60">
-            Agende envios por cliente e template.
-          </div>
-        </div>
+      {timePickerOpen && timePickerPos
+        ? createPortal(
+            <div
+              ref={timePickerPanelRef}
+              className="fixed z-[220] w-[260px] rounded-xl border border-white/10 bg-[#070A10] p-2 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.9)]"
+              style={{ left: timePickerPos.left, top: timePickerPos.top }}
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                  {Array.from({ length: 24 }).map((_, i) => {
+                    const h = String(i).padStart(2, "0");
+                    const selected =
+                      typeof timeValue === "string" && timeValue.slice(0, 2) === h;
+                    return (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => {
+                          const m =
+                            typeof timeValue === "string" && timeValue.length >= 5
+                              ? timeValue.slice(3, 5)
+                              : "00";
+                          setValue("data_envio_time", `${h}:${m}`, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          });
+                        }}
+                        className={[
+                          "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
+                          selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                        ].join(" ")}
+                      >
+                        {h}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                  {Array.from({ length: 60 }).map((_, i) => {
+                    const m = String(i).padStart(2, "0");
+                    const selected =
+                      typeof timeValue === "string" && timeValue.slice(3, 5) === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          const h =
+                            typeof timeValue === "string" && timeValue.length >= 2
+                              ? timeValue.slice(0, 2)
+                              : "00";
+                          setValue("data_envio_time", `${h}:${m}`, {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          });
+                          setTimePickerOpen(false);
+                        }}
+                        className={[
+                          "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
+                          selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                        ].join(" ")}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
+            Agendamentos
           </h1>
           <div className="mt-2 text-sm text-white/60">
             Agende envios por cliente e template.
@@ -392,7 +531,7 @@ export function SchedulesClient({
               {editing ? "Editar agendamento" : "Novo agendamento"}
             </div>
             <div className="mt-1 text-xs text-white/55">
-              Escolha cliente, template e data.
+              Escolha cliente, template e data/hora.
             </div>
           </div>
           <button
@@ -439,30 +578,58 @@ export function SchedulesClient({
                 </select>
               </div>
 
-              <div>
-                <div className="text-xs font-semibold text-white/60">
-                  Data
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <div className="text-xs font-semibold text-white/60">
+                    Data
+                  </div>
+                  <div className="relative mt-2">
+                    <input
+                      type="date"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                      {...dateField}
+                      onFocus={openDatePicker}
+                      onClick={openDatePicker}
+                      ref={(el) => {
+                        dateField.ref(el);
+                        dateInputRef.current = el;
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={openDatePicker}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
+                      aria-label="Selecionar data"
+                    >
+                      <Calendar className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="relative mt-2">
-                  <input
-                    type="date"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-                    {...dateField}
-                    onFocus={openDatePicker}
-                    onClick={openDatePicker}
-                    ref={(el) => {
-                      dateField.ref(el);
-                      dateInputRef.current = el;
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={openDatePicker}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
-                    aria-label="Selecionar data"
-                  >
-                    <Calendar className="h-4 w-4" />
-                  </button>
+                <div>
+                  <div className="text-xs font-semibold text-white/60">
+                    Hora
+                  </div>
+                  <div className="relative mt-2" ref={timePickerRef}>
+                    <input type="hidden" {...timeField} />
+                    <input
+                      type="text"
+                      readOnly
+                      value={timeValue || ""}
+                      placeholder="--:--"
+                      onFocus={openTimePicker}
+                      onClick={openTimePicker}
+                      ref={timeInputBoxRef}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={openTimePicker}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+                      aria-label="Selecionar hora"
+                    >
+                      <Clock className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 

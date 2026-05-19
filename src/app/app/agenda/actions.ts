@@ -103,6 +103,7 @@ const createSchema = z.object({
   debtor_id: z.string().uuid(),
   template_id: z.string().uuid().optional(),
   data_envio_date: z.string().min(10),
+  data_envio_time: z.string().min(4),
   status: z.string().optional(),
 });
 
@@ -141,7 +142,7 @@ export async function createScheduleAction(input: unknown) {
   try {
     dataEnvioIso = zonedDateTimeToUtcIso({
       date: parsed.data.data_envio_date,
-      time: "10:00",
+      time: parsed.data.data_envio_time,
       timeZone,
     });
   } catch {
@@ -194,7 +195,7 @@ export async function updateScheduleAction(input: unknown) {
   try {
     dataEnvioIso = zonedDateTimeToUtcIso({
       date: data.data_envio_date,
-      time: "10:00",
+      time: data.data_envio_time,
       timeZone,
     });
   } catch {
