@@ -34,6 +34,21 @@ function applyTemplate(text: string, vars: Record<string, string>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.split(`{${k}}`).join(v), text);
 }
 
+function formatBRL(value: unknown) {
+  if (value === null || value === undefined) return "";
+  const n = typeof value === "number" ? value : Number(String(value));
+  if (Number.isNaN(n)) return "";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+}
+
+function formatDateBR(value: unknown) {
+  if (value === null || value === undefined) return "";
+  const raw = String(value);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00`) : new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
+}
+
 async function sendZapiText(params: {
   instance_id: string;
   token: string;
@@ -240,7 +255,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, status, debtors(nome, telefone, pix_key), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, data_envio, status, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -288,6 +303,8 @@ export async function triggerScheduleNowAction(id: string) {
     const message = applyTemplate(templateText, {
       nome: String(debtor?.nome ?? ""),
       pix: String(debtor?.pix_key ?? ""),
+      valor: formatBRL(debtor?.valor),
+      vencimento: formatDateBR(debtor?.vencimento),
     });
 
     await sendZapiText({
