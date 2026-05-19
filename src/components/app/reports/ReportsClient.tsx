@@ -41,7 +41,7 @@ export function ReportsClient({
           Visão geral
         </h1>
         <div className="mt-2 text-sm text-white/60">
-          Dados reais das cobranças cadastradas.
+          Dados reais dos agendamentos cadastrados.
         </div>
       </div>
 
