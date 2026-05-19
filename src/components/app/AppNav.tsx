@@ -14,14 +14,12 @@ import {
   Plus,
   Settings,
   Smartphone,
-  WalletCards,
   X,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/app/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/app/clientes", label: "Clientes", icon: CircleUserRound },
-  { href: "/app/cobrancas", label: "Cobranças", icon: WalletCards },
   { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/app/whatsapp", label: "WhatsApp", icon: Smartphone },
   { href: "/app/mensagens", label: "Mensagens", icon: MessageSquareText },
