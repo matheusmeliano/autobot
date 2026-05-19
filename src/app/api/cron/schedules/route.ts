@@ -25,6 +25,7 @@ function isAuthorized(req: Request) {
 async function sendZapiText(params: {
   instance_id: string;
   token: string;
+  client_token?: string | null;
   phone: string;
   message: string;
 }) {
@@ -38,7 +39,9 @@ async function sendZapiText(params: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(includeHeaderToken ? { "Client-Token": params.token } : {}),
+        ...(includeHeaderToken && params.client_token
+          ? { "Client-Token": params.client_token }
+          : {}),
       },
       body,
     });
@@ -46,16 +49,20 @@ async function sendZapiText(params: {
     return { response, data };
   };
 
-  const first = await trySend(urlWithTokenInPath, true);
+  const first = await trySend(urlWithTokenInPath, Boolean(params.client_token));
   if (first.response.ok) return first.data;
 
   const errText = JSON.stringify(first.data ?? "");
-  const shouldRetry =
-    first.response.status === 400 &&
-    /client-token/i.test(errText);
+  const mentionsClientToken = /client-token/i.test(errText);
+  const isForbidden = first.response.status === 403;
+  const isBadRequest = first.response.status === 400;
 
-  if (shouldRetry) {
-    const second = await trySend(urlWithHeader, true);
+  if (mentionsClientToken && !params.client_token) {
+    throw new Error("Client-Token não configurado no WhatsApp.");
+  }
+
+  if ((isBadRequest || isForbidden) && mentionsClientToken) {
+    const second = await trySend(urlWithHeader, Boolean(params.client_token));
     if (second.response.ok) return second.data;
     throw new Error(
       `Falha ao enviar: ${second.response.status} ${JSON.stringify(second.data) ?? ""}`.trim(),
@@ -121,7 +128,7 @@ export async function GET(req: Request) {
 
       const { data: wa, error: waErr } = await supabase
         .from("whatsapp_instances")
-        .select("instance_id, token, status")
+        .select("instance_id, token, client_token, status")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -139,6 +146,7 @@ export async function GET(req: Request) {
       await sendZapiText({
         instance_id: wa.instance_id,
         token: wa.token,
+        client_token: wa.client_token,
         phone: debtorPhone,
         message,
       });

@@ -7,6 +7,7 @@ import { modalToast } from "@/lib/modalToast";
 type InstanceRow = {
   instance_id: string | null;
   token: string | null;
+  client_token: string | null;
   status: string | null;
   phone: string | null;
 };
@@ -14,6 +15,7 @@ type InstanceRow = {
 type FormValues = {
   instance_id: string;
   token: string;
+  client_token: string;
   phone: string;
 };
 
@@ -26,6 +28,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
     defaultValues: {
       instance_id: initial?.instance_id ?? "",
       token: initial?.token ?? "",
+      client_token: initial?.client_token ?? "",
       phone: initial?.phone ?? "",
     },
   });
@@ -34,6 +37,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
     const res = await upsertWhatsAppInstanceAction({
       instance_id: values.instance_id,
       token: values.token,
+      client_token: values.client_token || undefined,
       phone: values.phone || undefined,
     });
     if (!res.ok) {
@@ -111,6 +115,16 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
 
           <div className="grid gap-3 md:grid-cols-2">
             <div>
+              <div className="text-xs font-semibold text-white/60">
+                Client-Token
+              </div>
+              <input
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder="client-token"
+                {...register("client_token")}
+              />
+            </div>
+            <div>
               <div className="text-xs font-semibold text-white/60">Número</div>
               <input
                 className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
@@ -118,16 +132,15 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
                 {...register("phone")}
               />
             </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
-              >
-                {isSubmitting ? "Salvando..." : "Salvar"}
-              </button>
-            </div>
           </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {isSubmitting ? "Salvando..." : "Salvar"}
+          </button>
         </form>
       </div>
     </div>

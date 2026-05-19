@@ -5,7 +5,7 @@ export default async function WhatsAppPage() {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("whatsapp_instances")
-    .select("instance_id, token, status, phone")
+    .select("instance_id, token, client_token, status, phone")
     .maybeSingle();
 
   if (error) {
