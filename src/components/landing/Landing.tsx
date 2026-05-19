@@ -539,7 +539,7 @@ export function Landing() {
                 },
                 {
                   q: "Tem teste grátis?",
-                  a: "Assim que o cadastro for concluído, seu período de teste gratuito de 7 dias será ativado automaticamente.",
+                  a: "Ao se cadastrar, seu teste grátis de 7 dias começa automaticamente.",
                 },
               ].map((item) => (
                 <GlassCard key={item.q} className="p-5">
