@@ -37,47 +37,27 @@ type FormValues = {
 function dateTimeBR(v: string) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(d);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(d);
 }
 
 function dateBR(v: string) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    dateStyle: "short",
-  }).format(d);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
 function timeBR(v: string) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
 function splitDateTimeForInput(v: string) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return { date: "", time: "" };
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-  const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   return { date, time };
 }
 
