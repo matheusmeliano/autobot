@@ -52,8 +52,8 @@ export default async function DashboardPage() {
     supabase.from("whatsapp_instances").select("status").maybeSingle(),
     supabase.from("profiles").select("nome").eq("user_id", userId).maybeSingle(),
     supabase
-      .from("charges")
-      .select("id, status, created_at, debtors(nome)")
+      .from("schedules")
+      .select("id, status, data_envio, created_at, debtors(nome)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(6),
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
     id: String(r.id),
     debtorName: String(r?.debtors?.nome ?? "-"),
     status: String(r.status ?? ""),
-    createdAt: String(r.created_at ?? ""),
+    dateTime: String(r.data_envio ?? r.created_at ?? ""),
   }));
 
   return (

@@ -15,7 +15,7 @@ type ActivityRow = {
   id: string;
   debtorName: string;
   status: string;
-  createdAt: string;
+  dateTime: string;
 };
 
 type ChartPoint = { name: string; value: number };
@@ -59,10 +59,10 @@ function dateTimeBR(v: string) {
 
 function statusToLabel(status: string) {
   const s = status.trim().toLowerCase();
-  if (s === "paga" || s === "paid") return "Pago";
-  if (s === "enviada" || s === "sent") return "Enviado";
-  if (s === "falha" || s === "failed") return "Falha";
-  if (s === "pendente" || s === "pending") return "Pendente";
+  if (s === "agendado") return "Agendado";
+  if (s === "pausado") return "Pausado";
+  if (s === "executado") return "Executado";
+  if (s === "cancelado") return "Cancelado";
   return status;
 }
 
@@ -179,7 +179,7 @@ export function DashboardClient({
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-2">
           <div className="text-sm font-semibold">Atividades</div>
           <div className="mt-1 text-xs text-white/45">
-            Histórico de clientes cobrados recentemente.
+            Histórico da agenda.
           </div>
           <div className="mt-4 space-y-3">
             {activities.length ? (
@@ -192,16 +192,18 @@ export function DashboardClient({
                     <div className="min-w-0">
                       <div className="truncate text-xs font-semibold">{item.debtorName}</div>
                       <div className="mt-1 text-xs text-white/55">
-                        {statusToLabel(item.status)} • {dateTimeBR(item.createdAt)}
+                        {statusToLabel(item.status)} • {dateTimeBR(item.dateTime)}
                       </div>
                     </div>
                     <span
                       className={[
                         "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
-                        item.status.toLowerCase() === "paga"
+                        item.status.toLowerCase() === "executado"
                           ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                          : item.status.toLowerCase() === "falha"
+                          : item.status.toLowerCase() === "cancelado"
                             ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                            : item.status.toLowerCase() === "pausado"
+                              ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
                             : "border-white/10 bg-white/[0.04] text-white/70",
                       ].join(" ")}
                     >
@@ -212,9 +214,9 @@ export function DashboardClient({
               ))
             ) : (
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                <div className="text-xs font-semibold">Nenhuma cobrança ainda</div>
+                <div className="text-xs font-semibold">Nenhum agendamento ainda</div>
                 <div className="mt-1 text-xs text-white/55">
-                  Quando você enviar cobranças, elas aparecem aqui.
+                  Quando você criar agendamentos, eles aparecem aqui.
                 </div>
               </div>
             )}
