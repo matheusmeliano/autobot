@@ -262,7 +262,7 @@ export function MercadoPagoSubscribeButton(props: {
                 <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
                   PAGAMENTO
                 </div>
-                <div className="mt-1 text-lg font-semibold tracking-tight">
+                <div className="mt-1 text-lg font-semibold tracking-tight text-white/90">
                   Cartão de crédito
                 </div>
               </div>

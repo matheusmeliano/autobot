@@ -325,7 +325,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       <AppModal open={openEdit} onClose={closeEdit} size="md" zIndexClass="z-[100]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold">Editar usuário</div>
+            <div className="text-sm font-semibold text-white/90">Editar usuário</div>
             <div className="mt-1 text-xs text-white/55">{editing?.email ?? ""}</div>
           </div>
           <button
@@ -411,7 +411,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       <AppModal open={openPassword} onClose={closePassword} size="md" zIndexClass="z-[100]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold">Redefinir senha</div>
+            <div className="text-sm font-semibold text-white/90">Redefinir senha</div>
             <div className="mt-1 text-xs text-white/55">{editing?.email ?? ""}</div>
           </div>
           <button
@@ -452,7 +452,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold">Excluir usuário</div>
+            <div className="text-sm font-semibold text-white/90">Excluir usuário</div>
             <div className="mt-1 truncate text-xs text-white/55">{deleting?.email ?? ""}</div>
           </div>
           <button
