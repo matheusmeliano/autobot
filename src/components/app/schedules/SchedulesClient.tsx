@@ -3,13 +3,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
-import { Calendar, Clock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Calendar, Clock, Pencil, Plus, Trash2, X, Zap } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
   deleteScheduleAction,
+  triggerScheduleNowAction,
   updateScheduleAction,
 } from "@/app/app/agenda/actions";
 
@@ -96,6 +97,7 @@ export function SchedulesClient({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
+  const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement | null>(null);
@@ -246,6 +248,29 @@ export function SchedulesClient({
       }
       modalToast.success("Agendamento excluído.");
       setRows((prev) => prev.filter((r) => r.id !== row.id));
+    });
+  };
+
+  const triggerNow = (row: ScheduleRow) => {
+    if (!timeZone) {
+      modalToast.error("Selecione e salve seu fuso horário em Configurações antes de disparar.");
+      return;
+    }
+    if (String(row.status ?? "") === "executado") {
+      modalToast.info("Esse agendamento já foi executado.");
+      return;
+    }
+    setTriggeringId(row.id);
+    startTransition(async () => {
+      const res = await triggerScheduleNowAction(row.id);
+      if (!res.ok) {
+        modalToast.error(res.error ?? "Falha ao disparar.");
+        setTriggeringId(null);
+        return;
+      }
+      modalToast.success("Disparo iniciado.");
+      await refresh();
+      setTriggeringId(null);
     });
   };
 
@@ -448,6 +473,15 @@ export function SchedulesClient({
                     </div>
                     <div className="col-span-2 flex justify-end gap-2">
                       <button
+                        onClick={() => triggerNow(r)}
+                        disabled={isPending || triggeringId === r.id || String(r.status ?? "") === "executado"}
+                        className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+                        title="Disparar agora"
+                      >
+                        <Zap className="h-4 w-4" />
+                        Disparar agora
+                      </button>
+                      <button
                         onClick={() => openEdit(r)}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
                         title="Editar"
@@ -456,7 +490,7 @@ export function SchedulesClient({
                       </button>
                       <button
                         onClick={() => remove(r)}
-                        disabled={isPending}
+                        disabled={isPending || triggeringId === r.id}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Excluir"
                       >
