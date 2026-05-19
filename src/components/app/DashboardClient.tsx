@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowUpRight, MessageSquareText, Smartphone, WalletCards } from "lucide-react";
+import { ArrowUpRight, MessageSquareText, WalletCards } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 type StatPack = {
@@ -30,7 +30,7 @@ function Card({
         <div className="min-w-0">
           <div className="text-xs font-semibold text-white/55">{title}</div>
           <div className="mt-2 truncate text-2xl font-semibold tracking-tight">{value}</div>
-          <div className="mt-1 text-xs text-white/45">{subtitle}</div>
+          {subtitle ? <div className="mt-1 text-xs text-white/45">{subtitle}</div> : null}
         </div>
         <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] ring-1 ring-white/10">
           {icon}
@@ -96,26 +96,20 @@ export function DashboardClient({
         <Card
           title="Total recebido (mês)"
           value={money}
-          subtitle="Marcado como pago"
+          subtitle=""
           icon={<ArrowUpRight className="h-5 w-5" />}
         />
         <Card
           title="Cobranças enviadas"
           value={String(stats.chargesSent)}
-          subtitle="Status enviado + pago"
+          subtitle=""
           icon={<WalletCards className="h-5 w-5" />}
         />
         <Card
           title="Mensagens"
           value={String(stats.messages)}
-          subtitle="Total de cobranças criadas"
+          subtitle=""
           icon={<MessageSquareText className="h-5 w-5" />}
-        />
-        <Card
-          title="Status WhatsApp"
-          value={statusLabel}
-          subtitle="Config em WhatsApp"
-          icon={<Smartphone className="h-5 w-5" />}
         />
       </div>
 
