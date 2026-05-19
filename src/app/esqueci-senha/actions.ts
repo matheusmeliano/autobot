@@ -26,7 +26,7 @@ export async function forgotPasswordAction(formData: FormData) {
     return { ok: false, error: "Não foi possível gerar o link de retorno." };
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(
       "/redefinir-senha"
