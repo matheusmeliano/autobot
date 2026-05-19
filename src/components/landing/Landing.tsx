@@ -401,13 +401,13 @@ export function Landing() {
                   step: "02",
                   title: "Cadastre clientes",
                   description:
-                    "Organize contatos com telefone, valor, vencimento e status.",
+                    "Organize contatos com telefone, valor e vencimento.",
                 },
                 {
                   step: "03",
                   title: "Configure mensagens",
                   description:
-                    "Crie templates e personalize com nome, valor e data automaticamente.",
+                    "Crie templates e personalize com variáveis.",
                 },
                 {
                   step: "04",
