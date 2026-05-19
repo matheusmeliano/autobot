@@ -10,7 +10,7 @@ import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 export default async function AgendarPage() {
   const supabase = await createSupabaseServerClient();
 
-  const [schedulesRes, debtorsRes, templatesRes, profileRes] = await Promise.all([
+  const [schedulesRes, debtorsRes, templatesRes, profileRes, waRes] = await Promise.all([
     supabase
       .from("schedules")
       .select(
@@ -25,6 +25,7 @@ export default async function AgendarPage() {
       .order("created_at", { ascending: false })
       .limit(200),
     supabase.from("profiles").select("timezone").maybeSingle(),
+    supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
   ]);
 
   if (schedulesRes.error || debtorsRes.error || templatesRes.error) {
@@ -53,6 +54,11 @@ export default async function AgendarPage() {
 
   const tzRaw = (profileRes as any)?.data?.timezone;
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
+  const wa = (waRes as any)?.data ?? null;
+  const waStatus = String(wa?.status ?? "").toLowerCase();
+  const whatsappConfigured = Boolean(
+    wa?.instance_id && wa?.token && (waStatus === "configured" || waStatus === "connected"),
+  );
 
   return (
     <SchedulesClient
@@ -60,7 +66,7 @@ export default async function AgendarPage() {
       debtors={(debtorsRes.data ?? []) as DebtorOption[]}
       templates={(templatesRes.data ?? []) as TemplateOption[]}
       timeZone={timeZone}
+      whatsappConfigured={whatsappConfigured}
     />
   );
 }
-

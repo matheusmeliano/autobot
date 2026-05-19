@@ -5,6 +5,23 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+function prereqError(params: {
+  missingTimeZone: boolean;
+  missingWhatsApp: boolean;
+  context: "criar agendamentos" | "editar agendamentos" | "disparar agendamentos";
+}) {
+  if (params.missingTimeZone && params.missingWhatsApp) {
+    return `Selecione e salve seu fuso horário em Configurações e configure seu WhatsApp na página WhatsApp antes de ${params.context}.`;
+  }
+  if (params.missingTimeZone) {
+    return `Selecione e salve seu fuso horário em Configurações antes de ${params.context}.`;
+  }
+  if (params.missingWhatsApp) {
+    return `Configure seu WhatsApp na página WhatsApp antes de ${params.context}.`;
+  }
+  return null;
+}
+
 function normalizePhone(phone: string) {
   const d = phone.replace(/\D/g, "");
   if (!d) return "";
@@ -88,15 +105,23 @@ export async function createScheduleAction(input: unknown) {
   const userId = userRes.user?.id;
   if (!userId) return { ok: false, error: "Sem sessão." };
 
-  const { data: profile } = await supabase.from("profiles").select("timezone").maybeSingle();
-  const tzRaw = (profile as any)?.timezone;
+  const [profileRes, waRes] = await Promise.all([
+    supabase.from("profiles").select("timezone").maybeSingle(),
+    supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
+  ]);
+  const tzRaw = (profileRes as any)?.data?.timezone ?? (profileRes as any)?.timezone;
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : null;
-  if (!timeZone) {
-    return {
-      ok: false,
-      error: "Selecione e salve seu fuso horário em Configurações antes de criar agendamentos.",
-    };
-  }
+  const wa = (waRes as any)?.data ?? null;
+  const waStatus = String(wa?.status ?? "").toLowerCase();
+  const whatsappConfigured = Boolean(
+    wa?.instance_id && wa?.token && (waStatus === "configured" || waStatus === "connected"),
+  );
+  const msg = prereqError({
+    missingTimeZone: !timeZone,
+    missingWhatsApp: !whatsappConfigured,
+    context: "criar agendamentos",
+  });
+  if (msg) return { ok: false, error: msg };
 
   let dataEnvioIso: string;
   try {
@@ -129,15 +154,27 @@ export async function updateScheduleAction(input: unknown) {
 
   const supabase = await createSupabaseServerClient();
   const { id, ...data } = parsed.data;
-  const { data: profile } = await supabase.from("profiles").select("timezone").maybeSingle();
-  const tzRaw = (profile as any)?.timezone;
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) return { ok: false, error: "Sem sessão." };
+
+  const [profileRes, waRes] = await Promise.all([
+    supabase.from("profiles").select("timezone").maybeSingle(),
+    supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
+  ]);
+  const tzRaw = (profileRes as any)?.data?.timezone ?? (profileRes as any)?.timezone;
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : null;
-  if (!timeZone) {
-    return {
-      ok: false,
-      error: "Selecione e salve seu fuso horário em Configurações antes de editar agendamentos.",
-    };
-  }
+  const wa = (waRes as any)?.data ?? null;
+  const waStatus = String(wa?.status ?? "").toLowerCase();
+  const whatsappConfigured = Boolean(
+    wa?.instance_id && wa?.token && (waStatus === "configured" || waStatus === "connected"),
+  );
+  const msg = prereqError({
+    missingTimeZone: !timeZone,
+    missingWhatsApp: !whatsappConfigured,
+    context: "editar agendamentos",
+  });
+  if (msg) return { ok: false, error: msg };
 
   let dataEnvioIso: string;
   try {
@@ -180,6 +217,24 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) return { ok: false, error: "Sem sessão." };
+
+  const [profileRes, waRes] = await Promise.all([
+    supabase.from("profiles").select("timezone").maybeSingle(),
+    supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
+  ]);
+  const tzRaw = (profileRes as any)?.data?.timezone ?? (profileRes as any)?.timezone;
+  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : null;
+  const wa = (waRes as any)?.data ?? null;
+  const waStatus = String(wa?.status ?? "").toLowerCase();
+  const whatsappConfigured = Boolean(
+    wa?.instance_id && wa?.token && (waStatus === "configured" || waStatus === "connected"),
+  );
+  const msg = prereqError({
+    missingTimeZone: !timeZone,
+    missingWhatsApp: !whatsappConfigured,
+    context: "disparar agendamentos",
+  });
+  if (msg) return { ok: false, error: msg };
 
   const admin = createSupabaseAdminClient();
   const { data: schedule, error } = await admin

@@ -86,11 +86,13 @@ export function SchedulesClient({
   debtors,
   templates,
   timeZone,
+  whatsappConfigured,
 }: {
   initial: ScheduleRow[];
   debtors: DebtorOption[];
   templates: TemplateOption[];
   timeZone: BrazilTimeZone | null;
+  whatsappConfigured: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState<ScheduleRow[]>(initial);
@@ -107,6 +109,22 @@ export function SchedulesClient({
     null,
   );
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
+  const missingTimeZone = !timeZone;
+  const missingWhatsApp = !whatsappConfigured;
+
+  const prereqMessage = (context: "criar/editar" | "disparar") => {
+    const actionLabel = context === "disparar" ? "disparar agora" : "criar ou editar agendamentos";
+    if (missingTimeZone && missingWhatsApp) {
+      return `Selecione e salve seu fuso horário em Configurações e configure seu WhatsApp na página WhatsApp antes de ${actionLabel}.`;
+    }
+    if (missingTimeZone) {
+      return `Selecione e salve seu fuso horário em Configurações antes de ${actionLabel}.`;
+    }
+    if (missingWhatsApp) {
+      return `Configure seu WhatsApp na página WhatsApp antes de ${actionLabel}.`;
+    }
+    return null;
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -147,10 +165,9 @@ export function SchedulesClient({
   };
 
   const openCreate = () => {
-    if (!timeZone) {
-      modalToast.error(
-        "Você precisa selecionar e salvar seu fuso horário em Configurações antes de criar um agendamento.",
-      );
+    const msg = prereqMessage("criar/editar");
+    if (msg) {
+      modalToast.error(msg);
       return;
     }
     close();
@@ -158,6 +175,11 @@ export function SchedulesClient({
   };
 
   const openEdit = (row: ScheduleRow) => {
+    const msg = prereqMessage("criar/editar");
+    if (msg) {
+      modalToast.error(msg);
+      return;
+    }
     setEditing(row);
     setOpen(true);
     const dt = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
@@ -179,10 +201,9 @@ export function SchedulesClient({
     });
 
   const onSubmit = handleSubmit(async (values) => {
-    if (!timeZone) {
-      modalToast.error(
-        "Selecione e salve seu fuso horário em Configurações antes de criar/editar agendamentos.",
-      );
+    const msg = prereqMessage("criar/editar");
+    if (msg) {
+      modalToast.error(msg);
       return;
     }
     if (!values.debtor_id) {
@@ -250,8 +271,9 @@ export function SchedulesClient({
   };
 
   const triggerNow = (row: ScheduleRow) => {
-    if (!timeZone) {
-      modalToast.error("Selecione e salve seu fuso horário em Configurações antes de disparar.");
+    const msg = prereqMessage("disparar");
+    if (msg) {
+      modalToast.error(msg);
       return;
     }
     if (String(row.status ?? "") === "executado") {
