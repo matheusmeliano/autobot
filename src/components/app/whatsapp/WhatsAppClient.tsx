@@ -75,7 +75,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
             {initial?.instance_id ?? "-"}
           </div>
         </div>
-        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:col-span-2 min-[1201px]:col-span-1">
           <div className="text-xs font-semibold text-white/55">Número</div>
           <div className="mt-2 min-w-0 truncate text-sm font-semibold text-white/80">
             {initial?.phone ?? "-"}
