@@ -41,6 +41,10 @@ function money(v: number | null) {
 
 function dateBR(v: string | null) {
   if (!v) return "-";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [y, m, d] = v.split("-");
+    return `${d}/${m}/${y}`;
+  }
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
   return d.toLocaleDateString("pt-BR");
