@@ -169,6 +169,10 @@ export function SchedulesClient({
   };
 
   const timeField = register("data_envio_time", { required: true });
+  const openTimePicker = () => {
+    timeInputRef.current?.showPicker?.();
+    timeInputRef.current?.focus();
+  };
 
   return (
     <div>
@@ -335,6 +339,8 @@ export function SchedulesClient({
                       type="time"
                       className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
                       {...timeField}
+                      onFocus={openTimePicker}
+                      onClick={openTimePicker}
                       ref={(el) => {
                         timeField.ref(el);
                         timeInputRef.current = el;
@@ -342,10 +348,7 @@ export function SchedulesClient({
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        timeInputRef.current?.showPicker?.();
-                        timeInputRef.current?.focus();
-                      }}
+                      onClick={openTimePicker}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-white/55 hover:text-white/80"
                       aria-label="Selecionar hora"
                     >
