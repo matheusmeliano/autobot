@@ -435,14 +435,14 @@ export function SchedulesClient({
           Role para o lado.
         </div>
         <div className="overflow-x-auto">
-          <div className="min-w-[820px] min-[1201px]:min-w-0">
+          <div className="min-w-[980px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
               <div className="col-span-3">Cliente</div>
               <div className="col-span-2 text-center">Template</div>
               <div className="col-span-2 text-center">Data</div>
-              <div className="col-span-2 text-center">Hora</div>
+              <div className="col-span-1 text-center">Hora</div>
               <div className="col-span-1 text-center">Status</div>
-              <div className="col-span-2 text-right">Ações</div>
+              <div className="col-span-3 text-right">Ações</div>
             </div>
 
             {filtered.length === 0 ? (
@@ -463,7 +463,7 @@ export function SchedulesClient({
                     <div className="col-span-2 whitespace-nowrap text-center text-white/60">
                       {dateBR(r.data_envio, effectiveTimeZone)}
                     </div>
-                    <div className="col-span-2 whitespace-nowrap text-center text-white/60">
+                    <div className="col-span-1 whitespace-nowrap text-center text-white/60">
                       {timeBR(r.data_envio, effectiveTimeZone)}
                     </div>
                     <div className="col-span-1 flex justify-center">
@@ -471,7 +471,7 @@ export function SchedulesClient({
                         {r.status}
                       </span>
                     </div>
-                    <div className="col-span-2 flex justify-end gap-2">
+                    <div className="col-span-3 flex flex-nowrap justify-end gap-2">
                       <button
                         onClick={() => triggerNow(r)}
                         disabled={isPending || triggeringId === r.id || String(r.status ?? "") === "executado"}
