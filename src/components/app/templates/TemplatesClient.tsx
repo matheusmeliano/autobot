@@ -145,8 +145,8 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
         <div className="overflow-x-auto">
           <div className="min-w-[860px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
-              <div className="col-span-3">Nome</div>
-              <div className="col-span-7">Conteúdo</div>
+              <div className="col-span-3 text-center">Nome</div>
+              <div className="col-span-7 text-center">Conteúdo</div>
               <div className="col-span-2 text-right">Ações</div>
             </div>
 
@@ -161,8 +161,8 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                     key={r.id}
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
-                    <div className="col-span-3 truncate font-semibold">{r.nome}</div>
-                    <div className="col-span-7 min-w-0 line-clamp-2 text-white/60">
+                    <div className="col-span-3 truncate text-center font-semibold">{r.nome}</div>
+                    <div className="col-span-7 min-w-0 text-center line-clamp-2 text-white/60">
                       {r.conteudo}
                     </div>
                     <div className="col-span-2 flex justify-end gap-2">
