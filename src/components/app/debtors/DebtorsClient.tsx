@@ -266,15 +266,20 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
     });
   });
 
-  const remove = (id: string) => {
+  const remove = async (row: DebtorRow) => {
+    const confirmed = await modalToast.confirm(
+      `Tem certeza que deseja excluir o cliente "${row.nome}"?`,
+      { title: "Excluir cliente", confirmText: "Excluir", cancelText: "Cancelar" },
+    );
+    if (!confirmed) return;
     startTransition(async () => {
-      const res = await deleteDebtorAction(id);
+      const res = await deleteDebtorAction(row.id);
       if (!res.ok) {
         modalToast.error(res.error ?? "Falha ao excluir.");
         return;
       }
       modalToast.success("Cliente excluído.");
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
     });
   };
 
@@ -351,7 +356,7 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => remove(r.id)}
+                        onClick={() => remove(r)}
                         disabled={isPending}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Excluir"
