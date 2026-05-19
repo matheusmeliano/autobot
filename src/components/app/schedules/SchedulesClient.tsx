@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Clock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
+import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
   deleteScheduleAction,
@@ -40,24 +41,41 @@ function dateTimeBR(v: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(d);
 }
 
-function dateBR(v: string) {
+function dateBR(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
+  return new Intl.DateTimeFormat("pt-BR", { timeZone, dateStyle: "short" }).format(d);
 }
 
-function timeBR(v: string) {
+function timeBR(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(d);
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
 }
 
-function splitDateTimeForInput(v: string) {
+function splitDateTimeForInput(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return { date: "", time: "" };
-  const pad2 = (n: number) => String(n).padStart(2, "0");
-  const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(d);
+  const m: Record<string, string> = {};
+  for (const p of parts) {
+    if (p.type === "literal") continue;
+    m[p.type] = p.value;
+  }
+  const date = `${m.year}-${m.month}-${m.day}`;
+  const time = `${m.hour}:${m.minute}`;
   return { date, time };
 }
 
@@ -65,10 +83,12 @@ export function SchedulesClient({
   initial,
   debtors,
   templates,
+  timeZone,
 }: {
   initial: ScheduleRow[];
   debtors: DebtorOption[];
   templates: TemplateOption[];
+  timeZone: BrazilTimeZone;
 }) {
   const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState<ScheduleRow[]>(initial);
@@ -118,7 +138,7 @@ export function SchedulesClient({
   const openEdit = (row: ScheduleRow) => {
     setEditing(row);
     setOpen(true);
-    const dt = splitDateTimeForInput(row.data_envio);
+    const dt = splitDateTimeForInput(row.data_envio, timeZone);
     reset({
       id: row.id,
       debtor_id: row.debtor_id,
@@ -146,16 +166,31 @@ export function SchedulesClient({
       return;
     }
 
-    const dataEnvio = new Date(
-      `${values.data_envio_date}T${values.data_envio_time}`,
-    ).toISOString();
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       debtor_id: values.debtor_id,
       template_id: values.template_id ? values.template_id : undefined,
-      data_envio: dataEnvio,
+      data_envio_date: values.data_envio_date,
+      data_envio_time: values.data_envio_time,
       status: values.status || "agendado",
     };
+
+    if (!values.id) {
+      try {
+        const iso = zonedDateTimeToUtcIso({
+          date: values.data_envio_date,
+          time: values.data_envio_time,
+          timeZone,
+        });
+        if (new Date(iso).getTime() < Date.now()) {
+          modalToast.warning("Escolha um horário igual ou superior ao horário atual.");
+          return;
+        }
+      } catch {
+        modalToast.warning("Data/hora inválida.");
+        return;
+      }
+    }
 
     const res = editing
       ? await updateScheduleAction(payload)
@@ -254,10 +289,10 @@ export function SchedulesClient({
                       {r.template_nome ?? "-"}
                     </div>
                     <div className="col-span-2 whitespace-nowrap text-center text-white/60">
-                      {dateBR(r.data_envio)}
+                      {dateBR(r.data_envio, timeZone)}
                     </div>
                     <div className="col-span-2 whitespace-nowrap text-center text-white/60">
-                      {timeBR(r.data_envio)}
+                      {timeBR(r.data_envio, timeZone)}
                     </div>
                     <div className="col-span-1 flex justify-center">
                       <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">

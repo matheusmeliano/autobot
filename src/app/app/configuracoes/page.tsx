@@ -2,6 +2,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { ChangePasswordForm } from "@/components/app/ChangePasswordForm";
+import { TimezoneSettings } from "@/components/app/TimezoneSettings";
+import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 
 function dateTimeBR(v?: string | null) {
   if (!v) return "-";
@@ -15,10 +17,14 @@ export default async function ConfiguracoesPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nome, email, plano, created_at")
+    .select("nome, email, plano, created_at, timezone")
     .maybeSingle();
 
   const showPassword = !isGlobalAdminEmail(profile?.email);
+  const tz =
+    BRAZIL_TIMEZONES.includes((profile as any)?.timezone)
+      ? ((profile as any).timezone as BrazilTimeZone)
+      : "America/Sao_Paulo";
 
   return (
     <div>
@@ -58,6 +64,8 @@ export default async function ConfiguracoesPage() {
           </div>
         </div>
       </div>
+
+      <TimezoneSettings initialTimeZone={tz} />
 
       {showPassword ? (
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
