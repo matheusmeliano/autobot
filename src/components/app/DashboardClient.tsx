@@ -126,7 +126,7 @@ export function DashboardClient({
           icon={<BadgeCheck className="h-5 w-5" />}
         />
         <Card
-          title="Templates"
+          title="Templates (Mensagens)"
           value={String(stats.templates)}
           subtitle=""
           icon={<MessageSquareText className="h-5 w-5" />}
