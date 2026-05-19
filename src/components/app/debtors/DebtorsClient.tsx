@@ -107,6 +107,18 @@ function maskPhone(v: string) {
   return `(${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
 }
 
+function maskPixPhone(v: string) {
+  const d = digitsOnly(v);
+  if (!d.startsWith("55")) return v;
+  const local = d.slice(2);
+  const dd = local.slice(0, 2);
+  const rest = local.slice(2);
+  if (!dd) return v;
+  if (rest.length <= 4) return `+55 (${dd}) ${rest}`;
+  if (rest.length <= 8) return `+55 (${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+  return `+55 (${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+}
+
 type PixKeyType = "cpf" | "cnpj" | "email" | "telefone" | "aleatoria" | "desconhecida";
 
 function detectPixKeyType(raw: string): PixKeyType {
@@ -115,13 +127,9 @@ function detectPixKeyType(raw: string): PixKeyType {
   if (v.includes("@")) return "email";
   if (isUuidLike(v)) return "aleatoria";
   const d = digitsOnly(v);
-  if (d.startsWith("55") && d.length >= 12) return "telefone";
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) return "telefone";
   if (d.length === 14) return "cnpj";
-  if (d.length === 11) {
-    if (/[()+\s]/.test(v)) return "telefone";
-    return "cpf";
-  }
-  if (d.length === 10) return "telefone";
+  if (d.length === 11) return "cpf";
   return "desconhecida";
 }
 
@@ -131,7 +139,7 @@ function formatPixKey(raw: string) {
   if (type === "aleatoria") return raw.trim();
   if (type === "cnpj") return maskCnpj(raw);
   if (type === "cpf") return maskCpf(raw);
-  if (type === "telefone") return maskPhone(raw);
+  if (type === "telefone") return maskPixPhone(raw);
   return raw;
 }
 
@@ -210,7 +218,7 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
       telefone: row.telefone ?? "",
       valor: row.valor != null ? String(row.valor) : "",
       vencimento: row.vencimento ?? "",
-      pix_key: row.pix_key ?? "",
+      pix_key: row.pix_key ? formatPixKey(row.pix_key) : "",
       observacoes: row.observacoes ?? "",
       status: row.status ?? "ativo",
     });
@@ -382,10 +390,24 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                       <div className="text-xs font-semibold text-white/60">
                         Telefone
                       </div>
-                      <input
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                        placeholder="DDD + número"
-                        {...register("telefone")}
+                      <Controller
+                        control={control}
+                        name="telefone"
+                        render={({ field }) => (
+                          <input
+                            inputMode="tel"
+                            className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                            placeholder="(DD) 9XXXX-XXXX"
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              const raw = e.currentTarget.value;
+                              field.onChange(maskPhone(raw));
+                            }}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        )}
                       />
                     </div>
                   </div>
@@ -446,7 +468,7 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
                               ? "Detectado: Telefone"
                               : pixKeyType === "aleatoria"
                                 ? "Detectado: Chave aleatória"
-                                : "Chave que será enviada ao cliente para pagamento."}
+                                : "Se for telefone, use no formato +55DD9XXXXXXXX."}
                     </div>
                     <Controller
                       control={control}
