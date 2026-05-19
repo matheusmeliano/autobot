@@ -5,7 +5,7 @@ export default async function WhatsAppPage() {
   const supabase = await createSupabaseServerClient();
   const first = await supabase
     .from("whatsapp_instances")
-    .select("instance_id, token, client_token, status, phone")
+    .select("instance_id, token, client_token, status")
     .maybeSingle();
   const missingClientToken =
     first.error &&
@@ -14,7 +14,7 @@ export default async function WhatsAppPage() {
   const second = missingClientToken
     ? await supabase
         .from("whatsapp_instances")
-        .select("instance_id, token, status, phone")
+        .select("instance_id, token, status")
         .maybeSingle()
     : null;
   const data = (second?.data ?? first.data) as any;
@@ -23,9 +23,6 @@ export default async function WhatsAppPage() {
   if (error) {
     return (
       <div>
-        <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-          WHATSAPP
-        </div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
           Integração Z-API
         </h1>

@@ -7,7 +7,6 @@ const schema = z.object({
   instance_id: z.string().min(1),
   token: z.string().min(1),
   client_token: z.string().optional(),
-  phone: z.string().optional(),
 });
 
 export async function upsertWhatsAppInstanceAction(input: unknown) {
@@ -25,7 +24,6 @@ export async function upsertWhatsAppInstanceAction(input: unknown) {
       instance_id: parsed.data.instance_id,
       token: parsed.data.token,
       client_token: parsed.data.client_token ?? null,
-      phone: parsed.data.phone ?? null,
       status: "configured",
     },
     { onConflict: "user_id" }
