@@ -143,11 +143,11 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
           Role para o lado.
         </div>
         <div className="overflow-x-auto">
-          <div className="min-w-[720px]">
+          <div className="min-w-[860px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
               <div className="col-span-3">Nome</div>
-              <div className="col-span-8">Conteúdo</div>
-              <div className="col-span-1 text-right">Ações</div>
+              <div className="col-span-7">Conteúdo</div>
+              <div className="col-span-2 text-right">Ações</div>
             </div>
 
             {filtered.length === 0 ? (
@@ -161,11 +161,11 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                     key={r.id}
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
-                    <div className="col-span-3 font-semibold">{r.nome}</div>
-                    <div className="col-span-8 line-clamp-2 text-white/60">
+                    <div className="col-span-3 truncate font-semibold">{r.nome}</div>
+                    <div className="col-span-7 min-w-0 line-clamp-2 text-white/60">
                       {r.conteudo}
                     </div>
-                    <div className="col-span-1 flex justify-end gap-2">
+                    <div className="col-span-2 flex justify-end gap-2">
                       <button
                         onClick={() => openEdit(r)}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
