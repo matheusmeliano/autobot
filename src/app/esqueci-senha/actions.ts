@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
@@ -28,6 +29,43 @@ export async function forgotPasswordAction(formData: FormData) {
     return { ok: false, error: "Não foi possível gerar o link de retorno." };
   }
 
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.SUPABASE_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    null;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE ??
+    process.env.SUPABASE_SERVICE ??
+    null;
+
+  if (url && serviceKey) {
+    const admin = createClient(url, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    const { data: existingProfile, error: profileErr } = await admin
+      .from("profiles")
+      .select("user_id")
+      .ilike("email", normalizedEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileErr) {
+      return { ok: false, error: profileErr.message };
+    }
+
+    if (!existingProfile?.user_id) {
+      return { ok: false, error: "Este e-mail não está cadastrado." };
+    }
+  }
+
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(
@@ -47,7 +85,7 @@ export async function forgotPasswordAction(formData: FormData) {
       (msg.includes("no user") && msg.includes("email"));
 
     if (isUserNotFound) {
-      return { ok: true };
+      return { ok: false, error: "Este e-mail não está cadastrado." };
     }
     return { ok: false, error: supabaseErrorToPt(error.message) };
   }
