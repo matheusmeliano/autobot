@@ -300,7 +300,7 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por nome ou telefone..."
-            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 min-[1201px]:w-[420px]"
           />
           <button
             onClick={openCreate}
