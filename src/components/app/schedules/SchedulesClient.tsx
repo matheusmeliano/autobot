@@ -36,7 +36,11 @@ type FormValues = {
 function dateTimeBR(v: string) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return d.toLocaleString("pt-BR");
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(d);
 }
 
 export function SchedulesClient({
@@ -186,8 +190,8 @@ export function SchedulesClient({
           <div className="min-w-[820px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
               <div className="col-span-4">Cliente</div>
-              <div className="col-span-3">Template</div>
-              <div className="col-span-2 text-center">Data/Hora</div>
+              <div className="col-span-2">Template</div>
+              <div className="col-span-3 text-center">Data/Hora</div>
               <div className="col-span-1 text-center">Status</div>
               <div className="col-span-2 text-right">Ações</div>
             </div>
@@ -204,10 +208,10 @@ export function SchedulesClient({
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
                     <div className="col-span-4 truncate font-semibold">{r.debtor_nome}</div>
-                    <div className="col-span-3 truncate text-white/60">
+                    <div className="col-span-2 truncate text-white/60">
                       {r.template_nome ?? "-"}
                     </div>
-                    <div className="col-span-2 text-center text-white/60">
+                    <div className="col-span-3 whitespace-nowrap text-center text-white/60">
                       {dateTimeBR(r.data_envio)}
                     </div>
                     <div className="col-span-1 flex justify-center">
