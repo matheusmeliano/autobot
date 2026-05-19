@@ -26,9 +26,6 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div>
-      <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-        CONFIGURAÇÕES
-      </div>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
         Conta
       </h1>
