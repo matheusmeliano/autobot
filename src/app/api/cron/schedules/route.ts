@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { nextMonthlyIso } from "@/lib/recurrence";
 
 function normalizePhone(phone: string) {
   const d = phone.replace(/\D/g, "");
@@ -106,7 +107,7 @@ export async function GET(req: Request) {
   const { data: schedules, error } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, status, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
     )
     .in("status", ["agendado", "pausado"])
     .lte("data_envio", nowIso)
@@ -180,11 +181,48 @@ export async function GET(req: Request) {
         descricao: `Agendamento executado: ${scheduleId}`,
       });
 
-      await supabase.from("schedules").update({ status: "executado" }).eq("id", scheduleId);
+      const recurrence = String((s as any).recurrence ?? "none");
+      if (recurrence === "monthly") {
+        const tz = String((s as any).schedule_timezone ?? "");
+        const day = Number((s as any).recurrence_day ?? 1);
+        const time = String((s as any).recurrence_time ?? "");
+        const nextIso = nextMonthlyIso({
+          fromUtcIso: String((s as any).data_envio),
+          timeZone: tz || "America/Sao_Paulo",
+          day,
+          time: time || "00:00",
+        });
+
+        await supabase.from("schedule_runs").insert({
+          user_id: userId,
+          schedule_id: scheduleId,
+          scheduled_for: String((s as any).data_envio),
+          executed_at: nowIso,
+          status: "executado",
+        });
+
+        await supabase
+          .from("schedules")
+          .update({ status: "agendado", data_envio: nextIso })
+          .eq("id", scheduleId);
+      } else {
+        await supabase.from("schedules").update({ status: "executado" }).eq("id", scheduleId);
+      }
 
       results.push({ id: scheduleId, ok: true });
     } catch (e: any) {
       const msg = String(e?.message ?? "Erro desconhecido");
+      const recurrence = String((s as any)?.recurrence ?? "none");
+      if (recurrence === "monthly") {
+        await supabase.from("schedule_runs").insert({
+          user_id: userId,
+          schedule_id: scheduleId,
+          scheduled_for: String((s as any)?.data_envio ?? nowIso),
+          executed_at: nowIso,
+          status: "falha",
+          error: msg,
+        });
+      }
       await supabase.from("logs").insert({
         user_id: userId,
         tipo: "agenda_falha",

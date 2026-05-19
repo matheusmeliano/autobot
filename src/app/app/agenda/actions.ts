@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { nextMonthlyIso } from "@/lib/recurrence";
 
 function prereqError(params: {
   missingTimeZone: boolean;
@@ -104,6 +105,7 @@ const createSchema = z.object({
   template_id: z.string().uuid().optional(),
   data_envio_date: z.string().min(10),
   data_envio_time: z.string().min(4),
+  recurrence: z.enum(["none", "monthly"]).optional(),
   status: z.string().optional(),
 });
 
@@ -153,10 +155,18 @@ export async function createScheduleAction(input: unknown) {
     return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
   }
 
+  const recurrence = parsed.data.recurrence ?? "none";
+  const recurrenceDay = Number(parsed.data.data_envio_date.split("-")[2] ?? "");
+  const recurrenceTime = parsed.data.data_envio_time;
+
   const { error } = await supabase.from("schedules").insert({
     debtor_id: parsed.data.debtor_id,
     template_id: parsed.data.template_id ?? null,
     data_envio: dataEnvioIso,
+    recurrence,
+    schedule_timezone: recurrence === "monthly" ? timeZone : null,
+    recurrence_day: recurrence === "monthly" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
+    recurrence_time: recurrence === "monthly" ? recurrenceTime : null,
     status: parsed.data.status ?? "agendado",
   });
   if (error) return { ok: false, error: error.message };
@@ -206,12 +216,20 @@ export async function updateScheduleAction(input: unknown) {
     return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
   }
 
+  const recurrence = (data as any).recurrence ?? "none";
+  const recurrenceDay = Number(String(data.data_envio_date ?? "").split("-")[2] ?? "");
+  const recurrenceTime = String(data.data_envio_time ?? "");
+
   const { error } = await supabase
     .from("schedules")
     .update({
       debtor_id: data.debtor_id,
       template_id: data.template_id ?? null,
       data_envio: dataEnvioIso,
+      recurrence,
+      schedule_timezone: recurrence === "monthly" ? timeZone : null,
+      recurrence_day: recurrence === "monthly" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
+      recurrence_time: recurrence === "monthly" ? recurrenceTime : null,
       status: data.status ?? "agendado",
     })
     .eq("id", id);
@@ -255,7 +273,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, status, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -321,10 +339,47 @@ export async function triggerScheduleNowAction(id: string) {
       descricao: `Agendamento executado: ${String((schedule as any).id)}`,
     });
 
-    await admin.from("schedules").update({ status: "executado" }).eq("id", String((schedule as any).id));
+    const recurrence = String((schedule as any).recurrence ?? "none");
+    if (recurrence === "monthly") {
+      const tz = String((schedule as any).schedule_timezone ?? "");
+      const day = Number((schedule as any).recurrence_day ?? 1);
+      const time = String((schedule as any).recurrence_time ?? "");
+      const nextIso = nextMonthlyIso({
+        fromUtcIso: String((schedule as any).data_envio),
+        timeZone: tz || "America/Sao_Paulo",
+        day,
+        time: time || "00:00",
+      });
+
+      await admin.from("schedule_runs").insert({
+        user_id: userId,
+        schedule_id: String((schedule as any).id),
+        scheduled_for: String((schedule as any).data_envio),
+        executed_at: new Date().toISOString(),
+        status: "executado",
+      });
+
+      await admin
+        .from("schedules")
+        .update({ status: "agendado", data_envio: nextIso })
+        .eq("id", String((schedule as any).id));
+    } else {
+      await admin.from("schedules").update({ status: "executado" }).eq("id", String((schedule as any).id));
+    }
     return { ok: true };
   } catch (e: any) {
     const msg = String(e?.message ?? "Erro desconhecido");
+    const recurrence = String((schedule as any)?.recurrence ?? "none");
+    if (recurrence === "monthly") {
+      await admin.from("schedule_runs").insert({
+        user_id: userId,
+        schedule_id: String((schedule as any)?.id ?? ""),
+        scheduled_for: String((schedule as any)?.data_envio ?? new Date().toISOString()),
+        executed_at: new Date().toISOString(),
+        status: "falha",
+        error: msg,
+      });
+    }
     await admin.from("logs").insert({
       user_id: userId,
       tipo: "agenda_falha",

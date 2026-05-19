@@ -23,6 +23,7 @@ export type ScheduleRow = {
   template_id: string | null;
   data_envio: string;
   status: string;
+  recurrence?: string | null;
   created_at: string;
   debtor_nome: string;
   template_nome: string | null;
@@ -34,6 +35,7 @@ type FormValues = {
   template_id?: string;
   data_envio_date: string;
   data_envio_time: string;
+  recurrence: "none" | "monthly";
   status: string;
 };
 
@@ -145,6 +147,7 @@ export function SchedulesClient({
       template_id: "",
       data_envio_date: "",
       data_envio_time: "",
+      recurrence: "none",
       status: "agendado",
     },
   });
@@ -160,6 +163,7 @@ export function SchedulesClient({
       template_id: "",
       data_envio_date: "",
       data_envio_time: "",
+      recurrence: "none",
       status: "agendado",
     });
   };
@@ -189,6 +193,7 @@ export function SchedulesClient({
       template_id: row.template_id ?? "",
       data_envio_date: dt.date,
       data_envio_time: dt.time,
+      recurrence: String((row as any).recurrence ?? "none") === "monthly" ? "monthly" : "none",
       status: row.status,
     });
   };
@@ -221,6 +226,7 @@ export function SchedulesClient({
       template_id: values.template_id ? values.template_id : undefined,
       data_envio_date: values.data_envio_date,
       data_envio_time: values.data_envio_time,
+      recurrence: values.recurrence,
       status: values.status || "agendado",
     };
 
@@ -575,6 +581,19 @@ export function SchedulesClient({
                       {t.nome}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold text-white/60">
+                  Recorrência
+                </div>
+                <select
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                  {...register("recurrence")}
+                >
+                  <option value="none">Uma vez</option>
+                  <option value="monthly">Mensal</option>
                 </select>
               </div>
 
