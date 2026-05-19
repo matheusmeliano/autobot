@@ -46,15 +46,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!isAuthed) return;
 
     let active = true;
-    (async () => {
-      const { data: sub } = await supabase
-        .from("subscriptions")
-        .select("id, plano, status, vencimento, created_at")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    const checkAccess = async () => {
+      const [{ data: profile }, { data: sub }] = await Promise.all([
+        supabase.from("profiles").select("plano").maybeSingle(),
+        supabase
+          .from("subscriptions")
+          .select("id, plano, status, vencimento, created_at")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-      const plan = normalizePlan(sub?.plano ?? "teste");
+      const plan = normalizePlan(profile?.plano ?? sub?.plano ?? "teste");
+      if (plan === "vitalicio") {
+        if (!active) return;
+        setRestricted(false);
+        return;
+      }
+
       const rawStatus = String(sub?.status ?? "").toLowerCase();
       const status = rawStatus === "pausado" || rawStatus === "past_due" ? "cancelado" : rawStatus;
       const vencimento = sub?.vencimento ?? null;
@@ -68,16 +77,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         await supabase.from("subscriptions").update({ status: "cancelado" }).eq("id", sub.id);
       }
 
-      const isBlocked =
-        status === "cancelado" ||
-        (plan !== "vitalicio" && isExpired) ||
-        (plan === "teste" && isExpired);
+      const isBlocked = status === "cancelado" || isExpired;
       if (!active) return;
       setRestricted(isBlocked);
-    })();
+    };
+
+    checkAccess();
+    const onFocus = () => checkAccess();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") checkAccess();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       active = false;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [authChecked, isAuthed, supabase]);
 
