@@ -210,7 +210,7 @@ export function SchedulesClient({
         timeZone: effectiveTimeZone,
       });
       if (new Date(iso).getTime() < Date.now() + 3 * 60 * 1000) {
-        modalToast.warning("Escolha um horário futuro válido (mínimo +3 minutos).");
+        modalToast.error("Escolha um horário futuro válido (mínimo +3 minutos).");
         return;
       }
     } catch {
