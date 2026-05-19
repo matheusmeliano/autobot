@@ -17,10 +17,12 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type");
-  const nextParam = requestUrl.searchParams.get("next") ?? "/app";
-  const nextUrl = nextParam.startsWith("/") ? nextParam : "/app";
+  const nextParam = requestUrl.searchParams.get("next");
+  const isRecovery = type === "recovery";
+  const resolvedNextParam = isRecovery ? (nextParam ?? "/redefinir-senha") : (nextParam ?? "/app");
+  const nextUrl = resolvedNextParam.startsWith("/") ? resolvedNextParam : "/app";
   const isLoginReturn = nextUrl.startsWith("/login");
-  const isPasswordResetReturn = nextUrl.startsWith("/redefinir-senha");
+  const isPasswordResetReturn = isRecovery || nextUrl.startsWith("/redefinir-senha");
 
   if (code || tokenHash) {
     const url = getSupabaseUrl();

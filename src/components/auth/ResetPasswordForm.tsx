@@ -31,23 +31,72 @@ export function ResetPasswordForm() {
   });
 
   useEffect(() => {
-    const hash = typeof window !== "undefined" ? window.location.hash : "";
-    if (hash && hash.includes("error=")) {
-      const params = new URLSearchParams(hash.replace(/^#/, ""));
-      const description =
-        params.get("error_description") ??
-        params.get("error_code") ??
-        params.get("error") ??
-        "Link inválido ou expirado.";
-      setUrlError(
-        supabaseErrorToPt(decodeURIComponent(description.split("+").join(" ")))
-      );
-    }
-
     const supabase = createSupabaseBrowserClient();
-    supabase.auth.getSession().then(({ data }) => {
+    const run = async () => {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      const tokenHash = url.searchParams.get("token_hash");
+      const type = url.searchParams.get("type");
+
+      const hash = url.hash ? url.hash.replace(/^#/, "") : "";
+      const hashParams = hash ? new URLSearchParams(hash) : null;
+      const hashError = hashParams?.get("error") ?? null;
+
+      if (hashError) {
+        const description =
+          hashParams?.get("error_description") ??
+          hashParams?.get("error_code") ??
+          hashError ??
+          "Link inválido ou expirado.";
+        setUrlError(
+          supabaseErrorToPt(decodeURIComponent(description.split("+").join(" "))),
+        );
+        setHasSession(false);
+        return;
+      }
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setHasSession(false);
+          return;
+        }
+        url.searchParams.delete("code");
+        url.searchParams.delete("next");
+        url.searchParams.delete("type");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+      } else if (tokenHash && type) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: type as any,
+        });
+        if (error) {
+          setHasSession(false);
+          return;
+        }
+        url.searchParams.delete("token_hash");
+        url.searchParams.delete("type");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+      } else if (hashParams?.get("access_token") && hashParams?.get("refresh_token")) {
+        const accessToken = hashParams.get("access_token")!;
+        const refreshToken = hashParams.get("refresh_token")!;
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) {
+          setHasSession(false);
+          return;
+        }
+        url.hash = "";
+        window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+      }
+
+      const { data } = await supabase.auth.getSession();
       setHasSession(Boolean(data.session));
-    });
+    };
+
+    run();
   }, []);
 
   if (urlError) {
