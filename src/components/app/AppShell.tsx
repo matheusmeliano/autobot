@@ -9,7 +9,6 @@ import { Logo } from "@/components/ui/Logo";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { normalizePlan } from "@/lib/plans";
-import { Portal } from "@/components/ui/Portal";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -203,27 +202,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl min-[1201px]:p-6">
             {children}
           </div>
+          <div className="mt-3 flex justify-end text-xs text-white/35">
+            Desenvolvido pela{" "}
+            <a
+              href="#"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-white/60 hover:text-white"
+            >
+              HEYBROTHERS
+            </a>
+            .
+          </div>
         </div>
       </div>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-[#070A10]/80 backdrop-blur-xl min-[1201px]:hidden">
         <AppNav variant="bottom" restricted={restricted} />
       </div>
-
-      <Portal>
-        <div className="pointer-events-auto fixed bottom-20 right-4 z-[100] text-xs text-white/50 min-[1201px]:bottom-4">
-          Desenvolvido pela{" "}
-          <a
-            href="#"
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-white/70 hover:text-white"
-          >
-            HEYBROTHERS
-          </a>
-          .
-        </div>
-      </Portal>
     </div>
   );
 }
