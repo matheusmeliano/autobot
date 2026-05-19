@@ -58,6 +58,7 @@ export default async function AdminUsuariosPage() {
     const p = profileById.get(s.user_id);
     const planSub = normalizePlan(s?.plano ?? null);
     const planProfile = normalizePlan(p?.plano ?? null);
+    if (planSub === "vitalicio" || planProfile === "vitalicio") return false;
     const rawStatus = (s?.status ?? "").toLowerCase();
     const status = rawStatus === "pausado" || rawStatus === "past_due" ? "cancelado" : rawStatus;
     const vencimento = typeof s?.vencimento === "string" ? s.vencimento : null;
@@ -65,8 +66,7 @@ export default async function AdminUsuariosPage() {
       status === "ativo" &&
       vencimento &&
       vencimento < today &&
-      ((planSub === "teste" && planProfile === "teste") ||
-        (planSub !== "vitalicio" && planSub !== "teste"))
+      ((planSub === "teste" && planProfile === "teste") || planSub !== "teste")
     );
   });
 
