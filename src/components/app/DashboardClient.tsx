@@ -149,13 +149,13 @@ export function DashboardClient({
         />
       </div>
 
-      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5 min-[1201px]:items-start">
-        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-3">
+      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5">
+        <div className="flex h-full min-w-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-3">
           <div className="text-sm font-semibold">Agendamentos criados (7 dias)</div>
           <div className="mt-1 text-xs text-white/45">
             Dados reais dos agendamentos cadastrados.
           </div>
-          <div className="mt-4 h-40">
+          <div className="mt-4 min-h-[160px] flex-1">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chart}>
                 <defs>
@@ -187,12 +187,12 @@ export function DashboardClient({
           </div>
         </div>
 
-        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-2">
+        <div className="flex h-full min-w-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-2">
           <div className="text-sm font-semibold">Atividades</div>
           <div className="mt-1 text-xs text-white/45">
             Histórico da agenda.
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 flex-1 space-y-3">
             {activities.length ? (
               pagedActivities.map((item) => (
                 <div
