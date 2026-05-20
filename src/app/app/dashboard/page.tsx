@@ -69,7 +69,7 @@ export default async function DashboardPage() {
       .select("id, status, data_envio, created_at, debtors(nome)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(6),
+      .limit(50),
   ]);
 
   const stats = {
