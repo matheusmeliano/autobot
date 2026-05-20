@@ -180,6 +180,26 @@ export function Landing() {
                       label: "Relatórios",
                       value: "Relatórios completos e simples.",
                     },
+                    {
+                      icon: <MessageSquareText className="h-4 w-4" />,
+                      label: "Templates",
+                      value: "Mensagens prontas com variáveis.",
+                    },
+                    {
+                      icon: <CalendarDays className="h-4 w-4" />,
+                      label: "Agenda inteligente",
+                      value: "Disparos no horário certo.",
+                    },
+                    {
+                      icon: <Shield className="h-4 w-4" />,
+                      label: "Controle e segurança",
+                      value: "Operação simples e segura.",
+                    },
+                    {
+                      icon: <CreditCard className="h-4 w-4" />,
+                      label: "PIX no WhatsApp",
+                      value: "Copiar e colar na mensagem.",
+                    },
                   ].map((item) => (
                     <GlassCard key={item.label} className="p-4">
                       <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
