@@ -339,7 +339,7 @@ export function Landing() {
                 {
                   icon: <Zap className="h-5 w-5" />,
                   title: "Cobrança automática",
-                  desc: "Agende envios e deixe o sistema executar com retentativas.",
+                  desc: "Automatize suas cobranças e monitore tudo em tempo real.",
                 },
                 {
                   icon: <MessageSquareText className="h-5 w-5" />,
