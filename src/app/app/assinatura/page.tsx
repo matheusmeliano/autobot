@@ -98,7 +98,6 @@ export default async function AssinaturaPage() {
               </div>
             </div>
           </div>
-          <div className="mt-6 h-px bg-white/10" />
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
@@ -142,7 +141,6 @@ export default async function AssinaturaPage() {
               Mais escolhido
             </div>
           </div>
-          <div className="mt-6 h-px bg-white/10" />
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
@@ -183,7 +181,6 @@ export default async function AssinaturaPage() {
               </div>
             </div>
           </div>
-          <div className="mt-6 h-px bg-white/10" />
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
