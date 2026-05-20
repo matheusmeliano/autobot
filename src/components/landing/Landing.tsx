@@ -86,10 +86,10 @@ export function Landing() {
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#070A10]/60 backdrop-blur-xl">
         <Container>
           <div className="flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Logo />
               <div className="text-sm font-semibold tracking-tight">AutoBot</div>
-            </Link>
+            </div>
 
             <nav className="hidden items-center gap-6 text-sm text-white/70 md:flex">
               <a className="hover:text-white" href="#beneficios">
@@ -632,12 +632,12 @@ export function Landing() {
             <div className="border-t border-white/5 py-10">
               <div className="grid gap-10 md:grid-cols-2">
                 <div>
-                  <Link href="/" className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <Logo />
                     <div className="text-sm font-semibold tracking-tight">
                       AutoBot
                     </div>
-                  </Link>
+                  </div>
                   <div className="mt-3 max-w-sm text-sm text-white/55">
                     Plataforma SaaS que automatiza cobranças via WhatsApp.
                   </div>
