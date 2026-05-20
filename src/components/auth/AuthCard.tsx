@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 
 export function AuthCard({
@@ -23,13 +22,10 @@ export function AuthCard({
       </div>
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-16">
-        <Link
-          href="/"
-          className="mb-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white/70 hover:text-white"
-        >
+        <div className="mb-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white/70">
           <Logo />
           AutoBot
-        </Link>
+        </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
           <div className="text-center">
@@ -45,4 +41,3 @@ export function AuthCard({
     </div>
   );
 }
-

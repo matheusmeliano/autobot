@@ -32,10 +32,10 @@ export default async function AdminLayout({
         <aside className="hidden w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:block min-[1201px]:h-[calc(100vh-3rem)]">
           <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
             <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <Logo />
                 <div className="text-sm font-semibold tracking-tight">AutoBot</div>
-              </Link>
+              </div>
               <Link
                 href="/app"
                 className="rounded-xl px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.06] hover:text-white/85"
@@ -68,12 +68,12 @@ export default async function AdminLayout({
           <div className="mb-6 min-[1201px]:hidden">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
               <div className="flex items-center justify-between">
-                <Link href="/" className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <Logo />
                   <div className="text-sm font-semibold tracking-tight">
                     AutoBot
                   </div>
-                </Link>
+                </div>
                 <Link
                   href="/app"
                   className="rounded-xl px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.06] hover:text-white/85"

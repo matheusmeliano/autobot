@@ -322,7 +322,7 @@ export function Landing() {
                       {[
                         {
                           id: "a1",
-                          debtorName: "Lucas Brum",
+                          debtorName: "Mariana Costa",
                           status: "Executado",
                           dateTime: "10/05 • 14:00",
                         },
@@ -404,7 +404,7 @@ export function Landing() {
                 {
                   icon: <BarChart3 className="h-5 w-5" />,
                   title: "Relatórios inteligentes",
-                  desc: "Acompanhe suas cobranças de forma simples.",
+                  desc: "Cobranças organizadas, acompanhamento simples e eficiente.",
                 },
                 {
                   icon: <Shield className="h-5 w-5" />,
