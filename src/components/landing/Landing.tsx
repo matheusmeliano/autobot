@@ -629,6 +629,9 @@ export function Landing() {
                     <div className="text-xs font-semibold tracking-[0.2em] text-white/40">
                       PRODUTO
                     </div>
+                    <a className="block hover:text-white" href="#como-funciona">
+                      Como funciona?
+                    </a>
                     <a className="block hover:text-white" href="#planos">
                       Nossos planos
                     </a>
