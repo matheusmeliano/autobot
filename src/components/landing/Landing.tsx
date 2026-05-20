@@ -331,7 +331,7 @@ export function Landing() {
             <SectionTitle
               eyebrow="BENEFÍCIOS"
               title="Feito para reduzir inadimplência sem aumentar trabalho."
-              description="Tudo que você precisa para cobrar com consistência: automação, templates e visibilidade do que foi enviado e do que foi pago."
+              description="Tudo que você precisa para cobrar com consistência: automação, templates e visibilidade do que foi enviado."
             />
 
             <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
