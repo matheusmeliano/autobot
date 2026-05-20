@@ -354,7 +354,7 @@ export function Landing() {
                 {
                   icon: <BadgeCheck className="h-5 w-5" />,
                   title: "Redução da inadimplência",
-                  desc: "Cadência de cobrança e lembretes na hora certa.",
+                  desc: "Envie cobranças automaticamente no momento certo.",
                 },
                 {
                   icon: <BarChart3 className="h-5 w-5" />,
