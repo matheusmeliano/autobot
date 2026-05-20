@@ -139,9 +139,9 @@ export function DashboardClient({
           <div className="mt-1 text-xs text-white/45">
             Dados reais dos agendamentos cadastrados.
           </div>
-          <div className="mt-4 h-40">
+          <div className="mt-4 h-40 min-[1201px]:h-32">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chart}>
+              <AreaChart data={chart} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="dashValue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="rgb(99 102 241)" stopOpacity={0.55} />
@@ -153,6 +153,8 @@ export function DashboardClient({
                   tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
+                  height={18}
+                  tickMargin={8}
                 />
                 <Tooltip
                   contentStyle={{
