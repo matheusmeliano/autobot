@@ -101,7 +101,7 @@ export default async function AssinaturaPage() {
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
-              <div className="min-w-0">1 instância WhatsApp</div>
+              <div className="min-w-0">Conexão via Z-API</div>
             </li>
             <li className="flex items-start gap-2">
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
