@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   BadgeCheck,
+  CalendarDays,
   BarChart3,
   CreditCard,
   MessageSquareText,
@@ -199,30 +200,48 @@ export function Landing() {
                 <GlassCard className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-semibold text-white/70">
-                      Painel • Visão geral
+                      Painel
                     </div>
-                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-200 ring-1 ring-emerald-400/20">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                      Conectado
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/70">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
+                      WhatsApp: Conectado
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     {[
-                      { label: "Recebido (mês)", value: "R$ 18.420" },
-                      { label: "Cobranças enviadas", value: "312" },
-                      { label: "Inadimplentes", value: "27" },
-                      { label: "Mensagens", value: "1.284" },
+                      {
+                        label: "Agendamentos (mês)",
+                        value: "0",
+                        icon: <CalendarDays className="h-4 w-4" />,
+                      },
+                      {
+                        label: "Executados",
+                        value: "0",
+                        icon: <BadgeCheck className="h-4 w-4" />,
+                      },
+                      {
+                        label: "Templates (Mensagens)",
+                        value: "1",
+                        icon: <MessageSquareText className="h-4 w-4" />,
+                      },
                     ].map((kpi) => (
                       <div
                         key={kpi.label}
                         className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
                       >
-                        <div className="text-[11px] font-semibold text-white/55">
-                          {kpi.label}
-                        </div>
-                        <div className="mt-1 text-lg font-semibold">
-                          {kpi.value}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold text-white/55">
+                              {kpi.label}
+                            </div>
+                            <div className="mt-1 text-lg font-semibold">
+                              {kpi.value}
+                            </div>
+                          </div>
+                          <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
+                            {kpi.icon}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -230,14 +249,17 @@ export function Landing() {
 
                   <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
                     <div className="text-[11px] font-semibold text-white/55">
-                      Recebimentos (7 dias)
+                      Agendamentos criados (7 dias)
+                    </div>
+                    <div className="mt-1 text-[11px] text-white/45">
+                      Dados reais dos agendamentos cadastrados.
                     </div>
                     <div className="mt-3 h-32">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
                           <defs>
                             <linearGradient
-                              id="colorValue"
+                              id="dashValue"
                               x1="0"
                               y1="0"
                               x2="0"
@@ -277,36 +299,26 @@ export function Landing() {
                             dataKey="value"
                             stroke="rgb(99 102 241)"
                             strokeWidth={2}
-                            fill="url(#colorValue)"
+                            fill="url(#dashValue)"
                           />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
-                            <MessageSquareText className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold">
-                              Mensagem enviada
-                            </div>
-                            <div className="text-xs text-white/55">
-                              Lembrete amigável • João S.
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-[11px] font-semibold text-white/45">
-                          agora
-                        </div>
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="text-[11px] font-semibold text-white/55">
+                      Atividades
+                    </div>
+                    <div className="mt-1 text-[11px] text-white/45">
+                      Histórico da agenda.
+                    </div>
+                    <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                      <div className="text-xs font-semibold">
+                        Nenhum agendamento ainda
                       </div>
-                      <div className="mt-2 text-xs text-white/70">
-                        Olá João, tudo bem? Seu pagamento vence hoje. PIX:
-                        000.000.000-00
+                      <div className="mt-1 text-xs text-white/55">
+                        Quando você criar agendamentos, eles aparecem aqui.
                       </div>
                     </div>
                   </div>
