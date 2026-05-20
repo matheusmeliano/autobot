@@ -87,12 +87,12 @@ export function Landing() {
         <Container>
           <div className="pt-8 pb-5">
             <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5 shadow-[0_28px_80px_-55px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-              <div className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-2">
                 <Logo />
                 <div className="text-sm font-semibold tracking-tight text-black">
                   AutoBot
                 </div>
-              </div>
+              </Link>
 
               <nav className="hidden items-center gap-6 text-sm text-black/70 md:flex">
                 <a className="hover:text-black" href="#como-funciona">
