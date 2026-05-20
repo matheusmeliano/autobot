@@ -187,6 +187,9 @@ export function MercadoPagoRecurringButton(props: {
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
+            <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
+              ASSINATURA
+            </div>
             <div className="mt-1 text-lg font-semibold tracking-tight text-white/90">
               Cartão de crédito (mensal)
             </div>
