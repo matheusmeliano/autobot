@@ -208,22 +208,22 @@ export function Landing() {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="mt-4 grid gap-3 min-[520px]:grid-cols-2 min-[900px]:grid-cols-3">
                     {[
                       {
                         label: "Agendamentos (mês)",
                         value: "0",
-                        icon: <CalendarDays className="h-4 w-4" />,
+                        icon: <CalendarDays className="h-5 w-5" />,
                       },
                       {
                         label: "Executados",
                         value: "0",
-                        icon: <BadgeCheck className="h-4 w-4" />,
+                        icon: <BadgeCheck className="h-5 w-5" />,
                       },
                       {
                         label: "Templates (Mensagens)",
                         value: "1",
-                        icon: <MessageSquareText className="h-4 w-4" />,
+                        icon: <MessageSquareText className="h-5 w-5" />,
                       },
                     ].map((kpi) => (
                       <div
@@ -232,14 +232,14 @@ export function Landing() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="text-[11px] font-semibold text-white/55">
+                            <div className="text-xs font-semibold text-white/55">
                               {kpi.label}
                             </div>
-                            <div className="mt-1 text-lg font-semibold">
+                            <div className="mt-2 truncate text-2xl font-semibold tracking-tight">
                               {kpi.value}
                             </div>
                           </div>
-                          <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
+                          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] ring-1 ring-white/10">
                             {kpi.icon}
                           </div>
                         </div>
