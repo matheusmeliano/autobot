@@ -455,7 +455,12 @@ export function Landing() {
                   name: "Básico",
                   price: "R$ 49/mês",
                   highlight: false,
-                  items: ["1 instância WhatsApp", "Agendamentos", "Templates básicos"],
+                  items: [
+                    "Conexão via Z-API",
+                    "Até 15 cadastros",
+                    "Templates e variáveis",
+                    "Agendamento automático",
+                  ],
                 },
                 {
                   name: "Pro",
@@ -463,8 +468,9 @@ export function Landing() {
                   highlight: true,
                   items: [
                     "Tudo do Básico",
-                    "Retentativas inteligentes",
-                    "Relatórios completos",
+                    "Cadastro ilimitado",
+                    "Relatório completo",
+                    "Suporte prioritário",
                   ],
                 },
                 {
@@ -518,7 +524,8 @@ export function Landing() {
                         : "border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06]",
                     ].join(" ")}
                   >
-                    Começar <ArrowRight className="h-4 w-4" />
+                    {plan.name === "Vitalício" ? "Comprar vitalício" : "Assinar"}{" "}
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </GlassCard>
               ))}
