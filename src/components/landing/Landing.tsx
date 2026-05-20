@@ -131,7 +131,7 @@ export function Landing() {
       <main className="relative">
         <section className="pt-4 md:pt-12">
           <Container>
-            <div className="grid items-center gap-10 md:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid items-start gap-10 md:grid-cols-[1.2fr_0.8fr]">
               <div>
                 <motion.h1
                   initial={{ opacity: 0, y: 16 }}
