@@ -31,14 +31,19 @@ const NAV_ITEMS = [
 export function AppNav({
   variant,
   restricted,
+  plan,
 }: {
   variant: "sidebar" | "bottom";
   restricted?: boolean;
+  plan?: "teste" | "basico" | "pro" | "vitalicio";
 }) {
   const pathname = usePathname();
   const navItems = restricted
     ? NAV_ITEMS.filter((i) => i.href === "/app/assinatura")
-    : NAV_ITEMS;
+    : NAV_ITEMS.filter((i) => {
+        if (i.href !== "/app/relatorios") return true;
+        return plan === "pro" || plan === "vitalicio";
+      });
 
   if (variant === "bottom") {
     const [openMore, setOpenMore] = useState(false);

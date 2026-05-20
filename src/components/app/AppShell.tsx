@@ -19,6 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
   const [restricted, setRestricted] = useState(false);
+  const [plan, setPlan] = useState<"teste" | "basico" | "pro" | "vitalicio">("teste");
 
   useEffect(() => {
     let active = true;
@@ -58,8 +59,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ]);
 
       const plan = normalizePlan(profile?.plano ?? sub?.plano ?? "teste");
+      if (!active) return;
+      setPlan(plan);
       if (plan === "vitalicio") {
-        if (!active) return;
         setRestricted(false);
         return;
       }
@@ -166,7 +168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="mt-4 flex-1">
-              <AppNav variant="sidebar" restricted={restricted} />
+              <AppNav variant="sidebar" restricted={restricted} plan={plan} />
             </div>
 
             <form action={logoutAction} className="mt-4">
@@ -218,7 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-[#070A10]/80 backdrop-blur-xl min-[1201px]:hidden">
-        <AppNav variant="bottom" restricted={restricted} />
+        <AppNav variant="bottom" restricted={restricted} plan={plan} />
       </div>
     </div>
   );

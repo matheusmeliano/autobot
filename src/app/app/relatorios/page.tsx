@@ -1,4 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { normalizePlan } from "@/lib/plans";
 import {
   ReportsClient,
   type ReportChartPoint,
@@ -7,6 +9,21 @@ import {
 
 export default async function RelatoriosPage() {
   const supabase = await createSupabaseServerClient();
+  const [{ data: profile }, { data: sub }] = await Promise.all([
+    supabase.from("profiles").select("plano").maybeSingle(),
+    supabase
+      .from("subscriptions")
+      .select("plano, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const plan = normalizePlan((profile as any)?.plano ?? (sub as any)?.plano ?? "teste");
+  const canAccess = plan === "pro" || plan === "vitalicio";
+  if (!canAccess) {
+    redirect("/app/dashboard");
+  }
+
   const now = new Date();
   const start30 = new Date(now);
   start30.setDate(now.getDate() - 29);
