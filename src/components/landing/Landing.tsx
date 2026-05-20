@@ -128,16 +128,6 @@ export function Landing() {
           <Container>
             <div className="grid items-center gap-10 md:grid-cols-[1.2fr_0.8fr]">
               <div>
-                <motion.div
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-white/70"
-                >
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
-                  WhatsApp online • PIX pronto para copiar/colar
-                </motion.div>
-
                 <motion.h1
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
