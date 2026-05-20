@@ -395,61 +395,6 @@ export function Landing() {
           </Container>
         </section>
 
-        <section id="beneficios" className="pt-20 md:pt-28">
-          <Container>
-            <SectionTitle
-              eyebrow="BENEFÍCIOS"
-              title="Feito para reduzir inadimplência sem aumentar trabalho."
-              description="Tudo que você precisa para cobrar com consistência: automação, templates e visibilidade do que foi enviado."
-            />
-
-            <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
-              {[
-                {
-                  icon: <Zap className="h-5 w-5" />,
-                  title: "Cobrança automática",
-                  desc: "Automatize suas cobranças e monitore tudo em tempo real.",
-                },
-                {
-                  icon: <MessageSquareText className="h-5 w-5" />,
-                  title: "WhatsApp integrado",
-                  desc: "Integração com a Z-API para conexões seguras e estáveis.",
-                },
-                {
-                  icon: <CreditCard className="h-5 w-5" />,
-                  title: "PIX instantâneo",
-                  desc: "Mensagens com chave PIX e variáveis prontas para copiar.",
-                },
-                {
-                  icon: <BadgeCheck className="h-5 w-5" />,
-                  title: "Redução da inadimplência",
-                  desc: "Envie cobranças automaticamente no momento certo.",
-                },
-                {
-                  icon: <BarChart3 className="h-5 w-5" />,
-                  title: "Relatórios inteligentes",
-                  desc: "Cobranças organizadas, acompanhamento simples e eficiente.",
-                },
-                {
-                  icon: <Shield className="h-5 w-5" />,
-                  title: "Gestão simplificada",
-                  desc: "Um painel rápido e minimalista para operação diária.",
-                },
-              ].map((b) => (
-                <GlassCard key={b.title} className="p-5">
-                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
-                    {b.icon}
-                  </div>
-                  <div className="mt-4 text-sm font-semibold">{b.title}</div>
-                  <div className="mt-2 text-sm leading-relaxed text-white/60">
-                    {b.desc}
-                  </div>
-                </GlassCard>
-              ))}
-            </div>
-          </Container>
-        </section>
-
         <section id="como-funciona" className="pt-20 md:pt-28">
           <Container>
             <SectionTitle
