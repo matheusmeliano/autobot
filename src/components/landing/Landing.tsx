@@ -198,7 +198,7 @@ export function Landing() {
                     {
                       icon: <CreditCard className="h-4 w-4" />,
                       label: "PIX no WhatsApp",
-                      value: "Copiar e colar na mensagem.",
+                      value: "Mensagens com chave PIX.",
                     },
                   ].map((item) => (
                     <GlassCard key={item.label} className="p-4">
