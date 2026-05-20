@@ -105,7 +105,7 @@ export default async function AssinaturaPage() {
             </li>
             <li className="flex items-start gap-2">
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
-              <div className="min-w-0">Agendamentos</div>
+              <div className="min-w-0">Até 15 cadastros</div>
             </li>
             <li className="flex items-start gap-2">
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
