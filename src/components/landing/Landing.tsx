@@ -174,7 +174,7 @@ export function Landing() {
                     {
                       icon: <BarChart3 className="h-4 w-4" />,
                       label: "Relatórios",
-                      value: "Indicadores de cobrança",
+                      value: "Relatórios completos e simples.",
                     },
                   ].map((item) => (
                     <GlassCard key={item.label} className="p-4">
