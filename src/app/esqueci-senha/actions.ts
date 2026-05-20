@@ -68,9 +68,7 @@ export async function forgotPasswordAction(formData: FormData) {
 
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(
-      "/redefinir-senha"
-    )}`,
+    redirectTo: `${baseUrl}/redefinir-senha`,
   });
 
   if (error) {
