@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizePlan } from "@/lib/plans";
 
 const createSchema = z.object({
   nome: z.string().min(2),
@@ -24,6 +25,21 @@ export async function createDebtorAction(input: unknown) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const { data: profile } = await supabase.from("profiles").select("plano").maybeSingle();
+  const plan = normalizePlan((profile as any)?.plano);
+  const limited = plan !== "pro" && plan !== "vitalicio";
+
+  if (limited) {
+    const { count } = await supabase
+      .from("debtors")
+      .select("id", { count: "exact", head: true });
+    if ((count ?? 0) >= 15) {
+      return {
+        ok: false,
+        error: "Limite do plano básico: até 15 cadastros de clientes.",
+      };
+    }
+  }
 
   const { error } = await supabase.from("debtors").insert({
     nome: parsed.data.nome,
@@ -71,4 +87,3 @@ export async function deleteDebtorAction(id: string) {
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
-

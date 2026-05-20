@@ -10,6 +10,7 @@ import {
   deleteDebtorAction,
   updateDebtorAction,
 } from "@/app/app/clientes/actions";
+import { type PlanKey } from "@/lib/plans";
 
 export type DebtorRow = {
   id: string;
@@ -164,7 +165,7 @@ function normalizePixKeyForSave(raw: string) {
   return raw.trim();
 }
 
-export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
+export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<DebtorRow[]>(initial);
@@ -172,6 +173,7 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
   const [editing, setEditing] = useState<DebtorRow | null>(null);
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>("desconhecida");
   const vencimentoInputRef = useRef<HTMLInputElement | null>(null);
+  const canCreate = plan === "pro" || plan === "vitalicio" || rows.length < 15;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -224,6 +226,10 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
   };
 
   const openCreate = () => {
+    if (!canCreate) {
+      modalToast.error("Limite do plano básico: até 15 cadastros de clientes.");
+      return;
+    }
     close();
     setOpen(true);
   };
@@ -315,7 +321,8 @@ export function DebtorsClient({ initial }: { initial: DebtorRow[] }) {
           />
           <button
             onClick={openCreate}
-            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 sm:w-auto"
+            disabled={!canCreate}
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60 disabled:hover:bg-white sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Novo cliente

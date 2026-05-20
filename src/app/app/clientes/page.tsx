@@ -1,14 +1,18 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsClient";
 import Link from "next/link";
+import { normalizePlan, type PlanKey } from "@/lib/plans";
 
 export default async function ClientesPage() {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("debtors")
-    .select("id, nome, telefone, valor, vencimento, pix_key, observacoes, status, created_at")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const [{ data, error }, { data: profile }] = await Promise.all([
+    supabase
+      .from("debtors")
+      .select("id, nome, telefone, valor, vencimento, pix_key, observacoes, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase.from("profiles").select("plano").maybeSingle(),
+  ]);
 
   if (error) {
     return (
@@ -44,5 +48,6 @@ export default async function ClientesPage() {
     );
   }
 
-  return <DebtorsClient initial={(data ?? []) as DebtorRow[]} />;
+  const plan = normalizePlan((profile as any)?.plano) as PlanKey;
+  return <DebtorsClient initial={(data ?? []) as DebtorRow[]} plan={plan} />;
 }
