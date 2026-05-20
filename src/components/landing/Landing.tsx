@@ -169,7 +169,7 @@ export function Landing() {
                     {
                       icon: <Zap className="h-4 w-4" />,
                       label: "Envios automáticos",
-                      value: "Agendamentos + retentativas",
+                      value: "Automatize suas cobranças.",
                     },
                     {
                       icon: <BarChart3 className="h-4 w-4" />,
