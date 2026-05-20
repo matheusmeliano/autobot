@@ -208,7 +208,7 @@ export function Landing() {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 min-[520px]:grid-cols-2 min-[900px]:grid-cols-3">
+                  <div className="mt-4 grid gap-3 min-[520px]:grid-cols-2">
                     {[
                       {
                         label: "Agendamentos (mês)",
@@ -228,7 +228,12 @@ export function Landing() {
                     ].map((kpi) => (
                       <div
                         key={kpi.label}
-                        className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                        className={[
+                          "rounded-xl border border-white/10 bg-white/[0.03] p-3",
+                          kpi.label === "Templates (Mensagens)"
+                            ? "min-[520px]:col-span-2"
+                            : "",
+                        ].join(" ")}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
