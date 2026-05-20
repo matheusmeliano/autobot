@@ -218,7 +218,7 @@ export default async function AssinaturaPage() {
             href="https://wa.me/5565996933336"
             target="_blank"
             rel="noreferrer"
-            className="font-semibold text-white underline decoration-white/20 underline-offset-4 hover:decoration-white/40"
+            className="font-semibold text-white hover:text-white/90"
           >
             Entre em contato
           </a>{" "}
