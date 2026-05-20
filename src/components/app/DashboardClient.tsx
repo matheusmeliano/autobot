@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { BadgeCheck, CalendarDays, MessageSquareText } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
@@ -79,6 +80,21 @@ export function DashboardClient({
   chart: ChartPoint[];
   activities: ActivityRow[];
 }) {
+  const pageSize = 3;
+  const [activityPage, setActivityPage] = useState(1);
+  const activityPages = Math.max(1, Math.ceil(activities.length / pageSize));
+  const safeActivityPage = Math.min(activityPage, activityPages);
+
+  useEffect(() => {
+    if (activityPage !== safeActivityPage) setActivityPage(safeActivityPage);
+  }, [activityPage, safeActivityPage]);
+
+  const pagedActivities = useMemo(() => {
+    if (!activities.length) return [];
+    const start = (safeActivityPage - 1) * pageSize;
+    return activities.slice(start, start + pageSize);
+  }, [activities, safeActivityPage]);
+
   const isConnected =
     stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
@@ -178,7 +194,7 @@ export function DashboardClient({
           </div>
           <div className="mt-4 space-y-3">
             {activities.length ? (
-              activities.map((item) => (
+              pagedActivities.map((item) => (
                 <div
                   key={item.id}
                   className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
@@ -216,6 +232,31 @@ export function DashboardClient({
               </div>
             )}
           </div>
+          {activities.length > pageSize ? (
+            <div className="mt-4 grid grid-cols-3 items-center">
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white/80 hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.04]"
+                onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                disabled={safeActivityPage <= 1}
+                aria-label="Página anterior"
+              >
+                {"<"}
+              </button>
+              <div className="text-center text-xs font-semibold text-white/60">
+                {safeActivityPage} / {activityPages}
+              </div>
+              <button
+                type="button"
+                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white/80 hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.04]"
+                onClick={() => setActivityPage((p) => Math.min(activityPages, p + 1))}
+                disabled={safeActivityPage >= activityPages}
+                aria-label="Próxima página"
+              >
+                {">"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
