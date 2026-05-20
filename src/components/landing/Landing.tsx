@@ -95,9 +95,6 @@ export function Landing() {
               </div>
 
               <nav className="hidden items-center gap-6 text-sm text-black/70 md:flex">
-                <a className="hover:text-black" href="#beneficios">
-                  Benefícios
-                </a>
                 <a className="hover:text-black" href="#como-funciona">
                   Como funciona
                 </a>
@@ -632,9 +629,6 @@ export function Landing() {
                     <div className="text-xs font-semibold tracking-[0.2em] text-white/40">
                       PRODUTO
                     </div>
-                    <a className="block hover:text-white" href="#beneficios">
-                      Benefícios
-                    </a>
                     <a className="block hover:text-white" href="#planos">
                       Planos
                     </a>
