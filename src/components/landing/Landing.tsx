@@ -83,42 +83,46 @@ export function Landing() {
         <div className="absolute left-[-240px] top-[520px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),rgba(59,130,246,0)_55%)]" />
       </div>
 
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#070A10]/60 backdrop-blur-xl">
+      <header className="sticky top-0 z-30">
         <Container>
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Logo />
-              <div className="text-sm font-semibold tracking-tight">AutoBot</div>
-            </div>
+          <div className="py-4">
+            <div className="flex h-14 items-center justify-between rounded-full border border-white/10 bg-[linear-gradient(90deg,rgba(99,102,241,0.92),rgba(79,70,229,0.92))] px-5 shadow-[0_24px_70px_-45px_rgba(99,102,241,0.95)] backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <Logo />
+                <div className="text-sm font-semibold tracking-tight">
+                  AutoBot
+                </div>
+              </div>
 
-            <nav className="hidden items-center gap-6 text-sm text-white/70 md:flex">
-              <a className="hover:text-white" href="#beneficios">
-                Benefícios
-              </a>
-              <a className="hover:text-white" href="#como-funciona">
-                Como funciona
-              </a>
-              <a className="hover:text-white" href="#planos">
-                Planos
-              </a>
-              <a className="hover:text-white" href="#faq">
-                FAQ
-              </a>
-            </nav>
+              <nav className="hidden items-center gap-6 text-sm text-white/85 md:flex">
+                <a className="hover:text-white" href="#beneficios">
+                  Benefícios
+                </a>
+                <a className="hover:text-white" href="#como-funciona">
+                  Como funciona
+                </a>
+                <a className="hover:text-white" href="#planos">
+                  Planos
+                </a>
+                <a className="hover:text-white" href="#faq">
+                  FAQ
+                </a>
+              </nav>
 
-            <div className="flex items-center gap-3">
-              <Link
-                href="/login"
-                className="hidden rounded-xl px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white md:inline-flex"
-              >
-                Entrar
-              </Link>
-              <Link
-                href="/signup"
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
-              >
-                Fazer o teste <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/login"
+                  className="hidden rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/15 md:inline-flex"
+                >
+                  Entrar
+                </Link>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
+                >
+                  Fazer o teste <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
           </div>
         </Container>
