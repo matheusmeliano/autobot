@@ -344,7 +344,7 @@ export function Landing() {
                 {
                   icon: <MessageSquareText className="h-5 w-5" />,
                   title: "WhatsApp integrado",
-                  desc: "Integração com Z-API preparada para múltiplas instâncias.",
+                  desc: "Integração com a Z-API para conexões seguras e estáveis.",
                 },
                 {
                   icon: <CreditCard className="h-5 w-5" />,
