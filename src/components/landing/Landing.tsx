@@ -118,7 +118,7 @@ export function Landing() {
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#070A10,#0B1220)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110"
+                  className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#070A10,rgba(99,102,241,0.85))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110"
                 >
                   Fazer o teste <ArrowRight className="h-4 w-4" />
                 </Link>
