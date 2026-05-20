@@ -133,8 +133,8 @@ export function DashboardClient({
         />
       </div>
 
-      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-3">
+      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5 min-[1201px]:items-start">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-3">
           <div className="text-sm font-semibold">Agendamentos criados (7 dias)</div>
           <div className="mt-1 text-xs text-white/45">
             Dados reais dos agendamentos cadastrados.
@@ -171,7 +171,7 @@ export function DashboardClient({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-2">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-2">
           <div className="text-sm font-semibold">Atividades</div>
           <div className="mt-1 text-xs text-white/45">
             Histórico da agenda.
