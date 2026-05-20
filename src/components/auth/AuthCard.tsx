@@ -21,7 +21,7 @@ export function AuthCard({
         <div className="absolute left-[-240px] top-[520px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),rgba(59,130,246,0)_55%)]" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-16">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-start px-6 pb-16 pt-10 md:justify-center md:py-16">
         <div className="mb-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white/70">
           <Logo />
           AutoBot
