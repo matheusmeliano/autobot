@@ -85,8 +85,8 @@ export function Landing() {
 
       <header className="sticky top-0 z-30">
         <Container>
-          <div className="py-4">
-            <div className="flex h-14 items-center justify-between rounded-full border border-white/10 bg-[linear-gradient(90deg,rgba(99,102,241,0.92),rgba(79,70,229,0.92))] px-5 shadow-[0_24px_70px_-45px_rgba(99,102,241,0.95)] backdrop-blur-xl">
+          <div className="pt-8 pb-5">
+            <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5 shadow-[0_28px_80px_-55px_rgba(0,0,0,0.55)] backdrop-blur-xl">
               <div className="flex items-center gap-2">
                 <Logo />
                 <div className="text-sm font-semibold tracking-tight">
@@ -94,17 +94,17 @@ export function Landing() {
                 </div>
               </div>
 
-              <nav className="hidden items-center gap-6 text-sm text-white/85 md:flex">
-                <a className="hover:text-white" href="#beneficios">
+              <nav className="hidden items-center gap-6 text-sm text-black/70 md:flex">
+                <a className="hover:text-black" href="#beneficios">
                   Benefícios
                 </a>
-                <a className="hover:text-white" href="#como-funciona">
+                <a className="hover:text-black" href="#como-funciona">
                   Como funciona
                 </a>
-                <a className="hover:text-white" href="#planos">
+                <a className="hover:text-black" href="#planos">
                   Planos
                 </a>
-                <a className="hover:text-white" href="#faq">
+                <a className="hover:text-black" href="#faq">
                   FAQ
                 </a>
               </nav>
@@ -112,13 +112,13 @@ export function Landing() {
               <div className="flex items-center gap-3">
                 <Link
                   href="/login"
-                  className="hidden rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/15 md:inline-flex"
+                  className="hidden rounded-full border border-black/10 bg-black/[0.03] px-4 py-2 text-sm font-semibold text-black/70 hover:bg-black/[0.06] hover:text-black md:inline-flex"
                 >
                   Entrar
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
+                  className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-black/90"
                 >
                   Fazer o teste <ArrowRight className="h-4 w-4" />
                 </Link>
