@@ -359,7 +359,7 @@ export function Landing() {
                 {
                   icon: <BarChart3 className="h-5 w-5" />,
                   title: "Relatórios inteligentes",
-                  desc: "KPIs claros: enviados, falhas, pagos e inadimplência.",
+                  desc: "Acompanhe suas cobranças de forma simples.",
                 },
                 {
                   icon: <Shield className="h-5 w-5" />,
