@@ -208,7 +208,7 @@ export function Landing() {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 min-[520px]:grid-cols-2">
+                  <div className="mt-4 grid gap-3 min-[1100px]:grid-cols-2">
                     {[
                       {
                         label: "Agendamentos (mês)",
@@ -231,7 +231,7 @@ export function Landing() {
                         className={[
                           "rounded-xl border border-white/10 bg-white/[0.03] p-3",
                           kpi.label === "Templates (Mensagens)"
-                            ? "min-[520px]:col-span-2"
+                            ? "min-[1100px]:col-span-2"
                             : "",
                         ].join(" ")}
                       >
