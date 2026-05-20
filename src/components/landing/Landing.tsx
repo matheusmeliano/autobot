@@ -129,7 +129,7 @@ export function Landing() {
       </header>
 
       <main className="relative">
-        <section className="pt-16 md:pt-24">
+        <section className="pt-4 md:pt-12">
           <Container>
             <div className="grid items-center gap-10 md:grid-cols-[1.2fr_0.8fr]">
               <div>
