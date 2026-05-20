@@ -212,17 +212,17 @@ export function Landing() {
                     {[
                       {
                         label: "Agendamentos (mês)",
-                        value: "0",
+                        value: "24",
                         icon: <CalendarDays className="h-5 w-5" />,
                       },
                       {
                         label: "Executados",
-                        value: "0",
+                        value: "18",
                         icon: <BadgeCheck className="h-5 w-5" />,
                       },
                       {
                         label: "Templates (Mensagens)",
-                        value: "1",
+                        value: "7",
                         icon: <MessageSquareText className="h-5 w-5" />,
                       },
                     ].map((kpi) => (
@@ -318,13 +318,51 @@ export function Landing() {
                     <div className="mt-1 text-[11px] text-white/45">
                       Histórico da agenda.
                     </div>
-                    <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                      <div className="text-xs font-semibold">
-                        Nenhum agendamento ainda
-                      </div>
-                      <div className="mt-1 text-xs text-white/55">
-                        Quando você criar agendamentos, eles aparecem aqui.
-                      </div>
+                    <div className="mt-3 space-y-3">
+                      {[
+                        {
+                          id: "a1",
+                          debtorName: "Lucas Brum",
+                          status: "Executado",
+                          dateTime: "10/05 • 14:00",
+                        },
+                        {
+                          id: "a2",
+                          debtorName: "João Silva",
+                          status: "Agendado",
+                          dateTime: "12/05 • 09:30",
+                        },
+                      ].map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-xs font-semibold">
+                                {item.debtorName}
+                              </div>
+                              <div className="mt-1 text-xs text-white/55">
+                                {item.status} • {item.dateTime}
+                              </div>
+                            </div>
+                            <span
+                              className={[
+                                "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
+                                item.status.toLowerCase() === "executado"
+                                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                                  : item.status.toLowerCase() === "cancelado"
+                                    ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                                    : item.status.toLowerCase() === "pausado"
+                                      ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                                    : "border-white/10 bg-white/[0.04] text-white/70",
+                              ].join(" ")}
+                            >
+                              {item.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </GlassCard>
