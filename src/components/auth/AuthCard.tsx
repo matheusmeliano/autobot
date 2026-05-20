@@ -22,10 +22,13 @@ export function AuthCard({
       </div>
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-start px-6 pb-16 pt-10 md:justify-center md:py-16">
-        <div className="mb-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white/70">
+        <a
+          href="/"
+          className="mb-8 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white/70"
+        >
           <Logo />
           AutoBot
-        </div>
+        </a>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
           <div className="text-center">
