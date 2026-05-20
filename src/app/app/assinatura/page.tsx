@@ -32,9 +32,6 @@ export default async function AssinaturaPage() {
   if (error) {
     return (
       <div>
-        <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-          ASSINATURA
-        </div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
           Assinatura
         </h1>
@@ -58,9 +55,6 @@ export default async function AssinaturaPage() {
 
   return (
     <div>
-      <div className="text-xs font-semibold tracking-[0.2em] text-white/45">
-        ASSINATURA
-      </div>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
         Assinatura
       </h1>
