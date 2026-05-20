@@ -111,6 +111,10 @@ export default async function AssinaturaPage() {
               <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
               <div className="min-w-0">Templates e variáveis</div>
             </li>
+            <li className="flex items-start gap-2">
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="min-w-0">Agendamento automático</div>
+            </li>
           </ul>
           <div className="mt-6">
             <MercadoPagoRecurringButton
