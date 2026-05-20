@@ -88,8 +88,8 @@ export function Landing() {
           <div className="pt-8 pb-5">
             <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5 shadow-[0_28px_80px_-55px_rgba(0,0,0,0.55)] backdrop-blur-xl">
               <div className="flex items-center gap-2">
-                <Logo />
-                <div className="text-sm font-semibold tracking-tight">
+                <Logo className="bg-[#070A10] border-white/10" />
+                <div className="text-sm font-semibold tracking-tight text-black">
                   AutoBot
                 </div>
               </div>
@@ -118,7 +118,7 @@ export function Landing() {
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-black/90"
+                  className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,rgba(99,102,241,0.95),rgba(79,70,229,0.95))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
                 >
                   Fazer o teste <ArrowRight className="h-4 w-4" />
                 </Link>

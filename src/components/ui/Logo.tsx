@@ -1,10 +1,15 @@
 import { useId } from "react";
 
-export function Logo() {
+export function Logo({ className = "" }: { className?: string }) {
   const uid = useId().replace(/:/g, "");
   const gradientId = `bot-gradient-${uid}`;
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] shadow-sm">
+    <div
+      className={[
+        "flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] shadow-sm",
+        className,
+      ].join(" ")}
+    >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         width="24"
