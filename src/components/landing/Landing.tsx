@@ -128,7 +128,7 @@ export function Landing() {
       <main className="relative">
         <section className="pt-4 md:pt-12">
           <Container>
-            <div className="grid items-start gap-10 md:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid items-start gap-10 min-[1100px]:grid-cols-2">
               <div>
                 <motion.h1
                   initial={{ opacity: 0, y: 16 }}
@@ -152,65 +152,18 @@ export function Landing() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.55, delay: 0.15 }}
-                  className="mt-8 flex flex-col gap-2"
+                  className="mt-8 flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:gap-4"
                 >
                   <Link
                     href="/signup"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-sm hover:bg-white/90 sm:w-auto"
                   >
                     Começar gratuitamente <ArrowRight className="h-4 w-4" />
                   </Link>
-                  <div className="text-center text-xs font-medium text-white/55">
+                  <div className="text-center text-xs font-medium text-white/55 sm:text-left">
                     Comece no teste grátis de 7 dias.
                   </div>
                 </motion.div>
-
-                <div className="mt-10 grid gap-4 sm:grid-cols-2">
-                  {[
-                    {
-                      icon: <Zap className="h-4 w-4" />,
-                      label: "Envios automáticos",
-                      value: "Automatize suas cobranças.",
-                    },
-                    {
-                      icon: <BarChart3 className="h-4 w-4" />,
-                      label: "Relatórios",
-                      value: "Relatórios completos e simples.",
-                    },
-                    {
-                      icon: <MessageSquareText className="h-4 w-4" />,
-                      label: "Templates",
-                      value: "Mensagens prontas com variáveis.",
-                    },
-                    {
-                      icon: <CalendarDays className="h-4 w-4" />,
-                      label: "Agenda inteligente",
-                      value: "Disparos no horário certo.",
-                    },
-                    {
-                      icon: <Shield className="h-4 w-4" />,
-                      label: "Controle e segurança",
-                      value: "Operação simples e segura.",
-                    },
-                    {
-                      icon: <CreditCard className="h-4 w-4" />,
-                      label: "PIX no WhatsApp",
-                      value: "Mensagens com chave PIX.",
-                    },
-                  ].map((item) => (
-                    <GlassCard key={item.label} className="p-4">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
-                          {item.icon}
-                        </span>
-                        {item.label}
-                      </div>
-                      <div className="mt-3 text-sm text-white/60">
-                        {item.value}
-                      </div>
-                    </GlassCard>
-                  ))}
-                </div>
               </div>
 
               <motion.div
@@ -273,121 +226,177 @@ export function Landing() {
                     ))}
                   </div>
 
-                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                    <div className="text-[11px] font-semibold text-white/55">
-                      Agendamentos criados (7 dias)
+                  <div className="mt-4 grid gap-4 min-[1100px]:grid-cols-3">
+                    <div className="min-[1100px]:col-span-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold text-white/55">
+                        Agendamentos criados (7 dias)
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Dados reais dos agendamentos cadastrados.
+                      </div>
+                      <div className="mt-3 h-32">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData}>
+                            <defs>
+                              <linearGradient
+                                id="dashValue"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor="rgb(99 102 241)"
+                                  stopOpacity={0.55}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor="rgb(99 102 241)"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <XAxis
+                              dataKey="name"
+                              tick={{
+                                fill: "rgba(255,255,255,0.45)",
+                                fontSize: 10,
+                              }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: "rgba(15, 23, 42, 0.9)",
+                                border: "1px solid rgba(255,255,255,0.10)",
+                                borderRadius: 12,
+                              }}
+                              labelStyle={{ color: "rgba(255,255,255,0.7)" }}
+                              itemStyle={{ color: "white" }}
+                              formatter={(v: any) => [v, "Quantidade"]}
+                              labelFormatter={(l: any) => `Dia: ${l}`}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="value"
+                              stroke="rgb(99 102 241)"
+                              strokeWidth={2}
+                              fill="url(#dashValue)"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
-                    <div className="mt-1 text-[11px] text-white/45">
-                      Dados reais dos agendamentos cadastrados.
-                    </div>
-                    <div className="mt-3 h-32">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData}>
-                          <defs>
-                            <linearGradient
-                              id="dashValue"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="0%"
-                                stopColor="rgb(99 102 241)"
-                                stopOpacity={0.55}
-                              />
-                              <stop
-                                offset="100%"
-                                stopColor="rgb(99 102 241)"
-                                stopOpacity={0}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <XAxis
-                            dataKey="name"
-                            tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              background: "rgba(15, 23, 42, 0.9)",
-                              border: "1px solid rgba(255,255,255,0.10)",
-                              borderRadius: 12,
-                            }}
-                            labelStyle={{ color: "rgba(255,255,255,0.7)" }}
-                            itemStyle={{ color: "white" }}
-                            formatter={(v: any) => [v, "Quantidade"]}
-                            labelFormatter={(l: any) => `Dia: ${l}`}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="value"
-                            stroke="rgb(99 102 241)"
-                            strokeWidth={2}
-                            fill="url(#dashValue)"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
 
-                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                    <div className="text-[11px] font-semibold text-white/55">
-                      Atividades
-                    </div>
-                    <div className="mt-1 text-[11px] text-white/45">
-                      Histórico da agenda.
-                    </div>
-                    <div className="mt-3 space-y-3">
-                      {[
-                        {
-                          id: "a1",
-                          debtorName: "Mariana Costa",
-                          status: "Executado",
-                          dateTime: "10/05 • 14:00",
-                        },
-                        {
-                          id: "a2",
-                          debtorName: "João Silva",
-                          status: "Agendado",
-                          dateTime: "12/05 • 09:30",
-                        },
-                      ].map((item) => (
-                        <div
-                          key={item.id}
-                          className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="truncate text-xs font-semibold">
-                                {item.debtorName}
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold text-white/55">
+                        Atividades
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Histórico da agenda.
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        {[
+                          {
+                            id: "a1",
+                            debtorName: "Mariana Costa",
+                            status: "Executado",
+                            dateTime: "10/05 • 14:00",
+                          },
+                          {
+                            id: "a2",
+                            debtorName: "João Silva",
+                            status: "Agendado",
+                            dateTime: "12/05 • 09:30",
+                          },
+                        ].map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-xs font-semibold">
+                                  {item.debtorName}
+                                </div>
+                                <div className="mt-1 text-xs text-white/55">
+                                  {item.status} • {item.dateTime}
+                                </div>
                               </div>
-                              <div className="mt-1 text-xs text-white/55">
-                                {item.status} • {item.dateTime}
-                              </div>
+                              <span
+                                className={[
+                                  "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
+                                  item.status.toLowerCase() === "executado"
+                                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                                    : item.status.toLowerCase() === "cancelado"
+                                      ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                                      : item.status.toLowerCase() === "pausado"
+                                        ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                                        : "border-white/10 bg-white/[0.04] text-white/70",
+                                ].join(" ")}
+                              >
+                                {item.status}
+                              </span>
                             </div>
-                            <span
-                              className={[
-                                "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
-                                item.status.toLowerCase() === "executado"
-                                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                                  : item.status.toLowerCase() === "cancelado"
-                                    ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
-                                    : item.status.toLowerCase() === "pausado"
-                                      ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                                    : "border-white/10 bg-white/[0.04] text-white/70",
-                              ].join(" ")}
-                            >
-                              {item.status}
-                            </span>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </GlassCard>
               </motion.div>
+            </div>
+          </Container>
+        </section>
+
+        <section className="pt-10 md:pt-16">
+          <Container>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                {
+                  title: "Envios automáticos",
+                  description: "Automatize suas cobranças.",
+                  icon: <Zap className="h-4 w-4" />,
+                },
+                {
+                  title: "Relatórios",
+                  description: "Relatórios completos e simples.",
+                  icon: <BarChart3 className="h-4 w-4" />,
+                },
+                {
+                  title: "Templates",
+                  description: "Mensagens prontas com variáveis.",
+                  icon: <MessageSquareText className="h-4 w-4" />,
+                },
+                {
+                  title: "Agenda inteligente",
+                  description: "Disparos no horário certo.",
+                  icon: <CalendarDays className="h-4 w-4" />,
+                },
+                {
+                  title: "Controle e segurança",
+                  description: "Operação simples e segura.",
+                  icon: <Shield className="h-4 w-4" />,
+                },
+                {
+                  title: "PIX no WhatsApp",
+                  description: "Mensagens com chave PIX.",
+                  icon: <CreditCard className="h-4 w-4" />,
+                },
+              ].map((item) => (
+                <GlassCard key={item.title} className="p-4">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
+                      {item.icon}
+                    </span>
+                    {item.title}
+                  </div>
+                  <div className="mt-3 text-sm text-white/60">
+                    {item.description}
+                  </div>
+                </GlassCard>
+              ))}
             </div>
           </Container>
         </section>
