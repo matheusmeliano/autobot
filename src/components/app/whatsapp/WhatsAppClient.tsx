@@ -54,7 +54,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
           Integração Z-API
         </h1>
         <div className="mt-2 text-sm text-white/60">
-          Configure sua instância (API) por usuário.
+          Configure sua instância por usuário.
         </div>
       </div>
 
