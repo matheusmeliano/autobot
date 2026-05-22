@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -111,6 +111,8 @@ function GlassCard({
 
 export function Landing() {
   const carouselRef = useRef<HTMLDivElement | null>(null);
+  const lastCarouselInteractionAt = useRef(0);
+  const [carouselPaused, setCarouselPaused] = useState(false);
 
   const getCarouselStep = useCallback(() => {
     const el = carouselRef.current;
@@ -169,18 +171,23 @@ export function Landing() {
     init();
     window.setTimeout(init, 0);
 
-    const onResize = () => init();
-    window.addEventListener("resize", onResize);
+    window.addEventListener("resize", init);
+
+    return () => {
+      window.removeEventListener("resize", init);
+    };
+  }, [getCycleWidth]);
+
+  useEffect(() => {
+    if (carouselPaused) return;
 
     const id = window.setInterval(() => {
+      if (Date.now() - lastCarouselInteractionAt.current < 1200) return;
       scrollCarousel(1);
     }, 4200);
 
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.clearInterval(id);
-    };
-  }, [getCycleWidth, scrollCarousel]);
+    return () => window.clearInterval(id);
+  }, [carouselPaused, scrollCarousel]);
 
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
@@ -446,7 +453,21 @@ export function Landing() {
               <button
                 type="button"
                 aria-label="Voltar"
-                onClick={() => scrollCarousel(-1)}
+                onPointerEnter={() => setCarouselPaused(true)}
+                onPointerLeave={() => setCarouselPaused(false)}
+                onPointerDown={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(true);
+                }}
+                onPointerUp={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(false);
+                }}
+                onPointerCancel={() => setCarouselPaused(false)}
+                onClick={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  scrollCarousel(-1);
+                }}
                 className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 backdrop-blur-xl hover:bg-[#0B1220]/70"
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -468,9 +489,9 @@ export function Landing() {
                         <div
                           key={`${item.title}-${idx}`}
                           data-carousel-item
-                          className="w-full shrink-0 snap-center"
+                          className="w-full shrink-0 snap-center md:w-1/2 lg:w-1/3"
                         >
-                          <GlassCard className="mx-auto w-full max-w-[360px] p-4">
+                          <GlassCard className="w-full p-4">
                             <div className="flex items-center justify-center gap-2 text-center text-xs font-semibold text-white/70">
                               <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
                                 <Icon className="h-4 w-4" />
@@ -491,7 +512,21 @@ export function Landing() {
               <button
                 type="button"
                 aria-label="Avançar"
-                onClick={() => scrollCarousel(1)}
+                onPointerEnter={() => setCarouselPaused(true)}
+                onPointerLeave={() => setCarouselPaused(false)}
+                onPointerDown={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(true);
+                }}
+                onPointerUp={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(false);
+                }}
+                onPointerCancel={() => setCarouselPaused(false)}
+                onClick={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  scrollCarousel(1);
+                }}
                 className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 backdrop-blur-xl hover:bg-[#0B1220]/70"
               >
                 <ChevronRight className="h-5 w-5" />
