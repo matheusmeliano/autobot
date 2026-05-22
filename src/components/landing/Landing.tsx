@@ -134,7 +134,7 @@ export function Landing() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.55, delay: 0.05 }}
-                  className="mt-5 w-full text-balance text-4xl font-semibold tracking-tight leading-[1.06] md:text-6xl"
+                  className="mt-5 w-full text-balance text-[clamp(2rem,6vw,3.75rem)] font-semibold tracking-tight leading-[1.06]"
                 >
                   Automatize cobranças no WhatsApp e receba mais no PIX.
                 </motion.h1>
