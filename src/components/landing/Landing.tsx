@@ -444,7 +444,7 @@ export function Landing() {
                 type="button"
                 aria-label="Voltar"
                 onClick={() => scrollCarousel(-1)}
-                className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 shadow-[0_12px_40px_-18px_rgba(0,0,0,0.85)] backdrop-blur-xl hover:bg-[#0B1220]/70"
+                className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 backdrop-blur-xl hover:bg-[#0B1220]/70"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -491,7 +491,7 @@ export function Landing() {
                 type="button"
                 aria-label="Avançar"
                 onClick={() => scrollCarousel(1)}
-                className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 shadow-[0_12px_40px_-18px_rgba(0,0,0,0.85)] backdrop-blur-xl hover:bg-[#0B1220]/70"
+                className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 backdrop-blur-xl hover:bg-[#0B1220]/70"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
