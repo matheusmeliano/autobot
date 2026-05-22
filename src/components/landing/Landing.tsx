@@ -129,23 +129,23 @@ export function Landing() {
         <section className="pt-4 md:pt-12">
           <Container>
             <div className="grid items-start gap-10">
-              <div className="mx-auto w-full max-w-3xl text-center">
+              <div className="w-full text-center">
                 <motion.h1
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.55, delay: 0.05 }}
-                  className="mt-5 text-balance text-4xl font-semibold tracking-tight leading-[1.06] md:text-6xl"
+                  className="mt-5 w-full text-balance text-4xl font-semibold tracking-tight leading-[1.06] md:text-6xl"
                 >
-                  Cobranças no WhatsApp, recebimentos no PIX — no automático.
+                  Automatize cobranças no WhatsApp e receba mais no PIX.
                 </motion.h1>
                 <motion.p
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.55, delay: 0.1 }}
-                  className="mx-auto mt-4 max-w-2xl text-pretty text-base leading-relaxed text-white/65 md:text-lg"
+                  className="mt-4 w-full text-pretty text-base leading-relaxed text-white/65 md:text-lg"
                 >
-                  Automatize envios e agendamentos, reduza a inadimplência e
-                  acompanhe tudo em um painel simples.
+                  Envie cobranças automáticas, reduza inadimplência e escale seu
+                  negócio com automação inteligente.
                 </motion.p>
               </div>
 
