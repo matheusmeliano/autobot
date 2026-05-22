@@ -98,7 +98,6 @@ export function AppNav({
           onClose={() => setOpenMore(false)}
           position="bottom"
           zIndexClass="z-[110]"
-          panelClassName="shadow-[0_-30px_90px_-40px_rgba(0,0,0,0.9)]"
         >
           <div className="flex items-center justify-between px-2 py-2">
             <div className="text-sm font-semibold text-white/85">Mais</div>

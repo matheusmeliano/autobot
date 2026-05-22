@@ -225,7 +225,7 @@ export default function Chat() {
             className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"} items-end gap-2`}
           >
             {msg.sender === "bot" && (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#075E54] bg-[#128C7E] text-sm text-white shadow-sm">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#075E54] bg-[#128C7E] text-sm text-white">
                 🤖
               </div>
             )}
@@ -267,7 +267,7 @@ export default function Chat() {
 
         {isTyping && (
           <div className="flex items-end justify-start gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#075E54] bg-[#128C7E] text-sm text-white shadow-sm">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#075E54] bg-[#128C7E] text-sm text-white">
               🤖
             </div>
             <div className="relative flex h-[42px] items-center gap-1 rounded-lg rounded-bl-none border border-gray-200 bg-white p-3">

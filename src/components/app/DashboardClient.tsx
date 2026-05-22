@@ -120,7 +120,7 @@ export function DashboardClient({
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/70">
           <span
             className={[
-              "h-2 w-2 rounded-full shadow-[0_0_0_4px_rgba(16,185,129,0.12)]",
+              "h-2 w-2 rounded-full",
               statusLabel === "Conectado" ? "bg-emerald-400" : "bg-white/30",
             ].join(" ")}
           />

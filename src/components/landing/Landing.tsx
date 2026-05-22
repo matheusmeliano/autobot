@@ -101,7 +101,6 @@ function GlassCard({
     <div
       className={[
         "rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl",
-        "shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)]",
         className,
       ].join(" ")}
     >
@@ -190,7 +189,7 @@ export function Landing() {
       <header className="sticky top-0 z-30">
         <Container>
           <div className="pt-8 pb-5">
-            <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5 shadow-[0_28px_80px_-55px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+            <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5 backdrop-blur-xl">
               <Link href="/" className="flex items-center gap-2">
                 <Logo />
                 <div className="text-sm font-semibold tracking-tight text-black">
@@ -219,7 +218,7 @@ export function Landing() {
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#070A10,rgba(99,102,241,0.85))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110"
+                  className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#070A10,rgba(99,102,241,0.85))] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
                 >
                   Fazer o teste <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -264,7 +263,7 @@ export function Landing() {
                       Painel
                     </div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/70">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
                       WhatsApp: Conectado
                     </div>
                   </div>
@@ -471,13 +470,13 @@ export function Landing() {
                         className="w-full shrink-0 snap-center sm:w-[320px] sm:snap-start"
                       >
                         <GlassCard className="mx-auto w-full max-w-[320px] p-4 sm:mx-0 sm:max-w-none">
-                          <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
+                          <div className="flex items-center justify-center gap-2 text-center text-xs font-semibold text-white/70">
                             <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
                               <Icon className="h-4 w-4" />
                             </span>
                             {item.title}
                           </div>
-                          <div className="mt-3 text-sm text-white/60">
+                          <div className="mt-3 text-center text-sm text-white/60">
                             {item.description}
                           </div>
                         </GlassCard>
@@ -595,7 +594,7 @@ export function Landing() {
                   className={[
                     "flex h-full flex-col p-6",
                     plan.highlight
-                      ? "ring-1 ring-indigo-400/30 shadow-[0_0_0_1px_rgba(99,102,241,0.28),0_40px_100px_-40px_rgba(99,102,241,0.7)]"
+                      ? "ring-1 ring-indigo-400/30"
                       : "",
                   ].join(" ")}
                 >

@@ -34,7 +34,7 @@ export default function PrivacidadePage() {
       </header>
 
       <main className="mx-auto w-full max-w-3xl px-6 py-10">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] sm:p-8">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
           <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
             Política de Privacidade
           </h1>

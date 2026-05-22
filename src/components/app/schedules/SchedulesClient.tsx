@@ -359,7 +359,7 @@ export function SchedulesClient({
         ? createPortal(
             <div
               ref={timePickerPanelRef}
-              className="fixed z-[220] w-[260px] rounded-xl border border-white/10 bg-[#070A10] p-2 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.9)]"
+              className="fixed z-[220] w-[260px] rounded-xl border border-white/10 bg-[#070A10] p-2"
               style={{ left: timePickerPos.left, top: timePickerPos.top }}
             >
               <div className="grid grid-cols-2 gap-2">

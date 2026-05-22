@@ -34,7 +34,7 @@ export default function LinkedInPage() {
       </header>
 
       <main className="mx-auto w-full max-w-2xl px-6 py-10">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl shadow-[0_20px_80px_-30px_rgba(0,0,0,0.8)] sm:p-8">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
           <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
             LinkedIn
           </h1>
@@ -48,7 +48,7 @@ export default function LinkedInPage() {
               href="https://www.linkedin.com"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-sm hover:bg-white/90"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-white/90"
             >
               Abrir LinkedIn <ArrowUpRight className="h-4 w-4" />
             </a>
