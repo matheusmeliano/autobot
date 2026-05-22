@@ -121,6 +121,28 @@ export function Landing() {
     return first.offsetWidth + gap;
   }, []);
 
+  const getCycleWidth = useCallback(() => {
+    const step = getCarouselStep();
+    if (!step) return 0;
+    return step * FEATURE_CARDS.length;
+  }, [getCarouselStep]);
+
+  const normalizeCarousel = useCallback(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const cycle = getCycleWidth();
+    if (!cycle) return;
+
+    const left = el.scrollLeft;
+    if (left < cycle * 0.5) {
+      el.scrollLeft = left + cycle;
+      return;
+    }
+    if (left > cycle * 1.5) {
+      el.scrollLeft = left - cycle;
+    }
+  }, [getCycleWidth]);
+
   const scrollCarousel = useCallback(
     (dir: -1 | 1) => {
       const el = carouselRef.current;
@@ -128,53 +150,37 @@ export function Landing() {
       const step = getCarouselStep();
       if (!step) return;
 
-      const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth);
-      if (maxLeft <= 0) return;
-
-      const atStart = el.scrollLeft <= 8;
-      const atEnd = el.scrollLeft >= maxLeft - 8;
-
-      if (dir === 1 && atEnd) {
-        el.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-      }
-
-      if (dir === -1 && atStart) {
-        el.scrollTo({ left: maxLeft, behavior: "smooth" });
-        return;
-      }
-
-      const next = Math.min(maxLeft, Math.max(0, el.scrollLeft + dir * step));
-      el.scrollTo({ left: next, behavior: "smooth" });
+      el.scrollTo({ left: el.scrollLeft + dir * step, behavior: "smooth" });
+      window.setTimeout(() => normalizeCarousel(), 480);
     },
-    [getCarouselStep],
+    [getCarouselStep, normalizeCarousel],
   );
 
   useEffect(() => {
     const el = carouselRef.current;
     if (!el) return;
 
+    const init = () => {
+      const cycle = getCycleWidth();
+      if (!cycle) return;
+      el.scrollLeft = cycle;
+    };
+
+    init();
+    window.setTimeout(init, 0);
+
+    const onResize = () => init();
+    window.addEventListener("resize", onResize);
+
     const id = window.setInterval(() => {
-      const node = carouselRef.current;
-      if (!node) return;
-
-      const maxLeft = node.scrollWidth - node.clientWidth;
-      if (maxLeft <= 0) return;
-
-      const step = getCarouselStep();
-      if (!step) return;
-
-      const next = node.scrollLeft + step;
-      if (next >= maxLeft - 8) {
-        node.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-      }
-
-      node.scrollTo({ left: next, behavior: "smooth" });
+      scrollCarousel(1);
     }, 4200);
 
-    return () => window.clearInterval(id);
-  }, [getCarouselStep]);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.clearInterval(id);
+    };
+  }, [getCycleWidth, scrollCarousel]);
 
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
@@ -452,31 +458,33 @@ export function Landing() {
 
                 <div
                   ref={carouselRef}
-                  className="pointer-events-none flex select-none gap-4 overflow-hidden"
+                  className="pointer-events-none flex select-none gap-4 overflow-x-auto overflow-y-hidden snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                 >
-                  {FEATURE_CARDS.map((item) => {
+                  {[...FEATURE_CARDS, ...FEATURE_CARDS, ...FEATURE_CARDS].map(
+                    (item, idx) => {
                     const Icon = item.icon;
 
-                    return (
-                      <div
-                        key={item.title}
-                        data-carousel-item
-                        className="w-full shrink-0 snap-center sm:w-[320px] sm:snap-start"
-                      >
-                        <GlassCard className="mx-auto w-full max-w-[320px] p-4 sm:mx-0 sm:max-w-none">
-                          <div className="flex items-center justify-center gap-2 text-center text-xs font-semibold text-white/70">
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            {item.title}
-                          </div>
-                          <div className="mt-3 text-center text-sm text-white/60">
-                            {item.description}
-                          </div>
-                        </GlassCard>
-                      </div>
-                    );
-                  })}
+                      return (
+                        <div
+                          key={`${item.title}-${idx}`}
+                          data-carousel-item
+                          className="w-full shrink-0 snap-center"
+                        >
+                          <GlassCard className="mx-auto w-full max-w-[360px] p-4">
+                            <div className="flex items-center justify-center gap-2 text-center text-xs font-semibold text-white/70">
+                              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
+                                <Icon className="h-4 w-4" />
+                              </span>
+                              {item.title}
+                            </div>
+                            <div className="mt-3 text-center text-sm text-white/60">
+                              {item.description}
+                            </div>
+                          </GlassCard>
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               </div>
 
