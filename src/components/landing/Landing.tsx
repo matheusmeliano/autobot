@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -111,7 +111,6 @@ function GlassCard({
 
 export function Landing() {
   const carouselRef = useRef<HTMLDivElement | null>(null);
-  const [carouselPaused, setCarouselPaused] = useState(false);
 
   const getCarouselStep = useCallback(() => {
     const el = carouselRef.current;
@@ -154,7 +153,6 @@ export function Landing() {
   useEffect(() => {
     const el = carouselRef.current;
     if (!el) return;
-    if (carouselPaused) return;
 
     const id = window.setInterval(() => {
       const node = carouselRef.current;
@@ -176,7 +174,7 @@ export function Landing() {
     }, 4200);
 
     return () => window.clearInterval(id);
-  }, [carouselPaused, getCarouselStep]);
+  }, [getCarouselStep]);
 
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
@@ -454,11 +452,7 @@ export function Landing() {
 
                 <div
                   ref={carouselRef}
-                  onPointerEnter={() => setCarouselPaused(true)}
-                  onPointerLeave={() => setCarouselPaused(false)}
-                  onPointerDown={() => setCarouselPaused(true)}
-                  onPointerUp={() => setCarouselPaused(false)}
-                  className="flex gap-4 overflow-x-auto pb-1 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  className="pointer-events-none flex select-none gap-4 overflow-hidden"
                 >
                   {FEATURE_CARDS.map((item) => {
                     const Icon = item.icon;
