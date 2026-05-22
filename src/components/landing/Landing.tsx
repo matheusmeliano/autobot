@@ -329,23 +329,6 @@ export function Landing() {
                   </div>
                 </GlassCard>
               </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.15 }}
-                className="flex w-full flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-4"
-              >
-                <Link
-                  href="/signup"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-sm hover:bg-white/90 sm:w-auto"
-                >
-                  Começar gratuitamente <ArrowRight className="h-4 w-4" />
-                </Link>
-                <div className="text-center text-xs font-medium text-white/55">
-                  Comece no teste grátis de 7 dias.
-                </div>
-              </motion.div>
             </div>
           </Container>
         </section>
