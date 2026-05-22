@@ -131,8 +131,22 @@ export function Landing() {
       if (!step) return;
 
       const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth);
-      const next = Math.min(maxLeft, Math.max(0, el.scrollLeft + dir * step));
+      if (maxLeft <= 0) return;
 
+      const atStart = el.scrollLeft <= 8;
+      const atEnd = el.scrollLeft >= maxLeft - 8;
+
+      if (dir === 1 && atEnd) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+      }
+
+      if (dir === -1 && atStart) {
+        el.scrollTo({ left: maxLeft, behavior: "smooth" });
+        return;
+      }
+
+      const next = Math.min(maxLeft, Math.max(0, el.scrollLeft + dir * step));
       el.scrollTo({ left: next, behavior: "smooth" });
     },
     [getCarouselStep],
@@ -425,54 +439,60 @@ export function Landing() {
 
         <section className="pt-10 md:pt-16">
           <Container>
-            <div className="flex items-center justify-end gap-2">
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[#070A10] to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[#070A10] to-transparent" />
+
               <button
                 type="button"
+                aria-label="Voltar"
                 onClick={() => scrollCarousel(-1)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.06]"
+                className="absolute left-0 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 shadow-[0_12px_40px_-18px_rgba(0,0,0,0.85)] backdrop-blur-xl hover:bg-[#0B1220]/70"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
+
               <button
                 type="button"
+                aria-label="Avançar"
                 onClick={() => scrollCarousel(1)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.06]"
+                className="absolute right-0 top-1/2 z-20 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 shadow-[0_12px_40px_-18px_rgba(0,0,0,0.85)] backdrop-blur-xl hover:bg-[#0B1220]/70"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
-            </div>
 
-            <div
-              ref={carouselRef}
-              onPointerEnter={() => setCarouselPaused(true)}
-              onPointerLeave={() => setCarouselPaused(false)}
-              onPointerDown={() => setCarouselPaused(true)}
-              onPointerUp={() => setCarouselPaused(false)}
-              className="mt-4 flex gap-4 overflow-x-auto pb-1 snap-x snap-proximity"
-            >
-              {FEATURE_CARDS.map((item) => {
-                const Icon = item.icon;
+              <div
+                ref={carouselRef}
+                onPointerEnter={() => setCarouselPaused(true)}
+                onPointerLeave={() => setCarouselPaused(false)}
+                onPointerDown={() => setCarouselPaused(true)}
+                onPointerUp={() => setCarouselPaused(false)}
+                className="flex gap-4 overflow-x-auto px-12 pb-1 snap-x snap-proximity [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {FEATURE_CARDS.map((item) => {
+                  const Icon = item.icon;
 
-                return (
-                  <div
-                    key={item.title}
-                    data-carousel-item
-                    className="w-[280px] shrink-0 snap-start sm:w-[320px]"
-                  >
-                    <GlassCard className="p-4">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        {item.title}
-                      </div>
-                      <div className="mt-3 text-sm text-white/60">
-                        {item.description}
-                      </div>
-                    </GlassCard>
-                  </div>
-                );
-              })}
+                  return (
+                    <div
+                      key={item.title}
+                      data-carousel-item
+                      className="w-[280px] shrink-0 snap-start sm:w-[320px]"
+                    >
+                      <GlassCard className="p-4">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
+                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          {item.title}
+                        </div>
+                        <div className="mt-3 text-sm text-white/60">
+                          {item.description}
+                        </div>
+                      </GlassCard>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </Container>
         </section>
