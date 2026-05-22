@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
   CalendarDays,
   BarChart3,
   CreditCard,
+  ChevronLeft,
+  ChevronRight,
   MessageSquareText,
   Shield,
   Zap,
@@ -25,6 +28,39 @@ const chartData = [
   { name: "Sáb", value: 30 },
   { name: "Dom", value: 28 },
 ];
+
+const FEATURE_CARDS = [
+  {
+    title: "Envios automáticos",
+    description: "Automatize suas cobranças.",
+    icon: Zap,
+  },
+  {
+    title: "Relatórios",
+    description: "Relatórios completos e simples.",
+    icon: BarChart3,
+  },
+  {
+    title: "Templates",
+    description: "Mensagens prontas com variáveis.",
+    icon: MessageSquareText,
+  },
+  {
+    title: "Agenda inteligente",
+    description: "Disparos no horário certo.",
+    icon: CalendarDays,
+  },
+  {
+    title: "Controle e segurança",
+    description: "Operação simples e segura.",
+    icon: Shield,
+  },
+  {
+    title: "PIX no WhatsApp",
+    description: "Mensagens com chave PIX.",
+    icon: CreditCard,
+  },
+] as const;
 
 function Container({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto w-full max-w-6xl px-6">{children}</div>;
@@ -75,6 +111,60 @@ function GlassCard({
 }
 
 export function Landing() {
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const [carouselPaused, setCarouselPaused] = useState(false);
+
+  const getCarouselStep = useCallback(() => {
+    const el = carouselRef.current;
+    if (!el) return 0;
+    const first = el.querySelector<HTMLElement>("[data-carousel-item]");
+    if (!first) return el.clientWidth;
+    const gap = parseFloat(getComputedStyle(el).gap || "0");
+    return first.offsetWidth + gap;
+  }, []);
+
+  const scrollCarousel = useCallback(
+    (dir: -1 | 1) => {
+      const el = carouselRef.current;
+      if (!el) return;
+      const step = getCarouselStep();
+      if (!step) return;
+
+      const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+      const next = Math.min(maxLeft, Math.max(0, el.scrollLeft + dir * step));
+
+      el.scrollTo({ left: next, behavior: "smooth" });
+    },
+    [getCarouselStep],
+  );
+
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    if (carouselPaused) return;
+
+    const id = window.setInterval(() => {
+      const node = carouselRef.current;
+      if (!node) return;
+
+      const maxLeft = node.scrollWidth - node.clientWidth;
+      if (maxLeft <= 0) return;
+
+      const step = getCarouselStep();
+      if (!step) return;
+
+      const next = node.scrollLeft + step;
+      if (next >= maxLeft - 8) {
+        node.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+      }
+
+      node.scrollTo({ left: next, behavior: "smooth" });
+    }, 4200);
+
+    return () => window.clearInterval(id);
+  }, [carouselPaused, getCarouselStep]);
+
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -335,51 +425,54 @@ export function Landing() {
 
         <section className="pt-10 md:pt-16">
           <Container>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                {
-                  title: "Envios automáticos",
-                  description: "Automatize suas cobranças.",
-                  icon: <Zap className="h-4 w-4" />,
-                },
-                {
-                  title: "Relatórios",
-                  description: "Relatórios completos e simples.",
-                  icon: <BarChart3 className="h-4 w-4" />,
-                },
-                {
-                  title: "Templates",
-                  description: "Mensagens prontas com variáveis.",
-                  icon: <MessageSquareText className="h-4 w-4" />,
-                },
-                {
-                  title: "Agenda inteligente",
-                  description: "Disparos no horário certo.",
-                  icon: <CalendarDays className="h-4 w-4" />,
-                },
-                {
-                  title: "Controle e segurança",
-                  description: "Operação simples e segura.",
-                  icon: <Shield className="h-4 w-4" />,
-                },
-                {
-                  title: "PIX no WhatsApp",
-                  description: "Mensagens com chave PIX.",
-                  icon: <CreditCard className="h-4 w-4" />,
-                },
-              ].map((item) => (
-                <GlassCard key={item.title} className="p-4">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
-                      {item.icon}
-                    </span>
-                    {item.title}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => scrollCarousel(-1)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.06]"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollCarousel(1)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.06]"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div
+              ref={carouselRef}
+              onPointerEnter={() => setCarouselPaused(true)}
+              onPointerLeave={() => setCarouselPaused(false)}
+              onPointerDown={() => setCarouselPaused(true)}
+              onPointerUp={() => setCarouselPaused(false)}
+              className="mt-4 flex gap-4 overflow-x-auto pb-1 snap-x snap-proximity"
+            >
+              {FEATURE_CARDS.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <div
+                    key={item.title}
+                    data-carousel-item
+                    className="w-[280px] shrink-0 snap-start sm:w-[320px]"
+                  >
+                    <GlassCard className="p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        {item.title}
+                      </div>
+                      <div className="mt-3 text-sm text-white/60">
+                        {item.description}
+                      </div>
+                    </GlassCard>
                   </div>
-                  <div className="mt-3 text-sm text-white/60">
-                    {item.description}
-                  </div>
-                </GlassCard>
-              ))}
+                );
+              })}
             </div>
           </Container>
         </section>
