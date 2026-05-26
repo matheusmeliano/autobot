@@ -323,7 +323,7 @@ export default function Chat() {
         <div className="mt-1 text-[10px] text-gray-400">
           Desenvolvido pela{" "}
           <a
-            href="https://www.heybrothers.site/"
+            href="https://heybrothers.vercel.app/"
             target="_blank"
             rel="noopener noreferrer"
             className="font-semibold text-gray-500 transition-colors hover:text-[#128C7E]"

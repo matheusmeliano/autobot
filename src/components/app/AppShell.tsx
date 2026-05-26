@@ -207,7 +207,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="mt-3 flex justify-end text-xs text-white/35">
             Desenvolvido pela
             <a
-              href="#"
+              href="https://heybrothers.vercel.app/"
               target="_blank"
               rel="noreferrer"
               className="ml-1 font-semibold text-white/60 hover:text-white"
