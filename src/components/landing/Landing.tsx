@@ -764,7 +764,7 @@ export function Landing() {
                   <div className="mt-4 text-xs text-white/35">
                     Desenvolvido pela{" "}
                     <a
-                      href="#"
+                      href="https://heybrothers.vercel.app/"
                       target="_blank"
                       rel="noreferrer"
                       className="font-semibold text-white/60 hover:text-white"
