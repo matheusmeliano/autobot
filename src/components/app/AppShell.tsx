@@ -67,18 +67,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const el = document.documentElement;
-    const prevTheme = el.getAttribute("data-theme");
-    const hadClass = el.classList.contains("app-theme");
-    const hadReady = el.classList.contains("theme-ready");
     el.classList.add("app-theme");
+    el.setAttribute("data-app-theme-scope", "app");
     el.setAttribute("data-theme", theme);
     const raf = window.requestAnimationFrame(() => el.classList.add("theme-ready"));
     return () => {
       window.cancelAnimationFrame(raf);
-      if (!hadReady) el.classList.remove("theme-ready");
-      if (!hadClass) el.classList.remove("app-theme");
-      if (prevTheme) el.setAttribute("data-theme", prevTheme);
-      else el.removeAttribute("data-theme");
+      if (el.getAttribute("data-app-theme-scope") === "app") {
+        el.classList.remove("theme-ready");
+        el.classList.remove("app-theme");
+        el.removeAttribute("data-theme");
+        el.removeAttribute("data-app-theme-scope");
+      }
     };
   }, []);
 

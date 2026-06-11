@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import Script from "next/script";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { Logo } from "@/components/ui/Logo";
 import { logoutAction } from "@/app/app/actions";
+import { ScopedAppTheme } from "@/components/app/ScopedAppTheme";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,23 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#070A10] text-white">
+    <>
+      <Script id="autobot-admin-theme-init" strategy="beforeInteractive">
+        {`
+          (function() {
+            try {
+              var theme = localStorage.getItem("app_theme");
+              if (theme !== "light" && theme !== "dark") theme = "dark";
+              var el = document.documentElement;
+              el.classList.add("app-theme");
+              el.setAttribute("data-app-theme-scope", "admin");
+              el.setAttribute("data-theme", theme);
+            } catch (e) {}
+          })();
+        `}
+      </Script>
+      <ScopedAppTheme scopeId="admin" />
+      <div className="min-h-screen bg-[#070A10] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute left-1/2 top-[-260px] h-[680px] w-[680px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18),rgba(99,102,241,0)_55%)]" />
         <div className="absolute right-[-220px] top-[140px] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.12),rgba(16,185,129,0)_55%)]" />
@@ -107,6 +125,7 @@ export default async function AdminLayout({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

@@ -29,6 +29,7 @@ export default async function AppLayout({
               if (theme !== "light" && theme !== "dark") theme = "dark";
               var el = document.documentElement;
               el.classList.add("app-theme");
+              el.setAttribute("data-app-theme-scope", "app");
               el.setAttribute("data-theme", theme);
             } catch (e) {}
           })();
