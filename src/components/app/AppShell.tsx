@@ -23,7 +23,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAuthed, setIsAuthed] = useState(false);
   const [restricted, setRestricted] = useState(false);
   const [plan, setPlan] = useState<"teste" | "basico" | "pro" | "vitalicio">("teste");
-  const [theme, setTheme] = useState<AppTheme>("dark");
+  const [theme, setTheme] = useState<AppTheme>(() => {
+    if (typeof document === "undefined") return "dark";
+    const current = document.documentElement.getAttribute("data-theme");
+    return current === "light" || current === "dark" ? current : "dark";
+  });
   const [themePreference, setThemePreference] = useState<AppTheme | null>(null);
   const [themeLoaded, setThemeLoaded] = useState(false);
   const [themeGateDraft, setThemeGateDraft] = useState<AppTheme>("dark");
@@ -65,9 +69,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const el = document.documentElement;
     const prevTheme = el.getAttribute("data-theme");
     const hadClass = el.classList.contains("app-theme");
+    const hadReady = el.classList.contains("theme-ready");
     el.classList.add("app-theme");
     el.setAttribute("data-theme", theme);
+    const raf = window.requestAnimationFrame(() => el.classList.add("theme-ready"));
     return () => {
+      window.cancelAnimationFrame(raf);
+      if (!hadReady) el.classList.remove("theme-ready");
       if (!hadClass) el.classList.remove("app-theme");
       if (prevTheme) el.setAttribute("data-theme", prevTheme);
       else el.removeAttribute("data-theme");

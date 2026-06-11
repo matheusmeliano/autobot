@@ -13,6 +13,12 @@ body {
   height: 100%;
 }
 
+html.app-theme,
+html.app-theme body {
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
 body {
   width: 100%;
   overflow-x: hidden;
@@ -80,6 +86,17 @@ body {
 .app-theme {
   background: var(--app-bg);
   color: var(--app-fg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-theme.theme-ready,
+  .app-theme.theme-ready *,
+  .app-theme.theme-ready *::before,
+  .app-theme.theme-ready *::after {
+    transition-duration: 180ms;
+    transition-timing-function: ease;
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  }
 }
 
 .app-theme .text-white {

@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app/AppShell";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Script from "next/script";
 
 export const dynamic = "force-dynamic";
 
@@ -18,5 +19,22 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <>
+      <Script id="autobot-app-theme-init" strategy="beforeInteractive">
+        {`
+          (function() {
+            try {
+              var theme = localStorage.getItem("app_theme");
+              if (theme !== "light" && theme !== "dark") theme = "dark";
+              var el = document.documentElement;
+              el.classList.add("app-theme");
+              el.setAttribute("data-theme", theme);
+            } catch (e) {}
+          })();
+        `}
+      </Script>
+      <AppShell>{children}</AppShell>
+    </>
+  );
 }
