@@ -58,11 +58,11 @@ export function TimezoneSettings({
   };
 
   return (
-    <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-semibold text-white/90">Fuso horário</div>
-          <div className="mt-1 text-xs text-white/55">
+          <div className="text-sm font-semibold text-[var(--app-text-85)]">Fuso horário</div>
+          <div className="mt-1 text-xs text-[var(--app-text-55)]">
             Usado para validar e exibir datas/horários dos agendamentos.
           </div>
         </div>
@@ -75,7 +75,7 @@ export function TimezoneSettings({
             const v = e.target.value;
             setTimeZone(v ? (v as BrazilTimeZone) : "");
           }}
-          className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none focus:border-white/20 focus:ring-2 focus:ring-white/10 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+          className="h-11 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm text-[var(--app-text-85)] outline-none focus:border-[var(--app-border)] focus:ring-2 focus:ring-[var(--app-ring)] [&>option]:bg-[var(--app-option-bg)] [&>option]:text-[var(--app-text-85)]"
         >
           <option value="">Selecione seu fuso horário</option>
           {options.map((o) => (
@@ -88,7 +88,7 @@ export function TimezoneSettings({
           type="button"
           onClick={save}
           disabled={isPending || !timeZone}
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-6 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60 md:w-auto"
+          className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-6 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 md:w-auto"
         >
           Salvar
         </button>

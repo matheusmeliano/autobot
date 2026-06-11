@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { ChangePasswordForm } from "@/components/app/ChangePasswordForm";
+import { ThemeSettings } from "@/components/app/ThemeSettings";
 import { TimezoneSettings } from "@/components/app/TimezoneSettings";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 
@@ -59,6 +60,8 @@ export default async function ConfiguracoesPage() {
           </div>
         </div>
       </div>
+
+      <ThemeSettings />
 
       <TimezoneSettings initialTimeZone={tz} />
 

@@ -20,7 +20,8 @@ function variantMeta(variant: ModalToastVariant) {
       icon: CheckCircle2,
       accent: "border-emerald-400/25 bg-emerald-400/10 text-emerald-100",
       iconColor: "text-emerald-200",
-      button: "bg-white text-black hover:bg-white/90",
+      button:
+        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
     };
   }
   if (variant === "error") {
@@ -28,7 +29,8 @@ function variantMeta(variant: ModalToastVariant) {
       icon: XCircle,
       accent: "border-rose-400/25 bg-rose-400/10 text-rose-100",
       iconColor: "text-rose-200",
-      button: "bg-white text-black hover:bg-white/90",
+      button:
+        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
     };
   }
   if (variant === "warning") {
@@ -36,22 +38,25 @@ function variantMeta(variant: ModalToastVariant) {
       icon: AlertTriangle,
       accent: "border-amber-500/25 bg-amber-500/10 text-amber-100",
       iconColor: "text-amber-200",
-      button: "bg-white text-black hover:bg-white/90",
+      button:
+        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
     };
   }
   if (variant === "confirm") {
     return {
       icon: AlertTriangle,
-      accent: "border-white/10 bg-white/[0.04] text-white/85",
-      iconColor: "text-white/70",
-      button: "bg-white text-black hover:bg-white/90",
+      accent: "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)]",
+      iconColor: "text-[var(--app-text-70)]",
+      button:
+        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
     };
   }
   return {
     icon: Info,
     accent: "border-indigo-400/25 bg-indigo-400/10 text-indigo-100",
     iconColor: "text-indigo-200",
-    button: "bg-white text-black hover:bg-white/90",
+    button:
+      "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
   };
 }
 
@@ -91,10 +96,10 @@ export function ModalToastProvider() {
               <meta.icon className={["h-5 w-5", meta.iconColor].join(" ")} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold tracking-tight text-white">
+              <div className="text-sm font-semibold tracking-tight text-[var(--app-text-85)]">
                 {active.title ?? "Aviso"}
               </div>
-              <div className="mt-1 text-sm text-white/70">{active.message}</div>
+              <div className="mt-1 text-sm text-[var(--app-text-70)]">{active.message}</div>
             </div>
           </div>
 
@@ -103,7 +108,7 @@ export function ModalToastProvider() {
               <button
                 type="button"
                 onClick={() => close(false)}
-                className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
               >
                 {active.cancelText ?? "Cancelar"}
               </button>
@@ -129,4 +134,3 @@ export function ModalToastProvider() {
     </AppModal>
   );
 }
-

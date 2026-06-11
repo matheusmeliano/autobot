@@ -23,6 +23,177 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.app-theme[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #070a10;
+  --app-bg-soft: rgba(7, 10, 16, 0.8);
+  --app-fg: rgb(255, 255, 255);
+  --app-text-85: rgba(255, 255, 255, 0.85);
+  --app-text-80: rgba(255, 255, 255, 0.8);
+  --app-text-70: rgba(255, 255, 255, 0.7);
+  --app-text-60: rgba(255, 255, 255, 0.6);
+  --app-text-55: rgba(255, 255, 255, 0.55);
+  --app-text-50: rgba(255, 255, 255, 0.5);
+  --app-text-45: rgba(255, 255, 255, 0.45);
+  --app-text-35: rgba(255, 255, 255, 0.35);
+  --app-text-30: rgba(255, 255, 255, 0.3);
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-card: rgba(255, 255, 255, 0.04);
+  --app-card-2: rgba(255, 255, 255, 0.03);
+  --app-active: rgba(255, 255, 255, 0.08);
+  --app-hover: rgba(255, 255, 255, 0.06);
+  --app-ring: rgba(255, 255, 255, 0.1);
+  --app-modal-bg: rgba(7, 10, 16, 0.95);
+  --app-btn-primary-bg: #ffffff;
+  --app-btn-primary-fg: #000000;
+  --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
+  --app-option-bg: #070a10;
+}
+
+.app-theme[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #f8fafc;
+  --app-bg-soft: rgba(248, 250, 252, 0.86);
+  --app-fg: #0b1220;
+  --app-text-85: rgba(11, 18, 32, 0.85);
+  --app-text-80: rgba(11, 18, 32, 0.8);
+  --app-text-70: rgba(11, 18, 32, 0.7);
+  --app-text-60: rgba(11, 18, 32, 0.6);
+  --app-text-55: rgba(11, 18, 32, 0.55);
+  --app-text-50: rgba(11, 18, 32, 0.5);
+  --app-text-45: rgba(11, 18, 32, 0.45);
+  --app-text-35: rgba(11, 18, 32, 0.35);
+  --app-text-30: rgba(11, 18, 32, 0.3);
+  --app-border: rgba(11, 18, 32, 0.12);
+  --app-card: rgba(11, 18, 32, 0.04);
+  --app-card-2: rgba(11, 18, 32, 0.03);
+  --app-active: rgba(11, 18, 32, 0.08);
+  --app-hover: rgba(11, 18, 32, 0.05);
+  --app-ring: rgba(11, 18, 32, 0.14);
+  --app-modal-bg: rgba(248, 250, 252, 0.95);
+  --app-btn-primary-bg: #0b1220;
+  --app-btn-primary-fg: #ffffff;
+  --app-btn-primary-bg-hover: rgba(11, 18, 32, 0.9);
+  --app-option-bg: #ffffff;
+}
+
+.app-theme {
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
+.app-theme .text-white {
+  color: var(--app-fg) !important;
+}
+.app-theme .text-white\/85 {
+  color: var(--app-text-85) !important;
+}
+.app-theme .text-white\/80 {
+  color: var(--app-text-80) !important;
+}
+.app-theme .text-white\/75 {
+  color: var(--app-text-80) !important;
+}
+.app-theme .text-white\/70 {
+  color: var(--app-text-70) !important;
+}
+.app-theme .text-white\/60 {
+  color: var(--app-text-60) !important;
+}
+.app-theme .text-white\/55 {
+  color: var(--app-text-55) !important;
+}
+.app-theme .text-white\/50 {
+  color: var(--app-text-50) !important;
+}
+.app-theme .text-white\/45 {
+  color: var(--app-text-45) !important;
+}
+.app-theme .text-white\/35 {
+  color: var(--app-text-35) !important;
+}
+.app-theme .text-white\/30 {
+  color: var(--app-text-30) !important;
+}
+
+.app-theme .placeholder\:text-white\/30::placeholder {
+  color: var(--app-text-30) !important;
+}
+
+.app-theme .border-white\/10 {
+  border-color: var(--app-border) !important;
+}
+.app-theme .border-t.border-white\/10 {
+  border-top-color: var(--app-border) !important;
+}
+.app-theme .border-b.border-white\/10 {
+  border-bottom-color: var(--app-border) !important;
+}
+
+.app-theme .bg-white {
+  background-color: var(--app-btn-primary-bg) !important;
+}
+.app-theme .text-black {
+  color: var(--app-btn-primary-fg) !important;
+}
+.app-theme .hover\:bg-white\/90:hover {
+  background-color: var(--app-btn-primary-bg-hover) !important;
+}
+
+.app-theme .bg-white\/\[0\.08\] {
+  background-color: var(--app-active) !important;
+}
+.app-theme .bg-white\/\[0\.06\] {
+  background-color: var(--app-hover) !important;
+}
+.app-theme .bg-white\/\[0\.05\] {
+  background-color: var(--app-card) !important;
+}
+.app-theme .bg-white\/\[0\.04\] {
+  background-color: var(--app-card) !important;
+}
+.app-theme .bg-white\/\[0\.03\] {
+  background-color: var(--app-card-2) !important;
+}
+.app-theme .bg-white\/\[0\.02\] {
+  background-color: var(--app-card-2) !important;
+}
+
+.app-theme .hover\:bg-white\/\[0\.06\]:hover {
+  background-color: var(--app-hover) !important;
+}
+.app-theme .disabled\:hover\:bg-white\/\[0\.04\]:disabled:hover {
+  background-color: var(--app-card) !important;
+}
+.app-theme .disabled\:hover\:bg-white\/\[0\.03\]:disabled:hover {
+  background-color: var(--app-card-2) !important;
+}
+
+.app-theme .ring-white\/10 {
+  --tw-ring-color: var(--app-border) !important;
+}
+.app-theme .focus\:ring-white\/10:focus {
+  --tw-ring-color: var(--app-ring) !important;
+}
+.app-theme .focus\:ring-white\/20:focus {
+  --tw-ring-color: var(--app-ring) !important;
+}
+
+.app-theme .focus\:border-white\/20:focus {
+  border-color: var(--app-border) !important;
+}
+
+.app-theme .divide-white\/10 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--app-border) !important;
+}
+
+.app-theme .bg-\[\#070A10\] {
+  background-color: var(--app-bg) !important;
+}
+.app-theme .bg-\[\#070A10\]\/80 {
+  background-color: var(--app-bg-soft) !important;
+}
+
 .mp-brick-wrapper [class*="value-prop"] {
   display: none !important;
 }

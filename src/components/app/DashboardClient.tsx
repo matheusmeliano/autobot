@@ -33,14 +33,16 @@ function Card({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-xs font-semibold text-white/55">{title}</div>
+          <div className="text-xs font-semibold text-[var(--app-text-55)]">{title}</div>
           <div className="mt-2 truncate text-2xl font-semibold tracking-tight">{value}</div>
-          {subtitle ? <div className="mt-1 text-xs text-white/45">{subtitle}</div> : null}
+          {subtitle ? (
+            <div className="mt-1 text-xs text-[var(--app-text-45)]">{subtitle}</div>
+          ) : null}
         </div>
-        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] ring-1 ring-white/10">
+        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-card)] ring-1 ring-[var(--app-border)]">
           {icon}
         </div>
       </div>
@@ -114,14 +116,14 @@ export function DashboardClient({
           <h1 className="mt-2 text-2xl font-semibold tracking-tight min-[1201px]:text-3xl">
             {greeting}
           </h1>
-          <div className="mt-2 text-sm text-white/60">{email}</div>
+          <div className="mt-2 text-sm text-[var(--app-text-60)]">{email}</div>
         </div>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/70">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)]">
           <span
             className={[
               "h-2 w-2 rounded-full",
-              statusLabel === "Conectado" ? "bg-emerald-400" : "bg-white/30",
+              statusLabel === "Conectado" ? "bg-emerald-400" : "bg-[var(--app-text-30)]",
             ].join(" ")}
           />
           WhatsApp: {statusLabel}
@@ -150,9 +152,9 @@ export function DashboardClient({
       </div>
 
       <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5">
-        <div className="flex h-full min-w-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-3">
+        <div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 min-[1201px]:col-span-3">
           <div className="text-sm font-semibold">Agendamentos criados (7 dias)</div>
-          <div className="mt-1 text-xs text-white/45">
+          <div className="mt-1 text-xs text-[var(--app-text-45)]">
             Dados reais dos agendamentos cadastrados.
           </div>
           <div className="mt-4 min-h-[160px] flex-1">
@@ -166,18 +168,18 @@ export function DashboardClient({
                 </defs>
                 <XAxis
                   dataKey="name"
-                  tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }}
+                  tick={{ fill: "var(--app-text-45)", fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "rgba(15, 23, 42, 0.9)",
-                    border: "1px solid rgba(255,255,255,0.10)",
+                    background: "var(--app-modal-bg)",
+                    border: "1px solid var(--app-border)",
                     borderRadius: 12,
                   }}
-                  labelStyle={{ color: "rgba(255,255,255,0.7)" }}
-                  itemStyle={{ color: "white" }}
+                  labelStyle={{ color: "var(--app-text-70)" }}
+                  itemStyle={{ color: "var(--app-text-85)" }}
                   formatter={(v: any) => [v, "Quantidade"]}
                   labelFormatter={(l: any) => `Dia: ${l}`}
                 />
@@ -187,9 +189,9 @@ export function DashboardClient({
           </div>
         </div>
 
-        <div className="flex h-full min-w-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-[1201px]:col-span-2">
+        <div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 min-[1201px]:col-span-2">
           <div className="text-sm font-semibold">Atividades</div>
-          <div className="mt-1 text-xs text-white/45">
+          <div className="mt-1 text-xs text-[var(--app-text-45)]">
             Histórico da agenda.
           </div>
           <div className="mt-4 flex-1 space-y-3">
@@ -197,12 +199,12 @@ export function DashboardClient({
               pagedActivities.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                  className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-xs font-semibold">{item.debtorName}</div>
-                      <div className="mt-1 text-xs text-white/55">
+                      <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {statusToLabel(item.status)} • {dateTimeBR(item.dateTime)}
                       </div>
                     </div>
@@ -215,7 +217,7 @@ export function DashboardClient({
                             ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
                             : item.status.toLowerCase() === "pausado"
                               ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                            : "border-white/10 bg-white/[0.04] text-white/70",
+                            : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-70)]",
                       ].join(" ")}
                     >
                       {statusToLabel(item.status)}
@@ -224,9 +226,9 @@ export function DashboardClient({
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
                 <div className="text-xs font-semibold">Nenhum agendamento ainda</div>
-                <div className="mt-1 text-xs text-white/55">
+                <div className="mt-1 text-xs text-[var(--app-text-55)]">
                   Quando você criar agendamentos, eles aparecem aqui.
                 </div>
               </div>
@@ -236,19 +238,19 @@ export function DashboardClient({
             <div className="mt-4 grid grid-cols-3 items-center">
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white/80 hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.04]"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
                 onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
                 disabled={safeActivityPage <= 1}
                 aria-label="Página anterior"
               >
                 {"<"}
               </button>
-              <div className="text-center text-xs font-semibold text-white/60">
+              <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
                 {safeActivityPage} / {activityPages}
               </div>
               <button
                 type="button"
-                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-white/80 hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-white/[0.04]"
+                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
                 onClick={() => setActivityPage((p) => Math.min(activityPages, p + 1))}
                 disabled={safeActivityPage >= activityPages}
                 aria-label="Próxima página"

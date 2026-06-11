@@ -67,7 +67,7 @@ export function AppModal({
   if (!present) return null;
 
   const panelBase =
-    "relative w-full rounded-2xl border border-white/10 bg-[#070A10]/95 backdrop-blur-xl";
+    "relative w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-modal-bg)] backdrop-blur-xl";
 
   const centerPanel = [
     panelBase,

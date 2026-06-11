@@ -71,7 +71,9 @@ export function AppNav({
                 href={item.href}
                 className={[
                   "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold",
-                  active ? "bg-white/[0.08] text-white" : "text-white/60 hover:bg-white/[0.06] hover:text-white/85",
+                  active
+                    ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
+                    : "text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
                 ].join(" ")}
               >
                 <Icon className="h-4 w-4" />
@@ -86,8 +88,8 @@ export function AppNav({
               className={[
                 "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold",
                 plusActive
-                  ? "bg-white/[0.08] text-white"
-                  : "text-white/60 hover:bg-white/[0.06] hover:text-white/85",
+                  ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
+                  : "text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
               ].join(" ")}
             >
               <Plus className="h-4 w-4" />
@@ -103,11 +105,11 @@ export function AppNav({
           zIndexClass="z-[110]"
         >
           <div className="flex items-center justify-between px-2 py-2">
-            <div className="text-sm font-semibold text-white/85">Mais</div>
+            <div className="text-sm font-semibold text-[var(--app-text-85)]">Mais</div>
             <button
               type="button"
               onClick={() => setOpenMore(false)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
               aria-label="Fechar"
             >
               <X className="h-4 w-4" />
@@ -126,8 +128,8 @@ export function AppNav({
                   className={[
                     "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold",
                     active
-                      ? "bg-white/[0.08] text-white"
-                      : "border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.06]",
+                      ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
+                      : "border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]",
                   ].join(" ")}
                 >
                   <Icon className="h-4 w-4" />
@@ -152,7 +154,9 @@ export function AppNav({
             href={item.href}
             className={[
               "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold",
-              active ? "bg-white/[0.08] text-white" : "text-white/60 hover:bg-white/[0.06] hover:text-white/85",
+              active
+                ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
+                : "text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
             ].join(" ")}
           >
             <Icon className="h-4 w-4" />

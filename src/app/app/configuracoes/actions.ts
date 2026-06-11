@@ -8,6 +8,10 @@ const schema = z.object({
   timezone: z.enum(BRAZIL_TIMEZONES),
 });
 
+const themeSchema = z.object({
+  theme: z.enum(["light", "dark"]),
+});
+
 export async function updateTimezoneAction(input: unknown) {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Fuso horário inválido." };
@@ -31,6 +35,38 @@ export async function updateTimezoneAction(input: unknown) {
       return {
         ok: false,
         error: "Rode a migration para adicionar a coluna timezone em profiles e tente novamente.",
+      };
+    }
+    return { ok: false, error: msg };
+  }
+
+  return { ok: true };
+}
+
+export async function updateThemeAction(input: unknown) {
+  const parsed = themeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Tema inválido." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) return { ok: false, error: "Sem sessão." };
+
+  const { error } = await supabase.from("profiles").upsert(
+    {
+      user_id: userId,
+      theme: parsed.data.theme,
+    },
+    { onConflict: "user_id" },
+  );
+
+  if (error) {
+    const msg = error.message ?? "";
+    const missingColumn = /theme/i.test(msg) && /column/i.test(msg);
+    if (missingColumn) {
+      return {
+        ok: false,
+        error: "Rode a migration para adicionar a coluna theme em profiles e tente novamente.",
       };
     }
     return { ok: false, error: msg };

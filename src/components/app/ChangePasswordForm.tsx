@@ -37,12 +37,12 @@ export function ChangePasswordForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-3">
       <div>
-        <label className="text-xs font-semibold text-white/60">Nova senha</label>
+        <label className="text-xs font-semibold text-[var(--app-text-60)]">Nova senha</label>
         <div className="relative mt-2">
           <input
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-11 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
+            className="w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 pr-11 text-sm text-[var(--app-text-85)] outline-none ring-0 placeholder:text-[var(--app-text-30)] focus:border-[var(--app-border)] focus:ring-2 focus:ring-[var(--app-ring)]"
             placeholder="Mínimo 8 caracteres"
             {...register("password", {
               required: true,
@@ -53,7 +53,7 @@ export function ChangePasswordForm() {
             type="button"
             aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/50 hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-white/20"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-[var(--app-text-50)] hover:text-[var(--app-text-80)] focus:outline-none focus:ring-2 focus:ring-[var(--app-ring)]"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -61,11 +61,11 @@ export function ChangePasswordForm() {
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-white/60">Confirmar senha</label>
+        <label className="text-xs font-semibold text-[var(--app-text-60)]">Confirmar senha</label>
         <input
           type={showPassword ? "text" : "password"}
           autoComplete="new-password"
-          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
+          className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm text-[var(--app-text-85)] outline-none ring-0 placeholder:text-[var(--app-text-30)] focus:border-[var(--app-border)] focus:ring-2 focus:ring-[var(--app-ring)]"
           placeholder="Repita a nova senha"
           {...register("confirm", {
             required: true,
@@ -77,7 +77,7 @@ export function ChangePasswordForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-1 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+        className="mt-1 inline-flex w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-3 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60"
       >
         {isSubmitting ? "Salvando..." : "Salvar nova senha"}
       </button>

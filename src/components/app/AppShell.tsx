@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppNav } from "@/components/app/AppNav";
@@ -9,6 +9,9 @@ import { Logo } from "@/components/ui/Logo";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { normalizePlan } from "@/lib/plans";
+import { updateThemeAction } from "@/app/app/configuracoes/actions";
+import { modalToast } from "@/lib/modalToast";
+import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -20,6 +23,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAuthed, setIsAuthed] = useState(false);
   const [restricted, setRestricted] = useState(false);
   const [plan, setPlan] = useState<"teste" | "basico" | "pro" | "vitalicio">("teste");
+  const [theme, setTheme] = useState<AppTheme>("dark");
+  const [themePreference, setThemePreference] = useState<AppTheme | null>(null);
+  const [themeLoaded, setThemeLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -44,12 +50,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!authChecked) return;
+    if (isAuthed) return;
+    setTheme("dark");
+    setThemePreference(null);
+    setThemeLoaded(false);
+    setRestricted(false);
+    setPlan("teste");
+  }, [authChecked, isAuthed]);
+
+  const saveTheme = useCallback(
+    async (next: AppTheme) => {
+      setTheme(next);
+      try {
+        localStorage.setItem("app_theme", next);
+      } catch {}
+
+      const res = await updateThemeAction({ theme: next });
+      if (!res.ok) return res;
+
+      setThemePreference(next);
+      return { ok: true as const };
+    },
+    [setTheme],
+  );
+
+  useEffect(() => {
+    if (!authChecked) return;
     if (!isAuthed) return;
 
     let active = true;
     const checkAccess = async () => {
       const [{ data: profile }, { data: sub }] = await Promise.all([
-        supabase.from("profiles").select("plano").maybeSingle(),
+        supabase.from("profiles").select("plano, theme").maybeSingle(),
         supabase
           .from("subscriptions")
           .select("id, plano, status, vencimento, created_at")
@@ -61,6 +93,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const plan = normalizePlan(profile?.plano ?? sub?.plano ?? "teste");
       if (!active) return;
       setPlan(plan);
+      const rawTheme = (profile as any)?.theme;
+      const savedTheme: AppTheme | null = rawTheme === "light" || rawTheme === "dark" ? rawTheme : null;
+      setThemePreference(savedTheme);
+      let storedTheme: AppTheme | null = null;
+      try {
+        const v = localStorage.getItem("app_theme");
+        storedTheme = v === "light" || v === "dark" ? v : null;
+      } catch {}
+      setTheme(savedTheme ?? storedTheme ?? "dark");
+      setThemeLoaded(true);
       if (plan === "vitalicio") {
         setRestricted(false);
         return;
@@ -98,6 +140,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [authChecked, isAuthed, supabase]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!isAuthed) return;
+    if (!themeLoaded) return;
+    if (themePreference) return;
+    if (restricted) return;
+
+    const currentPath = pathname ?? "";
+    if (currentPath !== "/app/dashboard") {
+      router.replace("/app/dashboard");
+    }
+  }, [authChecked, isAuthed, pathname, restricted, router, themeLoaded, themePreference]);
 
   useEffect(() => {
     if (!authChecked) return;
@@ -140,16 +195,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     !currentPath.startsWith("/app/configuracoes/");
   if (shouldHoldRender) return null;
 
-  return (
-    <div className="min-h-screen bg-[#070A10] text-white">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-[-260px] h-[680px] w-[680px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18),rgba(99,102,241,0)_55%)]" />
-        <div className="absolute right-[-220px] top-[140px] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.12),rgba(16,185,129,0)_55%)]" />
-      </div>
+  const showThemeGate =
+    authChecked &&
+    isAuthed &&
+    themeLoaded &&
+    !themePreference &&
+    !restricted &&
+    (pathname ?? "") === "/app/dashboard";
 
-      <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-6">
+  const themeProviderValue = { theme, themePreference, themeLoaded, saveTheme };
+
+  return (
+    <AppThemeProvider value={themeProviderValue}>
+      <div data-theme={theme} className="app-theme min-h-screen">
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="absolute left-1/2 top-[-260px] h-[680px] w-[680px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18),rgba(99,102,241,0)_55%)]" />
+          <div className="absolute right-[-220px] top-[140px] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.12),rgba(16,185,129,0)_55%)]" />
+        </div>
+
+        <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-6">
         <aside className="hidden w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:block min-[1201px]:h-[calc(100vh-3rem)]">
-          <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
+          <div className="flex h-full flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 backdrop-blur-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Logo />
@@ -158,15 +224,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {showAdmin ? (
                 <Link
                   href="/admin"
-                  className="rounded-xl px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.06] hover:text-white/85"
+                  className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
                 >
                   Admin
                 </Link>
               ) : null}
             </div>
 
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-              <div className="text-[11px] font-semibold text-white/45">
+            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2">
+              <div className="text-[11px] font-semibold text-[var(--app-text-45)]">
                 Logado como
               </div>
               <div className="mt-1 truncate text-sm font-semibold">
@@ -181,7 +247,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <form action={logoutAction} className="mt-4">
               <button
                 type="submit"
-                className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
               >
                 Sair
               </button>
@@ -194,7 +260,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <form action={logoutAction}>
               <button
                 type="submit"
-                className="rounded-xl px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.06] hover:text-white/85"
+                className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
               >
                 Sair
               </button>
@@ -202,22 +268,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {showAdmin ? (
               <Link
                 href="/admin"
-                className="rounded-xl px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/[0.06] hover:text-white/85"
+                className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
               >
                 Admin
               </Link>
             ) : null}
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl min-[1201px]:p-6">
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 backdrop-blur-xl min-[1201px]:p-6">
             {children}
           </div>
-          <div className="mt-3 flex justify-end text-xs text-white/35">
+          <div className="mt-3 flex justify-end text-xs text-[var(--app-text-35)]">
             Desenvolvido pela
             <a
               href="https://heybrothers.vercel.app/"
               target="_blank"
               rel="noreferrer"
-              className="ml-1 font-semibold text-white/60 hover:text-white"
+              className="ml-1 font-semibold text-[var(--app-text-60)] hover:text-[var(--app-text-85)]"
             >
               HEYBROTHERS
             </a>
@@ -226,9 +292,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-[#070A10]/80 backdrop-blur-xl min-[1201px]:hidden">
+        <div className="fixed inset-x-0 bottom-0 border-t border-[var(--app-border)] bg-[var(--app-bg-soft)] backdrop-blur-xl min-[1201px]:hidden">
         <AppNav variant="bottom" restricted={restricted} plan={plan} />
       </div>
-    </div>
+
+        {showThemeGate ? (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4 py-10">
+            <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-modal-bg)] p-6 backdrop-blur-xl">
+              <div className="text-sm font-semibold tracking-tight text-[var(--app-text-85)]">
+                Escolha seu tema
+              </div>
+              <div className="mt-2 text-sm text-[var(--app-text-60)]">
+                Selecione como você prefere visualizar o sistema.
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await saveTheme("light");
+                    if (!res.ok) {
+                      modalToast.error(res.error ?? "Falha ao salvar.");
+                    }
+                  }}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                >
+                  Tema Claro
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await saveTheme("dark");
+                    if (!res.ok) {
+                      modalToast.error(res.error ?? "Falha ao salvar.");
+                    }
+                  }}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]"
+                >
+                  Tema Escuro
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </AppThemeProvider>
   );
 }
