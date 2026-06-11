@@ -210,19 +210,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.replace("/app/assinatura?blocked=1");
   }, [authChecked, isAuthed, pathname, restricted, router]);
 
-  const showAdmin = isGlobalAdminEmail(email);
-
-  if (authChecked && !isAuthed) return null;
-
-  const currentPath = pathname ?? "";
-  const shouldHoldRender =
-    restricted &&
-    currentPath !== "/app/assinatura" &&
-    !currentPath.startsWith("/app/assinatura/") &&
-    currentPath !== "/app/configuracoes" &&
-    !currentPath.startsWith("/app/configuracoes/");
-  if (shouldHoldRender) return null;
-
   const showThemeGate =
     authChecked &&
     isAuthed &&
@@ -236,6 +223,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setThemeGateDraft(theme);
     setThemeGateError("");
   }, [showThemeGate, theme]);
+
+  const showAdmin = isGlobalAdminEmail(email);
+
+  if (authChecked && !isAuthed) return null;
+
+  const currentPath = pathname ?? "";
+  const shouldHoldRender =
+    restricted &&
+    currentPath !== "/app/assinatura" &&
+    !currentPath.startsWith("/app/assinatura/") &&
+    currentPath !== "/app/configuracoes" &&
+    !currentPath.startsWith("/app/configuracoes/");
+  if (shouldHoldRender) return null;
 
   const themeProviderValue = { theme, themePreference, themeLoaded, saveTheme };
 
