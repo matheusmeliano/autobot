@@ -340,6 +340,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         </div>
 
         <form onSubmit={saveEdit} className="mt-5 space-y-3">
+          <input type="hidden" {...editForm.register("id", { required: true })} />
           <div>
             <label className="text-xs font-semibold text-white/60">Nome</label>
             <input
@@ -426,6 +427,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         </div>
 
         <form onSubmit={savePassword} className="mt-5 space-y-3">
+          <input type="hidden" {...passForm.register("id", { required: true })} />
           <div>
             <label className="text-xs font-semibold text-white/60">Nova senha</label>
             <div className="relative mt-2">
