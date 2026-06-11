@@ -61,6 +61,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setPlan("teste");
   }, [authChecked, isAuthed]);
 
+  useEffect(() => {
+    const el = document.documentElement;
+    const prevTheme = el.getAttribute("data-theme");
+    const hadClass = el.classList.contains("app-theme");
+    el.classList.add("app-theme");
+    el.setAttribute("data-theme", theme);
+    return () => {
+      if (!hadClass) el.classList.remove("app-theme");
+      if (prevTheme) el.setAttribute("data-theme", prevTheme);
+      else el.removeAttribute("data-theme");
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
   const saveTheme = useCallback(
     async (next: AppTheme) => {
       setTheme(next);
@@ -216,7 +233,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AppThemeProvider value={themeProviderValue}>
-      <div data-theme={theme} className="app-theme min-h-screen">
+      <div className="min-h-screen">
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
           <div className="absolute left-1/2 top-[-260px] h-[680px] w-[680px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.18),rgba(99,102,241,0)_55%)]" />
           <div className="absolute right-[-220px] top-[140px] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.12),rgba(16,185,129,0)_55%)]" />
