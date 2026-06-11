@@ -28,6 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [themeLoaded, setThemeLoaded] = useState(false);
   const [themeGateDraft, setThemeGateDraft] = useState<AppTheme>("dark");
   const [themeGateSaving, setThemeGateSaving] = useState(false);
+  const [themeGateError, setThemeGateError] = useState<string>("");
 
   useEffect(() => {
     let active = true;
@@ -208,6 +209,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!showThemeGate) return;
     setThemeGateDraft(theme);
+    setThemeGateError("");
   }, [showThemeGate, theme]);
 
   const themeProviderValue = { theme, themePreference, themeLoaded, saveTheme };
@@ -377,17 +379,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={async () => {
                   if (themeGateSaving) return;
                   setThemeGateSaving(true);
-                  const res = await saveTheme(themeGateDraft);
-                  if (!res.ok) {
-                    modalToast.error(res.error ?? "Falha ao salvar.");
+                  setThemeGateError("");
+                  try {
+                    const res = await saveTheme(themeGateDraft);
+                    if (!res.ok) {
+                      const msg = res.error ?? "Falha ao salvar.";
+                      setThemeGateError(msg);
+                      modalToast.error(msg);
+                      return;
+                    }
+                    setThemePreference(themeGateDraft);
+                  } catch {
+                    const msg = "Falha ao salvar.";
+                    setThemeGateError(msg);
+                    modalToast.error(msg);
+                  } finally {
+                    setThemeGateSaving(false);
                   }
-                  setThemeGateSaving(false);
                 }}
                 disabled={themeGateSaving}
                 className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60"
               >
                 {themeGateSaving ? "Salvando..." : "Salvar"}
               </button>
+              {themeGateError ? (
+                <div className="mt-3 rounded-xl border border-rose-400/25 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+                  {themeGateError}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
