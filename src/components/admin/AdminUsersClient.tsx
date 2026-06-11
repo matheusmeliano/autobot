@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Key, Pencil, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Key, Pencil, Trash2, X } from "lucide-react";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
@@ -72,6 +72,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const [openDelete, setOpenDelete] = useState(false);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [deleting, setDeleting] = useState<AdminUserRow | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const isSelfAdmin = (email: string) =>
     email.toLowerCase() === "heybrotherscolaboradores@gmail.com";
 
@@ -126,6 +127,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const closePassword = () => {
     setOpenPassword(false);
     setEditing(null);
+    setShowPassword(false);
     passForm.reset({ id: "", password: "" });
   };
 
@@ -150,6 +152,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const openPasswordModal = (row: AdminUserRow) => {
     setEditing(row);
     setOpenPassword(true);
+    setShowPassword(false);
     passForm.reset({ id: row.id, password: "" });
   };
 
@@ -425,12 +428,26 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         <form onSubmit={savePassword} className="mt-5 space-y-3">
           <div>
             <label className="text-xs font-semibold text-white/60">Nova senha</label>
-            <input
-              type="password"
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-              placeholder="Mínimo 8 caracteres"
-              {...passForm.register("password", { required: true, minLength: 8 })}
-            />
+            <div className="relative mt-2">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder="Mínimo 8 caracteres"
+                {...passForm.register("password", { required: true, minLength: 8 })}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           <button
