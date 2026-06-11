@@ -189,6 +189,12 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     }
     modalToast.success("Senha redefinida.");
     closePassword();
+  }, (errors) => {
+    if (errors.password?.message) {
+      modalToast.error(String(errors.password.message));
+      return;
+    }
+    modalToast.warning("Confira os campos.");
   });
 
   const remove = (row: AdminUserRow) => {
@@ -435,7 +441,10 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                 type={showPassword ? "text" : "password"}
                 className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
                 placeholder="Mínimo 8 caracteres"
-                {...passForm.register("password", { required: true, minLength: 8 })}
+                {...passForm.register("password", {
+                  required: true,
+                  minLength: { value: 8, message: "A senha deve ter no mínimo 8 caracteres." },
+                })}
               />
               <button
                 type="button"
@@ -450,6 +459,11 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                 )}
               </button>
             </div>
+            {passForm.formState.errors.password?.message ? (
+              <div className="mt-2 text-xs font-semibold text-rose-200">
+                {String(passForm.formState.errors.password.message)}
+              </div>
+            ) : null}
           </div>
 
           <button
