@@ -26,6 +26,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<AppTheme>("dark");
   const [themePreference, setThemePreference] = useState<AppTheme | null>(null);
   const [themeLoaded, setThemeLoaded] = useState(false);
+  const [themeGateDraft, setThemeGateDraft] = useState<AppTheme>("dark");
+  const [themeGateSaving, setThemeGateSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -203,6 +205,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     !restricted &&
     (pathname ?? "") === "/app/dashboard";
 
+  useEffect(() => {
+    if (!showThemeGate) return;
+    setThemeGateDraft(theme);
+  }, [showThemeGate, theme]);
+
   const themeProviderValue = { theme, themePreference, themeLoaded, saveTheme };
 
   return (
@@ -303,35 +310,84 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Escolha seu tema
               </div>
               <div className="mt-2 text-sm text-[var(--app-text-60)]">
-                Selecione como você prefere visualizar o sistema.
+                Selecione como você prefere visualizar o sistema e clique em salvar para continuar.
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
-                  onClick={async () => {
-                    const res = await saveTheme("light");
-                    if (!res.ok) {
-                      modalToast.error(res.error ?? "Falha ao salvar.");
-                    }
+                  onClick={() => {
+                    setThemeGateDraft("light");
+                    setTheme("light");
                   }}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                  className={[
+                    "w-full rounded-2xl border p-3 text-left",
+                    themeGateDraft === "light"
+                      ? "border-[var(--app-border)] bg-[var(--app-active)]"
+                      : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
+                  ].join(" ")}
                 >
-                  Tema Claro
+                  <div className="text-sm font-semibold text-[var(--app-text-85)]">Tema Claro</div>
+                  <div className="mt-2 app-theme rounded-xl border border-[var(--app-border)] p-3" data-theme="light">
+                    <div className="flex items-center justify-between">
+                      <div className="h-2.5 w-16 rounded-full bg-[var(--app-border)]" />
+                      <div className="h-2.5 w-10 rounded-full bg-[var(--app-border)]" />
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-card)] p-2">
+                        <div className="h-2 w-24 rounded-full bg-[var(--app-border)]" />
+                        <div className="mt-2 h-2 w-16 rounded-full bg-[var(--app-border)]" />
+                      </div>
+                      <div className="h-8 rounded-lg bg-[var(--app-btn-primary-bg)]" />
+                    </div>
+                  </div>
                 </button>
                 <button
                   type="button"
-                  onClick={async () => {
-                    const res = await saveTheme("dark");
-                    if (!res.ok) {
-                      modalToast.error(res.error ?? "Falha ao salvar.");
-                    }
+                  onClick={() => {
+                    setThemeGateDraft("dark");
+                    setTheme("dark");
                   }}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]"
+                  className={[
+                    "w-full rounded-2xl border p-3 text-left",
+                    themeGateDraft === "dark"
+                      ? "border-[var(--app-border)] bg-[var(--app-active)]"
+                      : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
+                  ].join(" ")}
                 >
-                  Tema Escuro
+                  <div className="text-sm font-semibold text-[var(--app-text-85)]">Tema Escuro</div>
+                  <div className="mt-2 app-theme rounded-xl border border-[var(--app-border)] p-3" data-theme="dark">
+                    <div className="flex items-center justify-between">
+                      <div className="h-2.5 w-16 rounded-full bg-[var(--app-border)]" />
+                      <div className="h-2.5 w-10 rounded-full bg-[var(--app-border)]" />
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-card)] p-2">
+                        <div className="h-2 w-24 rounded-full bg-[var(--app-border)]" />
+                        <div className="mt-2 h-2 w-16 rounded-full bg-[var(--app-border)]" />
+                      </div>
+                      <div className="h-8 rounded-lg bg-[var(--app-btn-primary-bg)]" />
+                    </div>
+                  </div>
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (themeGateSaving) return;
+                  setThemeGateSaving(true);
+                  const res = await saveTheme(themeGateDraft);
+                  if (!res.ok) {
+                    modalToast.error(res.error ?? "Falha ao salvar.");
+                  }
+                  setThemeGateSaving(false);
+                }}
+                disabled={themeGateSaving}
+                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60"
+              >
+                {themeGateSaving ? "Salvando..." : "Salvar"}
+              </button>
             </div>
           </div>
         ) : null}
