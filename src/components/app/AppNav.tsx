@@ -39,7 +39,9 @@ export function AppNav({
 }) {
   const pathname = usePathname();
   const navItems = restricted
-    ? NAV_ITEMS.filter((i) => i.href === "/app/assinatura")
+    ? NAV_ITEMS.filter(
+        (i) => i.href === "/app/assinatura" || i.href === "/app/configuracoes",
+      )
     : NAV_ITEMS.filter((i) => {
         if (i.href !== "/app/relatorios") return true;
         return plan === "pro" || plan === "vitalicio";
@@ -50,13 +52,14 @@ export function AppNav({
     const items = navItems.slice(0, 3);
     const moreItems = useMemo(() => navItems.slice(3), [navItems]);
     const plusActive = openMore || moreItems.some((i) => i.href === pathname);
+    const restrictedCols = navItems.length <= 1 ? "grid-cols-1" : "grid-cols-2";
 
     return (
       <>
         <nav
           className={[
             "grid gap-1 px-2 pb-safe",
-            restricted ? "grid-cols-1" : "grid-cols-4",
+            restricted ? restrictedCols : "grid-cols-4",
           ].join(" ")}
         >
           {items.map((item) => {

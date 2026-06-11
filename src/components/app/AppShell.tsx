@@ -115,7 +115,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!restricted) return;
 
     const currentPath = pathname ?? "";
-    if (currentPath === "/app/assinatura" || currentPath.startsWith("/app/assinatura/")) {
+    if (
+      currentPath === "/app/assinatura" ||
+      currentPath.startsWith("/app/assinatura/") ||
+      currentPath === "/app/configuracoes" ||
+      currentPath.startsWith("/app/configuracoes/")
+    ) {
       return;
     }
 
@@ -130,7 +135,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const shouldHoldRender =
     restricted &&
     currentPath !== "/app/assinatura" &&
-    !currentPath.startsWith("/app/assinatura/");
+    !currentPath.startsWith("/app/assinatura/") &&
+    currentPath !== "/app/configuracoes" &&
+    !currentPath.startsWith("/app/configuracoes/");
   if (shouldHoldRender) return null;
 
   return (
