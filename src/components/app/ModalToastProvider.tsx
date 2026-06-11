@@ -18,8 +18,8 @@ function variantMeta(variant: ModalToastVariant) {
   if (variant === "success") {
     return {
       icon: CheckCircle2,
-      accent: "border-emerald-400/25 bg-emerald-400/10 text-emerald-100",
-      iconColor: "text-emerald-200",
+      accent: "border-emerald-500/35 bg-emerald-500/15 text-emerald-800",
+      iconColor: "text-emerald-600",
       button:
         "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
     };
@@ -27,8 +27,8 @@ function variantMeta(variant: ModalToastVariant) {
   if (variant === "error") {
     return {
       icon: XCircle,
-      accent: "border-rose-400/25 bg-rose-400/10 text-rose-100",
-      iconColor: "text-rose-200",
+      accent: "border-rose-500/35 bg-rose-500/15 text-rose-800",
+      iconColor: "text-rose-600",
       button:
         "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
     };
@@ -36,8 +36,8 @@ function variantMeta(variant: ModalToastVariant) {
   if (variant === "warning") {
     return {
       icon: AlertTriangle,
-      accent: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-      iconColor: "text-amber-200",
+      accent: "border-amber-500/35 bg-amber-500/15 text-amber-800",
+      iconColor: "text-amber-600",
       button:
         "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
     };
@@ -53,8 +53,8 @@ function variantMeta(variant: ModalToastVariant) {
   }
   return {
     icon: Info,
-    accent: "border-indigo-400/25 bg-indigo-400/10 text-indigo-100",
-    iconColor: "text-indigo-200",
+    accent: "border-indigo-500/35 bg-indigo-500/15 text-indigo-800",
+    iconColor: "text-indigo-600",
     button:
       "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
   };
