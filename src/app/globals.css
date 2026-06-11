@@ -71,9 +71,9 @@ body {
   --app-hover: rgba(11, 18, 32, 0.05);
   --app-ring: rgba(11, 18, 32, 0.14);
   --app-modal-bg: rgba(248, 250, 252, 0.95);
-  --app-btn-primary-bg: #0b1220;
+  --app-btn-primary-bg: #2563eb;
   --app-btn-primary-fg: #ffffff;
-  --app-btn-primary-bg-hover: rgba(11, 18, 32, 0.9);
+  --app-btn-primary-bg-hover: #1d4ed8;
   --app-option-bg: #ffffff;
 }
 
