@@ -9,6 +9,10 @@ export function ThemeSettings() {
   const { theme, saveTheme } = useAppTheme();
 
   const choose = (next: AppTheme) => {
+    if (next === theme) {
+      modalToast.info("Esse tema já está em uso.");
+      return;
+    }
     startTransition(async () => {
       const res = await saveTheme(next);
       if (!res.ok) {
@@ -57,4 +61,3 @@ export function ThemeSettings() {
     </div>
   );
 }
-

@@ -336,6 +336,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => {
+                    if (themeGateDraft === "light") {
+                      modalToast.info("Esse tema já está em uso.");
+                      return;
+                    }
                     setThemeGateDraft("light");
                     setTheme("light");
                   }}
@@ -364,6 +368,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => {
+                    if (themeGateDraft === "dark") {
+                      modalToast.info("Esse tema já está em uso.");
+                      return;
+                    }
                     setThemeGateDraft("dark");
                     setTheme("dark");
                   }}
