@@ -95,7 +95,7 @@ export function AppModal({
           aria-label="Fechar"
           onClick={onClose}
           className={[
-            "absolute inset-0 z-0 bg-black/60",
+            "absolute inset-0 z-0 bg-transparent",
             "transition-opacity duration-200 ease-out",
             visible ? "opacity-100" : "opacity-0",
           ].join(" ")}
