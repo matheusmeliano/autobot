@@ -113,7 +113,7 @@ body {
   --app-btn-primary-fg: #0b1220;
   --app-btn-primary-bg-hover: #b8c4d6;
   --app-option-bg: #ffffff;
-  --app-select-bg: #ffffff;
+  --app-select-bg: rgba(11, 18, 32, 0.04);
   --app-accent-bg: rgba(148, 163, 184, 0.16);
   --app-accent-ring: rgba(100, 116, 139, 0.2);
   --app-accent-text: #334155;
