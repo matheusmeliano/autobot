@@ -88,7 +88,7 @@ export function TimezoneSettings({
           type="button"
           onClick={save}
           disabled={isPending || !timeZone}
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-6 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 md:w-auto"
+          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-6 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100 md:w-auto"
         >
           Salvar
         </button>
