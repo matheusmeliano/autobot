@@ -277,8 +277,8 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                           className={[
                             "inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold",
                             normalizeStatus(r.assinatura_status) === "ativo"
-                              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                              : "border-rose-400/30 bg-rose-400/10 text-rose-200",
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                              : "border-rose-500/30 bg-rose-500/10 text-rose-600",
                           ].join(" ")}
                         >
                           {statusLabel(normalizeStatus(r.assinatura_status))}
