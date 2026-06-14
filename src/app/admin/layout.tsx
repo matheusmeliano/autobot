@@ -20,8 +20,12 @@ export default async function AdminLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!isGlobalAdminEmail(user?.email)) {
-    redirect(user ? "/app" : "/login");
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!isGlobalAdminEmail(user.email)) {
+    redirect("/app");
   }
 
   const { data: profile } = await supabase.from("profiles").select("theme").maybeSingle();
