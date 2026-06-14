@@ -337,3 +337,81 @@ body {
 .mp-brick-wrapper [class*="value-prop"] {
   display: none !important;
 }
+
+.app-theme :is(
+  button,
+  a,
+  summary,
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="switch"],
+  [role="menuitem"],
+  [role="checkbox"],
+  [role="radio"],
+  [role="option"]
+),
+.app-theme :is(
+  button,
+  a,
+  summary,
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="switch"],
+  [role="menuitem"],
+  [role="checkbox"],
+  [role="radio"],
+  [role="option"]
+):is(:hover, :focus, :focus-visible, :active),
+.app-theme :is(
+  button,
+  a,
+  summary,
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="switch"],
+  [role="menuitem"],
+  [role="checkbox"],
+  [role="radio"],
+  [role="option"]
+):is(
+  [data-state="active"],
+  [data-state="checked"],
+  [data-state="open"],
+  [data-state="on"],
+  [aria-selected="true"],
+  [aria-pressed="true"],
+  [aria-checked="true"],
+  [aria-current="page"],
+  [aria-expanded="true"]
+) {
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-color: transparent !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-shadow: 0 0 #0000 !important;
+}
