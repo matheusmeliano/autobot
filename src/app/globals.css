@@ -132,6 +132,13 @@ body {
   background-color: var(--app-select-bg) !important;
 }
 
+.app-theme[data-theme="light"] select:focus,
+.app-theme[data-theme="light"] select:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: var(--app-border) !important;
+}
+
 .app-theme[data-theme="dark"] select,
 .app-theme[data-theme="dark"] input[type="date"] {
   color-scheme: dark !important;
