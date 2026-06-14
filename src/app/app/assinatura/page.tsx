@@ -63,9 +63,9 @@ export default async function AssinaturaPage() {
       </div>
 
       {isBlocked ? (
-        <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <div className="mt-6 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4 text-sm text-[var(--app-warning-text)]">
           <div className="font-semibold">Seu teste gratuito terminou.</div>
-          <div className="mt-1 text-amber-100/90">
+          <div className="mt-1 opacity-90">
             Para reativar o acesso completo, escolha um plano abaixo. Assim que
             ativar, todas as funcionalidades do sistema serão liberadas
             novamente.
@@ -100,19 +100,19 @@ export default async function AssinaturaPage() {
           </div>
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Conexão via Z-API</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Até 15 cadastros</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Templates e variáveis</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Agendamento automático</div>
             </li>
           </ul>
@@ -122,7 +122,7 @@ export default async function AssinaturaPage() {
               amount={49}
               userEmail={user?.email ?? null}
               disabled={plan === "basico" || plan === "vitalicio"}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
             >
               {plan === "basico"
                 ? "Plano atual"
@@ -141,25 +141,25 @@ export default async function AssinaturaPage() {
                 R$ 99/mês
               </div>
             </div>
-            <div className="shrink-0 whitespace-nowrap rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
+            <div className="shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--app-accent-text)] ring-1 ring-[var(--app-accent-ring)]">
               Mais escolhido
             </div>
           </div>
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Tudo do Básico</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Cadastro ilimitado</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Relatório completo</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Suporte prioritário</div>
             </li>
           </ul>
@@ -169,7 +169,7 @@ export default async function AssinaturaPage() {
               amount={99}
               userEmail={user?.email ?? null}
               disabled={plan === "pro" || plan === "vitalicio"}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:cursor-not-allowed disabled:border disabled:border-[var(--app-border)] disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
             >
               {plan === "pro"
                 ? "Plano atual"
@@ -191,11 +191,11 @@ export default async function AssinaturaPage() {
           </div>
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Tudo do Básico e Pro</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--app-border)]" />
               <div className="min-w-0">Sem mensalidades. Seu para sempre!</div>
             </li>
           </ul>
@@ -203,7 +203,7 @@ export default async function AssinaturaPage() {
             <MercadoPagoCheckoutButton
               plan="vitalicio"
               disabled={plan === "vitalicio"}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
             >
               {plan === "vitalicio" ? "Plano atual" : "Comprar vitalício"}
             </MercadoPagoCheckoutButton>

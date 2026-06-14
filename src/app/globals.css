@@ -54,6 +54,12 @@ body {
   --app-btn-primary-fg: #000000;
   --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
   --app-option-bg: #070a10;
+  --app-accent-bg: rgba(99, 102, 241, 0.16);
+  --app-accent-ring: rgba(129, 140, 248, 0.22);
+  --app-accent-text: #c7d2fe;
+  --app-warning-bg: rgba(245, 158, 11, 0.12);
+  --app-warning-border: rgba(245, 158, 11, 0.3);
+  --app-warning-text: #fde68a;
 }
 
 .app-theme[data-theme="light"] {
@@ -82,6 +88,12 @@ body {
   --app-btn-primary-bg-hover: #b8c4d6;
   --app-option-bg: #ffffff;
   --app-select-bg: #ffffff;
+  --app-accent-bg: rgba(79, 70, 229, 0.1);
+  --app-accent-ring: rgba(79, 70, 229, 0.18);
+  --app-accent-text: #4338ca;
+  --app-warning-bg: rgba(245, 158, 11, 0.12);
+  --app-warning-border: rgba(217, 119, 6, 0.24);
+  --app-warning-text: #92400e;
 }
 
 .app-theme {

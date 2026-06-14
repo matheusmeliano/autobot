@@ -203,7 +203,7 @@ export function MercadoPagoRecurringButton(props: {
         <div className="mt-3 text-sm text-white/60">
           Sua assinatura será cobrada automaticamente todo mês.
         </div>
-        <div className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+        <div className="mt-3 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-3 text-sm text-[var(--app-warning-text)]">
           Alguns bancos exigem que o cartão esteja habilitado para compras online e cobranças
           recorrentes. Se falhar, tente outro cartão ou libere no app do banco.
         </div>
