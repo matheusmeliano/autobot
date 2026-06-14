@@ -14,14 +14,16 @@ type QueueItem = {
   cancelText?: string;
 };
 
+const STANDARD_BUTTON_CLASS =
+  "border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100";
+
 function variantMeta(variant: ModalToastVariant) {
   if (variant === "success") {
     return {
       icon: CheckCircle2,
       accent: "border-emerald-500/35 bg-emerald-500/15 text-emerald-800",
       iconColor: "text-emerald-600",
-      button:
-        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
+      button: STANDARD_BUTTON_CLASS,
     };
   }
   if (variant === "error") {
@@ -29,8 +31,7 @@ function variantMeta(variant: ModalToastVariant) {
       icon: XCircle,
       accent: "border-rose-500/35 bg-rose-500/15 text-rose-800",
       iconColor: "text-rose-600",
-      button:
-        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
+      button: STANDARD_BUTTON_CLASS,
     };
   }
   if (variant === "warning") {
@@ -38,8 +39,7 @@ function variantMeta(variant: ModalToastVariant) {
       icon: AlertTriangle,
       accent: "border-amber-500/35 bg-amber-500/15 text-amber-800",
       iconColor: "text-amber-600",
-      button:
-        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
+      button: STANDARD_BUTTON_CLASS,
     };
   }
   if (variant === "confirm") {
@@ -47,16 +47,14 @@ function variantMeta(variant: ModalToastVariant) {
       icon: AlertTriangle,
       accent: "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)]",
       iconColor: "text-[var(--app-text-70)]",
-      button:
-        "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
+      button: STANDARD_BUTTON_CLASS,
     };
   }
   return {
     icon: Info,
     accent: "border-indigo-500/35 bg-indigo-500/15 text-indigo-800",
     iconColor: "text-indigo-600",
-    button:
-      "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]",
+    button: STANDARD_BUTTON_CLASS,
   };
 }
 
