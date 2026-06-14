@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { loadMercadoPagoSdk } from "@/lib/mercadopago-sdk";
 import { modalToast } from "@/lib/modalToast";
 
@@ -14,6 +15,7 @@ export function MercadoPagoRecurringButton(props: {
   className: string;
   children: React.ReactNode;
 }) {
+  const { theme } = useAppTheme();
   const publicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? "";
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -86,16 +88,20 @@ export function MercadoPagoRecurringButton(props: {
               hideFormTitle: true,
               hidePaymentButton: true,
               style: {
-                theme: "dark",
+                theme: theme === "light" ? "default" : "dark",
                 customVariables: {
-                  textPrimaryColor: "#ffffff",
-                  textSecondaryColor: "rgba(255,255,255,0.65)",
-                  inputBackgroundColor: "rgba(255,255,255,0.04)",
+                  textPrimaryColor: theme === "light" ? "#0b1220" : "#ffffff",
+                  textSecondaryColor:
+                    theme === "light" ? "rgba(11,18,32,0.6)" : "rgba(255,255,255,0.65)",
+                  inputBackgroundColor:
+                    theme === "light" ? "#ffffff" : "rgba(255,255,255,0.04)",
                   formBackgroundColor: "transparent",
-                  baseColor: "#ffffff",
-                  outlinePrimaryColor: "rgba(255,255,255,0.18)",
-                  outlineSecondaryColor: "rgba(255,255,255,0.10)",
-                  buttonTextColor: "#000000",
+                  baseColor: theme === "light" ? "#334155" : "#ffffff",
+                  outlinePrimaryColor:
+                    theme === "light" ? "rgba(11,18,32,0.16)" : "rgba(255,255,255,0.18)",
+                  outlineSecondaryColor:
+                    theme === "light" ? "rgba(11,18,32,0.1)" : "rgba(255,255,255,0.10)",
+                  buttonTextColor: theme === "light" ? "#ffffff" : "#000000",
                   borderRadiusMedium: "16px",
                 },
               },
@@ -122,7 +128,7 @@ export function MercadoPagoRecurringButton(props: {
     return () => {
       cancelled = true;
     };
-  }, [open, publicKey, ids, props.amount]);
+  }, [open, publicKey, ids, props.amount, theme]);
 
   async function confirm() {
     if (loading) return;
@@ -211,7 +217,7 @@ export function MercadoPagoRecurringButton(props: {
         <div
           id={ids.brick}
           className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
-          style={{ colorScheme: "dark" }}
+          style={{ colorScheme: theme }}
         />
 
         <button

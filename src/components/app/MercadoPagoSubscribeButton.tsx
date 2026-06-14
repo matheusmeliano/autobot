@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { loadMercadoPagoSdk } from "@/lib/mercadopago-sdk";
 import { modalToast } from "@/lib/modalToast";
 
@@ -14,6 +15,7 @@ export function MercadoPagoSubscribeButton(props: {
   amount: number;
   userEmail?: string | null;
 }) {
+  const { theme } = useAppTheme();
   const publicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? "";
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -102,16 +104,20 @@ export function MercadoPagoSubscribeButton(props: {
             },
             visual: {
               style: {
-                theme: "dark",
+                theme: theme === "light" ? "default" : "dark",
                 customVariables: {
-                  textPrimaryColor: "#ffffff",
-                  textSecondaryColor: "rgba(255,255,255,0.65)",
-                  inputBackgroundColor: "rgba(255,255,255,0.04)",
+                  textPrimaryColor: theme === "light" ? "#0b1220" : "#ffffff",
+                  textSecondaryColor:
+                    theme === "light" ? "rgba(11,18,32,0.6)" : "rgba(255,255,255,0.65)",
+                  inputBackgroundColor:
+                    theme === "light" ? "#ffffff" : "rgba(255,255,255,0.04)",
                   formBackgroundColor: "transparent",
-                  baseColor: "#ffffff",
-                  buttonTextColor: "#000000",
-                  outlinePrimaryColor: "rgba(255,255,255,0.18)",
-                  outlineSecondaryColor: "rgba(255,255,255,0.10)",
+                  baseColor: theme === "light" ? "#334155" : "#ffffff",
+                  buttonTextColor: theme === "light" ? "#ffffff" : "#000000",
+                  outlinePrimaryColor:
+                    theme === "light" ? "rgba(11,18,32,0.16)" : "rgba(255,255,255,0.18)",
+                  outlineSecondaryColor:
+                    theme === "light" ? "rgba(11,18,32,0.10)" : "rgba(255,255,255,0.10)",
                   borderRadiusMedium: "16px",
                 },
               },
@@ -176,7 +182,7 @@ export function MercadoPagoSubscribeButton(props: {
       cancelled = true;
       cleanupBrick();
     };
-  }, [open, mounted, publicKey, props.amount, props.plan, props.userEmail, ids]);
+  }, [open, mounted, publicKey, props.amount, props.plan, props.userEmail, ids, theme]);
 
   useEffect(() => {
     if (!open) {
@@ -318,6 +324,7 @@ export function MercadoPagoSubscribeButton(props: {
                 method === "card" ? "" : "hidden",
                 loading ? "pointer-events-none opacity-80" : "",
               ].join(" ")}
+              style={{ colorScheme: theme }}
             />
 
             {method === "pix" ? (
