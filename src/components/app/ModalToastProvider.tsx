@@ -52,8 +52,8 @@ function variantMeta(variant: ModalToastVariant) {
   }
   return {
     icon: Info,
-    accent: "border-indigo-500/35 bg-indigo-500/15 text-indigo-800",
-    iconColor: "text-indigo-600",
+    accent: "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)]",
+    iconColor: "text-[var(--app-text-70)]",
     button: STANDARD_BUTTON_CLASS,
   };
 }
