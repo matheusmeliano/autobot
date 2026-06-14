@@ -102,6 +102,9 @@ body {
 .app-theme .text-white {
   color: var(--app-fg) !important;
 }
+.app-theme .text-white\/90 {
+  color: var(--app-text-85) !important;
+}
 .app-theme .text-white\/85 {
   color: var(--app-text-85) !important;
 }
