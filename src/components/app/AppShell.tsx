@@ -12,21 +12,31 @@ import { normalizePlan } from "@/lib/plans";
 import { updateThemeAction } from "@/app/app/configuracoes/actions";
 import { modalToast } from "@/lib/modalToast";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
+import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  initialUserId,
+  initialTheme,
+}: {
+  children: React.ReactNode;
+  initialUserId: string;
+  initialTheme: AppTheme;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [email, setEmail] = useState<string>("");
+  const [userId, setUserId] = useState(initialUserId);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
   const [restricted, setRestricted] = useState(false);
   const [plan, setPlan] = useState<"teste" | "basico" | "pro" | "vitalicio">("teste");
   const [theme, setTheme] = useState<AppTheme>(() => {
-    if (typeof document === "undefined") return "dark";
-    const current = document.documentElement.getAttribute("data-theme");
-    return current === "light" || current === "dark" ? current : "dark";
+    if (typeof document === "undefined") return initialTheme;
+    const current = normalizeStoredTheme(document.documentElement.getAttribute("data-theme"));
+    return current ?? initialTheme;
   });
   const [themePreference, setThemePreference] = useState<AppTheme | null>(null);
   const [themeLoaded, setThemeLoaded] = useState(false);
@@ -39,12 +49,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     supabase.auth.getUser().then(({ data }) => {
       if (!active) return;
       setEmail(data.user?.email ?? "");
+      setUserId(data.user?.id ?? "");
       setIsAuthed(Boolean(data.user));
       setAuthChecked(true);
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user?.email ?? "");
+      setUserId(session?.user?.id ?? "");
       setIsAuthed(Boolean(session?.user));
       setAuthChecked(true);
     });
@@ -58,6 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!authChecked) return;
     if (isAuthed) return;
+    setUserId("");
     setTheme("dark");
     setThemePreference(null);
     setThemeLoaded(false);
@@ -88,18 +101,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const saveTheme = useCallback(
     async (next: AppTheme) => {
+      const previousTheme = theme;
       setTheme(next);
-      try {
-        localStorage.setItem("app_theme", next);
-      } catch {}
 
       const res = await updateThemeAction({ theme: next });
-      if (!res.ok) return res;
+      if (!res.ok) {
+        setTheme(previousTheme);
+        return res;
+      }
+
+      if (userId) {
+        try {
+          localStorage.setItem(getThemeStorageKey(userId), next);
+        } catch {}
+      }
 
       setThemePreference(next);
       return { ok: true as const };
     },
-    [setTheme],
+    [theme, userId],
   );
 
   useEffect(() => {
@@ -121,15 +141,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const plan = normalizePlan(profile?.plano ?? sub?.plano ?? "teste");
       if (!active) return;
       setPlan(plan);
-      const rawTheme = (profile as any)?.theme;
-      const savedTheme: AppTheme | null = rawTheme === "light" || rawTheme === "dark" ? rawTheme : null;
+      const rawTheme = (profile as { theme?: unknown } | null)?.theme;
+      const savedTheme = normalizeStoredTheme(rawTheme);
       setThemePreference(savedTheme);
       let storedTheme: AppTheme | null = null;
-      try {
-        const v = localStorage.getItem("app_theme");
-        storedTheme = v === "light" || v === "dark" ? v : null;
-      } catch {}
-      setTheme(savedTheme ?? storedTheme ?? "dark");
+      if (userId) {
+        try {
+          storedTheme = normalizeStoredTheme(localStorage.getItem(getThemeStorageKey(userId)));
+        } catch {}
+      }
+      const resolvedTheme = savedTheme ?? storedTheme ?? initialTheme;
+      setTheme(resolvedTheme);
+      if (userId) {
+        try {
+          localStorage.setItem(getThemeStorageKey(userId), resolvedTheme);
+        } catch {}
+      }
       setThemeLoaded(true);
       if (plan === "vitalicio") {
         setRestricted(false);
@@ -167,7 +194,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [authChecked, isAuthed, supabase]);
+  }, [authChecked, initialTheme, isAuthed, supabase, userId]);
 
   useEffect(() => {
     if (!authChecked) return;

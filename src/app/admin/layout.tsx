@@ -6,6 +6,7 @@ import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { Logo } from "@/components/ui/Logo";
 import { logoutAction } from "@/app/app/actions";
 import { ScopedAppTheme } from "@/components/app/ScopedAppTheme";
+import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
 
@@ -23,23 +24,44 @@ export default async function AdminLayout({
     redirect(user ? "/app" : "/login");
   }
 
+  const { data: profile } = await supabase.from("profiles").select("theme").maybeSingle();
+  const savedTheme = normalizeStoredTheme(profile?.theme);
+  const initialTheme = savedTheme ?? "dark";
+  const themeStorageKey = getThemeStorageKey(user.id);
+
   return (
     <>
       <Script id="autobot-admin-theme-init" strategy="beforeInteractive">
         {`
           (function() {
+            var fallbackTheme = ${JSON.stringify(initialTheme)};
             try {
-              var theme = localStorage.getItem("app_theme");
-              if (theme !== "light" && theme !== "dark") theme = "dark";
+              var storageKey = ${JSON.stringify(themeStorageKey)};
+              var theme = ${JSON.stringify(savedTheme)};
+              if (theme !== "light" && theme !== "dark") {
+                var storedTheme = localStorage.getItem(storageKey);
+                theme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : fallbackTheme;
+              } else {
+                localStorage.setItem(storageKey, theme);
+              }
               var el = document.documentElement;
               el.classList.add("app-theme");
               el.setAttribute("data-app-theme-scope", "admin");
               el.setAttribute("data-theme", theme);
-            } catch (e) {}
+            } catch (e) {
+              var el = document.documentElement;
+              el.classList.add("app-theme");
+              el.setAttribute("data-app-theme-scope", "admin");
+              el.setAttribute("data-theme", fallbackTheme);
+            }
           })();
         `}
       </Script>
-      <ScopedAppTheme scopeId="admin" />
+      <ScopedAppTheme
+        scopeId="admin"
+        userId={user.id}
+        initialTheme={initialTheme}
+      />
       <div className="min-h-screen bg-[#070A10] text-white">
       <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-6">
         <aside className="hidden w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:block min-[1201px]:h-[calc(100vh-3rem)]">

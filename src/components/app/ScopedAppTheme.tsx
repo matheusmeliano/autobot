@@ -1,24 +1,36 @@
 "use client";
 
 import { useEffect } from "react";
+import type { AppTheme } from "@/components/app/AppThemeProvider";
+import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 
-export function ScopedAppTheme({ scopeId }: { scopeId: string }) {
+export function ScopedAppTheme({
+  scopeId,
+  userId,
+  initialTheme,
+}: {
+  scopeId: string;
+  userId: string;
+  initialTheme: AppTheme;
+}) {
   useEffect(() => {
     const el = document.documentElement;
-    let theme = el.getAttribute("data-theme");
+    let theme = normalizeStoredTheme(el.getAttribute("data-theme"));
 
-    if (theme !== "light" && theme !== "dark") {
+    if (!theme) {
       try {
-        const stored = localStorage.getItem("app_theme");
-        theme = stored === "light" || stored === "dark" ? stored : "dark";
+        theme = normalizeStoredTheme(localStorage.getItem(getThemeStorageKey(userId))) ?? initialTheme;
       } catch {
-        theme = "dark";
+        theme = initialTheme;
       }
     }
 
     el.classList.add("app-theme");
     el.setAttribute("data-app-theme-scope", scopeId);
     el.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem(getThemeStorageKey(userId), theme);
+    } catch {}
 
     const raf = window.requestAnimationFrame(() => el.classList.add("theme-ready"));
 
@@ -31,8 +43,7 @@ export function ScopedAppTheme({ scopeId }: { scopeId: string }) {
         el.removeAttribute("data-app-theme-scope");
       }
     };
-  }, [scopeId]);
+  }, [initialTheme, scopeId, userId]);
 
   return null;
 }
-
