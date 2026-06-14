@@ -359,11 +359,11 @@ export function SchedulesClient({
         ? createPortal(
             <div
               ref={timePickerPanelRef}
-              className="fixed z-[220] w-[260px] rounded-xl border border-white/10 bg-[#070A10] p-2"
+              className="fixed z-[220] w-[260px] rounded-xl border border-[var(--app-border)] bg-[var(--app-modal-bg)] p-2 shadow-xl"
               style={{ left: timePickerPos.left, top: timePickerPos.top }}
             >
               <div className="grid grid-cols-2 gap-2">
-                <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                <div className="max-h-56 overflow-auto rounded-lg border border-[var(--app-border)] bg-[var(--app-card)]">
                   {Array.from({ length: 24 }).map((_, i) => {
                     const h = String(i).padStart(2, "0");
                     const selected =
@@ -385,7 +385,9 @@ export function SchedulesClient({
                         }}
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
-                          selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                          selected
+                            ? "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)]"
+                            : "text-[var(--app-text-80)] hover:bg-[var(--app-hover)]",
                         ].join(" ")}
                       >
                         {h}
@@ -393,7 +395,7 @@ export function SchedulesClient({
                     );
                   })}
                 </div>
-                <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                <div className="max-h-56 overflow-auto rounded-lg border border-[var(--app-border)] bg-[var(--app-card)]">
                   {Array.from({ length: 60 }).map((_, i) => {
                     const m = String(i).padStart(2, "0");
                     const selected =
@@ -416,7 +418,9 @@ export function SchedulesClient({
                         }}
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
-                          selected ? "bg-white text-black" : "text-white/80 hover:bg-white/[0.06]",
+                          selected
+                            ? "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)]"
+                            : "text-[var(--app-text-80)] hover:bg-[var(--app-hover)]",
                         ].join(" ")}
                       >
                         {m}
