@@ -218,6 +218,30 @@ body {
   background-color: var(--app-btn-primary-bg-hover) !important;
 }
 
+.app-theme[data-theme="light"] :is(button, a).bg-white {
+  border: 1px solid var(--app-border) !important;
+  background-color: var(--app-card) !important;
+}
+
+.app-theme[data-theme="light"] :is(button, a).text-black {
+  color: var(--app-text-85) !important;
+}
+
+.app-theme[data-theme="light"] :is(button, a).hover\:bg-white\/90:hover {
+  background-color: var(--app-hover) !important;
+}
+
+.app-theme[data-theme="light"] button.bg-white:disabled {
+  background-color: var(--app-card-2) !important;
+  color: var(--app-text-60) !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+}
+
+.app-theme[data-theme="light"] button.disabled\:opacity-60:disabled {
+  opacity: 1 !important;
+}
+
 .app-theme .bg-white\/\[0\.08\] {
   background-color: var(--app-active) !important;
 }
