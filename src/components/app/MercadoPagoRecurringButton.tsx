@@ -223,7 +223,7 @@ export function MercadoPagoRecurringButton(props: {
         <button
           type="button"
           disabled={loading || !ready}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
           onClick={confirm}
         >
           {loading ? "Processando..." : "Confirmar assinatura"}
