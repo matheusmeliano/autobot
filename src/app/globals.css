@@ -81,11 +81,31 @@ body {
   --app-btn-primary-fg: #0b1220;
   --app-btn-primary-bg-hover: #b8c4d6;
   --app-option-bg: #ffffff;
+  --app-select-bg: #ffffff;
 }
 
 .app-theme {
   background: var(--app-bg);
   color: var(--app-fg);
+}
+
+.app-theme[data-theme="light"] select {
+  color-scheme: light !important;
+  background-color: var(--app-select-bg) !important;
+}
+
+.app-theme[data-theme="dark"] select,
+.app-theme[data-theme="dark"] input[type="date"] {
+  color-scheme: dark !important;
+}
+
+.app-theme[data-theme="light"] input[type="date"] {
+  color-scheme: light !important;
+}
+
+.app-theme select option {
+  background-color: var(--app-option-bg) !important;
+  color: var(--app-fg) !important;
 }
 
 @media (prefers-reduced-motion: no-preference) {
