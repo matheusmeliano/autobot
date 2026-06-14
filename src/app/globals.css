@@ -80,9 +80,9 @@ body {
   --app-btn-primary-fg: #000000;
   --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
   --app-option-bg: #070a10;
-  --app-accent-bg: rgba(99, 102, 241, 0.16);
-  --app-accent-ring: rgba(129, 140, 248, 0.22);
-  --app-accent-text: #c7d2fe;
+  --app-accent-bg: rgba(255, 255, 255, 0.06);
+  --app-accent-ring: rgba(255, 255, 255, 0.14);
+  --app-accent-text: rgba(255, 255, 255, 0.8);
   --app-warning-bg: rgba(245, 158, 11, 0.12);
   --app-warning-border: rgba(245, 158, 11, 0.3);
   --app-warning-text: #fde68a;
