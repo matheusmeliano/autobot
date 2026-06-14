@@ -244,7 +244,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen">
         <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-6">
         <aside className="hidden w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:block min-[1201px]:h-[calc(100vh-3rem)]">
-          <div className="flex h-full flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 backdrop-blur-xl">
+          <div className="flex h-full flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Logo />
@@ -303,7 +303,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ) : null}
           </div>
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 backdrop-blur-xl min-[1201px]:p-6">
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6">
             {children}
           </div>
           <div className="mt-3 flex justify-end text-xs text-[var(--app-text-35)]">
