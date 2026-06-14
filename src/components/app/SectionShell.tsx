@@ -35,7 +35,7 @@ export function SectionShell({
         <div className="mt-4">
           <Link
             href={ctaHref}
-            className="inline-flex items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-2 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)]"
+            className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
           >
             {ctaLabel}
           </Link>

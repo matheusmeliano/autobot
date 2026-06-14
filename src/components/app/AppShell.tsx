@@ -426,7 +426,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }
                 }}
                 disabled={themeGateSaving}
-                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60"
+                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
               >
                 {themeGateSaving ? "Salvando..." : "Salvar"}
               </button>

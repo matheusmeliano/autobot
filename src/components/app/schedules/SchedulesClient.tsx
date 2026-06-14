@@ -386,7 +386,7 @@ export function SchedulesClient({
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
                           selected
-                            ? "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)]"
+                            ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
                             : "text-[var(--app-text-80)] hover:bg-[var(--app-hover)]",
                         ].join(" ")}
                       >
@@ -419,7 +419,7 @@ export function SchedulesClient({
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
                           selected
-                            ? "bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-fg)]"
+                            ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
                             : "text-[var(--app-text-80)] hover:bg-[var(--app-hover)]",
                         ].join(" ")}
                       >
