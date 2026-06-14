@@ -8,6 +8,32 @@
   }
 }
 
+:root {
+  --app-bg: #070a10;
+  --app-bg-soft: rgba(7, 10, 16, 0.8);
+  --app-fg: rgb(255, 255, 255);
+  --app-text-85: rgba(255, 255, 255, 0.85);
+  --app-text-80: rgba(255, 255, 255, 0.8);
+  --app-text-70: rgba(255, 255, 255, 0.7);
+  --app-text-60: rgba(255, 255, 255, 0.6);
+  --app-text-55: rgba(255, 255, 255, 0.55);
+  --app-text-50: rgba(255, 255, 255, 0.5);
+  --app-text-45: rgba(255, 255, 255, 0.45);
+  --app-text-35: rgba(255, 255, 255, 0.35);
+  --app-text-30: rgba(255, 255, 255, 0.3);
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-card: rgba(255, 255, 255, 0.04);
+  --app-card-2: rgba(255, 255, 255, 0.03);
+  --app-active: rgba(255, 255, 255, 0.08);
+  --app-hover: rgba(255, 255, 255, 0.06);
+  --app-ring: rgba(255, 255, 255, 0.1);
+  --app-modal-bg: rgba(7, 10, 16, 0.95);
+  --app-btn-primary-bg: #ffffff;
+  --app-btn-primary-fg: #000000;
+  --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
+  --app-option-bg: #070a10;
+}
+
 html,
 body {
   height: 100%;
