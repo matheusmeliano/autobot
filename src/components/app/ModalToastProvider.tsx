@@ -21,24 +21,24 @@ function variantMeta(variant: ModalToastVariant) {
   if (variant === "success") {
     return {
       icon: CheckCircle2,
-      accent: "border-emerald-500/35 bg-emerald-500/15 text-emerald-800",
-      iconColor: "text-emerald-600",
+      accent: "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)]",
+      iconColor: "text-[var(--app-text-70)]",
       button: STANDARD_BUTTON_CLASS,
     };
   }
   if (variant === "error") {
     return {
       icon: XCircle,
-      accent: "border-rose-500/35 bg-rose-500/15 text-rose-800",
-      iconColor: "text-rose-600",
+      accent: "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)]",
+      iconColor: "text-[var(--app-text-70)]",
       button: STANDARD_BUTTON_CLASS,
     };
   }
   if (variant === "warning") {
     return {
       icon: AlertTriangle,
-      accent: "border-amber-500/35 bg-amber-500/15 text-amber-800",
-      iconColor: "text-amber-600",
+      accent: "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)]",
+      iconColor: "text-[var(--app-text-70)]",
       button: STANDARD_BUTTON_CLASS,
     };
   }
