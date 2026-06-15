@@ -30,7 +30,7 @@ export function AuthCard({
           AutoBot
         </a>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
           <div className="text-center">
             <div className="text-2xl font-semibold tracking-tight">{title}</div>
             <div className="mt-2 text-sm text-white/60">{subtitle}</div>
