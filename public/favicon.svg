@@ -4,15 +4,6 @@
       <stop offset="0%" stop-color="#6366f1" />
       <stop offset="100%" stop-color="#10b981" />
     </linearGradient>
-    <filter id="shadow-sm" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow
-        dx="0"
-        dy="1"
-        stdDeviation="1"
-        flood-color="#000000"
-        flood-opacity="0.35"
-      />
-    </filter>
   </defs>
 
   <rect
@@ -24,7 +15,6 @@
     fill="#11141A"
     stroke="#FFFFFF1A"
     stroke-width="1"
-    filter="url(#shadow-sm)"
   />
 
   <g
