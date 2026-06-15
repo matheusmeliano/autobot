@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
+import { monthlyRecurrenceLimitMaxDate } from "@/lib/recurrence";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
@@ -27,6 +28,9 @@ export type ScheduleRow = {
   status: string;
   recurrence?: string | null;
   recurrence_until?: string | null;
+  recurrence_day?: number | null;
+  recurrence_time?: string | null;
+  schedule_timezone?: string | null;
   created_at: string;
   debtor_nome: string;
   template_nome: string | null;
@@ -94,6 +98,18 @@ function splitDateTimeForInput(v: string, timeZone: BrazilTimeZone) {
   return { date, time };
 }
 
+function getMonthlyCycleConfig(row: ScheduleRow, timeZone: BrazilTimeZone) {
+  const dateTime = splitDateTimeForInput(row.data_envio, timeZone);
+  const fallbackDay = Number(dateTime.date.split("-")[2] ?? "1");
+  return {
+    day: Number.isFinite(Number(row.recurrence_day)) ? Number(row.recurrence_day) : fallbackDay,
+    time:
+      typeof row.recurrence_time === "string" && /^\d{2}:\d{2}$/.test(row.recurrence_time)
+        ? row.recurrence_time
+        : dateTime.time || "00:00",
+  };
+}
+
 export function SchedulesClient({
   initial,
   debtors,
@@ -150,6 +166,29 @@ export function SchedulesClient({
     if (!q) return rows;
     return rows.filter((r) => r.debtor_nome.toLowerCase().includes(q));
   }, [query, rows]);
+
+  const recurrenceLimitMaxDate = useMemo(() => {
+    if (!recurrenceLimitRow || String(recurrenceLimitRow.recurrence ?? "none") !== "monthly") {
+      return null;
+    }
+
+    const rowTimeZone = (recurrenceLimitRow.schedule_timezone as BrazilTimeZone | null) ?? effectiveTimeZone;
+    const siblingSchedules = rows
+      .filter(
+        (row) =>
+          row.id !== recurrenceLimitRow.id &&
+          row.debtor_id === recurrenceLimitRow.debtor_id &&
+          String(row.recurrence ?? "none") === "monthly" &&
+          String(row.status ?? "") !== "executado",
+      )
+      .map((row) => getMonthlyCycleConfig(row, rowTimeZone));
+
+    return monthlyRecurrenceLimitMaxDate({
+      currentUtcIso: recurrenceLimitRow.data_envio,
+      timeZone: rowTimeZone,
+      schedules: [getMonthlyCycleConfig(recurrenceLimitRow, rowTimeZone), ...siblingSchedules],
+    });
+  }, [effectiveTimeZone, recurrenceLimitRow, rows]);
 
   const {
     register,
@@ -383,6 +422,12 @@ export function SchedulesClient({
     const currentDate = splitDateTimeForInput(recurrenceLimitRow.data_envio, effectiveTimeZone).date;
     if (recurrenceLimitValue && recurrenceLimitValue < currentDate) {
       modalToast.warning("A data final deve ser igual ou posterior à cobrança atual.");
+      return;
+    }
+    if (recurrenceLimitValue && recurrenceLimitMaxDate && recurrenceLimitValue > recurrenceLimitMaxDate) {
+      modalToast.warning(
+        `A data final deve ser no máximo ${dateOnlyBR(recurrenceLimitMaxDate)}, sempre até um dia antes da próxima cobrança configurada.`,
+      );
       return;
     }
 
@@ -849,6 +894,8 @@ export function SchedulesClient({
               onFocus={openRecurrenceLimitDatePicker}
               onClick={openRecurrenceLimitDatePicker}
               ref={recurrenceLimitDateInputRef}
+              min={splitDateTimeForInput(recurrenceLimitRow?.data_envio ?? "", effectiveTimeZone).date || undefined}
+              max={recurrenceLimitMaxDate ?? undefined}
               className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
             />
             <button
@@ -861,7 +908,9 @@ export function SchedulesClient({
             </button>
           </div>
           <div className="mt-2 text-[11px] text-white/45">
-            Se deixar em branco, a cobrança mensal continua sem limite.
+            {recurrenceLimitMaxDate
+              ? `Você pode definir até ${dateOnlyBR(recurrenceLimitMaxDate)}. Se deixar em branco, a cobrança mensal continua sem limite.`
+              : "Se deixar em branco, a cobrança mensal continua sem limite."}
           </div>
         </div>
 

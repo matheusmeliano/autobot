@@ -14,7 +14,7 @@ export default async function AgendarPage() {
     supabase
       .from("schedules")
       .select(
-        "id, debtor_id, template_id, data_envio, status, recurrence, recurrence_until, created_at, debtors(nome), message_templates(nome)",
+        "id, debtor_id, template_id, data_envio, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, created_at, debtors(nome), message_templates(nome)",
       )
       .order("data_envio", { ascending: true })
       .limit(200),
@@ -49,6 +49,9 @@ export default async function AgendarPage() {
       status: r.status,
       recurrence: r.recurrence ?? "none",
       recurrence_until: r.recurrence_until ?? null,
+      recurrence_day: r.recurrence_day ?? null,
+      recurrence_time: r.recurrence_time ?? null,
+      schedule_timezone: r.schedule_timezone ?? null,
       created_at: r.created_at,
       debtor_nome: r.debtors?.nome ?? "-",
       template_nome: r.message_templates?.nome ?? null,
