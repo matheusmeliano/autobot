@@ -6,7 +6,7 @@ import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   localDateInTimeZone,
-  monthlyRecurrenceLimitMaxDate,
+  monthlyRecurrenceLimitMinDate,
   nextMonthlyIso,
   shouldContinueMonthlyRecurrence,
 } from "@/lib/recurrence";
@@ -80,15 +80,13 @@ async function validateMonthlyRecurrenceLimit(params: {
     return "A data final da cobrança mensal deve ser igual ou posterior à cobrança atual.";
   }
 
-  const cycleEndDate = monthlyRecurrenceLimitMaxDate({
+  const minDate = monthlyRecurrenceLimitMinDate({
     currentUtcIso: params.currentUtcIso,
     timeZone: params.timeZone,
-    day: params.currentSchedule.day,
-    time: params.currentSchedule.time,
   });
 
-  if (cycleEndDate && params.recurrenceUntil < cycleEndDate) {
-    return `A data final da cobrança mensal deve ser no mínimo ${formatDateBR(cycleEndDate)}, sempre até um dia antes da próxima cobrança.`;
+  if (minDate && params.recurrenceUntil < minDate) {
+    return `A data final da cobrança mensal deve ser no mínimo ${formatDateBR(minDate)}, sempre a partir do próximo mês.`;
   }
 
   return null;

@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
-import { monthlyRecurrenceLimitMaxDate } from "@/lib/recurrence";
+import { monthlyRecurrenceLimitMinDate } from "@/lib/recurrence";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
@@ -175,19 +175,15 @@ export function SchedulesClient({
     return rows.filter((r) => r.debtor_nome.toLowerCase().includes(q));
   }, [query, rows]);
 
-  const recurrenceLimitCycleEndDate = useMemo(() => {
+  const recurrenceLimitMinDate = useMemo(() => {
     if (!recurrenceLimitRow || String(recurrenceLimitRow.recurrence ?? "none") !== "monthly") {
       return null;
     }
 
     const rowTimeZone = (recurrenceLimitRow.schedule_timezone as BrazilTimeZone | null) ?? effectiveTimeZone;
-    const cfg = getMonthlyCycleConfig(recurrenceLimitRow, rowTimeZone);
-
-    return monthlyRecurrenceLimitMaxDate({
+    return monthlyRecurrenceLimitMinDate({
       currentUtcIso: recurrenceLimitRow.data_envio,
       timeZone: rowTimeZone,
-      day: cfg.day,
-      time: cfg.time,
     });
   }, [effectiveTimeZone, recurrenceLimitRow, rows]);
 
@@ -509,9 +505,9 @@ export function SchedulesClient({
       modalToast.warning("A data final deve ser igual ou posterior à cobrança atual.");
       return;
     }
-    if (recurrenceLimitValue && recurrenceLimitCycleEndDate && recurrenceLimitValue < recurrenceLimitCycleEndDate) {
+    if (recurrenceLimitValue && recurrenceLimitMinDate && recurrenceLimitValue < recurrenceLimitMinDate) {
       modalToast.warning(
-        `A data final deve ser no mínimo ${dateOnlyBR(recurrenceLimitCycleEndDate)}, sempre até um dia antes da próxima cobrança.`,
+        `A data final deve ser no mínimo ${dateOnlyBR(recurrenceLimitMinDate)}, sempre a partir do próximo mês.`,
       );
       return;
     }
@@ -1137,7 +1133,7 @@ export function SchedulesClient({
               onFocus={openRecurrenceLimitDatePicker}
               onClick={openRecurrenceLimitDatePicker}
               ref={recurrenceLimitDateInputRef}
-              min={recurrenceLimitCycleEndDate ?? undefined}
+              min={recurrenceLimitMinDate ?? undefined}
               className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
             />
             <button
@@ -1158,8 +1154,8 @@ export function SchedulesClient({
             Remover limite
           </button>
           <div className="mt-2 text-[11px] text-white/45">
-            {recurrenceLimitCycleEndDate
-              ? `Mínimo: ${dateOnlyBR(recurrenceLimitCycleEndDate)}. Se deixar em branco, a cobrança mensal continua sem limite.`
+            {recurrenceLimitMinDate
+              ? `Mínimo: ${dateOnlyBR(recurrenceLimitMinDate)}. No próximo mês, todos os dias ficam disponíveis. Se deixar em branco, a cobrança mensal continua sem limite.`
               : "Se deixar em branco, a cobrança mensal continua sem limite."}
           </div>
         </div>

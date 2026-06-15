@@ -76,17 +76,24 @@ export function nextMonthlyIso(params: {
   });
 }
 
-export function monthlyRecurrenceLimitMaxDate(params: {
+export function monthlyRecurrenceLimitMinDate(params: {
   currentUtcIso: string;
   timeZone: string;
-  day: number;
-  time: string;
 }) {
-  const nextIso = nextMonthlyIso({
-    fromUtcIso: params.currentUtcIso,
+  const base = new Date(params.currentUtcIso);
+  if (Number.isNaN(base.getTime())) throw new Error("Data inválida");
+
+  const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: params.timeZone,
-    day: params.day,
-    time: params.time,
+    year: "numeric",
+    month: "2-digit",
   });
-  return subtractOneDayFromLocalDate(localDateInTimeZone(nextIso, params.timeZone));
+  const p = partsToMap(fmt.formatToParts(base));
+  const y = Number(p.year);
+  const m = Number(p.month);
+  if (!y || !m) throw new Error("Data inválida");
+
+  const nextY = m === 12 ? y + 1 : y;
+  const nextM = m === 12 ? 1 : m + 1;
+  return `${String(nextY).padStart(4, "0")}-${String(nextM).padStart(2, "0")}-01`;
 }
