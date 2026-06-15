@@ -149,7 +149,6 @@ body {
 .app-theme[data-theme="light"] select:focus,
 .app-theme[data-theme="light"] select:focus-visible {
   outline: none !important;
-  box-shadow: none !important;
   border-color: var(--app-border) !important;
 }
 
@@ -179,7 +178,7 @@ body {
   .app-theme.theme-ready *::after {
     transition-duration: 180ms;
     transition-timing-function: ease;
-    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-property: background-color, border-color, color, fill, stroke;
   }
 }
 
