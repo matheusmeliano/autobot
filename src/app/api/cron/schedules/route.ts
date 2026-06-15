@@ -250,7 +250,7 @@ export async function GET(req: Request) {
         await supabase.from("schedule_runs").insert({
           user_id: userId,
           schedule_id: scheduleId,
-          scheduled_for,
+          scheduled_for: scheduledFor,
           executed_at: nowIso,
           status: "falha",
           error: msg,
