@@ -352,7 +352,10 @@ export function SchedulesClient({
         time: values.data_envio_time,
         timeZone: effectiveTimeZone,
       });
-      if (new Date(iso).getTime() < Date.now() + 3 * 60 * 1000) {
+      const nowRounded = new Date();
+      nowRounded.setSeconds(0, 0);
+      const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
+      if (new Date(iso).getTime() < minAllowed) {
         modalToast.error("Escolha um horário futuro válido (mínimo +3 minutos).");
         return;
       }
@@ -368,7 +371,10 @@ export function SchedulesClient({
             time: c.time,
             timeZone: effectiveTimeZone,
           });
-          if (new Date(iso).getTime() < Date.now() + 3 * 60 * 1000) {
+          const nowRounded = new Date();
+          nowRounded.setSeconds(0, 0);
+          const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
+          if (new Date(iso).getTime() < minAllowed) {
             modalToast.error("Escolha um horário futuro válido (mínimo +3 minutos).");
             return;
           }

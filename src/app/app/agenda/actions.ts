@@ -214,7 +214,10 @@ export async function createScheduleAction(input: unknown) {
     return { ok: false, error: "Data/hora inválida." };
   }
 
-  if (new Date(dataEnvioIso).getTime() < Date.now() + 3 * 60 * 1000) {
+  const nowRounded = new Date();
+  nowRounded.setSeconds(0, 0);
+  const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
+  if (new Date(dataEnvioIso).getTime() < minAllowed) {
     return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
   }
 
@@ -295,7 +298,10 @@ export async function updateScheduleAction(input: unknown) {
     return { ok: false, error: "Data/hora inválida." };
   }
 
-  if (new Date(dataEnvioIso).getTime() < Date.now() + 3 * 60 * 1000) {
+  const nowRounded = new Date();
+  nowRounded.setSeconds(0, 0);
+  const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
+  if (new Date(dataEnvioIso).getTime() < minAllowed) {
     return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
   }
 
