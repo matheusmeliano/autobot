@@ -72,15 +72,15 @@ function statusToLabel(status: string) {
 function statusBadgeClassName(status: string) {
   const s = status.trim().toLowerCase();
   if (s === "executado") {
-    return "border-[var(--app-success-border)] bg-[var(--app-success-bg)] text-[var(--app-success-text)]";
+    return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-success-text)]";
   }
   if (s === "cancelado") {
-    return "border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] text-[var(--app-danger-text)]";
+    return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-danger-text)]";
   }
   if (s === "pausado") {
-    return "border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] text-[var(--app-warning-text)]";
+    return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-warning-text)]";
   }
-  return "border-[var(--app-accent-ring)] bg-[var(--app-accent-bg)] text-[var(--app-accent-text)]";
+  return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-accent-text)]";
 }
 
 export function DashboardClient({
