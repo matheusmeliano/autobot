@@ -119,6 +119,7 @@ export function SchedulesClient({
   const [recurrenceLimitValue, setRecurrenceLimitValue] = useState("");
   const [savingRecurrenceLimit, setSavingRecurrenceLimit] = useState(false);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const recurrenceLimitDateInputRef = useRef<HTMLInputElement | null>(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement | null>(null);
   const timePickerPanelRef = useRef<HTMLDivElement | null>(null);
@@ -412,6 +413,10 @@ export function SchedulesClient({
   const openDatePicker = () => {
     dateInputRef.current?.showPicker?.();
     dateInputRef.current?.focus();
+  };
+  const openRecurrenceLimitDatePicker = () => {
+    recurrenceLimitDateInputRef.current?.showPicker?.();
+    recurrenceLimitDateInputRef.current?.focus();
   };
   const openTimePicker = () => {
     const rect = timeInputBoxRef.current?.getBoundingClientRect();
@@ -841,11 +846,19 @@ export function SchedulesClient({
               type="date"
               value={recurrenceLimitValue}
               onChange={(e) => setRecurrenceLimitValue(e.target.value)}
+              onFocus={openRecurrenceLimitDatePicker}
+              onClick={openRecurrenceLimitDatePicker}
+              ref={recurrenceLimitDateInputRef}
               className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/80">
+            <button
+              type="button"
+              onClick={openRecurrenceLimitDatePicker}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+              aria-label="Selecionar data final"
+            >
               <Calendar className="h-4 w-4" />
-            </span>
+            </button>
           </div>
           <div className="mt-2 text-[11px] text-white/45">
             Se deixar em branco, a cobrança mensal continua sem limite.
