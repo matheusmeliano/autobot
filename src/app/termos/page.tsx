@@ -16,7 +16,7 @@ export default function TermosPage() {
         <div className="absolute left-[-240px] top-[520px] h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),rgba(59,130,246,0)_55%)]" />
       </div>
 
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#070A10]/60 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#070A10]/60">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
             <Logo />

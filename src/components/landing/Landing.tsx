@@ -200,7 +200,7 @@ export function Landing() {
       <header className="sticky top-0 z-30">
         <Container>
           <div className="pt-8 pb-5">
-            <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5 backdrop-blur-xl">
+            <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5">
               <Link href="/" className="flex items-center gap-2">
                 <Logo />
                 <div className="text-sm font-semibold tracking-tight text-black">

@@ -348,7 +348,7 @@ export function AppShell({
         </div>
       </div>
 
-        <div className="fixed inset-x-0 bottom-0 border-t border-[var(--app-border)] bg-[var(--app-bg-soft)] backdrop-blur-xl min-[1201px]:hidden">
+        <div className="fixed inset-x-0 bottom-0 border-t border-[var(--app-border)] bg-[var(--app-bg-soft)] min-[1201px]:hidden">
         <AppNav variant="bottom" restricted={restricted} plan={plan} />
       </div>
 
