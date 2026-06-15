@@ -66,7 +66,7 @@ export default async function AdminLayout({
         userId={user.id}
         initialTheme={initialTheme}
       />
-      <div className="min-h-screen bg-[#070A10] text-white">
+      <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-fg)]">
       <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-6">
         <aside className="hidden w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:block min-[1201px]:h-[calc(100vh-3rem)]">
           <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4">
