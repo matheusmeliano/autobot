@@ -640,7 +640,7 @@ export function SchedulesClient({
                             savingRecurrenceLimit
                           }
                           className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
-                          title="Pagamento Realizado"
+                          title="Pagamento realizado"
                         >
                           <Check className="h-4 w-4" />
                         </button>
