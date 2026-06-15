@@ -845,8 +845,11 @@ export function SchedulesClient({
               type="date"
               value={recurrenceLimitValue}
               onChange={(e) => setRecurrenceLimitValue(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
             />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/80">
+              <Calendar className="h-4 w-4" />
+            </span>
           </div>
           <div className="mt-2 text-[11px] text-white/45">
             Se deixar em branco, a cobrança mensal continua sem limite.
