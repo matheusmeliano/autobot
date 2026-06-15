@@ -1,5 +1,6 @@
 "use server";
 
+import fs from "node:fs";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -10,6 +11,40 @@ import {
   nextMonthlyIso,
   shouldContinueMonthlyRecurrence,
 } from "@/lib/recurrence";
+
+// #region debug-point extra-send-manual-bootstrap
+const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
+const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
+const __dbgMap = Object.fromEntries(
+  __dbgEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
+const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
+const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  if (!__dbgUrl || !__dbgSession) return;
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre",
+      hypothesisId,
+      traceId,
+      location: "app/app/agenda/actions",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
 
 function prereqError(params: {
   missingTimeZone: boolean;
@@ -408,6 +443,10 @@ export async function updateScheduleRecurrenceUntilAction(input: unknown) {
 }
 
 export async function triggerScheduleNowAction(id: string) {
+  const __dbgTraceId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // #region debug-point extra-send-manual-entry
+  __dbg(__dbgTraceId, "D", "manual-trigger-entry", { id });
+  // #endregion
   const supabase = await createSupabaseServerClient();
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
@@ -443,6 +482,17 @@ export async function triggerScheduleNowAction(id: string) {
   if (error) return { ok: false, error: error.message };
   if (!schedule?.id) return { ok: false, error: "Agendamento não encontrado." };
   if (String((schedule as any).user_id) !== userId) return { ok: false, error: "Sem permissão." };
+
+  // #region debug-point extra-send-manual-schedule
+  __dbg(__dbgTraceId, "B", "manual-trigger-loaded-schedule", {
+    scheduleId: String((schedule as any).id ?? ""),
+    userId,
+    debtorId: String((schedule as any).debtor_id ?? ""),
+    status: String((schedule as any).status ?? ""),
+    recurrence: String((schedule as any).recurrence ?? ""),
+    scheduledFor: String((schedule as any).data_envio ?? ""),
+  });
+  // #endregion
 
   const currentStatus = String((schedule as any).status ?? "");
   if (currentStatus === "executado") {
@@ -519,6 +569,13 @@ export async function triggerScheduleNowAction(id: string) {
       .maybeSingle();
 
     if (existingRun?.id) {
+      // #region debug-point extra-send-manual-existing-run
+      __dbg(__dbgTraceId, "D", "manual-existing-run-skip-send", {
+        scheduleId,
+        scheduledFor,
+        nextState,
+      });
+      // #endregion
       await admin.from("schedules").update(nextState).eq("id", scheduleId);
       return { ok: true };
     }
@@ -530,6 +587,16 @@ export async function triggerScheduleNowAction(id: string) {
       vencimento: formatDateBR(debtor?.vencimento),
     });
 
+    // #region debug-point extra-send-manual-before-send
+    __dbg(__dbgTraceId, "D", "manual-before-send", {
+      scheduleId,
+      scheduledFor,
+      debtorPhone,
+      normalizedPhone: normalizePhone(debtorPhone),
+      messagePreview: message.slice(0, 120),
+      nextState,
+    });
+    // #endregion
     await sendZapiText({
       instance_id: wa.instance_id,
       token: wa.token,
@@ -555,6 +622,13 @@ export async function triggerScheduleNowAction(id: string) {
       tipo: "agenda_executada",
       descricao: `Agendamento executado: ${scheduleId}`,
     });
+    // #region debug-point extra-send-manual-success
+    __dbg(__dbgTraceId, "D", "manual-send-success", {
+      scheduleId,
+      scheduledFor,
+      nextState,
+    });
+    // #endregion
     return { ok: true };
   } catch (e: any) {
     const msg = String(e?.message ?? "Erro desconhecido");
@@ -586,6 +660,15 @@ export async function triggerScheduleNowAction(id: string) {
     if (!wasExecuted.data?.id) {
       await admin.from("schedules").update({ status: "agendado" }).eq("id", scheduleId);
     }
+    // #region debug-point extra-send-manual-error
+    __dbg(__dbgTraceId, "D", "manual-send-error", {
+      scheduleId,
+      scheduledFor,
+      error: msg,
+      recurrence,
+      wasExecuted: Boolean(wasExecuted.data?.id),
+    });
+    // #endregion
     return { ok: false, error: msg };
   }
 }

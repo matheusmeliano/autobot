@@ -1,5 +1,41 @@
+import fs from "node:fs";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { nextMonthlyIso, shouldContinueMonthlyRecurrence } from "@/lib/recurrence";
+
+// #region debug-point extra-send-cron-bootstrap
+const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
+const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
+const __dbgMap = Object.fromEntries(
+  __dbgEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
+const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
+const __dbgTraceId = `cron-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const __dbg = (hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  if (!__dbgUrl || !__dbgSession) return;
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre",
+      hypothesisId,
+      traceId: __dbgTraceId,
+      location: "api/cron/schedules",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
 
 function normalizePhone(phone: string) {
   const d = phone.replace(/\D/g, "");
@@ -103,6 +139,14 @@ export async function GET(req: Request) {
 
   const supabase = createSupabaseAdminClient();
   const nowIso = new Date().toISOString();
+  // #region debug-point extra-send-cron-entry
+  __dbg("A", "cron-entry", {
+    nowIso,
+    method: req.method,
+    deployment,
+    authHeader: req.headers.get("authorization") ? "present" : "absent",
+  });
+  // #endregion
 
   const { data: schedules, error } = await supabase
     .from("schedules")
@@ -115,8 +159,27 @@ export async function GET(req: Request) {
     .limit(100);
 
   if (error) {
+    // #region debug-point extra-send-cron-query-error
+    __dbg("E", "cron-query-error", { nowIso, error: error.message });
+    // #endregion
     return Response.json({ ok: false, error: error.message, deployment }, { status: 500 });
   }
+
+  // #region debug-point extra-send-cron-query
+  __dbg("E", "cron-query-result", {
+    nowIso,
+    found: schedules?.length ?? 0,
+    schedules: (schedules ?? []).map((item: any) => ({
+      id: String(item?.id ?? ""),
+      user_id: String(item?.user_id ?? ""),
+      debtor_id: String(item?.debtor_id ?? ""),
+      status: String(item?.status ?? ""),
+      recurrence: String(item?.recurrence ?? ""),
+      data_envio: String(item?.data_envio ?? ""),
+      recurrence_until: String(item?.recurrence_until ?? ""),
+    })),
+  });
+  // #endregion
 
   const results: Array<{ id: string; ok: boolean; error?: string }> = [];
 
@@ -128,6 +191,18 @@ export async function GET(req: Request) {
     try {
       const debtor = (s as any).debtors ?? null;
       const template = (s as any).message_templates ?? null;
+
+      // #region debug-point extra-send-cron-item
+      __dbg("B", "cron-item-processing", {
+        scheduleId,
+        userId,
+        scheduledFor,
+        currentStatus: String((s as any).status ?? ""),
+        recurrence: String((s as any).recurrence ?? ""),
+        debtorId: String((s as any).debtor_id ?? ""),
+        debtorPhone: String(debtor?.telefone ?? ""),
+      });
+      // #endregion
 
       const debtorPhone = String(debtor?.telefone ?? "");
       const templateText = String(template?.conteudo ?? "");
@@ -145,6 +220,9 @@ export async function GET(req: Request) {
 
       if (lockErr) throw new Error(lockErr.message);
       if (!locked?.id) {
+        // #region debug-point extra-send-cron-lock-skip
+        __dbg("D", "cron-lock-skip", { scheduleId, scheduledFor });
+        // #endregion
         results.push({ id: scheduleId, ok: true });
         continue;
       }
@@ -194,6 +272,14 @@ export async function GET(req: Request) {
         .maybeSingle();
 
       if (existingRun?.id) {
+        // #region debug-point extra-send-cron-existing-run
+        __dbg("D", "cron-existing-run-skip-send", {
+          scheduleId,
+          scheduledFor,
+          existingRunId: String(existingRun.id),
+          nextState,
+        });
+        // #endregion
         await supabase.from("schedules").update(nextState).eq("id", scheduleId);
         results.push({ id: scheduleId, ok: true });
         continue;
@@ -207,6 +293,17 @@ export async function GET(req: Request) {
       });
 
       let messageSent = false;
+      // #region debug-point extra-send-cron-before-send
+      __dbg("A", "cron-before-send", {
+        scheduleId,
+        userId,
+        scheduledFor,
+        debtorPhone,
+        normalizedPhone: normalizePhone(debtorPhone),
+        messagePreview: message.slice(0, 120),
+        nextState,
+      });
+      // #endregion
       await sendZapiText({
         instance_id: wa.instance_id,
         token: wa.token,
@@ -227,6 +324,15 @@ export async function GET(req: Request) {
 
       const { error: updateError } = await supabase.from("schedules").update(nextState).eq("id", scheduleId);
       if (updateError) throw new Error(updateError.message);
+
+      // #region debug-point extra-send-cron-success
+      __dbg("C", "cron-send-success", {
+        scheduleId,
+        scheduledFor,
+        nextState,
+        messageSent,
+      });
+      // #endregion
 
       await supabase.from("logs").insert({
         user_id: userId,
@@ -267,7 +373,24 @@ export async function GET(req: Request) {
           .from("schedules")
           .update({ status: "agendado", data_envio: retryAt })
           .eq("id", scheduleId);
+        // #region debug-point extra-send-cron-retry
+        __dbg("D", "cron-retry-scheduled", {
+          scheduleId,
+          scheduledFor,
+          retryAt,
+          error: msg,
+        });
+        // #endregion
       }
+      // #region debug-point extra-send-cron-error
+      __dbg("C", "cron-send-error", {
+        scheduleId,
+        scheduledFor,
+        error: msg,
+        recurrence,
+        wasExecuted: Boolean(wasExecuted.data?.id),
+      });
+      // #endregion
       results.push({ id: scheduleId, ok: false, error: msg });
     }
   }
