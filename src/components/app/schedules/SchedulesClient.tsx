@@ -136,10 +136,18 @@ export function SchedulesClient({
   const [savingRecurrenceLimit, setSavingRecurrenceLimit] = useState(false);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const recurrenceLimitDateInputRef = useRef<HTMLInputElement | null>(null);
+  const [monthlyExtras, setMonthlyExtras] = useState<Array<{ date: string; time: string }>>([]);
+  const extraDateInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const extraTimeInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const extraTimeAnchorRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
-  const timePickerRef = useRef<HTMLDivElement | null>(null);
+  const timePickerAnchorRef = useRef<HTMLDivElement | null>(null);
+  const mainTimeAnchorRef = useRef<HTMLDivElement | null>(null);
   const timePickerPanelRef = useRef<HTMLDivElement | null>(null);
   const timeInputBoxRef = useRef<HTMLInputElement | null>(null);
+  const [timePickerTarget, setTimePickerTarget] = useState<
+    { kind: "main" } | { kind: "extra"; index: number } | null
+  >(null);
   const [timePickerPos, setTimePickerPos] = useState<{ left: number; top: number } | null>(
     null,
   );
@@ -167,26 +175,19 @@ export function SchedulesClient({
     return rows.filter((r) => r.debtor_nome.toLowerCase().includes(q));
   }, [query, rows]);
 
-  const recurrenceLimitMaxDate = useMemo(() => {
+  const recurrenceLimitCycleEndDate = useMemo(() => {
     if (!recurrenceLimitRow || String(recurrenceLimitRow.recurrence ?? "none") !== "monthly") {
       return null;
     }
 
     const rowTimeZone = (recurrenceLimitRow.schedule_timezone as BrazilTimeZone | null) ?? effectiveTimeZone;
-    const siblingSchedules = rows
-      .filter(
-        (row) =>
-          row.id !== recurrenceLimitRow.id &&
-          row.debtor_id === recurrenceLimitRow.debtor_id &&
-          String(row.recurrence ?? "none") === "monthly" &&
-          String(row.status ?? "") !== "executado",
-      )
-      .map((row) => getMonthlyCycleConfig(row, rowTimeZone));
+    const cfg = getMonthlyCycleConfig(recurrenceLimitRow, rowTimeZone);
 
     return monthlyRecurrenceLimitMaxDate({
       currentUtcIso: recurrenceLimitRow.data_envio,
       timeZone: rowTimeZone,
-      schedules: [getMonthlyCycleConfig(recurrenceLimitRow, rowTimeZone), ...siblingSchedules],
+      day: cfg.day,
+      time: cfg.time,
     });
   }, [effectiveTimeZone, recurrenceLimitRow, rows]);
 
@@ -210,11 +211,40 @@ export function SchedulesClient({
   });
 
   const timeValue = watch("data_envio_time");
+  const recurrenceValue = watch("recurrence");
+
+  const currentTimeForPicker = useMemo(() => {
+    if (!timePickerTarget) return "";
+    if (timePickerTarget.kind === "main") return typeof timeValue === "string" ? timeValue : "";
+    return monthlyExtras[timePickerTarget.index]?.time ?? "";
+  }, [monthlyExtras, timePickerTarget, timeValue]);
+
+  useEffect(() => {
+    if (recurrenceValue !== "monthly" && monthlyExtras.length > 0) {
+      setMonthlyExtras([]);
+    }
+  }, [monthlyExtras.length, recurrenceValue]);
+
+  const setTimeForTarget = (next: string, closeAfter = false) => {
+    if (!timePickerTarget) return;
+    if (timePickerTarget.kind === "main") {
+      setValue("data_envio_time", next, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+    } else {
+      const idx = timePickerTarget.index;
+      setMonthlyExtras((prev) => prev.map((c, i) => (i === idx ? { ...c, time: next } : c)));
+    }
+    if (closeAfter) {
+      setTimePickerOpen(false);
+      setTimePickerTarget(null);
+    }
+  };
 
   const close = () => {
     setOpen(false);
     setEditing(null);
     setTimePickerOpen(false);
+    setTimePickerTarget(null);
+    setMonthlyExtras([]);
     reset({
       debtor_id: "",
       template_id: "",
@@ -251,6 +281,7 @@ export function SchedulesClient({
     }
     setEditing(row);
     setOpen(true);
+    setMonthlyExtras([]);
     const dt = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
     reset({
       id: row.id,
@@ -284,6 +315,14 @@ export function SchedulesClient({
     if (!values.data_envio_date || !values.data_envio_time) {
       modalToast.warning("Selecione a data e a hora.");
       return;
+    }
+    if (values.recurrence === "monthly") {
+      for (const [i, c] of monthlyExtras.entries()) {
+        if (!c.date || !c.time) {
+          modalToast.warning(`Preencha data e hora da cobrança adicional ${i + 1}.`);
+          return;
+        }
+      }
     }
 
     const payload = {
@@ -321,6 +360,24 @@ export function SchedulesClient({
       modalToast.warning("Data/hora inválida.");
       return;
     }
+    if (values.recurrence === "monthly") {
+      try {
+        for (const c of monthlyExtras) {
+          const iso = zonedDateTimeToUtcIso({
+            date: c.date,
+            time: c.time,
+            timeZone: effectiveTimeZone,
+          });
+          if (new Date(iso).getTime() < Date.now() + 3 * 60 * 1000) {
+            modalToast.error("Escolha um horário futuro válido (mínimo +3 minutos).");
+            return;
+          }
+        }
+      } catch {
+        modalToast.warning("Data/hora inválida.");
+        return;
+      }
+    }
 
     const res = editing
       ? await updateScheduleAction(payload)
@@ -329,6 +386,24 @@ export function SchedulesClient({
     if (!res.ok) {
       modalToast.error(res.error ?? "Falha ao salvar.");
       return;
+    }
+
+    if (values.recurrence === "monthly" && monthlyExtras.length > 0) {
+      for (const c of monthlyExtras) {
+        const extraRes = await createScheduleAction({
+          debtor_id: values.debtor_id,
+          template_id: values.template_id ? values.template_id : undefined,
+          data_envio_date: c.date,
+          data_envio_time: c.time,
+          recurrence: "monthly",
+          recurrence_until: values.recurrence_until ? values.recurrence_until : undefined,
+          status: values.status || "agendado",
+        });
+        if (!extraRes.ok) {
+          modalToast.error(extraRes.error ?? "Falha ao salvar cobrança adicional.");
+          break;
+        }
+      }
     }
 
     modalToast.success(editing ? "Agendamento atualizado." : "Agendamento criado.");
@@ -424,9 +499,9 @@ export function SchedulesClient({
       modalToast.warning("A data final deve ser igual ou posterior à cobrança atual.");
       return;
     }
-    if (recurrenceLimitValue && recurrenceLimitMaxDate && recurrenceLimitValue > recurrenceLimitMaxDate) {
+    if (recurrenceLimitValue && recurrenceLimitCycleEndDate && recurrenceLimitValue < recurrenceLimitCycleEndDate) {
       modalToast.warning(
-        `A data final deve ser no máximo ${dateOnlyBR(recurrenceLimitMaxDate)}, sempre até um dia antes da próxima cobrança configurada.`,
+        `A data final deve ser no mínimo ${dateOnlyBR(recurrenceLimitCycleEndDate)}, sempre até um dia antes da próxima cobrança.`,
       );
       return;
     }
@@ -459,12 +534,20 @@ export function SchedulesClient({
     dateInputRef.current?.showPicker?.();
     dateInputRef.current?.focus();
   };
+  const openExtraDatePicker = (index: number) => {
+    extraDateInputRefs.current[index]?.showPicker?.();
+    extraDateInputRefs.current[index]?.focus();
+  };
   const openRecurrenceLimitDatePicker = () => {
     recurrenceLimitDateInputRef.current?.showPicker?.();
     recurrenceLimitDateInputRef.current?.focus();
   };
-  const openTimePicker = () => {
-    const rect = timeInputBoxRef.current?.getBoundingClientRect();
+  const openTimePicker = (params: {
+    target: { kind: "main" } | { kind: "extra"; index: number };
+    inputEl: HTMLInputElement | null;
+    anchorEl: HTMLDivElement | null;
+  }) => {
+    const rect = params.inputEl?.getBoundingClientRect();
     if (!rect) return;
 
     const pickerWidth = 260;
@@ -480,27 +563,46 @@ export function SchedulesClient({
 
     setTimePickerPos({ left, top });
     setTimePickerOpen(true);
+    setTimePickerTarget(params.target);
+    timePickerAnchorRef.current = params.anchorEl;
   };
 
   useLayoutEffect(() => {
     if (!timePickerOpen) return;
-    const onUpdate = () => openTimePicker();
+    const onUpdate = () => {
+      if (!timePickerTarget) return;
+      if (timePickerTarget.kind === "main") {
+        openTimePicker({
+          target: timePickerTarget,
+          inputEl: timeInputBoxRef.current,
+          anchorEl: mainTimeAnchorRef.current,
+        });
+        return;
+      }
+      const idx = timePickerTarget.index;
+      openTimePicker({
+        target: timePickerTarget,
+        inputEl: extraTimeInputRefs.current[idx] ?? null,
+        anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+      });
+    };
     window.addEventListener("resize", onUpdate);
     window.addEventListener("scroll", onUpdate, true);
     return () => {
       window.removeEventListener("resize", onUpdate);
       window.removeEventListener("scroll", onUpdate, true);
     };
-  }, [timePickerOpen]);
+  }, [timePickerOpen, timePickerTarget]);
 
   useEffect(() => {
     if (!timePickerOpen) return;
     const onPointerDown = (e: Event) => {
       const t = e.target as Node | null;
       if (!t) return;
-      if (timePickerRef.current?.contains(t)) return;
+      if (timePickerAnchorRef.current?.contains(t)) return;
       if (timePickerPanelRef.current?.contains(t)) return;
       setTimePickerOpen(false);
+      setTimePickerTarget(null);
     };
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("touchstart", onPointerDown);
@@ -524,21 +626,17 @@ export function SchedulesClient({
                   {Array.from({ length: 24 }).map((_, i) => {
                     const h = String(i).padStart(2, "0");
                     const selected =
-                      typeof timeValue === "string" && timeValue.slice(0, 2) === h;
+                      typeof currentTimeForPicker === "string" && currentTimeForPicker.slice(0, 2) === h;
                     return (
                       <button
                         key={h}
                         type="button"
                         onClick={() => {
                           const m =
-                            typeof timeValue === "string" && timeValue.length >= 5
-                              ? timeValue.slice(3, 5)
+                            typeof currentTimeForPicker === "string" && currentTimeForPicker.length >= 5
+                              ? currentTimeForPicker.slice(3, 5)
                               : "00";
-                          setValue("data_envio_time", `${h}:${m}`, {
-                            shouldDirty: true,
-                            shouldTouch: true,
-                            shouldValidate: true,
-                          });
+                          setTimeForTarget(`${h}:${m}`);
                         }}
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
@@ -556,22 +654,17 @@ export function SchedulesClient({
                   {Array.from({ length: 60 }).map((_, i) => {
                     const m = String(i).padStart(2, "0");
                     const selected =
-                      typeof timeValue === "string" && timeValue.slice(3, 5) === m;
+                      typeof currentTimeForPicker === "string" && currentTimeForPicker.slice(3, 5) === m;
                     return (
                       <button
                         key={m}
                         type="button"
                         onClick={() => {
                           const h =
-                            typeof timeValue === "string" && timeValue.length >= 2
-                              ? timeValue.slice(0, 2)
+                            typeof currentTimeForPicker === "string" && currentTimeForPicker.length >= 2
+                              ? currentTimeForPicker.slice(0, 2)
                               : "00";
-                          setValue("data_envio_time", `${h}:${m}`, {
-                            shouldDirty: true,
-                            shouldTouch: true,
-                            shouldValidate: true,
-                          });
-                          setTimePickerOpen(false);
+                          setTimeForTarget(`${h}:${m}`, true);
                         }}
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
@@ -830,21 +923,39 @@ export function SchedulesClient({
                   <div className="text-xs font-semibold text-white/60">
                     Hora
                   </div>
-                  <div className="relative mt-2" ref={timePickerRef}>
+                  <div className="relative mt-2" ref={mainTimeAnchorRef}>
                     <input type="hidden" {...timeField} />
                     <input
                       type="text"
                       readOnly
                       value={timeValue || ""}
                       placeholder="--:--"
-                      onFocus={openTimePicker}
-                      onClick={openTimePicker}
+                      onFocus={() =>
+                        openTimePicker({
+                          target: { kind: "main" },
+                          inputEl: timeInputBoxRef.current,
+                          anchorEl: mainTimeAnchorRef.current,
+                        })
+                      }
+                      onClick={() =>
+                        openTimePicker({
+                          target: { kind: "main" },
+                          inputEl: timeInputBoxRef.current,
+                          anchorEl: mainTimeAnchorRef.current,
+                        })
+                      }
                       ref={timeInputBoxRef}
                       className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
                     />
                     <button
                       type="button"
-                      onClick={openTimePicker}
+                      onClick={() =>
+                        openTimePicker({
+                          target: { kind: "main" },
+                          inputEl: timeInputBoxRef.current,
+                          anchorEl: mainTimeAnchorRef.current,
+                        })
+                      }
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
                       aria-label="Selecionar hora"
                     >
@@ -853,6 +964,125 @@ export function SchedulesClient({
                   </div>
                 </div>
               </div>
+
+              {recurrenceValue === "monthly" ? (
+                <div className="mt-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMonthlyExtras((prev) => [
+                          ...prev,
+                          { date: String(watch("data_envio_date") ?? ""), time: String(watch("data_envio_time") ?? "") },
+                        ])
+                      }
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/[0.06]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Adicionar
+                    </button>
+                  </div>
+
+                  {monthlyExtras.length > 0 ? (
+                    <div className="mt-3 grid gap-3">
+                      {monthlyExtras.map((c, idx) => (
+                        <div key={idx} className="grid gap-3 md:grid-cols-2">
+                          <div>
+                            <div className="text-xs font-semibold text-white/60">Data</div>
+                            <div className="relative mt-2">
+                              <input
+                                type="date"
+                                value={c.date}
+                                onChange={(e) =>
+                                  setMonthlyExtras((prev) =>
+                                    prev.map((x, i) => (i === idx ? { ...x, date: e.target.value } : x)),
+                                  )
+                                }
+                                onFocus={() => openExtraDatePicker(idx)}
+                                onClick={() => openExtraDatePicker(idx)}
+                                ref={(el) => {
+                                  extraDateInputRefs.current[idx] = el;
+                                }}
+                                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => openExtraDatePicker(idx)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
+                                aria-label="Selecionar data"
+                              >
+                                <Calendar className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs font-semibold text-white/60">Hora</div>
+                              <button
+                                type="button"
+                                onClick={() => setMonthlyExtras((prev) => prev.filter((_, i) => i !== idx))}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+                                aria-label="Remover cobrança"
+                                title="Remover"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <div
+                              className="relative mt-2"
+                              ref={(el) => {
+                                extraTimeAnchorRefs.current[idx] = el;
+                              }}
+                            >
+                              <input
+                                type="text"
+                                readOnly
+                                value={c.time}
+                                placeholder="--:--"
+                                onFocus={() =>
+                                  openTimePicker({
+                                    target: { kind: "extra", index: idx },
+                                    inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                    anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                  })
+                                }
+                                onClick={() =>
+                                  openTimePicker({
+                                    target: { kind: "extra", index: idx },
+                                    inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                    anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                  })
+                                }
+                                ref={(el) => {
+                                  extraTimeInputRefs.current[idx] = el;
+                                }}
+                                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openTimePicker({
+                                    target: { kind: "extra", index: idx },
+                                    inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                    anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                  })
+                                }
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+                                aria-label="Selecionar hora"
+                              >
+                                <Clock className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <button
                 type="submit"
@@ -894,8 +1124,7 @@ export function SchedulesClient({
               onFocus={openRecurrenceLimitDatePicker}
               onClick={openRecurrenceLimitDatePicker}
               ref={recurrenceLimitDateInputRef}
-              min={splitDateTimeForInput(recurrenceLimitRow?.data_envio ?? "", effectiveTimeZone).date || undefined}
-              max={recurrenceLimitMaxDate ?? undefined}
+              min={recurrenceLimitCycleEndDate ?? undefined}
               className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
             />
             <button
@@ -908,8 +1137,8 @@ export function SchedulesClient({
             </button>
           </div>
           <div className="mt-2 text-[11px] text-white/45">
-            {recurrenceLimitMaxDate
-              ? `Você pode definir até ${dateOnlyBR(recurrenceLimitMaxDate)}. Se deixar em branco, a cobrança mensal continua sem limite.`
+            {recurrenceLimitCycleEndDate
+              ? `Mínimo: ${dateOnlyBR(recurrenceLimitCycleEndDate)}. Se deixar em branco, a cobrança mensal continua sem limite.`
               : "Se deixar em branco, a cobrança mensal continua sem limite."}
           </div>
         </div>

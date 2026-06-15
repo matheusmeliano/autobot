@@ -67,41 +67,11 @@ function parseMonthlyCycleSchedule(row: any): MonthlyCycleSchedule | null {
   return { day, time };
 }
 
-async function getMonthlyCycleSchedules(params: {
-  admin: ReturnType<typeof createSupabaseAdminClient>;
-  userId: string;
-  debtorId: string;
-  excludeId?: string;
-}) {
-  let query = params.admin
-    .from("schedules")
-    .select("id, recurrence_day, recurrence_time")
-    .eq("user_id", params.userId)
-    .eq("debtor_id", params.debtorId)
-    .eq("recurrence", "monthly")
-    .neq("status", "executado");
-
-  if (params.excludeId) {
-    query = query.neq("id", params.excludeId);
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  return (data ?? [])
-    .map(parseMonthlyCycleSchedule)
-    .filter((row): row is MonthlyCycleSchedule => Boolean(row));
-}
-
 async function validateMonthlyRecurrenceLimit(params: {
-  admin: ReturnType<typeof createSupabaseAdminClient>;
-  userId: string;
-  debtorId: string;
   currentUtcIso: string;
   timeZone: string;
   currentSchedule: MonthlyCycleSchedule;
   recurrenceUntil?: string | null;
-  excludeId?: string;
 }) {
   if (!params.recurrenceUntil) return null;
 
@@ -110,20 +80,15 @@ async function validateMonthlyRecurrenceLimit(params: {
     return "A data final da cobrança mensal deve ser igual ou posterior à cobrança atual.";
   }
 
-  const siblingSchedules = await getMonthlyCycleSchedules({
-    admin: params.admin,
-    userId: params.userId,
-    debtorId: params.debtorId,
-    excludeId: params.excludeId,
-  });
-  const maxDate = monthlyRecurrenceLimitMaxDate({
+  const cycleEndDate = monthlyRecurrenceLimitMaxDate({
     currentUtcIso: params.currentUtcIso,
     timeZone: params.timeZone,
-    schedules: [params.currentSchedule, ...siblingSchedules],
+    day: params.currentSchedule.day,
+    time: params.currentSchedule.time,
   });
 
-  if (maxDate && params.recurrenceUntil > maxDate) {
-    return `A data final da cobrança mensal deve ser no máximo ${formatDateBR(maxDate)}, sempre até um dia antes da próxima cobrança configurada.`;
+  if (cycleEndDate && params.recurrenceUntil < cycleEndDate) {
+    return `A data final da cobrança mensal deve ser no mínimo ${formatDateBR(cycleEndDate)}, sempre até um dia antes da próxima cobrança.`;
   }
 
   return null;
@@ -216,7 +181,6 @@ export async function createScheduleAction(input: unknown) {
   if (!parsed.success) return { ok: false, error: "Dados inválidos." };
 
   const supabase = await createSupabaseServerClient();
-  const admin = createSupabaseAdminClient();
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) return { ok: false, error: "Sem sessão." };
@@ -266,9 +230,6 @@ export async function createScheduleAction(input: unknown) {
   const recurrenceTime = parsed.data.data_envio_time;
   if (recurrence === "monthly") {
     const recurrenceLimitValidation = await validateMonthlyRecurrenceLimit({
-      admin,
-      userId,
-      debtorId: parsed.data.debtor_id,
       currentUtcIso: dataEnvioIso,
       timeZone,
       currentSchedule: {
@@ -300,7 +261,6 @@ export async function updateScheduleAction(input: unknown) {
   if (!parsed.success) return { ok: false, error: "Dados inválidos." };
 
   const supabase = await createSupabaseServerClient();
-  const admin = createSupabaseAdminClient();
   const { id, ...data } = parsed.data;
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
@@ -351,9 +311,6 @@ export async function updateScheduleAction(input: unknown) {
   const recurrenceTime = String(data.data_envio_time ?? "");
   if (recurrence === "monthly") {
     const recurrenceLimitValidation = await validateMonthlyRecurrenceLimit({
-      admin,
-      userId,
-      debtorId: data.debtor_id,
       currentUtcIso: dataEnvioIso,
       timeZone,
       currentSchedule: {
@@ -361,7 +318,6 @@ export async function updateScheduleAction(input: unknown) {
         time: recurrenceTime,
       },
       recurrenceUntil: recurrenceUntil ?? null,
-      excludeId: id,
     });
     if (recurrenceLimitValidation) return { ok: false, error: recurrenceLimitValidation };
   }
@@ -416,9 +372,6 @@ export async function updateScheduleRecurrenceUntilAction(input: unknown) {
   }
 
   const recurrenceLimitValidation = await validateMonthlyRecurrenceLimit({
-    admin,
-    userId,
-    debtorId: String((schedule as any).debtor_id),
     currentUtcIso: String((schedule as any).data_envio),
     timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
     currentSchedule:
@@ -428,7 +381,6 @@ export async function updateScheduleRecurrenceUntilAction(input: unknown) {
         time: "00:00",
       },
     recurrenceUntil: parsed.data.recurrence_until ?? null,
-    excludeId: String((schedule as any).id),
   });
   if (recurrenceLimitValidation) {
     return { ok: false, error: recurrenceLimitValidation };
