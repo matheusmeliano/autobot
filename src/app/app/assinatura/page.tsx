@@ -89,7 +89,7 @@ export default async function AssinaturaPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 min-[1301px]:grid-cols-3">
-        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl sm:p-6">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold">Básico</div>
@@ -133,7 +133,7 @@ export default async function AssinaturaPage() {
           </div>
         </div>
 
-        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl sm:p-6">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold">Pro</div>
@@ -180,7 +180,7 @@ export default async function AssinaturaPage() {
           </div>
         </div>
 
-        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl sm:p-6">
+        <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold">Vitalício</div>
