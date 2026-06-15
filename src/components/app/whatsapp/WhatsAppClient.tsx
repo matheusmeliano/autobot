@@ -1,6 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
+import { HelpCircle } from "lucide-react";
 import { upsertWhatsAppInstanceAction } from "@/app/app/whatsapp/actions";
 import { modalToast } from "@/lib/modalToast";
 
@@ -99,8 +100,15 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="md:col-span-2">
-              <div className="text-xs font-semibold text-white/60">
-                Client-Token
+              <div className="flex items-center gap-2 text-xs font-semibold text-white/60">
+                <span>Client-Token</span>
+                <span className="group relative inline-flex">
+                  <HelpCircle className="h-4 w-4 text-white/50" aria-hidden="true" />
+                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 w-[280px] -translate-y-1/2 rounded-xl border border-white/10 bg-[#070A10] px-3 py-2 text-[11px] font-semibold leading-relaxed text-white/70 opacity-0 transition-opacity group-hover:opacity-100">
+                    Use o Client-Token para autenticar as requisições do AutoBot na sua instância da Z-API (header
+                    Client-Token). Algumas operações, como agendamentos, podem exigir esse token para funcionar.
+                  </span>
+                </span>
               </div>
               <input
                 className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
