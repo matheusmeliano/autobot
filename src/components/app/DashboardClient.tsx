@@ -69,6 +69,20 @@ function statusToLabel(status: string) {
   return status;
 }
 
+function statusBadgeClassName(status: string) {
+  const s = status.trim().toLowerCase();
+  if (s === "executado") {
+    return "border-[var(--app-success-border)] bg-[var(--app-success-bg)] text-[var(--app-success-text)]";
+  }
+  if (s === "cancelado") {
+    return "border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] text-[var(--app-danger-text)]";
+  }
+  if (s === "pausado") {
+    return "border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] text-[var(--app-warning-text)]";
+  }
+  return "border-[var(--app-accent-ring)] bg-[var(--app-accent-bg)] text-[var(--app-accent-text)]";
+}
+
 export function DashboardClient({
   email,
   name,
@@ -211,13 +225,7 @@ export function DashboardClient({
                     <span
                       className={[
                         "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
-                        item.status.toLowerCase() === "executado"
-                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                          : item.status.toLowerCase() === "cancelado"
-                            ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
-                            : item.status.toLowerCase() === "pausado"
-                              ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                            : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-70)]",
+                        statusBadgeClassName(item.status),
                       ].join(" ")}
                     >
                       {statusToLabel(item.status)}

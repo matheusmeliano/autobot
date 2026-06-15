@@ -84,9 +84,15 @@ body {
   --app-accent-ring: rgba(255, 255, 255, 0.14);
   --app-accent-text: rgba(255, 255, 255, 0.8);
   --app-accent-color: #94a3b8;
+  --app-success-bg: rgba(52, 211, 153, 0.14);
+  --app-success-border: rgba(52, 211, 153, 0.3);
+  --app-success-text: #a7f3d0;
   --app-warning-bg: rgba(245, 158, 11, 0.12);
   --app-warning-border: rgba(245, 158, 11, 0.3);
   --app-warning-text: #fde68a;
+  --app-danger-bg: rgba(248, 113, 113, 0.14);
+  --app-danger-border: rgba(248, 113, 113, 0.3);
+  --app-danger-text: #fecaca;
 }
 
 .app-theme[data-theme="light"] {
@@ -119,9 +125,15 @@ body {
   --app-accent-ring: rgba(100, 116, 139, 0.2);
   --app-accent-text: #334155;
   --app-accent-color: #64748b;
+  --app-success-bg: rgba(16, 185, 129, 0.12);
+  --app-success-border: rgba(5, 150, 105, 0.24);
+  --app-success-text: #166534;
   --app-warning-bg: rgba(245, 158, 11, 0.12);
   --app-warning-border: rgba(217, 119, 6, 0.24);
   --app-warning-text: #92400e;
+  --app-danger-bg: rgba(239, 68, 68, 0.1);
+  --app-danger-border: rgba(220, 38, 38, 0.2);
+  --app-danger-text: #991b1b;
 }
 
 .app-theme {
