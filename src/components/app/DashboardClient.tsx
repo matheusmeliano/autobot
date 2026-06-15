@@ -70,17 +70,7 @@ function statusToLabel(status: string) {
 }
 
 function statusBadgeClassName(status: string) {
-  const s = status.trim().toLowerCase();
-  if (s === "executado") {
-    return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-success-text)]";
-  }
-  if (s === "cancelado") {
-    return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-danger-text)]";
-  }
-  if (s === "pausado") {
-    return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-warning-text)]";
-  }
-  return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-accent-text)]";
+  return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-70)]";
 }
 
 export function DashboardClient({
