@@ -1144,17 +1144,17 @@ export function SchedulesClient({
               ? `Mínimo: ${dateOnlyBR(recurrenceLimitCycleEndDate)}. Se deixar em branco, a cobrança mensal continua sem limite.`
               : "Se deixar em branco, a cobrança mensal continua sem limite."}
           </div>
-        </div>
-
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => setRecurrenceLimitValue("")}
             disabled={savingRecurrenceLimit}
-            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
           >
             Remover limite
           </button>
+        </div>
+
+        <div className="mt-4">
           <button
             type="button"
             onClick={saveRecurrenceLimit}
