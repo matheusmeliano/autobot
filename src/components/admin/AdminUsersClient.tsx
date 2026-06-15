@@ -100,7 +100,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const passForm = useForm<PasswordValues>({
     defaultValues: { id: "", password: "" },
   });
-  const vencimentoField = editForm.register("vencimento");
+  const { ref: vencimentoFieldRef, ...vencimentoFieldProps } = editForm.register("vencimento");
 
   const refresh = () => {
     startTransition(async () => {
@@ -408,14 +408,14 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
             ) : (
               <input
                 ref={(element) => {
-                  vencimentoField.ref(element);
+                  vencimentoFieldRef(element);
                   vencimentoInputRef.current = element;
                 }}
                 type="date"
                 className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
                 onClick={openVencimentoPicker}
                 onFocus={openVencimentoPicker}
-                {...vencimentoField}
+                {...vencimentoFieldProps}
               />
             )}
           </div>
