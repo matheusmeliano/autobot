@@ -358,6 +358,8 @@ body {
   [role="radio"],
   [role="option"]
 ):is(
+  :focus,
+  :focus-visible,
   :active,
   [data-state="active"],
   [data-state="checked"],
