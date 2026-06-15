@@ -13,6 +13,29 @@ function lastDayOfMonth(year: number, month1: number) {
   return new Date(Date.UTC(year, month1, 0)).getUTCDate();
 }
 
+export function localDateInTimeZone(utcIso: string, timeZone: string) {
+  const base = new Date(utcIso);
+  if (Number.isNaN(base.getTime())) throw new Error("Data inválida");
+
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(base);
+}
+
+export function shouldContinueMonthlyRecurrence(params: {
+  nextUtcIso: string;
+  recurrenceUntil?: string | null;
+  timeZone: string;
+}) {
+  if (!params.recurrenceUntil) return true;
+  const nextLocalDate = localDateInTimeZone(params.nextUtcIso, params.timeZone);
+  return nextLocalDate <= params.recurrenceUntil;
+}
+
 export function nextMonthlyIso(params: {
   fromUtcIso: string;
   timeZone: string;
@@ -44,4 +67,3 @@ export function nextMonthlyIso(params: {
     timeZone: params.timeZone,
   });
 }
-

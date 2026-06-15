@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { nextMonthlyIso } from "@/lib/recurrence";
+import { localDateInTimeZone, nextMonthlyIso, shouldContinueMonthlyRecurrence } from "@/lib/recurrence";
 
 function prereqError(params: {
   missingTimeZone: boolean;
@@ -106,12 +106,31 @@ const createSchema = z.object({
   data_envio_date: z.string().min(10),
   data_envio_time: z.string().min(4),
   recurrence: z.enum(["none", "monthly"]).optional(),
+  recurrence_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   status: z.string().optional(),
 });
 
 const updateSchema = createSchema.extend({
   id: z.string().uuid(),
 });
+
+const updateRecurrenceUntilSchema = z.object({
+  id: z.string().uuid(),
+  recurrence_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+});
+
+function validateRecurrenceUntil(params: {
+  recurrence: "none" | "monthly";
+  recurrenceUntil?: string;
+  currentDate: string;
+}) {
+  if (params.recurrence !== "monthly") return null;
+  if (!params.recurrenceUntil) return null;
+  if (params.recurrenceUntil < params.currentDate) {
+    return "A data final da cobrança mensal deve ser igual ou posterior à primeira cobrança.";
+  }
+  return null;
+}
 
 export async function createScheduleAction(input: unknown) {
   const parsed = createSchema.safeParse(input);
@@ -156,6 +175,13 @@ export async function createScheduleAction(input: unknown) {
   }
 
   const recurrence = parsed.data.recurrence ?? "none";
+  const recurrenceUntil = parsed.data.recurrence_until;
+  const recurrenceValidation = validateRecurrenceUntil({
+    recurrence,
+    recurrenceUntil,
+    currentDate: parsed.data.data_envio_date,
+  });
+  if (recurrenceValidation) return { ok: false, error: recurrenceValidation };
   const recurrenceDay = Number(parsed.data.data_envio_date.split("-")[2] ?? "");
   const recurrenceTime = parsed.data.data_envio_time;
 
@@ -167,6 +193,7 @@ export async function createScheduleAction(input: unknown) {
     schedule_timezone: recurrence === "monthly" ? timeZone : null,
     recurrence_day: recurrence === "monthly" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
     recurrence_time: recurrence === "monthly" ? recurrenceTime : null,
+    recurrence_until: recurrence === "monthly" ? recurrenceUntil ?? null : null,
     status: parsed.data.status ?? "agendado",
   });
   if (error) return { ok: false, error: error.message };
@@ -217,6 +244,13 @@ export async function updateScheduleAction(input: unknown) {
   }
 
   const recurrence = (data as any).recurrence ?? "none";
+  const recurrenceUntil = data.recurrence_until;
+  const recurrenceValidation = validateRecurrenceUntil({
+    recurrence,
+    recurrenceUntil,
+    currentDate: data.data_envio_date,
+  });
+  if (recurrenceValidation) return { ok: false, error: recurrenceValidation };
   const recurrenceDay = Number(String(data.data_envio_date ?? "").split("-")[2] ?? "");
   const recurrenceTime = String(data.data_envio_time ?? "");
 
@@ -230,6 +264,7 @@ export async function updateScheduleAction(input: unknown) {
       schedule_timezone: recurrence === "monthly" ? timeZone : null,
       recurrence_day: recurrence === "monthly" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
       recurrence_time: recurrence === "monthly" ? recurrenceTime : null,
+      recurrence_until: recurrence === "monthly" ? recurrenceUntil ?? null : null,
       status: data.status ?? "agendado",
     })
     .eq("id", id);
@@ -242,6 +277,54 @@ export async function deleteScheduleAction(id: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("schedules").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function updateScheduleRecurrenceUntilAction(input: unknown) {
+  const parsed = updateRecurrenceUntilSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Dados inválidos." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) return { ok: false, error: "Sem sessão." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: schedule, error } = await admin
+    .from("schedules")
+    .select("id, user_id, data_envio, recurrence, schedule_timezone")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!schedule?.id) return { ok: false, error: "Agendamento não encontrado." };
+  if (String((schedule as any).user_id) !== userId) return { ok: false, error: "Sem permissão." };
+  if (String((schedule as any).recurrence ?? "none") !== "monthly") {
+    return { ok: false, error: "Essa opção está disponível apenas para agendamentos mensais." };
+  }
+
+  const currentDate = localDateInTimeZone(
+    String((schedule as any).data_envio),
+    String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+  );
+  if (parsed.data.recurrence_until && parsed.data.recurrence_until < currentDate) {
+    return { ok: false, error: "A data final deve ser igual ou posterior à cobrança atual." };
+  }
+
+  const { error: updateError } = await admin
+    .from("schedules")
+    .update({ recurrence_until: parsed.data.recurrence_until ?? null })
+    .eq("id", parsed.data.id);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  await admin.from("logs").insert({
+    user_id: userId,
+    tipo: "agenda_recorrencia_final",
+    descricao: parsed.data.recurrence_until
+      ? `Data final da cobrança mensal definida para ${parsed.data.recurrence_until} no agendamento ${parsed.data.id}`
+      : `Data final da cobrança mensal removida do agendamento ${parsed.data.id}`,
+  });
+
   return { ok: true };
 }
 
@@ -273,7 +356,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -350,6 +433,11 @@ export async function triggerScheduleNowAction(id: string) {
         day,
         time: time || "00:00",
       });
+      const shouldContinue = shouldContinueMonthlyRecurrence({
+        nextUtcIso: nextIso,
+        recurrenceUntil: String((schedule as any).recurrence_until ?? "") || null,
+        timeZone: tz || "America/Sao_Paulo",
+      });
 
       await admin.from("schedule_runs").insert({
         user_id: userId,
@@ -361,7 +449,7 @@ export async function triggerScheduleNowAction(id: string) {
 
       await admin
         .from("schedules")
-        .update({ status: "agendado", data_envio: nextIso })
+        .update(shouldContinue ? { status: "agendado", data_envio: nextIso } : { status: "executado" })
         .eq("id", String((schedule as any).id));
     } else {
       await admin.from("schedules").update({ status: "executado" }).eq("id", String((schedule as any).id));
@@ -399,7 +487,7 @@ export async function markSchedulePaidAction(id: string) {
   const admin = createSupabaseAdminClient();
   const { data: schedule, error } = await admin
     .from("schedules")
-    .select("id, user_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time")
+    .select("id, user_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until")
     .eq("id", id)
     .maybeSingle();
 
@@ -430,13 +518,18 @@ export async function markSchedulePaidAction(id: string) {
     scheduled_for: String((schedule as any).data_envio),
     executed_at: new Date().toISOString(),
     status: "executado",
-    error: "Pagamento marcado manualmente como realizado fora da plataforma.",
   });
   if (runError) return { ok: false, error: runError.message };
 
+  const shouldContinue = shouldContinueMonthlyRecurrence({
+    nextUtcIso: nextIso,
+    recurrenceUntil: String((schedule as any).recurrence_until ?? "") || null,
+    timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+  });
+
   const { error: updateError } = await admin
     .from("schedules")
-    .update({ status: "agendado", data_envio: nextIso })
+    .update(shouldContinue ? { status: "agendado", data_envio: nextIso } : { status: "executado" })
     .eq("id", String((schedule as any).id));
   if (updateError) return { ok: false, error: updateError.message };
 

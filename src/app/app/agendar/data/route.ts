@@ -5,7 +5,7 @@ export async function GET() {
   const { data } = await supabase
     .from("schedules")
     .select(
-      "id, debtor_id, template_id, data_envio, status, recurrence, created_at, debtors(nome), message_templates(nome)",
+      "id, debtor_id, template_id, data_envio, status, recurrence, recurrence_until, created_at, debtors(nome), message_templates(nome)",
     )
     .order("data_envio", { ascending: true })
     .limit(200);
@@ -18,6 +18,7 @@ export async function GET() {
       data_envio: r.data_envio,
       status: r.status,
       recurrence: r.recurrence ?? "none",
+      recurrence_until: r.recurrence_until ?? null,
       created_at: r.created_at,
       debtor_nome: r.debtors?.nome ?? "-",
       template_nome: r.message_templates?.nome ?? null,

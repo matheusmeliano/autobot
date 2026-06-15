@@ -12,6 +12,7 @@ import {
   deleteScheduleAction,
   markSchedulePaidAction,
   triggerScheduleNowAction,
+  updateScheduleRecurrenceUntilAction,
   updateScheduleAction,
 } from "@/app/app/agenda/actions";
 
@@ -25,6 +26,7 @@ export type ScheduleRow = {
   data_envio: string;
   status: string;
   recurrence?: string | null;
+  recurrence_until?: string | null;
   created_at: string;
   debtor_nome: string;
   template_nome: string | null;
@@ -37,6 +39,7 @@ type FormValues = {
   data_envio_date: string;
   data_envio_time: string;
   recurrence: "none" | "monthly";
+  recurrence_until: string;
   status: string;
 };
 
@@ -60,6 +63,13 @@ function timeBR(v: string, timeZone: BrazilTimeZone) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(d);
+}
+
+function dateOnlyBR(v: string) {
+  if (!v) return "-";
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00`) : new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
 function splitDateTimeForInput(v: string, timeZone: BrazilTimeZone) {
@@ -104,6 +114,10 @@ export function SchedulesClient({
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [recurrenceLimitOpen, setRecurrenceLimitOpen] = useState(false);
+  const [recurrenceLimitRow, setRecurrenceLimitRow] = useState<ScheduleRow | null>(null);
+  const [recurrenceLimitValue, setRecurrenceLimitValue] = useState("");
+  const [savingRecurrenceLimit, setSavingRecurrenceLimit] = useState(false);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement | null>(null);
@@ -150,11 +164,13 @@ export function SchedulesClient({
       data_envio_date: "",
       data_envio_time: "",
       recurrence: "none",
+      recurrence_until: "",
       status: "agendado",
     },
   });
 
   const timeValue = watch("data_envio_time");
+  const recurrenceValue = watch("recurrence");
 
   const close = () => {
     setOpen(false);
@@ -166,8 +182,16 @@ export function SchedulesClient({
       data_envio_date: "",
       data_envio_time: "",
       recurrence: "none",
+      recurrence_until: "",
       status: "agendado",
     });
+  };
+
+  const closeRecurrenceLimit = () => {
+    setRecurrenceLimitOpen(false);
+    setRecurrenceLimitRow(null);
+    setRecurrenceLimitValue("");
+    setSavingRecurrenceLimit(false);
   };
 
   const openCreate = () => {
@@ -196,6 +220,7 @@ export function SchedulesClient({
       data_envio_date: dt.date,
       data_envio_time: dt.time,
       recurrence: String((row as any).recurrence ?? "none") === "monthly" ? "monthly" : "none",
+      recurrence_until: row.recurrence_until ?? "",
       status: row.status,
     });
   };
@@ -229,8 +254,19 @@ export function SchedulesClient({
       data_envio_date: values.data_envio_date,
       data_envio_time: values.data_envio_time,
       recurrence: values.recurrence,
+      recurrence_until:
+        values.recurrence === "monthly" && values.recurrence_until ? values.recurrence_until : undefined,
       status: values.status || "agendado",
     };
+
+    if (
+      values.recurrence === "monthly" &&
+      values.recurrence_until &&
+      values.recurrence_until < values.data_envio_date
+    ) {
+      modalToast.warning("A data final deve ser igual ou posterior à primeira cobrança.");
+      return;
+    }
 
     try {
       const iso = zonedDateTimeToUtcIso({
@@ -330,6 +366,46 @@ export function SchedulesClient({
       await refresh();
       setMarkingPaidId(null);
     });
+  };
+
+  const openRecurrenceLimit = (row: ScheduleRow) => {
+    if (String(row.recurrence ?? "none") !== "monthly") {
+      modalToast.info("Essa opção está disponível apenas para agendamentos mensais.");
+      return;
+    }
+    setRecurrenceLimitRow(row);
+    setRecurrenceLimitValue(row.recurrence_until ?? "");
+    setRecurrenceLimitOpen(true);
+  };
+
+  const saveRecurrenceLimit = async () => {
+    if (!recurrenceLimitRow) return;
+    const currentDate = splitDateTimeForInput(recurrenceLimitRow.data_envio, effectiveTimeZone).date;
+    if (recurrenceLimitValue && recurrenceLimitValue < currentDate) {
+      modalToast.warning("A data final deve ser igual ou posterior à cobrança atual.");
+      return;
+    }
+
+    setSavingRecurrenceLimit(true);
+    try {
+      const res = await updateScheduleRecurrenceUntilAction({
+        id: recurrenceLimitRow.id,
+        recurrence_until: recurrenceLimitValue || null,
+      });
+      if (!res.ok) {
+        modalToast.error(res.error ?? "Falha ao salvar a data final.");
+        return;
+      }
+      modalToast.success(
+        recurrenceLimitValue
+          ? "Data final da cobrança mensal salva."
+          : "Data final da cobrança mensal removida.",
+      );
+      await refresh();
+      closeRecurrenceLimit();
+    } finally {
+      setSavingRecurrenceLimit(false);
+    }
   };
 
   const dateField = register("data_envio_date", { required: true });
@@ -549,7 +625,7 @@ export function SchedulesClient({
                       </button>
                       <button
                         onClick={() => openEdit(r)}
-                        disabled={isPending || markingPaidId === r.id}
+                        disabled={isPending || markingPaidId === r.id || savingRecurrenceLimit}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
                         title="Editar"
                       >
@@ -558,16 +634,45 @@ export function SchedulesClient({
                       {String(r.recurrence ?? "none") === "monthly" ? (
                         <button
                           onClick={() => markAsPaid(r)}
-                          disabled={isPending || triggeringId === r.id || markingPaidId === r.id}
+                          disabled={
+                            isPending ||
+                            triggeringId === r.id ||
+                            markingPaidId === r.id ||
+                            savingRecurrenceLimit
+                          }
                           className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
                           title="Pagamento Realizado"
                         >
                           <Check className="h-4 w-4" />
                         </button>
                       ) : null}
+                      {String(r.recurrence ?? "none") === "monthly" ? (
+                        <button
+                          onClick={() => openRecurrenceLimit(r)}
+                          disabled={
+                            isPending ||
+                            triggeringId === r.id ||
+                            markingPaidId === r.id ||
+                            savingRecurrenceLimit
+                          }
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
+                          title={
+                            r.recurrence_until
+                              ? `Cobrança mensal até ${dateOnlyBR(r.recurrence_until)}`
+                              : "Definir data final da cobrança mensal"
+                          }
+                        >
+                          <Calendar className="h-4 w-4" />
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => remove(r)}
-                        disabled={isPending || triggeringId === r.id || markingPaidId === r.id}
+                        disabled={
+                          isPending ||
+                          triggeringId === r.id ||
+                          markingPaidId === r.id ||
+                          savingRecurrenceLimit
+                        }
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Excluir"
                       >
@@ -649,6 +754,27 @@ export function SchedulesClient({
                 </select>
               </div>
 
+              {recurrenceValue === "monthly" ? (
+                <div>
+                  <div className="text-xs font-semibold text-white/60">
+                    Cobrar até (opcional)
+                  </div>
+                  <div className="relative mt-2">
+                    <input
+                      type="date"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                      {...register("recurrence_until")}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/80">
+                      <Calendar className="h-4 w-4" />
+                    </span>
+                  </div>
+                  <div className="mt-2 text-[11px] text-white/45">
+                    Deixe em branco para continuar cobrando sem data final.
+                  </div>
+                </div>
+              ) : null}
+
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <div className="text-xs font-semibold text-white/60">
@@ -712,6 +838,64 @@ export function SchedulesClient({
                 {editing ? "Salvar alterações" : "Criar agendamento"}
               </button>
         </form>
+      </AppModal>
+
+      <AppModal open={recurrenceLimitOpen} onClose={closeRecurrenceLimit} size="md" zIndexClass="z-[110]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-white/90">
+              Cobrança mensal até
+            </div>
+            <div className="mt-1 text-xs text-white/55">
+              Defina até quando a cobrança mensal de {recurrenceLimitRow?.debtor_nome ?? "este cliente"} deve continuar.
+            </div>
+          </div>
+          <button
+            onClick={closeRecurrenceLimit}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          <div className="text-xs font-semibold text-white/60">
+            Data final (opcional)
+          </div>
+          <div className="relative mt-2">
+            <input
+              type="date"
+              value={recurrenceLimitValue}
+              onChange={(e) => setRecurrenceLimitValue(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/80">
+              <Calendar className="h-4 w-4" />
+            </span>
+          </div>
+          <div className="mt-2 text-[11px] text-white/45">
+            Se deixar em branco, a cobrança mensal continua sem limite.
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setRecurrenceLimitValue("")}
+            disabled={savingRecurrenceLimit}
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
+          >
+            Remover limite
+          </button>
+          <button
+            type="button"
+            onClick={saveRecurrenceLimit}
+            disabled={savingRecurrenceLimit}
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
+          >
+            {savingRecurrenceLimit ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
       </AppModal>
     </div>
   );

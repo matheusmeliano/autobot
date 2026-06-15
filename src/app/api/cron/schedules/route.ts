@@ -1,5 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { nextMonthlyIso } from "@/lib/recurrence";
+import { nextMonthlyIso, shouldContinueMonthlyRecurrence } from "@/lib/recurrence";
 
 function normalizePhone(phone: string) {
   const d = phone.replace(/\D/g, "");
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
   const { data: schedules, error } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
     )
     .in("status", ["agendado", "pausado"])
     .lte("data_envio", nowIso)
@@ -192,6 +192,11 @@ export async function GET(req: Request) {
           day,
           time: time || "00:00",
         });
+        const shouldContinue = shouldContinueMonthlyRecurrence({
+          nextUtcIso: nextIso,
+          recurrenceUntil: String((s as any).recurrence_until ?? "") || null,
+          timeZone: tz || "America/Sao_Paulo",
+        });
 
         await supabase.from("schedule_runs").insert({
           user_id: userId,
@@ -203,7 +208,7 @@ export async function GET(req: Request) {
 
         await supabase
           .from("schedules")
-          .update({ status: "agendado", data_envio: nextIso })
+          .update(shouldContinue ? { status: "agendado", data_envio: nextIso } : { status: "executado" })
           .eq("id", scheduleId);
       } else {
         await supabase.from("schedules").update({ status: "executado" }).eq("id", scheduleId);
