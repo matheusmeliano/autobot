@@ -987,7 +987,10 @@ export function SchedulesClient({
                   {monthlyExtras.length > 0 ? (
                     <div className="mt-3 grid gap-3">
                       {monthlyExtras.map((c, idx) => (
-                        <div key={idx} className="grid gap-3 md:grid-cols-2">
+                        <div
+                          key={idx}
+                          className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+                        >
                           <div>
                             <div className="text-xs font-semibold text-white/60">Data</div>
                             <div className="relative mt-2">
@@ -1018,19 +1021,7 @@ export function SchedulesClient({
                           </div>
 
                           <div>
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-xs font-semibold text-white/60">Hora</div>
-                              <button
-                                type="button"
-                                onClick={() => setMonthlyExtras((prev) => prev.filter((_, i) => i !== idx))}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                                aria-label="Remover cobrança"
-                                title="Remover"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-
+                            <div className="text-xs font-semibold text-white/60">Hora</div>
                             <div
                               className="relative mt-2"
                               ref={(el) => {
@@ -1076,6 +1067,18 @@ export function SchedulesClient({
                                 <Clock className="h-4 w-4" />
                               </button>
                             </div>
+                          </div>
+
+                          <div className="flex justify-end md:pb-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setMonthlyExtras((prev) => prev.filter((_, i) => i !== idx))}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+                              aria-label="Remover cobrança"
+                              title="Remover"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
                       ))}
