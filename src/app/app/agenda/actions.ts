@@ -450,11 +450,15 @@ export async function triggerScheduleNowAction(id: string) {
   if (currentStatus === "executado") {
     return { ok: false, error: "Esse agendamento já foi executado." };
   }
+  if (currentStatus === "executando") {
+    return { ok: false, error: "Esse agendamento já está sendo processado." };
+  }
 
   const { data: locked, error: lockErr } = await admin
     .from("schedules")
     .update({ status: "executando" })
     .eq("id", String((schedule as any).id))
+    .in("status", ["agendado", "pausado"])
     .select("id")
     .maybeSingle();
 
@@ -464,6 +468,8 @@ export async function triggerScheduleNowAction(id: string) {
   try {
     const debtor = (schedule as any).debtors ?? null;
     const template = (schedule as any).message_templates ?? null;
+    const scheduleId = String((schedule as any).id);
+    const scheduledFor = String((schedule as any).data_envio ?? new Date().toISOString());
 
     const debtorPhone = String(debtor?.telefone ?? "");
     const templateText = String(template?.conteudo ?? "");
@@ -482,6 +488,43 @@ export async function triggerScheduleNowAction(id: string) {
       throw new Error("WhatsApp desconectado");
     }
 
+    const recurrence = String((schedule as any).recurrence ?? "none");
+    const tz = String((schedule as any).schedule_timezone ?? "");
+    const day = Number((schedule as any).recurrence_day ?? 1);
+    const time = String((schedule as any).recurrence_time ?? "");
+    const nextIso =
+      recurrence === "monthly"
+        ? nextMonthlyIso({
+            fromUtcIso: scheduledFor,
+            timeZone: tz || "America/Sao_Paulo",
+            day,
+            time: time || "00:00",
+          })
+        : null;
+    const nextState =
+      recurrence === "monthly"
+        ? shouldContinueMonthlyRecurrence({
+            nextUtcIso: String(nextIso),
+            recurrenceUntil: String((schedule as any).recurrence_until ?? "") || null,
+            timeZone: tz || "America/Sao_Paulo",
+          })
+          ? { status: "agendado", data_envio: String(nextIso) }
+          : { status: "executado" }
+        : { status: "executado" };
+
+    const { data: existingRun } = await admin
+      .from("schedule_runs")
+      .select("id")
+      .eq("schedule_id", scheduleId)
+      .eq("scheduled_for", scheduledFor)
+      .eq("status", "executado")
+      .maybeSingle();
+
+    if (existingRun?.id) {
+      await admin.from("schedules").update(nextState).eq("id", scheduleId);
+      return { ok: true };
+    }
+
     const message = applyTemplate(templateText, {
       nome: String(debtor?.nome ?? ""),
       pix: String(debtor?.pix_key ?? ""),
@@ -497,53 +540,41 @@ export async function triggerScheduleNowAction(id: string) {
       message,
     });
 
+    const { error: runError } = await admin.from("schedule_runs").insert({
+      user_id: userId,
+      schedule_id: scheduleId,
+      scheduled_for: scheduledFor,
+      executed_at: new Date().toISOString(),
+      status: "executado",
+    });
+    if (runError) throw new Error(runError.message);
+
+    const { error: updateError } = await admin.from("schedules").update(nextState).eq("id", scheduleId);
+    if (updateError) throw new Error(updateError.message);
+
     await admin.from("logs").insert({
       user_id: userId,
       tipo: "agenda_executada",
-      descricao: `Agendamento executado: ${String((schedule as any).id)}`,
+      descricao: `Agendamento executado: ${scheduleId}`,
     });
-
-    const recurrence = String((schedule as any).recurrence ?? "none");
-    if (recurrence === "monthly") {
-      const tz = String((schedule as any).schedule_timezone ?? "");
-      const day = Number((schedule as any).recurrence_day ?? 1);
-      const time = String((schedule as any).recurrence_time ?? "");
-      const nextIso = nextMonthlyIso({
-        fromUtcIso: String((schedule as any).data_envio),
-        timeZone: tz || "America/Sao_Paulo",
-        day,
-        time: time || "00:00",
-      });
-      const shouldContinue = shouldContinueMonthlyRecurrence({
-        nextUtcIso: nextIso,
-        recurrenceUntil: String((schedule as any).recurrence_until ?? "") || null,
-        timeZone: tz || "America/Sao_Paulo",
-      });
-
-      await admin.from("schedule_runs").insert({
-        user_id: userId,
-        schedule_id: String((schedule as any).id),
-        scheduled_for: String((schedule as any).data_envio),
-        executed_at: new Date().toISOString(),
-        status: "executado",
-      });
-
-      await admin
-        .from("schedules")
-        .update(shouldContinue ? { status: "agendado", data_envio: nextIso } : { status: "executado" })
-        .eq("id", String((schedule as any).id));
-    } else {
-      await admin.from("schedules").update({ status: "executado" }).eq("id", String((schedule as any).id));
-    }
     return { ok: true };
   } catch (e: any) {
     const msg = String(e?.message ?? "Erro desconhecido");
     const recurrence = String((schedule as any)?.recurrence ?? "none");
-    if (recurrence === "monthly") {
+    const scheduleId = String((schedule as any)?.id ?? "");
+    const scheduledFor = String((schedule as any)?.data_envio ?? new Date().toISOString());
+    const wasExecuted = await admin
+      .from("schedule_runs")
+      .select("id")
+      .eq("schedule_id", scheduleId)
+      .eq("scheduled_for", scheduledFor)
+      .eq("status", "executado")
+      .maybeSingle();
+    if (recurrence === "monthly" && !wasExecuted.data?.id) {
       await admin.from("schedule_runs").insert({
         user_id: userId,
-        schedule_id: String((schedule as any)?.id ?? ""),
-        scheduled_for: String((schedule as any)?.data_envio ?? new Date().toISOString()),
+        schedule_id: scheduleId,
+        scheduled_for: scheduledFor,
         executed_at: new Date().toISOString(),
         status: "falha",
         error: msg,
@@ -552,9 +583,11 @@ export async function triggerScheduleNowAction(id: string) {
     await admin.from("logs").insert({
       user_id: userId,
       tipo: "agenda_falha",
-      descricao: `Falha ao executar agendamento ${String((schedule as any).id)}: ${msg}`,
+      descricao: `Falha ao executar agendamento ${scheduleId}: ${msg}`,
     });
-    await admin.from("schedules").update({ status: "agendado" }).eq("id", String((schedule as any).id));
+    if (!wasExecuted.data?.id) {
+      await admin.from("schedules").update({ status: "agendado" }).eq("id", scheduleId);
+    }
     return { ok: false, error: msg };
   }
 }

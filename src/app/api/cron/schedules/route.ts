@@ -123,6 +123,7 @@ export async function GET(req: Request) {
   for (const s of schedules ?? []) {
     const scheduleId = String((s as any).id);
     const userId = String((s as any).user_id);
+    const scheduledFor = String((s as any).data_envio ?? nowIso);
 
     try {
       const debtor = (s as any).debtors ?? null;
@@ -160,6 +161,44 @@ export async function GET(req: Request) {
         throw new Error("WhatsApp desconectado");
       }
 
+      const recurrence = String((s as any).recurrence ?? "none");
+      const tz = String((s as any).schedule_timezone ?? "");
+      const day = Number((s as any).recurrence_day ?? 1);
+      const time = String((s as any).recurrence_time ?? "");
+      const nextIso =
+        recurrence === "monthly"
+          ? nextMonthlyIso({
+              fromUtcIso: scheduledFor,
+              timeZone: tz || "America/Sao_Paulo",
+              day,
+              time: time || "00:00",
+            })
+          : null;
+      const nextState =
+        recurrence === "monthly"
+          ? shouldContinueMonthlyRecurrence({
+              nextUtcIso: String(nextIso),
+              recurrenceUntil: String((s as any).recurrence_until ?? "") || null,
+              timeZone: tz || "America/Sao_Paulo",
+            })
+            ? { status: "agendado", data_envio: String(nextIso) }
+            : { status: "executado" }
+          : { status: "executado" };
+
+      const { data: existingRun } = await supabase
+        .from("schedule_runs")
+        .select("id, status")
+        .eq("schedule_id", scheduleId)
+        .eq("scheduled_for", scheduledFor)
+        .eq("status", "executado")
+        .maybeSingle();
+
+      if (existingRun?.id) {
+        await supabase.from("schedules").update(nextState).eq("id", scheduleId);
+        results.push({ id: scheduleId, ok: true });
+        continue;
+      }
+
       const message = applyTemplate(templateText, {
         nome: String(debtor?.nome ?? ""),
         pix: String(debtor?.pix_key ?? ""),
@@ -167,6 +206,7 @@ export async function GET(req: Request) {
         vencimento: formatDateBR(debtor?.vencimento),
       });
 
+      let messageSent = false;
       await sendZapiText({
         instance_id: wa.instance_id,
         token: wa.token,
@@ -174,6 +214,19 @@ export async function GET(req: Request) {
         phone: debtorPhone,
         message,
       });
+      messageSent = true;
+
+      const { error: runError } = await supabase.from("schedule_runs").insert({
+        user_id: userId,
+        schedule_id: scheduleId,
+        scheduled_for: scheduledFor,
+        executed_at: nowIso,
+        status: "executado",
+      });
+      if (runError) throw new Error(runError.message);
+
+      const { error: updateError } = await supabase.from("schedules").update(nextState).eq("id", scheduleId);
+      if (updateError) throw new Error(updateError.message);
 
       await supabase.from("logs").insert({
         user_id: userId,
@@ -181,48 +234,23 @@ export async function GET(req: Request) {
         descricao: `Agendamento executado: ${scheduleId}`,
       });
 
-      const recurrence = String((s as any).recurrence ?? "none");
-      if (recurrence === "monthly") {
-        const tz = String((s as any).schedule_timezone ?? "");
-        const day = Number((s as any).recurrence_day ?? 1);
-        const time = String((s as any).recurrence_time ?? "");
-        const nextIso = nextMonthlyIso({
-          fromUtcIso: String((s as any).data_envio),
-          timeZone: tz || "America/Sao_Paulo",
-          day,
-          time: time || "00:00",
-        });
-        const shouldContinue = shouldContinueMonthlyRecurrence({
-          nextUtcIso: nextIso,
-          recurrenceUntil: String((s as any).recurrence_until ?? "") || null,
-          timeZone: tz || "America/Sao_Paulo",
-        });
-
-        await supabase.from("schedule_runs").insert({
-          user_id: userId,
-          schedule_id: scheduleId,
-          scheduled_for: String((s as any).data_envio),
-          executed_at: nowIso,
-          status: "executado",
-        });
-
-        await supabase
-          .from("schedules")
-          .update(shouldContinue ? { status: "agendado", data_envio: nextIso } : { status: "executado" })
-          .eq("id", scheduleId);
-      } else {
-        await supabase.from("schedules").update({ status: "executado" }).eq("id", scheduleId);
-      }
-
       results.push({ id: scheduleId, ok: true });
     } catch (e: any) {
       const msg = String(e?.message ?? "Erro desconhecido");
       const recurrence = String((s as any)?.recurrence ?? "none");
-      if (recurrence === "monthly") {
+      const scheduledFor = String((s as any)?.data_envio ?? nowIso);
+      const wasExecuted = await supabase
+        .from("schedule_runs")
+        .select("id")
+        .eq("schedule_id", scheduleId)
+        .eq("scheduled_for", scheduledFor)
+        .eq("status", "executado")
+        .maybeSingle();
+      if (recurrence === "monthly" && !wasExecuted.data?.id) {
         await supabase.from("schedule_runs").insert({
           user_id: userId,
           schedule_id: scheduleId,
-          scheduled_for: String((s as any)?.data_envio ?? nowIso),
+          scheduled_for,
           executed_at: nowIso,
           status: "falha",
           error: msg,
@@ -233,11 +261,13 @@ export async function GET(req: Request) {
         tipo: "agenda_falha",
         descricao: `Falha ao executar agendamento ${scheduleId}: ${msg}`,
       });
-      const retryAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
-      await supabase
-        .from("schedules")
-        .update({ status: "agendado", data_envio: retryAt })
-        .eq("id", scheduleId);
+      if (!wasExecuted.data?.id) {
+        const retryAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+        await supabase
+          .from("schedules")
+          .update({ status: "agendado", data_envio: retryAt })
+          .eq("id", scheduleId);
+      }
       results.push({ id: scheduleId, ok: false, error: msg });
     }
   }

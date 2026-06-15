@@ -444,6 +444,10 @@ export function SchedulesClient({
       modalToast.info("Esse agendamento já foi executado.");
       return;
     }
+    if (String(row.status ?? "") === "executando") {
+      modalToast.info("Esse agendamento já está sendo processado.");
+      return;
+    }
     setTriggeringId(row.id);
     startTransition(async () => {
       const res = await triggerScheduleNowAction(row.id);
