@@ -337,23 +337,3 @@ body {
 .mp-brick-wrapper [class*="value-prop"] {
   display: none !important;
 }
-
-.app-theme :is(
-  button,
-  input[type="button"],
-  input[type="submit"],
-  input[type="reset"]
-):is(
-  :focus,
-  :focus-visible,
-  :active,
-  [aria-pressed="true"],
-  [data-state="active"]
-) {
-  border-color: transparent !important;
-  outline: none !important;
-  box-shadow: none !important;
-  --tw-ring-color: transparent !important;
-  --tw-ring-shadow: 0 0 #0000 !important;
-  --tw-shadow: 0 0 #0000 !important;
-}
