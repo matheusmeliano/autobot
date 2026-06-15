@@ -1139,19 +1139,19 @@ export function SchedulesClient({
               <Calendar className="h-4 w-4" />
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setRecurrenceLimitValue("")}
+            disabled={savingRecurrenceLimit}
+            className="mt-2 inline-flex text-[11px] font-semibold text-white/60 underline underline-offset-2 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Remover limite
+          </button>
           <div className="mt-2 text-[11px] text-white/45">
             {recurrenceLimitCycleEndDate
               ? `Mínimo: ${dateOnlyBR(recurrenceLimitCycleEndDate)}. Se deixar em branco, a cobrança mensal continua sem limite.`
               : "Se deixar em branco, a cobrança mensal continua sem limite."}
           </div>
-          <button
-            type="button"
-            onClick={() => setRecurrenceLimitValue("")}
-            disabled={savingRecurrenceLimit}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
-          >
-            Remover limite
-          </button>
         </div>
 
         <div className="mt-4">
