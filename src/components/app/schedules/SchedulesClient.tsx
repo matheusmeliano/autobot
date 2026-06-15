@@ -170,7 +170,6 @@ export function SchedulesClient({
   });
 
   const timeValue = watch("data_envio_time");
-  const recurrenceValue = watch("recurrence");
 
   const close = () => {
     setOpen(false);
@@ -753,27 +752,6 @@ export function SchedulesClient({
                   <option value="monthly">Mensal</option>
                 </select>
               </div>
-
-              {recurrenceValue === "monthly" ? (
-                <div>
-                  <div className="text-xs font-semibold text-white/60">
-                    Cobrar até (opcional)
-                  </div>
-                  <div className="relative mt-2">
-                    <input
-                      type="date"
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
-                      {...register("recurrence_until")}
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/80">
-                      <Calendar className="h-4 w-4" />
-                    </span>
-                  </div>
-                  <div className="mt-2 text-[11px] text-white/45">
-                    Deixe em branco para continuar cobrando sem data final.
-                  </div>
-                </div>
-              ) : null}
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
