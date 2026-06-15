@@ -389,3 +389,62 @@ export async function triggerScheduleNowAction(id: string) {
     return { ok: false, error: msg };
   }
 }
+
+export async function markSchedulePaidAction(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) return { ok: false, error: "Sem sessão." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: schedule, error } = await admin
+    .from("schedules")
+    .select("id, user_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!schedule?.id) return { ok: false, error: "Agendamento não encontrado." };
+  if (String((schedule as any).user_id) !== userId) return { ok: false, error: "Sem permissão." };
+
+  const recurrence = String((schedule as any).recurrence ?? "none");
+  if (recurrence !== "monthly") {
+    return { ok: false, error: "Essa opção está disponível apenas para agendamentos mensais." };
+  }
+
+  const currentStatus = String((schedule as any).status ?? "");
+  if (currentStatus === "executando") {
+    return { ok: false, error: "Esse agendamento está sendo processado no momento." };
+  }
+
+  const nextIso = nextMonthlyIso({
+    fromUtcIso: String((schedule as any).data_envio),
+    timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+    day: Number((schedule as any).recurrence_day ?? 1),
+    time: String((schedule as any).recurrence_time ?? "") || "00:00",
+  });
+
+  const { error: runError } = await admin.from("schedule_runs").insert({
+    user_id: userId,
+    schedule_id: String((schedule as any).id),
+    scheduled_for: String((schedule as any).data_envio),
+    executed_at: new Date().toISOString(),
+    status: "executado",
+    error: "Pagamento marcado manualmente como realizado fora da plataforma.",
+  });
+  if (runError) return { ok: false, error: runError.message };
+
+  const { error: updateError } = await admin
+    .from("schedules")
+    .update({ status: "agendado", data_envio: nextIso })
+    .eq("id", String((schedule as any).id));
+  if (updateError) return { ok: false, error: updateError.message };
+
+  await admin.from("logs").insert({
+    user_id: userId,
+    tipo: "agenda_pagamento_manual",
+    descricao: `Pagamento marcado manualmente como realizado para o agendamento ${String((schedule as any).id)}`,
+  });
+
+  return { ok: true };
+}

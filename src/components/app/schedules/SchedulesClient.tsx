@@ -3,13 +3,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
-import { Calendar, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
   deleteScheduleAction,
+  markSchedulePaidAction,
   triggerScheduleNowAction,
   updateScheduleAction,
 } from "@/app/app/agenda/actions";
@@ -102,6 +103,7 @@ export function SchedulesClient({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement | null>(null);
@@ -297,6 +299,36 @@ export function SchedulesClient({
       modalToast.success("Disparo iniciado.");
       await refresh();
       setTriggeringId(null);
+    });
+  };
+
+  const markAsPaid = async (row: ScheduleRow) => {
+    if (String(row.recurrence ?? "none") !== "monthly") {
+      modalToast.info("Essa opção está disponível apenas para agendamentos mensais.");
+      return;
+    }
+
+    const confirmed = await modalToast.confirm(
+      `Marcar a mensalidade atual de "${row.debtor_nome}" como quitada e avançar a cobrança para o próximo mês?`,
+      {
+        title: "Pagamento realizado",
+        confirmText: "Confirmar",
+        cancelText: "Cancelar",
+      },
+    );
+    if (!confirmed) return;
+
+    setMarkingPaidId(row.id);
+    startTransition(async () => {
+      const res = await markSchedulePaidAction(row.id);
+      if (!res.ok) {
+        modalToast.error(res.error ?? "Falha ao marcar pagamento.");
+        setMarkingPaidId(null);
+        return;
+      }
+      modalToast.success("Mensalidade atual marcada como quitada.");
+      await refresh();
+      setMarkingPaidId(null);
     });
   };
 
@@ -504,7 +536,12 @@ export function SchedulesClient({
                     <div className="col-span-3 flex flex-nowrap justify-end gap-2">
                       <button
                         onClick={() => triggerNow(r)}
-                        disabled={isPending || triggeringId === r.id || String(r.status ?? "") === "executado"}
+                        disabled={
+                          isPending ||
+                          triggeringId === r.id ||
+                          markingPaidId === r.id ||
+                          String(r.status ?? "") === "executado"
+                        }
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Disparar agora"
                       >
@@ -512,14 +549,25 @@ export function SchedulesClient({
                       </button>
                       <button
                         onClick={() => openEdit(r)}
+                        disabled={isPending || markingPaidId === r.id}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
                         title="Editar"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
+                      {String(r.recurrence ?? "none") === "monthly" ? (
+                        <button
+                          onClick={() => markAsPaid(r)}
+                          disabled={isPending || triggeringId === r.id || markingPaidId === r.id}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
+                          title="Pagamento Realizado"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => remove(r)}
-                        disabled={isPending || triggeringId === r.id}
+                        disabled={isPending || triggeringId === r.id || markingPaidId === r.id}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Excluir"
                       >
