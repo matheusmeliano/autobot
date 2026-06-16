@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
-import { monthlyRecurrenceLimitMinDate } from "@/lib/recurrence";
+import { localDateInTimeZone, monthlyRecurrenceLimitMinDate } from "@/lib/recurrence";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
@@ -154,6 +154,11 @@ export function SchedulesClient({
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const missingTimeZone = !timeZone;
   const missingWhatsApp = !whatsappConfigured;
+  const todayMinDate = useMemo(
+    () => localDateInTimeZone(new Date().toISOString(), effectiveTimeZone),
+    [effectiveTimeZone],
+  );
+  const scheduleDateMin = editing ? undefined : todayMinDate;
 
   const prereqMessage = (context: "criar/editar" | "disparar") => {
     const actionLabel = context === "disparar" ? "disparar agora" : "criar ou editar agendamentos";
@@ -906,6 +911,7 @@ export function SchedulesClient({
                   <div className="relative mt-2">
                     <input
                       type="date"
+                      min={scheduleDateMin}
                       className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
                       {...dateField}
                       onFocus={openDatePicker}
@@ -1002,6 +1008,7 @@ export function SchedulesClient({
                             <div className="relative mt-2">
                               <input
                                 type="date"
+                                min={scheduleDateMin}
                                 value={c.date}
                                 onChange={(e) =>
                                   setMonthlyExtras((prev) =>
