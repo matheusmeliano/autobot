@@ -15,6 +15,8 @@ type ModalToastInternal = Required<Pick<ModalToastOptions, "id" | "variant" | "m
   Omit<ModalToastOptions, "id" | "variant" | "message">;
 
 const confirmResolvers = new Map<string, (v: boolean) => void>();
+const closeResolvers = new Map<string, () => void>();
+const closedIds = new Set<string>();
 
 function randomId() {
   return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
@@ -43,6 +45,15 @@ export const modalToast = {
   info(message: string, title = "Aviso") {
     return modalToast.open({ variant: "info", title, message });
   },
+  wait(id: string) {
+    if (closedIds.has(id)) {
+      closedIds.delete(id);
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      closeResolvers.set(id, resolve);
+    });
+  },
   confirm(message: string, opts?: { title?: string; confirmText?: string; cancelText?: string }) {
     const id = randomId();
     return new Promise<boolean>((resolve) => {
@@ -66,3 +77,12 @@ export function resolveModalConfirm(id: string, value: boolean) {
   resolve(value);
 }
 
+export function resolveModalClose(id: string) {
+  const resolve = closeResolvers.get(id);
+  if (resolve) {
+    closeResolvers.delete(id);
+    resolve();
+    return;
+  }
+  closedIds.add(id);
+}

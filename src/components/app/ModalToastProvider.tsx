@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
-import { resolveModalConfirm, type ModalToastVariant } from "@/lib/modalToast";
+import { resolveModalClose, resolveModalConfirm, type ModalToastVariant } from "@/lib/modalToast";
 
 type QueueItem = {
   id: string;
@@ -77,6 +77,7 @@ export function ModalToastProvider() {
   const close = (result?: boolean) => {
     if (!active) return;
     if (active.variant === "confirm") resolveModalConfirm(active.id, Boolean(result));
+    resolveModalClose(active.id);
     setQueue((prev) => prev.slice(1));
   };
 

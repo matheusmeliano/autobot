@@ -413,12 +413,14 @@ export function SchedulesClient({
       }
     }
 
-    modalToast.success(editing ? "Agendamento atualizado." : "Agendamento criado.");
     if (!editing) {
       close();
-      setTimeout(() => window.location.reload(), 50);
+      const toastId = modalToast.success("Agendamento criado.");
+      await modalToast.wait(toastId);
+      window.location.reload();
       return;
     }
+    modalToast.success("Agendamento atualizado.");
     refresh();
     close();
   });
