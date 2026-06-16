@@ -414,6 +414,11 @@ export function SchedulesClient({
     }
 
     modalToast.success(editing ? "Agendamento atualizado." : "Agendamento criado.");
+    if (!editing) {
+      close();
+      setTimeout(() => window.location.reload(), 50);
+      return;
+    }
     refresh();
     close();
   });
