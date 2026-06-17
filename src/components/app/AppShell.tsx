@@ -471,7 +471,7 @@ export function AppShell({
                   type="button"
                   disabled={Boolean(paymentResolving)}
                   onClick={() => resolvePendingPayment("confirm")}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-btn-primary-bg)] px-4 text-sm font-semibold text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
                 >
                   {paymentResolving === "confirm" ? "Confirmando..." : "Confirmar pagamento"}
                 </button>
