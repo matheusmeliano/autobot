@@ -148,7 +148,7 @@ function buildDueDateIso(params: { day?: string; month?: string; year?: string }
 
 function debtorStatusLabel(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
-  if (s === "ativo") return "Ativo";
+  if (s === "ativo") return "Pago";
   if (s === "agendado") return "Agendado";
   if (s === "pendente") return "Pendente";
   if (s === "pago") return "Pago";

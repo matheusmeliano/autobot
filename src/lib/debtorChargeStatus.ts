@@ -57,7 +57,7 @@ export function deriveCurrentMonthDebtorStatus(
 
   if (hasPending) return "pendente";
   if (hasPaid) return "pago";
-  return "ativo";
+  return "pago";
 }
 
 export function applyCurrentMonthDebtorStatuses<
@@ -118,7 +118,7 @@ function normalizeDebtorChargeStatus(status: string) {
     case "suspeita_de_pagamento":
       return "pendente";
     default:
-      return "ativo";
+      return "pago";
   }
 }
 
@@ -131,17 +131,7 @@ export async function syncDebtorChargeStatus(admin: any, userId: string, debtorI
     .order("data_envio", { ascending: false })
     .limit(200);
 
-  const currentMonthStatus = deriveCurrentMonthDebtorStatus((schedules ?? []) as DebtorScheduleStatusRow[]);
-  const nextStatus =
-    currentMonthStatus !== "ativo"
-      ? currentMonthStatus
-      : (schedules ?? []).reduce(
-          (best: string, row: any) => {
-            const current = String(row?.status ?? "").toLowerCase();
-            return statusPriority(current) > statusPriority(best) ? current : best;
-          },
-          "",
-        );
+  const nextStatus = deriveCurrentMonthDebtorStatus((schedules ?? []) as DebtorScheduleStatusRow[]);
 
   await admin
     .from("debtors")
