@@ -2,10 +2,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsClient";
 import Link from "next/link";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
+import { applyCurrentMonthDebtorStatuses } from "@/lib/debtorChargeStatus";
 
 export default async function ClientesPage() {
   const supabase = await createSupabaseServerClient();
-  const [{ data, error }, { data: profile }] = await Promise.all([
+  const [{ data, error }, { data: profile }, { data: schedules }] = await Promise.all([
     supabase
       .from("debtors")
       .select(
@@ -14,6 +15,10 @@ export default async function ClientesPage() {
       .order("created_at", { ascending: false })
       .limit(200),
     supabase.from("profiles").select("plano").maybeSingle(),
+    supabase
+      .from("schedules")
+      .select("debtor_id, status, data_envio, charge_due_at, payment_received_at, schedule_timezone")
+      .limit(1000),
   ]);
 
   if (error) {
@@ -51,5 +56,13 @@ export default async function ClientesPage() {
   }
 
   const plan = normalizePlan((profile as any)?.plano) as PlanKey;
-  return <DebtorsClient initial={(data ?? []) as DebtorRow[]} plan={plan} />;
+  const rows = applyCurrentMonthDebtorStatuses({
+    debtors: ((data ?? []) as DebtorRow[]).map((row) => ({
+      ...row,
+      status: row.status ?? "ativo",
+    })),
+    schedules: (schedules ?? []) as any[],
+  });
+
+  return <DebtorsClient initial={rows as DebtorRow[]} plan={plan} />;
 }

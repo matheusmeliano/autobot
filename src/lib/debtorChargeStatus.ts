@@ -1,3 +1,94 @@
+import { localDateInTimeZone } from "@/lib/recurrence";
+
+export type DebtorChargeStatus = "ativo" | "pendente" | "pago" | "atrasado";
+
+type DebtorScheduleStatusRow = {
+  debtor_id?: string | null;
+  status?: string | null;
+  data_envio?: string | null;
+  charge_due_at?: string | null;
+  payment_received_at?: string | null;
+  schedule_timezone?: string | null;
+};
+
+function scheduleLocalDate(value: string | null | undefined, timeZone: string) {
+  const iso = String(value ?? "").trim();
+  if (!iso) return null;
+  try {
+    return localDateInTimeZone(iso, timeZone);
+  } catch {
+    return null;
+  }
+}
+
+export function deriveCurrentMonthDebtorStatus(
+  schedules: DebtorScheduleStatusRow[],
+  nowUtcIso = new Date().toISOString(),
+): DebtorChargeStatus {
+  let hasPending = false;
+  let hasPaid = false;
+
+  for (const row of schedules) {
+    const timeZone = String(row?.schedule_timezone ?? "") || "America/Sao_Paulo";
+    const currentLocalDate = scheduleLocalDate(nowUtcIso, timeZone);
+    if (!currentLocalDate) continue;
+
+    const currentMonth = currentLocalDate.slice(0, 7);
+    const dueLocalDate = scheduleLocalDate(row?.charge_due_at ?? row?.data_envio ?? null, timeZone);
+    const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
+    const currentStatus = String(row?.status ?? "").trim().toLowerCase();
+
+    if (dueLocalDate && dueLocalDate.startsWith(currentMonth)) {
+      if (currentStatus === "pago") {
+        hasPaid = true;
+        continue;
+      }
+      if (currentLocalDate > dueLocalDate) {
+        return "atrasado";
+      }
+      hasPending = true;
+      continue;
+    }
+
+    if (paymentLocalDate && paymentLocalDate.startsWith(currentMonth)) {
+      hasPaid = true;
+    }
+  }
+
+  if (hasPending) return "pendente";
+  if (hasPaid) return "pago";
+  return "ativo";
+}
+
+export function applyCurrentMonthDebtorStatuses<
+  T extends {
+    id: string;
+    status: string | null;
+  },
+>(params: {
+  debtors: T[];
+  schedules: DebtorScheduleStatusRow[];
+  nowUtcIso?: string;
+}) {
+  const schedulesByDebtor = new Map<string, DebtorScheduleStatusRow[]>();
+
+  for (const schedule of params.schedules) {
+    const debtorId = String(schedule?.debtor_id ?? "");
+    if (!debtorId) continue;
+    const list = schedulesByDebtor.get(debtorId) ?? [];
+    list.push(schedule);
+    schedulesByDebtor.set(debtorId, list);
+  }
+
+  return params.debtors.map((debtor) => ({
+    ...debtor,
+    status: deriveCurrentMonthDebtorStatus(
+      schedulesByDebtor.get(String(debtor.id)) ?? [],
+      params.nowUtcIso,
+    ),
+  }));
+}
+
 function statusPriority(status: string) {
   switch (status) {
     case "atrasado":
@@ -34,19 +125,23 @@ function normalizeDebtorChargeStatus(status: string) {
 export async function syncDebtorChargeStatus(admin: any, userId: string, debtorId: string) {
   const { data: schedules } = await admin
     .from("schedules")
-    .select("status, data_envio")
+    .select("status, data_envio, charge_due_at, payment_received_at, schedule_timezone")
     .eq("user_id", userId)
     .eq("debtor_id", debtorId)
     .order("data_envio", { ascending: false })
-    .limit(100);
+    .limit(200);
 
-  const nextStatus = (schedules ?? []).reduce(
-    (best: string, row: any) => {
-      const current = String(row?.status ?? "").toLowerCase();
-      return statusPriority(current) > statusPriority(best) ? current : best;
-    },
-    "",
-  );
+  const currentMonthStatus = deriveCurrentMonthDebtorStatus((schedules ?? []) as DebtorScheduleStatusRow[]);
+  const nextStatus =
+    currentMonthStatus !== "ativo"
+      ? currentMonthStatus
+      : (schedules ?? []).reduce(
+          (best: string, row: any) => {
+            const current = String(row?.status ?? "").toLowerCase();
+            return statusPriority(current) > statusPriority(best) ? current : best;
+          },
+          "",
+        );
 
   await admin
     .from("debtors")
