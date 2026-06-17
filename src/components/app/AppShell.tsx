@@ -427,13 +427,13 @@ export function AppShell({
                 Confirme se o cliente realmente pagou. Só então a cobrança será marcada como paga.
               </div>
 
-              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm">
+              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm">
                 {pendingPayment?.debtor?.nome ? (
                   <div className="font-semibold text-[var(--app-text-85)]">
                     Cliente: {pendingPayment.debtor.nome}
                   </div>
                 ) : null}
-                <div className="mt-2 text-xs text-[var(--app-text-60)]">
+                <div className={`${pendingPayment?.debtor?.nome ? "mt-2" : ""} text-xs text-[var(--app-text-60)]`}>
                   {pendingPayment?.from_phone ? `Telefone: ${pendingPayment.from_phone}` : null}
                 </div>
                 {pendingPayment?.ai_reason ? (
