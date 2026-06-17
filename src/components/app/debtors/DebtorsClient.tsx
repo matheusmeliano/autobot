@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Calendar, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import {
@@ -42,7 +42,9 @@ type FormValues = {
   nome: string;
   telefone?: string;
   valor?: string;
-  vencimento?: string;
+  vencimento_day?: string;
+  vencimento_month?: string;
+  vencimento_year?: string;
   pix_key?: string;
   observacoes?: string;
   status?: string;
@@ -63,6 +65,21 @@ const weekdayOptions = [
   { value: 7, label: "Dom" },
 ];
 
+const monthOptions = [
+  { value: "01", label: "Janeiro" },
+  { value: "02", label: "Fevereiro" },
+  { value: "03", label: "Marco" },
+  { value: "04", label: "Abril" },
+  { value: "05", label: "Maio" },
+  { value: "06", label: "Junho" },
+  { value: "07", label: "Julho" },
+  { value: "08", label: "Agosto" },
+  { value: "09", label: "Setembro" },
+  { value: "10", label: "Outubro" },
+  { value: "11", label: "Novembro" },
+  { value: "12", label: "Dezembro" },
+];
+
 function money(v: number | null) {
   if (typeof v !== "number") return "-";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -77,6 +94,56 @@ function dateBR(v: string | null) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
   return d.toLocaleDateString("pt-BR");
+}
+
+function dueDayLabel(v: string | null) {
+  if (!v) return "-";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return String(Number(v.slice(8, 10)));
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return String(d.getDate());
+}
+
+function splitDueDateParts(v: string | null | undefined, fallbackDate: Date) {
+  const fallbackYear = String(fallbackDate.getFullYear());
+  const fallbackMonth = String(fallbackDate.getMonth() + 1).padStart(2, "0");
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    return {
+      day: "",
+      month: fallbackMonth,
+      year: fallbackYear,
+      custom: false,
+    };
+  }
+  const year = v.slice(0, 4);
+  const month = v.slice(5, 7);
+  const day = String(Number(v.slice(8, 10)));
+  const custom = year !== fallbackYear || month !== fallbackMonth;
+  return { day, month, year, custom };
+}
+
+function buildDueDateIso(params: { day?: string; month?: string; year?: string }) {
+  const day = Number(String(params.day ?? "").trim());
+  const month = Number(String(params.month ?? "").trim());
+  const year = Number(String(params.year ?? "").trim());
+  if (!day) return { ok: true as const, value: undefined };
+  if (!Number.isInteger(day) || day < 1 || day > 31) {
+    return { ok: false as const, error: "Informe um dia de vencimento entre 1 e 31." };
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return { ok: false as const, error: "Informe um mes de vencimento valido." };
+  }
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) {
+    return { ok: false as const, error: "Informe um ano de vencimento valido." };
+  }
+  const lastDay = new Date(year, month, 0).getDate();
+  if (day > lastDay) {
+    return { ok: false as const, error: `Esse mes possui apenas ${lastDay} dias.` };
+  }
+  return {
+    ok: true as const,
+    value: `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
 }
 
 function debtorStatusLabel(status: string | null | undefined) {
@@ -222,6 +289,9 @@ function normalizePixKeyForSave(raw: string) {
 
 export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
   const pageSize = 5;
+  const currentDate = useMemo(() => new Date(), []);
+  const currentMonth = String(currentDate.getMonth() + 1).padStart(2, "0");
+  const currentYear = String(currentDate.getFullYear());
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<DebtorRow[]>(initial);
@@ -229,7 +299,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DebtorRow | null>(null);
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>("desconhecida");
-  const vencimentoInputRef = useRef<HTMLInputElement | null>(null);
+  const [customDueDate, setCustomDueDate] = useState(false);
   const canCreate = plan === "pro" || plan === "vitalicio" || rows.length < 15;
 
   const filtered = useMemo(() => {
@@ -267,7 +337,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       nome: "",
       telefone: "",
       valor: "",
-      vencimento: "",
+      vencimento_day: "",
+      vencimento_month: currentMonth,
+      vencimento_year: currentYear,
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -279,21 +351,18 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     },
   });
 
-  const vencimentoField = register("vencimento");
-  const openVencimentoPicker = () => {
-    vencimentoInputRef.current?.showPicker?.();
-    vencimentoInputRef.current?.focus();
-  };
-
   const close = () => {
     setOpen(false);
     setEditing(null);
     setPixKeyType("desconhecida");
+    setCustomDueDate(false);
     reset({
       nome: "",
       telefone: "",
       valor: "",
-      vencimento: "",
+      vencimento_day: "",
+      vencimento_month: currentMonth,
+      vencimento_year: currentYear,
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -315,15 +384,19 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   };
 
   const openEdit = (row: DebtorRow) => {
+    const dueParts = splitDueDateParts(row.vencimento, currentDate);
     setEditing(row);
     setOpen(true);
     setPixKeyType(detectPixKeyType(row.pix_key ?? ""));
+    setCustomDueDate(dueParts.custom);
     reset({
       id: row.id,
       nome: row.nome,
       telefone: row.telefone ?? "",
       valor: row.valor != null ? String(row.valor) : "",
-      vencimento: row.vencimento ?? "",
+      vencimento_day: dueParts.day,
+      vencimento_month: dueParts.month,
+      vencimento_year: dueParts.year,
       pix_key: row.pix_key ? formatPixKey(row.pix_key) : "",
       observacoes: row.observacoes ?? "",
       status: row.status ?? "ativo",
@@ -338,12 +411,21 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   const onSubmit = handleSubmit(async (values) => {
     const valor = values.valor ? parseBRLToNumber(values.valor) : null;
     const pixKey = values.pix_key ? normalizePixKeyForSave(values.pix_key) : null;
+    const dueDateResult = buildDueDateIso({
+      day: values.vencimento_day,
+      month: customDueDate ? values.vencimento_month : currentMonth,
+      year: customDueDate ? values.vencimento_year : currentYear,
+    });
+    if (!dueDateResult.ok) {
+      modalToast.error(dueDateResult.error);
+      return;
+    }
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       nome: values.nome,
       telefone: values.telefone || undefined,
       valor: typeof valor === "number" ? valor : undefined,
-      vencimento: values.vencimento || undefined,
+      vencimento: dueDateResult.value,
       pix_key: pixKey ? pixKey : undefined,
       observacoes: values.observacoes || undefined,
       status: values.status || "ativo",
@@ -452,7 +534,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
                     <div className="col-span-2 text-center">{money(r.valor)}</div>
                     <div className="col-span-2 text-center text-white/60">
-                      {dateBR(r.vencimento)}
+                      {dueDayLabel(r.vencimento)}
                     </div>
                     <div className="col-span-1 flex justify-center">
                       <span
@@ -600,27 +682,55 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       <div className="text-xs font-semibold text-white/60">
                         Vencimento
                       </div>
-                      <div className="relative mt-2">
-                        <input
-                          type="date"
-                          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-                          {...vencimentoField}
-                          onFocus={openVencimentoPicker}
-                          onClick={openVencimentoPicker}
-                          ref={(el) => {
-                            vencimentoField.ref(el);
-                            vencimentoInputRef.current = el;
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={openVencimentoPicker}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
-                          aria-label="Selecionar vencimento"
-                        >
-                          <Calendar className="h-4 w-4" />
-                        </button>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Por padrao, o dia informado usa o mes e o ano atuais.
                       </div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        inputMode="numeric"
+                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                        placeholder="Dia do vencimento"
+                        {...register("vencimento_day")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCustomDueDate((prev) => !prev)}
+                        className="mt-2 text-left text-xs font-semibold text-[var(--app-text-60)] hover:text-[var(--app-text-85)]"
+                      >
+                        {customDueDate ? "Usar mes atual" : "Definir outro mes/ano"}
+                      </button>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Mes atual: {monthOptions.find((m) => m.value === currentMonth)?.label} de {currentYear}
+                      </div>
+                      {customDueDate ? (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <div className="text-xs font-semibold text-white/60">Mes</div>
+                            <select
+                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                              {...register("vencimento_month")}
+                            >
+                              {monthOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-white/60">Ano</div>
+                            <input
+                              type="number"
+                              min={2000}
+                              max={9999}
+                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                              {...register("vencimento_year")}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
