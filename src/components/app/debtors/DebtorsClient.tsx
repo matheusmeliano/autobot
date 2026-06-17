@@ -682,27 +682,27 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       <div className="text-xs font-semibold text-white/60">
                         Vencimento
                       </div>
-                      <div className="mt-1 text-[11px] text-white/45">
-                        Por padrao, o dia informado usa o mes e o ano atuais.
-                      </div>
-                      <input
-                        type="number"
-                        min={1}
-                        max={31}
-                        inputMode="numeric"
-                        className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                        placeholder="Dia do vencimento"
-                        {...register("vencimento_day")}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setCustomDueDate((prev) => !prev)}
-                        className="mt-2 text-left text-xs font-semibold text-[var(--app-text-60)] hover:text-[var(--app-text-85)]"
-                      >
-                        {customDueDate ? "Usar mes atual" : "Definir outro mes/ano"}
-                      </button>
-                      <div className="mt-1 text-[11px] text-white/45">
-                        Mes atual: {monthOptions.find((m) => m.value === currentMonth)?.label} de {currentYear}
+                      <div className="mt-2 rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+                        <input
+                          type="number"
+                          min={1}
+                          max={31}
+                          inputMode="numeric"
+                          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                          placeholder="Dia do vencimento"
+                          {...register("vencimento_day")}
+                        />
+                        <div className="mt-2 text-[11px] text-white/45">
+                          Informe apenas o dia. O sistema usa automaticamente{" "}
+                          {monthOptions.find((m) => m.value === currentMonth)?.label} de {currentYear}.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCustomDueDate((prev) => !prev)}
+                          className="mt-3 text-left text-xs font-semibold text-[var(--app-text-60)] hover:text-[var(--app-text-85)]"
+                        >
+                          {customDueDate ? "Usar mes atual" : "Definir outro mes/ano"}
+                        </button>
                       </div>
                       {customDueDate ? (
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
