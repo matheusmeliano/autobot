@@ -11,6 +11,14 @@ import {
   updateDebtorAction,
 } from "@/app/app/clientes/actions";
 import { type PlanKey } from "@/lib/plans";
+import {
+  DEFAULT_RETRY_AUTO_CLOSE_DAYS,
+  DEFAULT_RETRY_INTERVAL_DAYS,
+  DEFAULT_RETRY_MAX_ATTEMPTS,
+  DEFAULT_RETRY_TIME,
+  DEFAULT_RETRY_WEEKDAYS,
+  normalizeRetryWeekdays,
+} from "@/lib/chargeRetry";
 
 export type DebtorRow = {
   id: string;
@@ -21,6 +29,11 @@ export type DebtorRow = {
   pix_key: string | null;
   observacoes: string | null;
   status: string;
+  retry_weekdays: number[] | null;
+  retry_time: string | null;
+  retry_max_attempts: number | null;
+  retry_interval_days: number | null;
+  retry_auto_close_days: number | null;
   created_at: string;
 };
 
@@ -33,7 +46,22 @@ type FormValues = {
   pix_key?: string;
   observacoes?: string;
   status?: string;
+  retry_weekdays: number[];
+  retry_time: string;
+  retry_max_attempts: number;
+  retry_interval_days: number;
+  retry_auto_close_days: number;
 };
+
+const weekdayOptions = [
+  { value: 1, label: "Seg" },
+  { value: 2, label: "Ter" },
+  { value: 3, label: "Qua" },
+  { value: 4, label: "Qui" },
+  { value: 5, label: "Sex" },
+  { value: 6, label: "Sab" },
+  { value: 7, label: "Dom" },
+];
 
 function money(v: number | null) {
   if (typeof v !== "number") return "-";
@@ -54,7 +82,28 @@ function dateBR(v: string | null) {
 function debtorStatusLabel(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
   if (s === "ativo") return "Ativo";
+  if (s === "agendado") return "Agendado";
+  if (s === "pendente") return "Pendente";
+  if (s === "pago") return "Pago";
+  if (s === "atrasado") return "Atrasado";
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "-";
+}
+
+function debtorStatusClass(status: string | null | undefined) {
+  const s = String(status ?? "").trim().toLowerCase();
+  if (s === "ativo" || s === "pago") {
+    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
+  }
+  if (s === "agendado") {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-600";
+  }
+  if (s === "pendente" || s === "suspeita_de_pagamento") {
+    return "border-orange-500/30 bg-orange-500/10 text-orange-600";
+  }
+  if (s === "atrasado") {
+    return "border-rose-500/30 bg-rose-500/10 text-rose-600";
+  }
+  return "border-white/10 bg-white/[0.04] text-white/70";
 }
 
 function digitsOnly(v: string) {
@@ -222,6 +271,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: "",
       observacoes: "",
       status: "ativo",
+      retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
+      retry_time: DEFAULT_RETRY_TIME,
+      retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     },
   });
 
@@ -243,6 +297,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: "",
       observacoes: "",
       status: "ativo",
+      retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
+      retry_time: DEFAULT_RETRY_TIME,
+      retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     });
   };
 
@@ -268,6 +327,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: row.pix_key ? formatPixKey(row.pix_key) : "",
       observacoes: row.observacoes ?? "",
       status: row.status ?? "ativo",
+      retry_weekdays: normalizeRetryWeekdays(row.retry_weekdays),
+      retry_time: row.retry_time ?? DEFAULT_RETRY_TIME,
+      retry_max_attempts: row.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_interval_days: row.retry_interval_days ?? DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: row.retry_auto_close_days ?? DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     });
   };
 
@@ -283,6 +347,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: pixKey ? pixKey : undefined,
       observacoes: values.observacoes || undefined,
       status: values.status || "ativo",
+      retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
+      retry_time: values.retry_time || DEFAULT_RETRY_TIME,
+      retry_max_attempts: Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_interval_days: Number(values.retry_interval_days) || DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: Number(values.retry_auto_close_days) || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     };
 
     const res = editing
@@ -389,9 +458,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       <span
                         className={[
                           "inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold",
-                          String(r.status ?? "").trim().toLowerCase() === "ativo"
-                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
-                            : "border-white/10 bg-white/[0.04] text-white/70",
+                          debtorStatusClass(r.status),
                         ].join(" ")}
                       >
                         {debtorStatusLabel(r.status)}
@@ -607,6 +674,94 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       placeholder="Notas internas"
                       {...register("observacoes")}
                     />
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                    <div className="text-xs font-semibold text-white/70">
+                      Reenvio de cobrança em atraso
+                    </div>
+                    <div className="mt-1 text-[11px] text-white/45">
+                      Define em quais dias e condições o sistema pode reenviar cobranças não pagas.
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="text-xs font-semibold text-white/60">Dias permitidos</div>
+                      <Controller
+                        control={control}
+                        name="retry_weekdays"
+                        render={({ field }) => {
+                          const current = normalizeRetryWeekdays(field.value);
+                          return (
+                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                              {weekdayOptions.map((option) => {
+                                const active = current.includes(option.value);
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => {
+                                      const next = active
+                                        ? current.filter((item) => item !== option.value)
+                                        : [...current, option.value];
+                                      field.onChange(normalizeRetryWeekdays(next));
+                                    }}
+                                    className={[
+                                      "rounded-xl border px-3 py-2 text-xs font-semibold",
+                                      active
+                                        ? "border-[var(--app-border)] bg-[var(--app-hover)] text-[var(--app-text-85)]"
+                                        : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.05]",
+                                    ].join(" ")}
+                                  >
+                                    {option.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div>
+                        <div className="text-xs font-semibold text-white/60">Horário de reenvio</div>
+                        <input
+                          type="time"
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                          {...register("retry_time")}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white/60">Máximo de tentativas</div>
+                        <input
+                          type="number"
+                          min={1}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                          {...register("retry_max_attempts", { valueAsNumber: true })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <div>
+                        <div className="text-xs font-semibold text-white/60">Intervalo entre tentativas (dias)</div>
+                        <input
+                          type="number"
+                          min={1}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                          {...register("retry_interval_days", { valueAsNumber: true })}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white/60">Encerrar automaticamente após (dias)</div>
+                        <input
+                          type="number"
+                          min={1}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                          {...register("retry_auto_close_days", { valueAsNumber: true })}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <button

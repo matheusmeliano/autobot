@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 export const runtime = "nodejs";
 
@@ -431,7 +432,7 @@ export async function POST(req: Request) {
         .select("id, status")
         .eq("user_id", userId)
         .eq("debtor_id", debtorId)
-        .in("status", ["agendado", "pausado", "suspeita_de_pagamento"])
+        .in("status", ["agendado", "pausado", "pendente", "atrasado", "suspeita_de_pagamento"])
         .order("data_envio", { ascending: true })
         .limit(1)
         .maybeSingle()
@@ -443,6 +444,7 @@ export async function POST(req: Request) {
         .select("id, status")
         .eq("user_id", userId)
         .eq("debtor_id", debtorId)
+        .in("status", ["agendado", "pausado", "pendente", "atrasado", "suspeita_de_pagamento"])
         .order("data_envio", { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -453,6 +455,9 @@ export async function POST(req: Request) {
 
   if (scheduleId) {
     await admin.from("schedules").update({ status: "suspeita_de_pagamento" }).eq("id", scheduleId);
+    if (debtorId) {
+      await syncDebtorChargeStatus(admin, userId, debtorId);
+    }
   }
 
   await admin.from("payment_suspicions").insert({

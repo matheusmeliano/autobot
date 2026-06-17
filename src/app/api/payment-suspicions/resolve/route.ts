@@ -1,6 +1,8 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { markSchedulePaidAction } from "@/app/app/agenda/actions";
+import { getResumeStatusAfterSuspicion } from "@/lib/chargeRetry";
+import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
     if (scheduleId) {
       const { data: schedule } = await admin
         .from("schedules")
-        .select("id, user_id, data_envio, status, recurrence")
+        .select("id, user_id, debtor_id, data_envio, status, recurrence")
         .eq("id", scheduleId)
         .maybeSingle();
 
@@ -48,14 +50,8 @@ export async function POST(req: Request) {
           return Response.json({ ok: false, error: paidRes.error ?? "Falha ao marcar pagamento." }, { status: 500 });
         }
       } else if (schedule?.id) {
-        await admin.from("schedule_runs").insert({
-          user_id: userId,
-          schedule_id: scheduleId,
-          scheduled_for: String((schedule as any)?.data_envio ?? nowIso),
-          executed_at: nowIso,
-          status: "executado",
-        });
-        await admin.from("schedules").update({ status: "executado" }).eq("id", scheduleId);
+        await admin.from("schedules").update({ status: "pago", payment_received_at: nowIso, closed_at: nowIso }).eq("id", scheduleId);
+        await syncDebtorChargeStatus(admin, userId, String((schedule as any)?.debtor_id ?? ""));
       }
     }
 
@@ -76,7 +72,20 @@ export async function POST(req: Request) {
   }
 
   if (scheduleId) {
-    await admin.from("schedules").update({ status: "agendado" }).eq("id", scheduleId);
+    const { data: schedule } = await admin
+      .from("schedules")
+      .select("id, debtor_id, status, first_sent_at, last_sent_at, schedule_timezone")
+      .eq("id", scheduleId)
+      .maybeSingle();
+    const nextStatus = getResumeStatusAfterSuspicion({
+      status: String((schedule as any)?.status ?? ""),
+      firstSentAt: String((schedule as any)?.first_sent_at ?? "") || null,
+      lastSentAt: String((schedule as any)?.last_sent_at ?? "") || null,
+      nowUtcIso: nowIso,
+      timeZone: String((schedule as any)?.schedule_timezone ?? "") || "America/Sao_Paulo",
+    });
+    await admin.from("schedules").update({ status: nextStatus }).eq("id", scheduleId);
+    await syncDebtorChargeStatus(admin, userId, String((schedule as any)?.debtor_id ?? ""));
   }
 
   await admin.from("payment_suspicions").update({ status: "rejected", resolved_at: nowIso }).eq("id", id);

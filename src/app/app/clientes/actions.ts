@@ -3,6 +3,13 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan } from "@/lib/plans";
+import {
+  DEFAULT_RETRY_AUTO_CLOSE_DAYS,
+  DEFAULT_RETRY_INTERVAL_DAYS,
+  DEFAULT_RETRY_MAX_ATTEMPTS,
+  DEFAULT_RETRY_TIME,
+  normalizeRetryWeekdays,
+} from "@/lib/chargeRetry";
 
 const createSchema = z.object({
   nome: z.string().min(2),
@@ -12,6 +19,11 @@ const createSchema = z.object({
   pix_key: z.string().optional(),
   observacoes: z.string().optional(),
   status: z.string().optional(),
+  retry_weekdays: z.array(z.coerce.number().int().min(1).max(7)).optional(),
+  retry_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  retry_max_attempts: z.coerce.number().int().min(1).max(100).optional(),
+  retry_interval_days: z.coerce.number().int().min(1).max(365).optional(),
+  retry_auto_close_days: z.coerce.number().int().min(1).max(365).optional(),
 });
 
 const updateSchema = createSchema.extend({
@@ -49,6 +61,11 @@ export async function createDebtorAction(input: unknown) {
     pix_key: parsed.data.pix_key || null,
     observacoes: parsed.data.observacoes || null,
     status: parsed.data.status || "ativo",
+    retry_weekdays: normalizeRetryWeekdays(parsed.data.retry_weekdays),
+    retry_time: parsed.data.retry_time || DEFAULT_RETRY_TIME,
+    retry_max_attempts: parsed.data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
+    retry_interval_days: parsed.data.retry_interval_days || DEFAULT_RETRY_INTERVAL_DAYS,
+    retry_auto_close_days: parsed.data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
   });
 
   if (error) return { ok: false, error: error.message };
@@ -74,6 +91,11 @@ export async function updateDebtorAction(input: unknown) {
       pix_key: data.pix_key || null,
       observacoes: data.observacoes || null,
       status: data.status || "ativo",
+      retry_weekdays: normalizeRetryWeekdays(data.retry_weekdays),
+      retry_time: data.retry_time || DEFAULT_RETRY_TIME,
+      retry_max_attempts: data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_interval_days: data.retry_interval_days || DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     })
     .eq("id", id);
 

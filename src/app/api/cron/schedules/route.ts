@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { nextMonthlyIso, shouldContinueMonthlyRecurrence } from "@/lib/recurrence";
+import { hasAutoCloseExpired, isPastLocalDay, nextRetryUtcIso, normalizeRetryConfig } from "@/lib/chargeRetry";
+import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 // #region debug-point extra-send-cron-bootstrap
 const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
@@ -148,12 +149,67 @@ export async function GET(req: Request) {
   });
   // #endregion
 
+  const { data: pendingSchedules, error: pendingError } = await supabase
+    .from("schedules")
+    .select(
+      "id, user_id, debtor_id, data_envio, charge_due_at, last_sent_at, first_sent_at, retry_attempts, status, schedule_timezone, debtors(retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days)",
+    )
+    .eq("status", "pendente")
+    .is("closed_at", null)
+    .limit(200);
+
+  if (pendingError) {
+    return Response.json({ ok: false, error: pendingError.message, deployment }, { status: 500 });
+  }
+
+  for (const item of pendingSchedules ?? []) {
+    const timeZone = String((item as any).schedule_timezone ?? "") || "America/Sao_Paulo";
+    const referenceUtcIso =
+      String((item as any).last_sent_at ?? "") ||
+      String((item as any).first_sent_at ?? "") ||
+      String((item as any).charge_due_at ?? "") ||
+      String((item as any).data_envio ?? nowIso);
+    if (!referenceUtcIso || !isPastLocalDay({ referenceUtcIso, nowUtcIso: nowIso, timeZone })) continue;
+
+    const retryConfig = normalizeRetryConfig((item as any).debtors ?? {});
+    const retryAttempts = Number((item as any).retry_attempts ?? 0);
+    const shouldClose =
+      retryAttempts >= retryConfig.maxAttempts ||
+      hasAutoCloseExpired({
+        firstSentAt: String((item as any).first_sent_at ?? "") || referenceUtcIso,
+        nowUtcIso: nowIso,
+        timeZone,
+        autoCloseDays: retryConfig.autoCloseDays,
+      });
+
+    const updatePayload = shouldClose
+      ? { status: "atrasado", closed_at: nowIso }
+      : {
+          status: "atrasado",
+          data_envio: nextRetryUtcIso({
+            fromUtcIso: referenceUtcIso,
+            timeZone,
+            weekdays: retryConfig.weekdays,
+            time: retryConfig.time,
+            intervalDays: retryConfig.intervalDays,
+          }),
+        };
+
+    await supabase.from("schedules").update(updatePayload).eq("id", String((item as any).id));
+    await syncDebtorChargeStatus(
+      supabase,
+      String((item as any).user_id ?? ""),
+      String((item as any).debtor_id ?? ""),
+    );
+  }
+
   const { data: schedules, error } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), message_templates(conteudo)",
     )
-    .in("status", ["agendado", "pausado"])
+    .in("status", ["agendado", "atrasado", "pausado"])
+    .is("closed_at", null)
     .lte("data_envio", nowIso)
     .order("data_envio", { ascending: true })
     .limit(100);
@@ -239,30 +295,6 @@ export async function GET(req: Request) {
         throw new Error("WhatsApp desconectado");
       }
 
-      const recurrence = String((s as any).recurrence ?? "none");
-      const tz = String((s as any).schedule_timezone ?? "");
-      const day = Number((s as any).recurrence_day ?? 1);
-      const time = String((s as any).recurrence_time ?? "");
-      const nextIso =
-        recurrence === "monthly"
-          ? nextMonthlyIso({
-              fromUtcIso: scheduledFor,
-              timeZone: tz || "America/Sao_Paulo",
-              day,
-              time: time || "00:00",
-            })
-          : null;
-      const nextState =
-        recurrence === "monthly"
-          ? shouldContinueMonthlyRecurrence({
-              nextUtcIso: String(nextIso),
-              recurrenceUntil: String((s as any).recurrence_until ?? "") || null,
-              timeZone: tz || "America/Sao_Paulo",
-            })
-            ? { status: "agendado", data_envio: String(nextIso) }
-            : { status: "executado" }
-          : { status: "executado" };
-
       const { data: existingRun } = await supabase
         .from("schedule_runs")
         .select("id, status")
@@ -277,10 +309,18 @@ export async function GET(req: Request) {
           scheduleId,
           scheduledFor,
           existingRunId: String(existingRun.id),
-          nextState,
+          nextStatus: "pendente",
         });
         // #endregion
-        await supabase.from("schedules").update(nextState).eq("id", scheduleId);
+        await supabase
+          .from("schedules")
+          .update({
+            status: "pendente",
+            first_sent_at: String((s as any).first_sent_at ?? "") || nowIso,
+            last_sent_at: nowIso,
+          })
+          .eq("id", scheduleId);
+        await syncDebtorChargeStatus(supabase, userId, String((s as any).debtor_id ?? ""));
         results.push({ id: scheduleId, ok: true });
         continue;
       }
@@ -301,7 +341,7 @@ export async function GET(req: Request) {
         debtorPhone,
         normalizedPhone: normalizePhone(debtorPhone),
         messagePreview: message.slice(0, 120),
-        nextState,
+        nextStatus: "pendente",
       });
       // #endregion
       await sendZapiText({
@@ -322,14 +362,23 @@ export async function GET(req: Request) {
       });
       if (runError) throw new Error(runError.message);
 
-      const { error: updateError } = await supabase.from("schedules").update(nextState).eq("id", scheduleId);
+      const { error: updateError } = await supabase
+        .from("schedules")
+        .update({
+          status: "pendente",
+          first_sent_at: String((s as any).first_sent_at ?? "") || nowIso,
+          last_sent_at: nowIso,
+          retry_attempts: Number((s as any).retry_attempts ?? 0) + 1,
+        })
+        .eq("id", scheduleId);
       if (updateError) throw new Error(updateError.message);
+      await syncDebtorChargeStatus(supabase, userId, String((s as any).debtor_id ?? ""));
 
       // #region debug-point extra-send-cron-success
       __dbg("C", "cron-send-success", {
         scheduleId,
         scheduledFor,
-        nextState,
+        nextStatus: "pendente",
         messageSent,
       });
       // #endregion
@@ -343,7 +392,6 @@ export async function GET(req: Request) {
       results.push({ id: scheduleId, ok: true });
     } catch (e: any) {
       const msg = String(e?.message ?? "Erro desconhecido");
-      const recurrence = String((s as any)?.recurrence ?? "none");
       const scheduledFor = String((s as any)?.data_envio ?? nowIso);
       const wasExecuted = await supabase
         .from("schedule_runs")
@@ -352,7 +400,7 @@ export async function GET(req: Request) {
         .eq("scheduled_for", scheduledFor)
         .eq("status", "executado")
         .maybeSingle();
-      if (recurrence === "monthly" && !wasExecuted.data?.id) {
+      if (!wasExecuted.data?.id) {
         await supabase.from("schedule_runs").insert({
           user_id: userId,
           schedule_id: scheduleId,
@@ -371,7 +419,7 @@ export async function GET(req: Request) {
         const retryAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
         await supabase
           .from("schedules")
-          .update({ status: "agendado", data_envio: retryAt })
+          .update({ status: String((s as any)?.status ?? "") === "atrasado" ? "atrasado" : "agendado", data_envio: retryAt })
           .eq("id", scheduleId);
         // #region debug-point extra-send-cron-retry
         __dbg("D", "cron-retry-scheduled", {
@@ -387,7 +435,7 @@ export async function GET(req: Request) {
         scheduleId,
         scheduledFor,
         error: msg,
-        recurrence,
+        currentStatus: String((s as any)?.status ?? ""),
         wasExecuted: Boolean(wasExecuted.data?.id),
       });
       // #endregion

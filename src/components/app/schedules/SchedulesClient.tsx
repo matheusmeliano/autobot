@@ -229,10 +229,24 @@ export function SchedulesClient({
   const statusLabel = (raw: unknown) => {
     const s = String(raw ?? "");
     if (s === "agendado") return "Agendado";
+    if (s === "pendente") return "Pendente";
+    if (s === "pago") return "Pago";
+    if (s === "atrasado") return "Atrasado";
     if (s === "executando") return "Executando";
     if (s === "executado") return "Executado";
     if (s === "suspeita_de_pagamento") return "Suspeita";
     return s || "-";
+  };
+
+  const statusClass = (raw: unknown) => {
+    const s = String(raw ?? "").toLowerCase();
+    if (s === "agendado") return "border-amber-500/30 bg-amber-500/10 text-amber-600";
+    if (s === "pendente" || s === "suspeita_de_pagamento") {
+      return "border-orange-500/30 bg-orange-500/10 text-orange-600";
+    }
+    if (s === "pago") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
+    if (s === "atrasado") return "border-rose-500/30 bg-rose-500/10 text-rose-600";
+    return "border-white/10 bg-white/[0.04] text-white/70";
   };
 
   const timeValue = watch("data_envio_time");
@@ -476,8 +490,12 @@ export function SchedulesClient({
       modalToast.info("Pagamento em análise. Confirme no painel para continuar.");
       return;
     }
-    if (String(row.status ?? "") === "executado") {
-      modalToast.info("Esse agendamento já foi executado.");
+    if (String(row.status ?? "") === "pendente") {
+      modalToast.info("Essa cobrança já foi enviada e está aguardando pagamento.");
+      return;
+    }
+    if (String(row.status ?? "") === "pago" || String(row.status ?? "") === "executado") {
+      modalToast.info("Essa cobrança já foi finalizada.");
       return;
     }
     if (String(row.status ?? "") === "executando") {
@@ -499,13 +517,10 @@ export function SchedulesClient({
   };
 
   const markAsPaid = async (row: ScheduleRow) => {
-    if (String(row.recurrence ?? "none") !== "monthly") {
-      modalToast.info("Essa opção está disponível apenas para agendamentos mensais.");
-      return;
-    }
-
     const confirmed = await modalToast.confirm(
-      `Marcar a mensalidade atual de "${row.debtor_nome}" como quitada e avançar a cobrança para o próximo mês?`,
+      String(row.recurrence ?? "none") === "monthly"
+        ? `Marcar a mensalidade atual de "${row.debtor_nome}" como quitada e avançar a cobrança para o próximo mês?`
+        : `Marcar a cobrança atual de "${row.debtor_nome}" como paga?`,
       {
         title: "Pagamento realizado",
         confirmText: "Confirmar",
@@ -522,7 +537,11 @@ export function SchedulesClient({
         setMarkingPaidId(null);
         return;
       }
-      modalToast.success("Mensalidade atual marcada como quitada.");
+      modalToast.success(
+        String(row.recurrence ?? "none") === "monthly"
+          ? "Mensalidade atual marcada como quitada."
+          : "Cobrança marcada como paga.",
+      );
       await refresh();
       setMarkingPaidId(null);
     });
@@ -793,7 +812,7 @@ export function SchedulesClient({
                       {timeBR(r.data_envio, effectiveTimeZone)}
                     </div>
                     <div className="col-span-1 flex justify-center">
-                      <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">
+                      <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass(r.status)}`}>
                         {statusLabel(r.status)}
                       </span>
                     </div>
@@ -805,6 +824,8 @@ export function SchedulesClient({
                           triggeringId === r.id ||
                           markingPaidId === r.id ||
                           String(r.status ?? "") === "executado" ||
+                          String(r.status ?? "") === "pendente" ||
+                          String(r.status ?? "") === "pago" ||
                           String(r.status ?? "") === "executando" ||
                           String(r.status ?? "") === "suspeita_de_pagamento"
                         }
@@ -821,21 +842,20 @@ export function SchedulesClient({
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
-                      {String(r.recurrence ?? "none") === "monthly" ? (
-                        <button
-                          onClick={() => markAsPaid(r)}
-                          disabled={
-                            isPending ||
-                            triggeringId === r.id ||
-                            markingPaidId === r.id ||
-                            savingRecurrenceLimit
-                          }
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
-                          title="Pagamento realizado"
-                        >
-                          <Check className="h-4 w-4" />
-                        </button>
-                      ) : null}
+                      <button
+                        onClick={() => markAsPaid(r)}
+                        disabled={
+                          isPending ||
+                          triggeringId === r.id ||
+                          markingPaidId === r.id ||
+                          savingRecurrenceLimit ||
+                          String(r.status ?? "") === "pago"
+                        }
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
+                        title="Pagamento realizado"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
                       {String(r.recurrence ?? "none") === "monthly" ? (
                         <button
                           onClick={() => openRecurrenceLimit(r)}
