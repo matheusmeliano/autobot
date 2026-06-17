@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
 import {
   createDebtorAction,
@@ -288,6 +289,7 @@ function normalizePixKeyForSave(raw: string) {
 }
 
 export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
+  const { theme } = useAppTheme();
   const pageSize = 5;
   const currentDate = useMemo(() => new Date(), []);
   const currentMonth = String(currentDate.getMonth() + 1).padStart(2, "0");
@@ -837,7 +839,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                         <div className="text-xs font-semibold text-white/60">Horário de reenvio</div>
                         <input
                           type="time"
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                          style={{ colorScheme: theme }}
                           {...register("retry_time")}
                         />
                       </div>
