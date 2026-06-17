@@ -650,33 +650,33 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
+                  <div className="grid gap-3">
+                    <div className="md:max-w-[calc(50%-0.375rem)]">
                       <div className="text-xs font-semibold text-white/60">Valor</div>
-                    <Controller
-                      control={control}
-                      name="valor"
-                      render={({ field }) => (
-                        <div className="relative mt-2">
-                          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/55">
-                            R$
+                      <Controller
+                        control={control}
+                        name="valor"
+                        render={({ field }) => (
+                          <div className="relative mt-2">
+                            <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/55">
+                              R$
+                            </div>
+                            <input
+                              inputMode="numeric"
+                              className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2 pl-12 pr-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                              placeholder="0,00"
+                              value={field.value ?? ""}
+                              onChange={(e) => {
+                                const next = formatBRLFromDigits(e.currentTarget.value);
+                                field.onChange(next);
+                              }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
                           </div>
-                          <input
-                            inputMode="numeric"
-                            className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2 pl-12 pr-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                            placeholder="0,00"
-                            value={field.value ?? ""}
-                            onChange={(e) => {
-                              const next = formatBRLFromDigits(e.currentTarget.value);
-                              field.onChange(next);
-                            }}
-                            onBlur={field.onBlur}
-                            name={field.name}
-                            ref={field.ref}
-                          />
-                        </div>
-                      )}
-                    />
+                        )}
+                      />
                     </div>
                     <div>
                       <div className="text-xs font-semibold text-white/60">
