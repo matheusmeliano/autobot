@@ -123,9 +123,11 @@ export function SchedulesClient({
   timeZone: BrazilTimeZone | null;
   whatsappConfigured: boolean;
 }) {
+  const pageSize = 5;
   const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState<ScheduleRow[]>(initial);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
@@ -179,6 +181,19 @@ export function SchedulesClient({
     if (!q) return rows;
     return rows.filter((r) => r.debtor_nome.toLowerCase().includes(q));
   }, [query, rows]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
+
+  const pagedRows = useMemo(() => {
+    if (!filtered.length) return [];
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage]);
 
   const recurrenceLimitMinDate = useMemo(() => {
     if (!recurrenceLimitRow || String(recurrenceLimitRow.recurrence ?? "none") !== "monthly") {
@@ -762,7 +777,7 @@ export function SchedulesClient({
               </div>
             ) : (
               <div className="divide-y divide-white/10">
-                {filtered.map((r) => (
+                {pagedRows.map((r) => (
                   <div
                     key={r.id}
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
@@ -856,6 +871,31 @@ export function SchedulesClient({
             )}
           </div>
         </div>
+        {filtered.length > pageSize ? (
+          <div className="grid grid-cols-3 items-center border-t border-white/10 px-4 py-3">
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+              aria-label="Página anterior"
+            >
+              {"<"}
+            </button>
+            <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
+              {safePage} / {totalPages}
+            </div>
+            <button
+              type="button"
+              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+              aria-label="Próxima página"
+            >
+              {">"}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[100]">

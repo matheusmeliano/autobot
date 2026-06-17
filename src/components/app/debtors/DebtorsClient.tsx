@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Calendar, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
@@ -166,9 +166,11 @@ function normalizePixKeyForSave(raw: string) {
 }
 
 export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
+  const pageSize = 5;
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<DebtorRow[]>(initial);
+  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DebtorRow | null>(null);
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>("desconhecida");
@@ -185,6 +187,19 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       );
     });
   }, [query, rows]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
+
+  const pagedRows = useMemo(() => {
+    if (!filtered.length) return [];
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage]);
 
   const {
     register,
@@ -351,7 +366,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
               </div>
             ) : (
               <div className="divide-y divide-white/10">
-                {filtered.map((r) => (
+                {pagedRows.map((r) => (
                   <div
                     key={r.id}
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
@@ -392,6 +407,31 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
             )}
           </div>
         </div>
+        {filtered.length > pageSize ? (
+          <div className="grid grid-cols-3 items-center border-t border-white/10 px-4 py-3">
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+              aria-label="Página anterior"
+            >
+              {"<"}
+            </button>
+            <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
+              {safePage} / {totalPages}
+            </div>
+            <button
+              type="button"
+              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+              aria-label="Próxima página"
+            >
+              {">"}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[100]">
