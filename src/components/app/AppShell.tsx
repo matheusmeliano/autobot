@@ -43,6 +43,8 @@ export function AppShell({
   const [themeGateDraft, setThemeGateDraft] = useState<AppTheme>("dark");
   const [themeGateSaving, setThemeGateSaving] = useState(false);
   const [themeGateError, setThemeGateError] = useState<string>("");
+  const [pendingPayment, setPendingPayment] = useState<any | null>(null);
+  const [paymentResolving, setPaymentResolving] = useState<"confirm" | "reject" | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -253,6 +255,69 @@ export function AppShell({
 
   const showAdmin = isGlobalAdminEmail(email);
 
+  const fetchPendingPayment = useCallback(async () => {
+    if (!authChecked) return;
+    if (!isAuthed) return;
+    try {
+      const res = await fetch("/api/payment-suspicions/pending", { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) return;
+      const next = json?.pending ?? null;
+      setPendingPayment((prev: any) => {
+        if (!next && !prev) return prev;
+        if (!next && prev) return null;
+        if (next && prev && String(next.id) === String(prev.id)) return prev;
+        return next;
+      });
+    } catch {}
+  }, [authChecked, isAuthed]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!isAuthed) return;
+    fetchPendingPayment();
+    const id = window.setInterval(() => fetchPendingPayment(), 8000);
+    const onFocus = () => fetchPendingPayment();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchPendingPayment();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [authChecked, fetchPendingPayment, isAuthed]);
+
+  const resolvePendingPayment = useCallback(
+    async (decision: "confirm" | "reject") => {
+      if (!pendingPayment?.id) return;
+      if (paymentResolving) return;
+      setPaymentResolving(decision);
+      try {
+        const res = await fetch("/api/payment-suspicions/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: pendingPayment.id, decision }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.ok) {
+          modalToast.error(json?.error ?? "Falha ao confirmar pagamento.");
+          return;
+        }
+        setPendingPayment(null);
+        modalToast.success(decision === "confirm" ? "Pagamento confirmado." : "Suspeita rejeitada.");
+        router.refresh();
+      } catch {
+        modalToast.error("Falha ao confirmar pagamento.");
+      } finally {
+        setPaymentResolving(null);
+      }
+    },
+    [paymentResolving, pendingPayment, router],
+  );
+
   if (authChecked && !isAuthed) return null;
 
   const currentPath = pathname ?? "";
@@ -351,6 +416,68 @@ export function AppShell({
         <div className="fixed inset-x-0 bottom-0 bg-[var(--app-bg)] min-[1201px]:hidden">
         <AppNav variant="bottom" restricted={restricted} plan={plan} />
       </div>
+
+        {pendingPayment ? (
+          <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/60 px-4 py-10">
+            <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-modal-bg)] p-6">
+              <div className="text-sm font-semibold tracking-tight text-[var(--app-text-85)]">
+                Possível pagamento detectado
+              </div>
+              <div className="mt-2 text-sm text-[var(--app-text-60)]">
+                Confirme se o cliente realmente pagou. Só então a cobrança será marcada como paga.
+              </div>
+
+              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm">
+                <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Cliente</div>
+                <div className="mt-1 font-semibold text-[var(--app-text-85)]">
+                  {pendingPayment?.debtor?.nome ?? "—"}
+                </div>
+                <div className="mt-2 text-xs text-[var(--app-text-60)]">
+                  {pendingPayment?.from_phone ? `Telefone: ${pendingPayment.from_phone}` : null}
+                </div>
+                {pendingPayment?.ai_reason ? (
+                  <div className="mt-2 text-xs text-[var(--app-text-60)]">
+                    Motivo: {pendingPayment.ai_reason}
+                  </div>
+                ) : null}
+                {pendingPayment?.message_text ? (
+                  <div className="mt-3 whitespace-pre-wrap text-xs text-[var(--app-text-60)]">
+                    {pendingPayment.message_text}
+                  </div>
+                ) : null}
+                {pendingPayment?.media_url ? (
+                  <a
+                    href={pendingPayment.media_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex text-xs font-semibold text-[var(--app-text-85)] underline"
+                  >
+                    Ver anexo
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={Boolean(paymentResolving)}
+                  onClick={() => resolvePendingPayment("reject")}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
+                >
+                  {paymentResolving === "reject" ? "Enviando..." : "Não é pagamento"}
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(paymentResolving)}
+                  onClick={() => resolvePendingPayment("confirm")}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-btn-primary-bg)] px-4 text-sm font-semibold text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {paymentResolving === "confirm" ? "Confirmando..." : "Confirmar pagamento"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {showThemeGate ? (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4 py-10">

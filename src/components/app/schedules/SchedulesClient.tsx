@@ -211,6 +211,15 @@ export function SchedulesClient({
     },
   });
 
+  const statusLabel = (raw: unknown) => {
+    const s = String(raw ?? "");
+    if (s === "agendado") return "Agendado";
+    if (s === "executando") return "Executando";
+    if (s === "executado") return "Executado";
+    if (s === "suspeita_de_pagamento") return "Suspeita";
+    return s || "-";
+  };
+
   const timeValue = watch("data_envio_time");
   const recurrenceValue = watch("recurrence");
 
@@ -446,6 +455,10 @@ export function SchedulesClient({
     const msg = prereqMessage("disparar");
     if (msg) {
       modalToast.error(msg);
+      return;
+    }
+    if (String(row.status ?? "") === "suspeita_de_pagamento") {
+      modalToast.info("Pagamento em análise. Confirme no painel para continuar.");
       return;
     }
     if (String(row.status ?? "") === "executado") {
@@ -766,7 +779,7 @@ export function SchedulesClient({
                     </div>
                     <div className="col-span-1 flex justify-center">
                       <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">
-                        {r.status}
+                        {statusLabel(r.status)}
                       </span>
                     </div>
                     <div className="col-span-3 flex flex-nowrap justify-end gap-2">
@@ -776,7 +789,9 @@ export function SchedulesClient({
                           isPending ||
                           triggeringId === r.id ||
                           markingPaidId === r.id ||
-                          String(r.status ?? "") === "executado"
+                          String(r.status ?? "") === "executado" ||
+                          String(r.status ?? "") === "executando" ||
+                          String(r.status ?? "") === "suspeita_de_pagamento"
                         }
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
                         title="Disparar agora"
