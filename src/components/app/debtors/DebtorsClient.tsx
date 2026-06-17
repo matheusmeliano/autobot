@@ -51,6 +51,12 @@ function dateBR(v: string | null) {
   return d.toLocaleDateString("pt-BR");
 }
 
+function debtorStatusLabel(status: string | null | undefined) {
+  const s = String(status ?? "").trim().toLowerCase();
+  if (s === "ativo") return "Ativo";
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "-";
+}
+
 function digitsOnly(v: string) {
   return v.replace(/\D/g, "");
 }
@@ -380,8 +386,15 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       {dateBR(r.vencimento)}
                     </div>
                     <div className="col-span-1 flex justify-center">
-                      <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">
-                        {r.status}
+                      <span
+                        className={[
+                          "inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold",
+                          String(r.status ?? "").trim().toLowerCase() === "ativo"
+                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                            : "border-white/10 bg-white/[0.04] text-white/70",
+                        ].join(" ")}
+                      >
+                        {debtorStatusLabel(r.status)}
                       </span>
                     </div>
                     <div className="col-span-2 flex justify-end gap-2">
