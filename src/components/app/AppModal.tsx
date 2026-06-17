@@ -7,9 +7,9 @@ type ModalPosition = "center" | "bottom";
 type ModalSize = "md" | "lg" | "xl";
 
 const SIZE_CLASS: Record<ModalSize, string> = {
-  md: "max-w-lg",
-  lg: "max-w-2xl",
-  xl: "max-w-3xl",
+  md: "max-w-md",
+  lg: "max-w-xl",
+  xl: "max-w-2xl",
 };
 
 export function AppModal({
@@ -72,8 +72,8 @@ export function AppModal({
   const centerPanel = [
     panelBase,
     SIZE_CLASS[size],
-    "max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain",
-    "p-5 sm:p-6",
+    "max-h-[calc(100vh-8rem)] overflow-y-auto overscroll-contain",
+    "p-4 sm:p-5",
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
     panelClassName,
@@ -102,7 +102,7 @@ export function AppModal({
         />
 
         {position === "center" ? (
-          <div className="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
+          <div className="relative z-10 flex min-h-full items-center justify-center px-3 py-6 sm:px-4 sm:py-8">
             <div className={centerPanel}>{children}</div>
           </div>
         ) : (
