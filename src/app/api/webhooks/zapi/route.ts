@@ -36,6 +36,59 @@ function getFirstNonEmpty(...values: Array<unknown>) {
   return "";
 }
 
+function normalizeText(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null }) {
+  const t = normalizeText(params.text || "");
+  const hasMedia = Boolean((params.mediaUrl || "").trim());
+  const positive =
+    t.includes("pix feito") ||
+    t.includes("pix realizado") ||
+    t.includes("pix ok") ||
+    t.includes("paguei") ||
+    t.includes("ja paguei") ||
+    t.includes("ja esta pago") ||
+    t.includes("ja ta pago") ||
+    t.includes("pago") ||
+    t.includes("transferi") ||
+    t.includes("transferencia feita") ||
+    t.includes("pagamento realizado") ||
+    t.includes("segue comprovante") ||
+    t.includes("comprovante");
+
+  const negative =
+    t.includes("vou pagar") ||
+    t.includes("pagarei") ||
+    t.includes("pago amanha") ||
+    t.includes("vou fazer o pix") ||
+    t.includes("vou fazer pix") ||
+    t.includes("manda o pix") ||
+    t.includes("manda sua chave") ||
+    t.includes("qual a chave") ||
+    t.includes("posso pagar") ||
+    t.includes("como posso pagar");
+
+  const isPayment = (positive || hasMedia) && !negative;
+  if (!isPayment) {
+    return { ok: false as const };
+  }
+  return {
+    ok: true as const,
+    result: {
+      is_payment_proof: true,
+      confidence: hasMedia ? 0.9 : 0.8,
+      reason: hasMedia ? "Comprovante/anexo recebido." : "Confirmação textual de pagamento detectada.",
+      raw: { source: "heuristic", positive, negative, hasMedia },
+    },
+  };
+}
+
 async function analyzePayment(params: { text: string; mediaUrl?: string | null }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -224,25 +277,51 @@ export async function POST(req: Request) {
 
   const hasContent = Boolean((messageText || "").trim() || (mediaUrl || "").trim());
   if (!hasContent) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_recebido",
+      descricao: `Webhook recebido (sem conteúdo): instance=${instanceId} type=${eventType || "-"}`,
+    });
     return Response.json({ ok: true, ignored: true });
   }
 
-  const analysis = await analyzePayment({ text: messageText, mediaUrl: mediaUrl || null }).catch((e: any) => ({
-    ok: false as const,
-    error: String(e?.message ?? "Falha ao analisar"),
-  }));
+  await admin.from("logs").insert({
+    user_id: userId,
+    tipo: "zapi_webhook_recebido",
+    descricao: `Webhook recebido: instance=${instanceId} type=${eventType || "-"} from=${normalizePhone(fromPhone) || "-"}`,
+  });
 
-  if (!analysis.ok) {
+  const analysis =
+    (await analyzePayment({ text: messageText, mediaUrl: mediaUrl || null }).catch((e: any) => ({
+      ok: false as const,
+      error: String(e?.message ?? "Falha ao analisar"),
+    }))) || { ok: false as const, error: "Falha ao analisar" };
+
+  const fallbackRes = analysis.ok
+    ? null
+    : heuristicPaymentDetection({ text: messageText, mediaUrl: mediaUrl || null });
+  if (!analysis.ok && (!fallbackRes || !fallbackRes.ok)) {
     return Response.json({ ok: true, analyzed: false, error: analysis.error });
   }
 
-  const shouldCreate = analysis.result.is_payment_proof && analysis.result.confidence >= 0.75;
+  const fallbackResult = fallbackRes && fallbackRes.ok ? fallbackRes.result : null;
+  const finalResult = analysis.ok
+    ? analysis.result
+    : {
+        is_payment_proof: true,
+        confidence: fallbackResult?.confidence ?? 0,
+        reason: fallbackResult?.reason ?? "",
+        extracted: null,
+        raw: fallbackResult?.raw ?? null,
+      };
+
+  const shouldCreate = finalResult.is_payment_proof && finalResult.confidence >= 0.75;
   if (!shouldCreate) {
     return Response.json({
       ok: true,
       analyzed: true,
       created: false,
-      confidence: analysis.result.confidence,
+      confidence: finalResult.confidence,
     });
   }
 
@@ -262,7 +341,7 @@ export async function POST(req: Request) {
         .select("id, status")
         .eq("user_id", userId)
         .eq("debtor_id", debtorId)
-        .eq("status", "agendado")
+        .in("status", ["agendado", "pausado"])
         .order("data_envio", { ascending: true })
         .limit(1)
         .maybeSingle()
@@ -283,9 +362,9 @@ export async function POST(req: Request) {
     from_phone: normalizedFrom || fromPhone || null,
     message_text: messageText || null,
     media_url: mediaUrl || null,
-    ai_confidence: analysis.result.confidence,
-    ai_reason: analysis.result.reason || null,
-    ai_result: analysis.result.raw,
+    ai_confidence: finalResult.confidence,
+    ai_reason: finalResult.reason || null,
+    ai_result: finalResult.raw,
     status: "pending",
   });
 
