@@ -378,6 +378,53 @@ export async function POST(req: Request) {
     descricao: `Webhook recebido: instance=${instanceId} type=${eventType || "-"} from=${normalizePhone(fromPhone) || "-"}`,
   });
 
+  const normalizedFrom = normalizePhone(fromPhone);
+  if (!normalizedFrom) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_ignorado",
+      descricao: "Webhook financeiro ignorado: remetente sem telefone identificável.",
+    });
+    return Response.json({ ok: true, ignored: true, reason: "missing_sender_phone" });
+  }
+
+  const { data: debtors } = await admin
+    .from("debtors")
+    .select("id, telefone")
+    .eq("user_id", userId)
+    .limit(500);
+
+  const match = (debtors ?? []).find((d: any) => normalizePhone(String(d?.telefone ?? "")) === normalizedFrom);
+  const debtorId = match?.id ? String(match.id) : null;
+  if (!debtorId) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_ignorado",
+      descricao: `Webhook financeiro ignorado: telefone ${normalizedFrom} sem cliente cadastrado.`,
+    });
+    return Response.json({ ok: true, ignored: true, reason: "unknown_debtor" });
+  }
+
+  const { data: activeSchedule } = await admin
+    .from("schedules")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq("debtor_id", debtorId)
+    .in("status", ["pendente", "atrasado"])
+    .order("data_envio", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const scheduleId = activeSchedule?.id ? String(activeSchedule.id) : null;
+  if (!scheduleId) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_ignorado",
+      descricao: `Webhook financeiro ignorado: cliente ${debtorId} sem cobrança pendente/atrasada.`,
+    });
+    return Response.json({ ok: true, ignored: true, reason: "no_open_charge" });
+  }
+
   const analysis =
     (await analyzePayment({ text: messageText, mediaUrl: mediaUrl || null }).catch((e: any) => ({
       ok: false as const,
@@ -415,43 +462,6 @@ export async function POST(req: Request) {
       confidence: finalResult.confidence,
     });
   }
-
-  const normalizedFrom = normalizePhone(fromPhone);
-  const { data: debtors } = await admin
-    .from("debtors")
-    .select("id, telefone")
-    .eq("user_id", userId)
-    .limit(500);
-
-  const match = (debtors ?? []).find((d: any) => normalizePhone(String(d?.telefone ?? "")) === normalizedFrom);
-  const debtorId = match?.id ? String(match.id) : null;
-
-  const { data: activeSchedule } = debtorId
-    ? await admin
-        .from("schedules")
-        .select("id, status")
-        .eq("user_id", userId)
-        .eq("debtor_id", debtorId)
-        .in("status", ["agendado", "pausado", "pendente", "atrasado", "suspeita_de_pagamento"])
-        .order("data_envio", { ascending: true })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
-
-  const { data: latestSchedule } = debtorId
-    ? await admin
-        .from("schedules")
-        .select("id, status")
-        .eq("user_id", userId)
-        .eq("debtor_id", debtorId)
-        .in("status", ["agendado", "pausado", "pendente", "atrasado", "suspeita_de_pagamento"])
-        .order("data_envio", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
-
-  const relatedSchedule = activeSchedule ?? latestSchedule ?? null;
-  const scheduleId = relatedSchedule?.id ? String(relatedSchedule.id) : null;
 
   if (scheduleId) {
     await admin.from("schedules").update({ status: "suspeita_de_pagamento" }).eq("id", scheduleId);
