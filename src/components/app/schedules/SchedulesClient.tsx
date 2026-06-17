@@ -24,6 +24,8 @@ export type ScheduleRow = {
   id: string;
   debtor_id: string;
   template_id: string | null;
+  template_pending_id: string | null;
+  template_overdue_id: string | null;
   data_envio: string;
   status: string;
   recurrence?: string | null;
@@ -34,12 +36,15 @@ export type ScheduleRow = {
   created_at: string;
   debtor_nome: string;
   template_nome: string | null;
+  template_pending_nome: string | null;
+  template_overdue_nome: string | null;
 };
 
 type FormValues = {
   id?: string;
   debtor_id: string;
-  template_id?: string;
+  template_pending_id?: string;
+  template_overdue_id?: string;
   data_envio_date: string;
   data_envio_time: string;
   recurrence: "none" | "monthly";
@@ -217,7 +222,8 @@ export function SchedulesClient({
   } = useForm<FormValues>({
     defaultValues: {
       debtor_id: "",
-      template_id: "",
+      template_pending_id: "",
+      template_overdue_id: "",
       data_envio_date: "",
       data_envio_time: "",
       recurrence: "none",
@@ -286,7 +292,8 @@ export function SchedulesClient({
     setMonthlyExtras([]);
     reset({
       debtor_id: "",
-      template_id: "",
+      template_pending_id: "",
+      template_overdue_id: "",
       data_envio_date: "",
       data_envio_time: "",
       recurrence: "none",
@@ -325,7 +332,8 @@ export function SchedulesClient({
     reset({
       id: row.id,
       debtor_id: row.debtor_id,
-      template_id: row.template_id ?? "",
+      template_pending_id: row.template_pending_id ?? row.template_id ?? "",
+      template_overdue_id: row.template_overdue_id ?? row.template_id ?? "",
       data_envio_date: dt.date,
       data_envio_time: dt.time,
       recurrence: String((row as any).recurrence ?? "none") === "monthly" ? "monthly" : "none",
@@ -351,6 +359,14 @@ export function SchedulesClient({
       modalToast.warning("Selecione um cliente.");
       return;
     }
+    if (!values.template_pending_id) {
+      modalToast.warning("Selecione o template pendente.");
+      return;
+    }
+    if (!values.template_overdue_id) {
+      modalToast.warning("Selecione o template atrasado.");
+      return;
+    }
     if (!values.data_envio_date || !values.data_envio_time) {
       modalToast.warning("Selecione a data e a hora.");
       return;
@@ -367,7 +383,8 @@ export function SchedulesClient({
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       debtor_id: values.debtor_id,
-      template_id: values.template_id ? values.template_id : undefined,
+      template_pending_id: values.template_pending_id ? values.template_pending_id : undefined,
+      template_overdue_id: values.template_overdue_id ? values.template_overdue_id : undefined,
       data_envio_date: values.data_envio_date,
       data_envio_time: values.data_envio_time,
       recurrence: values.recurrence,
@@ -437,7 +454,8 @@ export function SchedulesClient({
       for (const c of monthlyExtras) {
         const extraRes = await createScheduleAction({
           debtor_id: values.debtor_id,
-          template_id: values.template_id ? values.template_id : undefined,
+          template_pending_id: values.template_pending_id ? values.template_pending_id : undefined,
+          template_overdue_id: values.template_overdue_id ? values.template_overdue_id : undefined,
           data_envio_date: c.date,
           data_envio_time: c.time,
           recurrence: "monthly",
@@ -783,7 +801,7 @@ export function SchedulesClient({
           <div className="min-w-[980px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
               <div className="col-span-3">Cliente</div>
-              <div className="col-span-2 text-center">Template</div>
+              <div className="col-span-2 text-center">Templates</div>
               <div className="col-span-2 text-center">Data</div>
               <div className="col-span-1 text-center">Hora</div>
               <div className="col-span-1 text-center">Status</div>
@@ -802,8 +820,11 @@ export function SchedulesClient({
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
                     <div className="col-span-3 truncate font-semibold">{r.debtor_nome}</div>
-                    <div className="col-span-2 truncate text-center text-white/60">
-                      {r.template_nome ?? "-"}
+                    <div className="col-span-2 min-w-0 text-center text-white/60">
+                      <div className="truncate">{r.template_pending_nome ?? "-"}</div>
+                      <div className="truncate text-[11px] text-white/40">
+                        {r.template_overdue_nome ?? "-"}
+                      </div>
                     </div>
                     <div className="col-span-2 whitespace-nowrap text-center text-white/60">
                       {dateBR(r.data_envio, effectiveTimeZone)}
@@ -955,21 +976,41 @@ export function SchedulesClient({
                 </select>
               </div>
 
-              <div>
-                <div className="text-xs font-semibold text-white/60">
-                  Template (Mensagens)
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <div className="text-xs font-semibold text-white/60">Template Pendente</div>
+                  <div className="mt-1 text-[11px] text-white/45">
+                    Utilizado no primeiro envio da cobrança.
+                  </div>
+                  <select
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                    {...register("template_pending_id")}
+                  >
+                    <option value="">Sem template</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <select
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                  {...register("template_id")}
-                >
-                  <option value="">Sem template</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.nome}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <div className="text-xs font-semibold text-white/60">Template Atrasado</div>
+                  <div className="mt-1 text-[11px] text-white/45">
+                    Utilizado em todas as tentativas após o vencimento.
+                  </div>
+                  <select
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                    {...register("template_overdue_id")}
+                  >
+                    <option value="">Sem template</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>

@@ -206,7 +206,7 @@ export async function GET(req: Request) {
   const { data: schedules, error } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .in("status", ["agendado", "atrasado", "pausado"])
     .is("closed_at", null)
@@ -246,7 +246,9 @@ export async function GET(req: Request) {
 
     try {
       const debtor = (s as any).debtors ?? null;
-      const template = (s as any).message_templates ?? null;
+      const pendingTemplate = (s as any).pending_template ?? null;
+      const overdueTemplate = (s as any).overdue_template ?? null;
+      const sourceStatus = String((s as any).status ?? "") === "atrasado" ? "atrasado" : "pendente";
 
       // #region debug-point extra-send-cron-item
       __dbg("B", "cron-item-processing", {
@@ -261,16 +263,24 @@ export async function GET(req: Request) {
       // #endregion
 
       const debtorPhone = String(debtor?.telefone ?? "");
-      const templateText = String(template?.conteudo ?? "");
+      const templateText = String(
+        sourceStatus === "atrasado" ? overdueTemplate?.conteudo ?? "" : pendingTemplate?.conteudo ?? "",
+      );
 
       if (!debtorPhone) throw new Error("Cliente sem telefone");
-      if (!templateText) throw new Error("Template sem conteúdo");
+      if (!templateText) {
+        throw new Error(
+          sourceStatus === "atrasado"
+            ? "Template atrasado sem conteúdo."
+            : "Template pendente sem conteúdo.",
+        );
+      }
 
       const { data: locked, error: lockErr } = await supabase
         .from("schedules")
         .update({ status: "executando" })
         .eq("id", scheduleId)
-        .in("status", ["agendado", "pausado"])
+        .in("status", ["agendado", "atrasado", "pausado"])
         .select("id")
         .maybeSingle();
 
@@ -342,6 +352,7 @@ export async function GET(req: Request) {
         normalizedPhone: normalizePhone(debtorPhone),
         messagePreview: message.slice(0, 120),
         nextStatus: "pendente",
+        templateSource: sourceStatus,
       });
       // #endregion
       await sendZapiText({

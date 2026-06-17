@@ -180,7 +180,8 @@ async function sendZapiText(params: {
 
 const createSchema = z.object({
   debtor_id: z.string().uuid(),
-  template_id: z.string().uuid().optional(),
+  template_pending_id: z.string().uuid().optional(),
+  template_overdue_id: z.string().uuid().optional(),
   data_envio_date: z.string().min(10),
   data_envio_time: z.string().min(4),
   recurrence: z.enum(["none", "monthly"]).optional(),
@@ -280,7 +281,9 @@ export async function createScheduleAction(input: unknown) {
 
   const { error } = await supabase.from("schedules").insert({
     debtor_id: parsed.data.debtor_id,
-    template_id: parsed.data.template_id ?? null,
+    template_id: parsed.data.template_pending_id ?? null,
+    template_pending_id: parsed.data.template_pending_id ?? null,
+    template_overdue_id: parsed.data.template_overdue_id ?? null,
     data_envio: dataEnvioIso,
     charge_due_at: dataEnvioIso,
     recurrence,
@@ -374,7 +377,9 @@ export async function updateScheduleAction(input: unknown) {
     .from("schedules")
     .update({
       debtor_id: data.debtor_id,
-      template_id: data.template_id ?? null,
+      template_id: data.template_pending_id ?? null,
+      template_pending_id: data.template_pending_id ?? null,
+      template_overdue_id: data.template_overdue_id ?? null,
       data_envio: dataEnvioIso,
       charge_due_at: dataEnvioIso,
       recurrence,
@@ -503,7 +508,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento), message_templates(conteudo)",
+      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -544,14 +549,24 @@ export async function triggerScheduleNowAction(id: string) {
 
   try {
     const debtor = (schedule as any).debtors ?? null;
-    const template = (schedule as any).message_templates ?? null;
+    const pendingTemplate = (schedule as any).pending_template ?? null;
+    const overdueTemplate = (schedule as any).overdue_template ?? null;
     const scheduleId = String((schedule as any).id);
     const scheduledFor = String((schedule as any).data_envio ?? new Date().toISOString());
+    const sourceStatus = currentStatus === "atrasado" ? "atrasado" : "pendente";
 
     const debtorPhone = String(debtor?.telefone ?? "");
-    const templateText = String(template?.conteudo ?? "");
+    const templateText = String(
+      sourceStatus === "atrasado" ? overdueTemplate?.conteudo ?? "" : pendingTemplate?.conteudo ?? "",
+    );
     if (!debtorPhone) throw new Error("Cliente sem telefone");
-    if (!templateText) throw new Error("Template sem conteúdo");
+    if (!templateText) {
+      throw new Error(
+        sourceStatus === "atrasado"
+          ? "Template atrasado sem conteúdo."
+          : "Template pendente sem conteúdo.",
+      );
+    }
 
     const { data: wa, error: waErr } = await admin
       .from("whatsapp_instances")
@@ -608,6 +623,7 @@ export async function triggerScheduleNowAction(id: string) {
       normalizedPhone: normalizePhone(debtorPhone),
       messagePreview: message.slice(0, 120),
       nextStatus: "pendente",
+      templateSource: sourceStatus,
     });
     // #endregion
     await sendZapiText({
