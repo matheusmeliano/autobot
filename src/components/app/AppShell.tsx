@@ -428,9 +428,11 @@ export function AppShell({
               </div>
 
               <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm">
-                <div className="font-semibold text-[var(--app-text-85)]">
-                  {pendingPayment?.debtor?.nome ? `Cliente: ${pendingPayment.debtor.nome}` : "Cliente: não identificado"}
-                </div>
+                {pendingPayment?.debtor?.nome ? (
+                  <div className="font-semibold text-[var(--app-text-85)]">
+                    Cliente: {pendingPayment.debtor.nome}
+                  </div>
+                ) : null}
                 <div className="mt-2 text-xs text-[var(--app-text-60)]">
                   {pendingPayment?.from_phone ? `Telefone: ${pendingPayment.from_phone}` : null}
                 </div>

@@ -44,35 +44,129 @@ function normalizeText(text: string) {
     .trim();
 }
 
-function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null }) {
-  const t = normalizeText(params.text || "");
-  const hasMedia = Boolean((params.mediaUrl || "").trim());
-  const positive =
-    t.includes("pix feito") ||
-    t.includes("pix realizado") ||
-    t.includes("pix ok") ||
-    t.includes("paguei") ||
-    t.includes("ja paguei") ||
-    t.includes("ja esta pago") ||
-    t.includes("ja ta pago") ||
-    t.includes("pago") ||
-    t.includes("transferi") ||
-    t.includes("transferencia feita") ||
-    t.includes("pagamento realizado") ||
-    t.includes("segue comprovante") ||
-    t.includes("comprovante");
+const POSITIVE_TEXT_SNIPPETS = [
+  "pagamento realizado",
+  "pix feito",
+  "pix realizado",
+  "pix pago",
+  "pagamento efetuado",
+  "ja paguei",
+  "acabei de pagar",
+  "efetuei o pagamento",
+  "transferencia realizada",
+  "valor pago",
+  "conta quitada",
+  "debito quitado",
+  "mensalidade paga",
+  "tudo certo com o pagamento",
+  "envio de comprovante",
+  "segue comprovante",
+  "comprovante em anexo",
+  "enviando comprovante",
+  "comprovante do pagamento",
+  "comprovante enviado",
+  "anexei o comprovante",
+  "print do pagamento",
+  "print do pix",
+  "comprovante pix",
+  "recibo do pagamento",
+  "evidencia do pagamento",
+  "anexo do pagamento",
+  "pago",
+  "paguei",
+  "ja foi pago",
+  "ja esta pago",
+  "feito",
+  "resolvido",
+  "tudo pago",
+  "esta quitado",
+  "pagamento concluido",
+  "pix enviado",
+  "transferido",
+  "acabei de fazer o pix",
+  "ok, pago",
+  "pago agora",
+  "enviei o pix",
+  "confira o pix",
+  "pode verificar",
+  "da uma olhada",
+  "confirma ai",
+  "recebeu?",
+];
 
-  const negative =
-    t.includes("vou pagar") ||
-    t.includes("pagarei") ||
-    t.includes("pago amanha") ||
-    t.includes("vou fazer o pix") ||
-    t.includes("vou fazer pix") ||
-    t.includes("manda o pix") ||
-    t.includes("manda sua chave") ||
-    t.includes("qual a chave") ||
-    t.includes("posso pagar") ||
-    t.includes("como posso pagar");
+const NEGATIVE_TEXT_SNIPPETS = [
+  "vou pagar",
+  "pagarei",
+  "pago amanha",
+  "vou fazer o pix",
+  "vou fazer pix",
+  "manda o pix",
+  "manda sua chave",
+  "qual a chave",
+  "posso pagar",
+  "como posso pagar",
+];
+
+function extractMediaInfo(body: any) {
+  const mediaUrl = getFirstNonEmpty(
+    body?.image?.url,
+    body?.imageUrl,
+    body?.media?.url,
+    body?.file?.url,
+    body?.document?.url,
+    body?.message?.image?.url,
+    body?.message?.document?.url,
+    body?.message?.file?.url,
+    body?.data?.image?.url,
+    body?.data?.media?.url,
+    body?.data?.file?.url,
+    body?.data?.document?.url,
+    body?.data?.message?.image?.url,
+    body?.data?.message?.document?.url,
+    body?.data?.message?.file?.url,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.image?.url : "",
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.document?.url : "",
+  );
+
+  const typeSource = normalizeText(
+    getFirstNonEmpty(
+      body?.type,
+      body?.event,
+      body?.eventType,
+      body?.message?.type,
+      body?.message?.mimetype,
+      body?.message?.mimeType,
+      body?.data?.type,
+      body?.data?.event,
+      body?.data?.message?.type,
+      body?.data?.message?.mimetype,
+      body?.data?.message?.mimeType,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.type : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.mimetype : "",
+    ),
+  );
+
+  const hasImageFlag =
+    Boolean(body?.image || body?.message?.image || body?.data?.image || body?.data?.message?.image) ||
+    typeSource.includes("image") ||
+    typeSource.includes("imagem");
+  const hasDocumentFlag =
+    Boolean(body?.document || body?.message?.document || body?.data?.document || body?.data?.message?.document) ||
+    typeSource.includes("document") ||
+    typeSource.includes("arquivo") ||
+    typeSource.includes("application/");
+
+  return {
+    mediaUrl,
+    hasPaymentMedia: Boolean(mediaUrl || hasImageFlag || hasDocumentFlag),
+  };
+}
+
+function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null; hasPaymentMedia?: boolean }) {
+  const t = normalizeText(params.text || "");
+  const hasMedia = Boolean(params.hasPaymentMedia || (params.mediaUrl || "").trim());
+  const positive = POSITIVE_TEXT_SNIPPETS.some((snippet) => t.includes(snippet));
+  const negative = NEGATIVE_TEXT_SNIPPETS.some((snippet) => t.includes(snippet));
 
   const isPayment = (positive || hasMedia) && !negative;
   if (!isPayment) {
@@ -83,7 +177,7 @@ function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | n
     result: {
       is_payment_proof: true,
       confidence: hasMedia ? 0.9 : 0.8,
-      reason: hasMedia ? "Comprovante/anexo recebido." : "Confirmação textual de pagamento detectada.",
+      reason: hasMedia ? "Imagem/anexo recebido como potencial comprovante." : "Confirmação textual de pagamento detectada.",
       raw: { source: "heuristic", positive, negative, hasMedia },
     },
   };
@@ -113,6 +207,7 @@ Retorne sempre um JSON válido (sem texto fora do JSON) no formato:
 
 Regras:
 - confidence deve ser entre 0 e 1
+- Toda imagem ou documento enviado pelo cliente após uma cobrança deve ser tratado como potencial comprovante e pode gerar suspeita de pagamento mesmo sem texto.
 - is_payment_proof só pode ser true quando confidence >= 0.75 e existir evidência clara de pagamento, seja:
   - comprovante/recibo/print (imagem) com sinais claros de transação, ou
   - confirmação textual explícita de que JÁ PAGOU (ex: "paguei", "pix feito", "transferi", "já está pago"), preferencialmente com algum detalhe (valor, data/hora, banco, id/transação, referência).
@@ -125,7 +220,7 @@ Regras:
     ? ([
         {
           type: "text",
-          text: `Mensagem: ${userText}\n\nSe houver imagem anexa, analise como comprovante de pagamento.`,
+          text: `Mensagem: ${userText}\n\nSe houver imagem ou documento anexado, trate como potencial comprovante de pagamento.`,
         },
         { type: "image_url", image_url: { url: params.mediaUrl } },
       ] as any)
@@ -231,17 +326,8 @@ export async function POST(req: Request) {
     (body as any).data?.body,
   );
 
-  const mediaUrl = getFirstNonEmpty(
-    (body as any).image?.url,
-    (body as any).imageUrl,
-    (body as any).media?.url,
-    (body as any).file?.url,
-    (body as any).document?.url,
-    (body as any).data?.image?.url,
-    (body as any).data?.media?.url,
-    (body as any).data?.file?.url,
-    (body as any).data?.document?.url,
-  );
+  const mediaInfo = extractMediaInfo(body);
+  const mediaUrl = mediaInfo.mediaUrl;
 
   if (!instanceId) {
     return Response.json({ ok: true, ignored: true, reason: "missing_instance_id" });
@@ -275,7 +361,7 @@ export async function POST(req: Request) {
     { onConflict: "provider,event_id" },
   );
 
-  const hasContent = Boolean((messageText || "").trim() || (mediaUrl || "").trim());
+  const hasContent = Boolean((messageText || "").trim() || mediaInfo.hasPaymentMedia);
   if (!hasContent) {
     await admin.from("logs").insert({
       user_id: userId,
@@ -299,7 +385,11 @@ export async function POST(req: Request) {
 
   const fallbackRes = analysis.ok
     ? null
-    : heuristicPaymentDetection({ text: messageText, mediaUrl: mediaUrl || null });
+    : heuristicPaymentDetection({
+        text: messageText,
+        mediaUrl: mediaUrl || null,
+        hasPaymentMedia: mediaInfo.hasPaymentMedia,
+      });
   if (!analysis.ok && (!fallbackRes || !fallbackRes.ok)) {
     return Response.json({ ok: true, analyzed: false, error: analysis.error });
   }
@@ -335,19 +425,31 @@ export async function POST(req: Request) {
   const match = (debtors ?? []).find((d: any) => normalizePhone(String(d?.telefone ?? "")) === normalizedFrom);
   const debtorId = match?.id ? String(match.id) : null;
 
-  const { data: schedule } = debtorId
+  const { data: activeSchedule } = debtorId
     ? await admin
         .from("schedules")
         .select("id, status")
         .eq("user_id", userId)
         .eq("debtor_id", debtorId)
-        .in("status", ["agendado", "pausado"])
+        .in("status", ["agendado", "pausado", "suspeita_de_pagamento"])
         .order("data_envio", { ascending: true })
         .limit(1)
         .maybeSingle()
     : { data: null };
 
-  const scheduleId = schedule?.id ? String(schedule.id) : null;
+  const { data: latestSchedule } = debtorId
+    ? await admin
+        .from("schedules")
+        .select("id, status")
+        .eq("user_id", userId)
+        .eq("debtor_id", debtorId)
+        .order("data_envio", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
+  const relatedSchedule = activeSchedule ?? latestSchedule ?? null;
+  const scheduleId = relatedSchedule?.id ? String(relatedSchedule.id) : null;
 
   if (scheduleId) {
     await admin.from("schedules").update({ status: "suspeita_de_pagamento" }).eq("id", scheduleId);
