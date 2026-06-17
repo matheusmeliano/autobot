@@ -651,7 +651,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                   </div>
 
                   <div className="grid gap-3">
-                    <div className="md:max-w-[calc(50%-0.375rem)]">
+                    <div className="w-full">
                       <div className="text-xs font-semibold text-white/60">Valor</div>
                       <Controller
                         control={control}
