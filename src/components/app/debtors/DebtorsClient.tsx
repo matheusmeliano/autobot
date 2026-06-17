@@ -165,7 +165,7 @@ function debtorStatusClass(status: string | null | undefined) {
     return "border-amber-500/30 bg-amber-500/10 text-amber-600";
   }
   if (s === "pendente" || s === "suspeita_de_pagamento") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600";
+    return "border-yellow-500/30 bg-yellow-500/10 text-yellow-600";
   }
   if (s === "atrasado") {
     return "border-rose-500/30 bg-rose-500/10 text-rose-600";
