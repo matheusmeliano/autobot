@@ -841,6 +841,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           type="time"
                           className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
                           style={{ colorScheme: theme }}
+                          onClick={(e) => {
+                            e.currentTarget.showPicker?.();
+                          }}
                           {...register("retry_time")}
                         />
                       </div>
