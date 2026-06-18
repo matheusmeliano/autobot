@@ -27,13 +27,13 @@ export function deriveCurrentMonthDebtorStatus(
   nowUtcIso = new Date().toISOString(),
 ): DebtorChargeStatus {
   let hasPaid = false;
+  let hasPending = false;
 
   for (const row of schedules) {
     const timeZone = String(row?.schedule_timezone ?? "") || "America/Sao_Paulo";
     const currentLocalDate = scheduleLocalDate(nowUtcIso, timeZone);
     if (!currentLocalDate) continue;
 
-    const currentMonth = currentLocalDate.slice(0, 7);
     const dueLocalDate = scheduleLocalDate(row?.charge_due_at ?? row?.data_envio ?? null, timeZone);
     const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
     const currentStatus = String(row?.status ?? "").trim().toLowerCase();
@@ -43,21 +43,16 @@ export function deriveCurrentMonthDebtorStatus(
       if (currentLocalDate > dueLocalDate) {
         return "atrasado";
       }
-      return "pendente";
-    }
-
-    if (dueLocalDate && dueLocalDate.startsWith(currentMonth)) {
-      if (currentStatus === "pago") {
-        hasPaid = true;
-      }
+      hasPending = true;
       continue;
     }
 
-    if (paymentLocalDate && paymentLocalDate.startsWith(currentMonth)) {
+    if (currentStatus === "pago" || paymentLocalDate) {
       hasPaid = true;
     }
   }
 
+  if (hasPending) return "pendente";
   if (hasPaid) return "pago";
   return "pendente";
 }
