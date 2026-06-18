@@ -1,7 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardClient } from "@/components/app/DashboardClient";
 import { applyCurrentMonthDebtorStatuses } from "@/lib/debtorChargeStatus";
-import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
@@ -40,7 +39,7 @@ export default async function DashboardPage() {
     profileRes,
     activitiesRes,
     debtorsRes,
-    schedulesForAmountsRes,
+    schedulesRes,
     activeSchedulesRes,
   ] = await Promise.all([
     supabase
@@ -79,55 +78,28 @@ export default async function DashboardPage() {
       .in("status", ["agendado", "pendente", "atrasado", "suspeita_de_pagamento", "executando"]),
   ]);
 
-  const schedulesForAmounts = (schedulesForAmountsRes.data ?? []) as any[];
-  const schedulesByDebtor = new Map<string, any[]>();
-  for (const s of schedulesForAmounts) {
-    const debtorId = String((s as any)?.debtor_id ?? "");
-    if (!debtorId) continue;
-    const list = schedulesByDebtor.get(debtorId) ?? [];
-    list.push(s);
-    schedulesByDebtor.set(debtorId, list);
-  }
+  const schedules = (schedulesRes.data ?? []) as any[];
 
   const derivedDebtors = applyCurrentMonthDebtorStatuses({
     debtors: ((debtorsRes.data ?? []) as any[]).map((d) => ({
       ...d,
       status: String(d?.status ?? "ativo"),
     })),
-    schedules: schedulesForAmounts as any[],
+    schedules: schedules as any[],
   }) as Array<{
     id: string;
     status: string;
     valor: number | null;
-    accumulate_open_monthly_charges: boolean | null;
   }>;
 
-  const nowIso = new Date().toISOString();
   let receivableMonthTotal = 0;
   let receivableMonthPaid = 0;
 
   for (const d of derivedDebtors) {
     if (typeof d.valor !== "number" || Number.isNaN(d.valor)) continue;
-
-    const list = schedulesByDebtor.get(String(d.id)) ?? [];
-    const primary = list.find((r) => String((r as any)?.recurrence ?? "") === "monthly") ?? list[0] ?? null;
-
-    const amount =
-      getScheduleChargeAmount({
-        baseAmount: d.valor,
-        accumulateOpenMonthlyCharges: Boolean(d.accumulate_open_monthly_charges),
-        recurrence: primary ? String((primary as any)?.recurrence ?? "") : null,
-        status: primary ? String((primary as any)?.status ?? "") : null,
-        closedAt: primary ? String((primary as any)?.closed_at ?? "") || null : null,
-        chargeDueAt: primary ? String((primary as any)?.charge_due_at ?? "") || null : null,
-        dataEnvio: primary ? String((primary as any)?.data_envio ?? "") || null : null,
-        nowUtcIso: nowIso,
-        timeZone: primary ? String((primary as any)?.schedule_timezone ?? "") || "America/Sao_Paulo" : null,
-      }) ?? 0;
-
-    receivableMonthTotal += amount;
+    receivableMonthTotal += d.valor;
     if (String(d.status ?? "").trim().toLowerCase() === "pago") {
-      receivableMonthPaid += amount;
+      receivableMonthPaid += d.valor;
     }
   }
 
