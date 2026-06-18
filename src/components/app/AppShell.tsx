@@ -9,7 +9,7 @@ import { logoutAction } from "@/app/app/actions";
 import { Logo } from "@/components/ui/Logo";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { normalizePlan, type PlanType } from "@/lib/plans";
+import { normalizePlan, type PlanKey } from "@/lib/plans";
 import { updateThemeAction } from "@/app/app/configuracoes/actions";
 import { modalToast } from "@/lib/modalToast";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
@@ -56,7 +56,7 @@ export function AppShell({
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
   const [restricted, setRestricted] = useState(false);
-  const [plan, setPlan] = useState<PlanType>("teste");
+  const [plan, setPlan] = useState<PlanKey>("teste");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<AppTheme>(() => {
     if (typeof document === "undefined") return initialTheme;
