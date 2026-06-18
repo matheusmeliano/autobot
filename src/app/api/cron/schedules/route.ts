@@ -207,7 +207,7 @@ export async function GET(req: Request) {
   const { data: schedules, error } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .in("status", ["agendado", "atrasado", "pausado"])
     .is("closed_at", null)
@@ -266,6 +266,7 @@ export async function GET(req: Request) {
       const debtorPhone = String(debtor?.telefone ?? "");
       const chargeAmount = getScheduleChargeAmount({
         baseAmount: debtor?.valor,
+        accumulateOpenMonthlyCharges: Boolean(debtor?.accumulate_open_monthly_charges),
         recurrence: String((s as any).recurrence ?? ""),
         status: String((s as any).status ?? ""),
         chargeDueAt: String((s as any).charge_due_at ?? "") || null,

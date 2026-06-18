@@ -62,6 +62,7 @@ export function getOpenMonthlyInstallments(params: {
 
 export function getScheduleChargeAmount(params: {
   baseAmount: unknown;
+  accumulateOpenMonthlyCharges?: boolean | null;
   recurrence?: string | null;
   status?: string | null;
   closedAt?: string | null;
@@ -73,12 +74,13 @@ export function getScheduleChargeAmount(params: {
   const baseAmount = toNumber(params.baseAmount);
   if (baseAmount === null) return null;
 
+  const accumulate = Boolean(params.accumulateOpenMonthlyCharges);
   const recurrence = String(params.recurrence ?? "none").trim().toLowerCase();
   const status = String(params.status ?? "").trim().toLowerCase();
   const isClosed = Boolean(String(params.closedAt ?? "").trim());
   const timeZone = String(params.timeZone ?? "") || "America/Sao_Paulo";
 
-  if (recurrence !== "monthly" || isClosed || status === "pago") {
+  if (!accumulate || recurrence !== "monthly" || isClosed || status === "pago") {
     return baseAmount;
   }
 
@@ -94,6 +96,7 @@ export function getScheduleChargeAmount(params: {
 }
 
 export function nextMonthlyIsoAfterSettlement(params: {
+  accumulateOpenMonthlyCharges?: boolean | null;
   chargeDueAt?: string | null;
   dataEnvio?: string | null;
   nowUtcIso: string;
@@ -104,6 +107,7 @@ export function nextMonthlyIsoAfterSettlement(params: {
   const dueLocalDate = resolveScheduleLocalDate(params);
   if (!dueLocalDate) throw new Error("Data inválida");
 
+  const accumulate = Boolean(params.accumulateOpenMonthlyCharges);
   const installments = getOpenMonthlyInstallments({
     chargeDueAt: params.chargeDueAt,
     dataEnvio: params.dataEnvio,
@@ -113,7 +117,7 @@ export function nextMonthlyIsoAfterSettlement(params: {
   const baseMonthIndex = monthIndex(dueLocalDate);
   if (baseMonthIndex === null) throw new Error("Data inválida");
 
-  const targetMonthIndex = baseMonthIndex + installments;
+  const targetMonthIndex = baseMonthIndex + (accumulate ? installments : 1);
   const targetYear = Math.floor(targetMonthIndex / 12);
   const targetMonth = (targetMonthIndex % 12) + 1;
   const maxDay = lastDayOfMonth(targetYear, targetMonth);

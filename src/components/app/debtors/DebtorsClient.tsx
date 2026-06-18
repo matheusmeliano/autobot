@@ -30,6 +30,7 @@ export type DebtorRow = {
   pix_key: string | null;
   observacoes: string | null;
   status: string;
+  accumulate_open_monthly_charges: boolean | null;
   retry_weekdays: number[] | null;
   retry_time: string | null;
   retry_max_attempts: number | null;
@@ -49,6 +50,7 @@ type FormValues = {
   pix_key?: string;
   observacoes?: string;
   status?: string;
+  accumulate_open_monthly_charges?: boolean;
   retry_weekdays: number[];
   retry_time: string;
   retry_max_attempts: number;
@@ -345,6 +347,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: "",
       observacoes: "",
       status: "ativo",
+      accumulate_open_monthly_charges: false,
       retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
       retry_time: DEFAULT_RETRY_TIME,
       retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -368,6 +371,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: "",
       observacoes: "",
       status: "ativo",
+      accumulate_open_monthly_charges: false,
       retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
       retry_time: DEFAULT_RETRY_TIME,
       retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -402,6 +406,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: row.pix_key ? formatPixKey(row.pix_key) : "",
       observacoes: row.observacoes ?? "",
       status: row.status ?? "ativo",
+      accumulate_open_monthly_charges: Boolean(row.accumulate_open_monthly_charges),
       retry_weekdays: normalizeRetryWeekdays(row.retry_weekdays),
       retry_time: row.retry_time ?? DEFAULT_RETRY_TIME,
       retry_max_attempts: row.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -431,6 +436,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       pix_key: pixKey ? pixKey : undefined,
       observacoes: values.observacoes || undefined,
       status: values.status || "ativo",
+      accumulate_open_monthly_charges: Boolean(values.accumulate_open_monthly_charges),
       retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
       retry_time: values.retry_time || DEFAULT_RETRY_TIME,
       retry_max_attempts: Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -787,6 +793,22 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       {...register("observacoes")}
                     />
                   </div>
+
+                  <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-white/15 bg-white/[0.03]"
+                      {...register("accumulate_open_monthly_charges")}
+                    />
+                    <div>
+                      <div className="text-xs font-semibold text-white/75">
+                        Acumular mensalidades em aberto
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Quando ativado, mensalidades vencidas somam automaticamente aos meses seguintes ate o pagamento ou encerramento da cobranca.
+                      </div>
+                    </div>
+                  </label>
 
                   <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
                     <div className="text-xs font-semibold text-white/70">

@@ -509,7 +509,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -559,6 +559,7 @@ export async function triggerScheduleNowAction(id: string) {
     const debtorPhone = String(debtor?.telefone ?? "");
     const chargeAmount = getScheduleChargeAmount({
       baseAmount: debtor?.valor,
+      accumulateOpenMonthlyCharges: Boolean(debtor?.accumulate_open_monthly_charges),
       recurrence: String((schedule as any).recurrence ?? ""),
       status: currentStatus,
       closedAt: String((schedule as any).closed_at ?? "") || null,
@@ -731,7 +732,7 @@ export async function markSchedulePaidAction(id: string) {
   const admin = createSupabaseAdminClient();
   const { data: schedule, error } = await admin
     .from("schedules")
-    .select("id, user_id, debtor_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until")
+    .select("id, user_id, debtor_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(accumulate_open_monthly_charges)")
     .eq("id", id)
     .maybeSingle();
 
@@ -749,6 +750,7 @@ export async function markSchedulePaidAction(id: string) {
   let updatePayload: Record<string, unknown>;
   if (recurrence === "monthly") {
     const nextIso = nextMonthlyIsoAfterSettlement({
+      accumulateOpenMonthlyCharges: Boolean((schedule as any).debtors?.accumulate_open_monthly_charges),
       chargeDueAt: String((schedule as any).charge_due_at ?? "") || null,
       dataEnvio: String((schedule as any).data_envio ?? "") || null,
       nowUtcIso: nowIso,
