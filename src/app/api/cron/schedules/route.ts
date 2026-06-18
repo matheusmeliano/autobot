@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { hasAutoCloseExpired, isPastLocalDay, nextRetryUtcIso, normalizeRetryConfig } from "@/lib/chargeRetry";
+import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 // #region debug-point extra-send-cron-bootstrap
@@ -263,6 +264,15 @@ export async function GET(req: Request) {
       // #endregion
 
       const debtorPhone = String(debtor?.telefone ?? "");
+      const chargeAmount = getScheduleChargeAmount({
+        baseAmount: debtor?.valor,
+        recurrence: String((s as any).recurrence ?? ""),
+        status: String((s as any).status ?? ""),
+        chargeDueAt: String((s as any).charge_due_at ?? "") || null,
+        dataEnvio: String((s as any).data_envio ?? "") || null,
+        nowUtcIso: nowIso,
+        timeZone: String((s as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+      });
       const templateText = String(
         sourceStatus === "atrasado" ? overdueTemplate?.conteudo ?? "" : pendingTemplate?.conteudo ?? "",
       );
@@ -338,7 +348,7 @@ export async function GET(req: Request) {
       const message = applyTemplate(templateText, {
         nome: String(debtor?.nome ?? ""),
         pix: String(debtor?.pix_key ?? ""),
-        valor: formatBRL(debtor?.valor),
+        valor: formatBRL(chargeAmount ?? debtor?.valor),
         vencimento: formatDateBR(debtor?.vencimento),
       });
 

@@ -11,6 +11,7 @@ import {
   nextMonthlyIso,
   shouldContinueMonthlyRecurrence,
 } from "@/lib/recurrence";
+import { getScheduleChargeAmount, nextMonthlyIsoAfterSettlement } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 // #region debug-point extra-send-manual-bootstrap
@@ -508,7 +509,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -556,6 +557,16 @@ export async function triggerScheduleNowAction(id: string) {
     const sourceStatus = currentStatus === "atrasado" ? "atrasado" : "pendente";
 
     const debtorPhone = String(debtor?.telefone ?? "");
+    const chargeAmount = getScheduleChargeAmount({
+      baseAmount: debtor?.valor,
+      recurrence: String((schedule as any).recurrence ?? ""),
+      status: currentStatus,
+      closedAt: String((schedule as any).closed_at ?? "") || null,
+      chargeDueAt: String((schedule as any).charge_due_at ?? "") || null,
+      dataEnvio: String((schedule as any).data_envio ?? "") || null,
+      nowUtcIso: new Date().toISOString(),
+      timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+    });
     const templateText = String(
       sourceStatus === "atrasado" ? overdueTemplate?.conteudo ?? "" : pendingTemplate?.conteudo ?? "",
     );
@@ -611,7 +622,7 @@ export async function triggerScheduleNowAction(id: string) {
     const message = applyTemplate(templateText, {
       nome: String(debtor?.nome ?? ""),
       pix: String(debtor?.pix_key ?? ""),
-      valor: formatBRL(debtor?.valor),
+      valor: formatBRL(chargeAmount ?? debtor?.valor),
       vencimento: formatDateBR(debtor?.vencimento),
     });
 
@@ -737,8 +748,10 @@ export async function markSchedulePaidAction(id: string) {
   const nowIso = new Date().toISOString();
   let updatePayload: Record<string, unknown>;
   if (recurrence === "monthly") {
-    const nextIso = nextMonthlyIso({
-      fromUtcIso: String((schedule as any).charge_due_at ?? (schedule as any).data_envio),
+    const nextIso = nextMonthlyIsoAfterSettlement({
+      chargeDueAt: String((schedule as any).charge_due_at ?? "") || null,
+      dataEnvio: String((schedule as any).data_envio ?? "") || null,
+      nowUtcIso: nowIso,
       timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
       day: Number((schedule as any).recurrence_day ?? 1),
       time: String((schedule as any).recurrence_time ?? "") || "00:00",
