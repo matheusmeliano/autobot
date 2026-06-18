@@ -255,6 +255,94 @@ export function SchedulesClient({
     return "border-white/10 bg-white/[0.04] text-white/70";
   };
 
+  const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
+    const baseButtonClass =
+      variant === "mobile"
+        ? "inline-flex min-h-[40px] min-w-[calc(50%-0.25rem)] flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/[0.06] disabled:opacity-60"
+        : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60";
+    const triggerButtonClass =
+      variant === "mobile"
+        ? "inline-flex min-h-[40px] min-w-[calc(50%-0.25rem)] flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+        : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06] disabled:opacity-60";
+
+    return (
+      <div className={variant === "mobile" ? "flex flex-wrap gap-2" : "flex flex-nowrap justify-end gap-2"}>
+        <button
+          onClick={() => triggerNow(r)}
+          disabled={
+            isPending ||
+            triggeringId === r.id ||
+            markingPaidId === r.id ||
+            String(r.status ?? "") === "executado" ||
+            String(r.status ?? "") === "pendente" ||
+            String(r.status ?? "") === "pago" ||
+            String(r.status ?? "") === "executando" ||
+            String(r.status ?? "") === "suspeita_de_pagamento"
+          }
+          className={triggerButtonClass}
+          title="Disparar agora"
+        >
+          <Send className="h-4 w-4" />
+          {variant === "mobile" ? <span>Disparar</span> : null}
+        </button>
+        <button
+          onClick={() => openEdit(r)}
+          disabled={isPending || markingPaidId === r.id || savingRecurrenceLimit}
+          className={baseButtonClass}
+          title="Editar"
+        >
+          <Pencil className="h-4 w-4" />
+          {variant === "mobile" ? <span>Editar</span> : null}
+        </button>
+        <button
+          onClick={() => markAsPaid(r)}
+          disabled={
+            isPending ||
+            triggeringId === r.id ||
+            markingPaidId === r.id ||
+            savingRecurrenceLimit ||
+            String(r.status ?? "") === "pago"
+          }
+          className={baseButtonClass}
+          title="Pagamento realizado"
+        >
+          <Check className="h-4 w-4" />
+          {variant === "mobile" ? <span>Pago</span> : null}
+        </button>
+        {String(r.recurrence ?? "none") === "monthly" ? (
+          <button
+            onClick={() => openRecurrenceLimit(r)}
+            disabled={
+              isPending ||
+              triggeringId === r.id ||
+              markingPaidId === r.id ||
+              savingRecurrenceLimit
+            }
+            className={baseButtonClass}
+            title="Definir data final"
+          >
+            <Calendar className="h-4 w-4" />
+            {variant === "mobile" ? <span>Data final</span> : null}
+          </button>
+        ) : null}
+        <button
+          onClick={() => remove(r)}
+          disabled={
+            isPending ||
+            triggeringId === r.id ||
+            markingPaidId === r.id ||
+            savingRecurrenceLimit
+          }
+          className={baseButtonClass}
+          title="Excluir"
+        >
+          <Trash2 className="h-4 w-4" />
+          {variant === "mobile" ? <span>Excluir</span> : null}
+        </button>
+      </div>
+    );
+  };
+
   const timeValue = watch("data_envio_time");
   const recurrenceValue = watch("recurrence");
 
@@ -794,122 +882,126 @@ export function SchedulesClient({
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03]">
-        <div className="px-4 pt-3 text-center text-[11px] font-semibold text-white/45 min-[1201px]:hidden">
-          Role para o lado.
-        </div>
-        <div className="overflow-x-auto">
-          <div className="min-w-[980px] min-[1201px]:min-w-0">
-            <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
-              <div className="col-span-3">Cliente</div>
-              <div className="col-span-2 text-center">Templates</div>
-              <div className="col-span-2 text-center">Data</div>
-              <div className="col-span-1 text-center">Hora</div>
-              <div className="col-span-1 text-center">Status</div>
-              <div className="col-span-3 text-right">Ações</div>
+        <div className="min-[1201px]:hidden">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-10 text-center text-sm text-white/55">
+              Nenhum agendamento encontrado.
             </div>
+          ) : (
+            <div className="grid gap-3 p-3">
+              {pagedRows.map((r) => (
+                <div key={r.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-white/85">{r.debtor_nome}</div>
+                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
+                        Agendamento
+                      </div>
+                    </div>
+                    <span className={`inline-flex shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass(r.status)}`}>
+                      {statusLabel(r.status)}
+                    </span>
+                  </div>
 
-            {filtered.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-white/55">
-                Nenhum agendamento encontrado.
-              </div>
-            ) : (
-              <div className="divide-y divide-white/10">
-                {pagedRows.map((r) => (
-                  <div
-                    key={r.id}
-                    className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
-                  >
-                    <div className="col-span-3 truncate font-semibold">{r.debtor_nome}</div>
-                    <div className="col-span-2 min-w-0 text-center text-white/60">
-                      <div className="truncate">{r.template_pending_nome ?? "-"}</div>
-                      <div className="truncate text-[11px] text-white/40">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
+                        Template pendente
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/75">
+                        {r.template_pending_nome ?? "-"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
+                        Template atrasado
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/75">
                         {r.template_overdue_nome ?? "-"}
                       </div>
                     </div>
-                    <div className="col-span-2 whitespace-nowrap text-center text-white/60">
-                      {dateBR(r.data_envio, effectiveTimeZone)}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
+                        Data
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/75">
+                        {dateBR(r.data_envio, effectiveTimeZone)}
+                      </div>
                     </div>
-                    <div className="col-span-1 whitespace-nowrap text-center text-white/60">
-                      {timeBR(r.data_envio, effectiveTimeZone)}
-                    </div>
-                    <div className="col-span-1 flex justify-center">
-                      <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass(r.status)}`}>
-                        {statusLabel(r.status)}
-                      </span>
-                    </div>
-                    <div className="col-span-3 flex flex-nowrap justify-end gap-2">
-                      <button
-                        onClick={() => triggerNow(r)}
-                        disabled={
-                          isPending ||
-                          triggeringId === r.id ||
-                          markingPaidId === r.id ||
-                          String(r.status ?? "") === "executado" ||
-                          String(r.status ?? "") === "pendente" ||
-                          String(r.status ?? "") === "pago" ||
-                          String(r.status ?? "") === "executando" ||
-                          String(r.status ?? "") === "suspeita_de_pagamento"
-                        }
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
-                        title="Disparar agora"
-                      >
-                        <Send className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => openEdit(r)}
-                        disabled={isPending || markingPaidId === r.id || savingRecurrenceLimit}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
-                        title="Editar"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => markAsPaid(r)}
-                        disabled={
-                          isPending ||
-                          triggeringId === r.id ||
-                          markingPaidId === r.id ||
-                          savingRecurrenceLimit ||
-                          String(r.status ?? "") === "pago"
-                        }
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
-                        title="Pagamento realizado"
-                      >
-                        <Check className="h-4 w-4" />
-                      </button>
-                      {String(r.recurrence ?? "none") === "monthly" ? (
-                        <button
-                          onClick={() => openRecurrenceLimit(r)}
-                          disabled={
-                            isPending ||
-                            triggeringId === r.id ||
-                            markingPaidId === r.id ||
-                            savingRecurrenceLimit
-                          }
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
-                          title="Definir data final"
-                        >
-                          <Calendar className="h-4 w-4" />
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={() => remove(r)}
-                        disabled={
-                          isPending ||
-                          triggeringId === r.id ||
-                          markingPaidId === r.id ||
-                          savingRecurrenceLimit
-                        }
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
+                        Hora
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/75">
+                        {timeBR(r.data_envio, effectiveTimeZone)}
+                      </div>
                     </div>
                   </div>
-                ))}
+
+                  <div className="mt-4">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
+                      Ações
+                    </div>
+                    {renderActionButtons(r, "mobile")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="hidden min-[1201px]:block">
+          <div className="overflow-x-auto">
+            <div className="min-w-[980px] min-[1201px]:min-w-0">
+              <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
+                <div className="col-span-3">Cliente</div>
+                <div className="col-span-2 text-center">Templates</div>
+                <div className="col-span-2 text-center">Data</div>
+                <div className="col-span-1 text-center">Hora</div>
+                <div className="col-span-1 text-center">Status</div>
+                <div className="col-span-3 text-right">Ações</div>
               </div>
-            )}
+
+              {filtered.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm text-white/55">
+                  Nenhum agendamento encontrado.
+                </div>
+              ) : (
+                <div className="divide-y divide-white/10">
+                  {pagedRows.map((r) => (
+                    <div
+                      key={r.id}
+                      className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
+                    >
+                      <div className="col-span-3 truncate font-semibold">{r.debtor_nome}</div>
+                      <div className="col-span-2 min-w-0 text-center text-white/60">
+                        <div className="truncate">{r.template_pending_nome ?? "-"}</div>
+                        <div className="truncate text-[11px] text-white/40">
+                          {r.template_overdue_nome ?? "-"}
+                        </div>
+                      </div>
+                      <div className="col-span-2 whitespace-nowrap text-center text-white/60">
+                        {dateBR(r.data_envio, effectiveTimeZone)}
+                      </div>
+                      <div className="col-span-1 whitespace-nowrap text-center text-white/60">
+                        {timeBR(r.data_envio, effectiveTimeZone)}
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass(r.status)}`}>
+                          {statusLabel(r.status)}
+                        </span>
+                      </div>
+                      <div className="col-span-3">
+                        {renderActionButtons(r, "desktop")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {filtered.length > pageSize ? (
