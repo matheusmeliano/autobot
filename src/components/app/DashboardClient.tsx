@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { BadgeCheck, CalendarDays, MessageSquareText } from "lucide-react";
+import { BadgeCheck, CalendarDays, MessageSquareText, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 type StatPack = {
@@ -10,6 +10,9 @@ type StatPack = {
   schedulesExecuted: number;
   templates: number;
   whatsappStatus: string;
+  receivableMonthTotal: number;
+  receivableMonthPaid: number;
+  receivableMonthRemaining: number;
 };
 
 type ActivityRow = {
@@ -58,6 +61,10 @@ function dateTimeBR(v: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(d);
+}
+
+function brl(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 function statusToLabel(status: string) {
@@ -152,6 +159,27 @@ export function DashboardClient({
           value={String(stats.templates)}
           subtitle=""
           icon={<MessageSquareText className="h-5 w-5" />}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4 min-[1201px]:grid-cols-3">
+        <Card
+          title="Total a receber (mês)"
+          value={brl(stats.receivableMonthTotal)}
+          subtitle=""
+          icon={<Wallet className="h-5 w-5" />}
+        />
+        <Card
+          title="Já recebidos (mês)"
+          value={brl(stats.receivableMonthPaid)}
+          subtitle=""
+          icon={<Wallet className="h-5 w-5" />}
+        />
+        <Card
+          title="Falta receber (mês)"
+          value={brl(stats.receivableMonthRemaining)}
+          subtitle=""
+          icon={<Wallet className="h-5 w-5" />}
         />
       </div>
 
