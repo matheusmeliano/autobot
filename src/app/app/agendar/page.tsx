@@ -14,7 +14,7 @@ export default async function AgendarPage() {
     supabase
       .from("schedules")
       .select(
-        "id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, created_at, debtors(nome), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
+        "id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, debtors(nome), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
       )
       .order("data_envio", { ascending: true })
       .limit(200),
@@ -55,6 +55,7 @@ export default async function AgendarPage() {
       recurrence_time: r.recurrence_time ?? null,
       schedule_timezone: r.schedule_timezone ?? null,
       last_sent_at: r.last_sent_at ?? null,
+      payment_received_at: r.payment_received_at ?? null,
       created_at: r.created_at,
       debtor_nome: r.debtors?.nome ?? "-",
       template_nome: r.pending_template?.nome ?? null,

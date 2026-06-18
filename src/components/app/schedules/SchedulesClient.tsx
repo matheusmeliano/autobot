@@ -34,6 +34,7 @@ export type ScheduleRow = {
   recurrence_time?: string | null;
   schedule_timezone?: string | null;
   last_sent_at?: string | null;
+  payment_received_at?: string | null;
   created_at: string;
   debtor_nome: string;
   template_nome: string | null;
@@ -278,8 +279,19 @@ export function SchedulesClient({
       return { label: "Executado", className: statusClass("executado") };
     }
 
-    const isCurrentMonth = yearMonthKey(row.data_envio, effectiveTimeZone) === yearMonthKey(new Date().toISOString(), effectiveTimeZone);
-    if (isCurrentMonth && row.last_sent_at) {
+    if (raw === "pago") {
+      return { label: statusLabel(row.status), className: statusClass(row.status) };
+    }
+
+    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
+    const paymentMonthKey = row.payment_received_at
+      ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
+      : "";
+    if (
+      (sentMonthKey && sentMonthKey === currentMonthKey) ||
+      (paymentMonthKey && paymentMonthKey === currentMonthKey)
+    ) {
       return { label: "Executado", className: statusClass("executado") };
     }
 
