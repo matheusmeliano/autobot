@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Menu, X } from "lucide-react";
 import { AppNav } from "@/components/app/AppNav";
 import { logoutAction } from "@/app/app/actions";
 import { Logo } from "@/components/ui/Logo";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { normalizePlan } from "@/lib/plans";
+import { normalizePlan, type PlanType } from "@/lib/plans";
 import { updateThemeAction } from "@/app/app/configuracoes/actions";
 import { modalToast } from "@/lib/modalToast";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
@@ -50,11 +51,13 @@ export function AppShell({
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [email, setEmail] = useState<string>("");
+  const [profileName, setProfileName] = useState<string>("");
   const [userId, setUserId] = useState(initialUserId);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
   const [restricted, setRestricted] = useState(false);
-  const [plan, setPlan] = useState<"teste" | "basico" | "pro" | "vitalicio">("teste");
+  const [plan, setPlan] = useState<PlanType>("teste");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<AppTheme>(() => {
     if (typeof document === "undefined") return initialTheme;
     const current = normalizeStoredTheme(document.documentElement.getAttribute("data-theme"));
@@ -94,6 +97,7 @@ export function AppShell({
   useEffect(() => {
     if (!authChecked) return;
     if (isAuthed) return;
+    setProfileName("");
     setUserId("");
     setTheme("dark");
     setThemePreference(null);
@@ -153,7 +157,7 @@ export function AppShell({
     let active = true;
     const checkAccess = async () => {
       const [{ data: profile }, { data: sub }] = await Promise.all([
-        supabase.from("profiles").select("plano, theme").maybeSingle(),
+        supabase.from("profiles").select("plano, theme, nome").maybeSingle(),
         supabase
           .from("subscriptions")
           .select("id, plano, status, vencimento, created_at")
@@ -165,6 +169,7 @@ export function AppShell({
       const plan = normalizePlan(profile?.plano ?? sub?.plano ?? "teste");
       if (!active) return;
       setPlan(plan);
+      setProfileName(String(profile?.nome ?? "").trim());
       const rawTheme = (profile as { theme?: unknown } | null)?.theme;
       const savedTheme = normalizeStoredTheme(rawTheme);
       setThemePreference(savedTheme);
@@ -275,7 +280,38 @@ export function AppShell({
     setThemeGateError("");
   }, [showThemeGate, theme]);
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      document.body.style.removeProperty("overflow");
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
   const showAdmin = isGlobalAdminEmail(email);
+  const displayName = profileName || email.split("@")[0] || "Usuário";
+  const avatarLabel = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("")
+    .slice(0, 2);
 
   const fetchPendingPayment = useCallback(async () => {
     if (!authChecked) return;
@@ -392,27 +428,26 @@ export function AppShell({
         </aside>
 
         <div className="w-full pb-16 min-[1201px]:pb-6">
-          <div className="mb-4 space-y-3 min-[1201px]:hidden">
-            <div className="flex items-center justify-between gap-2">
-              <form action={logoutAction}>
-                <button
-                  type="submit"
-                  className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-                >
-                  Sair
-                </button>
-              </form>
-              {showAdmin ? (
-                <Link
-                  href="/admin"
-                  className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-                >
-                  Admin
-                </Link>
-              ) : null}
+          <div className="mb-4 flex items-center justify-end gap-2 min-[1201px]:hidden">
+            {showAdmin ? (
+              <Link
+                href="/admin"
+                className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+              >
+                Admin
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] text-[var(--app-text-80)] shadow-lg shadow-black/10 transition-all hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+              aria-label="Abrir menu"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-app-drawer"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             </div>
-            <LoggedInAsCard email={email} />
-          </div>
           <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6">
             {children}
           </div>
@@ -431,9 +466,88 @@ export function AppShell({
         </div>
       </div>
 
-        <div className="fixed inset-x-0 bottom-0 bg-[var(--app-bg)] min-[1201px]:hidden">
-        <AppNav variant="bottom" restricted={restricted} plan={plan} />
-      </div>
+        <div
+          className={[
+            "fixed inset-0 z-[260] min-[1201px]:hidden",
+            mobileMenuOpen ? "pointer-events-auto" : "pointer-events-none",
+          ].join(" ")}
+          aria-hidden={!mobileMenuOpen}
+        >
+          <button
+            type="button"
+            className={[
+              "absolute inset-0 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300",
+              mobileMenuOpen ? "opacity-100" : "opacity-0",
+            ].join(" ")}
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Fechar menu"
+          />
+          <aside
+            id="mobile-app-drawer"
+            className={[
+              "absolute right-0 top-0 flex h-full w-full max-w-sm flex-col overflow-hidden rounded-l-[2rem] border-l border-[var(--app-border)] bg-[var(--app-modal-bg)] shadow-2xl shadow-black/30 backdrop-blur-2xl transition-transform duration-300 ease-out",
+              mobileMenuOpen ? "translate-x-0" : "translate-x-full",
+            ].join(" ")}
+          >
+            <div className="border-b border-[var(--app-border)] bg-[var(--app-card)] px-5 py-4 backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)]">
+                    <Logo />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-[var(--app-text-85)]">AutoBot</div>
+                    <div className="mt-0.5 text-xs text-[var(--app-text-45)]">Navegação do aplicativo</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+                  aria-label="Fechar menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 shadow-lg shadow-black/10">
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-active)] text-sm font-semibold text-[var(--app-text-85)]">
+                    {avatarLabel || "U"}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                      {displayName}
+                    </div>
+                    <div className="mt-1 truncate text-xs text-[var(--app-text-55)]">
+                      {email || "Sem e-mail"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <AppNav
+                variant="drawer"
+                restricted={restricted}
+                plan={plan}
+                onNavigate={() => setMobileMenuOpen(false)}
+              />
+            </div>
+
+            <div className="border-t border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 backdrop-blur-xl">
+              <form action={logoutAction}>
+                <button
+                  type="submit"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] shadow-lg shadow-black/10 hover:bg-[var(--app-hover)]"
+                >
+                  Sair da conta
+                </button>
+              </form>
+            </div>
+          </aside>
+        </div>
 
         {pendingPayment ? (
           <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/60 px-4 py-10">
