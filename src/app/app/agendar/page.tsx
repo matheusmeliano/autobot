@@ -10,7 +10,7 @@ import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 export default async function AgendarPage() {
   const supabase = await createSupabaseServerClient();
 
-  const [schedulesRes, debtorsRes, templatesRes, profileRes, waRes] = await Promise.all([
+  const [schedulesRes, scheduleRunsRes, debtorsRes, templatesRes, profileRes, waRes] = await Promise.all([
     supabase
       .from("schedules")
       .select(
@@ -18,6 +18,12 @@ export default async function AgendarPage() {
       )
       .order("data_envio", { ascending: true })
       .limit(200),
+    supabase
+      .from("schedule_runs")
+      .select("schedule_id, scheduled_for")
+      .eq("status", "executado")
+      .order("scheduled_for", { ascending: false })
+      .limit(2000),
     supabase.from("debtors").select("id, nome").order("nome", { ascending: true }).limit(500),
     supabase
       .from("message_templates")
@@ -28,7 +34,7 @@ export default async function AgendarPage() {
     supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
   ]);
 
-  if (schedulesRes.error || debtorsRes.error || templatesRes.error) {
+  if (schedulesRes.error || scheduleRunsRes.error || debtorsRes.error || templatesRes.error) {
     return (
       <div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Agendamentos</h1>
@@ -38,6 +44,14 @@ export default async function AgendarPage() {
         </div>
       </div>
     );
+  }
+
+  const latestExecutedRunBySchedule = new Map<string, string>();
+  for (const run of scheduleRunsRes.data ?? []) {
+    const scheduleId = String((run as any)?.schedule_id ?? "");
+    const scheduledFor = String((run as any)?.scheduled_for ?? "");
+    if (!scheduleId || !scheduledFor || latestExecutedRunBySchedule.has(scheduleId)) continue;
+    latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
   }
 
   const initial =
@@ -56,6 +70,7 @@ export default async function AgendarPage() {
       schedule_timezone: r.schedule_timezone ?? null,
       last_sent_at: r.last_sent_at ?? null,
       payment_received_at: r.payment_received_at ?? null,
+      last_executed_scheduled_for: latestExecutedRunBySchedule.get(String(r.id)) ?? null,
       created_at: r.created_at,
       debtor_nome: r.debtors?.nome ?? "-",
       template_nome: r.pending_template?.nome ?? null,

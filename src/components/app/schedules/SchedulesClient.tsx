@@ -35,6 +35,7 @@ export type ScheduleRow = {
   schedule_timezone?: string | null;
   last_sent_at?: string | null;
   payment_received_at?: string | null;
+  last_executed_scheduled_for?: string | null;
   created_at: string;
   debtor_nome: string;
   template_nome: string | null;
@@ -284,11 +285,15 @@ export function SchedulesClient({
     }
 
     const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    const executedScheduleMonthKey = row.last_executed_scheduled_for
+      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
+      : "";
     const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
     const paymentMonthKey = row.payment_received_at
       ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
       : "";
     if (
+      (executedScheduleMonthKey && executedScheduleMonthKey === currentMonthKey) ||
       (sentMonthKey && sentMonthKey === currentMonthKey) ||
       (paymentMonthKey && paymentMonthKey === currentMonthKey)
     ) {
@@ -300,21 +305,27 @@ export function SchedulesClient({
 
   const displayMoments = (row: ScheduleRow) => {
     const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    const executedScheduleMonthKey = row.last_executed_scheduled_for
+      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
+      : "";
     const paymentMonthKey = row.payment_received_at
       ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
       : "";
     const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
 
-    const executedAtCurrentMonth =
+    const executedMomentCurrentMonth =
+      (executedScheduleMonthKey &&
+        executedScheduleMonthKey === currentMonthKey &&
+        row.last_executed_scheduled_for) ||
       (paymentMonthKey && paymentMonthKey === currentMonthKey && row.payment_received_at) ||
       (sentMonthKey && sentMonthKey === currentMonthKey && row.last_sent_at) ||
       null;
 
-    const primaryMoment = executedAtCurrentMonth ?? row.data_envio;
+    const primaryMoment = executedMomentCurrentMonth ?? row.data_envio;
     const hasNextSchedule =
-      Boolean(executedAtCurrentMonth) &&
+      Boolean(executedMomentCurrentMonth) &&
       Boolean(row.data_envio) &&
-      new Date(row.data_envio).getTime() > new Date(executedAtCurrentMonth).getTime();
+      new Date(row.data_envio).getTime() > new Date(executedMomentCurrentMonth).getTime();
 
     return {
       primaryDate: dateBR(primaryMoment, effectiveTimeZone),
