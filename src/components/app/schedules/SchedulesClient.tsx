@@ -1062,15 +1062,15 @@ export function SchedulesClient({
 
         <div className="hidden min-[1201px]:block">
           <div className="overflow-x-auto">
-            <div className="min-w-[1120px] min-[1201px]:min-w-0">
-              <div className="grid grid-cols-14 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
-                <div className="col-span-3">Cliente</div>
-                <div className="col-span-2 text-center">Templates</div>
-                <div className="col-span-2 text-center">Data</div>
-                <div className="col-span-1 text-center">Hora</div>
-                <div className="col-span-2 text-center">Próximos agendamentos</div>
-                <div className="col-span-1 text-center">Status</div>
-                <div className="col-span-3 text-right">Ações</div>
+            <div className="min-w-[1180px] min-[1201px]:min-w-0">
+              <div className="grid grid-cols-[minmax(18rem,1.9fr)_minmax(14rem,1.35fr)_minmax(7rem,0.8fr)_minmax(5rem,0.65fr)_minmax(10rem,1fr)_minmax(7rem,0.85fr)_minmax(12rem,1.2fr)] gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
+                <div>Cliente</div>
+                <div className="text-center">Templates</div>
+                <div className="text-center">Data</div>
+                <div className="text-center">Hora</div>
+                <div className="text-center">Próximos agendamentos</div>
+                <div className="text-center">Status</div>
+                <div className="text-right">Ações</div>
               </div>
 
               {filtered.length === 0 ? (
@@ -1086,12 +1086,12 @@ export function SchedulesClient({
                       return (
                       <div
                         key={r.id}
-                        className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
+                        className="grid grid-cols-[minmax(18rem,1.9fr)_minmax(14rem,1.35fr)_minmax(7rem,0.8fr)_minmax(5rem,0.65fr)_minmax(10rem,1fr)_minmax(7rem,0.85fr)_minmax(12rem,1.2fr)] items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
                       >
-                        <div className="col-span-3 truncate font-semibold text-[var(--app-text-85)]">
+                        <div className="truncate font-semibold text-[var(--app-text-85)]">
                           {r.debtor_nome}
                         </div>
-                        <div className="col-span-2 min-w-0 text-center text-[var(--app-text-70)]">
+                        <div className="min-w-0 text-center text-[var(--app-text-70)]">
                           <div className="truncate font-semibold text-[var(--app-text-80)]">
                             {r.template_pending_nome ?? "-"}
                           </div>
@@ -1099,13 +1099,13 @@ export function SchedulesClient({
                             {r.template_overdue_nome ?? "-"}
                           </div>
                         </div>
-                        <div className="col-span-2 whitespace-nowrap text-center text-[var(--app-text-70)]">
+                        <div className="whitespace-nowrap text-center text-[var(--app-text-70)]">
                           {moments.primaryDate}
                         </div>
-                        <div className="col-span-1 whitespace-nowrap text-center text-[var(--app-text-70)]">
+                        <div className="whitespace-nowrap text-center text-[var(--app-text-70)]">
                           {moments.primaryTime}
                         </div>
-                        <div className="col-span-2 min-w-0 text-center text-[var(--app-text-70)]">
+                        <div className="min-w-0 text-center text-[var(--app-text-70)]">
                           <div className="truncate font-semibold text-[var(--app-text-80)]">
                             {moments.nextDate}
                           </div>
@@ -1113,12 +1113,12 @@ export function SchedulesClient({
                             {moments.hasNextSchedule ? moments.nextTime : "Sem novo envio"}
                           </div>
                         </div>
-                        <div className="col-span-1 flex justify-center">
+                        <div className="flex justify-center">
                           <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
                             {visualStatus.label}
                           </span>
                         </div>
-                        <div className="col-span-3">
+                        <div className="flex justify-end">
                           {renderActionButtons(r, "desktop")}
                         </div>
                       </div>
