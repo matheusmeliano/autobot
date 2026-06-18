@@ -1062,8 +1062,8 @@ export function SchedulesClient({
 
         <div className="hidden min-[1201px]:block">
           <div className="overflow-x-auto">
-            <div className="min-w-[1180px] min-[1201px]:min-w-0">
-              <div className="grid grid-cols-[minmax(18rem,1.9fr)_minmax(14rem,1.35fr)_minmax(7rem,0.8fr)_minmax(5rem,0.65fr)_minmax(10rem,1fr)_minmax(7rem,0.85fr)_minmax(12rem,1.2fr)] gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
+            <div className="min-w-[1080px] min-[1201px]:min-w-0">
+              <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_7rem_5rem_minmax(0,1fr)_8rem_11rem] gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
                 <div>Cliente</div>
                 <div className="text-center">Templates</div>
                 <div className="text-center">Data</div>
@@ -1086,10 +1086,12 @@ export function SchedulesClient({
                       return (
                       <div
                         key={r.id}
-                        className="grid grid-cols-[minmax(18rem,1.9fr)_minmax(14rem,1.35fr)_minmax(7rem,0.8fr)_minmax(5rem,0.65fr)_minmax(10rem,1fr)_minmax(7rem,0.85fr)_minmax(12rem,1.2fr)] items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
+                        className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_7rem_5rem_minmax(0,1fr)_8rem_11rem] items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
                       >
-                        <div className="truncate font-semibold text-[var(--app-text-85)]">
-                          {r.debtor_nome}
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-[var(--app-text-85)]" title={r.debtor_nome}>
+                            {r.debtor_nome}
+                          </div>
                         </div>
                         <div className="min-w-0 text-center text-[var(--app-text-70)]">
                           <div className="truncate font-semibold text-[var(--app-text-80)]">
