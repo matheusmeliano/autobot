@@ -439,7 +439,6 @@ export function SchedulesClient({
           <Pencil className="h-4 w-4" />
           {variant === "mobile" ? <span>Editar</span> : null}
         </button>
-        <button
         {String(r.recurrence ?? "none") === "monthly" ? (
           <button
             onClick={() => openRecurrenceLimit(r)}
