@@ -68,30 +68,30 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
         </div>
         <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Instance ID</div>
-          <div className="mt-2 min-w-0 truncate text-sm font-semibold text-white/80">
+          <div className="mt-2 min-w-0 break-all text-sm font-semibold leading-relaxed text-white/80">
             {initial?.instance_id ?? "-"}
           </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="text-sm font-semibold">Configuração</div>
         <form onSubmit={onSubmit} className="mt-4 grid gap-3">
           <div className="grid gap-3 md:grid-cols-2">
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-semibold text-white/60">
                 Instance ID
               </div>
               <input
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
                 placeholder="instance_xxx"
                 {...register("instance_id", { required: true })}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-semibold text-white/60">Token</div>
               <input
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
                 placeholder="token"
                 {...register("token", { required: true })}
               />
@@ -111,7 +111,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
                 </span>
               </div>
               <input
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
                 placeholder="client-token"
                 {...register("client_token")}
               />

@@ -427,7 +427,7 @@ export function AppShell({
           </div>
         </aside>
 
-        <div className="w-full pb-0 min-[1201px]:pb-6">
+        <div className="flex min-h-[calc(100vh-3rem)] w-full flex-col pb-0 min-[1201px]:pb-6">
           <div className="fixed right-4 top-4 z-[250] flex items-center justify-end gap-2 min-[1201px]:hidden">
             <button
               type="button"
@@ -440,7 +440,7 @@ export function AppShell({
               <Menu className="h-5 w-5" />
             </button>
             </div>
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6">
+          <div className="flex-1 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6">
             {children}
           </div>
           <div className="mt-3 flex justify-end text-xs text-[var(--app-text-35)]">
