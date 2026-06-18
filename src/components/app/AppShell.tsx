@@ -484,7 +484,7 @@ export function AppShell({
             <div className="border-b border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)]">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--app-solid-surface-2)]">
                     <Logo />
                   </div>
                   <div>
