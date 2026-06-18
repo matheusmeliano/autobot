@@ -5,6 +5,7 @@ export type DebtorChargeStatus = "ativo" | "pendente" | "pago" | "atrasado";
 type DebtorScheduleStatusRow = {
   debtor_id?: string | null;
   status?: string | null;
+  recurrence?: string | null;
   data_envio?: string | null;
   charge_due_at?: string | null;
   payment_received_at?: string | null;
@@ -29,6 +30,7 @@ export function deriveCurrentMonthDebtorStatus(
   let hasPaidInCurrentMonth = false;
   let hasPendingInCurrentMonth = false;
   let hasAnyPaid = false;
+  let hasFutureMonthlyCharge = false;
 
   for (const row of schedules) {
     const timeZone = String(row?.schedule_timezone ?? "") || "America/Sao_Paulo";
@@ -39,6 +41,7 @@ export function deriveCurrentMonthDebtorStatus(
     const dueLocalDate = scheduleLocalDate(row?.charge_due_at ?? row?.data_envio ?? null, timeZone);
     const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
     const currentStatus = String(row?.status ?? "").trim().toLowerCase();
+    const recurrence = String(row?.recurrence ?? "").trim().toLowerCase();
     const isClosed = Boolean(String(row?.closed_at ?? "").trim());
 
     if (!isClosed && currentStatus !== "pago" && dueLocalDate) {
@@ -47,6 +50,8 @@ export function deriveCurrentMonthDebtorStatus(
       }
       if (dueLocalDate.slice(0, 7) === currentMonth) {
         hasPendingInCurrentMonth = true;
+      } else if (recurrence === "monthly" && dueLocalDate.slice(0, 7) > currentMonth) {
+        hasFutureMonthlyCharge = true;
       }
       continue;
     }
@@ -61,6 +66,7 @@ export function deriveCurrentMonthDebtorStatus(
 
   if (hasPaidInCurrentMonth) return "pago";
   if (hasPendingInCurrentMonth) return "pendente";
+  if (hasFutureMonthlyCharge) return "pago";
   if (hasAnyPaid) return "pago";
   return "pendente";
 }
@@ -130,7 +136,7 @@ function normalizeDebtorChargeStatus(status: string) {
 export async function syncDebtorChargeStatus(admin: any, userId: string, debtorId: string) {
   const { data: schedules } = await admin
     .from("schedules")
-    .select("status, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at")
+    .select("status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at")
     .eq("user_id", userId)
     .eq("debtor_id", debtorId)
     .order("data_envio", { ascending: false })
