@@ -301,7 +301,7 @@ export function DashboardClient({
         className="flex flex-col justify-between gap-4 min-[1201px]:flex-row min-[1201px]:items-end"
       >
         <div>
-          <h1 className="mt-2 text-xl font-semibold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-2xl min-[1201px]:text-[2rem]">
+          <h1 className="mt-2 text-lg font-semibold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-xl min-[1201px]:text-[1.75rem]">
             {greeting}
           </h1>
         </div>
