@@ -298,12 +298,8 @@ export function SchedulesClient({
 
   const displayStatus = (row: ScheduleRow) => {
     const raw = String(row.status ?? "").toLowerCase();
-    if (raw === "executado") {
+    if (raw === "executado" || raw === "pago") {
       return { label: "Executado", className: statusClass("executado") };
-    }
-
-    if (raw === "pago") {
-      return { label: statusLabel(row.status), className: statusClass(row.status) };
     }
 
     const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
@@ -322,7 +318,7 @@ export function SchedulesClient({
       return { label: "Executado", className: statusClass("executado") };
     }
 
-    return { label: statusLabel(row.status), className: statusClass(row.status) };
+    return { label: "Agendado", className: statusClass("agendado") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
