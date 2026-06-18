@@ -258,15 +258,15 @@ export function SchedulesClient({
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
     const baseButtonClass =
       variant === "mobile"
-        ? "inline-flex min-h-[40px] min-w-[calc(50%-0.25rem)] flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/[0.06] disabled:opacity-60"
+        ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/[0.06] disabled:opacity-60"
         : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60";
     const triggerButtonClass =
       variant === "mobile"
-        ? "inline-flex min-h-[40px] min-w-[calc(50%-0.25rem)] flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
+        ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06] disabled:opacity-60"
         : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06] disabled:opacity-60";
 
     return (
-      <div className={variant === "mobile" ? "flex flex-wrap gap-2" : "flex flex-nowrap justify-end gap-2"}>
+      <div className={variant === "mobile" ? "grid grid-cols-2 gap-2" : "flex flex-nowrap justify-end gap-2"}>
         <button
           onClick={() => triggerNow(r)}
           disabled={
@@ -890,7 +890,7 @@ export function SchedulesClient({
           ) : (
             <div className="grid gap-3 p-3">
               {pagedRows.map((r) => (
-                <div key={r.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div key={r.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold text-white/85">{r.debtor_nome}</div>
@@ -904,19 +904,19 @@ export function SchedulesClient({
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
                         Template pendente
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-white/75">
+                      <div className="mt-1 break-words text-sm font-semibold text-white/75">
                         {r.template_pending_nome ?? "-"}
                       </div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">
                         Template atrasado
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-white/75">
+                      <div className="mt-1 break-words text-sm font-semibold text-white/75">
                         {r.template_overdue_nome ?? "-"}
                       </div>
                     </div>
