@@ -313,6 +313,11 @@ export function AppShell({
     .join("")
     .slice(0, 2);
 
+  const handleLogoutSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
+    if (window.confirm("Deseja realmente sair?")) return;
+    event.preventDefault();
+  }, []);
+
   const fetchPendingPayment = useCallback(async () => {
     if (!authChecked) return;
     if (!isAuthed) return;
@@ -416,7 +421,7 @@ export function AppShell({
               <AppNav variant="sidebar" restricted={restricted} plan={plan} />
             </div>
 
-            <form action={logoutAction} className="mt-4">
+            <form action={logoutAction} className="mt-4" onSubmit={handleLogoutSubmit}>
               <button
                 type="submit"
                 className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
@@ -539,7 +544,7 @@ export function AppShell({
             </div>
 
             <div className="border-t border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-4">
-              <form action={logoutAction}>
+              <form action={logoutAction} onSubmit={handleLogoutSubmit}>
                 <button
                   type="submit"
                   className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-solid-surface)]"
