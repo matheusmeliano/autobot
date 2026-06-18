@@ -454,22 +454,6 @@ export function SchedulesClient({
           <Check className="h-4 w-4" />
           {variant === "mobile" ? <span>Pago</span> : null}
         </button>
-        {String(r.recurrence ?? "none") === "monthly" ? (
-          <button
-            onClick={() => openRecurrenceLimit(r)}
-            disabled={
-              isPending ||
-              triggeringId === r.id ||
-              markingPaidId === r.id ||
-              savingRecurrenceLimit
-            }
-            className={baseButtonClass}
-            title="Definir data final"
-          >
-            <Calendar className="h-4 w-4" />
-            {variant === "mobile" ? <span>Data final</span> : null}
-          </button>
-        ) : null}
         <button
           onClick={() => triggerNow(r)}
           disabled={
@@ -488,6 +472,22 @@ export function SchedulesClient({
           <Send className="h-4 w-4" />
           {variant === "mobile" ? <span>Disparar</span> : null}
         </button>
+        {String(r.recurrence ?? "none") === "monthly" ? (
+          <button
+            onClick={() => openRecurrenceLimit(r)}
+            disabled={
+              isPending ||
+              triggeringId === r.id ||
+              markingPaidId === r.id ||
+              savingRecurrenceLimit
+            }
+            className={baseButtonClass}
+            title="Definir data final"
+          >
+            <Calendar className="h-4 w-4" />
+            {variant === "mobile" ? <span>Data final</span> : null}
+          </button>
+        ) : null}
         <button
           onClick={() => remove(r)}
           disabled={
