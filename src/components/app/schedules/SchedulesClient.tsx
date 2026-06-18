@@ -431,24 +431,6 @@ export function SchedulesClient({
     return (
       <div className={variant === "mobile" ? "grid grid-cols-2 gap-2" : "flex flex-nowrap justify-end gap-2"}>
         <button
-          onClick={() => triggerNow(r)}
-          disabled={
-            isPending ||
-            triggeringId === r.id ||
-            markingPaidId === r.id ||
-            String(r.status ?? "") === "executado" ||
-            String(r.status ?? "") === "pendente" ||
-            String(r.status ?? "") === "pago" ||
-            String(r.status ?? "") === "executando" ||
-            String(r.status ?? "") === "suspeita_de_pagamento"
-          }
-          className={triggerButtonClass}
-          title="Disparar agora"
-        >
-          <Send className="h-4 w-4" />
-          {variant === "mobile" ? <span>Disparar</span> : null}
-        </button>
-        <button
           onClick={() => openEdit(r)}
           disabled={isPending || markingPaidId === r.id || savingRecurrenceLimit}
           className={baseButtonClass}
@@ -488,6 +470,24 @@ export function SchedulesClient({
             {variant === "mobile" ? <span>Data final</span> : null}
           </button>
         ) : null}
+        <button
+          onClick={() => triggerNow(r)}
+          disabled={
+            isPending ||
+            triggeringId === r.id ||
+            markingPaidId === r.id ||
+            String(r.status ?? "") === "executado" ||
+            String(r.status ?? "") === "pendente" ||
+            String(r.status ?? "") === "pago" ||
+            String(r.status ?? "") === "executando" ||
+            String(r.status ?? "") === "suspeita_de_pagamento"
+          }
+          className={triggerButtonClass}
+          title="Disparar agora"
+        >
+          <Send className="h-4 w-4" />
+          {variant === "mobile" ? <span>Disparar</span> : null}
+        </button>
         <button
           onClick={() => remove(r)}
           disabled={
