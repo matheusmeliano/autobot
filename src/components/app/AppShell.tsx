@@ -427,7 +427,7 @@ export function AppShell({
           </div>
         </aside>
 
-        <div className="w-full pb-16 min-[1201px]:pb-6">
+        <div className="w-full pb-0 min-[1201px]:pb-6">
           <div className="fixed right-4 top-4 z-[250] flex items-center justify-end gap-2 min-[1201px]:hidden">
             <button
               type="button"
