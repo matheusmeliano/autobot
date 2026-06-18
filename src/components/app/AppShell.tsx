@@ -429,14 +429,6 @@ export function AppShell({
 
         <div className="w-full pb-16 min-[1201px]:pb-6">
           <div className="mb-4 flex items-center justify-end gap-2 min-[1201px]:hidden">
-            {showAdmin ? (
-              <Link
-                href="/admin"
-                className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-              >
-                Admin
-              </Link>
-            ) : null}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
@@ -525,6 +517,16 @@ export function AppShell({
                   </div>
                 </div>
               </div>
+              {showAdmin ? (
+                <Link
+                  href="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mt-3 flex items-center justify-between rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] shadow-lg shadow-black/10 hover:bg-[var(--app-hover)]"
+                >
+                  <span>Admin</span>
+                  <span className="text-xs text-[var(--app-text-45)]">Painel administrativo</span>
+                </Link>
+              ) : null}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4">
