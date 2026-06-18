@@ -33,6 +33,7 @@ export type ScheduleRow = {
   recurrence_day?: number | null;
   recurrence_time?: string | null;
   schedule_timezone?: string | null;
+  last_sent_at?: string | null;
   created_at: string;
   debtor_nome: string;
   template_nome: string | null;
@@ -72,6 +73,22 @@ function timeBR(v: string, timeZone: BrazilTimeZone) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(d);
+}
+
+function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(d);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return `${map.year}-${map.month}`;
 }
 
 function dateOnlyBR(v: string) {
@@ -250,9 +267,23 @@ export function SchedulesClient({
     if (s === "pendente" || s === "suspeita_de_pagamento") {
       return "border-orange-500/30 bg-orange-500/10 text-orange-600";
     }
-    if (s === "pago") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
+    if (s === "pago" || s === "executado") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
     if (s === "atrasado") return "border-rose-500/30 bg-rose-500/10 text-rose-600";
     return "border-white/10 bg-white/[0.04] text-white/70";
+  };
+
+  const displayStatus = (row: ScheduleRow) => {
+    const raw = String(row.status ?? "").toLowerCase();
+    if (raw === "executado") {
+      return { label: "Executado", className: statusClass("executado") };
+    }
+
+    const isCurrentMonth = yearMonthKey(row.data_envio, effectiveTimeZone) === yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    if (isCurrentMonth && row.last_sent_at) {
+      return { label: "Executado", className: statusClass("executado") };
+    }
+
+    return { label: statusLabel(row.status), className: statusClass(row.status) };
   };
 
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
@@ -890,6 +921,9 @@ export function SchedulesClient({
           ) : (
             <div className="grid gap-3 p-3">
               {pagedRows.map((r) => (
+                (() => {
+                  const visualStatus = displayStatus(r);
+                  return (
                 <div
                   key={r.id}
                   className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4"
@@ -903,8 +937,8 @@ export function SchedulesClient({
                         Agendamento
                       </div>
                     </div>
-                    <span className={`inline-flex shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass(r.status)}`}>
-                      {statusLabel(r.status)}
+                    <span className={`inline-flex shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
+                      {visualStatus.label}
                     </span>
                   </div>
 
@@ -953,6 +987,8 @@ export function SchedulesClient({
                     {renderActionButtons(r, "mobile")}
                   </div>
                 </div>
+                  );
+                })()
               ))}
             </div>
           )}
@@ -977,36 +1013,41 @@ export function SchedulesClient({
               ) : (
                 <div className="divide-y divide-white/10">
                   {pagedRows.map((r) => (
-                    <div
-                      key={r.id}
-                      className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
-                    >
-                      <div className="col-span-3 truncate font-semibold text-[var(--app-text-85)]">
-                        {r.debtor_nome}
-                      </div>
-                      <div className="col-span-2 min-w-0 text-center text-[var(--app-text-70)]">
-                        <div className="truncate font-semibold text-[var(--app-text-80)]">
-                          {r.template_pending_nome ?? "-"}
+                    (() => {
+                      const visualStatus = displayStatus(r);
+                      return (
+                      <div
+                        key={r.id}
+                        className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
+                      >
+                        <div className="col-span-3 truncate font-semibold text-[var(--app-text-85)]">
+                          {r.debtor_nome}
                         </div>
-                        <div className="truncate text-[11px] text-[var(--app-text-55)]">
-                          {r.template_overdue_nome ?? "-"}
+                        <div className="col-span-2 min-w-0 text-center text-[var(--app-text-70)]">
+                          <div className="truncate font-semibold text-[var(--app-text-80)]">
+                            {r.template_pending_nome ?? "-"}
+                          </div>
+                          <div className="truncate text-[11px] text-[var(--app-text-55)]">
+                            {r.template_overdue_nome ?? "-"}
+                          </div>
+                        </div>
+                        <div className="col-span-2 whitespace-nowrap text-center text-[var(--app-text-70)]">
+                          {dateBR(r.data_envio, effectiveTimeZone)}
+                        </div>
+                        <div className="col-span-1 whitespace-nowrap text-center text-[var(--app-text-70)]">
+                          {timeBR(r.data_envio, effectiveTimeZone)}
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
+                            {visualStatus.label}
+                          </span>
+                        </div>
+                        <div className="col-span-3">
+                          {renderActionButtons(r, "desktop")}
                         </div>
                       </div>
-                      <div className="col-span-2 whitespace-nowrap text-center text-[var(--app-text-70)]">
-                        {dateBR(r.data_envio, effectiveTimeZone)}
-                      </div>
-                      <div className="col-span-1 whitespace-nowrap text-center text-[var(--app-text-70)]">
-                        {timeBR(r.data_envio, effectiveTimeZone)}
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass(r.status)}`}>
-                          {statusLabel(r.status)}
-                        </span>
-                      </div>
-                      <div className="col-span-3">
-                        {renderActionButtons(r, "desktop")}
-                      </div>
-                    </div>
+                      );
+                    })()
                   ))}
                 </div>
               )}
