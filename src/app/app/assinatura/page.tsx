@@ -74,14 +74,14 @@ export default async function AssinaturaPage() {
       ) : null}
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4">
-          <div className="text-xs font-semibold text-[var(--app-text-55)]">Plano</div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="text-xs font-semibold text-white/55">Plano</div>
           <div className="mt-2 text-xl font-semibold tracking-tight">
             {planLabel(plan)}
           </div>
         </div>
-        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4">
-          <div className="text-xs font-semibold text-[var(--app-text-55)]">Vencimento</div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="text-xs font-semibold text-white/55">Vencimento</div>
           <div className="mt-2 text-xl font-semibold tracking-tight">
             {plan === "vitalicio" ? "-" : dateBR(vencimento)}
           </div>
