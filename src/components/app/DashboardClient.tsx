@@ -22,7 +22,174 @@ type ActivityRow = {
   dateTime: string;
 };
 
-type ChartPoint = { name: string; value: number };
+type ChartFilter = "days" | "weeks" | "months" | "years";
+type ChartPoint = { name: string; value: number; label: string };
+
+const CHART_TIME_ZONE = "America/Sao_Paulo";
+
+function formatDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CHART_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+  };
+}
+
+function zonedDateKey(date: Date) {
+  const parts = formatDateParts(date);
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+function startOfZonedDay(date: Date) {
+  const parts = formatDateParts(date);
+  return new Date(parts.year, parts.month - 1, parts.day);
+}
+
+function addDays(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function addMonths(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + amount);
+  return next;
+}
+
+function startOfWeek(date: Date) {
+  const start = startOfZonedDay(date);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  return addDays(start, diff);
+}
+
+function monthKey(date: Date) {
+  const parts = formatDateParts(date);
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}`;
+}
+
+function yearKey(date: Date) {
+  return String(formatDateParts(date).year);
+}
+
+function shortDateLabel(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: CHART_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+  }).format(date);
+}
+
+function shortMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: CHART_TIME_ZONE,
+    month: "short",
+  })
+    .format(date)
+    .replace(".", "");
+}
+
+function weekdayLabel(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: CHART_TIME_ZONE,
+    weekday: "short",
+  })
+    .format(date)
+    .replace(".", "");
+}
+
+function buildChartPoints(filter: ChartFilter, chartDates: string[]): ChartPoint[] {
+  const validDates = chartDates
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()));
+
+  const now = new Date();
+
+  if (filter === "days") {
+    const buckets = Array.from({ length: 7 }).map((_, index) => {
+      const day = addDays(startOfZonedDay(now), -(6 - index));
+      return {
+        key: zonedDateKey(day),
+        name: weekdayLabel(day),
+        label: shortDateLabel(day),
+      };
+    });
+
+    return buckets.map((bucket) => ({
+      name: bucket.name,
+      label: bucket.label,
+      value: validDates.filter((date) => zonedDateKey(date) === bucket.key).length,
+    }));
+  }
+
+  if (filter === "weeks") {
+    const currentWeek = startOfWeek(now);
+    const buckets = Array.from({ length: 8 }).map((_, index) => {
+      const weekStart = addDays(currentWeek, (-(7 - index) * 7));
+      const weekEnd = addDays(weekStart, 6);
+      return {
+        key: zonedDateKey(weekStart),
+        name: shortDateLabel(weekStart),
+        label: `${shortDateLabel(weekStart)} a ${shortDateLabel(weekEnd)}`,
+      };
+    });
+
+    return buckets.map((bucket) => ({
+      name: bucket.name,
+      label: `Semana ${bucket.label}`,
+      value: validDates.filter((date) => zonedDateKey(startOfWeek(date)) === bucket.key).length,
+    }));
+  }
+
+  if (filter === "months") {
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const buckets = Array.from({ length: 12 }).map((_, index) => {
+      const month = addMonths(currentMonth, -(11 - index));
+      const monthLabel = shortMonthLabel(month);
+      const monthYear = new Intl.DateTimeFormat("pt-BR", {
+        timeZone: CHART_TIME_ZONE,
+        month: "long",
+        year: "numeric",
+      }).format(month);
+      return {
+        key: monthKey(month),
+        name: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+        label: monthYear.charAt(0).toUpperCase() + monthYear.slice(1),
+      };
+    });
+
+    return buckets.map((bucket) => ({
+      name: bucket.name,
+      label: bucket.label,
+      value: validDates.filter((date) => monthKey(date) === bucket.key).length,
+    }));
+  }
+
+  const currentYear = new Date(now.getFullYear(), 0, 1);
+  const buckets = Array.from({ length: 5 }).map((_, index) => {
+    const yearDate = addMonths(currentYear, (-(4 - index) * 12));
+    const label = String(yearDate.getFullYear());
+    return {
+      key: yearKey(yearDate),
+      name: label,
+      label,
+    };
+  });
+
+  return buckets.map((bucket) => ({
+    name: bucket.name,
+    label: bucket.label,
+    value: validDates.filter((date) => yearKey(date) === bucket.key).length,
+  }));
+}
 
 function Card({
   title,
@@ -84,17 +251,18 @@ export function DashboardClient({
   email,
   name,
   stats,
-  chart,
+  chartDates,
   activities,
 }: {
   email: string;
   name?: string;
   stats: StatPack;
-  chart: ChartPoint[];
+  chartDates: string[];
   activities: ActivityRow[];
 }) {
   const pageSize = 3;
   const [activityPage, setActivityPage] = useState(1);
+  const [chartFilter, setChartFilter] = useState<ChartFilter>("days");
   const activityPages = Math.max(1, Math.ceil(activities.length / pageSize));
   const safeActivityPage = Math.min(activityPage, activityPages);
 
@@ -107,6 +275,8 @@ export function DashboardClient({
     const start = (safeActivityPage - 1) * pageSize;
     return activities.slice(start, start + pageSize);
   }, [activities, safeActivityPage]);
+
+  const chart = useMemo(() => buildChartPoints(chartFilter, chartDates), [chartDates, chartFilter]);
 
   const isConnected =
     stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
@@ -185,9 +355,35 @@ export function DashboardClient({
 
       <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5">
         <div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 min-[1201px]:col-span-3">
-          <div className="text-sm font-semibold">Agendamentos criados (7 dias)</div>
-          <div className="mt-1 text-xs text-[var(--app-text-45)]">
-            Dados reais dos agendamentos cadastrados.
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold">Agendamentos criados</div>
+              <div className="mt-1 text-xs text-[var(--app-text-45)]">
+                Dados reais dos agendamentos cadastrados.
+              </div>
+            </div>
+            <div className="inline-flex w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-1 sm:w-auto">
+              {[
+                { key: "days", label: "Dias" },
+                { key: "weeks", label: "Semanas" },
+                { key: "months", label: "Meses" },
+                { key: "years", label: "Anos" },
+              ].map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={[
+                    "flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors sm:flex-none",
+                    chartFilter === option.key
+                      ? "bg-[var(--app-hover)] text-[var(--app-text-85)]"
+                      : "text-[var(--app-text-55)] hover:text-[var(--app-text-85)]",
+                  ].join(" ")}
+                  onClick={() => setChartFilter(option.key as ChartFilter)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="mt-4 min-h-[160px] flex-1">
             <ResponsiveContainer width="100%" height="100%">
@@ -213,7 +409,7 @@ export function DashboardClient({
                   labelStyle={{ color: "var(--app-text-70)" }}
                   itemStyle={{ color: "var(--app-text-85)" }}
                   formatter={(v: any) => [v, "Quantidade"]}
-                  labelFormatter={(l: any) => `Dia: ${l}`}
+                  labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.label ?? ""}
                 />
                 <Area type="monotone" dataKey="value" stroke="rgb(99 102 241)" strokeWidth={2} fill="url(#dashValue)" />
               </AreaChart>

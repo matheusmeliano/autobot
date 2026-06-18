@@ -25,20 +25,13 @@ export default async function DashboardPage() {
           receivableMonthPaid: 0,
           receivableMonthRemaining: 0,
         }}
-        chart={[]}
+        chartDates={[]}
         activities={[]}
       />
     );
   }
 
   const now = new Date();
-  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  startMonth.setHours(0, 0, 0, 0);
-  const startMonthIso = startMonth.toISOString();
-  const start7 = new Date(now);
-  start7.setDate(now.getDate() - 6);
-  start7.setHours(0, 0, 0, 0);
-  const start7Iso = start7.toISOString();
 
   const [
     templatesRes,
@@ -57,7 +50,8 @@ export default async function DashboardPage() {
       .from("schedules")
       .select("created_at")
       .eq("user_id", userId)
-      .gte("created_at", start7Iso),
+      .order("created_at", { ascending: true })
+      .limit(5000),
     supabase.from("whatsapp_instances").select("status").maybeSingle(),
     supabase.from("profiles").select("nome").eq("user_id", userId).maybeSingle(),
     supabase
@@ -149,19 +143,9 @@ export default async function DashboardPage() {
     receivableMonthRemaining,
   };
 
-  const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const days = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date(now);
-    d.setDate(now.getDate() - (6 - i));
-    const key = d.toISOString().slice(0, 10);
-    return { key, label: weekdays[d.getDay()] ?? "" };
-  });
-
-  const chartRows = (chartRes.data ?? []) as Array<{ created_at: string }>;
-  const chart = days.map((d) => ({
-    name: d.label,
-    value: chartRows.filter((c) => c.created_at.slice(0, 10) === d.key).length,
-  }));
+  const chartDates = ((chartRes.data ?? []) as Array<{ created_at: string }>).map((row) =>
+    String(row.created_at ?? ""),
+  );
 
   const activities = ((activitiesRes.data ?? []) as any[]).map((r) => ({
     id: String(r.id),
@@ -175,7 +159,7 @@ export default async function DashboardPage() {
       email={email}
       name={(profileRes as any)?.data?.nome ?? ""}
       stats={stats}
-      chart={chart}
+      chartDates={chartDates}
       activities={activities}
     />
   );
