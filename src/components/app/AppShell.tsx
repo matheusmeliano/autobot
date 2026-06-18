@@ -477,7 +477,7 @@ export function AppShell({
           <aside
             id="mobile-app-drawer"
             className={[
-              "absolute right-0 top-0 flex h-full w-full max-w-sm flex-col overflow-hidden rounded-l-[2rem] border-l border-[var(--app-border)] bg-[var(--app-solid-modal)] transition-transform duration-300 ease-out",
+              "absolute right-0 top-0 flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-[var(--app-border)] bg-[var(--app-solid-modal)] transition-transform duration-300 ease-out",
               mobileMenuOpen ? "translate-x-0" : "translate-x-full",
             ].join(" ")}
           >
