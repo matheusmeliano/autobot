@@ -131,11 +131,9 @@ export function AppNav({
                     <div className="min-w-0 flex-1">
                       <div className="truncate">{item.label}</div>
                     </div>
-                    {active ? (
-                      <span className="h-2.5 w-2.5 rounded-full bg-[var(--app-text-85)]" />
-                    ) : (
+                    {!active ? (
                       <ChevronRight className="h-4 w-4 text-[var(--app-text-35)] transition-transform group-hover:translate-x-0.5" />
-                    )}
+                    ) : null}
                   </Link>
                 );
               })}
