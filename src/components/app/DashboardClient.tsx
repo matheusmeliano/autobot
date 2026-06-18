@@ -143,27 +143,6 @@ export function DashboardClient({
 
       <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-3">
         <Card
-          title="Agendamentos (mês)"
-          value={String(stats.schedulesMonth)}
-          subtitle=""
-          icon={<CalendarDays className="h-5 w-5" />}
-        />
-        <Card
-          title="Executados"
-          value={String(stats.schedulesExecuted)}
-          subtitle=""
-          icon={<BadgeCheck className="h-5 w-5" />}
-        />
-        <Card
-          title="Templates (Mensagens)"
-          value={String(stats.templates)}
-          subtitle=""
-          icon={<MessageSquareText className="h-5 w-5" />}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-4 min-[1201px]:grid-cols-3">
-        <Card
           title="Total a receber (mês)"
           value={brl(stats.receivableMonthTotal)}
           subtitle=""
@@ -180,6 +159,27 @@ export function DashboardClient({
           value={brl(stats.receivableMonthRemaining)}
           subtitle=""
           icon={<Wallet className="h-5 w-5" />}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4 min-[1201px]:grid-cols-3">
+        <Card
+          title="Agendamentos (mês)"
+          value={String(stats.schedulesMonth)}
+          subtitle=""
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
+        <Card
+          title="Executados"
+          value={String(stats.schedulesExecuted)}
+          subtitle=""
+          icon={<BadgeCheck className="h-5 w-5" />}
+        />
+        <Card
+          title="Templates (Mensagens)"
+          value={String(stats.templates)}
+          subtitle=""
+          icon={<MessageSquareText className="h-5 w-5" />}
         />
       </div>
 
