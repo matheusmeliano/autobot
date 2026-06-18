@@ -100,6 +100,28 @@ function dateOnlyBR(v: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
+function lastDayOfMonth(year: number, month1: number) {
+  return new Date(Date.UTC(year, month1, 0)).getUTCDate();
+}
+
+function buildLocalDate(yearMonth: string, day: number) {
+  const [yearRaw, monthRaw] = yearMonth.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!year || !month) return "";
+  const safeDay = Math.max(1, Math.min(Number(day) || 1, lastDayOfMonth(year, month)));
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+function localScheduleIso(date: string, time: string, timeZone: BrazilTimeZone) {
+  if (!date || !time) return null;
+  try {
+    return zonedDateTimeToUtcIso({ date, time, timeZone });
+  } catch {
+    return null;
+  }
+}
+
 function splitDateTimeForInput(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return { date: "", time: "" };
@@ -320,15 +342,28 @@ export function SchedulesClient({
       (paymentMonthKey && paymentMonthKey === currentMonthKey && row.payment_received_at) ||
       (sentMonthKey && sentMonthKey === currentMonthKey && row.last_sent_at) ||
       null;
-
-    const primaryMoment = executedMomentCurrentMonth ?? row.data_envio;
-    const executedMomentTime = executedMomentCurrentMonth
-      ? new Date(executedMomentCurrentMonth).getTime()
-      : null;
-    const hasNextSchedule =
-      executedMomentTime !== null &&
-      Boolean(row.data_envio) &&
-      new Date(row.data_envio).getTime() > executedMomentTime;
+    const cycleConfig = getMonthlyCycleConfig(row, effectiveTimeZone);
+    const nextScheduleInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
+    const usesCurrentMonthCycle =
+      Boolean(executedMomentCurrentMonth) && String(row.recurrence ?? "none") === "monthly";
+    const primaryDateInput = usesCurrentMonthCycle
+      ? buildLocalDate(currentMonthKey, cycleConfig.day)
+      : executedMomentCurrentMonth
+        ? splitDateTimeForInput(executedMomentCurrentMonth, effectiveTimeZone).date
+        : nextScheduleInput.date;
+    const primaryTimeInput = usesCurrentMonthCycle
+      ? cycleConfig.time
+      : executedMomentCurrentMonth
+        ? splitDateTimeForInput(executedMomentCurrentMonth, effectiveTimeZone).time
+        : nextScheduleInput.time;
+    const primaryMoment =
+      localScheduleIso(primaryDateInput, primaryTimeInput, effectiveTimeZone) ??
+      executedMomentCurrentMonth ??
+      row.data_envio;
+    const primaryKey = primaryDateInput && primaryTimeInput ? `${primaryDateInput}T${primaryTimeInput}` : "";
+    const nextKey =
+      nextScheduleInput.date && nextScheduleInput.time ? `${nextScheduleInput.date}T${nextScheduleInput.time}` : "";
+    const hasNextSchedule = Boolean(primaryKey && nextKey && nextKey !== primaryKey);
 
     return {
       primaryDate: dateBR(primaryMoment, effectiveTimeZone),
@@ -337,6 +372,50 @@ export function SchedulesClient({
       nextTime: hasNextSchedule ? timeBR(row.data_envio, effectiveTimeZone) : "-",
       hasNextSchedule,
     };
+  };
+
+  const getEditDateTime = (row: ScheduleRow) => {
+    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    const executedScheduleMonthKey = row.last_executed_scheduled_for
+      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
+      : "";
+    const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
+    const paymentMonthKey = row.payment_received_at
+      ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
+      : "";
+    const hasCurrentMonthExecution =
+      executedScheduleMonthKey === currentMonthKey ||
+      sentMonthKey === currentMonthKey ||
+      paymentMonthKey === currentMonthKey;
+
+    if (String(row.recurrence ?? "none") === "monthly" && hasCurrentMonthExecution) {
+      const cycleConfig = getMonthlyCycleConfig(row, effectiveTimeZone);
+      return {
+        date: buildLocalDate(currentMonthKey, cycleConfig.day),
+        time: cycleConfig.time,
+      };
+    }
+
+    return splitDateTimeForInput(row.data_envio, effectiveTimeZone);
+  };
+
+  const normalizeEditedDateForPersistence = (row: ScheduleRow, date: string) => {
+    if (String(row.recurrence ?? "none") !== "monthly") return date;
+
+    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    const nextScheduleDate = splitDateTimeForInput(row.data_envio, effectiveTimeZone).date;
+    if (!nextScheduleDate) return date;
+
+    const nextScheduleMonthKey = nextScheduleDate.slice(0, 7);
+    if (nextScheduleMonthKey === currentMonthKey) return date;
+
+    const [yearRaw, monthRaw] = nextScheduleMonthKey.split("-");
+    const day = Number(String(date ?? "").split("-")[2] ?? "");
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    if (!year || !month) return date;
+    const safeDay = Math.max(1, Math.min(day || 1, lastDayOfMonth(year, month)));
+    return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
   };
 
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
@@ -500,7 +579,7 @@ export function SchedulesClient({
     setEditing(row);
     setOpen(true);
     setMonthlyExtras([]);
-    const dt = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
+    const dt = getEditDateTime(row);
     reset({
       id: row.id,
       debtor_id: row.debtor_id,
@@ -552,12 +631,17 @@ export function SchedulesClient({
       }
     }
 
+    const normalizedEditDate =
+      editing && values.data_envio_date
+        ? normalizeEditedDateForPersistence(editing, values.data_envio_date)
+        : values.data_envio_date;
+
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       debtor_id: values.debtor_id,
       template_pending_id: values.template_pending_id ? values.template_pending_id : undefined,
       template_overdue_id: values.template_overdue_id ? values.template_overdue_id : undefined,
-      data_envio_date: values.data_envio_date,
+      data_envio_date: normalizedEditDate,
       data_envio_time: values.data_envio_time,
       recurrence: values.recurrence,
       recurrence_until:
@@ -568,7 +652,7 @@ export function SchedulesClient({
     if (
       values.recurrence === "monthly" &&
       values.recurrence_until &&
-      values.recurrence_until < values.data_envio_date
+      values.recurrence_until < normalizedEditDate
     ) {
       modalToast.warning("A data final deve ser igual ou posterior à primeira cobrança.");
       return;
@@ -576,7 +660,7 @@ export function SchedulesClient({
 
     try {
       const iso = zonedDateTimeToUtcIso({
-        date: values.data_envio_date,
+        date: normalizedEditDate,
         time: values.data_envio_time,
         timeZone: effectiveTimeZone,
       });
