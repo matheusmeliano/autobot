@@ -298,6 +298,33 @@ export function SchedulesClient({
     return { label: statusLabel(row.status), className: statusClass(row.status) };
   };
 
+  const displayMoments = (row: ScheduleRow) => {
+    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    const paymentMonthKey = row.payment_received_at
+      ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
+      : "";
+    const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
+
+    const executedAtCurrentMonth =
+      (paymentMonthKey && paymentMonthKey === currentMonthKey && row.payment_received_at) ||
+      (sentMonthKey && sentMonthKey === currentMonthKey && row.last_sent_at) ||
+      null;
+
+    const primaryMoment = executedAtCurrentMonth ?? row.data_envio;
+    const hasNextSchedule =
+      Boolean(executedAtCurrentMonth) &&
+      Boolean(row.data_envio) &&
+      new Date(row.data_envio).getTime() > new Date(executedAtCurrentMonth).getTime();
+
+    return {
+      primaryDate: dateBR(primaryMoment, effectiveTimeZone),
+      primaryTime: timeBR(primaryMoment, effectiveTimeZone),
+      nextDate: hasNextSchedule ? dateBR(row.data_envio, effectiveTimeZone) : "-",
+      nextTime: hasNextSchedule ? timeBR(row.data_envio, effectiveTimeZone) : "-",
+      hasNextSchedule,
+    };
+  };
+
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
     const baseButtonClass =
       variant === "mobile"
@@ -935,6 +962,7 @@ export function SchedulesClient({
               {pagedRows.map((r) => (
                 (() => {
                   const visualStatus = displayStatus(r);
+                  const moments = displayMoments(r);
                   return (
                 <div
                   key={r.id}
@@ -979,7 +1007,7 @@ export function SchedulesClient({
                         Data
                       </div>
                       <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                        {dateBR(r.data_envio, effectiveTimeZone)}
+                        {moments.primaryDate}
                       </div>
                     </div>
                     <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
@@ -987,8 +1015,20 @@ export function SchedulesClient({
                         Hora
                       </div>
                       <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                        {timeBR(r.data_envio, effectiveTimeZone)}
+                        {moments.primaryTime}
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                      Próximo agendamento
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
+                      {moments.nextDate}
+                    </div>
+                    <div className="mt-1 text-xs text-[var(--app-text-60)]">
+                      {moments.hasNextSchedule ? moments.nextTime : "Sem novo envio programado."}
                     </div>
                   </div>
 
@@ -1008,12 +1048,13 @@ export function SchedulesClient({
 
         <div className="hidden min-[1201px]:block">
           <div className="overflow-x-auto">
-            <div className="min-w-[980px] min-[1201px]:min-w-0">
-              <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
+            <div className="min-w-[1120px] min-[1201px]:min-w-0">
+              <div className="grid grid-cols-14 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
                 <div className="col-span-3">Cliente</div>
                 <div className="col-span-2 text-center">Templates</div>
                 <div className="col-span-2 text-center">Data</div>
                 <div className="col-span-1 text-center">Hora</div>
+                <div className="col-span-2 text-center">Próximos agendamentos</div>
                 <div className="col-span-1 text-center">Status</div>
                 <div className="col-span-3 text-right">Ações</div>
               </div>
@@ -1027,10 +1068,11 @@ export function SchedulesClient({
                   {pagedRows.map((r) => (
                     (() => {
                       const visualStatus = displayStatus(r);
+                      const moments = displayMoments(r);
                       return (
                       <div
                         key={r.id}
-                        className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
+                        className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
                       >
                         <div className="col-span-3 truncate font-semibold text-[var(--app-text-85)]">
                           {r.debtor_nome}
@@ -1044,10 +1086,18 @@ export function SchedulesClient({
                           </div>
                         </div>
                         <div className="col-span-2 whitespace-nowrap text-center text-[var(--app-text-70)]">
-                          {dateBR(r.data_envio, effectiveTimeZone)}
+                          {moments.primaryDate}
                         </div>
                         <div className="col-span-1 whitespace-nowrap text-center text-[var(--app-text-70)]">
-                          {timeBR(r.data_envio, effectiveTimeZone)}
+                          {moments.primaryTime}
+                        </div>
+                        <div className="col-span-2 min-w-0 text-center text-[var(--app-text-70)]">
+                          <div className="truncate font-semibold text-[var(--app-text-80)]">
+                            {moments.nextDate}
+                          </div>
+                          <div className="truncate text-[11px] text-[var(--app-text-55)]">
+                            {moments.hasNextSchedule ? moments.nextTime : "Sem novo envio"}
+                          </div>
                         </div>
                         <div className="col-span-1 flex justify-center">
                           <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
