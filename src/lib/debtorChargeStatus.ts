@@ -9,6 +9,7 @@ type DebtorScheduleStatusRow = {
   charge_due_at?: string | null;
   payment_received_at?: string | null;
   schedule_timezone?: string | null;
+  closed_at?: string | null;
 };
 
 function scheduleLocalDate(value: string | null | undefined, timeZone: string) {
@@ -25,7 +26,6 @@ export function deriveCurrentMonthDebtorStatus(
   schedules: DebtorScheduleStatusRow[],
   nowUtcIso = new Date().toISOString(),
 ): DebtorChargeStatus {
-  let hasPending = false;
   let hasPaid = false;
 
   for (const row of schedules) {
@@ -37,16 +37,19 @@ export function deriveCurrentMonthDebtorStatus(
     const dueLocalDate = scheduleLocalDate(row?.charge_due_at ?? row?.data_envio ?? null, timeZone);
     const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
     const currentStatus = String(row?.status ?? "").trim().toLowerCase();
+    const isClosed = Boolean(String(row?.closed_at ?? "").trim());
+
+    if (!isClosed && currentStatus !== "pago" && dueLocalDate) {
+      if (currentLocalDate > dueLocalDate) {
+        return "atrasado";
+      }
+      return "pendente";
+    }
 
     if (dueLocalDate && dueLocalDate.startsWith(currentMonth)) {
       if (currentStatus === "pago") {
         hasPaid = true;
-        continue;
       }
-      if (currentLocalDate > dueLocalDate) {
-        return "atrasado";
-      }
-      hasPending = true;
       continue;
     }
 
@@ -55,9 +58,8 @@ export function deriveCurrentMonthDebtorStatus(
     }
   }
 
-  if (hasPending) return "pendente";
   if (hasPaid) return "pago";
-  return "pago";
+  return "pendente";
 }
 
 export function applyCurrentMonthDebtorStatuses<
@@ -110,22 +112,22 @@ function statusPriority(status: string) {
 
 function normalizeDebtorChargeStatus(status: string) {
   switch (status) {
-    case "agendado":
     case "pendente":
     case "pago":
     case "atrasado":
       return status;
+    case "agendado":
     case "suspeita_de_pagamento":
       return "pendente";
     default:
-      return "pago";
+      return "pendente";
   }
 }
 
 export async function syncDebtorChargeStatus(admin: any, userId: string, debtorId: string) {
   const { data: schedules } = await admin
     .from("schedules")
-    .select("status, data_envio, charge_due_at, payment_received_at, schedule_timezone")
+    .select("status, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at")
     .eq("user_id", userId)
     .eq("debtor_id", debtorId)
     .order("data_envio", { ascending: false })
