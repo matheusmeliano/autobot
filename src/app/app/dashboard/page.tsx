@@ -17,8 +17,8 @@ export default async function DashboardPage() {
         email={email}
         name=""
         stats={{
-          schedulesMonth: 0,
-          schedulesExecuted: 0,
+          clients: 0,
+          activeSchedules: 0,
           templates: 0,
           whatsappStatus: "disconnected",
           receivableMonthTotal: 0,
@@ -41,8 +41,6 @@ export default async function DashboardPage() {
   const start7Iso = start7.toISOString();
 
   const [
-    schedulesMonthRes,
-    schedulesExecutedRes,
     templatesRes,
     chartRes,
     whatsappRes,
@@ -50,17 +48,8 @@ export default async function DashboardPage() {
     activitiesRes,
     debtorsRes,
     schedulesForAmountsRes,
+    activeSchedulesRes,
   ] = await Promise.all([
-    supabase
-      .from("schedules")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", startMonthIso),
-    supabase
-      .from("schedules")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "executado"),
     supabase
       .from("message_templates")
       .select("id", { count: "exact", head: true }),
@@ -89,6 +78,11 @@ export default async function DashboardPage() {
       )
       .eq("user_id", userId)
       .limit(2000),
+    supabase
+      .from("schedules")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .in("status", ["agendado", "pendente", "atrasado", "suspeita_de_pagamento", "executando"]),
   ]);
 
   const schedulesForAmounts = (schedulesForAmountsRes.data ?? []) as any[];
@@ -146,9 +140,9 @@ export default async function DashboardPage() {
   const receivableMonthRemaining = Math.max(0, receivableMonthTotal - receivableMonthPaid);
 
   const stats = {
-    schedulesMonth: schedulesMonthRes.count ?? 0,
-    schedulesExecuted: schedulesExecutedRes.count ?? 0,
+    clients: (debtorsRes.data ?? []).length,
     templates: templatesRes.count ?? 0,
+    activeSchedules: activeSchedulesRes.count ?? 0,
     whatsappStatus: whatsappRes.data?.status ?? "disconnected",
     receivableMonthTotal,
     receivableMonthPaid,

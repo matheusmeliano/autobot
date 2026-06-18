@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { BadgeCheck, CalendarDays, MessageSquareText, Wallet } from "lucide-react";
+import { CalendarDays, MessageSquareText, Users, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 type StatPack = {
-  schedulesMonth: number;
-  schedulesExecuted: number;
+  clients: number;
   templates: number;
+  activeSchedules: number;
   whatsappStatus: string;
   receivableMonthTotal: number;
   receivableMonthPaid: number;
@@ -164,22 +164,22 @@ export function DashboardClient({
 
       <div className="mt-4 grid gap-4 min-[1201px]:grid-cols-3">
         <Card
-          title="Agendamentos (mês)"
-          value={String(stats.schedulesMonth)}
+          title="Clientes"
+          value={String(stats.clients)}
           subtitle=""
-          icon={<CalendarDays className="h-5 w-5" />}
+          icon={<Users className="h-5 w-5" />}
         />
         <Card
-          title="Executados"
-          value={String(stats.schedulesExecuted)}
-          subtitle=""
-          icon={<BadgeCheck className="h-5 w-5" />}
-        />
-        <Card
-          title="Templates (Mensagens)"
+          title="Mensagens (template)"
           value={String(stats.templates)}
           subtitle=""
           icon={<MessageSquareText className="h-5 w-5" />}
+        />
+        <Card
+          title="Agendamentos ativos"
+          value={String(stats.activeSchedules)}
+          subtitle=""
+          icon={<CalendarDays className="h-5 w-5" />}
         />
       </div>
 
