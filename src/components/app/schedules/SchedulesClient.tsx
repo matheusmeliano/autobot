@@ -961,7 +961,7 @@ export function SchedulesClient({
         <div className="hidden min-[1201px]:block">
           <div className="overflow-x-auto">
             <div className="min-w-[980px] min-[1201px]:min-w-0">
-              <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
+              <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
                 <div className="col-span-3">Cliente</div>
                 <div className="col-span-2 text-center">Templates</div>
                 <div className="col-span-2 text-center">Data</div>
@@ -979,19 +979,23 @@ export function SchedulesClient({
                   {pagedRows.map((r) => (
                     <div
                       key={r.id}
-                      className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
+                      className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-80)]"
                     >
-                      <div className="col-span-3 truncate font-semibold">{r.debtor_nome}</div>
-                      <div className="col-span-2 min-w-0 text-center text-white/60">
-                        <div className="truncate">{r.template_pending_nome ?? "-"}</div>
-                        <div className="truncate text-[11px] text-white/40">
+                      <div className="col-span-3 truncate font-semibold text-[var(--app-text-85)]">
+                        {r.debtor_nome}
+                      </div>
+                      <div className="col-span-2 min-w-0 text-center text-[var(--app-text-70)]">
+                        <div className="truncate font-semibold text-[var(--app-text-80)]">
+                          {r.template_pending_nome ?? "-"}
+                        </div>
+                        <div className="truncate text-[11px] text-[var(--app-text-55)]">
                           {r.template_overdue_nome ?? "-"}
                         </div>
                       </div>
-                      <div className="col-span-2 whitespace-nowrap text-center text-white/60">
+                      <div className="col-span-2 whitespace-nowrap text-center text-[var(--app-text-70)]">
                         {dateBR(r.data_envio, effectiveTimeZone)}
                       </div>
-                      <div className="col-span-1 whitespace-nowrap text-center text-white/60">
+                      <div className="col-span-1 whitespace-nowrap text-center text-[var(--app-text-70)]">
                         {timeBR(r.data_envio, effectiveTimeZone)}
                       </div>
                       <div className="col-span-1 flex justify-center">
