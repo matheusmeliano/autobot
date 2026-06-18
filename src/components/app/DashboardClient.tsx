@@ -323,7 +323,7 @@ export function DashboardClient({
         </div>
       </motion.div>
 
-      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-3">
+      <div className="mt-0 grid gap-4 min-[1201px]:mt-6 min-[1201px]:grid-cols-3">
         <Card
           title="Total a receber (mês)"
           value={brl(stats.receivableMonthTotal)}
