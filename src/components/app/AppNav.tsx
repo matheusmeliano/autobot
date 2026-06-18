@@ -97,7 +97,7 @@ export function AppNav({
         {navGroups.map((group) => (
           <div
             key={group.label}
-            className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-2"
+            className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-2"
           >
             <div className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
               {group.label}
@@ -114,7 +114,7 @@ export function AppNav({
                     className={[
                       "group flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm font-semibold transition-all duration-200",
                       active
-                        ? "border-[var(--app-border)] bg-[var(--app-active)] text-[var(--app-text-85)]"
+                        ? "border-[var(--app-border)] bg-[var(--app-card-2)] text-[var(--app-text-85)]"
                         : "border-transparent text-[var(--app-text-70)] hover:border-[var(--app-border)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
                     ].join(" ")}
                   >
@@ -122,8 +122,8 @@ export function AppNav({
                       className={[
                         "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-colors",
                         active
-                          ? "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)]"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-60)] group-hover:text-[var(--app-text-85)]",
+                          ? "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)]"
+                          : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-60)] group-hover:text-[var(--app-text-85)]",
                       ].join(" ")}
                     >
                       <Icon className="h-4 w-4" />

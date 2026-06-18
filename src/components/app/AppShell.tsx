@@ -482,14 +482,14 @@ export function AppShell({
           <aside
             id="mobile-app-drawer"
             className={[
-              "absolute right-0 top-0 flex h-full w-full max-w-none flex-col overflow-hidden border-l border-[var(--app-border)] bg-[var(--app-solid-modal)] transition-transform duration-300 ease-out md:max-w-sm",
+              "absolute right-0 top-0 flex h-full w-full max-w-none flex-col overflow-hidden border-l border-[var(--app-border)] bg-[var(--app-bg)] transition-transform duration-300 ease-out md:max-w-sm",
               mobileMenuOpen ? "translate-x-0" : "translate-x-full",
             ].join(" ")}
           >
-            <div className="border-b border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 py-4">
+            <div className="border-b border-[var(--app-border)] bg-[var(--app-card)] px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--app-solid-surface-2)]">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--app-card-2)]">
                     <Logo />
                   </div>
                   <div>
@@ -500,16 +500,16 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-fg)] hover:bg-[var(--app-solid-surface)] hover:text-[var(--app-fg)]"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] text-[var(--app-fg)] hover:bg-[var(--app-card)] hover:text-[var(--app-fg)]"
                   aria-label="Fechar menu"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="mt-4 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4">
+              <div className="mt-4 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-active)] text-sm font-semibold text-[var(--app-text-85)]">
+                  <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-85)]">
                     {avatarLabel || "U"}
                   </div>
                   <div className="min-w-0">
@@ -526,7 +526,7 @@ export function AppShell({
                 <Link
                   href="/admin"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="mt-3 flex items-center justify-between rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-solid-surface)]"
+                  className="mt-3 flex items-center justify-between rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-card)]"
                 >
                   <span>Admin</span>
                   <span className="text-xs text-[var(--app-text-45)]">Painel administrativo</span>
@@ -543,11 +543,11 @@ export function AppShell({
               />
             </div>
 
-            <div className="border-t border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-4">
+            <div className="border-t border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4">
               <form action={logoutAction} onSubmit={handleLogoutSubmit}>
                 <button
                   type="submit"
-                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-solid-surface)]"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-card)]"
                 >
                   Sair da conta
                 </button>
