@@ -428,7 +428,7 @@ export function AppShell({
         </aside>
 
         <div className="w-full pb-16 min-[1201px]:pb-6">
-          <div className="mb-4 flex items-center justify-end gap-2 min-[1201px]:hidden">
+          <div className="fixed right-4 top-4 z-[250] flex items-center justify-end gap-2 min-[1201px]:hidden">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
