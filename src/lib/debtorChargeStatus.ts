@@ -26,14 +26,16 @@ export function deriveCurrentMonthDebtorStatus(
   schedules: DebtorScheduleStatusRow[],
   nowUtcIso = new Date().toISOString(),
 ): DebtorChargeStatus {
-  let hasPaid = false;
-  let hasPending = false;
+  let hasPaidInCurrentMonth = false;
+  let hasPendingInCurrentMonth = false;
+  let hasAnyPaid = false;
 
   for (const row of schedules) {
     const timeZone = String(row?.schedule_timezone ?? "") || "America/Sao_Paulo";
     const currentLocalDate = scheduleLocalDate(nowUtcIso, timeZone);
     if (!currentLocalDate) continue;
 
+    const currentMonth = currentLocalDate.slice(0, 7);
     const dueLocalDate = scheduleLocalDate(row?.charge_due_at ?? row?.data_envio ?? null, timeZone);
     const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
     const currentStatus = String(row?.status ?? "").trim().toLowerCase();
@@ -43,17 +45,23 @@ export function deriveCurrentMonthDebtorStatus(
       if (currentLocalDate > dueLocalDate) {
         return "atrasado";
       }
-      hasPending = true;
+      if (dueLocalDate.slice(0, 7) === currentMonth) {
+        hasPendingInCurrentMonth = true;
+      }
       continue;
     }
 
     if (currentStatus === "pago" || paymentLocalDate) {
-      hasPaid = true;
+      hasAnyPaid = true;
+      if (paymentLocalDate && paymentLocalDate.slice(0, 7) === currentMonth) {
+        hasPaidInCurrentMonth = true;
+      }
     }
   }
 
-  if (hasPending) return "pendente";
-  if (hasPaid) return "pago";
+  if (hasPaidInCurrentMonth) return "pago";
+  if (hasPendingInCurrentMonth) return "pendente";
+  if (hasAnyPaid) return "pago";
   return "pendente";
 }
 
