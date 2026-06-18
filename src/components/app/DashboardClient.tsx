@@ -297,7 +297,6 @@ export function DashboardClient({
           <h1 className="mt-2 text-2xl font-semibold tracking-tight min-[1201px]:text-3xl">
             {greeting}
           </h1>
-          <div className="mt-2 text-sm text-[var(--app-text-60)]">{email}</div>
         </div>
 
         <div className="inline-flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)]">

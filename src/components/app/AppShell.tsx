@@ -14,6 +14,28 @@ import { modalToast } from "@/lib/modalToast";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 
+function LoggedInAsCard({
+  email,
+  className = "",
+}: {
+  email: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={[
+        "rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2",
+        className,
+      ].join(" ")}
+    >
+      <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Logado como</div>
+      <div className="mt-1 truncate text-sm font-semibold text-[var(--app-text-85)]">
+        {email || "—"}
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({
   children,
   initialUserId,
@@ -352,14 +374,7 @@ export function AppShell({
               ) : null}
             </div>
 
-            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2">
-              <div className="text-[11px] font-semibold text-[var(--app-text-45)]">
-                Logado como
-              </div>
-              <div className="mt-1 truncate text-sm font-semibold">
-                {email || "—"}
-              </div>
-            </div>
+            <LoggedInAsCard email={email} className="mt-4" />
 
             <div className="mt-4 flex-1">
               <AppNav variant="sidebar" restricted={restricted} plan={plan} />
@@ -377,23 +392,26 @@ export function AppShell({
         </aside>
 
         <div className="w-full pb-16 min-[1201px]:pb-6">
-          <div className="mb-4 flex items-center justify-between gap-2 min-[1201px]:hidden">
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-              >
-                Sair
-              </button>
-            </form>
-            {showAdmin ? (
-              <Link
-                href="/admin"
-                className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-              >
-                Admin
-              </Link>
-            ) : null}
+          <div className="mb-4 space-y-3 min-[1201px]:hidden">
+            <LoggedInAsCard email={email} />
+            <div className="flex items-center justify-between gap-2">
+              <form action={logoutAction}>
+                <button
+                  type="submit"
+                  className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+                >
+                  Sair
+                </button>
+              </form>
+              {showAdmin ? (
+                <Link
+                  href="/admin"
+                  className="rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+                >
+                  Admin
+                </Link>
+              ) : null}
+            </div>
           </div>
           <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6">
             {children}
