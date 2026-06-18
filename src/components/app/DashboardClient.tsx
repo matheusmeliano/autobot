@@ -281,6 +281,13 @@ export function DashboardClient({
   const isConnected =
     stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
+  const operationMonthLabel = useMemo(() => {
+    const month = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      month: "long",
+    }).format(new Date());
+    return month.charAt(0).toUpperCase() + month.slice(1);
+  }, []);
 
   const cleanedName = (name ?? "").trim();
   const greeting = cleanedName ? `Bem-vindo(a) ${cleanedName}!` : "Bem-vindo(a)!";
@@ -299,14 +306,20 @@ export function DashboardClient({
           </h1>
         </div>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)]">
-          <span
-            className={[
-              "h-2 w-2 rounded-full",
-              statusLabel === "Conectado" ? "bg-emerald-400" : "bg-[var(--app-text-30)]",
-            ].join(" ")}
-          />
-          WhatsApp: {statusLabel}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)]">
+            <span
+              className={[
+                "h-2 w-2 rounded-full",
+                statusLabel === "Conectado" ? "bg-emerald-400" : "bg-[var(--app-text-30)]",
+              ].join(" ")}
+            />
+            WhatsApp: {statusLabel}
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)]">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Operação: {operationMonthLabel}
+          </div>
         </div>
       </motion.div>
 
