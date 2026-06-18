@@ -333,7 +333,7 @@ export function SchedulesClient({
             markingPaidId === r.id ||
             savingRecurrenceLimit
           }
-          className={baseButtonClass}
+          className={variant === "mobile" ? `${baseButtonClass} col-span-2` : baseButtonClass}
           title="Excluir"
         >
           <Trash2 className="h-4 w-4" />
