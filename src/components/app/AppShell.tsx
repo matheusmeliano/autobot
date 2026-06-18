@@ -393,7 +393,6 @@ export function AppShell({
 
         <div className="w-full pb-16 min-[1201px]:pb-6">
           <div className="mb-4 space-y-3 min-[1201px]:hidden">
-            <LoggedInAsCard email={email} />
             <div className="flex items-center justify-between gap-2">
               <form action={logoutAction}>
                 <button
@@ -412,6 +411,7 @@ export function AppShell({
                 </Link>
               ) : null}
             </div>
+            <LoggedInAsCard email={email} />
           </div>
           <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6">
             {children}
