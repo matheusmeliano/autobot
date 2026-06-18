@@ -432,7 +432,7 @@ export function AppShell({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] text-[var(--app-text-80)] shadow-lg shadow-black/10 transition-all hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] transition-all hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
               aria-label="Abrir menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-app-drawer"
@@ -468,7 +468,7 @@ export function AppShell({
           <button
             type="button"
             className={[
-              "absolute inset-0 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300",
+              "absolute inset-0 bg-black/55 transition-opacity duration-300",
               mobileMenuOpen ? "opacity-100" : "opacity-0",
             ].join(" ")}
             onClick={() => setMobileMenuOpen(false)}
@@ -477,11 +477,11 @@ export function AppShell({
           <aside
             id="mobile-app-drawer"
             className={[
-              "absolute right-0 top-0 flex h-full w-full max-w-sm flex-col overflow-hidden rounded-l-[2rem] border-l border-[var(--app-border)] bg-[var(--app-modal-bg)] shadow-2xl shadow-black/30 backdrop-blur-2xl transition-transform duration-300 ease-out",
+              "absolute right-0 top-0 flex h-full w-full max-w-sm flex-col overflow-hidden rounded-l-[2rem] border-l border-[var(--app-border)] bg-[var(--app-modal-bg)] transition-transform duration-300 ease-out",
               mobileMenuOpen ? "translate-x-0" : "translate-x-full",
             ].join(" ")}
           >
-            <div className="border-b border-[var(--app-border)] bg-[var(--app-card)] px-5 py-4 backdrop-blur-xl">
+            <div className="border-b border-[var(--app-border)] bg-[var(--app-card)] px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)]">
@@ -502,7 +502,7 @@ export function AppShell({
                 </button>
               </div>
 
-              <div className="mt-4 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 shadow-lg shadow-black/10">
+              <div className="mt-4 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4">
                 <div className="flex items-center gap-3">
                   <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-active)] text-sm font-semibold text-[var(--app-text-85)]">
                     {avatarLabel || "U"}
@@ -521,7 +521,7 @@ export function AppShell({
                 <Link
                   href="/admin"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="mt-3 flex items-center justify-between rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] shadow-lg shadow-black/10 hover:bg-[var(--app-hover)]"
+                  className="mt-3 flex items-center justify-between rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                 >
                   <span>Admin</span>
                   <span className="text-xs text-[var(--app-text-45)]">Painel administrativo</span>
@@ -538,11 +538,11 @@ export function AppShell({
               />
             </div>
 
-            <div className="border-t border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 backdrop-blur-xl">
+            <div className="border-t border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4">
               <form action={logoutAction}>
                 <button
                   type="submit"
-                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] shadow-lg shadow-black/10 hover:bg-[var(--app-hover)]"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                 >
                   Sair da conta
                 </button>
