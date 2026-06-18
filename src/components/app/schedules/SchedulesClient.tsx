@@ -258,7 +258,7 @@ export function SchedulesClient({
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
     const baseButtonClass =
       variant === "mobile"
-        ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+        ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
         : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60";
     const triggerButtonClass =
       variant === "mobile"
@@ -899,7 +899,7 @@ export function SchedulesClient({
                       <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
                         {r.debtor_nome}
                       </div>
-                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-45)]">
+                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Agendamento
                       </div>
                     </div>
@@ -910,18 +910,18 @@ export function SchedulesClient({
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-45)]">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Template pendente
                       </div>
-                      <div className="mt-1 break-words text-sm font-semibold text-[var(--app-text-80)]">
+                      <div className="mt-1 break-words text-sm font-semibold text-[var(--app-text-85)]">
                         {r.template_pending_nome ?? "-"}
                       </div>
                     </div>
                     <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-45)]">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Template atrasado
                       </div>
-                      <div className="mt-1 break-words text-sm font-semibold text-[var(--app-text-80)]">
+                      <div className="mt-1 break-words text-sm font-semibold text-[var(--app-text-85)]">
                         {r.template_overdue_nome ?? "-"}
                       </div>
                     </div>
@@ -929,25 +929,25 @@ export function SchedulesClient({
 
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-45)]">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Data
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-[var(--app-text-80)]">
+                      <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
                         {dateBR(r.data_envio, effectiveTimeZone)}
                       </div>
                     </div>
                     <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-45)]">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Hora
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-[var(--app-text-80)]">
+                      <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
                         {timeBR(r.data_envio, effectiveTimeZone)}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-4">
-                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-45)]">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                       Ações
                     </div>
                     {renderActionButtons(r, "mobile")}
