@@ -32,8 +32,8 @@
   --app-btn-primary-fg: #000000;
   --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
   --app-option-bg: #070a10;
-  --app-solid-surface: #111827;
-  --app-solid-surface-2: #0f172a;
+  --app-solid-surface: #0b1017;
+  --app-solid-surface-2: #11161f;
   --app-solid-modal: #070a10;
 }
 
@@ -83,8 +83,8 @@ body {
   --app-btn-primary-fg: #000000;
   --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
   --app-option-bg: #070a10;
-  --app-solid-surface: #111827;
-  --app-solid-surface-2: #0f172a;
+  --app-solid-surface: #0b1017;
+  --app-solid-surface-2: #11161f;
   --app-solid-modal: #070a10;
   --app-accent-bg: rgba(255, 255, 255, 0.06);
   --app-accent-ring: rgba(255, 255, 255, 0.14);
@@ -127,8 +127,8 @@ body {
   --app-btn-primary-bg-hover: #b8c4d6;
   --app-option-bg: #ffffff;
   --app-solid-surface: #ffffff;
-  --app-solid-surface-2: #ffffff;
-  --app-solid-modal: #ffffff;
+  --app-solid-surface-2: #f8fafc;
+  --app-solid-modal: #f8fafc;
   --app-select-bg: rgba(11, 18, 32, 0.04);
   --app-accent-bg: rgba(148, 163, 184, 0.16);
   --app-accent-ring: rgba(100, 116, 139, 0.2);
