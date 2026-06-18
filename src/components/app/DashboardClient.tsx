@@ -306,7 +306,7 @@ export function DashboardClient({
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 min-[1201px]:justify-end">
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)]">
             <span
               className={[
