@@ -322,10 +322,13 @@ export function SchedulesClient({
       null;
 
     const primaryMoment = executedMomentCurrentMonth ?? row.data_envio;
+    const executedMomentTime = executedMomentCurrentMonth
+      ? new Date(executedMomentCurrentMonth).getTime()
+      : null;
     const hasNextSchedule =
-      Boolean(executedMomentCurrentMonth) &&
+      executedMomentTime !== null &&
       Boolean(row.data_envio) &&
-      new Date(row.data_envio).getTime() > new Date(executedMomentCurrentMonth).getTime();
+      new Date(row.data_envio).getTime() > executedMomentTime;
 
     return {
       primaryDate: dateBR(primaryMoment, effectiveTimeZone),
