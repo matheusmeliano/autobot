@@ -300,13 +300,13 @@ export function DashboardClient({
         transition={{ duration: 0.4 }}
         className="flex flex-col justify-between gap-4 min-[1201px]:flex-row min-[1201px]:items-end"
       >
-        <div>
+        <div className="hidden min-[1201px]:block">
           <h1 className="mt-2 text-lg font-semibold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-xl min-[1201px]:text-[1.75rem]">
             {greeting}
           </h1>
         </div>
 
-        <div className="flex w-full flex-wrap items-center gap-2 min-[1201px]:justify-end">
+        <div className="hidden w-full flex-wrap items-center gap-2 min-[1201px]:flex min-[1201px]:justify-end">
           <div className="inline-flex w-full items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)] min-[1201px]:w-auto">
             <span
               className={[
