@@ -6,14 +6,13 @@ import { createPortal } from "react-dom";
 import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
-import { localDateInTimeZone, monthlyRecurrenceLimitMinDate } from "@/lib/recurrence";
+import { localDateInTimeZone } from "@/lib/recurrence";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
   deleteScheduleAction,
   markSchedulePaidAction,
   triggerScheduleNowAction,
-  updateScheduleRecurrenceUntilAction,
   updateScheduleAction,
 } from "@/app/app/agenda/actions";
 
@@ -91,13 +90,6 @@ function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
     map[part.type] = part.value;
   }
   return `${map.year}-${map.month}`;
-}
-
-function dateOnlyBR(v: string) {
-  if (!v) return "-";
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00`) : new Date(v);
-  if (Number.isNaN(d.getTime())) return v;
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
 function lastDayOfMonth(year: number, month1: number) {
@@ -178,12 +170,8 @@ export function SchedulesClient({
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
-  const [recurrenceLimitOpen, setRecurrenceLimitOpen] = useState(false);
-  const [recurrenceLimitRow, setRecurrenceLimitRow] = useState<ScheduleRow | null>(null);
-  const [recurrenceLimitValue, setRecurrenceLimitValue] = useState("");
-  const [savingRecurrenceLimit, setSavingRecurrenceLimit] = useState(false);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
-  const recurrenceLimitDateInputRef = useRef<HTMLInputElement | null>(null);
+  const recurrenceUntilInputRef = useRef<HTMLInputElement | null>(null);
   const [monthlyExtras, setMonthlyExtras] = useState<Array<{ date: string; time: string }>>([]);
   const extraDateInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const extraTimeInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -240,18 +228,6 @@ export function SchedulesClient({
     const start = (safePage - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, safePage]);
-
-  const recurrenceLimitMinDate = useMemo(() => {
-    if (!recurrenceLimitRow || String(recurrenceLimitRow.recurrence ?? "none") !== "monthly") {
-      return null;
-    }
-
-    const rowTimeZone = (recurrenceLimitRow.schedule_timezone as BrazilTimeZone | null) ?? effectiveTimeZone;
-    return monthlyRecurrenceLimitMinDate({
-      currentUtcIso: recurrenceLimitRow.data_envio,
-      timeZone: rowTimeZone,
-    });
-  }, [effectiveTimeZone, recurrenceLimitRow, rows]);
 
   const {
     register,
@@ -428,36 +404,19 @@ export function SchedulesClient({
       <div className={variant === "mobile" ? "grid grid-cols-2 gap-2" : "flex flex-nowrap justify-end gap-2"}>
         <button
           onClick={() => openEdit(r)}
-          disabled={isPending || markingPaidId === r.id || savingRecurrenceLimit}
+          disabled={isPending || markingPaidId === r.id}
           className={baseButtonClass}
           title="Editar"
         >
           <Pencil className="h-4 w-4" />
           {variant === "mobile" ? <span>Editar</span> : null}
         </button>
-        {String(r.recurrence ?? "none") === "monthly" ? (
-          <button
-            onClick={() => openRecurrenceLimit(r)}
-            disabled={
-              isPending ||
-              triggeringId === r.id ||
-              markingPaidId === r.id ||
-              savingRecurrenceLimit
-            }
-            className={baseButtonClass}
-            title="Definir data final"
-          >
-            <Calendar className="h-4 w-4" />
-            {variant === "mobile" ? <span>Data final</span> : null}
-          </button>
-        ) : null}
         <button
           onClick={() => markAsPaid(r)}
           disabled={
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id ||
-            savingRecurrenceLimit ||
             String(r.status ?? "") === "pago"
           }
           className={baseButtonClass}
@@ -489,8 +448,7 @@ export function SchedulesClient({
           disabled={
             isPending ||
             triggeringId === r.id ||
-            markingPaidId === r.id ||
-            savingRecurrenceLimit
+            markingPaidId === r.id
           }
           className={variant === "mobile" ? `${baseButtonClass} col-span-2` : baseButtonClass}
           title="Excluir"
@@ -547,13 +505,6 @@ export function SchedulesClient({
       recurrence_until: "",
       status: "agendado",
     });
-  };
-
-  const closeRecurrenceLimit = () => {
-    setRecurrenceLimitOpen(false);
-    setRecurrenceLimitRow(null);
-    setRecurrenceLimitValue("");
-    setSavingRecurrenceLimit(false);
   };
 
   const openCreate = () => {
@@ -817,54 +768,9 @@ export function SchedulesClient({
     });
   };
 
-  const openRecurrenceLimit = (row: ScheduleRow) => {
-    if (String(row.recurrence ?? "none") !== "monthly") {
-      modalToast.info("Essa opção está disponível apenas para agendamentos mensais.");
-      return;
-    }
-    setRecurrenceLimitRow(row);
-    setRecurrenceLimitValue(row.recurrence_until ?? "");
-    setRecurrenceLimitOpen(true);
-  };
-
-  const saveRecurrenceLimit = async () => {
-    if (!recurrenceLimitRow) return;
-    const currentDate = splitDateTimeForInput(recurrenceLimitRow.data_envio, effectiveTimeZone).date;
-    if (recurrenceLimitValue && recurrenceLimitValue < currentDate) {
-      modalToast.warning("A data final deve ser igual ou posterior à cobrança atual.");
-      return;
-    }
-    if (recurrenceLimitValue && recurrenceLimitMinDate && recurrenceLimitValue < recurrenceLimitMinDate) {
-      modalToast.warning(
-        `A data final deve ser no mínimo ${dateOnlyBR(recurrenceLimitMinDate)}, sempre a partir do próximo mês.`,
-      );
-      return;
-    }
-
-    setSavingRecurrenceLimit(true);
-    try {
-      const res = await updateScheduleRecurrenceUntilAction({
-        id: recurrenceLimitRow.id,
-        recurrence_until: recurrenceLimitValue || null,
-      });
-      if (!res.ok) {
-        modalToast.error(res.error ?? "Falha ao salvar a data final.");
-        return;
-      }
-      modalToast.success(
-        recurrenceLimitValue
-          ? "Data final da cobrança mensal salva."
-          : "Data final da cobrança mensal removida.",
-      );
-      await refresh();
-      closeRecurrenceLimit();
-    } finally {
-      setSavingRecurrenceLimit(false);
-    }
-  };
-
   const dateField = register("data_envio_date", { required: true });
   const timeField = register("data_envio_time", { required: true });
+  const recurrenceUntilField = register("recurrence_until");
   const openDatePicker = () => {
     dateInputRef.current?.showPicker?.();
     dateInputRef.current?.focus();
@@ -873,9 +779,9 @@ export function SchedulesClient({
     extraDateInputRefs.current[index]?.showPicker?.();
     extraDateInputRefs.current[index]?.focus();
   };
-  const openRecurrenceLimitDatePicker = () => {
-    recurrenceLimitDateInputRef.current?.showPicker?.();
-    recurrenceLimitDateInputRef.current?.focus();
+  const openRecurrenceUntilDatePicker = () => {
+    recurrenceUntilInputRef.current?.showPicker?.();
+    recurrenceUntilInputRef.current?.focus();
   };
   const openTimePicker = (params: {
     target: { kind: "main" } | { kind: "extra"; index: number };
@@ -1402,7 +1308,36 @@ export function SchedulesClient({
 
               {recurrenceValue === "monthly" ? (
                 <div className="mt-1">
-                  <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-white/60">Data final (opcional)</div>
+                    <div className="mt-1 text-[11px] text-white/45">
+                      Se deixar em branco, a cobrança mensal continua sem limite.
+                    </div>
+                    <div className="relative mt-2">
+                      <input
+                        type="date"
+                        min={watch("data_envio_date") || undefined}
+                        className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                        {...recurrenceUntilField}
+                        onFocus={openRecurrenceUntilDatePicker}
+                        onClick={openRecurrenceUntilDatePicker}
+                        ref={(el) => {
+                          recurrenceUntilField.ref(el);
+                          recurrenceUntilInputRef.current = el;
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={openRecurrenceUntilDatePicker}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
+                        aria-label="Selecionar data final"
+                      >
+                        <Calendar className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
                     <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
                     <button
                       type="button"
@@ -1533,74 +1468,6 @@ export function SchedulesClient({
         </form>
       </AppModal>
 
-      <AppModal open={recurrenceLimitOpen} onClose={closeRecurrenceLimit} size="md" zIndexClass="z-[110]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-white/90">
-              Cobrança mensal até
-            </div>
-            <div className="mt-1 text-xs text-white/55">
-              Defina até quando a cobrança mensal de {recurrenceLimitRow?.debtor_nome ?? "este cliente"} deve continuar.
-            </div>
-          </div>
-          <button
-            onClick={closeRecurrenceLimit}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mt-4">
-          <div className="text-xs font-semibold text-white/60">
-            Data final (opcional)
-          </div>
-          <div className="relative mt-2">
-            <input
-              type="date"
-              value={recurrenceLimitValue}
-              onChange={(e) => setRecurrenceLimitValue(e.target.value)}
-              onFocus={openRecurrenceLimitDatePicker}
-              onClick={openRecurrenceLimitDatePicker}
-              ref={recurrenceLimitDateInputRef}
-              min={recurrenceLimitMinDate ?? undefined}
-              className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-            />
-            <button
-              type="button"
-              onClick={openRecurrenceLimitDatePicker}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
-              aria-label="Selecionar data final"
-            >
-              <Calendar className="h-4 w-4" />
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setRecurrenceLimitValue("")}
-            disabled={savingRecurrenceLimit}
-            className="mt-2 inline-flex text-[11px] font-semibold text-white/60 underline underline-offset-2 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Remover limite
-          </button>
-          <div className="mt-2 text-[11px] text-white/45">
-            {recurrenceLimitMinDate
-              ? `Mínimo: ${dateOnlyBR(recurrenceLimitMinDate)}. No próximo mês, todos os dias ficam disponíveis. Se deixar em branco, a cobrança mensal continua sem limite.`
-              : "Se deixar em branco, a cobrança mensal continua sem limite."}
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={saveRecurrenceLimit}
-            disabled={savingRecurrenceLimit}
-            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
-          >
-            {savingRecurrenceLimit ? "Salvando..." : "Salvar"}
-          </button>
-        </div>
-      </AppModal>
     </div>
   );
 }
