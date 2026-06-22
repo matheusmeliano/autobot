@@ -41,6 +41,25 @@ function weekdayFromLocalDate(localDate: string) {
   return weekday === 0 ? 7 : weekday;
 }
 
+function localDateTimeParts(utcIso: string, timeZone: string) {
+  const base = new Date(utcIso);
+  if (Number.isNaN(base.getTime())) throw new Error("Data inválida");
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(base);
+  return parts.reduce<Record<string, string>>((acc, part) => {
+    if (part.type !== "literal") acc[part.type] = part.value;
+    return acc;
+  }, {});
+}
+
 export function normalizeRetryWeekdays(input: unknown) {
   const values = Array.isArray(input) ? input : [];
   const unique = Array.from(
@@ -113,6 +132,32 @@ export function nextRetryUtcIso(params: {
   return zonedDateTimeToUtcIso({
     date: localDate,
     time: validTime(params.time) ? params.time : DEFAULT_RETRY_TIME,
+    timeZone: params.timeZone,
+  });
+}
+
+export function shiftFirstChargeFromWeekendUtcIso(params: {
+  utcIso: string;
+  timeZone: string;
+  enabled: boolean;
+}) {
+  if (!params.enabled) return params.utcIso;
+  const localParts = localDateTimeParts(params.utcIso, params.timeZone);
+  const originalLocalDate = `${localParts.year}-${localParts.month}-${localParts.day}`;
+  const localTime = `${localParts.hour ?? "00"}:${localParts.minute ?? "00"}`;
+  let nextLocalDate = originalLocalDate;
+
+  while (true) {
+    const weekday = weekdayFromLocalDate(nextLocalDate);
+    if (weekday >= 1 && weekday <= 5) break;
+    nextLocalDate = addDaysToLocalDate(nextLocalDate, 1);
+  }
+
+  if (nextLocalDate === originalLocalDate) return params.utcIso;
+
+  return zonedDateTimeToUtcIso({
+    date: nextLocalDate,
+    time: validTime(localTime) ? localTime : DEFAULT_RETRY_TIME,
     timeZone: params.timeZone,
   });
 }

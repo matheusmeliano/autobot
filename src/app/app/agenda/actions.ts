@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { shiftFirstChargeFromWeekendUtcIso } from "@/lib/chargeRetry";
 import {
   localDateInTimeZone,
   monthlyRecurrenceLimitMinDate,
@@ -102,6 +103,15 @@ function parseMonthlyCycleSchedule(row: any): MonthlyCycleSchedule | null {
   const time = String(row?.recurrence_time ?? "");
   if (!Number.isFinite(day) || day < 1 || !/^\d{2}:\d{2}$/.test(time)) return null;
   return { day, time };
+}
+
+async function debtorSkipsWeekendsOnFirstCharge(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, debtorId: string) {
+  const { data } = await supabase
+    .from("debtors")
+    .select("skip_weekends_on_first_charge")
+    .eq("id", debtorId)
+    .maybeSingle();
+  return Boolean((data as any)?.skip_weekends_on_first_charge);
 }
 
 async function validateMonthlyRecurrenceLimit(params: {
@@ -250,6 +260,12 @@ export async function createScheduleAction(input: unknown) {
     return { ok: false, error: "Data/hora inválida." };
   }
 
+  dataEnvioIso = shiftFirstChargeFromWeekendUtcIso({
+    utcIso: dataEnvioIso,
+    timeZone,
+    enabled: await debtorSkipsWeekendsOnFirstCharge(supabase, parsed.data.debtor_id),
+  });
+
   const nowRounded = new Date();
   nowRounded.setSeconds(0, 0);
   const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
@@ -337,6 +353,12 @@ export async function updateScheduleAction(input: unknown) {
   } catch {
     return { ok: false, error: "Data/hora inválida." };
   }
+
+  dataEnvioIso = shiftFirstChargeFromWeekendUtcIso({
+    utcIso: dataEnvioIso,
+    timeZone,
+    enabled: await debtorSkipsWeekendsOnFirstCharge(supabase, data.debtor_id),
+  });
 
   const nowRounded = new Date();
   nowRounded.setSeconds(0, 0);
@@ -732,7 +754,7 @@ export async function markSchedulePaidAction(id: string) {
   const admin = createSupabaseAdminClient();
   const { data: schedule, error } = await admin
     .from("schedules")
-    .select("id, user_id, debtor_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(accumulate_open_monthly_charges)")
+    .select("id, user_id, debtor_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(accumulate_open_monthly_charges, skip_weekends_on_first_charge)")
     .eq("id", id)
     .maybeSingle();
 
@@ -749,7 +771,7 @@ export async function markSchedulePaidAction(id: string) {
   const nowIso = new Date().toISOString();
   let updatePayload: Record<string, unknown>;
   if (recurrence === "monthly") {
-    const nextIso = nextMonthlyIsoAfterSettlement({
+    const nextIsoBase = nextMonthlyIsoAfterSettlement({
       accumulateOpenMonthlyCharges: Boolean((schedule as any).debtors?.accumulate_open_monthly_charges),
       chargeDueAt: String((schedule as any).charge_due_at ?? "") || null,
       dataEnvio: String((schedule as any).data_envio ?? "") || null,
@@ -757,6 +779,11 @@ export async function markSchedulePaidAction(id: string) {
       timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
       day: Number((schedule as any).recurrence_day ?? 1),
       time: String((schedule as any).recurrence_time ?? "") || "00:00",
+    });
+    const nextIso = shiftFirstChargeFromWeekendUtcIso({
+      utcIso: nextIsoBase,
+      timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+      enabled: Boolean((schedule as any).debtors?.skip_weekends_on_first_charge),
     });
     const shouldContinue = shouldContinueMonthlyRecurrence({
       nextUtcIso: nextIso,

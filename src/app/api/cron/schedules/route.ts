@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { hasAutoCloseExpired, isPastLocalDay, nextRetryUtcIso, normalizeRetryConfig } from "@/lib/chargeRetry";
+import {
+  hasAutoCloseExpired,
+  isPastLocalDay,
+  nextRetryUtcIso,
+  normalizeRetryConfig,
+  shiftFirstChargeFromWeekendUtcIso,
+} from "@/lib/chargeRetry";
 import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
@@ -207,7 +213,7 @@ export async function GET(req: Request) {
   const { data: schedules, error } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .in("status", ["agendado", "atrasado", "pausado"])
     .is("closed_at", null)
@@ -250,6 +256,25 @@ export async function GET(req: Request) {
       const pendingTemplate = (s as any).pending_template ?? null;
       const overdueTemplate = (s as any).overdue_template ?? null;
       const sourceStatus = String((s as any).status ?? "") === "atrasado" ? "atrasado" : "pendente";
+      const timeZone = String((s as any).schedule_timezone ?? "") || "America/Sao_Paulo";
+      const isFirstCharge = !String((s as any).first_sent_at ?? "");
+      const shiftedFirstChargeUtcIso = shiftFirstChargeFromWeekendUtcIso({
+        utcIso: scheduledFor,
+        timeZone,
+        enabled: String((s as any).status ?? "") === "agendado" && isFirstCharge && Boolean(debtor?.skip_weekends_on_first_charge),
+      });
+
+      if (shiftedFirstChargeUtcIso !== scheduledFor) {
+        await supabase
+          .from("schedules")
+          .update({
+            data_envio: shiftedFirstChargeUtcIso,
+            charge_due_at: shiftedFirstChargeUtcIso,
+          })
+          .eq("id", scheduleId);
+        results.push({ id: scheduleId, ok: true });
+        continue;
+      }
 
       // #region debug-point extra-send-cron-item
       __dbg("B", "cron-item-processing", {

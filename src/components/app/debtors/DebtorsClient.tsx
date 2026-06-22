@@ -31,6 +31,7 @@ export type DebtorRow = {
   observacoes: string | null;
   status: string;
   accumulate_open_monthly_charges: boolean | null;
+  skip_weekends_on_first_charge: boolean | null;
   retry_weekdays: number[] | null;
   retry_time: string | null;
   retry_max_attempts: number | null;
@@ -51,6 +52,7 @@ type FormValues = {
   observacoes?: string;
   status?: string;
   accumulate_open_monthly_charges?: boolean;
+  skip_weekends_on_first_charge?: boolean;
   retry_weekdays: number[];
   retry_time: string;
   retry_max_attempts: number;
@@ -348,6 +350,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       observacoes: "",
       status: "ativo",
       accumulate_open_monthly_charges: false,
+      skip_weekends_on_first_charge: false,
       retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
       retry_time: DEFAULT_RETRY_TIME,
       retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -372,6 +375,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       observacoes: "",
       status: "ativo",
       accumulate_open_monthly_charges: false,
+      skip_weekends_on_first_charge: false,
       retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
       retry_time: DEFAULT_RETRY_TIME,
       retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -407,6 +411,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       observacoes: row.observacoes ?? "",
       status: row.status ?? "ativo",
       accumulate_open_monthly_charges: Boolean(row.accumulate_open_monthly_charges),
+      skip_weekends_on_first_charge: Boolean(row.skip_weekends_on_first_charge),
       retry_weekdays: normalizeRetryWeekdays(row.retry_weekdays),
       retry_time: row.retry_time ?? DEFAULT_RETRY_TIME,
       retry_max_attempts: row.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -437,6 +442,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       observacoes: values.observacoes || undefined,
       status: values.status || "ativo",
       accumulate_open_monthly_charges: Boolean(values.accumulate_open_monthly_charges),
+      skip_weekends_on_first_charge: Boolean(values.skip_weekends_on_first_charge),
       retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
       retry_time: values.retry_time || DEFAULT_RETRY_TIME,
       retry_max_attempts: Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
@@ -886,6 +892,22 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       </div>
                       <div className="mt-1 text-[11px] text-white/45">
                         Quando ativado, mensalidades vencidas somam automaticamente aos meses seguintes ate o pagamento ou encerramento da cobranca.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-white/15 bg-white/[0.03]"
+                      {...register("skip_weekends_on_first_charge")}
+                    />
+                    <div>
+                      <div className="text-xs font-semibold text-white/75">
+                        Pular finais de semana na primeira cobrança
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Quando ativado, a primeira tentativa agendada para sábado ou domingo é movida automaticamente para o próximo dia útil. Reenvios e cobranças em atraso seguem a programação normal.
                       </div>
                     </div>
                   </label>
