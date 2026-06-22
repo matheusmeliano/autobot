@@ -520,39 +520,41 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
             <div className="divide-y divide-[var(--app-border)] min-[1201px]:hidden">
               {pagedRows.map((r) => (
                 <div key={r.id} className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
-                        {r.nome}
+                  <div className="min-w-0">
+                    <div className="truncate text-base font-semibold text-[var(--app-text-85)]">
+                      {r.nome}
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2.5">
+                        <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Telefone</div>
+                        <div className="min-w-0 truncate text-right text-sm text-[var(--app-text-85)]">
+                          {r.telefone ?? "-"}
+                        </div>
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
-                        <div className="min-w-0">
-                          <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Telefone</div>
-                          <div className="mt-1 truncate text-sm text-[var(--app-text-70)]">
-                            {r.telefone ?? "-"}
-                          </div>
-                        </div>
-                        <div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2.5">
                           <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Valor</div>
-                          <div className="mt-1 text-sm text-[var(--app-text-85)]">{money(r.valor)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Vencimento</div>
-                          <div className="mt-1 text-sm text-[var(--app-text-70)]">{dueDayLabel(r.vencimento)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Status</div>
-                          <div className="mt-1">
-                            <span
-                              className={[
-                                "inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold",
-                                debtorStatusClass(r.status),
-                              ].join(" ")}
-                            >
-                              {debtorStatusLabel(r.status)}
-                            </span>
+                          <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
+                            {money(r.valor)}
                           </div>
                         </div>
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2.5">
+                          <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Vencimento</div>
+                          <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
+                            {dueDayLabel(r.vencimento)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2.5">
+                        <div className="text-[11px] font-semibold text-[var(--app-text-45)]">Status</div>
+                        <span
+                          className={[
+                            "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                            debtorStatusClass(r.status),
+                          ].join(" ")}
+                        >
+                          {debtorStatusLabel(r.status)}
+                        </span>
                       </div>
                     </div>
                   </div>
