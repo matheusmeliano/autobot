@@ -145,7 +145,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
           />
           <button
             onClick={openCreate}
-            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-2 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Novo template
@@ -317,7 +317,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
               <button
                 type="submit"
                 disabled={isSubmitting || isPending}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60"
+                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
               >
                 {editing ? "Salvar alterações" : "Criar template"}
               </button>
