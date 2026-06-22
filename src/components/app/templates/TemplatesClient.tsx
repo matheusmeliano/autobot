@@ -131,7 +131,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
           <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
             Templates
           </h1>
-          <div className="mt-2 text-sm text-white/60">
+          <div className="mt-2 text-sm text-[var(--app-text-60)]">
             Use variáveis: {"{nome}"} {"{valor}"} {"{vencimento}"} {"{pix}"}
           </div>
         </div>
@@ -141,11 +141,11 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar template..."
-            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+            className="w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
           />
           <button
             onClick={openCreate}
-            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-2 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Novo template
@@ -153,37 +153,78 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03]">
-        <div className="px-4 pt-3 text-center text-[11px] font-semibold text-white/45 sm:hidden">
-          Role para o lado.
-        </div>
-        <div className="overflow-x-auto">
-          <div className="min-w-[860px] min-[1201px]:min-w-0">
-            <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
-              <div className="col-span-3 text-center">Nome</div>
-              <div className="col-span-7 text-center">Conteúdo</div>
-              <div className="col-span-2 text-right">Ações</div>
+      <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
+        {filtered.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-[var(--app-text-60)]">
+            Nenhum template encontrado.
+          </div>
+        ) : (
+          <>
+            <div className="divide-y divide-[var(--app-border)] min-[1201px]:hidden">
+              {pagedRows.map((r) => (
+                <div key={r.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                        {r.nome}
+                      </div>
+                      <div className="mt-2 text-xs font-semibold text-[var(--app-text-55)]">
+                        Conteúdo
+                      </div>
+                      <div className="mt-1 whitespace-pre-line text-sm text-[var(--app-text-70)] line-clamp-4">
+                        {r.conteudo}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => openEdit(r)}
+                      className="inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+                      title="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => remove(r)}
+                      disabled={isPending}
+                      className="inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {filtered.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-white/55">
-                Nenhum template encontrado.
+            <div className="hidden min-[1201px]:block">
+              <div className="grid grid-cols-12 gap-3 border-b border-[var(--app-border)] px-4 py-3 text-xs font-semibold text-[var(--app-text-55)]">
+                <div className="col-span-3 text-center">Nome</div>
+                <div className="col-span-7 text-center">Conteúdo</div>
+                <div className="col-span-2 text-right">Ações</div>
               </div>
-            ) : (
-              <div className="divide-y divide-white/10">
+
+              <div className="divide-y divide-[var(--app-border)]">
                 {pagedRows.map((r) => (
                   <div
                     key={r.id}
-                    className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
+                    className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-85)]"
                   >
-                    <div className="col-span-3 truncate text-center font-semibold">{r.nome}</div>
-                    <div className="col-span-7 min-w-0 text-center line-clamp-2 text-white/60">
+                    <div
+                      className="col-span-3 truncate text-center font-semibold"
+                      title={r.nome}
+                    >
+                      {r.nome}
+                    </div>
+                    <div className="col-span-7 min-w-0 text-center text-[var(--app-text-70)] line-clamp-2">
                       {r.conteudo}
                     </div>
                     <div className="col-span-2 flex justify-end gap-2">
                       <button
                         onClick={() => openEdit(r)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
                         title="Editar"
                       >
                         <Pencil className="h-4 w-4" />
@@ -191,7 +232,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                       <button
                         onClick={() => remove(r)}
                         disabled={isPending}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-60"
                         title="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -200,11 +241,12 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
+
         {filtered.length > pageSize ? (
-          <div className="grid grid-cols-3 items-center border-t border-white/10 px-4 py-3">
+          <div className="grid grid-cols-3 items-center border-t border-[var(--app-border)] px-4 py-3">
             <button
               type="button"
               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
@@ -233,16 +275,16 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[100]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-white/90">
+            <div className="text-sm font-semibold text-[var(--app-text-85)]">
               {editing ? "Editar template" : "Novo template"}
             </div>
-            <div className="mt-1 text-xs text-white/55">
+            <div className="mt-1 text-xs text-[var(--app-text-55)]">
               Monte sua mensagem com variáveis e PIX.
             </div>
           </div>
           <button
             onClick={close}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -250,21 +292,21 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
 
         <form onSubmit={onSubmit} className="mt-4 grid gap-3">
               <div>
-                <div className="text-xs font-semibold text-white/60">Nome</div>
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">Nome</div>
                 <input
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
                   placeholder="Ex: Cobrança amigável"
                   {...register("nome", { required: true })}
                 />
               </div>
 
               <div>
-                <div className="text-xs font-semibold text-white/60">
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">
                   Conteúdo
                 </div>
                 <textarea
                   rows={7}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
                   placeholder={
                     "Olá {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPIX: {pix}\n\nObrigado!"
                   }
@@ -275,7 +317,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
               <button
                 type="submit"
                 disabled={isSubmitting || isPending}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60"
               >
                 {editing ? "Salvar alterações" : "Criar template"}
               </button>
