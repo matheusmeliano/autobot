@@ -450,7 +450,7 @@ export function SchedulesClient({
             triggeringId === r.id ||
             markingPaidId === r.id
           }
-          className={variant === "mobile" ? `${baseButtonClass} col-span-2` : baseButtonClass}
+          className={baseButtonClass}
           title="Excluir"
         >
           <Trash2 className="h-4 w-4" />
