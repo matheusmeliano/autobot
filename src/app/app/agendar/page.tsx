@@ -5,6 +5,7 @@ import {
   type ScheduleRow,
   type TemplateOption,
 } from "@/components/app/schedules/SchedulesClient";
+import { buildAgendaRows } from "@/lib/agendaRows";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 
 export default async function AgendarPage() {
@@ -14,7 +15,7 @@ export default async function AgendarPage() {
     supabase
       .from("schedules")
       .select(
-        "id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, debtors(nome), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
+        "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
       )
       .order("data_envio", { ascending: true })
       .limit(200),
@@ -26,7 +27,9 @@ export default async function AgendarPage() {
       .limit(2000),
     supabase
       .from("debtors")
-      .select("id, nome, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days")
+      .select(
+        "id, nome, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)",
+      )
       .order("nome", { ascending: true })
       .limit(500),
     supabase
@@ -58,30 +61,11 @@ export default async function AgendarPage() {
     latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
   }
 
-  const initial =
-    (schedulesRes.data ?? []).map((r: any) => ({
-      id: r.id,
-      debtor_id: r.debtor_id,
-      template_id: r.template_id,
-      template_pending_id: r.template_pending_id ?? null,
-      template_overdue_id: r.template_overdue_id ?? null,
-      data_envio: r.data_envio,
-      charge_due_at: r.charge_due_at ?? null,
-      status: r.status,
-      recurrence: r.recurrence ?? "none",
-      recurrence_until: r.recurrence_until ?? null,
-      recurrence_day: r.recurrence_day ?? null,
-      recurrence_time: r.recurrence_time ?? null,
-      schedule_timezone: r.schedule_timezone ?? null,
-      last_sent_at: r.last_sent_at ?? null,
-      payment_received_at: r.payment_received_at ?? null,
-      last_executed_scheduled_for: latestExecutedRunBySchedule.get(String(r.id)) ?? null,
-      created_at: r.created_at,
-      debtor_nome: r.debtors?.nome ?? "-",
-      template_nome: r.pending_template?.nome ?? null,
-      template_pending_nome: r.pending_template?.nome ?? null,
-      template_overdue_nome: r.overdue_template?.nome ?? null,
-    })) ?? [];
+  const initial = buildAgendaRows({
+    debtors: (debtorsRes.data ?? []) as any[],
+    schedules: (schedulesRes.data ?? []) as any[],
+    latestExecutedRunBySchedule,
+  });
 
   const tzRaw = (profileRes as any)?.data?.timezone;
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;

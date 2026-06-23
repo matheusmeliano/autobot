@@ -45,11 +45,15 @@ export type TemplateOption = { id: string; nome: string };
 export type ScheduleRow = {
   id: string;
   debtor_id: string;
+  charge_id?: string | null;
+  source_kind?: "charge" | "schedule";
+  schedule_missing?: boolean;
   template_id: string | null;
   template_pending_id: string | null;
   template_overdue_id: string | null;
   data_envio: string;
   charge_due_at?: string | null;
+  next_charge_due_at?: string | null;
   status: string;
   recurrence?: string | null;
   recurrence_until?: string | null;
@@ -411,32 +415,25 @@ export function SchedulesClient({
 
   const displayStatus = (row: ScheduleRow) => {
     const raw = String(row.status ?? "").toLowerCase();
-    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
-    const chargeMonthKey = yearMonthKey(row.charge_due_at ?? row.data_envio, effectiveTimeZone);
-    const executedScheduleMonthKey = row.last_executed_scheduled_for
-      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
-      : "";
-    const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
-    const paymentMonthKey = row.payment_received_at
-      ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
-      : "";
-    const processedByState = [
-      "pendente",
-      "atrasado",
-      "pago",
-      "executado",
-      "suspeita_de_pagamento",
-      "executando",
-    ].includes(raw);
-    const processedByEvidence =
-      executedScheduleMonthKey === currentMonthKey ||
-      sentMonthKey === currentMonthKey ||
-      paymentMonthKey === currentMonthKey;
+    const primaryMoment = row.charge_due_at ?? row.data_envio;
+    const primaryTime = new Date(primaryMoment).getTime();
+    const isFuture = Number.isFinite(primaryTime) && primaryTime > Date.now();
+    const processedByState = ["pendente", "pago", "executado", "suspeita_de_pagamento", "executando"].includes(raw);
+    const processedByEvidence = Boolean(row.last_executed_scheduled_for || row.last_sent_at || row.payment_received_at);
 
-    if (chargeMonthKey === currentMonthKey && (processedByState || processedByEvidence)) {
+    if (isFuture) {
+      return { label: "Agendado", className: statusClass("agendado") };
+    }
+    if (processedByState || processedByEvidence) {
       return { label: "Executado", className: statusClass("executado") };
     }
-    return { label: "Pendente", className: statusClass("pendente") };
+    if (raw === "atrasado") {
+      return { label: "Atrasado", className: statusClass("atrasado") };
+    }
+    if (raw === "pendente") {
+      return { label: "Pendente", className: statusClass("pendente") };
+    }
+    return { label: statusLabel(raw || "agendado"), className: statusClass(raw || "agendado") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
@@ -446,7 +443,10 @@ export function SchedulesClient({
     const primaryMoment =
       localScheduleIso(dueInput.date, sendInput.time || dueInput.time, effectiveTimeZone) ??
       dueMoment;
-    const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
+    const nextRecurringMoment =
+      row.source_kind === "charge"
+        ? row.next_charge_due_at ?? null
+        : row.next_charge_due_at ?? getNextRecurringMoment(row, effectiveTimeZone);
     const hasNextSchedule = Boolean(nextRecurringMoment);
 
     return {
@@ -487,6 +487,7 @@ export function SchedulesClient({
   };
 
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
+    const scheduleUnavailable = Boolean(r.schedule_missing) || String(r.id ?? "").startsWith("charge:");
     const baseButtonClass =
       variant === "mobile"
         ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
@@ -500,7 +501,7 @@ export function SchedulesClient({
       <div className={variant === "mobile" ? "grid grid-cols-2 gap-2" : "flex flex-nowrap justify-end gap-2"}>
         <button
           onClick={() => openEdit(r)}
-          disabled={isPending || markingPaidId === r.id}
+          disabled={scheduleUnavailable || isPending || markingPaidId === r.id}
           className={baseButtonClass}
           title="Editar"
         >
@@ -510,6 +511,7 @@ export function SchedulesClient({
         <button
           onClick={() => markAsPaid(r)}
           disabled={
+            scheduleUnavailable ||
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id ||
@@ -524,6 +526,7 @@ export function SchedulesClient({
         <button
           onClick={() => triggerNow(r)}
           disabled={
+            scheduleUnavailable ||
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id ||
@@ -542,6 +545,7 @@ export function SchedulesClient({
         <button
           onClick={() => remove(r)}
           disabled={
+            scheduleUnavailable ||
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id
