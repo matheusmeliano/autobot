@@ -61,14 +61,15 @@ export default async function AgendarPage() {
     latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
   }
 
+  const tzRaw = (profileRes as any)?.data?.timezone;
+  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const initial = buildAgendaRows({
     debtors: (debtorsRes.data ?? []) as any[],
     schedules: (schedulesRes.data ?? []) as any[],
     latestExecutedRunBySchedule,
+    currentUtcIso: new Date().toISOString(),
+    timeZone: timeZone ?? "America/Sao_Paulo",
   });
-
-  const tzRaw = (profileRes as any)?.data?.timezone;
-  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const wa = (waRes as any)?.data ?? null;
   const waStatus = String(wa?.status ?? "").toLowerCase();
   const whatsappConfigured = Boolean(

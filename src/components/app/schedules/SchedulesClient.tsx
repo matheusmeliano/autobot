@@ -414,35 +414,16 @@ export function SchedulesClient({
   };
 
   const displayStatus = (row: ScheduleRow) => {
-    const raw = String(row.status ?? "").toLowerCase();
     const primaryMoment = row.charge_due_at ?? row.data_envio;
     const primaryTime = new Date(primaryMoment).getTime();
-    const isFuture = Number.isFinite(primaryTime) && primaryTime > Date.now();
-    const processedByState = ["pendente", "pago", "executado", "suspeita_de_pagamento", "executando"].includes(raw);
-    const processedByEvidence = Boolean(row.last_executed_scheduled_for || row.last_sent_at || row.payment_received_at);
-
-    if (isFuture) {
-      return { label: "Agendado", className: statusClass("agendado") };
-    }
-    if (processedByState || processedByEvidence) {
-      return { label: "Executado", className: statusClass("executado") };
-    }
-    if (raw === "atrasado") {
-      return { label: "Atrasado", className: statusClass("atrasado") };
-    }
-    if (raw === "pendente") {
-      return { label: "Pendente", className: statusClass("pendente") };
-    }
-    return { label: statusLabel(raw || "agendado"), className: statusClass(raw || "agendado") };
+    const alreadyReachedChargeDate = Number.isFinite(primaryTime) && primaryTime <= Date.now();
+    return alreadyReachedChargeDate
+      ? { label: "Executado", className: statusClass("executado") }
+      : { label: "Pendente", className: statusClass("pendente") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
     const dueMoment = row.charge_due_at ?? row.data_envio;
-    const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
-    const sendInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
-    const primaryMoment =
-      localScheduleIso(dueInput.date, sendInput.time || dueInput.time, effectiveTimeZone) ??
-      dueMoment;
     const nextRecurringMoment =
       row.source_kind === "charge"
         ? row.next_charge_due_at ?? null
@@ -450,8 +431,8 @@ export function SchedulesClient({
     const hasNextSchedule = Boolean(nextRecurringMoment);
 
     return {
-      primaryDate: dateBR(primaryMoment, effectiveTimeZone),
-      primaryTime: timeBR(primaryMoment, effectiveTimeZone),
+      primaryDate: dateBR(dueMoment, effectiveTimeZone),
+      primaryTime: timeBR(dueMoment, effectiveTimeZone),
       nextDate: hasNextSchedule ? dateBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
       nextTime: hasNextSchedule ? timeBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
       hasNextSchedule,
