@@ -568,7 +568,10 @@ export function AppShell({
 
               <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm">
                 {pendingPayment?.debtor?.nome ? (
-                  <div className="font-semibold text-[var(--app-text-85)]">
+                  <div
+                    className="truncate font-semibold text-[var(--app-text-85)]"
+                    title={`Cliente: ${pendingPayment.debtor.nome}`}
+                  >
                     Cliente: {pendingPayment.debtor.nome}
                   </div>
                 ) : null}

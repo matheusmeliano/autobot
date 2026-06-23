@@ -1176,7 +1176,7 @@ export function SchedulesClient({
                   Cliente
                 </div>
                 <select
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                  className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                   {...register("debtor_id", { required: true })}
                 >
                   <option value="">Selecione...</option>
@@ -1195,7 +1195,7 @@ export function SchedulesClient({
                     Utilizado no primeiro envio da cobrança.
                   </div>
                   <select
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                    className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                     {...register("template_pending_id")}
                   >
                     <option value="">Sem template</option>
@@ -1212,7 +1212,7 @@ export function SchedulesClient({
                     Utilizado em todas as tentativas após o vencimento.
                   </div>
                   <select
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                    className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                     {...register("template_overdue_id")}
                   >
                     <option value="">Sem template</option>

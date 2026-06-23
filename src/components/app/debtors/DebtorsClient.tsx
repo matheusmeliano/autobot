@@ -545,9 +545,14 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                         <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
                           {r.nome}
                         </div>
-                        <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                          Cliente
-                        </div>
+                        {r.observacoes ? (
+                          <div
+                            className="mt-1 truncate text-[11px] text-[var(--app-text-55)]"
+                            title={r.observacoes}
+                          >
+                            {r.observacoes}
+                          </div>
+                        ) : null}
                       </div>
                       <span
                         className={[
