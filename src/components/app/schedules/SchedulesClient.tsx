@@ -7,7 +7,12 @@ import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-re
 import { AppModal } from "@/components/app/AppModal";
 import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
-import { localDateInTimeZone } from "@/lib/recurrence";
+import {
+  localDateInTimeZone,
+  nextMonthlyIso,
+  nextYearlyIso,
+  shouldContinueRecurringRecurrence,
+} from "@/lib/recurrence";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import {
   createScheduleAction,
@@ -180,6 +185,53 @@ function getMonthlyCycleConfig(row: ScheduleRow, timeZone: BrazilTimeZone) {
         ? row.recurrence_time
         : dateTime.time || "00:00",
   };
+}
+
+function getNextRecurringMoment(row: ScheduleRow, timeZone: BrazilTimeZone) {
+  const recurrence = String(row.recurrence ?? "none").toLowerCase();
+  if (recurrence !== "monthly" && recurrence !== "yearly") return null;
+
+  const baseIso = row.charge_due_at ?? row.data_envio;
+  if (!baseIso) return null;
+
+  const dueInput = splitDateTimeForInput(baseIso, timeZone);
+  const sendInput = splitDateTimeForInput(row.data_envio, timeZone);
+  const recurrenceDay = Number(row.recurrence_day ?? dueInput.date.split("-")[2] ?? "");
+  const recurrenceTime =
+    typeof row.recurrence_time === "string" && /^\d{2}:\d{2}$/.test(row.recurrence_time)
+      ? row.recurrence_time
+      : sendInput.time || dueInput.time || "00:00";
+
+  try {
+    const nextIso =
+      recurrence === "yearly"
+        ? nextYearlyIso({
+            fromUtcIso: baseIso,
+            timeZone,
+            day: Number.isFinite(recurrenceDay) ? recurrenceDay : 1,
+            time: recurrenceTime,
+          })
+        : nextMonthlyIso({
+            fromUtcIso: baseIso,
+            timeZone,
+            day: Number.isFinite(recurrenceDay) ? recurrenceDay : 1,
+            time: recurrenceTime,
+          });
+
+    if (
+      !shouldContinueRecurringRecurrence({
+        nextUtcIso: nextIso,
+        recurrenceUntil: row.recurrence_until ?? null,
+        timeZone,
+      })
+    ) {
+      return null;
+    }
+
+    return nextIso;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeDebtorRetryValues(debtor: DebtorOption | null | undefined) {
@@ -367,15 +419,14 @@ export function SchedulesClient({
     const primaryMoment =
       localScheduleIso(dueInput.date, sendInput.time || dueInput.time, effectiveTimeZone) ??
       dueMoment;
-    const dueKey = dueInput.date ? `${dueInput.date}T${sendInput.time || dueInput.time || "00:00"}` : "";
-    const sendKey = sendInput.date && sendInput.time ? `${sendInput.date}T${sendInput.time}` : "";
-    const hasNextSchedule = Boolean(dueKey && sendKey && sendKey !== dueKey);
+    const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
+    const hasNextSchedule = Boolean(nextRecurringMoment);
 
     return {
       primaryDate: dateBR(primaryMoment, effectiveTimeZone),
       primaryTime: timeBR(primaryMoment, effectiveTimeZone),
-      nextDate: hasNextSchedule ? dateBR(row.data_envio, effectiveTimeZone) : "-",
-      nextTime: hasNextSchedule ? timeBR(row.data_envio, effectiveTimeZone) : "-",
+      nextDate: hasNextSchedule ? dateBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
+      nextTime: hasNextSchedule ? timeBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
       hasNextSchedule,
     };
   };
