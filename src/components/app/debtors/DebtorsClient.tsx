@@ -1308,16 +1308,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           Distribui automaticamente as demais cobranças ao longo do mesmo dia.
                         </div>
                       </div>
-                      <div>
-                        <div className="text-xs font-semibold text-white/60">Intervalo entre tentativas (dias)</div>
-                        <input
-                          type="number"
-                          min={1}
-                          max={365}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                          {...register("retry_interval_days", { valueAsNumber: true })}
-                        />
-                      </div>
+                      <input type="hidden" {...register("retry_interval_days", { valueAsNumber: true })} />
                     </div>
 
                     <div className="mt-3">
