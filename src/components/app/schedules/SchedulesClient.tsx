@@ -332,19 +332,8 @@ export function SchedulesClient({
 
   const displayStatus = (row: ScheduleRow) => {
     const raw = String(row.status ?? "").toLowerCase();
-    if (
-      raw === "atrasado" ||
-      raw === "pendente" ||
-      raw === "suspeita_de_pagamento" ||
-      raw === "executando"
-    ) {
-      return { label: statusLabel(raw), className: statusClass(raw) };
-    }
-    if (raw === "executado" || raw === "pago") {
-      return { label: "Executado", className: statusClass("executado") };
-    }
-
     const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
+    const chargeMonthKey = yearMonthKey(row.charge_due_at ?? row.data_envio, effectiveTimeZone);
     const executedScheduleMonthKey = row.last_executed_scheduled_for
       ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
       : "";
@@ -352,15 +341,23 @@ export function SchedulesClient({
     const paymentMonthKey = row.payment_received_at
       ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
       : "";
-    if (
-      (executedScheduleMonthKey && executedScheduleMonthKey === currentMonthKey) ||
-      (sentMonthKey && sentMonthKey === currentMonthKey) ||
-      (paymentMonthKey && paymentMonthKey === currentMonthKey)
-    ) {
+    const processedByState = [
+      "pendente",
+      "atrasado",
+      "pago",
+      "executado",
+      "suspeita_de_pagamento",
+      "executando",
+    ].includes(raw);
+    const processedByEvidence =
+      executedScheduleMonthKey === currentMonthKey ||
+      sentMonthKey === currentMonthKey ||
+      paymentMonthKey === currentMonthKey;
+
+    if (chargeMonthKey === currentMonthKey && (processedByState || processedByEvidence)) {
       return { label: "Executado", className: statusClass("executado") };
     }
-
-    return { label: "Agendado", className: statusClass("agendado") };
+    return { label: "Pendente", className: statusClass("pendente") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
