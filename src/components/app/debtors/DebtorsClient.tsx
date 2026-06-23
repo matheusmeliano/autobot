@@ -72,6 +72,8 @@ type FormValues = {
   retry_auto_close_days: number;
 };
 
+type ChargeFormValue = FormValues["charges"][number];
+
 const weekdayOptions = [
   { value: 1, label: "Seg" },
   { value: 2, label: "Ter" },
@@ -122,6 +124,14 @@ function progressText(row: DebtorRow) {
   if (!Number.isFinite(total) || total <= 0) return null;
   const paid = Math.max(0, Math.min(total, Number(row.progress_paid ?? 0) || 0));
   return `${paid}/${total} Pagas`;
+}
+
+function defaultChargeFormValue(day: string): ChargeFormValue {
+  return {
+    amount: "",
+    due_day: day,
+    recurrence_unit: "monthly",
+  };
 }
 
 
@@ -313,7 +323,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     defaultValues: {
       nome: "",
       telefone: "",
-      charges: [{ amount: "", due_day: String(currentDate.getDate()), recurrence_unit: "monthly" }],
+      charges: [defaultChargeFormValue(String(currentDate.getDate()))],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -339,7 +349,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     reset({
       nome: "",
       telefone: "",
-      charges: [{ amount: "", due_day: String(currentDate.getDate()), recurrence_unit: "monthly" }],
+      charges: [defaultChargeFormValue(String(currentDate.getDate()))],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -366,7 +376,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     setEditing(row);
     setOpen(true);
     setPixKeyType(detectPixKeyType(row.pix_key ?? ""));
-    const charges =
+    const charges: ChargeFormValue[] =
       row.charges && row.charges.length
         ? [...row.charges]
             .sort((a, b) => (a.due_day ?? 0) - (b.due_day ?? 0))
@@ -380,7 +390,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                   : "";
               })(),
               due_day: String(c.due_day ?? ""),
-              recurrence_unit: c.recurrence_unit === "yearly" ? "yearly" : "monthly",
+              recurrence_unit: (c.recurrence_unit === "yearly" ? "yearly" : "monthly") as
+                | "monthly"
+                | "yearly",
             }))
         : [
             {
@@ -392,7 +404,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     })
                   : "",
               due_day: String(dueDayLabel(row.vencimento) ?? ""),
-              recurrence_unit: "monthly",
+              recurrence_unit: "monthly" as "monthly" | "yearly",
             },
           ];
     reset({
@@ -418,13 +430,21 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
 
   const onSubmit = handleSubmit(async (values) => {
     const pixKey = values.pix_key ? normalizePixKeyForSave(values.pix_key) : null;
-    const mappedCharges = (values.charges ?? [])
+    const mappedCharges: Array<{
+      index: number;
+      id?: string;
+      amount: number | null;
+      dueDay: number;
+      recurrenceUnit: "monthly" | "yearly";
+    }> = (values.charges ?? [])
       .map((c, index) => ({
         index,
         id: c.charge_id,
         amount: c.amount ? parseBRLToNumber(c.amount) : null,
         dueDay: Number(String(c.due_day ?? "").trim()),
-        recurrenceUnit: c.recurrence_unit === "yearly" ? "yearly" : "monthly",
+        recurrenceUnit: (c.recurrence_unit === "yearly" ? "yearly" : "monthly") as
+          | "monthly"
+          | "yearly",
       }))
       .filter((c) => typeof c.amount === "number" && c.amount > 0 && Number.isInteger(c.dueDay) && c.dueDay >= 1 && c.dueDay <= 31)
       .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
@@ -790,11 +810,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             modalToast.error(`Limite: no máximo ${MAX_RETRY_ATTEMPTS_PER_DAY} cobranças por cliente.`);
                             return;
                           }
-                          appendCharge({
-                            amount: "",
-                            due_day: String(currentDate.getDate()),
-                            recurrence_unit: "monthly",
-                          });
+                          appendCharge(defaultChargeFormValue(String(currentDate.getDate())));
                         }}
                         className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06]"
                       >
