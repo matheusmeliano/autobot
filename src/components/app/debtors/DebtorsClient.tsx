@@ -958,7 +958,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       />
                     </div>
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="mt-4 grid gap-3">
                       <div>
                         <div className="text-xs font-semibold text-white/60">Horário de reenvio</div>
                         <input
