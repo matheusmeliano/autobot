@@ -175,6 +175,33 @@ function splitDateTimeForInput(v: string, timeZone: BrazilTimeZone) {
   return { date, time };
 }
 
+function currentMinScheduleLocalDateTime(timeZone: BrazilTimeZone) {
+  const nowRounded = new Date();
+  nowRounded.setSeconds(0, 0);
+  const minDate = new Date(nowRounded.getTime() + 3 * 60 * 1000);
+  return splitDateTimeForInput(minDate.toISOString(), timeZone);
+}
+
+function isFutureScheduleDateTime(params: {
+  date: string;
+  time: string;
+  timeZone: BrazilTimeZone;
+}) {
+  try {
+    const iso = zonedDateTimeToUtcIso({
+      date: params.date,
+      time: params.time,
+      timeZone: params.timeZone,
+    });
+    const nowRounded = new Date();
+    nowRounded.setSeconds(0, 0);
+    const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
+    return new Date(iso).getTime() >= minAllowed;
+  } catch {
+    return false;
+  }
+}
+
 function getMonthlyCycleConfig(row: ScheduleRow, timeZone: BrazilTimeZone) {
   const dateTime = splitDateTimeForInput(row.data_envio, timeZone);
   const fallbackDay = Number(dateTime.date.split("-")[2] ?? "1");
@@ -298,7 +325,7 @@ export function SchedulesClient({
     () => localDateInTimeZone(new Date().toISOString(), effectiveTimeZone),
     [effectiveTimeZone],
   );
-  const scheduleDateMin = editing ? undefined : todayMinDate;
+  const scheduleDateMin = todayMinDate;
 
   const prereqMessage = (context: "criar/editar" | "disparar") => {
     const actionLabel = context === "disparar" ? "disparar agora" : "criar ou editar agendamentos";
@@ -530,6 +557,7 @@ export function SchedulesClient({
   };
 
   const timeValue = watch("data_envio_time");
+  const scheduleDateValue = watch("data_envio_date");
   const recurrenceValue = watch("recurrence");
   const selectedDebtorId = watch("debtor_id");
   const selectedDebtor = useMemo(
@@ -552,6 +580,15 @@ export function SchedulesClient({
     if (timePickerTarget.kind === "main") return typeof timeValue === "string" ? timeValue : "";
     return monthlyExtras[timePickerTarget.index]?.time ?? "";
   }, [monthlyExtras, timePickerTarget, timeValue]);
+  const currentMinSchedule = useMemo(
+    () => currentMinScheduleLocalDateTime(effectiveTimeZone),
+    [effectiveTimeZone, open, timePickerOpen, timePickerTarget, timeValue, monthlyExtras],
+  );
+  const currentPickerDate = useMemo(() => {
+    if (!timePickerTarget) return "";
+    if (timePickerTarget.kind === "main") return String(scheduleDateValue ?? "");
+    return monthlyExtras[timePickerTarget.index]?.date ?? "";
+  }, [monthlyExtras, scheduleDateValue, timePickerTarget]);
 
   useEffect(() => {
     if (recurrenceValue !== "monthly" && monthlyExtras.length > 0) {
@@ -714,15 +751,13 @@ export function SchedulesClient({
     }
 
     try {
-      const iso = zonedDateTimeToUtcIso({
-        date: normalizedEditDate,
-        time: values.data_envio_time,
-        timeZone: effectiveTimeZone,
-      });
-      const nowRounded = new Date();
-      nowRounded.setSeconds(0, 0);
-      const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
-      if (new Date(iso).getTime() < minAllowed) {
+      if (
+        !isFutureScheduleDateTime({
+          date: normalizedEditDate,
+          time: values.data_envio_time,
+          timeZone: effectiveTimeZone,
+        })
+      ) {
         modalToast.error("Escolha um horário futuro válido (mínimo +3 minutos).");
         return;
       }
@@ -733,15 +768,13 @@ export function SchedulesClient({
     if (values.recurrence === "monthly") {
       try {
         for (const c of monthlyExtras) {
-          const iso = zonedDateTimeToUtcIso({
-            date: c.date,
-            time: c.time,
-            timeZone: effectiveTimeZone,
-          });
-          const nowRounded = new Date();
-          nowRounded.setSeconds(0, 0);
-          const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
-          if (new Date(iso).getTime() < minAllowed) {
+          if (
+            !isFutureScheduleDateTime({
+              date: c.date,
+              time: c.time,
+              timeZone: effectiveTimeZone,
+            })
+          ) {
             modalToast.error("Escolha um horário futuro válido (mínimo +3 minutos).");
             return;
           }
@@ -988,24 +1021,33 @@ export function SchedulesClient({
                 <div className="max-h-56 overflow-auto rounded-lg border border-[var(--app-border)] bg-[var(--app-card)]">
                   {Array.from({ length: 24 }).map((_, i) => {
                     const h = String(i).padStart(2, "0");
+                    const currentMinute =
+                      typeof currentTimeForPicker === "string" && currentTimeForPicker.length >= 5
+                        ? currentTimeForPicker.slice(3, 5)
+                        : "00";
+                    const disabled =
+                      Boolean(currentPickerDate) &&
+                      !isFutureScheduleDateTime({
+                        date: currentPickerDate,
+                        time: `${h}:${currentMinute}`,
+                        timeZone: effectiveTimeZone,
+                      });
                     const selected =
                       typeof currentTimeForPicker === "string" && currentTimeForPicker.slice(0, 2) === h;
                     return (
                       <button
                         key={h}
                         type="button"
+                        disabled={disabled}
                         onClick={() => {
-                          const m =
-                            typeof currentTimeForPicker === "string" && currentTimeForPicker.length >= 5
-                              ? currentTimeForPicker.slice(3, 5)
-                              : "00";
-                          setTimeForTarget(`${h}:${m}`);
+                          setTimeForTarget(`${h}:${currentMinute}`);
                         }}
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
                           selected
                             ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
                             : "text-[var(--app-text-80)] hover:bg-[var(--app-hover)]",
+                          disabled ? "cursor-not-allowed opacity-40 hover:bg-transparent" : "",
                         ].join(" ")}
                       >
                         {h}
@@ -1016,24 +1058,33 @@ export function SchedulesClient({
                 <div className="max-h-56 overflow-auto rounded-lg border border-[var(--app-border)] bg-[var(--app-card)]">
                   {Array.from({ length: 60 }).map((_, i) => {
                     const m = String(i).padStart(2, "0");
+                    const currentHour =
+                      typeof currentTimeForPicker === "string" && currentTimeForPicker.length >= 2
+                        ? currentTimeForPicker.slice(0, 2)
+                        : currentMinSchedule.time.slice(0, 2);
+                    const disabled =
+                      Boolean(currentPickerDate) &&
+                      !isFutureScheduleDateTime({
+                        date: currentPickerDate,
+                        time: `${currentHour}:${m}`,
+                        timeZone: effectiveTimeZone,
+                      });
                     const selected =
                       typeof currentTimeForPicker === "string" && currentTimeForPicker.slice(3, 5) === m;
                     return (
                       <button
                         key={m}
                         type="button"
+                        disabled={disabled}
                         onClick={() => {
-                          const h =
-                            typeof currentTimeForPicker === "string" && currentTimeForPicker.length >= 2
-                              ? currentTimeForPicker.slice(0, 2)
-                              : "00";
-                          setTimeForTarget(`${h}:${m}`, true);
+                          setTimeForTarget(`${currentHour}:${m}`, true);
                         }}
                         className={[
                           "flex w-full items-center justify-center px-3 py-2 text-sm font-semibold",
                           selected
                             ? "bg-[var(--app-active)] text-[var(--app-text-85)]"
                             : "text-[var(--app-text-80)] hover:bg-[var(--app-hover)]",
+                          disabled ? "cursor-not-allowed opacity-40 hover:bg-transparent" : "",
                         ].join(" ")}
                       >
                         {m}

@@ -255,6 +255,32 @@ function validateRecurrenceUntil(params: {
   return null;
 }
 
+function validateFutureScheduleDateTime(params: {
+  date: string;
+  time: string;
+  timeZone: string;
+}) {
+  let scheduledIso: string;
+  try {
+    scheduledIso = zonedDateTimeToUtcIso({
+      date: params.date,
+      time: params.time,
+      timeZone: params.timeZone,
+    });
+  } catch {
+    return { ok: false as const, error: "Data/hora inválida." };
+  }
+
+  const nowRounded = new Date();
+  nowRounded.setSeconds(0, 0);
+  const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
+  if (new Date(scheduledIso).getTime() < minAllowed) {
+    return { ok: false as const, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
+  }
+
+  return { ok: true as const, scheduledIso };
+}
+
 async function updateDebtorRetrySettings(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   debtorId: string,
@@ -306,29 +332,19 @@ export async function createScheduleAction(input: unknown) {
   });
   if (msg) return { ok: false, error: msg };
 
-  let dataEnvioIso: string;
-  try {
-    dataEnvioIso = zonedDateTimeToUtcIso({
-      date: parsed.data.data_envio_date,
-      time: parsed.data.data_envio_time,
-      timeZone,
-    });
-  } catch {
-    return { ok: false, error: "Data/hora inválida." };
-  }
+  const futureValidation = validateFutureScheduleDateTime({
+    date: parsed.data.data_envio_date,
+    time: parsed.data.data_envio_time,
+    timeZone,
+  });
+  if (!futureValidation.ok) return { ok: false, error: futureValidation.error };
+  let dataEnvioIso = futureValidation.scheduledIso;
 
   dataEnvioIso = shiftFirstChargeFromWeekendUtcIso({
     utcIso: dataEnvioIso,
     timeZone,
     enabled: await debtorSkipsWeekendsOnFirstCharge(supabase, parsed.data.debtor_id),
   });
-
-  const nowRounded = new Date();
-  nowRounded.setSeconds(0, 0);
-  const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
-  if (new Date(dataEnvioIso).getTime() < minAllowed) {
-    return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
-  }
 
   const recurrence = parsed.data.recurrence ?? "none";
   const recurrenceUntil = parsed.data.recurrence_until;
@@ -403,29 +419,19 @@ export async function updateScheduleAction(input: unknown) {
   });
   if (msg) return { ok: false, error: msg };
 
-  let dataEnvioIso: string;
-  try {
-    dataEnvioIso = zonedDateTimeToUtcIso({
-      date: data.data_envio_date,
-      time: data.data_envio_time,
-      timeZone,
-    });
-  } catch {
-    return { ok: false, error: "Data/hora inválida." };
-  }
+  const futureValidation = validateFutureScheduleDateTime({
+    date: data.data_envio_date,
+    time: data.data_envio_time,
+    timeZone,
+  });
+  if (!futureValidation.ok) return { ok: false, error: futureValidation.error };
+  let dataEnvioIso = futureValidation.scheduledIso;
 
   dataEnvioIso = shiftFirstChargeFromWeekendUtcIso({
     utcIso: dataEnvioIso,
     timeZone,
     enabled: await debtorSkipsWeekendsOnFirstCharge(supabase, data.debtor_id),
   });
-
-  const nowRounded = new Date();
-  nowRounded.setSeconds(0, 0);
-  const minAllowed = nowRounded.getTime() + 3 * 60 * 1000;
-  if (new Date(dataEnvioIso).getTime() < minAllowed) {
-    return { ok: false, error: "Escolha um horário futuro válido (mínimo +3 minutos)." };
-  }
 
   const recurrence = (data as any).recurrence ?? "none";
   const recurrenceUntil = data.recurrence_until;
