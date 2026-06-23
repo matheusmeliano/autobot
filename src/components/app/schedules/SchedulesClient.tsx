@@ -987,7 +987,10 @@ export function SchedulesClient({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Template pendente
                       </div>
-                      <div className="mt-1 break-words text-sm font-semibold text-[var(--app-text-85)]">
+                      <div
+                        className="mt-1 truncate text-sm font-semibold text-[var(--app-text-85)]"
+                        title={r.template_pending_nome ?? "-"}
+                      >
                         {r.template_pending_nome ?? "-"}
                       </div>
                     </div>
@@ -995,7 +998,10 @@ export function SchedulesClient({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Template atrasado
                       </div>
-                      <div className="mt-1 break-words text-sm font-semibold text-[var(--app-text-85)]">
+                      <div
+                        className="mt-1 truncate text-sm font-semibold text-[var(--app-text-85)]"
+                        title={r.template_overdue_nome ?? "-"}
+                      >
                         {r.template_overdue_nome ?? "-"}
                       </div>
                     </div>
