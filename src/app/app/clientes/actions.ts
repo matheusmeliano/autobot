@@ -192,12 +192,12 @@ function normalizeDebtorCharges(input: {
 }): DebtorChargeInput[] {
   const fromList = Array.isArray(input.charges) ? input.charges : [];
   if (fromList.length) {
-    const normalized = fromList
+    const normalized: DebtorChargeInput[] = fromList
       .map((c) => ({
         id: c.id ? String(c.id) : undefined,
         amount: Number(c.amount),
         due_day: Number(c.due_day),
-        recurrence_unit: c.recurrence_unit === "yearly" ? "yearly" : "monthly",
+        recurrence_unit: (c.recurrence_unit === "yearly" ? "yearly" : "monthly") as "monthly" | "yearly",
       }))
       .filter(
         (c) =>
