@@ -17,6 +17,7 @@ import {
   DEFAULT_RETRY_INTERVAL_DAYS,
   DEFAULT_RETRY_MAX_ATTEMPTS,
   DEFAULT_RETRY_TIME,
+  MAX_RETRY_ATTEMPTS_PER_DAY,
   DEFAULT_RETRY_WEEKDAYS,
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
@@ -414,7 +415,10 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       skip_weekends_on_first_charge: Boolean(row.skip_weekends_on_first_charge),
       retry_weekdays: normalizeRetryWeekdays(row.retry_weekdays),
       retry_time: row.retry_time ?? DEFAULT_RETRY_TIME,
-      retry_max_attempts: row.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_max_attempts: Math.min(
+        MAX_RETRY_ATTEMPTS_PER_DAY,
+        row.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
+      ),
       retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: row.retry_auto_close_days ?? DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     });
@@ -445,7 +449,10 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       skip_weekends_on_first_charge: Boolean(values.skip_weekends_on_first_charge),
       retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
       retry_time: values.retry_time || DEFAULT_RETRY_TIME,
-      retry_max_attempts: Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_max_attempts: Math.min(
+        MAX_RETRY_ATTEMPTS_PER_DAY,
+        Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
+      ),
       retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: Number(values.retry_auto_close_days) || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     };
@@ -976,6 +983,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                         <input
                           type="number"
                           min={1}
+                          max={MAX_RETRY_ATTEMPTS_PER_DAY}
                           className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
                           {...register("retry_max_attempts", { valueAsNumber: true })}
                         />

@@ -4,6 +4,7 @@ import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 export const DEFAULT_RETRY_WEEKDAYS = [1, 2, 3, 4, 5];
 export const DEFAULT_RETRY_TIME = "09:00";
 export const DEFAULT_RETRY_MAX_ATTEMPTS = 1;
+export const MAX_RETRY_ATTEMPTS_PER_DAY = 5;
 export const DEFAULT_RETRY_INTERVAL_DAYS = 1;
 export const DEFAULT_RETRY_AUTO_CLOSE_DAYS = 30;
 const SAME_DAY_RETRY_LAST_TIME = "20:00";
@@ -90,7 +91,10 @@ export function normalizeRetryConfig(input: any): RetryConfig {
   return {
     weekdays: normalizeRetryWeekdays(input?.retry_weekdays),
     time: validTime(String(input?.retry_time ?? "")) ? String(input.retry_time) : DEFAULT_RETRY_TIME,
-    maxAttempts: Math.max(1, Number(input?.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS) || DEFAULT_RETRY_MAX_ATTEMPTS),
+    maxAttempts: Math.min(
+      MAX_RETRY_ATTEMPTS_PER_DAY,
+      Math.max(1, Number(input?.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS) || DEFAULT_RETRY_MAX_ATTEMPTS),
+    ),
     // This interval is no longer configurable in the UI, so re-sends always advance by one day.
     intervalDays: DEFAULT_RETRY_INTERVAL_DAYS,
     autoCloseDays: Math.max(

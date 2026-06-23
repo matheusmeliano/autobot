@@ -7,6 +7,7 @@ import {
   DEFAULT_RETRY_AUTO_CLOSE_DAYS,
   DEFAULT_RETRY_INTERVAL_DAYS,
   DEFAULT_RETRY_MAX_ATTEMPTS,
+  MAX_RETRY_ATTEMPTS_PER_DAY,
   DEFAULT_RETRY_TIME,
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
@@ -23,7 +24,7 @@ const createSchema = z.object({
   skip_weekends_on_first_charge: z.boolean().optional(),
   retry_weekdays: z.array(z.coerce.number().int().min(1).max(7)).optional(),
   retry_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  retry_max_attempts: z.coerce.number().int().min(1).max(100).optional(),
+  retry_max_attempts: z.coerce.number().int().min(1).max(MAX_RETRY_ATTEMPTS_PER_DAY).optional(),
   retry_interval_days: z.coerce.number().int().min(1).max(365).optional(),
   retry_auto_close_days: z.coerce.number().int().min(1).max(365).optional(),
 });
@@ -67,7 +68,10 @@ export async function createDebtorAction(input: unknown) {
     skip_weekends_on_first_charge: Boolean(parsed.data.skip_weekends_on_first_charge),
     retry_weekdays: normalizeRetryWeekdays(parsed.data.retry_weekdays),
     retry_time: parsed.data.retry_time || DEFAULT_RETRY_TIME,
-    retry_max_attempts: parsed.data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
+    retry_max_attempts: Math.min(
+      MAX_RETRY_ATTEMPTS_PER_DAY,
+      parsed.data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
+    ),
     retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
     retry_auto_close_days: parsed.data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
   });
@@ -99,7 +103,10 @@ export async function updateDebtorAction(input: unknown) {
       skip_weekends_on_first_charge: Boolean(data.skip_weekends_on_first_charge),
       retry_weekdays: normalizeRetryWeekdays(data.retry_weekdays),
       retry_time: data.retry_time || DEFAULT_RETRY_TIME,
-      retry_max_attempts: data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_max_attempts: Math.min(
+        MAX_RETRY_ATTEMPTS_PER_DAY,
+        data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
+      ),
       retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     })
