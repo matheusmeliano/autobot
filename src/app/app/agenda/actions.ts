@@ -804,7 +804,7 @@ export async function markSchedulePaidAction(id: string) {
   const admin = createSupabaseAdminClient();
   const { data: schedule, error } = await admin
     .from("schedules")
-    .select("id, user_id, debtor_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(accumulate_open_monthly_charges, skip_weekends_on_first_charge)")
+    .select("id, user_id, debtor_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(accumulate_open_monthly_charges, skip_weekends_on_first_charge), charge:debtor_charges!schedules_charge_id_fkey(recurrence_month, recurrence_year)")
     .eq("id", id)
     .maybeSingle();
 
@@ -830,6 +830,8 @@ export async function markSchedulePaidAction(id: string) {
       day: Number((schedule as any).recurrence_day ?? 1),
       time: String((schedule as any).recurrence_time ?? "") || "00:00",
       recurrence,
+      targetMonth: Number((schedule as any).charge?.recurrence_month ?? 0) || null,
+      targetYear: Number((schedule as any).charge?.recurrence_year ?? 0) || null,
     });
     const nextIso = shiftFirstChargeFromWeekendUtcIso({
       utcIso: nextIsoBase,

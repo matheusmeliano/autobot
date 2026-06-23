@@ -29,7 +29,8 @@ const createSchema = z
           id: z.string().uuid().optional(),
           amount: z.coerce.number().min(0.01),
           due_day: z.coerce.number().int().min(1).max(31),
-          recurrence_unit: z.enum(["monthly", "yearly"]).optional(),
+          recurrence_month: z.coerce.number().int().min(1).max(12),
+          recurrence_year: z.coerce.number().int().min(2000).max(9999),
         }),
       )
       .min(1)
@@ -72,7 +73,8 @@ type DebtorChargeInput = {
   id?: string;
   amount: number;
   due_day: number;
-  recurrence_unit: "monthly" | "yearly";
+  recurrence_month: number;
+  recurrence_year: number;
 };
 
 function validTime(value: string) {
@@ -185,18 +187,29 @@ function buildLocalDate(yearMonth: string, day: number) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
+function nextMonthYear(baseDate = new Date()) {
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth() + 1;
+  const monthIndex = month;
+  const nextYear = year + Math.floor(monthIndex / 12);
+  const nextMonth = (monthIndex % 12) + 1;
+  return { month: nextMonth, year: nextYear };
+}
+
 function normalizeDebtorCharges(input: {
   charges?:
     | Array<{
         id?: string;
         amount: number;
         due_day: number;
-        recurrence_unit?: "monthly" | "yearly";
+        recurrence_month?: number;
+        recurrence_year?: number;
       }>
     | null;
   valor?: number;
   vencimento?: string;
 }): DebtorChargeInput[] {
+  const fallbackRecurrence = nextMonthYear();
   const fromList = Array.isArray(input.charges) ? input.charges : [];
   if (fromList.length) {
     const normalized: DebtorChargeInput[] = fromList
@@ -204,7 +217,8 @@ function normalizeDebtorCharges(input: {
         id: c.id ? String(c.id) : undefined,
         amount: Number(c.amount),
         due_day: Number(c.due_day),
-        recurrence_unit: (c.recurrence_unit === "yearly" ? "yearly" : "monthly") as "monthly" | "yearly",
+        recurrence_month: Number(c.recurrence_month ?? fallbackRecurrence.month),
+        recurrence_year: Number(c.recurrence_year ?? fallbackRecurrence.year),
       }))
       .filter(
         (c) =>
@@ -212,7 +226,13 @@ function normalizeDebtorCharges(input: {
           c.amount > 0 &&
           Number.isInteger(c.due_day) &&
           c.due_day >= 1 &&
-          c.due_day <= 31,
+          c.due_day <= 31 &&
+          Number.isInteger(c.recurrence_month) &&
+          c.recurrence_month >= 1 &&
+          c.recurrence_month <= 12 &&
+          Number.isInteger(c.recurrence_year) &&
+          c.recurrence_year >= 2000 &&
+          c.recurrence_year <= 9999,
       )
       .slice(0, 5)
       .sort((a, b) => a.due_day - b.due_day);
@@ -222,7 +242,14 @@ function normalizeDebtorCharges(input: {
   const legacyAmount = Number(input.valor);
   const legacyDue = String(input.vencimento ?? "").trim();
   if (Number.isFinite(legacyAmount) && legacyAmount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(legacyDue)) {
-    return [{ amount: legacyAmount, due_day: Number(legacyDue.slice(8, 10)), recurrence_unit: "monthly" }];
+    return [
+      {
+        amount: legacyAmount,
+        due_day: Number(legacyDue.slice(8, 10)),
+        recurrence_month: fallbackRecurrence.month,
+        recurrence_year: fallbackRecurrence.year,
+      },
+    ];
   }
 
   return [];
@@ -285,7 +312,8 @@ async function syncDebtorChargesAndSchedules(params: {
       .update({
         amount: charge.amount,
         due_day: charge.due_day,
-        recurrence_unit: charge.recurrence_unit,
+        recurrence_month: charge.recurrence_month,
+        recurrence_year: charge.recurrence_year,
       })
       .eq("id", String(charge.id));
     if (error) return { ok: false as const, error: error.message };
@@ -301,10 +329,11 @@ async function syncDebtorChargesAndSchedules(params: {
           debtor_id: params.debtorId,
           amount: c.amount,
           due_day: c.due_day,
-          recurrence_unit: c.recurrence_unit,
+          recurrence_month: c.recurrence_month,
+          recurrence_year: c.recurrence_year,
         })),
       )
-      .select("id, amount, due_day, recurrence_unit");
+      .select("id, amount, due_day, recurrence_month, recurrence_year");
     if (error) return { ok: false as const, error: error.message };
     inserted = (data ?? []) as any[];
   }
@@ -331,7 +360,7 @@ async function syncDebtorChargesAndSchedules(params: {
 
   const { data: finalCharges, error: finalChargesError } = await params.supabase
     .from("debtor_charges")
-    .select("id, amount, due_day, recurrence_unit, created_at")
+    .select("id, amount, due_day, recurrence_month, recurrence_year, created_at")
     .eq("debtor_id", params.debtorId)
     .order("due_day", { ascending: true })
     .order("created_at", { ascending: true })
@@ -341,7 +370,6 @@ async function syncDebtorChargesAndSchedules(params: {
   for (const charge of finalCharges ?? []) {
     const chargeId = String((charge as any).id ?? "");
     const dueDay = Number((charge as any).due_day ?? 1);
-    const recurrenceUnit = String((charge as any).recurrence_unit ?? "monthly") === "yearly" ? "yearly" : "monthly";
     const dueLocalDate = buildLocalDate(currentYearMonth, dueDay);
     if (!dueLocalDate) continue;
 
@@ -379,7 +407,7 @@ async function syncDebtorChargesAndSchedules(params: {
         template_overdue_id: templateIds.overdueId,
         data_envio: scheduleAt,
         charge_due_at: dueAt,
-        recurrence: recurrenceUnit,
+        recurrence: "monthly",
         schedule_timezone: timeZone,
         recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
         recurrence_time: retryTime,
@@ -394,7 +422,7 @@ async function syncDebtorChargesAndSchedules(params: {
         template_id: templateIds.pendingId,
         template_pending_id: templateIds.pendingId,
         template_overdue_id: templateIds.overdueId,
-        recurrence: recurrenceUnit,
+        recurrence: "monthly",
         schedule_timezone: timeZone,
         recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
         recurrence_time: retryTime,

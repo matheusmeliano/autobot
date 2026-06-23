@@ -35,7 +35,8 @@ export type DebtorRow = {
     id: string;
     amount: number;
     due_day: number;
-    recurrence_unit?: "monthly" | "yearly";
+    recurrence_month?: number;
+    recurrence_year?: number;
     created_at?: string | null;
   }>;
   progress_paid?: number;
@@ -58,7 +59,8 @@ type FormValues = {
     charge_id?: string;
     amount: string;
     due_day: string;
-    recurrence_unit: "monthly" | "yearly";
+    recurrence_month: string;
+    recurrence_year: string;
   }>;
   pix_key?: string;
   observacoes?: string;
@@ -73,6 +75,21 @@ type FormValues = {
 };
 
 type ChargeFormValue = FormValues["charges"][number];
+
+const monthOptions = [
+  { value: "1", label: "Janeiro" },
+  { value: "2", label: "Fevereiro" },
+  { value: "3", label: "Marco" },
+  { value: "4", label: "Abril" },
+  { value: "5", label: "Maio" },
+  { value: "6", label: "Junho" },
+  { value: "7", label: "Julho" },
+  { value: "8", label: "Agosto" },
+  { value: "9", label: "Setembro" },
+  { value: "10", label: "Outubro" },
+  { value: "11", label: "Novembro" },
+  { value: "12", label: "Dezembro" },
+];
 
 const weekdayOptions = [
   { value: 1, label: "Seg" },
@@ -126,11 +143,23 @@ function progressText(row: DebtorRow) {
   return `${paid}/${total} Pagas`;
 }
 
-function defaultChargeFormValue(day: string): ChargeFormValue {
+function nextMonthYear(baseDate: Date) {
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth() + 1;
+  const nextMonthIndex = month;
+  return {
+    month: String((nextMonthIndex % 12) + 1),
+    year: String(year + Math.floor(nextMonthIndex / 12)),
+  };
+}
+
+function defaultChargeFormValue(day: string, baseDate: Date): ChargeFormValue {
+  const next = nextMonthYear(baseDate);
   return {
     amount: "",
     due_day: day,
-    recurrence_unit: "monthly",
+    recurrence_month: next.month,
+    recurrence_year: next.year,
   };
 }
 
@@ -323,7 +352,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     defaultValues: {
       nome: "",
       telefone: "",
-      charges: [defaultChargeFormValue(String(currentDate.getDate()))],
+      charges: [defaultChargeFormValue(String(currentDate.getDate()), currentDate)],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -349,7 +378,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     reset({
       nome: "",
       telefone: "",
-      charges: [defaultChargeFormValue(String(currentDate.getDate()))],
+      charges: [defaultChargeFormValue(String(currentDate.getDate()), currentDate)],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -390,9 +419,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                   : "";
               })(),
               due_day: String(c.due_day ?? ""),
-              recurrence_unit: (c.recurrence_unit === "yearly" ? "yearly" : "monthly") as
-                | "monthly"
-                | "yearly",
+              recurrence_month: String(c.recurrence_month ?? nextMonthYear(currentDate).month),
+              recurrence_year: String(c.recurrence_year ?? nextMonthYear(currentDate).year),
             }))
         : [
             {
@@ -404,7 +432,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     })
                   : "",
               due_day: String(dueDayLabel(row.vencimento) ?? ""),
-              recurrence_unit: "monthly" as "monthly" | "yearly",
+              recurrence_month: nextMonthYear(currentDate).month,
+              recurrence_year: nextMonthYear(currentDate).year,
             },
           ];
     reset({
@@ -435,18 +464,31 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       id?: string;
       amount: number | null;
       dueDay: number;
-      recurrenceUnit: "monthly" | "yearly";
+      recurrenceMonth: number;
+      recurrenceYear: number;
     }> = (values.charges ?? [])
       .map((c, index) => ({
         index,
         id: c.charge_id,
         amount: c.amount ? parseBRLToNumber(c.amount) : null,
         dueDay: Number(String(c.due_day ?? "").trim()),
-        recurrenceUnit: (c.recurrence_unit === "yearly" ? "yearly" : "monthly") as
-          | "monthly"
-          | "yearly",
+        recurrenceMonth: Number(String(c.recurrence_month ?? "").trim()),
+        recurrenceYear: Number(String(c.recurrence_year ?? "").trim()),
       }))
-      .filter((c) => typeof c.amount === "number" && c.amount > 0 && Number.isInteger(c.dueDay) && c.dueDay >= 1 && c.dueDay <= 31)
+      .filter(
+        (c) =>
+          typeof c.amount === "number" &&
+          c.amount > 0 &&
+          Number.isInteger(c.dueDay) &&
+          c.dueDay >= 1 &&
+          c.dueDay <= 31 &&
+          Number.isInteger(c.recurrenceMonth) &&
+          c.recurrenceMonth >= 1 &&
+          c.recurrenceMonth <= 12 &&
+          Number.isInteger(c.recurrenceYear) &&
+          c.recurrenceYear >= 2000 &&
+          c.recurrenceYear <= 9999,
+      )
       .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
       .sort((a, b) => (a.dueDay !== b.dueDay ? a.dueDay - b.dueDay : a.index - b.index));
 
@@ -463,7 +505,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         ...(c.id ? { id: c.id } : {}),
         amount: c.amount as number,
         due_day: c.dueDay,
-        recurrence_unit: c.recurrenceUnit,
+        recurrence_month: c.recurrenceMonth,
+        recurrence_year: c.recurrenceYear,
       })),
       pix_key: pixKey ? pixKey : undefined,
       observacoes: values.observacoes || undefined,
@@ -810,7 +853,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             modalToast.error(`Limite: no máximo ${MAX_RETRY_ATTEMPTS_PER_DAY} cobranças por cliente.`);
                             return;
                           }
-                          appendCharge(defaultChargeFormValue(String(currentDate.getDate())));
+                          appendCharge(defaultChargeFormValue(String(currentDate.getDate()), currentDate));
                         }}
                         className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06]"
                       >
@@ -865,16 +908,31 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                                 {...register(`charges.${index}.due_day` as const)}
                               />
                             </div>
-                            <div>
-                              <div className="text-xs font-semibold text-white/60">Próxima recorrência</div>
-                              <select
-                                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                                {...register(`charges.${index}.recurrence_unit` as const)}
-                              >
-                                <option value="monthly">Próximo mês</option>
-                                <option value="yearly">Próximo ano</option>
-                              </select>
-                            </div>
+                          </div>
+
+                          <div className="mt-3">
+                            <div className="text-xs font-semibold text-white/60">Mês</div>
+                            <select
+                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                              {...register(`charges.${index}.recurrence_month` as const)}
+                            >
+                              {monthOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="mt-3">
+                            <div className="text-xs font-semibold text-white/60">Ano</div>
+                            <input
+                              type="number"
+                              min={2000}
+                              max={9999}
+                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                              {...register(`charges.${index}.recurrence_year` as const)}
+                            />
                           </div>
 
                           {chargeFields.length > 1 ? (
@@ -891,7 +949,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
 
                     <div className="mt-2 text-[11px] text-white/45">
-                      Ordena automaticamente por vencimento e permite definir por cobrança se a próxima recorrência vai para o próximo mês ou próximo ano.
+                      Ordena automaticamente por vencimento e permite definir por cobrança o mês e o ano da próxima recorrência.
                     </div>
                   </div>
 

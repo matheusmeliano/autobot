@@ -140,7 +140,39 @@ export function nextRecurringIsoAfterSettlement(params: {
   day: number;
   time: string;
   recurrence: string;
+  targetMonth?: number | null;
+  targetYear?: number | null;
 }) {
+  const targetMonth = Number(params.targetMonth);
+  const targetYear = Number(params.targetYear);
+  if (
+    Number.isInteger(targetMonth) &&
+    targetMonth >= 1 &&
+    targetMonth <= 12 &&
+    Number.isInteger(targetYear) &&
+    targetYear >= 2000 &&
+    targetYear <= 9999
+  ) {
+    const dueLocalDate = resolveScheduleLocalDate(params);
+    if (dueLocalDate) {
+      const parts = parseLocalDate(dueLocalDate);
+      if (parts) {
+        const targetKey = targetYear * 100 + targetMonth;
+        const currentKey = parts.year * 100 + parts.month;
+        if (targetKey > currentKey) {
+          const maxDay = lastDayOfMonth(targetYear, targetMonth);
+          const safeDay = Math.max(1, Math.min(Number(params.day) || 1, maxDay));
+          const date = `${String(targetYear).padStart(4, "0")}-${String(targetMonth).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+          return zonedDateTimeToUtcIso({
+            date,
+            time: params.time,
+            timeZone: params.timeZone,
+          });
+        }
+      }
+    }
+  }
+
   const recurrence = String(params.recurrence ?? "none").trim().toLowerCase();
   if (recurrence === "yearly") {
     const dueLocalDate = resolveScheduleLocalDate(params);
