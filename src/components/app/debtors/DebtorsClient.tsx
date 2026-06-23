@@ -628,7 +628,19 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     key={r.id}
                     className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-85)]"
                   >
-                    <div className="col-span-3 truncate font-semibold" title={r.nome}>{r.nome}</div>
+                    <div className="col-span-3 min-w-0">
+                      <div className="truncate font-semibold" title={r.nome}>
+                        {r.nome}
+                      </div>
+                      {r.observacoes ? (
+                        <div
+                          className="truncate text-[11px] text-[var(--app-text-55)]"
+                          title={r.observacoes}
+                        >
+                          {r.observacoes}
+                        </div>
+                      ) : null}
+                    </div>
                     <div className="col-span-2 truncate text-center text-[var(--app-text-70)]">
                       {r.telefone ?? "-"}
                     </div>
