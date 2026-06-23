@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
 import { localDateInTimeZone } from "@/lib/recurrence";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -161,6 +162,7 @@ export function SchedulesClient({
   timeZone: BrazilTimeZone | null;
   whatsappConfigured: boolean;
 }) {
+  const { theme } = useAppTheme();
   const pageSize = 5;
   const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState<ScheduleRow[]>(initial);
@@ -263,13 +265,13 @@ export function SchedulesClient({
 
   const statusClass = (raw: unknown) => {
     const s = String(raw ?? "").toLowerCase();
-    if (s === "agendado") return "bg-yellow-500 text-[rgb(255,255,255)]";
+    if (s === "agendado") return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
     if (s === "pendente" || s === "suspeita_de_pagamento") {
       return "bg-orange-500 text-[rgb(255,255,255)]";
     }
     if (s === "pago" || s === "executado") return "bg-emerald-600 text-[rgb(255,255,255)]";
     if (s === "atrasado") return "bg-rose-600 text-[rgb(255,255,255)]";
-    return "bg-yellow-500 text-[rgb(255,255,255)]";
+    return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
   };
 
   const displayStatus = (row: ScheduleRow) => {

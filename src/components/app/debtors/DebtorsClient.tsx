@@ -181,13 +181,13 @@ function debtorStatusLabel(status: string | null | undefined) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "-";
 }
 
-function debtorStatusClass(status: string | null | undefined) {
+function debtorStatusClass(status: string | null | undefined, theme: "light" | "dark") {
   const s = String(status ?? "").trim().toLowerCase();
   if (s === "ativo" || s === "pago") {
     return "bg-emerald-600 text-[rgb(255,255,255)]";
   }
   if (s === "agendado") {
-    return "bg-yellow-500 text-[rgb(255,255,255)]";
+    return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
   }
   if (s === "pendente" || s === "suspeita_de_pagamento") {
     return "bg-orange-500 text-[rgb(255,255,255)]";
@@ -195,7 +195,7 @@ function debtorStatusClass(status: string | null | undefined) {
   if (s === "atrasado") {
     return "bg-rose-600 text-[rgb(255,255,255)]";
   }
-  return "bg-yellow-500 text-[rgb(255,255,255)]";
+  return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
 }
 
 function digitsOnly(v: string) {
@@ -694,7 +694,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       <span
                         className={[
                           "inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
-                          debtorStatusClass(r.status),
+                          debtorStatusClass(r.status, theme),
                         ].join(" ")}
                       >
                         {debtorStatusLabel(r.status)}
@@ -801,7 +801,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       <span
                         className={[
                           "inline-flex rounded-full px-2 py-1 text-[11px] font-semibold",
-                          debtorStatusClass(r.status),
+                          debtorStatusClass(r.status, theme),
                         ].join(" ")}
                       >
                         {debtorStatusLabel(r.status)}
