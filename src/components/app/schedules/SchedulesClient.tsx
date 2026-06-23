@@ -282,6 +282,7 @@ export function SchedulesClient({
   }, [filtered, safePage]);
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
