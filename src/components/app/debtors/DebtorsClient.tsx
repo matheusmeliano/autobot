@@ -153,13 +153,20 @@ function nextMonthYear(baseDate: Date) {
   };
 }
 
+function currentMonthYear(baseDate: Date) {
+  return {
+    month: String(baseDate.getMonth() + 1),
+    year: String(baseDate.getFullYear()),
+  };
+}
+
 function defaultChargeFormValue(day: string, baseDate: Date): ChargeFormValue {
-  const next = nextMonthYear(baseDate);
+  const current = currentMonthYear(baseDate);
   return {
     amount: "",
     due_day: day,
-    recurrence_month: next.month,
-    recurrence_year: next.year,
+    recurrence_month: current.month,
+    recurrence_year: current.year,
   };
 }
 
@@ -347,6 +354,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     handleSubmit,
     reset,
     control,
+    setValue,
+    watch,
     formState: { isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
@@ -370,6 +379,33 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     control,
     name: "charges",
   });
+  const watchedCharges = watch("charges");
+  const currentRecurrence = useMemo(
+    () => ({
+      month: currentDate.getMonth() + 1,
+      year: currentDate.getFullYear(),
+    }),
+    [currentDate],
+  );
+
+  useEffect(() => {
+    (watchedCharges ?? []).forEach((charge, index) => {
+      const year = Number(String(charge?.recurrence_year ?? "").trim());
+      const month = Number(String(charge?.recurrence_month ?? "").trim());
+      if (Number.isInteger(year) && year < currentRecurrence.year) {
+        setValue(`charges.${index}.recurrence_year`, String(currentRecurrence.year));
+        return;
+      }
+      if (
+        Number.isInteger(year) &&
+        year === currentRecurrence.year &&
+        Number.isInteger(month) &&
+        month < currentRecurrence.month
+      ) {
+        setValue(`charges.${index}.recurrence_month`, String(currentRecurrence.month));
+      }
+    });
+  }, [currentRecurrence.month, currentRecurrence.year, setValue, watchedCharges]);
 
   const close = () => {
     setOpen(false);
@@ -419,8 +455,25 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                   : "";
               })(),
               due_day: String(c.due_day ?? ""),
-              recurrence_month: String(c.recurrence_month ?? nextMonthYear(currentDate).month),
-              recurrence_year: String(c.recurrence_year ?? nextMonthYear(currentDate).year),
+              recurrence_month: (() => {
+                const month = Number(c.recurrence_month ?? currentMonthYear(currentDate).month);
+                const year = Number(c.recurrence_year ?? currentMonthYear(currentDate).year);
+                if (
+                  Number.isInteger(year) &&
+                  Number.isInteger(month) &&
+                  year === currentRecurrence.year &&
+                  month < currentRecurrence.month
+                ) {
+                  return String(currentRecurrence.month);
+                }
+                return String(month);
+              })(),
+              recurrence_year: String(
+                Math.max(
+                  currentRecurrence.year,
+                  Number(c.recurrence_year ?? currentMonthYear(currentDate).year) || currentRecurrence.year,
+                ),
+              ),
             }))
         : [
             {
@@ -432,8 +485,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     })
                   : "",
               due_day: String(dueDayLabel(row.vencimento) ?? ""),
-              recurrence_month: nextMonthYear(currentDate).month,
-              recurrence_year: nextMonthYear(currentDate).year,
+              recurrence_month: currentMonthYear(currentDate).month,
+              recurrence_year: currentMonthYear(currentDate).year,
             },
           ];
     reset({
@@ -459,6 +512,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
 
   const onSubmit = handleSubmit(async (values) => {
     const pixKey = values.pix_key ? normalizePixKeyForSave(values.pix_key) : null;
+    const currentRecurrenceKey = currentRecurrence.year * 100 + currentRecurrence.month;
     const mappedCharges: Array<{
       index: number;
       id?: string;
@@ -477,6 +531,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       }))
       .filter(
         (c) =>
+          !(Number.isInteger(c.recurrenceMonth) && Number.isInteger(c.recurrenceYear)) ||
+          c.recurrenceYear * 100 + c.recurrenceMonth >= currentRecurrenceKey,
+      )
+      .filter(
+        (c) =>
           typeof c.amount === "number" &&
           c.amount > 0 &&
           Number.isInteger(c.dueDay) &&
@@ -492,6 +551,16 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
       .sort((a, b) => (a.dueDay !== b.dueDay ? a.dueDay - b.dueDay : a.index - b.index));
 
+    if (
+      (values.charges ?? []).some((c) => {
+        const month = Number(String(c.recurrence_month ?? "").trim());
+        const year = Number(String(c.recurrence_year ?? "").trim());
+        return Number.isInteger(month) && Number.isInteger(year) && year * 100 + month < currentRecurrenceKey;
+      })
+    ) {
+      modalToast.error("Mês e ano da recorrência devem ser do mês atual em diante.");
+      return;
+    }
     if (!mappedCharges.length) {
       modalToast.error("Informe pelo menos 1 cobrança (valor e dia de vencimento).");
       return;
@@ -867,6 +936,14 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           key={field.id}
                           className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
                         >
+                          {(() => {
+                            const selectedYear = Number(watchedCharges?.[index]?.recurrence_year ?? currentRecurrence.year);
+                            const availableMonthOptions =
+                              selectedYear === currentRecurrence.year
+                                ? monthOptions.filter((option) => Number(option.value) >= currentRecurrence.month)
+                                : monthOptions;
+                            return (
+                              <>
                           <input type="hidden" {...register(`charges.${index}.charge_id`)} />
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="w-full">
@@ -916,7 +993,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                               className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                               {...register(`charges.${index}.recurrence_month` as const)}
                             >
-                              {monthOptions.map((option) => (
+                              {availableMonthOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
                                   {option.label}
                                 </option>
@@ -928,7 +1005,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             <div className="text-xs font-semibold text-white/60">Ano</div>
                             <input
                               type="number"
-                              min={2000}
+                              min={currentRecurrence.year}
                               max={9999}
                               className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
                               {...register(`charges.${index}.recurrence_year` as const)}
@@ -944,6 +1021,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                               Remover cobrança
                             </button>
                           ) : null}
+                              </>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>

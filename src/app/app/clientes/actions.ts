@@ -49,14 +49,32 @@ const createSchema = z
   })
   .superRefine((data, ctx) => {
     const hasCharges = Array.isArray(data.charges) && data.charges.length > 0;
-    if (hasCharges) return;
-    const hasLegacy = typeof data.valor === "number" && /^\d{4}-\d{2}-\d{2}$/.test(String(data.vencimento ?? ""));
-    if (hasLegacy) return;
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Informe pelo menos 1 cobrança (valor e dia de vencimento).",
-      path: ["charges"],
-    });
+    if (!hasCharges) {
+      const hasLegacy = typeof data.valor === "number" && /^\d{4}-\d{2}-\d{2}$/.test(String(data.vencimento ?? ""));
+      if (!hasLegacy) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Informe pelo menos 1 cobrança (valor e dia de vencimento).",
+          path: ["charges"],
+        });
+      }
+      return;
+    }
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    for (const [index, charge] of (data.charges ?? []).entries()) {
+      const targetKey = charge.recurrence_year * 100 + charge.recurrence_month;
+      const currentKey = currentYear * 100 + currentMonth;
+      if (targetKey < currentKey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Mês e ano da recorrência devem ser do mês atual em diante.",
+          path: ["charges", index, "recurrence_month"],
+        });
+      }
+    }
   });
 
 const updateSchema = createSchema.extend({
