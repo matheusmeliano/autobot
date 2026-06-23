@@ -549,10 +549,68 @@ export async function createDebtorAction(input: unknown) {
 export async function updateDebtorAction(input: unknown) {
   const parsed = updateSchema.safeParse(input);
   if (!parsed.success) {
+    // #region debug-point E:update-parse-failed
+    void (async () => {
+      let url = "http://127.0.0.1:7777/event";
+      let sessionId = "clientes-popup-save";
+      try {
+        const fs = await import("node:fs/promises");
+        const env = await fs.readFile(".dbg/clientes-popup-save.env", "utf8");
+        url = env.match(/DEBUG_SERVER_URL=(.+)/)?.[1] ?? url;
+        sessionId = env.match(/DEBUG_SESSION_ID=(.+)/)?.[1] ?? sessionId;
+      } catch {}
+      await fetch(url, {
+        method: "POST",
+        body: JSON.stringify({
+          sessionId,
+          runId: "pre-fix",
+          hypothesisId: "E",
+          location: "clientes/actions.ts:updateDebtorAction:parse-failed",
+          msg: "[DEBUG] updateDebtorAction rejeitou payload no parse",
+          data: {
+            issues: parsed.error.issues.map((issue) => ({
+              path: issue.path,
+              message: issue.message,
+              code: issue.code,
+            })),
+          },
+          ts: Date.now(),
+        }),
+      }).catch(() => {});
+    })();
+    // #endregion
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
   const charges = normalizeDebtorCharges(parsed.data);
+  // #region debug-point A:update-start
+  void (async () => {
+    let url = "http://127.0.0.1:7777/event";
+    let sessionId = "clientes-popup-save";
+    try {
+      const fs = await import("node:fs/promises");
+      const env = await fs.readFile(".dbg/clientes-popup-save.env", "utf8");
+      url = env.match(/DEBUG_SERVER_URL=(.+)/)?.[1] ?? url;
+      sessionId = env.match(/DEBUG_SESSION_ID=(.+)/)?.[1] ?? sessionId;
+    } catch {}
+    await fetch(url, {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId,
+        runId: "pre-fix",
+        hypothesisId: "A",
+        location: "clientes/actions.ts:updateDebtorAction:start",
+        msg: "[DEBUG] updateDebtorAction iniciou",
+        data: {
+          debtorId: parsed.data.id,
+          inputChargesCount: Array.isArray(parsed.data.charges) ? parsed.data.charges.length : 0,
+          normalizedChargesCount: charges.length,
+        },
+        ts: Date.now(),
+      }),
+    }).catch(() => {});
+  })();
+  // #endregion
   if (!charges.length) {
     return { ok: false, error: "Informe pelo menos 1 cobrança (valor e dia de vencimento)." };
   }
@@ -589,8 +647,35 @@ export async function updateDebtorAction(input: unknown) {
       retry_auto_close_days: data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     })
     .eq("id", id);
+  // #region debug-point D:update-debtor-row
+  void (async () => {
+    let url = "http://127.0.0.1:7777/event";
+    let sessionId = "clientes-popup-save";
+    try {
+      const fs = await import("node:fs/promises");
+      const env = await fs.readFile(".dbg/clientes-popup-save.env", "utf8");
+      url = env.match(/DEBUG_SERVER_URL=(.+)/)?.[1] ?? url;
+      sessionId = env.match(/DEBUG_SESSION_ID=(.+)/)?.[1] ?? sessionId;
+    } catch {}
+    await fetch(url, {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId,
+        runId: "pre-fix",
+        hypothesisId: "D",
+        location: "clientes/actions.ts:updateDebtorAction:debtors-update",
+        msg: "[DEBUG] update na tabela debtors concluido",
+        data: {
+          debtorId: id,
+          ok: !error,
+          error: error?.message ?? null,
+        },
+        ts: Date.now(),
+      }),
+    }).catch(() => {});
+  })();
+  // #endregion
 
-  if (error) return { ok: false, error: error.message };
 
   const autoScheduleResult = await syncDebtorChargesAndSchedules({
     supabase,
@@ -603,6 +688,35 @@ export async function updateDebtorAction(input: unknown) {
       ? ((profile as any).timezone as (typeof BRAZIL_TIMEZONES)[number])
       : null,
   });
+  // #region debug-point D:update-sync-result
+  void (async () => {
+    let url = "http://127.0.0.1:7777/event";
+    let sessionId = "clientes-popup-save";
+    try {
+      const fs = await import("node:fs/promises");
+      const env = await fs.readFile(".dbg/clientes-popup-save.env", "utf8");
+      url = env.match(/DEBUG_SERVER_URL=(.+)/)?.[1] ?? url;
+      sessionId = env.match(/DEBUG_SESSION_ID=(.+)/)?.[1] ?? sessionId;
+    } catch {}
+    await fetch(url, {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId,
+        runId: "pre-fix",
+        hypothesisId: "D",
+        location: "clientes/actions.ts:updateDebtorAction:sync-result",
+        msg: "[DEBUG] sincronizacao de charges e schedules concluida",
+        data: {
+          debtorId: id,
+          ok: autoScheduleResult.ok,
+          error: "error" in autoScheduleResult ? (autoScheduleResult.error ?? null) : null,
+          warning: "warning" in autoScheduleResult ? (autoScheduleResult.warning ?? null) : null,
+        },
+        ts: Date.now(),
+      }),
+    }).catch(() => {});
+  })();
+  // #endregion
 
   if (!autoScheduleResult.ok) {
     return { ok: false, error: autoScheduleResult.error ?? "Falha ao iniciar a cobrança." };
