@@ -986,7 +986,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
 
                     <div className="mt-3">
-                      <div className="md:max-w-[calc(50%-0.375rem)]">
+                      <div className="w-full">
                         <div className="text-xs font-semibold text-white/60">Encerrar automaticamente após (dias)</div>
                         <input
                           type="number"
