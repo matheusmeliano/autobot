@@ -985,17 +985,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       </div>
                     </div>
 
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      <div>
-                        <div className="text-xs font-semibold text-white/60">Intervalo entre tentativas (dias)</div>
-                        <input
-                          type="number"
-                          min={1}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                          {...register("retry_interval_days", { valueAsNumber: true })}
-                        />
-                      </div>
-                      <div>
+                    <div className="mt-3">
+                      <div className="md:max-w-[calc(50%-0.375rem)]">
                         <div className="text-xs font-semibold text-white/60">Encerrar automaticamente após (dias)</div>
                         <input
                           type="number"
