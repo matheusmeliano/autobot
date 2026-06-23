@@ -186,7 +186,14 @@ function buildLocalDate(yearMonth: string, day: number) {
 }
 
 function normalizeDebtorCharges(input: {
-  charges?: DebtorChargeInput[] | null;
+  charges?:
+    | Array<{
+        id?: string;
+        amount: number;
+        due_day: number;
+        recurrence_unit?: "monthly" | "yearly";
+      }>
+    | null;
   valor?: number;
   vencimento?: string;
 }): DebtorChargeInput[] {
