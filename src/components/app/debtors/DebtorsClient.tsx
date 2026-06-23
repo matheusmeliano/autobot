@@ -184,18 +184,18 @@ function debtorStatusLabel(status: string | null | undefined) {
 function debtorStatusClass(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
   if (s === "ativo" || s === "pago") {
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
+    return "bg-emerald-700 text-white";
   }
   if (s === "agendado") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600";
+    return "bg-slate-600 text-white";
   }
   if (s === "pendente" || s === "suspeita_de_pagamento") {
-    return "border-yellow-500/40 bg-yellow-500/10 text-yellow-600";
+    return "bg-amber-600 text-white";
   }
   if (s === "atrasado") {
-    return "border-rose-500/30 bg-rose-500/10 text-rose-600";
+    return "bg-rose-700 text-white";
   }
-  return "border-white/10 bg-white/[0.04] text-white/70";
+  return "bg-slate-600 text-white";
 }
 
 function digitsOnly(v: string) {
@@ -693,7 +693,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       </div>
                       <span
                         className={[
-                          "inline-flex shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold",
+                          "inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
                           debtorStatusClass(r.status),
                         ].join(" ")}
                       >
@@ -800,7 +800,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     <div className="col-span-1 flex justify-center">
                       <span
                         className={[
-                          "inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold",
+                          "inline-flex rounded-full px-2 py-1 text-[11px] font-semibold",
                           debtorStatusClass(r.status),
                         ].join(" ")}
                       >
