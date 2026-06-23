@@ -332,6 +332,14 @@ export function SchedulesClient({
 
   const displayStatus = (row: ScheduleRow) => {
     const raw = String(row.status ?? "").toLowerCase();
+    if (
+      raw === "atrasado" ||
+      raw === "pendente" ||
+      raw === "suspeita_de_pagamento" ||
+      raw === "executando"
+    ) {
+      return { label: statusLabel(raw), className: statusClass(raw) };
+    }
     if (raw === "executado" || raw === "pago") {
       return { label: "Executado", className: statusClass("executado") };
     }
