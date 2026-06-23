@@ -467,6 +467,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     }
 
     modalToast.success(editing ? "Cliente atualizado." : "Cliente criado.");
+    if ("warning" in res && res.warning) {
+      modalToast.error(res.warning);
+    }
 
     startTransition(async () => {
       const r = await fetch("/app/clientes/data", { cache: "no-store" });
