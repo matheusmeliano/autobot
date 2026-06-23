@@ -187,7 +187,7 @@ function debtorStatusClass(status: string | null | undefined) {
     return "bg-emerald-700 text-[rgb(255,255,255)]";
   }
   if (s === "agendado") {
-    return "bg-yellow-600 text-[rgb(255,255,255)]";
+    return "bg-yellow-500 text-[rgb(255,255,255)]";
   }
   if (s === "pendente" || s === "suspeita_de_pagamento") {
     return "bg-orange-600 text-[rgb(255,255,255)]";
@@ -195,7 +195,7 @@ function debtorStatusClass(status: string | null | undefined) {
   if (s === "atrasado") {
     return "bg-rose-700 text-[rgb(255,255,255)]";
   }
-  return "bg-yellow-600 text-[rgb(255,255,255)]";
+  return "bg-yellow-500 text-[rgb(255,255,255)]";
 }
 
 function digitsOnly(v: string) {
