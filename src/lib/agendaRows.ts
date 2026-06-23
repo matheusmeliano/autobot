@@ -174,39 +174,6 @@ export function buildAgendaRows(params: {
       });
     }
 
-    for (const schedule of availableSchedules) {
-      const scheduleId = String(schedule.id ?? "");
-      if (!scheduleId || usedScheduleIds.has(scheduleId)) continue;
-      const dataEnvio = String(schedule.data_envio ?? "");
-      if (!dataEnvio) continue;
-      rows.push({
-        id: scheduleId,
-        debtor_id: debtorId,
-        charge_id: schedule.charge_id ? String(schedule.charge_id) : null,
-        source_kind: "schedule",
-        schedule_missing: false,
-        template_id: schedule.template_id ? String(schedule.template_id) : null,
-        template_pending_id: schedule.template_pending_id ? String(schedule.template_pending_id) : null,
-        template_overdue_id: schedule.template_overdue_id ? String(schedule.template_overdue_id) : null,
-        data_envio: dataEnvio,
-        charge_due_at: schedule.charge_due_at ? String(schedule.charge_due_at) : null,
-        next_charge_due_at: null,
-        status: String(schedule.status ?? "agendado"),
-        recurrence: schedule.recurrence ? String(schedule.recurrence) : "none",
-        recurrence_until: schedule.recurrence_until ? String(schedule.recurrence_until) : null,
-        recurrence_day: Number.isFinite(Number(schedule.recurrence_day)) ? Number(schedule.recurrence_day) : null,
-        recurrence_time: schedule.recurrence_time ? String(schedule.recurrence_time) : retryTime,
-        schedule_timezone: schedule.schedule_timezone ? String(schedule.schedule_timezone) : timeZone,
-        last_sent_at: schedule.last_sent_at ? String(schedule.last_sent_at) : null,
-        payment_received_at: schedule.payment_received_at ? String(schedule.payment_received_at) : null,
-        last_executed_scheduled_for: params.latestExecutedRunBySchedule.get(scheduleId) ?? null,
-        created_at: String(schedule.created_at ?? dataEnvio),
-        debtor_nome: String(debtor.nome ?? "-"),
-        template_nome: schedule.pending_template?.nome ? String(schedule.pending_template.nome) : null,
-        template_pending_nome: schedule.pending_template?.nome ? String(schedule.pending_template.nome) : null,
-        template_overdue_nome: schedule.overdue_template?.nome ? String(schedule.overdue_template.nome) : null,
-      });
-    }
   }
 
   return rows.sort((a, b) => {

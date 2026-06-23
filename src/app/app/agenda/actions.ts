@@ -305,6 +305,18 @@ async function updateDebtorRetrySettings(
   return error;
 }
 
+async function debtorHasRegisteredCharges(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  debtorId: string,
+) {
+  const { count, error } = await supabase
+    .from("debtor_charges")
+    .select("id", { count: "exact", head: true })
+    .eq("debtor_id", debtorId);
+  if (error) return { ok: false as const, error: error.message, hasCharges: false };
+  return { ok: true as const, hasCharges: (count ?? 0) > 0 };
+}
+
 export async function createScheduleAction(input: unknown) {
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Dados inválidos." };
@@ -331,6 +343,15 @@ export async function createScheduleAction(input: unknown) {
     context: "criar agendamentos",
   });
   if (msg) return { ok: false, error: msg };
+  const chargeCheck = await debtorHasRegisteredCharges(supabase, parsed.data.debtor_id);
+  if (!chargeCheck.ok) return { ok: false, error: chargeCheck.error };
+  if (chargeCheck.hasCharges) {
+    return {
+      ok: false,
+      error:
+        "Esse cliente já possui cobranças cadastradas em Clientes. Os agendamentos dele são gerados automaticamente por cobrança.",
+    };
+  }
 
   const futureValidation = validateFutureScheduleDateTime({
     date: parsed.data.data_envio_date,
@@ -418,6 +439,21 @@ export async function updateScheduleAction(input: unknown) {
     context: "editar agendamentos",
   });
   if (msg) return { ok: false, error: msg };
+  const chargeCheck = await debtorHasRegisteredCharges(supabase, data.debtor_id);
+  if (!chargeCheck.ok) return { ok: false, error: chargeCheck.error };
+  const { data: previous } = await supabase
+    .from("schedules")
+    .select("debtor_id, charge_id")
+    .eq("id", id)
+    .maybeSingle();
+  const previousChargeId = String((previous as any)?.charge_id ?? "");
+  if (chargeCheck.hasCharges && !previousChargeId) {
+    return {
+      ok: false,
+      error:
+        "Esse cliente já possui cobranças cadastradas em Clientes. Edite as cobranças no cadastro do cliente para atualizar os agendamentos automáticos.",
+    };
+  }
 
   const futureValidation = validateFutureScheduleDateTime({
     date: data.data_envio_date,
@@ -458,12 +494,6 @@ export async function updateScheduleAction(input: unknown) {
 
   const retryUpdateError = await updateDebtorRetrySettings(supabase, data.debtor_id, data);
   if (retryUpdateError) return { ok: false, error: retryUpdateError.message };
-
-  const { data: previous } = await supabase
-    .from("schedules")
-    .select("debtor_id")
-    .eq("id", id)
-    .maybeSingle();
 
   const { error } = await supabase
     .from("schedules")
