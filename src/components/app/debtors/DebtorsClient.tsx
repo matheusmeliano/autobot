@@ -125,13 +125,38 @@ function chargesTotal(row: DebtorRow) {
   return row.valor;
 }
 
+function compareChargeOrder(
+  a: {
+    due_day?: number | string | null;
+    recurrence_month?: number | string | null;
+    recurrence_year?: number | string | null;
+  },
+  b: {
+    due_day?: number | string | null;
+    recurrence_month?: number | string | null;
+    recurrence_year?: number | string | null;
+  },
+) {
+  const yearA = Number(a.recurrence_year ?? 0);
+  const yearB = Number(b.recurrence_year ?? 0);
+  if (yearA !== yearB) return yearA - yearB;
+
+  const monthA = Number(a.recurrence_month ?? 0);
+  const monthB = Number(b.recurrence_month ?? 0);
+  if (monthA !== monthB) return monthA - monthB;
+
+  return Number(a.due_day ?? 0) - Number(b.due_day ?? 0);
+}
+
 function chargesFirstDueDay(row: DebtorRow) {
   if (row.charges && row.charges.length) {
-    const min = row.charges
-      .map((c) => Number(c.due_day))
-      .filter((n) => Number.isInteger(n) && n >= 1 && n <= 31)
-      .sort((a, b) => a - b)[0];
-    return typeof min === "number" ? String(min) : dueDayLabel(row.vencimento);
+    const firstCharge = [...row.charges]
+      .sort(compareChargeOrder)
+      .find((c) => {
+        const dueDay = Number(c.due_day);
+        return Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31;
+      });
+    return firstCharge ? String(Number(firstCharge.due_day)) : dueDayLabel(row.vencimento);
   }
   return dueDayLabel(row.vencimento);
 }
@@ -444,7 +469,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     const charges: ChargeFormValue[] =
       row.charges && row.charges.length
         ? [...row.charges]
-            .sort((a, b) => (a.due_day ?? 0) - (b.due_day ?? 0))
+            .sort(compareChargeOrder)
             .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
             .map((c) => ({
               charge_id: c.id,
@@ -505,7 +530,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         MAX_RETRY_ATTEMPTS_PER_DAY,
         row.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
       ),
-      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_interval_days: row.retry_interval_days ?? DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: row.retry_auto_close_days ?? DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     });
   };
@@ -568,7 +593,21 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
           c.recurrenceYear <= 9999,
       )
       .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
-      .sort((a, b) => (a.dueDay !== b.dueDay ? a.dueDay - b.dueDay : a.index - b.index));
+      .sort((a, b) => {
+        const order = compareChargeOrder(
+          {
+            due_day: a.dueDay,
+            recurrence_month: a.recurrenceMonth,
+            recurrence_year: a.recurrenceYear,
+          },
+          {
+            due_day: b.dueDay,
+            recurrence_month: b.recurrenceMonth,
+            recurrence_year: b.recurrenceYear,
+          },
+        );
+        return order !== 0 ? order : a.index - b.index;
+      });
 
     if (
       (values.charges ?? []).some((c) => {
@@ -647,7 +686,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         MAX_RETRY_ATTEMPTS_PER_DAY,
         Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
       ),
-      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_interval_days: Number(values.retry_interval_days) || DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: Number(values.retry_auto_close_days) || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     };
 
@@ -1268,6 +1307,16 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                         <div className="mt-2 text-[11px] text-white/45">
                           Distribui automaticamente as demais cobranças ao longo do mesmo dia.
                         </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white/60">Intervalo entre tentativas (dias)</div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={365}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                          {...register("retry_interval_days", { valueAsNumber: true })}
+                        />
                       </div>
                     </div>
 

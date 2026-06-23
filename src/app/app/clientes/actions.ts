@@ -95,6 +95,15 @@ type DebtorChargeInput = {
   recurrence_year: number;
 };
 
+function compareDebtorChargeOrder(
+  a: Pick<DebtorChargeInput, "due_day" | "recurrence_month" | "recurrence_year">,
+  b: Pick<DebtorChargeInput, "due_day" | "recurrence_month" | "recurrence_year">,
+) {
+  if (a.recurrence_year !== b.recurrence_year) return a.recurrence_year - b.recurrence_year;
+  if (a.recurrence_month !== b.recurrence_month) return a.recurrence_month - b.recurrence_month;
+  return a.due_day - b.due_day;
+}
+
 function validTime(value: string) {
   return /^\d{2}:\d{2}$/.test(value);
 }
@@ -159,9 +168,14 @@ function nextInitialOverdueAttemptUtcIso(params: {
   timeZone: string;
   retryWeekdays?: number[];
   retryTime?: string;
+  retryIntervalDays?: number;
 }) {
   const retryWeekdays = normalizeRetryWeekdays(params.retryWeekdays);
   const retryTime = validTime(String(params.retryTime ?? "")) ? String(params.retryTime) : DEFAULT_RETRY_TIME;
+  const retryIntervalDays = Math.min(
+    365,
+    Math.max(1, Number(params.retryIntervalDays) || DEFAULT_RETRY_INTERVAL_DAYS),
+  );
   const parts = localDateTimeParts(params.nowUtcIso, params.timeZone);
   const currentLocalDate = `${parts.year}-${parts.month}-${parts.day}`;
   const currentLocalTime = `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
@@ -180,7 +194,7 @@ function nextInitialOverdueAttemptUtcIso(params: {
     timeZone: params.timeZone,
     weekdays: retryWeekdays,
     time: retryTime,
-    intervalDays: DEFAULT_RETRY_INTERVAL_DAYS,
+    intervalDays: retryIntervalDays,
   });
 }
 
@@ -253,7 +267,7 @@ function normalizeDebtorCharges(input: {
           c.recurrence_year <= 9999,
       )
       .slice(0, 5)
-      .sort((a, b) => a.due_day - b.due_day);
+      .sort(compareDebtorChargeOrder);
     if (normalized.length) return normalized;
   }
 
@@ -280,6 +294,7 @@ async function syncDebtorChargesAndSchedules(params: {
   charges: DebtorChargeInput[];
   retryWeekdays?: number[];
   retryTime?: string;
+  retryIntervalDays?: number;
   nowUtcIso?: string;
   timeZone?: string | null;
 }) {
@@ -289,7 +304,6 @@ async function syncDebtorChargesAndSchedules(params: {
       ? params.timeZone
       : "America/Sao_Paulo";
   const currentLocalDate = localDateInTimeZone(nowUtcIso, timeZone);
-  const currentYearMonth = currentLocalDate.slice(0, 7);
   const retryTime = validTime(String(params.retryTime ?? "")) ? String(params.retryTime) : DEFAULT_RETRY_TIME;
 
   const { data: templates, error: templatesError } = await params.supabase
@@ -380,6 +394,8 @@ async function syncDebtorChargesAndSchedules(params: {
     .from("debtor_charges")
     .select("id, amount, due_day, recurrence_month, recurrence_year, created_at")
     .eq("debtor_id", params.debtorId)
+    .order("recurrence_year", { ascending: true })
+    .order("recurrence_month", { ascending: true })
     .order("due_day", { ascending: true })
     .order("created_at", { ascending: true })
     .limit(10);
@@ -388,7 +404,17 @@ async function syncDebtorChargesAndSchedules(params: {
   for (const charge of finalCharges ?? []) {
     const chargeId = String((charge as any).id ?? "");
     const dueDay = Number((charge as any).due_day ?? 1);
-    const dueLocalDate = buildLocalDate(currentYearMonth, dueDay);
+    const targetYear = Number((charge as any).recurrence_year ?? 0);
+    const targetMonth = Number((charge as any).recurrence_month ?? 0);
+    const targetYearMonth =
+      Number.isInteger(targetYear) &&
+      targetYear >= 2000 &&
+      Number.isInteger(targetMonth) &&
+      targetMonth >= 1 &&
+      targetMonth <= 12
+        ? `${String(targetYear).padStart(4, "0")}-${String(targetMonth).padStart(2, "0")}`
+        : currentLocalDate.slice(0, 7);
+    const dueLocalDate = buildLocalDate(targetYearMonth, dueDay);
     if (!dueLocalDate) continue;
 
     const dueAt = zonedDateTimeToUtcIso({ date: dueLocalDate, time: retryTime, timeZone });
@@ -402,6 +428,7 @@ async function syncDebtorChargesAndSchedules(params: {
             timeZone,
             retryWeekdays: params.retryWeekdays,
             retryTime,
+            retryIntervalDays: params.retryIntervalDays,
           })
         : dueAt;
 
@@ -511,7 +538,7 @@ export async function createDebtorAction(input: unknown) {
       MAX_RETRY_ATTEMPTS_PER_DAY,
       parsed.data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
     ),
-    retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+    retry_interval_days: parsed.data.retry_interval_days || DEFAULT_RETRY_INTERVAL_DAYS,
     retry_auto_close_days: parsed.data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
   };
 
@@ -532,6 +559,7 @@ export async function createDebtorAction(input: unknown) {
     charges,
     retryWeekdays: parsed.data.retry_weekdays,
     retryTime: parsed.data.retry_time,
+    retryIntervalDays: parsed.data.retry_interval_days,
     timeZone: BRAZIL_TIMEZONES.includes((profile as any)?.timezone)
       ? ((profile as any).timezone as (typeof BRAZIL_TIMEZONES)[number])
       : null,
@@ -643,7 +671,7 @@ export async function updateDebtorAction(input: unknown) {
         MAX_RETRY_ATTEMPTS_PER_DAY,
         data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
       ),
-      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_interval_days: data.retry_interval_days || DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     })
     .eq("id", id);
@@ -684,6 +712,7 @@ export async function updateDebtorAction(input: unknown) {
     charges,
     retryWeekdays: data.retry_weekdays,
     retryTime: data.retry_time,
+    retryIntervalDays: data.retry_interval_days,
     timeZone: BRAZIL_TIMEZONES.includes((profile as any)?.timezone)
       ? ((profile as any).timezone as (typeof BRAZIL_TIMEZONES)[number])
       : null,
