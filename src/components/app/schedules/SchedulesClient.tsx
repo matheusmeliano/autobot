@@ -49,7 +49,7 @@ type FormValues = {
   template_overdue_id?: string;
   data_envio_date: string;
   data_envio_time: string;
-  recurrence: "none" | "monthly";
+  recurrence: "none" | "monthly" | "yearly";
   recurrence_until: string;
   status: string;
 };
@@ -317,7 +317,8 @@ export function SchedulesClient({
     const cycleConfig = getMonthlyCycleConfig(row, effectiveTimeZone);
     const nextScheduleInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
     const usesCurrentMonthCycle =
-      Boolean(executedMomentCurrentMonth) && String(row.recurrence ?? "none") === "monthly";
+      Boolean(executedMomentCurrentMonth) &&
+      ["monthly", "yearly"].includes(String(row.recurrence ?? "none"));
     const primaryDateInput = usesCurrentMonthCycle
       ? buildLocalDate(currentMonthKey, cycleConfig.day)
       : executedMomentCurrentMonth
@@ -534,7 +535,12 @@ export function SchedulesClient({
       template_overdue_id: row.template_overdue_id ?? row.template_id ?? "",
       data_envio_date: dt.date,
       data_envio_time: dt.time,
-      recurrence: String((row as any).recurrence ?? "none") === "monthly" ? "monthly" : "none",
+      recurrence:
+        String((row as any).recurrence ?? "none") === "yearly"
+          ? "yearly"
+          : String((row as any).recurrence ?? "none") === "monthly"
+            ? "monthly"
+            : "none",
       recurrence_until: row.recurrence_until ?? "",
       status: row.status,
     });
@@ -592,7 +598,7 @@ export function SchedulesClient({
       data_envio_time: values.data_envio_time,
       recurrence: values.recurrence,
       recurrence_until:
-        values.recurrence === "monthly" && values.recurrence_until ? values.recurrence_until : undefined,
+        values.recurrence !== "none" && values.recurrence_until ? values.recurrence_until : undefined,
       status: values.status || "agendado",
     };
 
@@ -742,7 +748,9 @@ export function SchedulesClient({
     const confirmed = await modalToast.confirm(
       String(row.recurrence ?? "none") === "monthly"
         ? `Marcar a mensalidade atual de "${row.debtor_nome}" como quitada e avançar a cobrança para o próximo mês?`
-        : `Marcar a cobrança atual de "${row.debtor_nome}" como paga?`,
+        : String(row.recurrence ?? "none") === "yearly"
+          ? `Marcar a cobrança anual atual de "${row.debtor_nome}" como quitada e avançar para o próximo ano?`
+          : `Marcar a cobrança atual de "${row.debtor_nome}" como paga?`,
       {
         title: "Pagamento realizado",
         confirmText: "Confirmar",
@@ -763,7 +771,9 @@ export function SchedulesClient({
       const toastId = modalToast.success(
         String(row.recurrence ?? "none") === "monthly"
           ? "Mensalidade atual marcada como quitada."
-          : "Cobrança marcada como paga.",
+          : String(row.recurrence ?? "none") === "yearly"
+            ? "Cobrança anual atual marcada como quitada."
+            : "Cobrança marcada como paga.",
       );
       await modalToast.wait(toastId);
       window.location.reload();
@@ -1237,6 +1247,7 @@ export function SchedulesClient({
                 >
                   <option value="none">Uma vez</option>
                   <option value="monthly">Mensal</option>
+                  <option value="yearly">Anual</option>
                 </select>
               </div>
 
@@ -1314,12 +1325,12 @@ export function SchedulesClient({
                 </div>
               </div>
 
-              {recurrenceValue === "monthly" ? (
+              {recurrenceValue !== "none" ? (
                 <div className="mt-1">
                   <div>
                     <div className="text-xs font-semibold text-white/60">Data final (opcional)</div>
                     <div className="mt-1 text-[11px] text-white/45">
-                      Se deixar em branco, a cobrança mensal continua sem limite.
+                      Se deixar em branco, a cobrança recorrente continua sem limite.
                     </div>
                     <div className="relative mt-2">
                       <input

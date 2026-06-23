@@ -9,10 +9,9 @@ import { nextSameDayRetryUtcIso, normalizeRetryConfig, shiftFirstChargeFromWeeke
 import {
   localDateInTimeZone,
   monthlyRecurrenceLimitMinDate,
-  nextMonthlyIso,
-  shouldContinueMonthlyRecurrence,
+  shouldContinueRecurringRecurrence,
 } from "@/lib/recurrence";
-import { getScheduleChargeAmount, nextMonthlyIsoAfterSettlement } from "@/lib/chargeAccumulation";
+import { getScheduleChargeAmount, nextRecurringIsoAfterSettlement } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 // #region debug-point extra-send-manual-bootstrap
@@ -215,7 +214,7 @@ const createSchema = z.object({
   template_overdue_id: z.string().uuid().optional(),
   data_envio_date: z.string().min(10),
   data_envio_time: z.string().min(4),
-  recurrence: z.enum(["none", "monthly"]).optional(),
+  recurrence: z.enum(["none", "monthly", "yearly"]).optional(),
   recurrence_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   status: z.string().optional(),
 });
@@ -230,14 +229,14 @@ const updateRecurrenceUntilSchema = z.object({
 });
 
 function validateRecurrenceUntil(params: {
-  recurrence: "none" | "monthly";
+  recurrence: "none" | "monthly" | "yearly";
   recurrenceUntil?: string;
   currentDate: string;
 }) {
-  if (params.recurrence !== "monthly") return null;
+  if (params.recurrence === "none") return null;
   if (!params.recurrenceUntil) return null;
   if (params.recurrenceUntil < params.currentDate) {
-    return "A data final da cobrança mensal deve ser igual ou posterior à primeira cobrança.";
+    return "A data final da cobrança recorrente deve ser igual ou posterior à primeira cobrança.";
   }
   return null;
 }
@@ -324,10 +323,10 @@ export async function createScheduleAction(input: unknown) {
     data_envio: dataEnvioIso,
     charge_due_at: dataEnvioIso,
     recurrence,
-    schedule_timezone: recurrence === "monthly" ? timeZone : null,
-    recurrence_day: recurrence === "monthly" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
-    recurrence_time: recurrence === "monthly" ? recurrenceTime : null,
-    recurrence_until: recurrence === "monthly" ? recurrenceUntil ?? null : null,
+    schedule_timezone: recurrence !== "none" ? timeZone : null,
+    recurrence_day: recurrence !== "none" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
+    recurrence_time: recurrence !== "none" ? recurrenceTime : null,
+    recurrence_until: recurrence !== "none" ? recurrenceUntil ?? null : null,
     status: parsed.data.status ?? "agendado",
   });
   if (error) return { ok: false, error: error.message };
@@ -426,10 +425,10 @@ export async function updateScheduleAction(input: unknown) {
       data_envio: dataEnvioIso,
       charge_due_at: dataEnvioIso,
       recurrence,
-      schedule_timezone: recurrence === "monthly" ? timeZone : null,
-      recurrence_day: recurrence === "monthly" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
-      recurrence_time: recurrence === "monthly" ? recurrenceTime : null,
-      recurrence_until: recurrence === "monthly" ? recurrenceUntil ?? null : null,
+      schedule_timezone: recurrence !== "none" ? timeZone : null,
+      recurrence_day: recurrence !== "none" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
+      recurrence_time: recurrence !== "none" ? recurrenceTime : null,
+      recurrence_until: recurrence !== "none" ? recurrenceUntil ?? null : null,
       status: data.status ?? "agendado",
       first_sent_at: null,
       last_sent_at: null,
@@ -765,7 +764,7 @@ export async function triggerScheduleNowAction(id: string) {
       .eq("scheduled_for", scheduledFor)
       .eq("status", "executado")
       .maybeSingle();
-    if (recurrence === "monthly" && !wasExecuted.data?.id) {
+    if ((recurrence === "monthly" || recurrence === "yearly") && !wasExecuted.data?.id) {
       await admin.from("schedule_runs").insert({
         user_id: userId,
         schedule_id: scheduleId,
@@ -821,8 +820,8 @@ export async function markSchedulePaidAction(id: string) {
   const recurrence = String((schedule as any).recurrence ?? "none");
   const nowIso = new Date().toISOString();
   let updatePayload: Record<string, unknown>;
-  if (recurrence === "monthly") {
-    const nextIsoBase = nextMonthlyIsoAfterSettlement({
+  if (recurrence === "monthly" || recurrence === "yearly") {
+    const nextIsoBase = nextRecurringIsoAfterSettlement({
       accumulateOpenMonthlyCharges: Boolean((schedule as any).debtors?.accumulate_open_monthly_charges),
       chargeDueAt: String((schedule as any).charge_due_at ?? "") || null,
       dataEnvio: String((schedule as any).data_envio ?? "") || null,
@@ -830,13 +829,14 @@ export async function markSchedulePaidAction(id: string) {
       timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
       day: Number((schedule as any).recurrence_day ?? 1),
       time: String((schedule as any).recurrence_time ?? "") || "00:00",
+      recurrence,
     });
     const nextIso = shiftFirstChargeFromWeekendUtcIso({
       utcIso: nextIsoBase,
       timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
       enabled: Boolean((schedule as any).debtors?.skip_weekends_on_first_charge),
     });
-    const shouldContinue = shouldContinueMonthlyRecurrence({
+    const shouldContinue = shouldContinueRecurringRecurrence({
       nextUtcIso: nextIso,
       recurrenceUntil: String((schedule as any).recurrence_until ?? "") || null,
       timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",

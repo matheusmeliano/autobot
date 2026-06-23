@@ -44,6 +44,14 @@ export function shouldContinueMonthlyRecurrence(params: {
   return nextLocalDate <= params.recurrenceUntil;
 }
 
+export function shouldContinueRecurringRecurrence(params: {
+  nextUtcIso: string;
+  recurrenceUntil?: string | null;
+  timeZone: string;
+}) {
+  return shouldContinueMonthlyRecurrence(params);
+}
+
 export function nextMonthlyIso(params: {
   fromUtcIso: string;
   timeZone: string;
@@ -68,6 +76,37 @@ export function nextMonthlyIso(params: {
   const maxDay = lastDayOfMonth(nextY, nextM);
   const day = Math.max(1, Math.min(Number(params.day) || 1, maxDay));
   const date = `${String(nextY).padStart(4, "0")}-${String(nextM).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  return zonedDateTimeToUtcIso({
+    date,
+    time: params.time,
+    timeZone: params.timeZone,
+  });
+}
+
+export function nextYearlyIso(params: {
+  fromUtcIso: string;
+  timeZone: string;
+  day: number;
+  time: string;
+}) {
+  const base = new Date(params.fromUtcIso);
+  if (Number.isNaN(base.getTime())) throw new Error("Data inválida");
+
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: params.timeZone,
+    year: "numeric",
+    month: "2-digit",
+  });
+  const p = partsToMap(fmt.formatToParts(base));
+  const y = Number(p.year);
+  const m = Number(p.month);
+  if (!y || !m) throw new Error("Data inválida");
+
+  const nextY = y + 1;
+  const maxDay = lastDayOfMonth(nextY, m);
+  const day = Math.max(1, Math.min(Number(params.day) || 1, maxDay));
+  const date = `${String(nextY).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
   return zonedDateTimeToUtcIso({
     date,

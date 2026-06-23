@@ -55,18 +55,19 @@ function deriveCurrentMonthDebtorSnapshot(
     const recurrence = String(row?.recurrence ?? "").trim().toLowerCase();
     const dueLocalDate = scheduleLocalDate(row?.charge_due_at ?? row?.data_envio ?? null, timeZone);
     if (!dueLocalDate) continue;
+    const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
 
     const dueMonth = dueLocalDate.slice(0, 7);
-    const isMonthly = recurrence === "monthly";
-    const isRelevant = isMonthly || dueMonth === currentMonth;
+    const isRecurring = recurrence === "monthly" || recurrence === "yearly";
+    const paymentInCurrentMonth = Boolean(paymentLocalDate && paymentLocalDate.slice(0, 7) === currentMonth);
+    const isRelevant = dueMonth === currentMonth || (isRecurring && paymentInCurrentMonth && dueMonth > currentMonth);
     if (!isRelevant) continue;
 
     total += 1;
 
-    const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
     const status = String(row?.status ?? "").trim().toLowerCase();
 
-    const paidThisMonth = isMonthly
+    const paidThisMonth = isRecurring
       ? Boolean(paymentLocalDate && paymentLocalDate.slice(0, 7) === currentMonth && dueMonth > currentMonth)
       : status === "pago" || Boolean(paymentLocalDate);
 

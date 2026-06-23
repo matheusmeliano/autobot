@@ -130,3 +130,34 @@ export function nextMonthlyIsoAfterSettlement(params: {
     timeZone: params.timeZone,
   });
 }
+
+export function nextRecurringIsoAfterSettlement(params: {
+  accumulateOpenMonthlyCharges?: boolean | null;
+  chargeDueAt?: string | null;
+  dataEnvio?: string | null;
+  nowUtcIso: string;
+  timeZone: string;
+  day: number;
+  time: string;
+  recurrence: string;
+}) {
+  const recurrence = String(params.recurrence ?? "none").trim().toLowerCase();
+  if (recurrence === "yearly") {
+    const dueLocalDate = resolveScheduleLocalDate(params);
+    if (!dueLocalDate) throw new Error("Data inválida");
+    const parts = parseLocalDate(dueLocalDate);
+    if (!parts) throw new Error("Data inválida");
+    const nextYear = parts.year + 1;
+    const maxDay = lastDayOfMonth(nextYear, parts.month);
+    const safeDay = Math.max(1, Math.min(Number(params.day) || 1, maxDay));
+    const date = `${String(nextYear).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+
+    return zonedDateTimeToUtcIso({
+      date,
+      time: params.time,
+      timeZone: params.timeZone,
+    });
+  }
+
+  return nextMonthlyIsoAfterSettlement(params);
+}

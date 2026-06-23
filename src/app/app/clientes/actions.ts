@@ -29,6 +29,7 @@ const createSchema = z
           id: z.string().uuid().optional(),
           amount: z.coerce.number().min(0.01),
           due_day: z.coerce.number().int().min(1).max(31),
+          recurrence_unit: z.enum(["monthly", "yearly"]).optional(),
         }),
       )
       .min(1)
@@ -71,6 +72,7 @@ type DebtorChargeInput = {
   id?: string;
   amount: number;
   due_day: number;
+  recurrence_unit: "monthly" | "yearly";
 };
 
 function validTime(value: string) {
@@ -195,6 +197,7 @@ function normalizeDebtorCharges(input: {
         id: c.id ? String(c.id) : undefined,
         amount: Number(c.amount),
         due_day: Number(c.due_day),
+        recurrence_unit: c.recurrence_unit === "yearly" ? "yearly" : "monthly",
       }))
       .filter(
         (c) =>
@@ -212,7 +215,7 @@ function normalizeDebtorCharges(input: {
   const legacyAmount = Number(input.valor);
   const legacyDue = String(input.vencimento ?? "").trim();
   if (Number.isFinite(legacyAmount) && legacyAmount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(legacyDue)) {
-    return [{ amount: legacyAmount, due_day: Number(legacyDue.slice(8, 10)) }];
+    return [{ amount: legacyAmount, due_day: Number(legacyDue.slice(8, 10)), recurrence_unit: "monthly" }];
   }
 
   return [];
@@ -250,7 +253,7 @@ async function syncDebtorChargesAndSchedules(params: {
       .update({ closed_at: nowUtcIso })
       .eq("debtor_id", params.debtorId)
       .is("closed_at", null)
-      .eq("recurrence", "monthly");
+      .in("recurrence", ["monthly", "yearly"]);
     if (closeError) return { ok: false as const, error: closeError.message };
     await syncDebtorChargeStatus(createSupabaseAdminClient(), params.userId, params.debtorId);
     return {
@@ -272,7 +275,11 @@ async function syncDebtorChargesAndSchedules(params: {
   for (const charge of incomingWithId) {
     const { error } = await params.supabase
       .from("debtor_charges")
-      .update({ amount: charge.amount, due_day: charge.due_day })
+      .update({
+        amount: charge.amount,
+        due_day: charge.due_day,
+        recurrence_unit: charge.recurrence_unit,
+      })
       .eq("id", String(charge.id));
     if (error) return { ok: false as const, error: error.message };
   }
@@ -287,9 +294,10 @@ async function syncDebtorChargesAndSchedules(params: {
           debtor_id: params.debtorId,
           amount: c.amount,
           due_day: c.due_day,
+          recurrence_unit: c.recurrence_unit,
         })),
       )
-      .select("id, amount, due_day");
+      .select("id, amount, due_day, recurrence_unit");
     if (error) return { ok: false as const, error: error.message };
     inserted = (data ?? []) as any[];
   }
@@ -316,7 +324,7 @@ async function syncDebtorChargesAndSchedules(params: {
 
   const { data: finalCharges, error: finalChargesError } = await params.supabase
     .from("debtor_charges")
-    .select("id, amount, due_day, created_at")
+    .select("id, amount, due_day, recurrence_unit, created_at")
     .eq("debtor_id", params.debtorId)
     .order("due_day", { ascending: true })
     .order("created_at", { ascending: true })
@@ -326,6 +334,7 @@ async function syncDebtorChargesAndSchedules(params: {
   for (const charge of finalCharges ?? []) {
     const chargeId = String((charge as any).id ?? "");
     const dueDay = Number((charge as any).due_day ?? 1);
+    const recurrenceUnit = String((charge as any).recurrence_unit ?? "monthly") === "yearly" ? "yearly" : "monthly";
     const dueLocalDate = buildLocalDate(currentYearMonth, dueDay);
     if (!dueLocalDate) continue;
 
@@ -363,7 +372,7 @@ async function syncDebtorChargesAndSchedules(params: {
         template_overdue_id: templateIds.overdueId,
         data_envio: scheduleAt,
         charge_due_at: dueAt,
-        recurrence: "monthly",
+        recurrence: recurrenceUnit,
         schedule_timezone: timeZone,
         recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
         recurrence_time: retryTime,
@@ -378,6 +387,7 @@ async function syncDebtorChargesAndSchedules(params: {
         template_id: templateIds.pendingId,
         template_pending_id: templateIds.pendingId,
         template_overdue_id: templateIds.overdueId,
+        recurrence: recurrenceUnit,
         schedule_timezone: timeZone,
         recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
         recurrence_time: retryTime,

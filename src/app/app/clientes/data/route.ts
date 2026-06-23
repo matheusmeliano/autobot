@@ -7,7 +7,7 @@ export async function GET() {
     supabase
       .from("debtors")
       .select(
-        "id, nome, telefone, valor, vencimento, pix_key, observacoes, status, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, created_at",
+        "id, nome, telefone, valor, vencimento, pix_key, observacoes, status, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, created_at, debtor_charges(id, amount, due_day, recurrence_unit, created_at)",
       )
       .order("created_at", { ascending: false })
       .limit(200),
@@ -22,6 +22,12 @@ export async function GET() {
       debtors: ((debtors ?? []) as any[]).map((row) => ({
         ...row,
         status: String(row?.status ?? "ativo"),
+        charges: ((row as any)?.debtor_charges ?? []).map((c: any) => ({
+          ...c,
+          amount: typeof c?.amount === "number" ? c.amount : Number(c?.amount),
+          due_day: typeof c?.due_day === "number" ? c.due_day : Number(c?.due_day),
+          recurrence_unit: String(c?.recurrence_unit ?? "monthly") === "yearly" ? "yearly" : "monthly",
+        })),
       })),
       schedules: (schedules ?? []) as any[],
     }),

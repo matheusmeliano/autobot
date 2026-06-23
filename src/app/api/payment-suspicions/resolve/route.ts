@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       const recurrence = String((schedule as any)?.recurrence ?? "none");
-      if (recurrence === "monthly") {
+      if (recurrence === "monthly" || recurrence === "yearly") {
         const paidRes = await markSchedulePaidAction(scheduleId);
         if (!paidRes.ok) {
           return Response.json({ ok: false, error: paidRes.error ?? "Falha ao marcar pagamento." }, { status: 500 });

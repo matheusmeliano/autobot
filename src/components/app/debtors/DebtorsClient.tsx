@@ -35,6 +35,7 @@ export type DebtorRow = {
     id: string;
     amount: number;
     due_day: number;
+    recurrence_unit?: "monthly" | "yearly";
     created_at?: string | null;
   }>;
   progress_paid?: number;
@@ -57,6 +58,7 @@ type FormValues = {
     charge_id?: string;
     amount: string;
     due_day: string;
+    recurrence_unit: "monthly" | "yearly";
   }>;
   pix_key?: string;
   observacoes?: string;
@@ -80,35 +82,9 @@ const weekdayOptions = [
   { value: 7, label: "Dom" },
 ];
 
-const monthOptions = [
-  { value: "01", label: "Janeiro" },
-  { value: "02", label: "Fevereiro" },
-  { value: "03", label: "Marco" },
-  { value: "04", label: "Abril" },
-  { value: "05", label: "Maio" },
-  { value: "06", label: "Junho" },
-  { value: "07", label: "Julho" },
-  { value: "08", label: "Agosto" },
-  { value: "09", label: "Setembro" },
-  { value: "10", label: "Outubro" },
-  { value: "11", label: "Novembro" },
-  { value: "12", label: "Dezembro" },
-];
-
 function money(v: number | null) {
   if (typeof v !== "number") return "-";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function dateBR(v: string | null) {
-  if (!v) return "-";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    const [y, m, d] = v.split("-");
-    return `${d}/${m}/${y}`;
-  }
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return v;
-  return d.toLocaleDateString("pt-BR");
 }
 
 function dueDayLabel(v: string | null) {
@@ -148,47 +124,6 @@ function progressText(row: DebtorRow) {
   return `${paid}/${total} Pagas`;
 }
 
-function splitDueDateParts(v: string | null | undefined, fallbackDate: Date) {
-  const fallbackYear = String(fallbackDate.getFullYear());
-  const fallbackMonth = String(fallbackDate.getMonth() + 1).padStart(2, "0");
-  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    return {
-      day: "",
-      month: fallbackMonth,
-      year: fallbackYear,
-      custom: false,
-    };
-  }
-  const year = v.slice(0, 4);
-  const month = v.slice(5, 7);
-  const day = String(Number(v.slice(8, 10)));
-  const custom = year !== fallbackYear || month !== fallbackMonth;
-  return { day, month, year, custom };
-}
-
-function buildDueDateIso(params: { day?: string; month?: string; year?: string }) {
-  const day = Number(String(params.day ?? "").trim());
-  const month = Number(String(params.month ?? "").trim());
-  const year = Number(String(params.year ?? "").trim());
-  if (!day) return { ok: true as const, value: undefined };
-  if (!Number.isInteger(day) || day < 1 || day > 31) {
-    return { ok: false as const, error: "Informe um dia de vencimento entre 1 e 31." };
-  }
-  if (!Number.isInteger(month) || month < 1 || month > 12) {
-    return { ok: false as const, error: "Informe um mes de vencimento valido." };
-  }
-  if (!Number.isInteger(year) || year < 2000 || year > 9999) {
-    return { ok: false as const, error: "Informe um ano de vencimento valido." };
-  }
-  const lastDay = new Date(year, month, 0).getDate();
-  if (day > lastDay) {
-    return { ok: false as const, error: `Esse mes possui apenas ${lastDay} dias.` };
-  }
-  return {
-    ok: true as const,
-    value: `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-  };
-}
 
 function debtorStatusLabel(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
@@ -378,7 +313,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     defaultValues: {
       nome: "",
       telefone: "",
-      charges: [{ amount: "", due_day: String(currentDate.getDate()) }],
+      charges: [{ amount: "", due_day: String(currentDate.getDate()), recurrence_unit: "monthly" }],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -404,7 +339,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     reset({
       nome: "",
       telefone: "",
-      charges: [{ amount: "", due_day: String(currentDate.getDate()) }],
+      charges: [{ amount: "", due_day: String(currentDate.getDate()), recurrence_unit: "monthly" }],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -445,6 +380,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                   : "";
               })(),
               due_day: String(c.due_day ?? ""),
+              recurrence_unit: c.recurrence_unit === "yearly" ? "yearly" : "monthly",
             }))
         : [
             {
@@ -456,6 +392,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     })
                   : "",
               due_day: String(dueDayLabel(row.vencimento) ?? ""),
+              recurrence_unit: "monthly",
             },
           ];
     reset({
@@ -487,6 +424,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         id: c.charge_id,
         amount: c.amount ? parseBRLToNumber(c.amount) : null,
         dueDay: Number(String(c.due_day ?? "").trim()),
+        recurrenceUnit: c.recurrence_unit === "yearly" ? "yearly" : "monthly",
       }))
       .filter((c) => typeof c.amount === "number" && c.amount > 0 && Number.isInteger(c.dueDay) && c.dueDay >= 1 && c.dueDay <= 31)
       .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
@@ -505,6 +443,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         ...(c.id ? { id: c.id } : {}),
         amount: c.amount as number,
         due_day: c.dueDay,
+        recurrence_unit: c.recurrenceUnit,
       })),
       pix_key: pixKey ? pixKey : undefined,
       observacoes: values.observacoes || undefined,
@@ -851,7 +790,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             modalToast.error(`Limite: no máximo ${MAX_RETRY_ATTEMPTS_PER_DAY} cobranças por cliente.`);
                             return;
                           }
-                          appendCharge({ amount: "", due_day: String(currentDate.getDate()) });
+                          appendCharge({
+                            amount: "",
+                            due_day: String(currentDate.getDate()),
+                            recurrence_unit: "monthly",
+                          });
                         }}
                         className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06]"
                       >
@@ -866,7 +809,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
                         >
                           <input type="hidden" {...register(`charges.${index}.charge_id`)} />
-                          <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-3 sm:grid-cols-3">
                             <div className="w-full">
                               <div className="text-xs font-semibold text-white/60">Valor</div>
                               <Controller
@@ -906,6 +849,16 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                                 {...register(`charges.${index}.due_day` as const)}
                               />
                             </div>
+                            <div>
+                              <div className="text-xs font-semibold text-white/60">Próxima recorrência</div>
+                              <select
+                                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                                {...register(`charges.${index}.recurrence_unit` as const)}
+                              >
+                                <option value="monthly">Próximo mês</option>
+                                <option value="yearly">Próximo ano</option>
+                              </select>
+                            </div>
                           </div>
 
                           {chargeFields.length > 1 ? (
@@ -922,7 +875,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
 
                     <div className="mt-2 text-[11px] text-white/45">
-                      Ordena automaticamente por vencimento e permite até {MAX_RETRY_ATTEMPTS_PER_DAY} cobranças por cliente.
+                      Ordena automaticamente por vencimento e permite definir por cobrança se a próxima recorrência vai para o próximo mês ou próximo ano.
                     </div>
                   </div>
 
