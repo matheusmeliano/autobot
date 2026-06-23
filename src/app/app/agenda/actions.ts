@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { shiftFirstChargeFromWeekendUtcIso } from "@/lib/chargeRetry";
+import { nextSameDayRetryUtcIso, normalizeRetryConfig, shiftFirstChargeFromWeekendUtcIso } from "@/lib/chargeRetry";
 import {
   localDateInTimeZone,
   monthlyRecurrenceLimitMinDate,
@@ -112,6 +112,26 @@ async function debtorSkipsWeekendsOnFirstCharge(supabase: Awaited<ReturnType<typ
     .eq("id", debtorId)
     .maybeSingle();
   return Boolean((data as any)?.skip_weekends_on_first_charge);
+}
+
+async function countExecutedRunsOnLocalDate(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  scheduleId: string;
+  timeZone: string;
+  localDate: string;
+}) {
+  const { data } = await params.admin
+    .from("schedule_runs")
+    .select("executed_at")
+    .eq("schedule_id", params.scheduleId)
+    .eq("status", "executado")
+    .order("executed_at", { ascending: false })
+    .limit(50);
+
+  return (data ?? []).filter((run: any) => {
+    const executedAt = String(run?.executed_at ?? "");
+    return executedAt && localDateInTimeZone(executedAt, params.timeZone) === params.localDate;
+  }).length;
 }
 
 async function validateMonthlyRecurrenceLimit(params: {
@@ -531,7 +551,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -577,6 +597,8 @@ export async function triggerScheduleNowAction(id: string) {
     const scheduleId = String((schedule as any).id);
     const scheduledFor = String((schedule as any).data_envio ?? new Date().toISOString());
     const sourceStatus = currentStatus === "atrasado" ? "atrasado" : "pendente";
+    const timeZone = String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo";
+    const retryConfig = normalizeRetryConfig(debtor ?? {});
 
     const debtorPhone = String(debtor?.telefone ?? "");
     const chargeAmount = getScheduleChargeAmount({
@@ -677,13 +699,37 @@ export async function triggerScheduleNowAction(id: string) {
     });
     if (runError) throw new Error(runError.message);
 
+    const nowIso = new Date().toISOString();
+    const nowLocalDate = localDateInTimeZone(nowIso, timeZone);
+    const sentToday =
+      sourceStatus === "atrasado"
+        ? await countExecutedRunsOnLocalDate({
+            admin,
+            scheduleId,
+            timeZone,
+            localDate: nowLocalDate,
+          })
+        : 0;
+    const nextSameDayRetryAt =
+      sourceStatus === "atrasado"
+        ? nextSameDayRetryUtcIso({
+            nowUtcIso: nowIso,
+            localDate: nowLocalDate,
+            timeZone,
+            time: retryConfig.time,
+            dailySendLimit: retryConfig.maxAttempts,
+            sentToday,
+          })
+        : null;
+
     const { error: updateError } = await admin
       .from("schedules")
       .update({
-        status: "pendente",
-        first_sent_at: String((schedule as any).first_sent_at ?? "") || new Date().toISOString(),
-        last_sent_at: new Date().toISOString(),
+        status: nextSameDayRetryAt ? "atrasado" : "pendente",
+        first_sent_at: String((schedule as any).first_sent_at ?? "") || nowIso,
+        last_sent_at: nowIso,
         retry_attempts: Number((schedule as any).retry_attempts ?? 0) + 1,
+        ...(nextSameDayRetryAt ? { data_envio: nextSameDayRetryAt } : {}),
       })
       .eq("id", scheduleId);
     if (updateError) throw new Error(updateError.message);

@@ -6,6 +6,7 @@ export const DEFAULT_RETRY_TIME = "09:00";
 export const DEFAULT_RETRY_MAX_ATTEMPTS = 5;
 export const DEFAULT_RETRY_INTERVAL_DAYS = 1;
 export const DEFAULT_RETRY_AUTO_CLOSE_DAYS = 30;
+const SAME_DAY_RETRY_LAST_TIME = "20:00";
 
 export type RetryConfig = {
   weekdays: number[];
@@ -17,6 +18,19 @@ export type RetryConfig = {
 
 function validTime(value: string) {
   return /^\d{2}:\d{2}$/.test(value);
+}
+
+function timeToMinutes(value: string) {
+  if (!validTime(value)) return 0;
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(value: number) {
+  const safe = Math.max(0, Math.min(23 * 60 + 59, Math.round(value)));
+  const hours = Math.floor(safe / 60);
+  const minutes = safe % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function addDaysToLocalDate(localDate: string, days: number) {
@@ -132,6 +146,43 @@ export function nextRetryUtcIso(params: {
   return zonedDateTimeToUtcIso({
     date: localDate,
     time: validTime(params.time) ? params.time : DEFAULT_RETRY_TIME,
+    timeZone: params.timeZone,
+  });
+}
+
+export function nextSameDayRetryUtcIso(params: {
+  nowUtcIso: string;
+  localDate: string;
+  timeZone: string;
+  time: string;
+  dailySendLimit: number;
+  sentToday: number;
+}) {
+  const dailySendLimit = Math.max(1, Number(params.dailySendLimit) || DEFAULT_RETRY_MAX_ATTEMPTS);
+  if (dailySendLimit <= 1 || params.sentToday >= dailySendLimit) return null;
+
+  const startMinutes = timeToMinutes(validTime(params.time) ? params.time : DEFAULT_RETRY_TIME);
+  const lastMinutes = Math.max(startMinutes, timeToMinutes(SAME_DAY_RETRY_LAST_TIME));
+  const slotIndex = Math.max(0, params.sentToday);
+
+  if (slotIndex >= dailySendLimit) return null;
+
+  const distributedMinutes =
+    slotIndex >= dailySendLimit - 1
+      ? lastMinutes
+      : startMinutes + ((lastMinutes - startMinutes) * slotIndex) / Math.max(1, dailySendLimit - 1);
+
+  const localParts = localDateTimeParts(params.nowUtcIso, params.timeZone);
+  const currentLocalDate = `${localParts.year}-${localParts.month}-${localParts.day}`;
+  if (currentLocalDate !== params.localDate) return null;
+
+  const currentMinutes = timeToMinutes(`${localParts.hour ?? "00"}:${localParts.minute ?? "00"}`) + 2;
+  const nextMinutes = Math.max(Math.round(distributedMinutes), currentMinutes);
+  if (nextMinutes > 23 * 60 + 59) return null;
+
+  return zonedDateTimeToUtcIso({
+    date: params.localDate,
+    time: minutesToTime(nextMinutes),
     timeZone: params.timeZone,
   });
 }

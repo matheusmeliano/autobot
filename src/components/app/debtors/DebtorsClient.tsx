@@ -917,7 +917,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       Reenvio de cobrança em atraso
                     </div>
                     <div className="mt-1 text-[11px] text-white/45">
-                      Define em quais dias e condições o sistema pode reenviar cobranças não pagas.
+                      Define em quais dias, horários e quantos envios podem acontecer no mesmo dia para cobranças não pagas.
                     </div>
 
                     <div className="mt-4">
@@ -972,13 +972,16 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                         />
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-white/60">Máximo de tentativas</div>
+                        <div className="text-xs font-semibold text-white/60">Envios por dia</div>
                         <input
                           type="number"
                           min={1}
                           className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
                           {...register("retry_max_attempts", { valueAsNumber: true })}
                         />
+                        <div className="mt-2 text-[11px] text-white/45">
+                          Usa o horario acima como primeiro envio do dia e distribui os demais automaticamente ao longo do mesmo dia.
+                        </div>
                       </div>
                     </div>
 

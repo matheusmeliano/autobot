@@ -4,11 +4,13 @@ import {
   hasAutoCloseExpired,
   isPastLocalDay,
   nextRetryUtcIso,
+  nextSameDayRetryUtcIso,
   normalizeRetryConfig,
   shiftFirstChargeFromWeekendUtcIso,
 } from "@/lib/chargeRetry";
 import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
+import { localDateInTimeZone } from "@/lib/recurrence";
 
 // #region debug-point extra-send-cron-bootstrap
 const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
@@ -70,6 +72,26 @@ function formatDateBR(value: unknown) {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00`) : new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
+}
+
+async function countExecutedRunsOnLocalDate(params: {
+  supabase: ReturnType<typeof createSupabaseAdminClient>;
+  scheduleId: string;
+  timeZone: string;
+  localDate: string;
+}) {
+  const { data } = await params.supabase
+    .from("schedule_runs")
+    .select("executed_at")
+    .eq("schedule_id", params.scheduleId)
+    .eq("status", "executado")
+    .order("executed_at", { ascending: false })
+    .limit(50);
+
+  return (data ?? []).filter((run: any) => {
+    const executedAt = String(run?.executed_at ?? "");
+    return executedAt && localDateInTimeZone(executedAt, params.timeZone) === params.localDate;
+  }).length;
 }
 
 function isAuthorized(req: Request) {
@@ -179,9 +201,7 @@ export async function GET(req: Request) {
     if (!referenceUtcIso || !isPastLocalDay({ referenceUtcIso, nowUtcIso: nowIso, timeZone })) continue;
 
     const retryConfig = normalizeRetryConfig((item as any).debtors ?? {});
-    const retryAttempts = Number((item as any).retry_attempts ?? 0);
     const shouldClose =
-      retryAttempts >= retryConfig.maxAttempts ||
       hasAutoCloseExpired({
         firstSentAt: String((item as any).first_sent_at ?? "") || referenceUtcIso,
         nowUtcIso: nowIso,
@@ -257,6 +277,7 @@ export async function GET(req: Request) {
       const overdueTemplate = (s as any).overdue_template ?? null;
       const sourceStatus = String((s as any).status ?? "") === "atrasado" ? "atrasado" : "pendente";
       const timeZone = String((s as any).schedule_timezone ?? "") || "America/Sao_Paulo";
+      const retryConfig = normalizeRetryConfig(debtor ?? {});
       const isFirstCharge = !String((s as any).first_sent_at ?? "");
       const shiftedFirstChargeUtcIso = shiftFirstChargeFromWeekendUtcIso({
         utcIso: scheduledFor,
@@ -409,13 +430,36 @@ export async function GET(req: Request) {
       });
       if (runError) throw new Error(runError.message);
 
+      const nowLocalDate = localDateInTimeZone(nowIso, timeZone);
+      const sentToday =
+        sourceStatus === "atrasado"
+          ? await countExecutedRunsOnLocalDate({
+              supabase,
+              scheduleId,
+              timeZone,
+              localDate: nowLocalDate,
+            })
+          : 0;
+      const nextSameDayRetryAt =
+        sourceStatus === "atrasado"
+          ? nextSameDayRetryUtcIso({
+              nowUtcIso: nowIso,
+              localDate: nowLocalDate,
+              timeZone,
+              time: retryConfig.time,
+              dailySendLimit: retryConfig.maxAttempts,
+              sentToday,
+            })
+          : null;
+
       const { error: updateError } = await supabase
         .from("schedules")
         .update({
-          status: "pendente",
+          status: nextSameDayRetryAt ? "atrasado" : "pendente",
           first_sent_at: String((s as any).first_sent_at ?? "") || nowIso,
           last_sent_at: nowIso,
           retry_attempts: Number((s as any).retry_attempts ?? 0) + 1,
+          ...(nextSameDayRetryAt ? { data_envio: nextSameDayRetryAt } : {}),
         })
         .eq("id", scheduleId);
       if (updateError) throw new Error(updateError.message);
