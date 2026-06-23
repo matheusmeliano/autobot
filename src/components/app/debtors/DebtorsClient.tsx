@@ -980,7 +980,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           {...register("retry_max_attempts", { valueAsNumber: true })}
                         />
                         <div className="mt-2 text-[11px] text-white/45">
-                          Usa o horario acima como primeiro envio do dia e distribui os demais automaticamente ao longo do mesmo dia.
+                          Distribui automaticamente as demais cobranças ao longo do mesmo dia.
                         </div>
                       </div>
                     </div>
