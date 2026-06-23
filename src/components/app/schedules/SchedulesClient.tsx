@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
@@ -16,8 +16,25 @@ import {
   triggerScheduleNowAction,
   updateScheduleAction,
 } from "@/app/app/agenda/actions";
+import {
+  DEFAULT_RETRY_AUTO_CLOSE_DAYS,
+  DEFAULT_RETRY_INTERVAL_DAYS,
+  DEFAULT_RETRY_MAX_ATTEMPTS,
+  DEFAULT_RETRY_TIME,
+  DEFAULT_RETRY_WEEKDAYS,
+  MAX_RETRY_ATTEMPTS_PER_DAY,
+  normalizeRetryWeekdays,
+} from "@/lib/chargeRetry";
 
-export type DebtorOption = { id: string; nome: string };
+export type DebtorOption = {
+  id: string;
+  nome: string;
+  retry_weekdays?: number[] | null;
+  retry_time?: string | null;
+  retry_max_attempts?: number | null;
+  retry_interval_days?: number | null;
+  retry_auto_close_days?: number | null;
+};
 export type TemplateOption = { id: string; nome: string };
 
 export type ScheduleRow = {
@@ -27,6 +44,7 @@ export type ScheduleRow = {
   template_pending_id: string | null;
   template_overdue_id: string | null;
   data_envio: string;
+  charge_due_at?: string | null;
   status: string;
   recurrence?: string | null;
   recurrence_until?: string | null;
@@ -53,7 +71,22 @@ type FormValues = {
   recurrence: "none" | "monthly" | "yearly";
   recurrence_until: string;
   status: string;
+  retry_weekdays: number[];
+  retry_time: string;
+  retry_max_attempts: number;
+  retry_interval_days: number;
+  retry_auto_close_days: number;
 };
+
+const weekdayOptions = [
+  { value: 1, label: "Seg" },
+  { value: 2, label: "Ter" },
+  { value: 3, label: "Qua" },
+  { value: 4, label: "Qui" },
+  { value: 5, label: "Sex" },
+  { value: 6, label: "Sab" },
+  { value: 7, label: "Dom" },
+];
 
 function dateTimeBR(v: string) {
   const d = new Date(v);
@@ -149,6 +182,19 @@ function getMonthlyCycleConfig(row: ScheduleRow, timeZone: BrazilTimeZone) {
   };
 }
 
+function normalizeDebtorRetryValues(debtor: DebtorOption | null | undefined) {
+  return {
+    retry_weekdays: normalizeRetryWeekdays(debtor?.retry_weekdays),
+    retry_time: debtor?.retry_time ?? DEFAULT_RETRY_TIME,
+    retry_max_attempts: Math.min(
+      MAX_RETRY_ATTEMPTS_PER_DAY,
+      debtor?.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
+    ),
+    retry_interval_days: debtor?.retry_interval_days ?? DEFAULT_RETRY_INTERVAL_DAYS,
+    retry_auto_close_days: debtor?.retry_auto_close_days ?? DEFAULT_RETRY_AUTO_CLOSE_DAYS,
+  };
+}
+
 export function SchedulesClient({
   initial,
   debtors,
@@ -190,6 +236,10 @@ export function SchedulesClient({
     null,
   );
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
+  const debtorsById = useMemo(
+    () => new Map(debtors.map((debtor) => [String(debtor.id), debtor])),
+    [debtors],
+  );
   const missingTimeZone = !timeZone;
   const missingWhatsApp = !whatsappConfigured;
   const todayMinDate = useMemo(
@@ -248,6 +298,11 @@ export function SchedulesClient({
       recurrence: "none",
       recurrence_until: "",
       status: "agendado",
+      retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
+      retry_time: DEFAULT_RETRY_TIME,
+      retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     },
   });
 
@@ -300,45 +355,15 @@ export function SchedulesClient({
   };
 
   const displayMoments = (row: ScheduleRow) => {
-    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
-    const executedScheduleMonthKey = row.last_executed_scheduled_for
-      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
-      : "";
-    const paymentMonthKey = row.payment_received_at
-      ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
-      : "";
-    const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
-
-    const executedMomentCurrentMonth =
-      (executedScheduleMonthKey &&
-        executedScheduleMonthKey === currentMonthKey &&
-        row.last_executed_scheduled_for) ||
-      (paymentMonthKey && paymentMonthKey === currentMonthKey && row.payment_received_at) ||
-      (sentMonthKey && sentMonthKey === currentMonthKey && row.last_sent_at) ||
-      null;
-    const cycleConfig = getMonthlyCycleConfig(row, effectiveTimeZone);
-    const nextScheduleInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
-    const usesCurrentMonthCycle =
-      Boolean(executedMomentCurrentMonth) &&
-      ["monthly", "yearly"].includes(String(row.recurrence ?? "none"));
-    const primaryDateInput = usesCurrentMonthCycle
-      ? buildLocalDate(currentMonthKey, cycleConfig.day)
-      : executedMomentCurrentMonth
-        ? splitDateTimeForInput(executedMomentCurrentMonth, effectiveTimeZone).date
-        : nextScheduleInput.date;
-    const primaryTimeInput = usesCurrentMonthCycle
-      ? cycleConfig.time
-      : executedMomentCurrentMonth
-        ? splitDateTimeForInput(executedMomentCurrentMonth, effectiveTimeZone).time
-        : nextScheduleInput.time;
+    const dueMoment = row.charge_due_at ?? row.data_envio;
+    const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
+    const sendInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
     const primaryMoment =
-      localScheduleIso(primaryDateInput, primaryTimeInput, effectiveTimeZone) ??
-      executedMomentCurrentMonth ??
-      row.data_envio;
-    const primaryKey = primaryDateInput && primaryTimeInput ? `${primaryDateInput}T${primaryTimeInput}` : "";
-    const nextKey =
-      nextScheduleInput.date && nextScheduleInput.time ? `${nextScheduleInput.date}T${nextScheduleInput.time}` : "";
-    const hasNextSchedule = Boolean(primaryKey && nextKey && nextKey !== primaryKey);
+      localScheduleIso(dueInput.date, sendInput.time || dueInput.time, effectiveTimeZone) ??
+      dueMoment;
+    const dueKey = dueInput.date ? `${dueInput.date}T${sendInput.time || dueInput.time || "00:00"}` : "";
+    const sendKey = sendInput.date && sendInput.time ? `${sendInput.date}T${sendInput.time}` : "";
+    const hasNextSchedule = Boolean(dueKey && sendKey && sendKey !== dueKey);
 
     return {
       primaryDate: dateBR(primaryMoment, effectiveTimeZone),
@@ -350,28 +375,12 @@ export function SchedulesClient({
   };
 
   const getEditDateTime = (row: ScheduleRow) => {
-    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
-    const executedScheduleMonthKey = row.last_executed_scheduled_for
-      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
-      : "";
-    const sentMonthKey = row.last_sent_at ? yearMonthKey(row.last_sent_at, effectiveTimeZone) : "";
-    const paymentMonthKey = row.payment_received_at
-      ? yearMonthKey(row.payment_received_at, effectiveTimeZone)
-      : "";
-    const hasCurrentMonthExecution =
-      executedScheduleMonthKey === currentMonthKey ||
-      sentMonthKey === currentMonthKey ||
-      paymentMonthKey === currentMonthKey;
-
-    if (String(row.recurrence ?? "none") === "monthly" && hasCurrentMonthExecution) {
-      const cycleConfig = getMonthlyCycleConfig(row, effectiveTimeZone);
-      return {
-        date: buildLocalDate(currentMonthKey, cycleConfig.day),
-        time: cycleConfig.time,
-      };
-    }
-
-    return splitDateTimeForInput(row.data_envio, effectiveTimeZone);
+    const dueInput = splitDateTimeForInput(row.charge_due_at ?? row.data_envio, effectiveTimeZone);
+    const sendInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
+    return {
+      date: dueInput.date,
+      time: sendInput.time || dueInput.time,
+    };
   };
 
   const normalizeEditedDateForPersistence = (row: ScheduleRow, date: string) => {
@@ -465,6 +474,21 @@ export function SchedulesClient({
 
   const timeValue = watch("data_envio_time");
   const recurrenceValue = watch("recurrence");
+  const selectedDebtorId = watch("debtor_id");
+  const selectedDebtor = useMemo(
+    () => debtorsById.get(String(selectedDebtorId ?? "")) ?? null,
+    [debtorsById, selectedDebtorId],
+  );
+
+  useEffect(() => {
+    if (!open || !selectedDebtorId) return;
+    const retryDefaults = normalizeDebtorRetryValues(selectedDebtor);
+    setValue("retry_weekdays", retryDefaults.retry_weekdays, { shouldDirty: false });
+    setValue("retry_time", retryDefaults.retry_time, { shouldDirty: false });
+    setValue("retry_max_attempts", retryDefaults.retry_max_attempts, { shouldDirty: false });
+    setValue("retry_interval_days", retryDefaults.retry_interval_days, { shouldDirty: false });
+    setValue("retry_auto_close_days", retryDefaults.retry_auto_close_days, { shouldDirty: false });
+  }, [open, selectedDebtor, selectedDebtorId, setValue]);
 
   const currentTimeForPicker = useMemo(() => {
     if (!timePickerTarget) return "";
@@ -507,6 +531,11 @@ export function SchedulesClient({
       recurrence: "none",
       recurrence_until: "",
       status: "agendado",
+      retry_weekdays: DEFAULT_RETRY_WEEKDAYS,
+      retry_time: DEFAULT_RETRY_TIME,
+      retry_max_attempts: DEFAULT_RETRY_MAX_ATTEMPTS,
+      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     });
   };
 
@@ -529,6 +558,7 @@ export function SchedulesClient({
     setEditing(row);
     setOpen(true);
     setMonthlyExtras([]);
+    const retryDefaults = normalizeDebtorRetryValues(debtorsById.get(String(row.debtor_id)) ?? null);
     const dt = getEditDateTime(row);
     reset({
       id: row.id,
@@ -545,6 +575,11 @@ export function SchedulesClient({
             : "none",
       recurrence_until: row.recurrence_until ?? "",
       status: row.status,
+      retry_weekdays: retryDefaults.retry_weekdays,
+      retry_time: retryDefaults.retry_time,
+      retry_max_attempts: retryDefaults.retry_max_attempts,
+      retry_interval_days: retryDefaults.retry_interval_days,
+      retry_auto_close_days: retryDefaults.retry_auto_close_days,
     });
   };
 
@@ -602,6 +637,14 @@ export function SchedulesClient({
       recurrence_until:
         values.recurrence !== "none" && values.recurrence_until ? values.recurrence_until : undefined,
       status: values.status || "agendado",
+      retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
+      retry_time: values.retry_time || DEFAULT_RETRY_TIME,
+      retry_max_attempts: Math.min(
+        MAX_RETRY_ATTEMPTS_PER_DAY,
+        Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
+      ),
+      retry_interval_days: Number(values.retry_interval_days) || DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: Number(values.retry_auto_close_days) || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     };
 
     if (
@@ -672,6 +715,14 @@ export function SchedulesClient({
           recurrence: "monthly",
           recurrence_until: values.recurrence_until ? values.recurrence_until : undefined,
           status: values.status || "agendado",
+          retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
+          retry_time: values.retry_time || DEFAULT_RETRY_TIME,
+          retry_max_attempts: Math.min(
+            MAX_RETRY_ATTEMPTS_PER_DAY,
+            Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
+          ),
+          retry_interval_days: Number(values.retry_interval_days) || DEFAULT_RETRY_INTERVAL_DAYS,
+          retry_auto_close_days: Number(values.retry_auto_close_days) || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
         });
         if (!extraRes.ok) {
           modalToast.error(extraRes.error ?? "Falha ao salvar cobrança adicional.");
@@ -1478,6 +1529,94 @@ export function SchedulesClient({
                   ) : null}
                 </div>
               ) : null}
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="text-xs font-semibold text-white/70">
+                  Reenvio de cobrança em atraso
+                </div>
+                <div className="mt-1 text-[11px] text-white/45">
+                  Define em quais dias, horários e quantos envios podem acontecer no mesmo dia para cobranças não pagas.
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-xs font-semibold text-white/60">Dias permitidos</div>
+                  <Controller
+                    control={control}
+                    name="retry_weekdays"
+                    render={({ field }) => {
+                      const current = normalizeRetryWeekdays(field.value);
+                      return (
+                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                          {weekdayOptions.map((option) => {
+                            const active = current.includes(option.value);
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => {
+                                  const next = active
+                                    ? current.filter((item) => item !== option.value)
+                                    : [...current, option.value];
+                                  field.onChange(normalizeRetryWeekdays(next));
+                                }}
+                                className={[
+                                  "rounded-xl border px-3 py-2 text-xs font-semibold",
+                                  active
+                                    ? "border-[var(--app-border)] bg-[var(--app-hover)] text-[var(--app-text-85)]"
+                                    : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.05]",
+                                ].join(" ")}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    }}
+                  />
+                </div>
+
+                <div className="mt-4 grid gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-white/60">Horário de reenvio</div>
+                    <input
+                      type="time"
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                      style={{ colorScheme: theme }}
+                      onClick={(e) => {
+                        e.currentTarget.showPicker?.();
+                      }}
+                      {...register("retry_time")}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white/60">Envios por dia</div>
+                    <input
+                      type="number"
+                      min={1}
+                      max={MAX_RETRY_ATTEMPTS_PER_DAY}
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                      {...register("retry_max_attempts", { valueAsNumber: true })}
+                    />
+                    <div className="mt-2 text-[11px] text-white/45">
+                      Distribui automaticamente as demais cobranças ao longo do mesmo dia.
+                    </div>
+                  </div>
+                  <input type="hidden" {...register("retry_interval_days", { valueAsNumber: true })} />
+                </div>
+
+                <div className="mt-3">
+                  <div className="w-full">
+                    <div className="text-xs font-semibold text-white/60">Encerrar automaticamente após (dias)</div>
+                    <input
+                      type="number"
+                      min={1}
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
+                      {...register("retry_auto_close_days", { valueAsNumber: true })}
+                    />
+                  </div>
+                </div>
+              </div>
 
               <button
                 type="submit"

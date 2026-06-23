@@ -6,7 +6,7 @@ export async function GET() {
     supabase
       .from("schedules")
       .select(
-        "id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, debtors(nome), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
+        "id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, debtors(nome), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
       )
       .order("data_envio", { ascending: true })
       .limit(200),
@@ -34,6 +34,7 @@ export async function GET() {
       template_pending_id: r.template_pending_id ?? null,
       template_overdue_id: r.template_overdue_id ?? null,
       data_envio: r.data_envio,
+      charge_due_at: r.charge_due_at ?? null,
       status: r.status,
       recurrence: r.recurrence ?? "none",
       recurrence_until: r.recurrence_until ?? null,

@@ -1236,92 +1236,22 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
                   </label>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                    <div className="text-xs font-semibold text-white/70">
-                      Reenvio de cobrança em atraso
-                    </div>
-                    <div className="mt-1 text-[11px] text-white/45">
-                      Define em quais dias, horários e quantos envios podem acontecer no mesmo dia para cobranças não pagas.
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="text-xs font-semibold text-white/60">Dias permitidos</div>
-                      <Controller
-                        control={control}
-                        name="retry_weekdays"
-                        render={({ field }) => {
-                          const current = normalizeRetryWeekdays(field.value);
-                          return (
-                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-                              {weekdayOptions.map((option) => {
-                                const active = current.includes(option.value);
-                                return (
-                                  <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => {
-                                      const next = active
-                                        ? current.filter((item) => item !== option.value)
-                                        : [...current, option.value];
-                                      field.onChange(normalizeRetryWeekdays(next));
-                                    }}
-                                    className={[
-                                      "rounded-xl border px-3 py-2 text-xs font-semibold",
-                                      active
-                                        ? "border-[var(--app-border)] bg-[var(--app-hover)] text-[var(--app-text-85)]"
-                                        : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.05]",
-                                    ].join(" ")}
-                                  >
-                                    {option.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          );
-                        }}
-                      />
-                    </div>
-
-                    <div className="mt-4 grid gap-3">
-                      <div>
-                        <div className="text-xs font-semibold text-white/60">Horário de reenvio</div>
+                  <div className="hidden">
+                    <Controller
+                      control={control}
+                      name="retry_weekdays"
+                      render={({ field }) => (
                         <input
-                          type="time"
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                          style={{ colorScheme: theme }}
-                          onClick={(e) => {
-                            e.currentTarget.showPicker?.();
-                          }}
-                          {...register("retry_time")}
+                          type="hidden"
+                          value={normalizeRetryWeekdays(field.value).join(",")}
+                          readOnly
                         />
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-white/60">Envios por dia</div>
-                        <input
-                          type="number"
-                          min={1}
-                          max={MAX_RETRY_ATTEMPTS_PER_DAY}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                          {...register("retry_max_attempts", { valueAsNumber: true })}
-                        />
-                        <div className="mt-2 text-[11px] text-white/45">
-                          Distribui automaticamente as demais cobranças ao longo do mesmo dia.
-                        </div>
-                      </div>
-                      <input type="hidden" {...register("retry_interval_days", { valueAsNumber: true })} />
-                    </div>
-
-                    <div className="mt-3">
-                      <div className="w-full">
-                        <div className="text-xs font-semibold text-white/60">Encerrar automaticamente após (dias)</div>
-                        <input
-                          type="number"
-                          min={1}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                          {...register("retry_auto_close_days", { valueAsNumber: true })}
-                        />
-                      </div>
-                    </div>
+                      )}
+                    />
+                    <input type="hidden" {...register("retry_time")} />
+                    <input type="hidden" {...register("retry_max_attempts", { valueAsNumber: true })} />
+                    <input type="hidden" {...register("retry_interval_days", { valueAsNumber: true })} />
+                    <input type="hidden" {...register("retry_auto_close_days", { valueAsNumber: true })} />
                   </div>
 
                   <button

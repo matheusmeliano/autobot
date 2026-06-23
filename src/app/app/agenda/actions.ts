@@ -5,7 +5,16 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { nextSameDayRetryUtcIso, normalizeRetryConfig, shiftFirstChargeFromWeekendUtcIso } from "@/lib/chargeRetry";
+import {
+  DEFAULT_RETRY_AUTO_CLOSE_DAYS,
+  DEFAULT_RETRY_INTERVAL_DAYS,
+  DEFAULT_RETRY_MAX_ATTEMPTS,
+  DEFAULT_RETRY_TIME,
+  nextSameDayRetryUtcIso,
+  normalizeRetryConfig,
+  normalizeRetryWeekdays,
+  shiftFirstChargeFromWeekendUtcIso,
+} from "@/lib/chargeRetry";
 import {
   localDateInTimeZone,
   monthlyRecurrenceLimitMinDate,
@@ -217,6 +226,11 @@ const createSchema = z.object({
   recurrence: z.enum(["none", "monthly", "yearly"]).optional(),
   recurrence_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   status: z.string().optional(),
+  retry_weekdays: z.array(z.coerce.number().int().min(1).max(7)).optional(),
+  retry_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  retry_max_attempts: z.coerce.number().int().min(1).max(5).optional(),
+  retry_interval_days: z.coerce.number().int().min(1).max(365).optional(),
+  retry_auto_close_days: z.coerce.number().int().min(1).max(365).optional(),
 });
 
 const updateSchema = createSchema.extend({
@@ -239,6 +253,30 @@ function validateRecurrenceUntil(params: {
     return "A data final da cobrança recorrente deve ser igual ou posterior à primeira cobrança.";
   }
   return null;
+}
+
+async function updateDebtorRetrySettings(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  debtorId: string,
+  input: {
+    retry_weekdays?: number[];
+    retry_time?: string;
+    retry_max_attempts?: number;
+    retry_interval_days?: number;
+    retry_auto_close_days?: number;
+  },
+) {
+  const { error } = await supabase
+    .from("debtors")
+    .update({
+      retry_weekdays: normalizeRetryWeekdays(input.retry_weekdays),
+      retry_time: input.retry_time || DEFAULT_RETRY_TIME,
+      retry_max_attempts: Math.min(5, input.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS),
+      retry_interval_days: input.retry_interval_days || DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_auto_close_days: input.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
+    })
+    .eq("id", debtorId);
+  return error;
 }
 
 export async function createScheduleAction(input: unknown) {
@@ -314,6 +352,9 @@ export async function createScheduleAction(input: unknown) {
     });
     if (recurrenceLimitValidation) return { ok: false, error: recurrenceLimitValidation };
   }
+
+  const retryUpdateError = await updateDebtorRetrySettings(supabase, parsed.data.debtor_id, parsed.data);
+  if (retryUpdateError) return { ok: false, error: retryUpdateError.message };
 
   const { error } = await supabase.from("schedules").insert({
     debtor_id: parsed.data.debtor_id,
@@ -408,6 +449,9 @@ export async function updateScheduleAction(input: unknown) {
     });
     if (recurrenceLimitValidation) return { ok: false, error: recurrenceLimitValidation };
   }
+
+  const retryUpdateError = await updateDebtorRetrySettings(supabase, data.debtor_id, data);
+  if (retryUpdateError) return { ok: false, error: retryUpdateError.message };
 
   const { data: previous } = await supabase
     .from("schedules")
