@@ -464,7 +464,7 @@ async function syncDebtorChargesAndSchedules(params: {
 export async function createDebtorAction(input: unknown) {
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: "Dados inválidos." };
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
   const charges = normalizeDebtorCharges(parsed.data);
@@ -549,7 +549,7 @@ export async function createDebtorAction(input: unknown) {
 export async function updateDebtorAction(input: unknown) {
   const parsed = updateSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: "Dados inválidos." };
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
   const charges = normalizeDebtorCharges(parsed.data);
