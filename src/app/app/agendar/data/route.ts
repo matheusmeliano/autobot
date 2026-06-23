@@ -20,7 +20,7 @@ export async function GET() {
     supabase
       .from("debtors")
       .select(
-        "id, nome, retry_time, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)",
+        "id, nome, observacoes, retry_time, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)",
       )
       .order("nome", { ascending: true })
       .limit(500),

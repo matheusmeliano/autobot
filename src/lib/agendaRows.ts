@@ -1,3 +1,4 @@
+import { resolveAutoChargeTemplates, type ChargeTemplateChoice } from "@/lib/chargeTemplates";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 type DebtorChargeRow = {
@@ -8,15 +9,12 @@ type DebtorChargeRow = {
   created_at?: string | null;
 };
 
-type TemplateChoice = {
-  id: string;
-  nome?: string | null;
-  created_at?: string | null;
-};
+type TemplateChoice = ChargeTemplateChoice;
 
 type DebtorRow = {
   id: string;
   nome?: string | null;
+  observacoes?: string | null;
   retry_time?: string | null;
   debtor_charges?: DebtorChargeRow[] | null;
 };
@@ -85,41 +83,6 @@ function buildChargeIso(charge: DebtorChargeRow, time: string, timeZone: string)
   return zonedDateTimeToUtcIso({ date, time, timeZone });
 }
 
-function resolveChargeTemplateDefaults(templates: TemplateChoice[]) {
-  if (!templates.length) {
-    return {
-      pendingId: null,
-      pendingNome: null,
-      overdueId: null,
-      overdueNome: null,
-    };
-  }
-
-  const sorted = [...templates].sort((a, b) =>
-    String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")),
-  );
-  const findByName = (keywords: string[], excludeIds = new Set<string>()) =>
-    sorted.find((template) => {
-      const id = String(template.id ?? "");
-      if (!id || excludeIds.has(id)) return false;
-      const name = String(template.nome ?? "").trim().toLowerCase();
-      return keywords.some((keyword) => name.includes(keyword));
-    });
-
-  const pending = findByName(["pendente", "inicial", "primeira"]) ?? sorted[0] ?? null;
-  const overdue =
-    findByName(["atras", "vencid", "overdue"], new Set([String(pending?.id ?? "")])) ??
-    sorted.find((template) => String(template.id ?? "") !== String(pending?.id ?? "")) ??
-    pending;
-
-  return {
-    pendingId: pending?.id ? String(pending.id) : null,
-    pendingNome: pending?.nome ? String(pending.nome) : null,
-    overdueId: overdue?.id ? String(overdue.id) : pending?.id ? String(pending.id) : null,
-    overdueNome: overdue?.nome ? String(overdue.nome) : pending?.nome ? String(pending.nome) : null,
-  };
-}
-
 function fallbackScheduleMatch(
   schedules: ScheduleSourceRow[],
   charge: DebtorChargeRow,
@@ -140,7 +103,6 @@ export function buildAgendaRows(params: {
   latestExecutedRunBySchedule: Map<string, string>;
   templates?: TemplateChoice[];
 }) {
-  const templateDefaults = resolveChargeTemplateDefaults(params.templates ?? []);
   const scheduleGroups = new Map<string, ScheduleSourceRow[]>();
   for (const schedule of params.schedules ?? []) {
     if (String(schedule.closed_at ?? "").trim()) continue;
@@ -164,6 +126,10 @@ export function buildAgendaRows(params: {
 
     const availableSchedules = scheduleGroups.get(debtorId) ?? [];
     const usedScheduleIds = new Set<string>();
+    const templateDefaults = resolveAutoChargeTemplates(
+      params.templates ?? [],
+      String(debtor.observacoes ?? debtor.nome ?? ""),
+    );
 
     for (const [index, charge] of charges.entries()) {
       const chargeId = String(charge.id ?? "");

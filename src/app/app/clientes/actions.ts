@@ -13,6 +13,7 @@ import {
   nextRetryUtcIso,
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
+import { resolveAutoChargeTemplates, type ChargeTemplateChoice } from "@/lib/chargeTemplates";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { localDateInTimeZone } from "@/lib/recurrence";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -81,11 +82,7 @@ const updateSchema = createSchema.extend({
   id: z.string().uuid(),
 });
 
-type TemplateChoice = {
-  id: string;
-  nome?: string | null;
-  created_at?: string | null;
-};
+type TemplateChoice = ChargeTemplateChoice;
 
 type DebtorChargeInput = {
   id?: string;
@@ -132,35 +129,6 @@ function localDateTimeParts(utcIso: string, timeZone: string) {
     if (part.type !== "literal") acc[part.type] = part.value;
     return acc;
   }, {});
-}
-
-function resolveChargeTemplateIds(templates: TemplateChoice[]) {
-  if (!templates.length) return { pendingId: null, overdueId: null };
-
-  const sorted = [...templates].sort((a, b) =>
-    String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")),
-  );
-  const findByName = (keywords: string[], excludeIds = new Set<string>()) =>
-    sorted.find((template) => {
-      const id = String(template.id ?? "");
-      if (!id || excludeIds.has(id)) return false;
-      const name = String(template.nome ?? "").trim().toLowerCase();
-      return keywords.some((keyword) => name.includes(keyword));
-    });
-
-  const pending =
-    findByName(["pendente", "inicial", "primeira"]) ??
-    sorted[0] ??
-    null;
-  const overdue =
-    findByName(["atras", "vencid", "overdue"], new Set([String(pending?.id ?? "")])) ??
-    sorted.find((template) => String(template.id ?? "") !== String(pending?.id ?? "")) ??
-    pending;
-
-  return {
-    pendingId: pending?.id ? String(pending.id) : null,
-    overdueId: overdue?.id ? String(overdue.id) : pending?.id ? String(pending.id) : null,
-  };
 }
 
 function nextInitialOverdueAttemptUtcIso(params: {
@@ -291,6 +259,7 @@ async function syncDebtorChargesAndSchedules(params: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   userId: string;
   debtorId: string;
+  debtorHint?: string | null;
   charges: DebtorChargeInput[];
   retryWeekdays?: number[];
   retryTime?: string;
@@ -312,7 +281,10 @@ async function syncDebtorChargesAndSchedules(params: {
     .order("created_at", { ascending: true })
     .limit(50);
   if (templatesError) return { ok: false as const, error: templatesError.message };
-  const templateIds = resolveChargeTemplateIds((templates ?? []) as TemplateChoice[]);
+  const templateIds = resolveAutoChargeTemplates(
+    (templates ?? []) as TemplateChoice[],
+    params.debtorHint,
+  );
   if (!templateIds.pendingId || !templateIds.overdueId) {
     const { error: closeError } = await params.supabase
       .from("schedules")
@@ -599,6 +571,7 @@ export async function createDebtorAction(input: unknown) {
     supabase,
     userId,
     debtorId,
+    debtorHint: parsed.data.observacoes || parsed.data.nome,
     charges,
     retryWeekdays: parsed.data.retry_weekdays,
     retryTime: parsed.data.retry_time,
@@ -752,6 +725,7 @@ export async function updateDebtorAction(input: unknown) {
     supabase,
     userId,
     debtorId: id,
+    debtorHint: data.observacoes || data.nome,
     charges,
     retryWeekdays: data.retry_weekdays,
     retryTime: data.retry_time,

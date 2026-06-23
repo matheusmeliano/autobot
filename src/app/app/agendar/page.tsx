@@ -28,7 +28,7 @@ export default async function AgendarPage() {
     supabase
       .from("debtors")
       .select(
-        "id, nome, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)",
+        "id, nome, observacoes, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)",
       )
       .order("nome", { ascending: true })
       .limit(500),
