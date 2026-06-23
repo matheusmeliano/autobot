@@ -17,22 +17,45 @@ import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { localDateInTimeZone } from "@/lib/recurrence";
 import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 
-const createSchema = z.object({
-  nome: z.string().min(2),
-  telefone: z.string().optional(),
-  valor: z.coerce.number().optional(),
-  vencimento: z.string().optional(),
-  pix_key: z.string().optional(),
-  observacoes: z.string().optional(),
-  status: z.string().optional(),
-  accumulate_open_monthly_charges: z.boolean().optional(),
-  skip_weekends_on_first_charge: z.boolean().optional(),
-  retry_weekdays: z.array(z.coerce.number().int().min(1).max(7)).optional(),
-  retry_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  retry_max_attempts: z.coerce.number().int().min(1).max(MAX_RETRY_ATTEMPTS_PER_DAY).optional(),
-  retry_interval_days: z.coerce.number().int().min(1).max(365).optional(),
-  retry_auto_close_days: z.coerce.number().int().min(1).max(365).optional(),
-});
+const createSchema = z
+  .object({
+    nome: z.string().min(2),
+    telefone: z.string().optional(),
+    valor: z.coerce.number().optional(),
+    vencimento: z.string().optional(),
+    charges: z
+      .array(
+        z.object({
+          id: z.string().uuid().optional(),
+          amount: z.coerce.number().min(0.01),
+          due_day: z.coerce.number().int().min(1).max(31),
+        }),
+      )
+      .min(1)
+      .max(5)
+      .optional(),
+    pix_key: z.string().optional(),
+    observacoes: z.string().optional(),
+    status: z.string().optional(),
+    accumulate_open_monthly_charges: z.boolean().optional(),
+    skip_weekends_on_first_charge: z.boolean().optional(),
+    retry_weekdays: z.array(z.coerce.number().int().min(1).max(7)).optional(),
+    retry_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    retry_max_attempts: z.coerce.number().int().min(1).max(MAX_RETRY_ATTEMPTS_PER_DAY).optional(),
+    retry_interval_days: z.coerce.number().int().min(1).max(365).optional(),
+    retry_auto_close_days: z.coerce.number().int().min(1).max(365).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasCharges = Array.isArray(data.charges) && data.charges.length > 0;
+    if (hasCharges) return;
+    const hasLegacy = typeof data.valor === "number" && /^\d{4}-\d{2}-\d{2}$/.test(String(data.vencimento ?? ""));
+    if (hasLegacy) return;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe pelo menos 1 cobrança (valor e dia de vencimento).",
+      path: ["charges"],
+    });
+  });
 
 const updateSchema = createSchema.extend({
   id: z.string().uuid(),
@@ -42,6 +65,12 @@ type TemplateChoice = {
   id: string;
   nome?: string | null;
   created_at?: string | null;
+};
+
+type DebtorChargeInput = {
+  id?: string;
+  amount: number;
+  due_day: number;
 };
 
 function validTime(value: string) {
@@ -133,86 +162,237 @@ function nextInitialOverdueAttemptUtcIso(params: {
   });
 }
 
-async function ensureCurrentMonthOverdueSchedule(params: {
+function diffDaysLocalDate(fromDate: string, toDate: string) {
+  const [fy, fm, fd] = fromDate.split("-").map(Number);
+  const [ty, tm, td] = toDate.split("-").map(Number);
+  const from = Date.UTC(fy, fm - 1, fd, 12, 0, 0);
+  const to = Date.UTC(ty, tm - 1, td, 12, 0, 0);
+  return Math.floor((to - from) / (24 * 60 * 60 * 1000));
+}
+
+function lastDayOfMonth(year: number, month1: number) {
+  return new Date(Date.UTC(year, month1, 0)).getUTCDate();
+}
+
+function buildLocalDate(yearMonth: string, day: number) {
+  const [yearRaw, monthRaw] = yearMonth.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!year || !month) return "";
+  const safeDay = Math.max(1, Math.min(Number(day) || 1, lastDayOfMonth(year, month)));
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+function normalizeDebtorCharges(input: {
+  charges?: DebtorChargeInput[] | null;
+  valor?: number;
+  vencimento?: string;
+}): DebtorChargeInput[] {
+  const fromList = Array.isArray(input.charges) ? input.charges : [];
+  if (fromList.length) {
+    const normalized = fromList
+      .map((c) => ({
+        id: c.id ? String(c.id) : undefined,
+        amount: Number(c.amount),
+        due_day: Number(c.due_day),
+      }))
+      .filter(
+        (c) =>
+          Number.isFinite(c.amount) &&
+          c.amount > 0 &&
+          Number.isInteger(c.due_day) &&
+          c.due_day >= 1 &&
+          c.due_day <= 31,
+      )
+      .slice(0, 5)
+      .sort((a, b) => a.due_day - b.due_day);
+    if (normalized.length) return normalized;
+  }
+
+  const legacyAmount = Number(input.valor);
+  const legacyDue = String(input.vencimento ?? "").trim();
+  if (Number.isFinite(legacyAmount) && legacyAmount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(legacyDue)) {
+    return [{ amount: legacyAmount, due_day: Number(legacyDue.slice(8, 10)) }];
+  }
+
+  return [];
+}
+
+async function syncDebtorChargesAndSchedules(params: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   userId: string;
   debtorId: string;
-  dueDate?: string | null;
+  charges: DebtorChargeInput[];
   retryWeekdays?: number[];
   retryTime?: string;
   nowUtcIso?: string;
   timeZone?: string | null;
 }) {
-  const dueDate = String(params.dueDate ?? "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return { ok: true as const };
-
   const nowUtcIso = params.nowUtcIso ?? new Date().toISOString();
   const timeZone =
     params.timeZone && BRAZIL_TIMEZONES.includes(params.timeZone as (typeof BRAZIL_TIMEZONES)[number])
       ? params.timeZone
       : "America/Sao_Paulo";
   const currentLocalDate = localDateInTimeZone(nowUtcIso, timeZone);
-
-  if (dueDate.slice(0, 7) !== currentLocalDate.slice(0, 7) || dueDate >= currentLocalDate) {
-    return { ok: true as const };
-  }
-
-  const { data: existingSchedule, error: existingScheduleError } = await params.supabase
-    .from("schedules")
-    .select("id")
-    .eq("debtor_id", params.debtorId)
-    .is("closed_at", null)
-    .limit(1)
-    .maybeSingle();
-  if (existingScheduleError) return { ok: false as const, error: existingScheduleError.message };
-  if (existingSchedule?.id) return { ok: true as const };
+  const currentYearMonth = currentLocalDate.slice(0, 7);
+  const retryTime = validTime(String(params.retryTime ?? "")) ? String(params.retryTime) : DEFAULT_RETRY_TIME;
 
   const { data: templates, error: templatesError } = await params.supabase
     .from("message_templates")
     .select("id, nome, created_at")
     .order("created_at", { ascending: true })
-    .limit(20);
+    .limit(50);
   if (templatesError) return { ok: false as const, error: templatesError.message };
-
   const templateIds = resolveChargeTemplateIds((templates ?? []) as TemplateChoice[]);
   if (!templateIds.pendingId || !templateIds.overdueId) {
+    const { error: closeError } = await params.supabase
+      .from("schedules")
+      .update({ closed_at: nowUtcIso })
+      .eq("debtor_id", params.debtorId)
+      .is("closed_at", null)
+      .eq("recurrence", "monthly");
+    if (closeError) return { ok: false as const, error: closeError.message };
+    await syncDebtorChargeStatus(createSupabaseAdminClient(), params.userId, params.debtorId);
     return {
       ok: true as const,
       warning:
-        "Cliente criado, mas sem template suficiente para iniciar automaticamente a cobrança em atraso. Configure seus templates em Mensagens.",
+        "Cliente salvo, mas sem template suficiente para gerar cobranças automáticas. Configure seus templates em Mensagens.",
     };
   }
 
-  const retryTime = validTime(String(params.retryTime ?? "")) ? String(params.retryTime) : DEFAULT_RETRY_TIME;
-  const scheduleAt = nextInitialOverdueAttemptUtcIso({
-    nowUtcIso,
-    timeZone,
-    retryWeekdays: params.retryWeekdays,
-    retryTime,
-  });
-  const dueAt = zonedDateTimeToUtcIso({
-    date: currentLocalDate,
-    time: retryTime,
-    timeZone,
-  });
-  const recurrenceDay = Number(dueDate.slice(8, 10) ?? "1");
+  const { data: existingCharges, error: existingChargesError } = await params.supabase
+    .from("debtor_charges")
+    .select("id")
+    .eq("debtor_id", params.debtorId)
+    .limit(20);
+  if (existingChargesError) return { ok: false as const, error: existingChargesError.message };
+  const existingChargeIds = new Set((existingCharges ?? []).map((c: any) => String(c?.id ?? "")).filter(Boolean));
 
-  const { error: scheduleError } = await params.supabase.from("schedules").insert({
-    debtor_id: params.debtorId,
-    template_id: templateIds.pendingId,
-    template_pending_id: templateIds.pendingId,
-    template_overdue_id: templateIds.overdueId,
-    data_envio: scheduleAt,
-    charge_due_at: dueAt,
-    recurrence: "monthly",
-    schedule_timezone: timeZone,
-    recurrence_day: Number.isFinite(recurrenceDay) ? recurrenceDay : 1,
-    recurrence_time: retryTime,
-    recurrence_until: null,
-    status: "atrasado",
-  });
+  const incomingWithId = params.charges.filter((c) => c.id && existingChargeIds.has(String(c.id)));
+  for (const charge of incomingWithId) {
+    const { error } = await params.supabase
+      .from("debtor_charges")
+      .update({ amount: charge.amount, due_day: charge.due_day })
+      .eq("id", String(charge.id));
+    if (error) return { ok: false as const, error: error.message };
+  }
 
-  if (scheduleError) return { ok: false as const, error: scheduleError.message };
+  const toInsert = params.charges.filter((c) => !c.id || !existingChargeIds.has(String(c.id)));
+  let inserted: Array<{ id: string; amount: number; due_day: number }> = [];
+  if (toInsert.length) {
+    const { data, error } = await params.supabase
+      .from("debtor_charges")
+      .insert(
+        toInsert.map((c) => ({
+          debtor_id: params.debtorId,
+          amount: c.amount,
+          due_day: c.due_day,
+        })),
+      )
+      .select("id, amount, due_day");
+    if (error) return { ok: false as const, error: error.message };
+    inserted = (data ?? []) as any[];
+  }
+
+  const currentChargeIds = new Set(
+    params.charges
+      .map((c) => (c.id && existingChargeIds.has(String(c.id)) ? String(c.id) : null))
+      .filter(Boolean),
+  );
+  for (const c of inserted) currentChargeIds.add(String((c as any).id ?? ""));
+
+  const removedIds = Array.from(existingChargeIds).filter((id) => !currentChargeIds.has(id));
+  if (removedIds.length) {
+    const { error: closeError } = await params.supabase
+      .from("schedules")
+      .update({ closed_at: nowUtcIso, status: "pago", charge_id: null })
+      .in("charge_id", removedIds)
+      .is("closed_at", null);
+    if (closeError) return { ok: false as const, error: closeError.message };
+
+    const { error: deleteChargesError } = await params.supabase.from("debtor_charges").delete().in("id", removedIds);
+    if (deleteChargesError) return { ok: false as const, error: deleteChargesError.message };
+  }
+
+  const { data: finalCharges, error: finalChargesError } = await params.supabase
+    .from("debtor_charges")
+    .select("id, amount, due_day, created_at")
+    .eq("debtor_id", params.debtorId)
+    .order("due_day", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(10);
+  if (finalChargesError) return { ok: false as const, error: finalChargesError.message };
+
+  for (const charge of finalCharges ?? []) {
+    const chargeId = String((charge as any).id ?? "");
+    const dueDay = Number((charge as any).due_day ?? 1);
+    const dueLocalDate = buildLocalDate(currentYearMonth, dueDay);
+    if (!dueLocalDate) continue;
+
+    const dueAt = zonedDateTimeToUtcIso({ date: dueLocalDate, time: retryTime, timeZone });
+    const daysSinceDue = diffDaysLocalDate(dueLocalDate, currentLocalDate);
+    const shouldStartOverdue = daysSinceDue >= 3;
+    const shouldSendNow = daysSinceDue >= 0 && !shouldStartOverdue;
+    const scheduleAt =
+      shouldStartOverdue || shouldSendNow
+        ? nextInitialOverdueAttemptUtcIso({
+            nowUtcIso,
+            timeZone,
+            retryWeekdays: params.retryWeekdays,
+            retryTime,
+          })
+        : dueAt;
+
+    const status = shouldStartOverdue ? "atrasado" : "agendado";
+
+    const { data: existingSchedule, error: scheduleLookupError } = await params.supabase
+      .from("schedules")
+      .select("id, status, first_sent_at")
+      .eq("charge_id", chargeId)
+      .is("closed_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (scheduleLookupError) return { ok: false as const, error: scheduleLookupError.message };
+
+    if (!existingSchedule?.id) {
+      const { error: insertScheduleError } = await params.supabase.from("schedules").insert({
+        debtor_id: params.debtorId,
+        charge_id: chargeId,
+        template_id: templateIds.pendingId,
+        template_pending_id: templateIds.pendingId,
+        template_overdue_id: templateIds.overdueId,
+        data_envio: scheduleAt,
+        charge_due_at: dueAt,
+        recurrence: "monthly",
+        schedule_timezone: timeZone,
+        recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
+        recurrence_time: retryTime,
+        recurrence_until: null,
+        status,
+      });
+      if (insertScheduleError) return { ok: false as const, error: insertScheduleError.message };
+    } else {
+      const existingStatus = String((existingSchedule as any)?.status ?? "");
+      const hasFirstSent = Boolean(String((existingSchedule as any)?.first_sent_at ?? "").trim());
+      const updateBase: Record<string, unknown> = {
+        template_id: templateIds.pendingId,
+        template_pending_id: templateIds.pendingId,
+        template_overdue_id: templateIds.overdueId,
+        schedule_timezone: timeZone,
+        recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
+        recurrence_time: retryTime,
+      };
+      const updatePayload =
+        existingStatus === "agendado" && !hasFirstSent
+          ? { ...updateBase, data_envio: scheduleAt, charge_due_at: dueAt, status }
+          : updateBase;
+      const { error: updateScheduleError } = await params.supabase
+        .from("schedules")
+        .update(updatePayload)
+        .eq("id", String((existingSchedule as any).id));
+      if (updateScheduleError) return { ok: false as const, error: updateScheduleError.message };
+    }
+  }
 
   await syncDebtorChargeStatus(createSupabaseAdminClient(), params.userId, params.debtorId);
   return { ok: true as const };
@@ -222,6 +402,11 @@ export async function createDebtorAction(input: unknown) {
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Dados inválidos." };
+  }
+
+  const charges = normalizeDebtorCharges(parsed.data);
+  if (!charges.length) {
+    return { ok: false, error: "Informe pelo menos 1 cobrança (valor e dia de vencimento)." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -246,11 +431,12 @@ export async function createDebtorAction(input: unknown) {
     }
   }
 
+  const totalAmount = charges.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
   const debtorPayload = {
     nome: parsed.data.nome,
     telefone: parsed.data.telefone || null,
-    valor: typeof parsed.data.valor === "number" ? parsed.data.valor : null,
-    vencimento: parsed.data.vencimento || null,
+    valor: Number.isFinite(totalAmount) && totalAmount > 0 ? totalAmount : null,
+    vencimento: null,
     pix_key: parsed.data.pix_key || null,
     observacoes: parsed.data.observacoes || null,
     status: parsed.data.status || "ativo",
@@ -276,11 +462,11 @@ export async function createDebtorAction(input: unknown) {
   const debtorId = String((createdDebtor as any)?.id ?? "");
   if (!debtorId) return { ok: false, error: "Falha ao criar o cliente." };
 
-  const autoScheduleResult = await ensureCurrentMonthOverdueSchedule({
+  const autoScheduleResult = await syncDebtorChargesAndSchedules({
     supabase,
     userId,
     debtorId,
-    dueDate: parsed.data.vencimento ?? null,
+    charges,
     retryWeekdays: parsed.data.retry_weekdays,
     retryTime: parsed.data.retry_time,
     timeZone: BRAZIL_TIMEZONES.includes((profile as any)?.timezone)
@@ -289,6 +475,7 @@ export async function createDebtorAction(input: unknown) {
   });
 
   if (!autoScheduleResult.ok) {
+    await supabase.from("debtor_charges").delete().eq("debtor_id", debtorId);
     await supabase.from("debtors").delete().eq("id", debtorId);
     return { ok: false, error: autoScheduleResult.error ?? "Falha ao iniciar a cobrança." };
   }
@@ -302,6 +489,11 @@ export async function updateDebtorAction(input: unknown) {
     return { ok: false, error: "Dados inválidos." };
   }
 
+  const charges = normalizeDebtorCharges(parsed.data);
+  if (!charges.length) {
+    return { ok: false, error: "Informe pelo menos 1 cobrança (valor e dia de vencimento)." };
+  }
+
   const supabase = await createSupabaseServerClient();
   const { id, ...data } = parsed.data;
   const [{ data: userRes }, { data: profile }] = await Promise.all([
@@ -311,13 +503,14 @@ export async function updateDebtorAction(input: unknown) {
   const userId = userRes.user?.id;
   if (!userId) return { ok: false, error: "Sem sessão." };
 
+  const totalAmount = charges.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
   const { error } = await supabase
     .from("debtors")
     .update({
       nome: data.nome,
       telefone: data.telefone || null,
-      valor: typeof data.valor === "number" ? data.valor : null,
-      vencimento: data.vencimento || null,
+      valor: Number.isFinite(totalAmount) && totalAmount > 0 ? totalAmount : null,
+      vencimento: null,
       pix_key: data.pix_key || null,
       observacoes: data.observacoes || null,
       status: data.status || "ativo",
@@ -336,11 +529,11 @@ export async function updateDebtorAction(input: unknown) {
 
   if (error) return { ok: false, error: error.message };
 
-  const autoScheduleResult = await ensureCurrentMonthOverdueSchedule({
+  const autoScheduleResult = await syncDebtorChargesAndSchedules({
     supabase,
     userId,
     debtorId: id,
-    dueDate: data.vencimento ?? null,
+    charges,
     retryWeekdays: data.retry_weekdays,
     retryTime: data.retry_time,
     timeZone: BRAZIL_TIMEZONES.includes((profile as any)?.timezone)

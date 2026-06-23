@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { useAppTheme } from "@/components/app/AppThemeProvider";
@@ -31,6 +31,14 @@ export type DebtorRow = {
   pix_key: string | null;
   observacoes: string | null;
   status: string;
+  charges?: Array<{
+    id: string;
+    amount: number;
+    due_day: number;
+    created_at?: string | null;
+  }>;
+  progress_paid?: number;
+  progress_total?: number;
   accumulate_open_monthly_charges: boolean | null;
   skip_weekends_on_first_charge: boolean | null;
   retry_weekdays: number[] | null;
@@ -45,10 +53,11 @@ type FormValues = {
   id?: string;
   nome: string;
   telefone?: string;
-  valor?: string;
-  vencimento_day?: string;
-  vencimento_month?: string;
-  vencimento_year?: string;
+  charges: Array<{
+    charge_id?: string;
+    amount: string;
+    due_day: string;
+  }>;
   pix_key?: string;
   observacoes?: string;
   status?: string;
@@ -108,6 +117,35 @@ function dueDayLabel(v: string | null) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
   return String(d.getDate());
+}
+
+function chargesTotal(row: DebtorRow) {
+  if (row.charges && row.charges.length) {
+    const sum = row.charges.reduce((acc, c) => {
+      const n = typeof c.amount === "number" ? c.amount : Number(c.amount);
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    return Number.isFinite(sum) ? sum : row.valor;
+  }
+  return row.valor;
+}
+
+function chargesFirstDueDay(row: DebtorRow) {
+  if (row.charges && row.charges.length) {
+    const min = row.charges
+      .map((c) => Number(c.due_day))
+      .filter((n) => Number.isInteger(n) && n >= 1 && n <= 31)
+      .sort((a, b) => a - b)[0];
+    return typeof min === "number" ? String(min) : dueDayLabel(row.vencimento);
+  }
+  return dueDayLabel(row.vencimento);
+}
+
+function progressText(row: DebtorRow) {
+  const total = Number(row.progress_total ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const paid = Math.max(0, Math.min(total, Number(row.progress_paid ?? 0) || 0));
+  return `${paid}/${total} Pagas`;
 }
 
 function splitDueDateParts(v: string | null | undefined, fallbackDate: Date) {
@@ -297,8 +335,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   const { theme } = useAppTheme();
   const pageSize = 5;
   const currentDate = useMemo(() => new Date(), []);
-  const currentMonth = String(currentDate.getMonth() + 1).padStart(2, "0");
-  const currentYear = String(currentDate.getFullYear());
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<DebtorRow[]>(initial);
@@ -306,7 +342,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DebtorRow | null>(null);
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>("desconhecida");
-  const [customDueDate, setCustomDueDate] = useState(false);
   const canCreate = plan === "pro" || plan === "vitalicio" || rows.length < 15;
 
   const filtered = useMemo(() => {
@@ -343,10 +378,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     defaultValues: {
       nome: "",
       telefone: "",
-      valor: "",
-      vencimento_day: "",
-      vencimento_month: currentMonth,
-      vencimento_year: currentYear,
+      charges: [{ amount: "", due_day: String(currentDate.getDate()) }],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -360,18 +392,19 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     },
   });
 
+  const { fields: chargeFields, append: appendCharge, remove: removeCharge } = useFieldArray({
+    control,
+    name: "charges",
+  });
+
   const close = () => {
     setOpen(false);
     setEditing(null);
     setPixKeyType("desconhecida");
-    setCustomDueDate(false);
     reset({
       nome: "",
       telefone: "",
-      valor: "",
-      vencimento_day: "",
-      vencimento_month: currentMonth,
-      vencimento_year: currentYear,
+      charges: [{ amount: "", due_day: String(currentDate.getDate()) }],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -395,19 +428,41 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   };
 
   const openEdit = (row: DebtorRow) => {
-    const dueParts = splitDueDateParts(row.vencimento, currentDate);
     setEditing(row);
     setOpen(true);
     setPixKeyType(detectPixKeyType(row.pix_key ?? ""));
-    setCustomDueDate(dueParts.custom);
+    const charges =
+      row.charges && row.charges.length
+        ? [...row.charges]
+            .sort((a, b) => (a.due_day ?? 0) - (b.due_day ?? 0))
+            .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
+            .map((c) => ({
+              charge_id: c.id,
+              amount: (() => {
+                const n = typeof c.amount === "number" ? c.amount : Number(c.amount);
+                return Number.isFinite(n)
+                  ? n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : "";
+              })(),
+              due_day: String(c.due_day ?? ""),
+            }))
+        : [
+            {
+              amount:
+                typeof row.valor === "number"
+                  ? row.valor.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : "",
+              due_day: String(dueDayLabel(row.vencimento) ?? ""),
+            },
+          ];
     reset({
       id: row.id,
       nome: row.nome,
       telefone: row.telefone ?? "",
-      valor: row.valor != null ? String(row.valor) : "",
-      vencimento_day: dueParts.day,
-      vencimento_month: dueParts.month,
-      vencimento_year: dueParts.year,
+      charges,
       pix_key: row.pix_key ? formatPixKey(row.pix_key) : "",
       observacoes: row.observacoes ?? "",
       status: row.status ?? "ativo",
@@ -425,23 +480,32 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   };
 
   const onSubmit = handleSubmit(async (values) => {
-    const valor = values.valor ? parseBRLToNumber(values.valor) : null;
     const pixKey = values.pix_key ? normalizePixKeyForSave(values.pix_key) : null;
-    const dueDateResult = buildDueDateIso({
-      day: values.vencimento_day,
-      month: customDueDate ? values.vencimento_month : currentMonth,
-      year: customDueDate ? values.vencimento_year : currentYear,
-    });
-    if (!dueDateResult.ok) {
-      modalToast.error(dueDateResult.error);
+    const mappedCharges = (values.charges ?? [])
+      .map((c, index) => ({
+        index,
+        id: c.charge_id,
+        amount: c.amount ? parseBRLToNumber(c.amount) : null,
+        dueDay: Number(String(c.due_day ?? "").trim()),
+      }))
+      .filter((c) => typeof c.amount === "number" && c.amount > 0 && Number.isInteger(c.dueDay) && c.dueDay >= 1 && c.dueDay <= 31)
+      .slice(0, MAX_RETRY_ATTEMPTS_PER_DAY)
+      .sort((a, b) => (a.dueDay !== b.dueDay ? a.dueDay - b.dueDay : a.index - b.index));
+
+    if (!mappedCharges.length) {
+      modalToast.error("Informe pelo menos 1 cobrança (valor e dia de vencimento).");
       return;
     }
+
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       nome: values.nome,
       telefone: values.telefone || undefined,
-      valor: typeof valor === "number" ? valor : undefined,
-      vencimento: dueDateResult.value,
+      charges: mappedCharges.map((c) => ({
+        ...(c.id ? { id: c.id } : {}),
+        amount: c.amount as number,
+        due_day: c.dueDay,
+      })),
       pix_key: pixKey ? pixKey : undefined,
       observacoes: values.observacoes || undefined,
       status: values.status || "ativo",
@@ -549,6 +613,12 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             {r.observacoes}
                           </div>
                         ) : null}
+                        {(() => {
+                          const p = progressText(r);
+                          return p ? (
+                            <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{p}</div>
+                          ) : null;
+                        })()}
                       </div>
                       <span
                         className={[
@@ -574,7 +644,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             Valor
                           </div>
                           <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                            {money(r.valor)}
+                            {money(chargesTotal(r))}
                           </div>
                         </div>
                         <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
@@ -582,7 +652,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             Vencimento
                           </div>
                           <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                            {dueDayLabel(r.vencimento)}
+                            {chargesFirstDueDay(r)}
                           </div>
                         </div>
                       </div>
@@ -644,13 +714,17 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           {r.observacoes}
                         </div>
                       ) : null}
+                      {(() => {
+                        const p = progressText(r);
+                        return p ? <div className="truncate text-[11px] text-[var(--app-text-55)]">{p}</div> : null;
+                      })()}
                     </div>
                     <div className="col-span-2 truncate text-center text-[var(--app-text-70)]">
                       {r.telefone ?? "-"}
                     </div>
-                    <div className="col-span-2 text-center">{money(r.valor)}</div>
+                    <div className="col-span-2 text-center">{money(chargesTotal(r))}</div>
                     <div className="col-span-2 text-center text-[var(--app-text-70)]">
-                      {dueDayLabel(r.vencimento)}
+                      {chargesFirstDueDay(r)}
                     </div>
                     <div className="col-span-1 flex justify-center">
                       <span
@@ -767,87 +841,88 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
                   </div>
 
-                  <div className="grid gap-3">
-                    <div className="w-full">
-                      <div className="text-xs font-semibold text-white/60">Valor</div>
-                      <Controller
-                        control={control}
-                        name="valor"
-                        render={({ field }) => (
-                          <div className="relative mt-2">
-                            <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/55">
-                              R$
-                            </div>
-                            <input
-                              inputMode="numeric"
-                              className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2 pl-12 pr-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                              placeholder="0,00"
-                              value={field.value ?? ""}
-                              onChange={(e) => {
-                                const next = formatBRLFromDigits(e.currentTarget.value);
-                                field.onChange(next);
-                              }}
-                              onBlur={field.onBlur}
-                              name={field.name}
-                              ref={field.ref}
-                            />
-                          </div>
-                        )}
-                      />
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-semibold text-white/60">Cobranças do mês</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (chargeFields.length >= MAX_RETRY_ATTEMPTS_PER_DAY) {
+                            modalToast.error(`Limite: no máximo ${MAX_RETRY_ATTEMPTS_PER_DAY} cobranças por cliente.`);
+                            return;
+                          }
+                          appendCharge({ amount: "", due_day: String(currentDate.getDate()) });
+                        }}
+                        className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06]"
+                      >
+                        Adicionar
+                      </button>
                     </div>
-                    <div>
-                      <div className="text-xs font-semibold text-white/60">
-                        Vencimento
-                      </div>
-                      <div className="mt-2 rounded-2xl border border-white/10 bg-white/[0.02] p-3">
-                        <input
-                          type="number"
-                          min={1}
-                          max={31}
-                          inputMode="numeric"
-                          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                          placeholder="Dia do vencimento"
-                          {...register("vencimento_day")}
-                        />
-                        <div className="mt-2 text-[11px] text-white/45">
-                          Informe apenas o dia. O sistema usa automaticamente{" "}
-                          {monthOptions.find((m) => m.value === currentMonth)?.label} de {currentYear}.
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setCustomDueDate((prev) => !prev)}
-                          className="mt-3 text-left text-xs font-semibold text-[var(--app-text-60)] hover:text-[var(--app-text-85)]"
+
+                    <div className="mt-2 grid gap-3">
+                      {chargeFields.map((field, index) => (
+                        <div
+                          key={field.id}
+                          className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
                         >
-                          {customDueDate ? "Usar mes atual" : "Definir outro mes/ano"}
-                        </button>
-                      </div>
-                      {customDueDate ? (
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                          <div>
-                            <div className="text-xs font-semibold text-white/60">Mes</div>
-                            <select
-                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                              {...register("vencimento_month")}
+                          <input type="hidden" {...register(`charges.${index}.charge_id`)} />
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="w-full">
+                              <div className="text-xs font-semibold text-white/60">Valor</div>
+                              <Controller
+                                control={control}
+                                name={`charges.${index}.amount`}
+                                render={({ field }) => (
+                                  <div className="relative mt-2">
+                                    <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/55">
+                                      R$
+                                    </div>
+                                    <input
+                                      inputMode="numeric"
+                                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2 pl-12 pr-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                                      placeholder="0,00"
+                                      value={field.value ?? ""}
+                                      onChange={(e) => {
+                                        const next = formatBRLFromDigits(e.currentTarget.value);
+                                        field.onChange(next);
+                                      }}
+                                      onBlur={field.onBlur}
+                                      name={field.name}
+                                      ref={field.ref}
+                                    />
+                                  </div>
+                                )}
+                              />
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold text-white/60">Dia de vencimento</div>
+                              <input
+                                type="number"
+                                min={1}
+                                max={31}
+                                inputMode="numeric"
+                                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                                placeholder="Ex: 10"
+                                {...register(`charges.${index}.due_day` as const)}
+                              />
+                            </div>
+                          </div>
+
+                          {chargeFields.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => removeCharge(index)}
+                              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-white/85 hover:bg-white/[0.06]"
                             >
-                              {monthOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-white/60">Ano</div>
-                            <input
-                              type="number"
-                              min={2000}
-                              max={9999}
-                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                              {...register("vencimento_year")}
-                            />
-                          </div>
+                              Remover cobrança
+                            </button>
+                          ) : null}
                         </div>
-                      ) : null}
+                      ))}
+                    </div>
+
+                    <div className="mt-2 text-[11px] text-white/45">
+                      Ordena automaticamente por vencimento e permite até {MAX_RETRY_ATTEMPTS_PER_DAY} cobranças por cliente.
                     </div>
                   </div>
 

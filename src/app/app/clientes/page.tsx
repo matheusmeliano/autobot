@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsClient";
 import Link from "next/link";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
-import { applyCurrentMonthDebtorStatuses } from "@/lib/debtorChargeStatus";
+import { applyCurrentMonthDebtorStatuses, deriveCurrentMonthDebtorProgress } from "@/lib/debtorChargeStatus";
 
 export default async function ClientesPage() {
   const supabase = await createSupabaseServerClient();
@@ -10,14 +10,16 @@ export default async function ClientesPage() {
     supabase
       .from("debtors")
       .select(
-        "id, nome, telefone, valor, vencimento, pix_key, observacoes, status, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, created_at",
+        "id, nome, telefone, valor, vencimento, pix_key, observacoes, status, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, created_at, debtor_charges(id, amount, due_day, created_at)",
       )
       .order("created_at", { ascending: false })
       .limit(200),
     supabase.from("profiles").select("plano").maybeSingle(),
     supabase
       .from("schedules")
-      .select("debtor_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at")
+      .select(
+        "debtor_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at, charge_id",
+      )
       .limit(1000),
   ]);
 
@@ -56,12 +58,31 @@ export default async function ClientesPage() {
   }
 
   const plan = normalizePlan((profile as any)?.plano) as PlanKey;
-  const rows = applyCurrentMonthDebtorStatuses({
-    debtors: ((data ?? []) as DebtorRow[]).map((row) => ({
+  const schedulesByDebtor = new Map<string, any[]>();
+  for (const s of (schedules ?? []) as any[]) {
+    const debtorId = String((s as any)?.debtor_id ?? "");
+    if (!debtorId) continue;
+    const list = schedulesByDebtor.get(debtorId) ?? [];
+    list.push(s);
+    schedulesByDebtor.set(debtorId, list);
+  }
+
+  const rowsWithStatus = applyCurrentMonthDebtorStatuses({
+    debtors: ((data ?? []) as any[]).map((row) => ({
       ...row,
       status: row.status ?? "ativo",
+      charges: ((row as any)?.debtor_charges ?? []).map((c: any) => ({
+        ...c,
+        amount: typeof c?.amount === "number" ? c.amount : Number(c?.amount),
+        due_day: typeof c?.due_day === "number" ? c.due_day : Number(c?.due_day),
+      })),
     })),
     schedules: (schedules ?? []) as any[],
+  });
+
+  const rows = (rowsWithStatus as any[]).map((row) => {
+    const prog = deriveCurrentMonthDebtorProgress(schedulesByDebtor.get(String(row.id)) ?? []);
+    return { ...row, progress_paid: prog.paid, progress_total: prog.total };
   });
 
   return <DebtorsClient initial={rows as DebtorRow[]} plan={plan} />;

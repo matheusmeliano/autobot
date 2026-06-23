@@ -74,6 +74,14 @@ function formatDateBR(value: unknown) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
+function diffDaysLocalDate(fromDate: string, toDate: string) {
+  const [fy, fm, fd] = fromDate.split("-").map(Number);
+  const [ty, tm, td] = toDate.split("-").map(Number);
+  const from = Date.UTC(fy, fm - 1, fd, 12, 0, 0);
+  const to = Date.UTC(ty, tm - 1, td, 12, 0, 0);
+  return Math.floor((to - from) / (24 * 60 * 60 * 1000));
+}
+
 async function countExecutedRunsOnLocalDate(params: {
   supabase: ReturnType<typeof createSupabaseAdminClient>;
   scheduleId: string;
@@ -198,7 +206,12 @@ export async function GET(req: Request) {
       String((item as any).first_sent_at ?? "") ||
       String((item as any).charge_due_at ?? "") ||
       String((item as any).data_envio ?? nowIso);
-    if (!referenceUtcIso || !isPastLocalDay({ referenceUtcIso, nowUtcIso: nowIso, timeZone })) continue;
+    const dueUtcIso = String((item as any).charge_due_at ?? "") || String((item as any).data_envio ?? "");
+    if (!referenceUtcIso || !dueUtcIso) continue;
+    const dueLocalDate = localDateInTimeZone(dueUtcIso, timeZone);
+    const nowLocalDate = localDateInTimeZone(nowIso, timeZone);
+    if (diffDaysLocalDate(dueLocalDate, nowLocalDate) < 3) continue;
+    if (!isPastLocalDay({ referenceUtcIso, nowUtcIso: nowIso, timeZone })) continue;
 
     const retryConfig = normalizeRetryConfig((item as any).debtors ?? {});
     const shouldClose =
@@ -233,7 +246,7 @@ export async function GET(req: Request) {
   const { data: schedules, error } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+      "id, user_id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), charge:debtor_charges!schedules_charge_id_fkey(amount, due_day), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .in("status", ["agendado", "atrasado", "pausado"])
     .is("closed_at", null)
@@ -311,7 +324,7 @@ export async function GET(req: Request) {
 
       const debtorPhone = String(debtor?.telefone ?? "");
       const chargeAmount = getScheduleChargeAmount({
-        baseAmount: debtor?.valor,
+        baseAmount: (s as any).charge?.amount ?? debtor?.valor,
         accumulateOpenMonthlyCharges: Boolean(debtor?.accumulate_open_monthly_charges),
         recurrence: String((s as any).recurrence ?? ""),
         status: String((s as any).status ?? ""),
@@ -395,8 +408,13 @@ export async function GET(req: Request) {
       const message = applyTemplate(templateText, {
         nome: String(debtor?.nome ?? ""),
         pix: String(debtor?.pix_key ?? ""),
-        valor: formatBRL(chargeAmount ?? debtor?.valor),
-        vencimento: formatDateBR(debtor?.vencimento),
+        valor: formatBRL(chargeAmount ?? (s as any).charge?.amount ?? debtor?.valor),
+        vencimento: formatDateBR(
+          localDateInTimeZone(
+            String((s as any).charge_due_at ?? (s as any).data_envio ?? nowIso),
+            timeZone,
+          ),
+        ),
       });
 
       let messageSent = false;

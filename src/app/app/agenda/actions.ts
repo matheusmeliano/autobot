@@ -551,7 +551,7 @@ export async function triggerScheduleNowAction(id: string) {
   const { data: schedule, error } = await admin
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+      "id, user_id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), charge:debtor_charges!schedules_charge_id_fkey(amount, due_day), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -602,7 +602,7 @@ export async function triggerScheduleNowAction(id: string) {
 
     const debtorPhone = String(debtor?.telefone ?? "");
     const chargeAmount = getScheduleChargeAmount({
-      baseAmount: debtor?.valor,
+      baseAmount: (schedule as any).charge?.amount ?? debtor?.valor,
       accumulateOpenMonthlyCharges: Boolean(debtor?.accumulate_open_monthly_charges),
       recurrence: String((schedule as any).recurrence ?? ""),
       status: currentStatus,
@@ -667,8 +667,13 @@ export async function triggerScheduleNowAction(id: string) {
     const message = applyTemplate(templateText, {
       nome: String(debtor?.nome ?? ""),
       pix: String(debtor?.pix_key ?? ""),
-      valor: formatBRL(chargeAmount ?? debtor?.valor),
-      vencimento: formatDateBR(debtor?.vencimento),
+      valor: formatBRL(chargeAmount ?? (schedule as any).charge?.amount ?? debtor?.valor),
+      vencimento: formatDateBR(
+        localDateInTimeZone(
+          String((schedule as any).charge_due_at ?? (schedule as any).data_envio ?? new Date().toISOString()),
+          timeZone,
+        ),
+      ),
     });
 
     // #region debug-point extra-send-manual-before-send
