@@ -42,6 +42,7 @@ function deriveCurrentMonthDebtorSnapshot(
   let hasPending = false;
   let hasOverdue = false;
   let hasScheduled = false;
+  let hasFutureScheduled = false;
 
   for (const row of schedules) {
     const timeZone = String(row?.schedule_timezone ?? "") || "America/Sao_Paulo";
@@ -60,6 +61,10 @@ function deriveCurrentMonthDebtorSnapshot(
     const dueMonth = dueLocalDate.slice(0, 7);
     const isRecurring = recurrence === "monthly" || recurrence === "yearly";
     const paymentInCurrentMonth = Boolean(paymentLocalDate && paymentLocalDate.slice(0, 7) === currentMonth);
+    if (dueMonth > currentMonth && !(isRecurring && paymentInCurrentMonth)) {
+      hasFutureScheduled = true;
+      continue;
+    }
     const isRelevant = dueMonth === currentMonth || (isRecurring && paymentInCurrentMonth && dueMonth > currentMonth);
     if (!isRelevant) continue;
 
@@ -88,7 +93,7 @@ function deriveCurrentMonthDebtorSnapshot(
     hasScheduled = true;
   }
 
-  return { total, paid, hasPending, hasOverdue, hasScheduled };
+  return { total, paid, hasPending, hasOverdue, hasScheduled, hasFutureScheduled };
 }
 
 export function deriveCurrentMonthDebtorStatus(
@@ -96,11 +101,11 @@ export function deriveCurrentMonthDebtorStatus(
   nowUtcIso = new Date().toISOString(),
 ): DebtorChargeStatus {
   const snap = deriveCurrentMonthDebtorSnapshot(schedules, nowUtcIso);
-  if (snap.total <= 0) return "pendente";
+  if (snap.total <= 0) return snap.hasFutureScheduled ? "agendado" : "pendente";
   if (snap.hasOverdue) return "atrasado";
   if (snap.hasPending) return "pendente";
   if (snap.paid >= snap.total) return "pago";
-  if (snap.hasScheduled) return "agendado";
+  if (snap.hasScheduled || snap.hasFutureScheduled) return "agendado";
   return "pendente";
 }
 
