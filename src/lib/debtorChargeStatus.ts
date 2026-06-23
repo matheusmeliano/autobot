@@ -191,6 +191,37 @@ export function deriveCurrentMonthDebtorProgress(
   return { paid: snap.paid, total: snap.total };
 }
 
+export function deriveDebtorChargeProgress(
+  charges: DebtorChargeRow[],
+  schedules: DebtorScheduleStatusRow[],
+) {
+  const normalizedCharges = charges
+    .filter((charge) => buildChargeLocalDate(charge))
+    .map((charge) => String(charge.id ?? "").trim())
+    .filter(Boolean);
+
+  if (!normalizedCharges.length) {
+    return deriveCurrentMonthDebtorProgress(schedules);
+  }
+
+  const paidChargeIds = new Set(
+    schedules
+      .filter((row) => {
+        const status = String(row.status ?? "").trim().toLowerCase();
+        return (
+          status === "pago" ||
+          status === "executado" ||
+          Boolean(String(row.payment_received_at ?? "").trim())
+        );
+      })
+      .map((row) => String(row.charge_id ?? "").trim())
+      .filter(Boolean),
+  );
+
+  const paid = normalizedCharges.filter((chargeId) => paidChargeIds.has(chargeId)).length;
+  return { paid, total: normalizedCharges.length };
+}
+
 export function applyCurrentMonthDebtorStatuses<
   T extends {
     id: string;

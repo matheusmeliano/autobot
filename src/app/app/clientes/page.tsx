@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsClient";
 import Link from "next/link";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
-import { applyCurrentMonthDebtorStatuses, deriveCurrentMonthDebtorProgress } from "@/lib/debtorChargeStatus";
+import { applyCurrentMonthDebtorStatuses, deriveDebtorChargeProgress } from "@/lib/debtorChargeStatus";
 
 export default async function ClientesPage() {
   const supabase = await createSupabaseServerClient();
@@ -83,7 +83,7 @@ export default async function ClientesPage() {
   });
 
   const rows = (rowsWithStatus as any[]).map((row) => {
-    const prog = deriveCurrentMonthDebtorProgress(schedulesByDebtor.get(String(row.id)) ?? []);
+    const prog = deriveDebtorChargeProgress(row.charges ?? [], schedulesByDebtor.get(String(row.id)) ?? []);
     return { ...row, progress_paid: prog.paid, progress_total: prog.total };
   });
 
