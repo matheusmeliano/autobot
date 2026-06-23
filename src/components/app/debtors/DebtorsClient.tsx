@@ -184,7 +184,7 @@ function debtorStatusLabel(status: string | null | undefined) {
 function debtorStatusClass(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
   if (s === "ativo" || s === "pago") {
-    return "bg-emerald-700 text-[rgb(255,255,255)]";
+    return "bg-emerald-600 text-[rgb(255,255,255)]";
   }
   if (s === "agendado") {
     return "bg-yellow-500 text-[rgb(255,255,255)]";
@@ -193,7 +193,7 @@ function debtorStatusClass(status: string | null | undefined) {
     return "bg-orange-500 text-[rgb(255,255,255)]";
   }
   if (s === "atrasado") {
-    return "bg-rose-700 text-[rgb(255,255,255)]";
+    return "bg-rose-600 text-[rgb(255,255,255)]";
   }
   return "bg-yellow-500 text-[rgb(255,255,255)]";
 }
