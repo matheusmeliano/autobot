@@ -8,6 +8,12 @@ type DebtorChargeRow = {
   created_at?: string | null;
 };
 
+type TemplateChoice = {
+  id: string;
+  nome?: string | null;
+  created_at?: string | null;
+};
+
 type DebtorRow = {
   id: string;
   nome?: string | null;
@@ -79,6 +85,41 @@ function buildChargeIso(charge: DebtorChargeRow, time: string, timeZone: string)
   return zonedDateTimeToUtcIso({ date, time, timeZone });
 }
 
+function resolveChargeTemplateDefaults(templates: TemplateChoice[]) {
+  if (!templates.length) {
+    return {
+      pendingId: null,
+      pendingNome: null,
+      overdueId: null,
+      overdueNome: null,
+    };
+  }
+
+  const sorted = [...templates].sort((a, b) =>
+    String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")),
+  );
+  const findByName = (keywords: string[], excludeIds = new Set<string>()) =>
+    sorted.find((template) => {
+      const id = String(template.id ?? "");
+      if (!id || excludeIds.has(id)) return false;
+      const name = String(template.nome ?? "").trim().toLowerCase();
+      return keywords.some((keyword) => name.includes(keyword));
+    });
+
+  const pending = findByName(["pendente", "inicial", "primeira"]) ?? sorted[0] ?? null;
+  const overdue =
+    findByName(["atras", "vencid", "overdue"], new Set([String(pending?.id ?? "")])) ??
+    sorted.find((template) => String(template.id ?? "") !== String(pending?.id ?? "")) ??
+    pending;
+
+  return {
+    pendingId: pending?.id ? String(pending.id) : null,
+    pendingNome: pending?.nome ? String(pending.nome) : null,
+    overdueId: overdue?.id ? String(overdue.id) : pending?.id ? String(pending.id) : null,
+    overdueNome: overdue?.nome ? String(overdue.nome) : pending?.nome ? String(pending.nome) : null,
+  };
+}
+
 function fallbackScheduleMatch(
   schedules: ScheduleSourceRow[],
   charge: DebtorChargeRow,
@@ -97,7 +138,9 @@ export function buildAgendaRows(params: {
   debtors: DebtorRow[];
   schedules: ScheduleSourceRow[];
   latestExecutedRunBySchedule: Map<string, string>;
+  templates?: TemplateChoice[];
 }) {
+  const templateDefaults = resolveChargeTemplateDefaults(params.templates ?? []);
   const scheduleGroups = new Map<string, ScheduleSourceRow[]>();
   for (const schedule of params.schedules ?? []) {
     if (String(schedule.closed_at ?? "").trim()) continue;
@@ -145,9 +188,15 @@ export function buildAgendaRows(params: {
         charge_id: chargeId,
         source_kind: "charge",
         schedule_missing: !matchedSchedule?.id,
-        template_id: matchedSchedule?.template_id ? String(matchedSchedule.template_id) : null,
-        template_pending_id: matchedSchedule?.template_pending_id ? String(matchedSchedule.template_pending_id) : null,
-        template_overdue_id: matchedSchedule?.template_overdue_id ? String(matchedSchedule.template_overdue_id) : null,
+        template_id: matchedSchedule?.template_id
+          ? String(matchedSchedule.template_id)
+          : templateDefaults.pendingId,
+        template_pending_id: matchedSchedule?.template_pending_id
+          ? String(matchedSchedule.template_pending_id)
+          : templateDefaults.pendingId,
+        template_overdue_id: matchedSchedule?.template_overdue_id
+          ? String(matchedSchedule.template_overdue_id)
+          : templateDefaults.overdueId,
         data_envio: String(dataEnvio),
         charge_due_at: String(chargeDueAt),
         next_charge_due_at: nextChargeDueAt,
@@ -164,13 +213,15 @@ export function buildAgendaRows(params: {
           : null,
         created_at: String(matchedSchedule?.created_at ?? charge.created_at ?? chargeDueAt),
         debtor_nome: String(debtor.nome ?? "-"),
-        template_nome: matchedSchedule?.pending_template?.nome ? String(matchedSchedule.pending_template.nome) : null,
+        template_nome: matchedSchedule?.pending_template?.nome
+          ? String(matchedSchedule.pending_template.nome)
+          : templateDefaults.pendingNome,
         template_pending_nome: matchedSchedule?.pending_template?.nome
           ? String(matchedSchedule.pending_template.nome)
-          : null,
+          : templateDefaults.pendingNome,
         template_overdue_nome: matchedSchedule?.overdue_template?.nome
           ? String(matchedSchedule.overdue_template.nome)
-          : null,
+          : templateDefaults.overdueNome,
       });
     }
 

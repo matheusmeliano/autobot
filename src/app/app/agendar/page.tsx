@@ -34,8 +34,8 @@ export default async function AgendarPage() {
       .limit(500),
     supabase
       .from("message_templates")
-      .select("id, nome")
-      .order("created_at", { ascending: false })
+      .select("id, nome, created_at")
+      .order("created_at", { ascending: true })
       .limit(200),
     supabase.from("profiles").select("timezone").maybeSingle(),
     supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
@@ -67,6 +67,7 @@ export default async function AgendarPage() {
     debtors: (debtorsRes.data ?? []) as any[],
     schedules: (schedulesRes.data ?? []) as any[],
     latestExecutedRunBySchedule,
+    templates: (templatesRes.data ?? []) as any[],
   });
   const wa = (waRes as any)?.data ?? null;
   const waStatus = String(wa?.status ?? "").toLowerCase();

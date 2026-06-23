@@ -3,7 +3,7 @@ import { buildAgendaRows } from "@/lib/agendaRows";
 
 export async function GET() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
-  const [{ data: schedules }, { data: scheduleRuns }, { data: debtors }] = await Promise.all([
+  const [{ data: schedules }, { data: scheduleRuns }, { data: debtors }, { data: templates }] = await Promise.all([
     supabase
       .from("schedules")
       .select(
@@ -24,6 +24,11 @@ export async function GET() {
       )
       .order("nome", { ascending: true })
       .limit(500),
+    supabase
+      .from("message_templates")
+      .select("id, nome, created_at")
+      .order("created_at", { ascending: true })
+      .limit(200),
   ]);
 
   const latestExecutedRunBySchedule = new Map<string, string>();
@@ -38,6 +43,7 @@ export async function GET() {
     debtors: (debtors ?? []) as any[],
     schedules: (schedules ?? []) as any[],
     latestExecutedRunBySchedule,
+    templates: (templates ?? []) as any[],
   });
 
   return Response.json(rows);
