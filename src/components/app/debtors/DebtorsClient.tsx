@@ -868,7 +868,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
                         >
                           <input type="hidden" {...register(`charges.${index}.charge_id`)} />
-                          <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
                             <div className="w-full">
                               <div className="text-xs font-semibold text-white/60">Valor</div>
                               <Controller
