@@ -415,7 +415,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       retry_weekdays: normalizeRetryWeekdays(row.retry_weekdays),
       retry_time: row.retry_time ?? DEFAULT_RETRY_TIME,
       retry_max_attempts: row.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS,
-      retry_interval_days: row.retry_interval_days ?? DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: row.retry_auto_close_days ?? DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     });
   };
@@ -446,7 +446,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
       retry_time: values.retry_time || DEFAULT_RETRY_TIME,
       retry_max_attempts: Number(values.retry_max_attempts) || DEFAULT_RETRY_MAX_ATTEMPTS,
-      retry_interval_days: Number(values.retry_interval_days) || DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: Number(values.retry_auto_close_days) || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     };
 

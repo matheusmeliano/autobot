@@ -91,7 +91,8 @@ export function normalizeRetryConfig(input: any): RetryConfig {
     weekdays: normalizeRetryWeekdays(input?.retry_weekdays),
     time: validTime(String(input?.retry_time ?? "")) ? String(input.retry_time) : DEFAULT_RETRY_TIME,
     maxAttempts: Math.max(1, Number(input?.retry_max_attempts ?? DEFAULT_RETRY_MAX_ATTEMPTS) || DEFAULT_RETRY_MAX_ATTEMPTS),
-    intervalDays: Math.max(1, Number(input?.retry_interval_days ?? DEFAULT_RETRY_INTERVAL_DAYS) || DEFAULT_RETRY_INTERVAL_DAYS),
+    // This interval is no longer configurable in the UI, so re-sends always advance by one day.
+    intervalDays: DEFAULT_RETRY_INTERVAL_DAYS,
     autoCloseDays: Math.max(
       1,
       Number(input?.retry_auto_close_days ?? DEFAULT_RETRY_AUTO_CLOSE_DAYS) || DEFAULT_RETRY_AUTO_CLOSE_DAYS,

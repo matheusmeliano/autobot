@@ -68,7 +68,7 @@ export async function createDebtorAction(input: unknown) {
     retry_weekdays: normalizeRetryWeekdays(parsed.data.retry_weekdays),
     retry_time: parsed.data.retry_time || DEFAULT_RETRY_TIME,
     retry_max_attempts: parsed.data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
-    retry_interval_days: parsed.data.retry_interval_days || DEFAULT_RETRY_INTERVAL_DAYS,
+    retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
     retry_auto_close_days: parsed.data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
   });
 
@@ -100,7 +100,7 @@ export async function updateDebtorAction(input: unknown) {
       retry_weekdays: normalizeRetryWeekdays(data.retry_weekdays),
       retry_time: data.retry_time || DEFAULT_RETRY_TIME,
       retry_max_attempts: data.retry_max_attempts || DEFAULT_RETRY_MAX_ATTEMPTS,
-      retry_interval_days: data.retry_interval_days || DEFAULT_RETRY_INTERVAL_DAYS,
+      retry_interval_days: DEFAULT_RETRY_INTERVAL_DAYS,
       retry_auto_close_days: data.retry_auto_close_days || DEFAULT_RETRY_AUTO_CLOSE_DAYS,
     })
     .eq("id", id);
