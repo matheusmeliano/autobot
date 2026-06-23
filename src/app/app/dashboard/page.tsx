@@ -72,13 +72,13 @@ export default async function DashboardPage() {
       .limit(50),
     supabase
       .from("debtors")
-      .select("id, valor, status, accumulate_open_monthly_charges")
+      .select("id, valor, status, accumulate_open_monthly_charges, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)")
       .eq("user_id", userId)
       .limit(1000),
     supabase
       .from("schedules")
       .select(
-        "debtor_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at",
+        "debtor_id, charge_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at",
       )
       .eq("user_id", userId)
       .limit(2000),
@@ -105,6 +105,12 @@ export default async function DashboardPage() {
     debtors: ((debtorsRes.data ?? []) as any[]).map((d) => ({
       ...d,
       status: String(d?.status ?? "ativo"),
+      charges: ((d as any)?.debtor_charges ?? []).map((c: any) => ({
+        ...c,
+        due_day: typeof c?.due_day === "number" ? c.due_day : Number(c?.due_day),
+        recurrence_month: typeof c?.recurrence_month === "number" ? c.recurrence_month : Number(c?.recurrence_month),
+        recurrence_year: typeof c?.recurrence_year === "number" ? c.recurrence_year : Number(c?.recurrence_year),
+      })),
     })),
     schedules: schedules as any[],
   }) as Array<{

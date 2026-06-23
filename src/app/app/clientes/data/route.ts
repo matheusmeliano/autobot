@@ -13,7 +13,7 @@ export async function GET() {
       .limit(200),
     supabase
       .from("schedules")
-      .select("debtor_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at")
+      .select("debtor_id, charge_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at")
       .limit(1000),
   ]);
 
