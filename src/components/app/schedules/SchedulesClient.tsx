@@ -679,9 +679,10 @@ export function SchedulesClient({
       window.location.reload();
       return;
     }
-    modalToast.success("Agendamento atualizado.");
-    refresh();
     close();
+    const toastId = modalToast.success("Agendamento atualizado.");
+    await modalToast.wait(toastId);
+    window.location.reload();
   });
 
   const remove = async (row: ScheduleRow) => {
@@ -690,15 +691,14 @@ export function SchedulesClient({
       { title: "Excluir agendamento", confirmText: "Excluir", cancelText: "Cancelar" },
     );
     if (!confirmed) return;
-    startTransition(async () => {
-      const res = await deleteScheduleAction(row.id);
-      if (!res.ok) {
-        modalToast.error(res.error ?? "Falha ao excluir.");
-        return;
-      }
-      modalToast.success("Agendamento excluído.");
-      setRows((prev) => prev.filter((r) => r.id !== row.id));
-    });
+    const res = await deleteScheduleAction(row.id);
+    if (!res.ok) {
+      modalToast.error(res.error ?? "Falha ao excluir.");
+      return;
+    }
+    const toastId = modalToast.success("Agendamento excluído.");
+    await modalToast.wait(toastId);
+    window.location.reload();
   };
 
   const triggerNow = (row: ScheduleRow) => {
@@ -731,9 +731,10 @@ export function SchedulesClient({
         setTriggeringId(null);
         return;
       }
-      modalToast.success("Disparo iniciado.");
-      await refresh();
       setTriggeringId(null);
+      const toastId = modalToast.success("Disparo iniciado.");
+      await modalToast.wait(toastId);
+      window.location.reload();
     });
   };
 
@@ -758,13 +759,14 @@ export function SchedulesClient({
         setMarkingPaidId(null);
         return;
       }
-      modalToast.success(
+      setMarkingPaidId(null);
+      const toastId = modalToast.success(
         String(row.recurrence ?? "none") === "monthly"
           ? "Mensalidade atual marcada como quitada."
           : "Cobrança marcada como paga.",
       );
-      await refresh();
-      setMarkingPaidId(null);
+      await modalToast.wait(toastId);
+      window.location.reload();
     });
   };
 

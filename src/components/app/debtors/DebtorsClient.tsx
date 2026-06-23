@@ -466,17 +466,14 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       return;
     }
 
-    modalToast.success(editing ? "Cliente atualizado." : "Cliente criado.");
+    close();
     if ("warning" in res && res.warning) {
-      modalToast.error(res.warning);
+      const warnId = modalToast.warning(res.warning);
+      await modalToast.wait(warnId);
     }
-
-    startTransition(async () => {
-      const r = await fetch("/app/clientes/data", { cache: "no-store" });
-      const json = (await r.json()) as DebtorRow[];
-      setRows(json);
-      close();
-    });
+    const toastId = modalToast.success(editing ? "Cliente atualizado." : "Cliente criado.");
+    await modalToast.wait(toastId);
+    window.location.reload();
   });
 
   const remove = async (row: DebtorRow) => {
@@ -485,15 +482,14 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       { title: "Excluir cliente", confirmText: "Excluir", cancelText: "Cancelar" },
     );
     if (!confirmed) return;
-    startTransition(async () => {
-      const res = await deleteDebtorAction(row.id);
-      if (!res.ok) {
-        modalToast.error(res.error ?? "Falha ao excluir.");
-        return;
-      }
-      modalToast.success("Cliente excluído.");
-      setRows((prev) => prev.filter((r) => r.id !== row.id));
-    });
+    const res = await deleteDebtorAction(row.id);
+    if (!res.ok) {
+      modalToast.error(res.error ?? "Falha ao excluir.");
+      return;
+    }
+    const toastId = modalToast.success("Cliente excluído.");
+    await modalToast.wait(toastId);
+    window.location.reload();
   };
 
   return (

@@ -97,14 +97,10 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
       return;
     }
 
-    modalToast.success(editing ? "Template atualizado." : "Template criado.");
-
-    startTransition(async () => {
-      const r = await fetch("/app/mensagens/data", { cache: "no-store" });
-      const json = (await r.json()) as TemplateRow[];
-      setRows(json);
-      close();
-    });
+    close();
+    const toastId = modalToast.success(editing ? "Template atualizado." : "Template criado.");
+    await modalToast.wait(toastId);
+    window.location.reload();
   });
 
   const remove = async (row: TemplateRow) => {
@@ -113,15 +109,14 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
       { title: "Excluir template", confirmText: "Excluir", cancelText: "Cancelar" },
     );
     if (!confirmed) return;
-    startTransition(async () => {
-      const res = await deleteTemplateAction(row.id);
-      if (!res.ok) {
-        modalToast.error(res.error ?? "Falha ao excluir.");
-        return;
-      }
-      modalToast.success("Template excluído.");
-      setRows((prev) => prev.filter((r) => r.id !== row.id));
-    });
+    const res = await deleteTemplateAction(row.id);
+    if (!res.ok) {
+      modalToast.error(res.error ?? "Falha ao excluir.");
+      return;
+    }
+    const toastId = modalToast.success("Template excluído.");
+    await modalToast.wait(toastId);
+    window.location.reload();
   };
 
   return (
