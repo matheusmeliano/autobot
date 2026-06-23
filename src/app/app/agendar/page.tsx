@@ -67,8 +67,6 @@ export default async function AgendarPage() {
     debtors: (debtorsRes.data ?? []) as any[],
     schedules: (schedulesRes.data ?? []) as any[],
     latestExecutedRunBySchedule,
-    currentUtcIso: new Date().toISOString(),
-    timeZone: timeZone ?? "America/Sao_Paulo",
   });
   const wa = (waRes as any)?.data ?? null;
   const waStatus = String(wa?.status ?? "").toLowerCase();

@@ -1,10 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { buildAgendaRows } from "@/lib/agendaRows";
-import { BRAZIL_TIMEZONES } from "@/lib/timezone";
 
 export async function GET() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
-  const [{ data: schedules }, { data: scheduleRuns }, { data: debtors }, profileRes] = await Promise.all([
+  const [{ data: schedules }, { data: scheduleRuns }, { data: debtors }] = await Promise.all([
     supabase
       .from("schedules")
       .select(
@@ -25,7 +24,6 @@ export async function GET() {
       )
       .order("nome", { ascending: true })
       .limit(500),
-    supabase.from("profiles").select("timezone").maybeSingle(),
   ]);
 
   const latestExecutedRunBySchedule = new Map<string, string>();
@@ -36,14 +34,10 @@ export async function GET() {
     latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
   }
 
-  const tzRaw = (profileRes as any)?.data?.timezone;
-  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? tzRaw : "America/Sao_Paulo";
   const rows = buildAgendaRows({
     debtors: (debtors ?? []) as any[],
     schedules: (schedules ?? []) as any[],
     latestExecutedRunBySchedule,
-    currentUtcIso: new Date().toISOString(),
-    timeZone,
   });
 
   return Response.json(rows);

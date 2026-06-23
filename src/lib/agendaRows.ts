@@ -1,4 +1,3 @@
-import { localDateInTimeZone } from "@/lib/recurrence";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 type DebtorChargeRow = {
@@ -98,14 +97,7 @@ export function buildAgendaRows(params: {
   debtors: DebtorRow[];
   schedules: ScheduleSourceRow[];
   latestExecutedRunBySchedule: Map<string, string>;
-  currentUtcIso?: string;
-  timeZone?: string;
 }) {
-  const effectiveTimeZone = String(params.timeZone ?? "").trim() || "America/Sao_Paulo";
-  const currentYearMonth = localDateInTimeZone(params.currentUtcIso ?? new Date().toISOString(), effectiveTimeZone).slice(
-    0,
-    7,
-  );
   const scheduleGroups = new Map<string, ScheduleSourceRow[]>();
   for (const schedule of params.schedules ?? []) {
     if (String(schedule.closed_at ?? "").trim()) continue;
@@ -217,18 +209,11 @@ export function buildAgendaRows(params: {
     }
   }
 
-  return rows
-    .filter((row) => {
-      const primaryMoment = String(row.charge_due_at ?? row.data_envio ?? "");
-      if (!primaryMoment) return false;
-      const primaryDate = localDateInTimeZone(primaryMoment, effectiveTimeZone);
-      return primaryDate.slice(0, 7) === currentYearMonth;
-    })
-    .sort((a, b) => {
-      const debtorCompare = String(a.debtor_nome ?? "").localeCompare(String(b.debtor_nome ?? ""), "pt-BR", {
-        sensitivity: "base",
-      });
-      if (debtorCompare !== 0) return debtorCompare;
-      return String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio));
+  return rows.sort((a, b) => {
+    const debtorCompare = String(a.debtor_nome ?? "").localeCompare(String(b.debtor_nome ?? ""), "pt-BR", {
+      sensitivity: "base",
     });
+    if (debtorCompare !== 0) return debtorCompare;
+    return String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio));
+  });
 }
