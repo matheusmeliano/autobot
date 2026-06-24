@@ -134,6 +134,14 @@ function monthYearCompactBR(v: string, timeZone: BrazilTimeZone) {
   return monthYearBR(v, timeZone).replace(" de ", "/");
 }
 
+function normalizeDateOnly(v: unknown) {
+  const s = String(v ?? "").trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+  return "";
+}
+
 function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return "";
@@ -783,7 +791,7 @@ export function SchedulesClient({
           : String((row as any).recurrence ?? "none") === "monthly"
             ? "monthly"
             : "none",
-      recurrence_until: row.recurrence_until ?? "",
+      recurrence_until: normalizeDateOnly(row.recurrence_until),
       status: row.status,
       retry_weekdays: retryDefaults.retry_weekdays,
       retry_time: retryDefaults.retry_time,
@@ -835,6 +843,7 @@ export function SchedulesClient({
       editing && values.data_envio_date
         ? normalizeEditedDateForPersistence(editing, values.data_envio_date)
         : values.data_envio_date;
+    const normalizedRecurrenceUntil = normalizeDateOnly(values.recurrence_until);
 
     const payload = {
       ...(values.id ? { id: values.id } : {}),
@@ -845,7 +854,7 @@ export function SchedulesClient({
       data_envio_time: values.data_envio_time,
       recurrence: values.recurrence,
       recurrence_until:
-        values.recurrence !== "none" && values.recurrence_until ? values.recurrence_until : undefined,
+        values.recurrence !== "none" && normalizedRecurrenceUntil ? normalizedRecurrenceUntil : undefined,
       status: values.status || "agendado",
       retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
       retry_time: values.retry_time || DEFAULT_RETRY_TIME,
@@ -859,8 +868,8 @@ export function SchedulesClient({
 
     if (
       values.recurrence === "monthly" &&
-      values.recurrence_until &&
-      values.recurrence_until < normalizedEditDate
+      normalizedRecurrenceUntil &&
+      normalizedRecurrenceUntil < normalizedEditDate
     ) {
       modalToast.warning("A data final deve ser igual ou posterior à primeira cobrança.");
       return;
@@ -919,7 +928,7 @@ export function SchedulesClient({
           data_envio_date: c.date,
           data_envio_time: c.time,
           recurrence: "monthly",
-          recurrence_until: values.recurrence_until ? values.recurrence_until : undefined,
+          recurrence_until: normalizedRecurrenceUntil ? normalizedRecurrenceUntil : undefined,
           status: values.status || "agendado",
           retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
           retry_time: values.retry_time || DEFAULT_RETRY_TIME,
