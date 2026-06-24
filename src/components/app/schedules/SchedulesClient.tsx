@@ -415,29 +415,23 @@ export function SchedulesClient({
 
   const displayStatus = (row: ScheduleRow) => {
     const primaryMoment = row.charge_due_at ?? row.data_envio;
-    const primaryTime = new Date(primaryMoment).getTime();
-    const alreadyReachedChargeDate = Number.isFinite(primaryTime) && primaryTime <= Date.now();
-    return alreadyReachedChargeDate
+    const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
+    const dueLocalDate = localDateInTimeZone(primaryMoment, effectiveTimeZone);
+    const alreadyPassedChargeDate = Boolean(dueLocalDate) && dueLocalDate < currentLocalDate;
+    return alreadyPassedChargeDate
       ? { label: "Executado", className: statusClass("executado") }
       : { label: "Pendente", className: statusClass("pendente") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
     const dueMoment = row.charge_due_at ?? row.data_envio;
-    const nextRecurringMoment =
-      row.source_kind === "charge"
-        ? row.next_charge_due_at ?? null
-        : row.next_charge_due_at ?? getNextRecurringMoment(row, effectiveTimeZone);
-    const hasNextSchedule = Boolean(nextRecurringMoment);
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
 
     return {
       primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
-      nextDate: hasNextSchedule ? dateBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
-      nextTime: hasNextSchedule ? timeBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
-      hasNextSchedule,
+      scheduledDate: dateBR(row.data_envio, effectiveTimeZone),
     };
   };
 
@@ -1188,13 +1182,10 @@ export function SchedulesClient({
 
                   <div className="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                      Próximo agendamento
+                      Agendado para
                     </div>
                     <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                      {moments.nextDate}
-                    </div>
-                    <div className="mt-1 text-xs text-[var(--app-text-60)]">
-                      {moments.hasNextSchedule ? moments.nextTime : "Sem novo envio programado."}
+                      {moments.scheduledDate}
                     </div>
                   </div>
 
@@ -1220,7 +1211,7 @@ export function SchedulesClient({
                 <div className="text-center">Templates</div>
                 <div className="text-center">Vencimento</div>
                 <div className="text-center">Hora</div>
-                <div className="text-center">Próximos agendamentos</div>
+                <div className="text-center">Agendado para</div>
                 <div className="text-center">Status</div>
                 <div className="text-right">Ações</div>
               </div>
@@ -1261,10 +1252,7 @@ export function SchedulesClient({
                         </div>
                         <div className="min-w-0 text-center text-[var(--app-text-70)]">
                           <div className="truncate font-semibold text-[var(--app-text-80)]">
-                            {moments.nextDate}
-                          </div>
-                          <div className="truncate text-[11px] text-[var(--app-text-55)]">
-                            {moments.hasNextSchedule ? moments.nextTime : "Sem novo envio"}
+                            {moments.scheduledDate}
                           </div>
                         </div>
                         <div className="flex justify-center">
