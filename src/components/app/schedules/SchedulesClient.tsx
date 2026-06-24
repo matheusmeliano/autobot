@@ -1674,7 +1674,24 @@ export function SchedulesClient({
 
               {recurrenceValue !== "none" ? (
                 <div className="mt-1">
-                  <div>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMonthlyExtras((prev) => [
+                          ...prev,
+                          { date: String(watch("data_envio_date") ?? ""), time: String(watch("data_envio_time") ?? "") },
+                        ])
+                      }
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/[0.06]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Adicionar
+                    </button>
+                  </div>
+
+                  <div className="mt-4">
                     <div className="text-xs font-semibold text-white/60">Data final (opcional)</div>
                     <div className="mt-1 text-[11px] text-white/45">
                       Se deixar em branco, a cobrança recorrente continua sem limite.
@@ -1701,23 +1718,6 @@ export function SchedulesClient({
                         <Calendar className="h-4 w-4" />
                       </button>
                     </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMonthlyExtras((prev) => [
-                          ...prev,
-                          { date: String(watch("data_envio_date") ?? ""), time: String(watch("data_envio_time") ?? "") },
-                        ])
-                      }
-                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/[0.06]"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Adicionar
-                    </button>
                   </div>
 
                   {monthlyExtras.length > 0 ? (
