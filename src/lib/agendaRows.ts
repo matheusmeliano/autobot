@@ -217,6 +217,38 @@ export function buildAgendaRows(params: {
       const nextCharge = charges[index + 1] ?? null;
       const nextChargeDueAt = nextCharge ? buildChargeIso(nextCharge, retryTime, rowTimeZone) : null;
 
+      // #region debug-point A:adriano-agenda-row
+      if (String(debtor.nome ?? "") === "Adriano Construtor") {
+        fetch("http://127.0.0.1:7778/event", {
+          method: "POST",
+          body: JSON.stringify({
+            sessionId: "adriano-status-executado",
+            runId: "pre-fix",
+            hypothesisId: "A",
+            location: "agendaRows.ts:buildAgendaRows",
+            msg: "[DEBUG] Linha de agenda montada para Adriano",
+            data: {
+              debtorId,
+              debtorName: debtor.nome ?? null,
+              chargeId,
+              chargeDueDay: charge.due_day ?? null,
+              chargeMonth: charge.recurrence_month ?? null,
+              chargeYear: charge.recurrence_year ?? null,
+              matchedScheduleId: matchedSchedule?.id ?? null,
+              matchedScheduleChargeId: matchedSchedule?.charge_id ?? null,
+              matchedScheduleStatus: matchedSchedule?.status ?? null,
+              matchedScheduleClosedAt: matchedSchedule?.closed_at ?? null,
+              matchedScheduleDueAt: matchedSchedule?.charge_due_at ?? null,
+              rowChargeDueAt: chargeDueAt,
+              rowDataEnvio: dataEnvio,
+              nextChargeDueAt,
+            },
+            ts: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+      // #endregion
+
       rows.push({
         id: matchedSchedule?.id ? String(matchedSchedule.id) : `charge:${chargeId}`,
         debtor_id: debtorId,
