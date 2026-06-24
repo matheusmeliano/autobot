@@ -53,6 +53,7 @@ type AgendaRow = {
   template_overdue_id: string | null;
   data_envio: string;
   charge_due_at: string | null;
+  operational_due_at: string | null;
   next_charge_due_at: string | null;
   status: string;
   recurrence: string | null;
@@ -81,6 +82,38 @@ function buildChargeIso(charge: DebtorChargeRow, time: string, timeZone: string)
   const safeDay = String(Math.max(1, Math.min(Number(charge.due_day) || 1, 31))).padStart(2, "0");
   const date = `${String(charge.recurrence_year).padStart(4, "0")}-${String(charge.recurrence_month).padStart(2, "0")}-${safeDay}`;
   return zonedDateTimeToUtcIso({ date, time, timeZone });
+}
+
+function currentOperationalYearMonth(timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return {
+    year: Number(map.year ?? "0"),
+    month: Number(map.month ?? "0"),
+  };
+}
+
+function buildOperationalChargeIso(params: {
+  dueDay: number;
+  time: string;
+  timeZone: string;
+}) {
+  const { year, month } = currentOperationalYearMonth(params.timeZone);
+  const operationalCharge: DebtorChargeRow = {
+    id: "operational",
+    due_day: params.dueDay,
+    recurrence_month: month,
+    recurrence_year: year,
+  };
+  return buildChargeIso(operationalCharge, params.time, params.timeZone);
 }
 
 function fallbackScheduleMatch(
@@ -147,6 +180,11 @@ export function buildAgendaRows(params: {
         : params.defaultTimeZone || "America/Sao_Paulo";
 
       const chargeDueAt = buildChargeIso(charge, retryTime, rowTimeZone);
+      const operationalDueAt = buildOperationalChargeIso({
+        dueDay: Number(charge.due_day ?? 1),
+        time: retryTime,
+        timeZone: rowTimeZone,
+      });
       const dataEnvio = matchedSchedule?.data_envio ?? chargeDueAt;
       const nextCharge = charges[index + 1] ?? null;
       const nextChargeDueAt = nextCharge ? buildChargeIso(nextCharge, retryTime, rowTimeZone) : null;
@@ -168,6 +206,7 @@ export function buildAgendaRows(params: {
           : templateDefaults.overdueId,
         data_envio: String(dataEnvio),
         charge_due_at: String(chargeDueAt),
+        operational_due_at: String(operationalDueAt),
         next_charge_due_at: nextChargeDueAt,
         status: String(matchedSchedule?.status ?? "agendado"),
         recurrence: matchedSchedule?.recurrence ? String(matchedSchedule.recurrence) : "none",

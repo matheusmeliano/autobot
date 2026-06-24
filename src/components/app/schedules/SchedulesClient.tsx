@@ -53,6 +53,7 @@ export type ScheduleRow = {
   template_overdue_id: string | null;
   data_envio: string;
   charge_due_at?: string | null;
+  operational_due_at?: string | null;
   next_charge_due_at?: string | null;
   status: string;
   recurrence?: string | null;
@@ -482,13 +483,12 @@ export function SchedulesClient({
     const dueMoment = row.charge_due_at ?? row.data_envio;
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
-    const operationalSchedule = operationalScheduleByDebtor.get(String(row.debtor_id ?? "")) ?? null;
 
     return {
       primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
-      scheduledDate: operationalSchedule
-        ? dateBR(operationalSchedule.charge_due_at ?? operationalSchedule.data_envio, effectiveTimeZone)
+      scheduledDate: row.operational_due_at
+        ? dateBR(row.operational_due_at, effectiveTimeZone)
         : "-",
     };
   };
