@@ -483,13 +483,14 @@ export function SchedulesClient({
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
     const operationalSchedule = operationalScheduleByDebtor.get(String(row.debtor_id ?? "")) ?? null;
+    const operationalMonth = operationalSchedule
+      ? yearMonthKey(operationalSchedule.charge_due_at ?? operationalSchedule.data_envio, effectiveTimeZone).slice(5, 7)
+      : "";
 
     return {
       primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
-      scheduledDate: operationalSchedule
-        ? dateBR(operationalSchedule.charge_due_at ?? operationalSchedule.data_envio, effectiveTimeZone)
-        : "-",
+      scheduledDate: operationalMonth || "-",
     };
   };
 
