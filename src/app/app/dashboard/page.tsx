@@ -2,6 +2,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardClient } from "@/components/app/DashboardClient";
 import { applyCurrentMonthDebtorStatuses } from "@/lib/debtorChargeStatus";
 import { localDateInTimeZone } from "@/lib/recurrence";
+import { buildAgendaRows } from "@/lib/agendaRows";
+import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 
 function scheduleLocalMonthKey(value: string | null | undefined, timeZone: string) {
   const iso = String(value ?? "").trim();
@@ -37,6 +39,7 @@ export default async function DashboardPage() {
         }}
         chartDates={[]}
         activities={[]}
+        timeZone={null}
       />
     );
   }
@@ -48,14 +51,16 @@ export default async function DashboardPage() {
     chartRes,
     whatsappRes,
     profileRes,
-    activitiesRes,
+    scheduleRunsRes,
     debtorsRes,
     schedulesRes,
     activeSchedulesRes,
   ] = await Promise.all([
     supabase
       .from("message_templates")
-      .select("id", { count: "exact", head: true }),
+      .select("id, nome, created_at")
+      .order("created_at", { ascending: true })
+      .limit(200),
     supabase
       .from("schedules")
       .select("created_at")
@@ -63,22 +68,22 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: true })
       .limit(5000),
     supabase.from("whatsapp_instances").select("status").maybeSingle(),
-    supabase.from("profiles").select("nome").eq("user_id", userId).maybeSingle(),
+    supabase.from("profiles").select("nome, timezone").eq("user_id", userId).maybeSingle(),
     supabase
-      .from("schedules")
-      .select("id, status, data_envio, created_at, debtors(nome)")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(50),
+      .from("schedule_runs")
+      .select("schedule_id, scheduled_for")
+      .eq("status", "executado")
+      .order("scheduled_for", { ascending: false })
+      .limit(2000),
     supabase
       .from("debtors")
-      .select("id, valor, status, accumulate_open_monthly_charges, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)")
+      .select("id, nome, observacoes, valor, status, retry_time, accumulate_open_monthly_charges, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)")
       .eq("user_id", userId)
       .limit(1000),
     supabase
       .from("schedules")
       .select(
-        "debtor_id, charge_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at",
+        "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
       )
       .eq("user_id", userId)
       .limit(2000),
@@ -90,6 +95,15 @@ export default async function DashboardPage() {
   ]);
 
   const schedules = (schedulesRes.data ?? []) as any[];
+  const latestExecutedRunBySchedule = new Map<string, string>();
+  for (const run of scheduleRunsRes.data ?? []) {
+    const scheduleId = String((run as any)?.schedule_id ?? "");
+    const scheduledFor = String((run as any)?.scheduled_for ?? "");
+    if (!scheduleId || !scheduledFor || latestExecutedRunBySchedule.has(scheduleId)) continue;
+    latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
+  }
+  const tzRaw = (profileRes as any)?.data?.timezone;
+  const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const currentMonthKey = localDateInTimeZone(now.toISOString(), "America/Sao_Paulo").slice(0, 7);
   const schedulesByDebtor = new Map<string, any[]>();
 
@@ -165,7 +179,7 @@ export default async function DashboardPage() {
 
   const stats = {
     clients: (debtorsRes.data ?? []).length,
-    templates: templatesRes.count ?? 0,
+    templates: (templatesRes.data ?? []).length,
     activeSchedules: activeSchedulesRes.count ?? 0,
     whatsappStatus: whatsappRes.data?.status ?? "disconnected",
     receivableMonthTotal,
@@ -177,11 +191,22 @@ export default async function DashboardPage() {
     String(row.created_at ?? ""),
   );
 
-  const activities = ((activitiesRes.data ?? []) as any[]).map((r) => ({
-    id: String(r.id),
-    debtorName: String(r?.debtors?.nome ?? "-"),
-    status: String(r.status ?? ""),
-    dateTime: String(r.data_envio ?? r.created_at ?? ""),
+  const activities = buildAgendaRows({
+    debtors: (debtorsRes.data ?? []) as any[],
+    schedules,
+    latestExecutedRunBySchedule,
+    templates: (templatesRes.data ?? []) as any[],
+    defaultTimeZone: timeZone,
+  }).map((row) => ({
+    id: String(row.id),
+    debtorName: String(row.debtor_nome ?? "-"),
+    status: String(row.status ?? ""),
+    dataEnvio: String(row.data_envio ?? ""),
+    chargeDueAt: row.charge_due_at ? String(row.charge_due_at) : null,
+    lastExecutedScheduledFor: row.last_executed_scheduled_for
+      ? String(row.last_executed_scheduled_for)
+      : null,
+    paymentReceivedAt: row.payment_received_at ? String(row.payment_received_at) : null,
   }));
 
   return (
@@ -191,6 +216,7 @@ export default async function DashboardPage() {
       stats={stats}
       chartDates={chartDates}
       activities={activities}
+      timeZone={timeZone}
     />
   );
 }

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarDays, MessageSquareText, Users, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { localDateInTimeZone } from "@/lib/recurrence";
+import { type BrazilTimeZone } from "@/lib/timezone";
 
 type StatPack = {
   clients: number;
@@ -19,7 +21,10 @@ type ActivityRow = {
   id: string;
   debtorName: string;
   status: string;
-  dateTime: string;
+  dataEnvio: string;
+  chargeDueAt: string | null;
+  lastExecutedScheduledFor: string | null;
+  paymentReceivedAt: string | null;
 };
 
 type ChartFilter = "days" | "weeks" | "months" | "years";
@@ -220,11 +225,11 @@ function Card({
   );
 }
 
-function dateTimeBR(v: string) {
+function dateTimeBR(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
   return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
+    timeZone,
     dateStyle: "short",
     timeStyle: "short",
   }).format(d);
@@ -237,14 +242,50 @@ function brl(value: number) {
 function statusToLabel(status: string) {
   const s = status.trim().toLowerCase();
   if (s === "agendado") return "Agendado";
+  if (s === "pendente") return "Agendado";
+  if (s === "suspeita_de_pagamento") return "Agendado";
   if (s === "pausado") return "Pausado";
   if (s === "executado") return "Executado";
   if (s === "cancelado") return "Cancelado";
+  if (s === "pago") return "Executado";
+  if (s === "atrasado") return "Atrasado";
   return status;
 }
 
 function statusBadgeClassName(status: string) {
-  return "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-70)]";
+  const s = status.trim().toLowerCase();
+  if (s === "executado" || s === "pago") return "bg-emerald-600 text-[rgb(255,255,255)]";
+  if (s === "atrasado" || s === "cancelado") return "bg-rose-600 text-[rgb(255,255,255)]";
+  return "bg-yellow-600 text-[rgb(255,255,255)]";
+}
+
+function hasExecutedCurrentInstance(activity: ActivityRow) {
+  const normalizedStatus = String(activity.status ?? "").trim().toLowerCase();
+  if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
+  if (String(activity.paymentReceivedAt ?? "").trim()) return true;
+
+  const lastExecutedAt = String(activity.lastExecutedScheduledFor ?? "").trim();
+  const scheduledFor = String(activity.dataEnvio ?? "").trim();
+  if (lastExecutedAt && scheduledFor) {
+    const executedMs = new Date(lastExecutedAt).getTime();
+    const scheduledMs = new Date(scheduledFor).getTime();
+    if (!Number.isNaN(executedMs) && !Number.isNaN(scheduledMs) && executedMs === scheduledMs) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getActivityVisualStatus(activity: ActivityRow, timeZone: BrazilTimeZone) {
+  const dueMoment = activity.chargeDueAt ?? activity.dataEnvio;
+  const currentLocalDate = localDateInTimeZone(new Date().toISOString(), timeZone);
+  const dueLocalDate = localDateInTimeZone(String(dueMoment), timeZone);
+  const isExecuted =
+    hasExecutedCurrentInstance(activity) ||
+    (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
+  const label = isExecuted ? "Executado" : "Agendado";
+  return { label, className: statusBadgeClassName(label) };
 }
 
 export function DashboardClient({
@@ -253,14 +294,17 @@ export function DashboardClient({
   stats,
   chartDates,
   activities,
+  timeZone,
 }: {
   email: string;
   name?: string;
   stats: StatPack;
   chartDates: string[];
   activities: ActivityRow[];
+  timeZone: BrazilTimeZone | null;
 }) {
   const pageSize = 3;
+  const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const [activityPage, setActivityPage] = useState(1);
   const [chartFilter, setChartFilter] = useState<ChartFilter>("days");
   const activityPages = Math.max(1, Math.ceil(activities.length / pageSize));
@@ -436,29 +480,30 @@ export function DashboardClient({
           </div>
           <div className="mt-4 flex-1 space-y-3">
             {activities.length ? (
-              pagedActivities.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold">{item.debtorName}</div>
-                      <div className="mt-1 text-xs text-[var(--app-text-55)]">
-                        {statusToLabel(item.status)} • {dateTimeBR(item.dateTime)}
+              pagedActivities.map((item) => {
+                const visualStatus = getActivityVisualStatus(item, effectiveTimeZone);
+                const dueMoment = item.chargeDueAt ?? item.dataEnvio;
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-semibold">{item.debtorName}</div>
+                        <div className="mt-1 text-xs text-[var(--app-text-55)]">
+                          {visualStatus.label} • {dateTimeBR(dueMoment, effectiveTimeZone)}
+                        </div>
                       </div>
+                      <span
+                        className={`mt-0.5 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${visualStatus.className}`}
+                      >
+                        {visualStatus.label}
+                      </span>
                     </div>
-                    <span
-                      className={[
-                        "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
-                        statusBadgeClassName(item.status),
-                      ].join(" ")}
-                    >
-                      {statusToLabel(item.status)}
-                    </span>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
                 <div className="text-xs font-semibold">Nenhum agendamento ainda</div>
