@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import Script from "next/script";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
+import { AdminLogoutForm } from "@/components/admin/AdminLogoutForm";
 import { Logo } from "@/components/ui/Logo";
-import { logoutAction } from "@/app/app/actions";
 import { ScopedAppTheme } from "@/components/app/ScopedAppTheme";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 
@@ -92,14 +92,7 @@ export default async function AdminLayout({
 
             <div className="mt-4 flex-1" />
 
-            <form action={logoutAction} className="mt-4">
-              <button
-                type="submit"
-                className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
-              >
-                Sair
-              </button>
-            </form>
+            <AdminLogoutForm className="mt-4" />
           </div>
         </aside>
 
@@ -130,14 +123,7 @@ export default async function AdminLayout({
                 </div>
               </div>
 
-              <form action={logoutAction} className="mt-4">
-                <button
-                  type="submit"
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
-                >
-                  Sair
-                </button>
-              </form>
+              <AdminLogoutForm className="mt-4" />
             </div>
           </div>
 
