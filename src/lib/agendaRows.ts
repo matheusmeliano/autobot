@@ -1,47 +1,5 @@
-import fs from "node:fs";
 import { resolveAutoChargeTemplates, type ChargeTemplateChoice } from "@/lib/chargeTemplates";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
-
-// #region debug-point executed-still-agendado-bootstrap
-const __dbgEnvPathExecutedStillAgendado = ".dbg/executed-still-agendado.env";
-const __dbgEnvRawExecutedStillAgendado = fs.existsSync(__dbgEnvPathExecutedStillAgendado)
-  ? fs.readFileSync(__dbgEnvPathExecutedStillAgendado, "utf8")
-  : "";
-const __dbgMapExecutedStillAgendado = Object.fromEntries(
-  __dbgEnvRawExecutedStillAgendado
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgUrlExecutedStillAgendado =
-  __dbgMapExecutedStillAgendado.DEBUG_SERVER_URL ?? "http://127.0.0.1:7779/event";
-const __dbgSessionExecutedStillAgendado =
-  __dbgMapExecutedStillAgendado.DEBUG_SESSION_ID ?? "executed-still-agendado";
-const __dbgExecutedStillAgendado = (
-  hypothesisId: string,
-  location: string,
-  msg: string,
-  data: Record<string, unknown>,
-) => {
-  fetch(__dbgUrlExecutedStillAgendado, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSessionExecutedStillAgendado,
-      runId: "pre",
-      hypothesisId,
-      location,
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
 
 type DebtorChargeRow = {
   id: string;
@@ -258,31 +216,6 @@ export function buildAgendaRows(params: {
       const dataEnvio = matchedSchedule?.data_envio ?? chargeDueAt;
       const nextCharge = charges[index + 1] ?? null;
       const nextChargeDueAt = nextCharge ? buildChargeIso(nextCharge, retryTime, rowTimeZone) : null;
-
-      // #region debug-point A:arts-car-row-build
-      if (String(debtor.nome ?? "").includes("Arts Car")) {
-        __dbgExecutedStillAgendado(
-          "A",
-          "agendaRows.ts:buildAgendaRows",
-          "[DEBUG] Linha de agenda montada para Arts Car",
-          {
-            debtorId,
-            debtorName: debtor.nome ?? null,
-            chargeId,
-            matchedScheduleId: matchedSchedule?.id ?? null,
-            matchedScheduleChargeId: matchedSchedule?.charge_id ?? null,
-            matchedScheduleStatus: matchedSchedule?.status ?? null,
-            matchedScheduleLastSentAt: matchedSchedule?.last_sent_at ?? null,
-            matchedScheduleChargeDueAt: matchedSchedule?.charge_due_at ?? null,
-            chargeDueAt,
-            dataEnvio,
-            latestExecutedScheduledFor: matchedSchedule?.id
-              ? params.latestExecutedRunBySchedule.get(String(matchedSchedule.id)) ?? null
-              : null,
-          },
-        );
-      }
-      // #endregion
 
       // #region debug-point A:adriano-agenda-row
       if (String(debtor.nome ?? "") === "Adriano Construtor") {

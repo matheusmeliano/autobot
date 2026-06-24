@@ -582,36 +582,6 @@ export function SchedulesClient({
       hasExecutedCurrentInstance(row) ||
       (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
 
-    // #region debug-point C:arts-car-display-status
-    if (String(row.debtor_nome ?? "").includes("Arts Car")) {
-      fetch("http://127.0.0.1:7779/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: "executed-still-agendado",
-          runId: "pre",
-          hypothesisId: "C",
-          location: "SchedulesClient.tsx:displayStatus",
-          msg: "[DEBUG] Status visual calculado para Arts Car",
-          data: {
-            rowId: row.id,
-            debtorId: row.debtor_id,
-            debtorName: row.debtor_nome,
-            rowStatus: row.status ?? null,
-            chargeId: row.charge_id ?? null,
-            dueMoment,
-            dueLocalDate,
-            currentLocalDate,
-            lastSentAt: row.last_sent_at ?? null,
-            lastExecutedScheduledFor: row.last_executed_scheduled_for ?? null,
-            isExecuted,
-          },
-          ts: Date.now(),
-        }),
-      }).catch(() => {});
-    }
-    // #endregion
-
     return isExecuted
       ? { label: "Executado", className: statusClass("executado") }
       : { label: "Agendado", className: statusClass("pendente") };
