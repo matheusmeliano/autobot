@@ -149,6 +149,43 @@ export function deriveDebtorChargeProgress(
   return { paid, total: normalizedCharges.length };
 }
 
+export function deriveReferenceMonthDebtorChargeProgress(
+  charges: DebtorChargeRow[],
+  schedules: DebtorScheduleStatusRow[],
+  nowUtcIso = new Date().toISOString(),
+) {
+  const scheduleTimeZone = String(schedules[0]?.schedule_timezone ?? "") || "America/Sao_Paulo";
+  const currentLocalDate = scheduleLocalDate(nowUtcIso, scheduleTimeZone);
+  if (!currentLocalDate) return { paid: 0, total: 0 };
+  const referenceYearMonth = currentLocalDate.slice(0, 7);
+
+  const referenceChargeIds = charges
+    .filter((charge) => buildChargeLocalDate(charge))
+    .filter((charge) => {
+      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
+      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
+      return `${year}-${month}` === referenceYearMonth;
+    })
+    .sort(compareChargeOrder)
+    .map((charge) => String(charge.id ?? "").trim())
+    .filter(Boolean);
+
+  if (!referenceChargeIds.length) return { paid: 0, total: 0 };
+
+  const paidChargeIds = new Set(
+    schedules
+      .filter((row) => {
+        const status = String(row.status ?? "").trim().toLowerCase();
+        return status === "pago" || Boolean(String(row.payment_received_at ?? "").trim());
+      })
+      .map((row) => String(row.charge_id ?? "").trim())
+      .filter(Boolean),
+  );
+
+  const paid = referenceChargeIds.filter((chargeId) => paidChargeIds.has(chargeId)).length;
+  return { paid, total: referenceChargeIds.length };
+}
+
 export function applyCurrentMonthDebtorStatuses<
   T extends {
     id: string;
