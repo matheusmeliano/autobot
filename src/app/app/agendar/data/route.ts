@@ -1,9 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { buildAgendaRows } from "@/lib/agendaRows";
+import { BRAZIL_TIMEZONES } from "@/lib/timezone";
 
 export async function GET() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
-  const [{ data: schedules }, { data: scheduleRuns }, { data: debtors }, { data: templates }] = await Promise.all([
+  const [{ data: schedules }, { data: scheduleRuns }, { data: debtors }, { data: templates }, profileRes] = await Promise.all([
     supabase
       .from("schedules")
       .select(
@@ -29,6 +30,7 @@ export async function GET() {
       .select("id, nome, created_at")
       .order("created_at", { ascending: true })
       .limit(200),
+    supabase.from("profiles").select("timezone").maybeSingle(),
   ]);
 
   const latestExecutedRunBySchedule = new Map<string, string>();
@@ -44,6 +46,9 @@ export async function GET() {
     schedules: (schedules ?? []) as any[],
     latestExecutedRunBySchedule,
     templates: (templates ?? []) as any[],
+    defaultTimeZone: BRAZIL_TIMEZONES.includes((profileRes as any)?.data?.timezone)
+      ? ((profileRes as any).data.timezone as (typeof BRAZIL_TIMEZONES)[number])
+      : null,
   });
 
   return Response.json(rows);

@@ -102,6 +102,7 @@ export function buildAgendaRows(params: {
   schedules: ScheduleSourceRow[];
   latestExecutedRunBySchedule: Map<string, string>;
   templates?: TemplateChoice[];
+  defaultTimeZone?: string | null;
 }) {
   const scheduleGroups = new Map<string, ScheduleSourceRow[]>();
   for (const schedule of params.schedules ?? []) {
@@ -117,7 +118,6 @@ export function buildAgendaRows(params: {
   for (const debtor of params.debtors ?? []) {
     const debtorId = String(debtor.id ?? "");
     if (!debtorId) continue;
-    const timeZone = "America/Sao_Paulo";
     const retryTime = String(debtor.retry_time ?? "").trim() || "09:00";
     const charges = [...((debtor.debtor_charges ?? []) as DebtorChargeRow[])]
       .filter((charge) => String(charge?.id ?? ""))
@@ -142,11 +142,14 @@ export function buildAgendaRows(params: {
       const matchedSchedule = exactMatch ?? fallbackScheduleMatch(availableSchedules, charge, usedScheduleIds);
       const matchedScheduleId = String(matchedSchedule?.id ?? "");
       if (matchedScheduleId) usedScheduleIds.add(matchedScheduleId);
+      const rowTimeZone = matchedSchedule?.schedule_timezone
+        ? String(matchedSchedule.schedule_timezone)
+        : params.defaultTimeZone || "America/Sao_Paulo";
 
-      const chargeDueAt = buildChargeIso(charge, retryTime, timeZone);
+      const chargeDueAt = buildChargeIso(charge, retryTime, rowTimeZone);
       const dataEnvio = matchedSchedule?.data_envio ?? chargeDueAt;
       const nextCharge = charges[index + 1] ?? null;
-      const nextChargeDueAt = nextCharge ? buildChargeIso(nextCharge, retryTime, timeZone) : null;
+      const nextChargeDueAt = nextCharge ? buildChargeIso(nextCharge, retryTime, rowTimeZone) : null;
 
       rows.push({
         id: matchedSchedule?.id ? String(matchedSchedule.id) : `charge:${chargeId}`,
@@ -171,7 +174,7 @@ export function buildAgendaRows(params: {
         recurrence_until: matchedSchedule?.recurrence_until ? String(matchedSchedule.recurrence_until) : null,
         recurrence_day: Number.isFinite(Number(charge.due_day)) ? Number(charge.due_day) : null,
         recurrence_time: matchedSchedule?.recurrence_time ? String(matchedSchedule.recurrence_time) : retryTime,
-        schedule_timezone: matchedSchedule?.schedule_timezone ? String(matchedSchedule.schedule_timezone) : timeZone,
+        schedule_timezone: rowTimeZone,
         last_sent_at: matchedSchedule?.last_sent_at ? String(matchedSchedule.last_sent_at) : null,
         payment_received_at: matchedSchedule?.payment_received_at ? String(matchedSchedule.payment_received_at) : null,
         last_executed_scheduled_for: matchedSchedule?.id

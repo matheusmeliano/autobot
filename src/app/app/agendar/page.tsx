@@ -68,6 +68,7 @@ export default async function AgendarPage() {
     schedules: (schedulesRes.data ?? []) as any[],
     latestExecutedRunBySchedule,
     templates: (templatesRes.data ?? []) as any[],
+    defaultTimeZone: timeZone,
   });
   const wa = (waRes as any)?.data ?? null;
   const waStatus = String(wa?.status ?? "").toLowerCase();
