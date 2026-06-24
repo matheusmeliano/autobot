@@ -368,7 +368,9 @@ export function SchedulesClient({
     const scheduleMap = new Map<string, ScheduleRow>();
     for (const [debtorId, debtorRows] of grouped.entries()) {
       const currentMonthRows = debtorRows
-        .filter((row) => yearMonthKey(row.data_envio, effectiveTimeZone) === operationalMonthKey)
+        .filter(
+          (row) => yearMonthKey(row.charge_due_at ?? row.data_envio, effectiveTimeZone) === operationalMonthKey,
+        )
         .sort((a, b) =>
           String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio)),
         );
@@ -485,7 +487,9 @@ export function SchedulesClient({
     return {
       primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
-      scheduledDate: operationalSchedule ? dateBR(operationalSchedule.data_envio, effectiveTimeZone) : "-",
+      scheduledDate: operationalSchedule
+        ? dateBR(operationalSchedule.charge_due_at ?? operationalSchedule.data_envio, effectiveTimeZone)
+        : "-",
     };
   };
 
