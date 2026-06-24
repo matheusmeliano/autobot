@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Eye, EyeOff, Key, Pencil, Trash2, X } from "lucide-react";
+import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
@@ -70,6 +71,7 @@ function statusClass(v: "ativo" | "cancelado") {
 export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const pageSize = 5;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const vencimentoInputRef = useRef<HTMLInputElement | null>(null);
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
@@ -81,8 +83,9 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [deleting, setDeleting] = useState<AdminUserRow | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const isSelfAdmin = (email: string) =>
-    email.toLowerCase() === "heybrotherscolaboradores@gmail.com";
+  const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
+
+  const isSelfAdmin = (email: string) => isGlobalAdminEmail(email);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -106,6 +109,24 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     const start = (safePage - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, safePage]);
+
+  useEffect(() => {
+    const updateOverflow = () => {
+      const element = tableScrollRef.current;
+      if (!element) {
+        setHasHorizontalOverflow(false);
+        return;
+      }
+      setHasHorizontalOverflow(element.scrollWidth > element.clientWidth + 1);
+    };
+
+    updateOverflow();
+    window.addEventListener("resize", updateOverflow);
+
+    return () => {
+      window.removeEventListener("resize", updateOverflow);
+    };
+  }, [filtered.length, page, safePage]);
 
   const editForm = useForm<EditValues>({
     defaultValues: {
@@ -262,10 +283,12 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03]">
-        <div className="px-4 pt-3 text-center text-[11px] font-semibold text-white/45 min-[1201px]:hidden">
-          Role para o lado.
-        </div>
-        <div className="overflow-x-auto">
+        {hasHorizontalOverflow ? (
+          <div className="px-4 pt-3 text-center text-[11px] font-semibold text-white/45 min-[1201px]:hidden">
+            Role para o lado.
+          </div>
+        ) : null}
+        <div ref={tableScrollRef} className="overflow-x-auto">
           <div className="min-w-[820px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
               <div className="col-span-4">Usuário</div>

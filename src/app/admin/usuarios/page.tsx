@@ -1,4 +1,5 @@
 import { AdminUsersClient, type AdminUserRow } from "@/components/admin/AdminUsersClient";
+import { listAllAuthUsers } from "@/lib/adminUsers";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizePlan } from "@/lib/plans";
 
@@ -21,7 +22,7 @@ export default async function AdminUsuariosPage() {
     );
   }
 
-  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+  const { data, error } = await listAllAuthUsers(supabase);
   if (error) {
     return (
       <div className="space-y-3">

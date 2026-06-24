@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { listAllAuthUsers } from "@/lib/adminUsers";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan } from "@/lib/plans";
@@ -18,7 +19,7 @@ export async function GET() {
     return new Response("Configuração do servidor incompleta.", { status: 500 });
   }
 
-  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+  const { data, error } = await listAllAuthUsers(supabase);
   if (error) {
     return new Response(error.message, { status: 500 });
   }
