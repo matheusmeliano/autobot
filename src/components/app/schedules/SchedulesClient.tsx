@@ -350,6 +350,50 @@ export function SchedulesClient({
     if (!q) return rows;
     return rows.filter((r) => r.debtor_nome.toLowerCase().includes(q));
   }, [query, rows]);
+  const operationalMonthKey = useMemo(
+    () => yearMonthKey(new Date().toISOString(), effectiveTimeZone),
+    [effectiveTimeZone],
+  );
+  const operationalStatusByDebtor = useMemo(() => {
+    const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
+    const grouped = new Map<string, ScheduleRow[]>();
+
+    for (const row of rows) {
+      const debtorId = String(row.debtor_id ?? "");
+      if (!debtorId) continue;
+      const list = grouped.get(debtorId) ?? [];
+      list.push(row);
+      grouped.set(debtorId, list);
+    }
+
+    const statusMap = new Map<string, { label: "Pendente" | "Executado"; className: string }>();
+    for (const [debtorId, debtorRows] of grouped.entries()) {
+      const currentMonthRows = debtorRows
+        .filter((row) => yearMonthKey(row.data_envio, effectiveTimeZone) === operationalMonthKey)
+        .sort((a, b) =>
+          String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio)),
+        );
+      const referenceRow = currentMonthRows[0] ?? null;
+
+      if (!referenceRow) {
+        statusMap.set(debtorId, {
+          label: "Pendente",
+          className: statusClass("pendente"),
+        });
+        continue;
+      }
+
+      const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
+      const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
+      const isExecuted = Boolean(dueLocalDate) && dueLocalDate < currentLocalDate;
+      statusMap.set(debtorId, {
+        label: isExecuted ? "Executado" : "Pendente",
+        className: statusClass(isExecuted ? "executado" : "pendente"),
+      });
+    }
+
+    return statusMap;
+  }, [effectiveTimeZone, operationalMonthKey, rows, theme]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -414,13 +458,12 @@ export function SchedulesClient({
   };
 
   const displayStatus = (row: ScheduleRow) => {
-    const primaryMoment = row.charge_due_at ?? row.data_envio;
-    const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
-    const dueLocalDate = localDateInTimeZone(primaryMoment, effectiveTimeZone);
-    const alreadyPassedChargeDate = Boolean(dueLocalDate) && dueLocalDate < currentLocalDate;
-    return alreadyPassedChargeDate
-      ? { label: "Executado", className: statusClass("executado") }
-      : { label: "Pendente", className: statusClass("pendente") };
+    return (
+      operationalStatusByDebtor.get(String(row.debtor_id ?? "")) ?? {
+        label: "Pendente",
+        className: statusClass("pendente"),
+      }
+    );
   };
 
   const displayMoments = (row: ScheduleRow) => {
