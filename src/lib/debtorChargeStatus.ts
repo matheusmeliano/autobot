@@ -1,6 +1,6 @@
 import { localDateInTimeZone } from "@/lib/recurrence";
 
-export type DebtorChargeStatus = "agendado" | "pendente" | "pago" | "atrasado";
+export type DebtorChargeStatus = "agendado" | "atrasado" | "pago";
 
 type DebtorScheduleStatusRow = {
   debtor_id?: string | null;
@@ -21,8 +21,6 @@ type DebtorChargeRow = {
   recurrence_year?: number | null;
   created_at?: string | null;
 };
-
-const OVERDUE_GRACE_DAYS = 3;
 
 function scheduleLocalDate(value: string | null | undefined, timeZone: string) {
   const iso = String(value ?? "").trim();
@@ -71,150 +69,61 @@ function buildChargeLocalDate(charge: DebtorChargeRow) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
-function monthDistance(fromYearMonth: string, toYearMonth: string) {
-  const [fromYear, fromMonth] = fromYearMonth.split("-").map(Number);
-  const [toYear, toMonth] = toYearMonth.split("-").map(Number);
-  if (!fromYear || !fromMonth || !toYear || !toMonth) return null;
-  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
-}
-
-function buildLocalDateForYearMonth(yearMonth: string, day: number) {
-  const [yearRaw, monthRaw] = yearMonth.split("-");
-  const year = Number(yearRaw);
-  const month = Number(monthRaw);
-  if (!year || !month) return null;
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const safeDay = Math.min(Math.max(1, Number(day) || 1), lastDay);
-  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
-}
-
-function deriveFirstChargeDebtorStatus(
+function deriveReferenceMonthDebtorStatus(
   charges: DebtorChargeRow[],
   schedules: DebtorScheduleStatusRow[],
   nowUtcIso = new Date().toISOString(),
-): DebtorChargeStatus | null {
-  const firstCharge = [...charges]
-    .sort(compareChargeOrder)
-    .find((charge) => buildChargeLocalDate(charge));
+): DebtorChargeStatus {
+  const scheduleTimeZone = String(schedules[0]?.schedule_timezone ?? "") || "America/Sao_Paulo";
+  const currentLocalDate = scheduleLocalDate(nowUtcIso, scheduleTimeZone);
+  if (!currentLocalDate) return "agendado";
+  const referenceYearMonth = currentLocalDate.slice(0, 7);
 
-  if (!firstCharge) return null;
+  const referenceCharges = charges
+    .filter((charge) => buildChargeLocalDate(charge))
+    .filter((charge) => {
+      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
+      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
+      return `${year}-${month}` === referenceYearMonth;
+    })
+    .sort(compareChargeOrder);
 
-  const firstChargeId = String(firstCharge.id ?? "").trim();
-  const matchingSchedules = firstChargeId
-    ? schedules.filter((row) => String(row.charge_id ?? "").trim() === firstChargeId)
-    : [];
-  const timeZone = String(matchingSchedules[0]?.schedule_timezone ?? "") || "America/Sao_Paulo";
-  const currentLocalDate = scheduleLocalDate(nowUtcIso, timeZone);
-  const dueLocalDateOriginal = buildChargeLocalDate(firstCharge);
-  if (!currentLocalDate || !dueLocalDateOriginal) return null;
+  if (!referenceCharges.length) return "agendado";
 
-  const operationalYearMonth = currentLocalDate.slice(0, 7);
-  const chargeYearMonth = dueLocalDateOriginal.slice(0, 7);
-  const dueVsOperationalDistance = monthDistance(operationalYearMonth, chargeYearMonth);
-  const operationalDueLocalDate =
-    dueVsOperationalDistance === 1
-      ? buildLocalDateForYearMonth(operationalYearMonth, Number(firstCharge.due_day ?? 0))
-      : null;
-  const dueLocalDate = operationalDueLocalDate ?? dueLocalDateOriginal;
-
-  const paid = matchingSchedules.some((row) => {
-    const status = String(row.status ?? "").trim().toLowerCase();
-    return (
-      status === "pago" ||
-      status === "executado" ||
-      Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone))
-    );
-  });
-  if (paid) return "pago";
-
-  const daysSinceDue = diffDaysLocalDate(dueLocalDate, currentLocalDate);
-  if (daysSinceDue >= OVERDUE_GRACE_DAYS) return "atrasado";
-  if (daysSinceDue >= 1) return "pendente";
-  return "agendado";
-}
-
-function deriveCurrentMonthDebtorSnapshot(
-  schedules: DebtorScheduleStatusRow[],
-  nowUtcIso = new Date().toISOString(),
-) {
-  let total = 0;
-  let paid = 0;
-  let hasPending = false;
+  let paidCount = 0;
   let hasOverdue = false;
-  let hasScheduled = false;
-  let hasFutureScheduled = false;
 
-  for (const row of schedules) {
-    const timeZone = String(row?.schedule_timezone ?? "") || "America/Sao_Paulo";
-    const currentLocalDate = scheduleLocalDate(nowUtcIso, timeZone);
-    if (!currentLocalDate) continue;
-    const currentMonth = currentLocalDate.slice(0, 7);
-
-    const isClosed = Boolean(String(row?.closed_at ?? "").trim());
-    if (isClosed) continue;
-
-    const recurrence = String(row?.recurrence ?? "").trim().toLowerCase();
-    const dueLocalDate = scheduleLocalDate(row?.charge_due_at ?? row?.data_envio ?? null, timeZone);
+  for (const charge of referenceCharges) {
+    const chargeId = String(charge.id ?? "").trim();
+    const dueLocalDate = buildChargeLocalDate(charge);
     if (!dueLocalDate) continue;
-    const paymentLocalDate = scheduleLocalDate(row?.payment_received_at ?? null, timeZone);
 
-    const dueMonth = dueLocalDate.slice(0, 7);
-    const isRecurring = recurrence === "monthly" || recurrence === "yearly";
-    const paymentInCurrentMonth = Boolean(paymentLocalDate && paymentLocalDate.slice(0, 7) === currentMonth);
-    if (dueMonth > currentMonth && !(isRecurring && paymentInCurrentMonth)) {
-      hasFutureScheduled = true;
-      continue;
-    }
-    const isRelevant = dueMonth === currentMonth || (isRecurring && paymentInCurrentMonth && dueMonth > currentMonth);
-    if (!isRelevant) continue;
+    const matchingSchedules = chargeId
+      ? schedules.filter((row) => String(row.charge_id ?? "").trim() === chargeId)
+      : [];
+    const timeZone = String(matchingSchedules[0]?.schedule_timezone ?? "") || scheduleTimeZone;
+    const paid = matchingSchedules.some((row) => {
+      const status = String(row.status ?? "").trim().toLowerCase();
+      return (
+        status === "pago" ||
+        status === "executado" ||
+        Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone))
+      );
+    });
 
-    total += 1;
-
-    const status = String(row?.status ?? "").trim().toLowerCase();
-
-    const paidThisMonth = isRecurring
-      ? Boolean(paymentLocalDate && paymentLocalDate.slice(0, 7) === currentMonth && dueMonth > currentMonth)
-      : status === "pago" || Boolean(paymentLocalDate);
-
-    if (paidThisMonth) {
-      paid += 1;
+    if (paid) {
+      paidCount += 1;
       continue;
     }
 
-    const daysSinceDue = diffDaysLocalDate(dueLocalDate, currentLocalDate);
-    if (daysSinceDue >= OVERDUE_GRACE_DAYS) {
+    if (dueLocalDate < currentLocalDate) {
       hasOverdue = true;
-      continue;
     }
-    if (daysSinceDue >= 0) {
-      hasPending = true;
-      continue;
-    }
-    hasScheduled = true;
   }
 
-  return { total, paid, hasPending, hasOverdue, hasScheduled, hasFutureScheduled };
-}
-
-export function deriveCurrentMonthDebtorStatus(
-  schedules: DebtorScheduleStatusRow[],
-  nowUtcIso = new Date().toISOString(),
-): DebtorChargeStatus {
-  const snap = deriveCurrentMonthDebtorSnapshot(schedules, nowUtcIso);
-  if (snap.total <= 0) return snap.hasFutureScheduled ? "agendado" : "pendente";
-  if (snap.hasOverdue) return "atrasado";
-  if (snap.hasPending) return "pendente";
-  if (snap.paid >= snap.total) return "pago";
-  if (snap.hasScheduled || snap.hasFutureScheduled) return "agendado";
-  return "pendente";
-}
-
-export function deriveCurrentMonthDebtorProgress(
-  schedules: DebtorScheduleStatusRow[],
-  nowUtcIso = new Date().toISOString(),
-) {
-  const snap = deriveCurrentMonthDebtorSnapshot(schedules, nowUtcIso);
-  return { paid: snap.paid, total: snap.total };
+  if (paidCount >= referenceCharges.length) return "pago";
+  if (hasOverdue) return "atrasado";
+  return "agendado";
 }
 
 export function deriveDebtorChargeProgress(
@@ -226,9 +135,7 @@ export function deriveDebtorChargeProgress(
     .map((charge) => String(charge.id ?? "").trim())
     .filter(Boolean);
 
-  if (!normalizedCharges.length) {
-    return deriveCurrentMonthDebtorProgress(schedules);
-  }
+  if (!normalizedCharges.length) return { paid: 0, total: 0 };
 
   const paidChargeIds = new Set(
     schedules
@@ -271,16 +178,11 @@ export function applyCurrentMonthDebtorStatuses<
 
   return params.debtors.map((debtor) => ({
     ...debtor,
-    status:
-      deriveFirstChargeDebtorStatus(
-        Array.isArray(debtor.charges) ? debtor.charges : [],
-        schedulesByDebtor.get(String(debtor.id)) ?? [],
-        params.nowUtcIso,
-      ) ??
-      deriveCurrentMonthDebtorStatus(
-        schedulesByDebtor.get(String(debtor.id)) ?? [],
-        params.nowUtcIso,
-      ),
+    status: deriveReferenceMonthDebtorStatus(
+      Array.isArray(debtor.charges) ? debtor.charges : [],
+      schedulesByDebtor.get(String(debtor.id)) ?? [],
+      params.nowUtcIso,
+    ),
   }));
 }
 
@@ -290,8 +192,6 @@ function statusPriority(status: string) {
       return 5;
     case "suspeita_de_pagamento":
       return 4;
-    case "pendente":
-      return 3;
     case "agendado":
       return 2;
     case "pago":
@@ -305,15 +205,16 @@ function statusPriority(status: string) {
 
 function normalizeDebtorChargeStatus(status: string) {
   switch (status) {
-    case "pendente":
     case "pago":
     case "atrasado":
     case "agendado":
       return status;
+    case "pendente":
+      return "atrasado";
     case "suspeita_de_pagamento":
       return "agendado";
     default:
-      return "pendente";
+      return "agendado";
   }
 }
 
@@ -334,10 +235,10 @@ export async function syncDebtorChargeStatus(admin: any, userId: string, debtorI
   ]);
 
   const nextStatus =
-    deriveFirstChargeDebtorStatus(
+    deriveReferenceMonthDebtorStatus(
       (charges ?? []) as DebtorChargeRow[],
       (schedules ?? []) as DebtorScheduleStatusRow[],
-    ) ?? deriveCurrentMonthDebtorStatus((schedules ?? []) as DebtorScheduleStatusRow[]);
+    );
 
   await admin
     .from("debtors")

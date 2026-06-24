@@ -198,26 +198,26 @@ function defaultChargeFormValue(day: string, baseDate: Date): ChargeFormValue {
 
 function debtorStatusLabel(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
-  if (s === "ativo") return "Pago";
   if (s === "agendado") return "Agendado";
-  if (s === "pendente") return "Pendente";
   if (s === "pago") return "Pago";
   if (s === "atrasado") return "Atrasado";
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "-";
+  if (s === "pendente") return "Atrasado";
+  if (s === "suspeita_de_pagamento") return "Agendado";
+  return "Agendado";
 }
 
 function debtorStatusClass(status: string | null | undefined, theme: "light" | "dark") {
   const s = String(status ?? "").trim().toLowerCase();
-  if (s === "ativo" || s === "pago") {
+  if (s === "pago") {
     return "bg-emerald-600 text-[rgb(255,255,255)]";
   }
   if (s === "agendado") {
     return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
   }
-  if (s === "pendente" || s === "suspeita_de_pagamento") {
-    return "bg-orange-500 text-[rgb(255,255,255)]";
-  }
   if (s === "atrasado") {
+    return "bg-rose-600 text-[rgb(255,255,255)]";
+  }
+  if (s === "pendente") {
     return "bg-rose-600 text-[rgb(255,255,255)]";
   }
   return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
