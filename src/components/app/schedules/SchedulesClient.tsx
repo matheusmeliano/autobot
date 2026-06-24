@@ -130,6 +130,10 @@ function monthYearBR(v: string, timeZone: BrazilTimeZone) {
   }).format(d);
 }
 
+function monthYearCompactBR(v: string, timeZone: BrazilTimeZone) {
+  return monthYearBR(v, timeZone).replace(" de ", "/");
+}
+
 function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return "";
@@ -586,8 +590,7 @@ export function SchedulesClient({
             scheduleUnavailable ||
             isPending ||
             triggeringId === r.id ||
-            markingPaidId === r.id ||
-            String(r.status ?? "") === "pago"
+            markingPaidId === r.id
           }
           className={baseButtonClass}
           title="Pagamento realizado"
@@ -967,8 +970,16 @@ export function SchedulesClient({
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
     const referenceMoment = row.charge_due_at ?? row.data_envio;
     const referenceMonthLabel = referenceMoment ? monthYearBR(referenceMoment, effectiveTimeZone) : null;
+    const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
     const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
     const nextReferenceLabel = nextRecurringMoment ? monthYearBR(nextRecurringMoment, effectiveTimeZone) : null;
+    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
+    if (normalizedStatus === "pago" || normalizedStatus === "executado") {
+      modalToast.info(
+        `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,
+      );
+      return;
+    }
     const confirmed = await modalToast.confirm(
       String(row.recurrence ?? "none") === "monthly"
         ? `Deseja marcar a mensalidade de ${referenceMonthLabel ?? "referência atual"} de "${row.debtor_nome}" como quitada e avançar a próxima cobrança para ${nextReferenceLabel ?? "o próximo mês"}?`
