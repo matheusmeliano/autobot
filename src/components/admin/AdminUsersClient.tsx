@@ -62,6 +62,11 @@ function statusLabel(v: "ativo" | "cancelado") {
   return "Cancelado";
 }
 
+function statusClass(v: "ativo" | "cancelado") {
+  if (v === "ativo") return "bg-emerald-600 text-[rgb(255,255,255)]";
+  return "bg-rose-600 text-[rgb(255,255,255)]";
+}
+
 export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const pageSize = 5;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -295,12 +300,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         <span className="text-white/60">-</span>
                       ) : (
                         <span
-                          className={[
-                            "inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold",
-                            normalizeStatus(r.assinatura_status) === "ativo"
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
-                              : "border-rose-500/30 bg-rose-500/10 text-rose-600",
-                          ].join(" ")}
+                          className={`inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
                         >
                           {statusLabel(normalizeStatus(r.assinatura_status))}
                         </span>
