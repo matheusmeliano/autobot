@@ -974,6 +974,31 @@ export function SchedulesClient({
     const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
     const nextReferenceLabel = nextRecurringMoment ? monthYearBR(nextRecurringMoment, effectiveTimeZone) : null;
     const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
+    // #region debug-point A:mark-as-paid-click
+    fetch("http://127.0.0.1:7777/event", {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId: "payment-repeat-popup",
+        runId: "pre-fix",
+        hypothesisId: "A",
+        location: "SchedulesClient.tsx:markAsPaid",
+        msg: "[DEBUG] Clique em Pagamento realizado",
+        data: {
+          scheduleId: row.id,
+          debtorName: row.debtor_nome,
+          recurrence: row.recurrence ?? null,
+          rowStatus: row.status ?? null,
+          normalizedStatus,
+          paymentReceivedAt: row.payment_received_at ?? null,
+          referenceMoment,
+          referenceMonthLabel,
+          nextRecurringMoment,
+          nextReferenceLabel,
+        },
+        ts: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (normalizedStatus === "pago" || normalizedStatus === "executado") {
       modalToast.info(
         `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,

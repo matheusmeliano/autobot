@@ -84,6 +84,25 @@ function buildChargeIso(charge: DebtorChargeRow, time: string, timeZone: string)
   return zonedDateTimeToUtcIso({ date, time, timeZone });
 }
 
+function localDateKey(value: string | null | undefined, timeZone: string) {
+  const iso = String(value ?? "").trim();
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return `${map.year ?? ""}-${map.month ?? ""}-${map.day ?? ""}`;
+}
+
 function currentOperationalYearMonth(timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -120,12 +139,19 @@ function fallbackScheduleMatch(
   schedules: ScheduleSourceRow[],
   charge: DebtorChargeRow,
   usedScheduleIds: Set<string>,
+  defaultTimeZone: string,
 ) {
+  const targetDateKey = `${String(charge.recurrence_year).padStart(4, "0")}-${String(charge.recurrence_month).padStart(2, "0")}-${String(
+    Math.max(1, Math.min(Number(charge.due_day) || 1, 31)),
+  ).padStart(2, "0")}`;
   return (
     schedules.find((schedule) => {
       const scheduleId = String(schedule.id ?? "");
       if (!scheduleId || usedScheduleIds.has(scheduleId)) return false;
-      return Number(schedule.recurrence_day ?? 0) === Number(charge.due_day ?? 0);
+      const timeZone = String(schedule.schedule_timezone ?? "").trim() || defaultTimeZone;
+      const scheduleDateKey = localDateKey(schedule.charge_due_at ?? schedule.data_envio ?? null, timeZone);
+      if (scheduleDateKey) return scheduleDateKey === targetDateKey;
+      return false;
     }) ?? null
   );
 }
@@ -172,7 +198,9 @@ export function buildAgendaRows(params: {
           if (!scheduleId || usedScheduleIds.has(scheduleId)) return false;
           return String(schedule.charge_id ?? "") === chargeId;
         }) ?? null;
-      const matchedSchedule = exactMatch ?? fallbackScheduleMatch(availableSchedules, charge, usedScheduleIds);
+      const matchedSchedule =
+        exactMatch ??
+        fallbackScheduleMatch(availableSchedules, charge, usedScheduleIds, params.defaultTimeZone || "America/Sao_Paulo");
       const matchedScheduleId = String(matchedSchedule?.id ?? "");
       if (matchedScheduleId) usedScheduleIds.add(matchedScheduleId);
       const rowTimeZone = matchedSchedule?.schedule_timezone
