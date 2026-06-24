@@ -404,14 +404,14 @@ export function SchedulesClient({
   }, [effectiveTimeZone, operationalMonthKey, rows]);
   const operationalStatusByDebtor = useMemo(() => {
     const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
-    const statusMap = new Map<string, { label: "Pendente" | "Executado"; className: string }>();
+    const statusMap = new Map<string, { label: "Agendado" | "Executado"; className: string }>();
     for (const row of rows) {
       const debtorId = String(row.debtor_id ?? "");
       if (!debtorId || statusMap.has(debtorId)) continue;
       const referenceRow = operationalScheduleByDebtor.get(debtorId) ?? null;
       if (!referenceRow) {
         statusMap.set(debtorId, {
-          label: "Pendente",
+          label: "Agendado",
           className: statusClass("pendente"),
         });
         continue;
@@ -421,7 +421,7 @@ export function SchedulesClient({
       const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
       const isExecuted = Boolean(dueLocalDate) && dueLocalDate < currentLocalDate;
       statusMap.set(debtorId, {
-        label: isExecuted ? "Executado" : "Pendente",
+        label: isExecuted ? "Executado" : "Agendado",
         className: statusClass(isExecuted ? "executado" : "pendente"),
       });
     }
@@ -471,7 +471,7 @@ export function SchedulesClient({
   const statusLabel = (raw: unknown) => {
     const s = String(raw ?? "");
     if (s === "agendado") return "Agendado";
-    if (s === "pendente") return "Pendente";
+    if (s === "pendente") return "Agendado";
     if (s === "pago") return "Pago";
     if (s === "atrasado") return "Atrasado";
     if (s === "executando") return "Executando";
@@ -505,7 +505,7 @@ export function SchedulesClient({
 
     return isExecuted
       ? { label: "Executado", className: statusClass("executado") }
-      : { label: "Pendente", className: statusClass("pendente") };
+      : { label: "Agendado", className: statusClass("pendente") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
