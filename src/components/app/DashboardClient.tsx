@@ -259,6 +259,15 @@ function statusBadgeClassName(status: string) {
   return "bg-yellow-600 text-[rgb(255,255,255)]";
 }
 
+function normalizeActivityStatus(status: string) {
+  const s = status.trim().toLowerCase();
+  if (s === "executado" || s === "pago") return "Executado";
+  if (s === "atrasado") return "Atrasado";
+  if (s === "cancelado") return "Cancelado";
+  if (s === "pausado") return "Pausado";
+  return "Agendado";
+}
+
 function hasExecutedCurrentInstance(activity: ActivityRow) {
   const normalizedStatus = String(activity.status ?? "").trim().toLowerCase();
   if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
@@ -281,10 +290,13 @@ function getActivityVisualStatus(activity: ActivityRow, timeZone: BrazilTimeZone
   const dueMoment = activity.chargeDueAt ?? activity.dataEnvio;
   const currentLocalDate = localDateInTimeZone(new Date().toISOString(), timeZone);
   const dueLocalDate = localDateInTimeZone(String(dueMoment), timeZone);
-  const isExecuted =
-    hasExecutedCurrentInstance(activity) ||
-    (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
-  const label = isExecuted ? "Executado" : "Agendado";
+  const isOverdue =
+    Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate;
+  const label = hasExecutedCurrentInstance(activity)
+    ? "Executado"
+    : isOverdue
+      ? "Atrasado"
+      : normalizeActivityStatus(activity.status);
   return { label, className: statusBadgeClassName(label) };
 }
 
@@ -327,11 +339,11 @@ export function DashboardClient({
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
   const operationMonthLabel = useMemo(() => {
     const month = new Intl.DateTimeFormat("pt-BR", {
-      timeZone: "America/Sao_Paulo",
+      timeZone: effectiveTimeZone,
       month: "long",
     }).format(new Date());
     return month.charAt(0).toUpperCase() + month.slice(1);
-  }, []);
+  }, [effectiveTimeZone]);
 
   const cleanedName = (name ?? "").trim();
   const greeting = cleanedName ? `Bem-vindo(a) ${cleanedName}!` : "Bem-vindo(a)!";
@@ -476,7 +488,7 @@ export function DashboardClient({
         <div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 min-[1201px]:col-span-2">
           <div className="text-sm font-semibold">Atividades</div>
           <div className="mt-1 text-xs text-[var(--app-text-45)]">
-            Histórico da agenda.
+            Mais recentes da agenda.
           </div>
           <div className="mt-4 flex-1 space-y-3">
             {activities.length ? (
