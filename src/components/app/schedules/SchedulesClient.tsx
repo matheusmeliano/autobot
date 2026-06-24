@@ -478,12 +478,20 @@ export function SchedulesClient({
   }
 
   const displayStatus = (row: ScheduleRow) => {
-    return (
-      operationalStatusByDebtor.get(String(row.debtor_id ?? "")) ?? {
-        label: "Pendente",
-        className: statusClass("pendente"),
-      }
-    );
+    const nowIso = new Date().toISOString();
+    const currentLocalDate = localDateInTimeZone(nowIso, effectiveTimeZone);
+    const dueMoment = row.charge_due_at ?? row.data_envio;
+    const dueKey = yearMonthKey(dueMoment, effectiveTimeZone);
+    const operationalKey = yearMonthKey(nowIso, effectiveTimeZone);
+    const dist = monthDistance(operationalKey, dueKey);
+    const operationalMoment =
+      dist === 1 && row.operational_due_at ? String(row.operational_due_at) : String(dueMoment);
+    const dueLocalDate = localDateInTimeZone(operationalMoment, effectiveTimeZone);
+    const isExecuted = Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate;
+
+    return isExecuted
+      ? { label: "Executado", className: statusClass("executado") }
+      : { label: "Pendente", className: statusClass("pendente") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
