@@ -458,7 +458,9 @@ export function SchedulesClient({
 
       const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
       const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
-      const isExecuted = Boolean(dueLocalDate) && dueLocalDate < currentLocalDate;
+      const isExecuted =
+        hasExecutedCurrentInstance(referenceRow) ||
+        (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
       // #region debug-point C:adriano-status-eval
       if (String(referenceRow.debtor_nome ?? "") === "Adriano Construtor") {
         fetch("http://127.0.0.1:7778/event", {
@@ -554,12 +556,61 @@ export function SchedulesClient({
     return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
   }
 
+  const hasExecutedCurrentInstance = (row: ScheduleRow) => {
+    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
+    if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
+
+    const lastExecutedAt = String(row.last_executed_scheduled_for ?? "").trim();
+    const scheduledFor = String(row.data_envio ?? "").trim();
+    if (lastExecutedAt && scheduledFor) {
+      const executedMs = new Date(lastExecutedAt).getTime();
+      const scheduledMs = new Date(scheduledFor).getTime();
+      if (!Number.isNaN(executedMs) && !Number.isNaN(scheduledMs) && executedMs === scheduledMs) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const displayStatus = (row: ScheduleRow) => {
     const nowIso = new Date().toISOString();
     const currentLocalDate = localDateInTimeZone(nowIso, effectiveTimeZone);
     const dueMoment = row.charge_due_at ?? row.data_envio;
     const dueLocalDate = localDateInTimeZone(String(dueMoment), effectiveTimeZone);
-    const isExecuted = Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate;
+    const isExecuted =
+      hasExecutedCurrentInstance(row) ||
+      (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
+
+    // #region debug-point C:arts-car-display-status
+    if (String(row.debtor_nome ?? "").includes("Arts Car")) {
+      fetch("http://127.0.0.1:7779/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "executed-still-agendado",
+          runId: "pre",
+          hypothesisId: "C",
+          location: "SchedulesClient.tsx:displayStatus",
+          msg: "[DEBUG] Status visual calculado para Arts Car",
+          data: {
+            rowId: row.id,
+            debtorId: row.debtor_id,
+            debtorName: row.debtor_nome,
+            rowStatus: row.status ?? null,
+            chargeId: row.charge_id ?? null,
+            dueMoment,
+            dueLocalDate,
+            currentLocalDate,
+            lastSentAt: row.last_sent_at ?? null,
+            lastExecutedScheduledFor: row.last_executed_scheduled_for ?? null,
+            isExecuted,
+          },
+          ts: Date.now(),
+        }),
+      }).catch(() => {});
+    }
+    // #endregion
 
     return isExecuted
       ? { label: "Executado", className: statusClass("executado") }
