@@ -562,20 +562,7 @@ export function SchedulesClient({
     const dueMoment = row.charge_due_at ?? row.data_envio;
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
-    const operationalInput = splitDateTimeForInput(
-      row.operational_due_at ?? dueMoment,
-      effectiveTimeZone,
-    );
-    const dueYearMonth = dueInput.date ? dueInput.date.slice(0, 7) : "";
-    const operationalYearMonth = operationalInput.date ? operationalInput.date.slice(0, 7) : "";
-    const dueVsOperationalMonthDistance =
-      dueYearMonth && operationalYearMonth ? monthDistance(operationalYearMonth, dueYearMonth) : null;
-    const scheduledDate =
-      dueInput.date &&
-      operationalInput.date &&
-      (dueVsOperationalMonthDistance === 0 || dueVsOperationalMonthDistance === 1)
-        ? `${dueInput.date.slice(-2)}/${operationalInput.date.slice(5, 7)}/${operationalInput.date.slice(0, 4)}`
-        : dateBR(dueMoment, effectiveTimeZone);
+    const scheduledDate = dateBR(dueMoment, effectiveTimeZone);
 
     return {
       primaryDate: dueDay,
