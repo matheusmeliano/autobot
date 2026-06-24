@@ -354,8 +354,7 @@ export function SchedulesClient({
     () => yearMonthKey(new Date().toISOString(), effectiveTimeZone),
     [effectiveTimeZone],
   );
-  const operationalStatusByDebtor = useMemo(() => {
-    const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
+  const operationalScheduleByDebtor = useMemo(() => {
     const grouped = new Map<string, ScheduleRow[]>();
 
     for (const row of rows) {
@@ -366,7 +365,7 @@ export function SchedulesClient({
       grouped.set(debtorId, list);
     }
 
-    const statusMap = new Map<string, { label: "Pendente" | "Executado"; className: string }>();
+    const scheduleMap = new Map<string, ScheduleRow>();
     for (const [debtorId, debtorRows] of grouped.entries()) {
       const currentMonthRows = debtorRows
         .filter((row) => yearMonthKey(row.data_envio, effectiveTimeZone) === operationalMonthKey)
@@ -374,7 +373,18 @@ export function SchedulesClient({
           String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio)),
         );
       const referenceRow = currentMonthRows[0] ?? null;
+      if (referenceRow) scheduleMap.set(debtorId, referenceRow);
+    }
 
+    return scheduleMap;
+  }, [effectiveTimeZone, operationalMonthKey, rows]);
+  const operationalStatusByDebtor = useMemo(() => {
+    const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
+    const statusMap = new Map<string, { label: "Pendente" | "Executado"; className: string }>();
+    for (const row of rows) {
+      const debtorId = String(row.debtor_id ?? "");
+      if (!debtorId || statusMap.has(debtorId)) continue;
+      const referenceRow = operationalScheduleByDebtor.get(debtorId) ?? null;
       if (!referenceRow) {
         statusMap.set(debtorId, {
           label: "Pendente",
@@ -393,7 +403,7 @@ export function SchedulesClient({
     }
 
     return statusMap;
-  }, [effectiveTimeZone, operationalMonthKey, rows, theme]);
+  }, [effectiveTimeZone, operationalScheduleByDebtor, rows, theme]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -470,11 +480,12 @@ export function SchedulesClient({
     const dueMoment = row.charge_due_at ?? row.data_envio;
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
+    const operationalSchedule = operationalScheduleByDebtor.get(String(row.debtor_id ?? "")) ?? null;
 
     return {
       primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
-      scheduledDate: dateBR(row.data_envio, effectiveTimeZone),
+      scheduledDate: operationalSchedule ? dateBR(operationalSchedule.data_envio, effectiveTimeZone) : "-",
     };
   };
 
