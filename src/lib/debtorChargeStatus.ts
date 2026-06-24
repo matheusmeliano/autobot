@@ -71,6 +71,23 @@ function buildChargeLocalDate(charge: DebtorChargeRow) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
+function monthDistance(fromYearMonth: string, toYearMonth: string) {
+  const [fromYear, fromMonth] = fromYearMonth.split("-").map(Number);
+  const [toYear, toMonth] = toYearMonth.split("-").map(Number);
+  if (!fromYear || !fromMonth || !toYear || !toMonth) return null;
+  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
+}
+
+function buildLocalDateForYearMonth(yearMonth: string, day: number) {
+  const [yearRaw, monthRaw] = yearMonth.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!year || !month) return null;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const safeDay = Math.min(Math.max(1, Number(day) || 1), lastDay);
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
 function deriveFirstChargeDebtorStatus(
   charges: DebtorChargeRow[],
   schedules: DebtorScheduleStatusRow[],
@@ -88,8 +105,17 @@ function deriveFirstChargeDebtorStatus(
     : [];
   const timeZone = String(matchingSchedules[0]?.schedule_timezone ?? "") || "America/Sao_Paulo";
   const currentLocalDate = scheduleLocalDate(nowUtcIso, timeZone);
-  const dueLocalDate = buildChargeLocalDate(firstCharge);
-  if (!currentLocalDate || !dueLocalDate) return null;
+  const dueLocalDateOriginal = buildChargeLocalDate(firstCharge);
+  if (!currentLocalDate || !dueLocalDateOriginal) return null;
+
+  const operationalYearMonth = currentLocalDate.slice(0, 7);
+  const chargeYearMonth = dueLocalDateOriginal.slice(0, 7);
+  const dueVsOperationalDistance = monthDistance(operationalYearMonth, chargeYearMonth);
+  const operationalDueLocalDate =
+    dueVsOperationalDistance === 1
+      ? buildLocalDateForYearMonth(operationalYearMonth, Number(firstCharge.due_day ?? 0))
+      : null;
+  const dueLocalDate = operationalDueLocalDate ?? dueLocalDateOriginal;
 
   const paid = matchingSchedules.some((row) => {
     const status = String(row.status ?? "").trim().toLowerCase();
