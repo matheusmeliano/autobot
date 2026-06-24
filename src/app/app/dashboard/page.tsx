@@ -22,17 +22,10 @@ function chargeMonthKey(charge: { recurrence_month?: unknown; recurrence_year?: 
 }
 
 function activitySortTime(activity: {
-  paymentReceivedAt?: string | null;
-  lastExecutedScheduledFor?: string | null;
   chargeDueAt?: string | null;
   dataEnvio?: string | null;
 }) {
-  const iso =
-    activity.paymentReceivedAt ??
-    activity.lastExecutedScheduledFor ??
-    activity.chargeDueAt ??
-    activity.dataEnvio ??
-    "";
+  const iso = activity.chargeDueAt ?? activity.dataEnvio ?? "";
   const time = new Date(String(iso)).getTime();
   return Number.isNaN(time) ? 0 : time;
 }
