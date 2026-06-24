@@ -114,14 +114,24 @@ function dueDayLabel(v: string | null) {
   return String(d.getDate());
 }
 
-function chargesTotal(row: DebtorRow) {
+function chargesTotal(row: DebtorRow, reference?: { month: number; year: number }) {
   if (row.charges && row.charges.length) {
-    const sum = row.charges.reduce((acc, c) => {
+    const scoped = reference
+      ? row.charges.filter(
+          (c) =>
+            Number(c.recurrence_month ?? 0) === reference.month &&
+            Number(c.recurrence_year ?? 0) === reference.year,
+        )
+      : row.charges;
+
+    const sum = scoped.reduce((acc, c) => {
       const n = typeof c.amount === "number" ? c.amount : Number(c.amount);
       return acc + (Number.isFinite(n) ? n : 0);
     }, 0);
-    return Number.isFinite(sum) ? sum : row.valor;
+
+    if (Number.isFinite(sum) && sum > 0) return sum;
   }
+
   return row.valor;
 }
 
@@ -834,7 +844,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             Valor
                           </div>
                           <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                            {money(chargesTotal(r))}
+                            {money(chargesTotal(r, currentRecurrence))}
                           </div>
                         </div>
                         <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
@@ -912,7 +922,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     <div className="col-span-2 truncate text-center text-[var(--app-text-70)]">
                       {r.telefone ?? "-"}
                     </div>
-                    <div className="col-span-2 text-center">{money(chargesTotal(r))}</div>
+                    <div className="col-span-2 text-center">{money(chargesTotal(r, currentRecurrence))}</div>
                     <div className="col-span-2 text-center text-[var(--app-text-70)]">
                       {chargesFirstDueDay(r)}
                     </div>
