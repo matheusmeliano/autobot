@@ -105,9 +105,7 @@ function deriveReferenceMonthDebtorStatus(
     const paid = matchingSchedules.some((row) => {
       const status = String(row.status ?? "").trim().toLowerCase();
       return (
-        status === "pago" ||
-        status === "executado" ||
-        Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone))
+        status === "pago" || Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone))
       );
     });
 
@@ -141,11 +139,7 @@ export function deriveDebtorChargeProgress(
     schedules
       .filter((row) => {
         const status = String(row.status ?? "").trim().toLowerCase();
-        return (
-          status === "pago" ||
-          status === "executado" ||
-          Boolean(String(row.payment_received_at ?? "").trim())
-        );
+        return status === "pago" || Boolean(String(row.payment_received_at ?? "").trim());
       })
       .map((row) => String(row.charge_id ?? "").trim())
       .filter(Boolean),
