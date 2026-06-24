@@ -446,7 +446,7 @@ export function SchedulesClient({
     return s || "-";
   };
 
-  const statusClass = (raw: unknown) => {
+  function statusClass(raw: unknown) {
     const s = String(raw ?? "").toLowerCase();
     if (s === "agendado") return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
     if (s === "pendente" || s === "suspeita_de_pagamento") {
@@ -455,7 +455,7 @@ export function SchedulesClient({
     if (s === "pago" || s === "executado") return "bg-emerald-600 text-[rgb(255,255,255)]";
     if (s === "atrasado") return "bg-rose-600 text-[rgb(255,255,255)]";
     return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
-  };
+  }
 
   const displayStatus = (row: ScheduleRow) => {
     return (
