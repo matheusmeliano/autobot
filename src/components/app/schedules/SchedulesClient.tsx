@@ -487,9 +487,7 @@ export function SchedulesClient({
     return {
       primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
-      scheduledDate: row.operational_due_at
-        ? dateBR(row.operational_due_at, effectiveTimeZone)
-        : "-",
+      scheduledDate: dateBR(dueMoment, effectiveTimeZone),
     };
   };
 
