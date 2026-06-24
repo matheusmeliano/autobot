@@ -373,18 +373,18 @@ async function syncDebtorChargesAndSchedules(params: {
     .limit(10);
   if (finalChargesError) return { ok: false as const, error: finalChargesError.message };
   const finalChargeIds = new Set((finalCharges ?? []).map((charge: any) => String(charge?.id ?? "")).filter(Boolean));
-  const { data: openAutoSchedules, error: openAutoSchedulesError } = await params.supabase
+  const { data: autoSchedules, error: autoSchedulesError } = await params.supabase
     .from("schedules")
     .select(
-      "id, charge_id, status, first_sent_at, payment_received_at, recurrence_day, recurrence_time, data_envio, charge_due_at, created_at",
+      "id, charge_id, status, first_sent_at, payment_received_at, recurrence_day, recurrence_time, data_envio, charge_due_at, created_at, closed_at",
     )
     .eq("debtor_id", params.debtorId)
-    .is("closed_at", null)
     .in("recurrence", ["monthly", "yearly"])
     .order("created_at", { ascending: true })
     .limit(50);
-  if (openAutoSchedulesError) return { ok: false as const, error: openAutoSchedulesError.message };
-  const usedOpenScheduleIds = new Set<string>();
+  if (autoSchedulesError) return { ok: false as const, error: autoSchedulesError.message };
+  const openAutoSchedules = (autoSchedules ?? []).filter((schedule: any) => !schedule?.closed_at);
+  const usedScheduleIds = new Set<string>();
 
   for (const charge of finalCharges ?? []) {
     const chargeId = String((charge as any).id ?? "");
@@ -419,16 +419,16 @@ async function syncDebtorChargesAndSchedules(params: {
 
     const status = shouldStartOverdue ? "atrasado" : "agendado";
     const exactSchedule =
-      (openAutoSchedules ?? []).find((schedule: any) => {
+      (autoSchedules ?? []).find((schedule: any) => {
         const scheduleId = String(schedule?.id ?? "");
-        if (!scheduleId || usedOpenScheduleIds.has(scheduleId)) return false;
+        if (!scheduleId || usedScheduleIds.has(scheduleId)) return false;
         return String(schedule?.charge_id ?? "") === chargeId;
       }) ?? null;
     const reusableLegacySchedule =
       exactSchedule ??
       (openAutoSchedules ?? []).find((schedule: any) => {
         const scheduleId = String(schedule?.id ?? "");
-        if (!scheduleId || usedOpenScheduleIds.has(scheduleId)) return false;
+        if (!scheduleId || usedScheduleIds.has(scheduleId)) return false;
         const scheduleChargeId = String(schedule?.charge_id ?? "");
         if (scheduleChargeId && finalChargeIds.has(scheduleChargeId)) return false;
         const scheduleDueAt = String(schedule?.charge_due_at ?? "");
@@ -440,7 +440,7 @@ async function syncDebtorChargesAndSchedules(params: {
       null;
     const existingSchedule = exactSchedule ?? reusableLegacySchedule;
     if (existingSchedule?.id) {
-      usedOpenScheduleIds.add(String((existingSchedule as any).id ?? ""));
+      usedScheduleIds.add(String((existingSchedule as any).id ?? ""));
     }
 
     if (!existingSchedule?.id) {
@@ -463,6 +463,9 @@ async function syncDebtorChargesAndSchedules(params: {
     } else {
       const existingStatus = String((existingSchedule as any)?.status ?? "");
       const hasFirstSent = Boolean(String((existingSchedule as any)?.first_sent_at ?? "").trim());
+      const hasPaidConfirmation =
+        existingStatus.toLowerCase() === "pago" ||
+        Boolean(String((existingSchedule as any)?.payment_received_at ?? "").trim());
       const existingChargeId = String((existingSchedule as any)?.charge_id ?? "");
       const existingDueLocalDate = String((existingSchedule as any)?.charge_due_at ?? "")
         ? localDateInTimeZone(String((existingSchedule as any)?.charge_due_at ?? ""), timeZone)
@@ -518,7 +521,7 @@ async function syncDebtorChargesAndSchedules(params: {
         })() ||
         existingRecurrenceDay !== dueDay ||
         existingRecurrenceTime !== retryTime ||
-        existingStatus !== status;
+        (!hasPaidConfirmation && existingStatus !== status);
       const updatePayload =
         shouldRefreshSchedule
           ? {
@@ -543,7 +546,7 @@ async function syncDebtorChargesAndSchedules(params: {
 
   const duplicateOrOrphanScheduleIds = (openAutoSchedules ?? [])
     .map((schedule: any) => String(schedule?.id ?? ""))
-    .filter((id) => id && !usedOpenScheduleIds.has(id));
+    .filter((id) => id && !usedScheduleIds.has(id));
   if (duplicateOrOrphanScheduleIds.length) {
     const { error: closeDuplicateSchedulesError } = await params.supabase
       .from("schedules")
