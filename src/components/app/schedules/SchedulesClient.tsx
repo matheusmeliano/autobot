@@ -1691,35 +1691,6 @@ export function SchedulesClient({
                     </button>
                   </div>
 
-                  <div className="mt-4">
-                    <div className="text-xs font-semibold text-white/60">Data final (opcional)</div>
-                    <div className="mt-1 text-[11px] text-white/45">
-                      Se deixar em branco, a cobrança recorrente continua sem limite.
-                    </div>
-                    <div className="relative mt-2">
-                      <input
-                        type="date"
-                        min={watch("data_envio_date") || undefined}
-                        className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-                        {...recurrenceUntilField}
-                        onFocus={openRecurrenceUntilDatePicker}
-                        onClick={openRecurrenceUntilDatePicker}
-                        ref={(el) => {
-                          recurrenceUntilField.ref(el);
-                          recurrenceUntilInputRef.current = el;
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={openRecurrenceUntilDatePicker}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
-                        aria-label="Selecionar data final"
-                      >
-                        <Calendar className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
                   {monthlyExtras.length > 0 ? (
                     <div className="mt-3 grid gap-3">
                       {monthlyExtras.map((c, idx) => (
@@ -1821,6 +1792,35 @@ export function SchedulesClient({
                       ))}
                     </div>
                   ) : null}
+
+                  <div className="mt-4">
+                    <div className="text-xs font-semibold text-white/60">Data final (opcional)</div>
+                    <div className="mt-1 text-[11px] text-white/45">
+                      Se deixar em branco, a cobrança recorrente continua sem limite.
+                    </div>
+                    <div className="relative mt-2">
+                      <input
+                        type="date"
+                        min={watch("data_envio_date") || undefined}
+                        className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                        {...recurrenceUntilField}
+                        onFocus={openRecurrenceUntilDatePicker}
+                        onClick={openRecurrenceUntilDatePicker}
+                        ref={(el) => {
+                          recurrenceUntilField.ref(el);
+                          recurrenceUntilInputRef.current = el;
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={openRecurrenceUntilDatePicker}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
+                        aria-label="Selecionar data final"
+                      >
+                        <Calendar className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : null}
 

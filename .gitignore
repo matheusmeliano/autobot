@@ -29,3 +29,5 @@ Senha Painel de Controle.txt
 *.sln
 *.sw?
 .vite
+.dbg/
+trae-debug-log-*.ndjson
