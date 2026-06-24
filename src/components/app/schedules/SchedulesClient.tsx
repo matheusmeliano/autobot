@@ -484,7 +484,7 @@ export function SchedulesClient({
     const s = String(raw ?? "").toLowerCase();
     if (s === "agendado") return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
     if (s === "pendente" || s === "suspeita_de_pagamento") {
-      return "bg-orange-500 text-[rgb(255,255,255)]";
+      return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
     }
     if (s === "pago" || s === "executado") return "bg-emerald-600 text-[rgb(255,255,255)]";
     if (s === "atrasado") return "bg-rose-600 text-[rgb(255,255,255)]";
