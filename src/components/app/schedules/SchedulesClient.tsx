@@ -405,37 +405,6 @@ export function SchedulesClient({
           String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio)),
         );
       const referenceRow = currentMonthRows[0] ?? null;
-      // #region debug-point B:adriano-reference-row
-      if (currentMonthRows.some((row) => String(row.debtor_nome ?? "") === "Adriano Construtor")) {
-        fetch("http://127.0.0.1:7778/event", {
-          method: "POST",
-          body: JSON.stringify({
-            sessionId: "adriano-status-executado",
-            runId: "pre-fix",
-            hypothesisId: "B",
-            location: "SchedulesClient.tsx:operationalScheduleByDebtor",
-            msg: "[DEBUG] Referencia operacional escolhida para Adriano",
-            data: {
-              debtorId,
-              operationalMonthKey,
-              rows: currentMonthRows.map((row) => ({
-                id: row.id,
-                debtorNome: row.debtor_nome,
-                chargeId: row.charge_id ?? null,
-                status: row.status ?? null,
-                chargeDueAt: row.charge_due_at ?? null,
-                dataEnvio: row.data_envio ?? null,
-                paymentReceivedAt: row.payment_received_at ?? null,
-              })),
-              referenceRowId: referenceRow?.id ?? null,
-              referenceRowDueAt: referenceRow?.charge_due_at ?? null,
-              referenceRowStatus: referenceRow?.status ?? null,
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-      }
-      // #endregion
       if (referenceRow) scheduleMap.set(debtorId, referenceRow);
     }
 
@@ -508,30 +477,6 @@ export function SchedulesClient({
       // #endregion
       const isExecuted =
         executedByCurrentInstance || (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
-      // #region debug-point C:adriano-status-eval
-      if (String(referenceRow.debtor_nome ?? "") === "Adriano Construtor") {
-        fetch("http://127.0.0.1:7778/event", {
-          method: "POST",
-          body: JSON.stringify({
-            sessionId: "adriano-status-executado",
-            runId: "pre-fix",
-            hypothesisId: "C",
-            location: "SchedulesClient.tsx:operationalStatusByDebtor",
-            msg: "[DEBUG] Status operacional calculado para Adriano",
-            data: {
-              debtorId,
-              currentLocalDate,
-              dueMoment,
-              dueLocalDate,
-              isExecuted,
-              rowStatus: referenceRow.status ?? null,
-              paymentReceivedAt: referenceRow.payment_received_at ?? null,
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-      }
-      // #endregion
       statusMap.set(debtorId, {
         label: isExecuted ? "Executado" : "Agendado",
         className: statusClass(isExecuted ? "executado" : "pendente"),
@@ -603,7 +548,7 @@ export function SchedulesClient({
     return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
   }
 
-  const hasExecutedCurrentInstance = (row: ScheduleRow) => {
+  function hasExecutedCurrentInstance(row: ScheduleRow) {
     const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
     if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
 
@@ -618,7 +563,7 @@ export function SchedulesClient({
     }
 
     return false;
-  };
+  }
 
   const displayStatus = (row: ScheduleRow) => {
     const nowIso = new Date().toISOString();
