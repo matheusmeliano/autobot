@@ -458,9 +458,56 @@ export function SchedulesClient({
 
       const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
       const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
+      let executedByCurrentInstance = false;
+      // #region debug-point A:agendar-operational-status
+      try {
+        fetch("http://127.0.0.1:7780/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: "client-load-crash",
+            runId: "pre",
+            hypothesisId: "A",
+            location: "SchedulesClient.tsx:operationalStatusByDebtor",
+            msg: "[DEBUG] Antes de calcular status operacional",
+            data: {
+              debtorId,
+              debtorName: referenceRow.debtor_nome ?? null,
+              rowId: referenceRow.id ?? null,
+              rowStatus: referenceRow.status ?? null,
+              dueMoment,
+              dueLocalDate,
+              currentLocalDate,
+            },
+            ts: Date.now(),
+          }),
+        }).catch(() => {});
+        executedByCurrentInstance = hasExecutedCurrentInstance(referenceRow);
+      } catch (error) {
+        fetch("http://127.0.0.1:7780/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: "client-load-crash",
+            runId: "pre",
+            hypothesisId: "A",
+            location: "SchedulesClient.tsx:operationalStatusByDebtor",
+            msg: "[DEBUG] Falha ao calcular status operacional",
+            data: {
+              debtorId,
+              debtorName: referenceRow.debtor_nome ?? null,
+              rowId: referenceRow.id ?? null,
+              errorName: error instanceof Error ? error.name : typeof error,
+              errorMessage: error instanceof Error ? error.message : String(error),
+            },
+            ts: Date.now(),
+          }),
+        }).catch(() => {});
+        throw error;
+      }
+      // #endregion
       const isExecuted =
-        hasExecutedCurrentInstance(referenceRow) ||
-        (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
+        executedByCurrentInstance || (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
       // #region debug-point C:adriano-status-eval
       if (String(referenceRow.debtor_nome ?? "") === "Adriano Construtor") {
         fetch("http://127.0.0.1:7778/event", {
