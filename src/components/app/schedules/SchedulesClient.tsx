@@ -149,6 +149,13 @@ function buildLocalDate(yearMonth: string, day: number) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
+function monthDistance(fromYearMonth: string, toYearMonth: string) {
+  const [fromYear, fromMonth] = fromYearMonth.split("-").map(Number);
+  const [toYear, toMonth] = toYearMonth.split("-").map(Number);
+  if (!fromYear || !fromMonth || !toYear || !toMonth) return null;
+  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
+}
+
 function localScheduleIso(date: string, time: string, timeZone: BrazilTimeZone) {
   if (!date || !time) return null;
   try {
@@ -491,8 +498,15 @@ export function SchedulesClient({
         dueMoment,
       effectiveTimeZone,
     );
+    const dueYearMonth = dueInput.date ? dueInput.date.slice(0, 7) : "";
+    const operationalYearMonth = operationalInput.date ? operationalInput.date.slice(0, 7) : "";
+    const dueVsOperationalMonthDistance =
+      dueYearMonth && operationalYearMonth ? monthDistance(operationalYearMonth, dueYearMonth) : null;
     const scheduledDate =
-      operationalSchedule && dueInput.date && operationalInput.date
+      operationalSchedule &&
+      dueInput.date &&
+      operationalInput.date &&
+      dueVsOperationalMonthDistance === 1
         ? `${dueInput.date.slice(-2)}/${operationalInput.date.slice(5, 7)}/${operationalInput.date.slice(0, 4)}`
         : dateBR(dueMoment, effectiveTimeZone);
 
