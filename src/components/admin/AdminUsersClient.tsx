@@ -117,7 +117,10 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         setHasHorizontalOverflow(false);
         return;
       }
-      setHasHorizontalOverflow(element.scrollWidth > element.clientWidth + 1);
+      const contentWidth = element.firstElementChild instanceof HTMLElement
+        ? element.firstElementChild.scrollWidth
+        : element.scrollWidth;
+      setHasHorizontalOverflow(contentWidth - element.clientWidth > 24);
     };
 
     updateOverflow();
