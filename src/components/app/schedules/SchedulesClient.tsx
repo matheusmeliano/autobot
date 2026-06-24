@@ -935,6 +935,30 @@ export function SchedulesClient({
       modalToast.error(msg);
       return;
     }
+    const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
+    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
+    const referenceYearMonth = referenceMoment ? yearMonthKey(referenceMoment, effectiveTimeZone) : "";
+    const executedYearMonth = row.last_executed_scheduled_for
+      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
+      : "";
+    const alreadyProcessed =
+      Boolean(String(row.payment_received_at ?? "").trim()) ||
+      String(row.status ?? "").trim().toLowerCase() === "pago" ||
+      String(row.status ?? "").trim().toLowerCase() === "executado";
+    const alreadyTriggeredThisMonth = Boolean(executedYearMonth) && executedYearMonth === referenceYearMonth;
+    if (alreadyProcessed) {
+      modalToast.info(
+        `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,
+      );
+      return;
+    }
+    if (alreadyTriggeredThisMonth) {
+      modalToast.info(
+        `Você já disparou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}". Isso evita registros duplicados e deixa claro que esse envio já foi processado no mês.`,
+      );
+      return;
+    }
     if (String(row.status ?? "") === "suspeita_de_pagamento") {
       modalToast.info("Pagamento em análise. Confirme no painel para continuar.");
       return;
