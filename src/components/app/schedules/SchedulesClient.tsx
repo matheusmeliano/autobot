@@ -120,6 +120,16 @@ function timeBR(v: string, timeZone: BrazilTimeZone) {
   }).format(d);
 }
 
+function monthYearBR(v: string, timeZone: BrazilTimeZone) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    month: "long",
+    year: "numeric",
+  }).format(d);
+}
+
 function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return "";
@@ -954,11 +964,16 @@ export function SchedulesClient({
   };
 
   const markAsPaid = async (row: ScheduleRow) => {
+    const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
+    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    const referenceMonthLabel = referenceMoment ? monthYearBR(referenceMoment, effectiveTimeZone) : null;
+    const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
+    const nextReferenceLabel = nextRecurringMoment ? monthYearBR(nextRecurringMoment, effectiveTimeZone) : null;
     const confirmed = await modalToast.confirm(
       String(row.recurrence ?? "none") === "monthly"
-        ? `Marcar a mensalidade atual de "${row.debtor_nome}" como quitada e avançar a cobrança para o próximo mês?`
+        ? `Deseja marcar a mensalidade de ${referenceMonthLabel ?? "referência atual"} de "${row.debtor_nome}" como quitada e avançar a próxima cobrança para ${nextReferenceLabel ?? "o próximo mês"}?`
         : String(row.recurrence ?? "none") === "yearly"
-          ? `Marcar a cobrança anual atual de "${row.debtor_nome}" como quitada e avançar para o próximo ano?`
+          ? `Deseja marcar a cobrança anual de ${referenceMonthLabel ?? "referência atual"} de "${row.debtor_nome}" como quitada e avançar a próxima cobrança para ${nextReferenceLabel ?? "o próximo ano"}?`
           : `Marcar a cobrança atual de "${row.debtor_nome}" como paga?`,
       {
         title: "Pagamento realizado",
