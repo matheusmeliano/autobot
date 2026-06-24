@@ -483,11 +483,18 @@ export function SchedulesClient({
     const dueMoment = row.charge_due_at ?? row.data_envio;
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
+    const operationalSchedule = operationalScheduleByDebtor.get(String(row.debtor_id ?? "")) ?? null;
 
     return {
       primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
-      scheduledDate: dateBR(dueMoment, effectiveTimeZone),
+      scheduledDate: dateBR(
+        operationalSchedule?.operational_due_at ??
+          operationalSchedule?.charge_due_at ??
+          operationalSchedule?.data_envio ??
+          dueMoment,
+        effectiveTimeZone,
+      ),
     };
   };
 
