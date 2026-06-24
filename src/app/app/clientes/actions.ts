@@ -375,7 +375,9 @@ async function syncDebtorChargesAndSchedules(params: {
   const finalChargeIds = new Set((finalCharges ?? []).map((charge: any) => String(charge?.id ?? "")).filter(Boolean));
   const { data: openAutoSchedules, error: openAutoSchedulesError } = await params.supabase
     .from("schedules")
-    .select("id, charge_id, status, first_sent_at, payment_received_at, recurrence_day, charge_due_at, created_at")
+    .select(
+      "id, charge_id, status, first_sent_at, payment_received_at, recurrence_day, recurrence_time, data_envio, charge_due_at, created_at",
+    )
     .eq("debtor_id", params.debtorId)
     .is("closed_at", null)
     .in("recurrence", ["monthly", "yearly"])
@@ -462,6 +464,34 @@ async function syncDebtorChargesAndSchedules(params: {
       const existingStatus = String((existingSchedule as any)?.status ?? "");
       const hasFirstSent = Boolean(String((existingSchedule as any)?.first_sent_at ?? "").trim());
       const existingChargeId = String((existingSchedule as any)?.charge_id ?? "");
+      const existingDueLocalDate = String((existingSchedule as any)?.charge_due_at ?? "")
+        ? localDateInTimeZone(String((existingSchedule as any)?.charge_due_at ?? ""), timeZone)
+        : "";
+      const existingDueLocalTime = (() => {
+        const existingDueAt = String((existingSchedule as any)?.charge_due_at ?? "");
+        if (!existingDueAt) return "";
+        try {
+          const parts = localDateTimeParts(existingDueAt, timeZone);
+          return `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
+        } catch {
+          return "";
+        }
+      })();
+      const existingScheduleLocalDate = String((existingSchedule as any)?.data_envio ?? "")
+        ? localDateInTimeZone(String((existingSchedule as any)?.data_envio ?? ""), timeZone)
+        : "";
+      const existingScheduleLocalTime = (() => {
+        const existingDataEnvio = String((existingSchedule as any)?.data_envio ?? "");
+        if (!existingDataEnvio) return "";
+        try {
+          const parts = localDateTimeParts(existingDataEnvio, timeZone);
+          return `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
+        } catch {
+          return "";
+        }
+      })();
+      const existingRecurrenceDay = Number((existingSchedule as any)?.recurrence_day ?? 0);
+      const existingRecurrenceTime = String((existingSchedule as any)?.recurrence_time ?? "");
       const updateBase: Record<string, unknown> = {
         charge_id: chargeId,
         template_id: templateIds.pendingId,
@@ -472,10 +502,36 @@ async function syncDebtorChargesAndSchedules(params: {
         recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
         recurrence_time: retryTime,
       };
-      const shouldRefreshSchedule = existingChargeId !== chargeId || !hasFirstSent;
+      const shouldRefreshSchedule =
+        existingChargeId !== chargeId ||
+        !hasFirstSent ||
+        existingDueLocalDate !== dueLocalDate ||
+        existingDueLocalTime !== retryTime ||
+        existingScheduleLocalDate !== localDateInTimeZone(scheduleAt, timeZone) ||
+        existingScheduleLocalTime !== (() => {
+          try {
+            const parts = localDateTimeParts(scheduleAt, timeZone);
+            return `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
+          } catch {
+            return "";
+          }
+        })() ||
+        existingRecurrenceDay !== dueDay ||
+        existingRecurrenceTime !== retryTime ||
+        existingStatus !== status;
       const updatePayload =
         shouldRefreshSchedule
-          ? { ...updateBase, data_envio: scheduleAt, charge_due_at: dueAt, status }
+          ? {
+              ...updateBase,
+              data_envio: scheduleAt,
+              charge_due_at: dueAt,
+              status,
+              first_sent_at: null,
+              last_sent_at: null,
+              retry_attempts: 0,
+              payment_received_at: null,
+              closed_at: null,
+            }
           : updateBase;
       const { error: updateScheduleError } = await params.supabase
         .from("schedules")
