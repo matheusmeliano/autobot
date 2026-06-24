@@ -429,9 +429,11 @@ export function SchedulesClient({
         ? row.next_charge_due_at ?? null
         : row.next_charge_due_at ?? getNextRecurringMoment(row, effectiveTimeZone);
     const hasNextSchedule = Boolean(nextRecurringMoment);
+    const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
+    const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
 
     return {
-      primaryDate: dateBR(dueMoment, effectiveTimeZone),
+      primaryDate: dueDay,
       primaryTime: timeBR(dueMoment, effectiveTimeZone),
       nextDate: hasNextSchedule ? dateBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
       nextTime: hasNextSchedule ? timeBR(String(nextRecurringMoment), effectiveTimeZone) : "-",
@@ -1168,7 +1170,7 @@ export function SchedulesClient({
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Data
+                        Vencimento
                       </div>
                       <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
                         {moments.primaryDate}
@@ -1216,7 +1218,7 @@ export function SchedulesClient({
               <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_7rem_5rem_minmax(0,1fr)_8rem_11rem] gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
                 <div>Cliente</div>
                 <div className="text-center">Templates</div>
-                <div className="text-center">Data</div>
+                <div className="text-center">Vencimento</div>
                 <div className="text-center">Hora</div>
                 <div className="text-center">Próximos agendamentos</div>
                 <div className="text-center">Status</div>
