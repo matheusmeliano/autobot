@@ -1693,7 +1693,7 @@ export function SchedulesClient({
                         </button>
                       </div>
                       <div className="mt-1 text-[11px] text-white/45">
-                        Máximo de {MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais por cliente nesse bloco.
+                        Máximo de {MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais.
                       </div>
 
                       {monthlyExtras.length > 0 ? (
