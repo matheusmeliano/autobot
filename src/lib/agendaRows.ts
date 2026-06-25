@@ -135,14 +135,6 @@ function buildOperationalChargeIso(params: {
   return buildChargeIso(operationalCharge, params.time, params.timeZone);
 }
 
-function isChargeInCurrentOperationalMonth(charge: DebtorChargeRow, timeZone: string) {
-  const { year, month } = currentOperationalYearMonth(timeZone);
-  return (
-    Number(charge.recurrence_year ?? 0) === year &&
-    Number(charge.recurrence_month ?? 0) === month
-  );
-}
-
 function fallbackScheduleMatch(
   schedules: ScheduleSourceRow[],
   charge: DebtorChargeRow,
@@ -214,7 +206,6 @@ export function buildAgendaRows(params: {
       const rowTimeZone = matchedSchedule?.schedule_timezone
         ? String(matchedSchedule.schedule_timezone)
         : params.defaultTimeZone || "America/Sao_Paulo";
-      if (!isChargeInCurrentOperationalMonth(charge, rowTimeZone)) continue;
 
       const chargeDueAt = buildChargeIso(charge, retryTime, rowTimeZone);
       const operationalDueAt = buildOperationalChargeIso({
@@ -222,9 +213,7 @@ export function buildAgendaRows(params: {
         time: retryTime,
         timeZone: rowTimeZone,
       });
-      const effectiveChargeDueAt =
-        String(matchedSchedule?.charge_due_at ?? "").trim() || chargeDueAt;
-      const dataEnvio = matchedSchedule?.data_envio ?? effectiveChargeDueAt;
+      const dataEnvio = matchedSchedule?.data_envio ?? chargeDueAt;
       const nextCharge = charges[index + 1] ?? null;
       const nextChargeDueAt = nextCharge ? buildChargeIso(nextCharge, retryTime, rowTimeZone) : null;
 
@@ -244,7 +233,7 @@ export function buildAgendaRows(params: {
           ? String(matchedSchedule.template_overdue_id)
           : templateDefaults.overdueId,
         data_envio: String(dataEnvio),
-        charge_due_at: String(effectiveChargeDueAt),
+        charge_due_at: String(chargeDueAt),
         operational_due_at: String(operationalDueAt),
         next_charge_due_at: nextChargeDueAt,
         status: String(matchedSchedule?.status ?? "agendado"),
@@ -279,8 +268,6 @@ export function buildAgendaRows(params: {
       sensitivity: "base",
     });
     if (debtorCompare !== 0) return debtorCompare;
-    return String(a.operational_due_at ?? a.charge_due_at ?? a.data_envio).localeCompare(
-      String(b.operational_due_at ?? b.charge_due_at ?? b.data_envio),
-    );
+    return String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio));
   });
 }
