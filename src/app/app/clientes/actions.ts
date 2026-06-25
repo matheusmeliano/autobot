@@ -187,6 +187,16 @@ function buildLocalDate(yearMonth: string, day: number) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
+function hasPaidScheduleConfirmation(schedule: {
+  status?: string | null;
+  payment_received_at?: string | null;
+}) {
+  return (
+    String(schedule?.status ?? "").trim().toLowerCase() === "pago" ||
+    Boolean(String(schedule?.payment_received_at ?? "").trim())
+  );
+}
+
 function nextMonthYear(baseDate = new Date()) {
   const year = baseDate.getFullYear();
   const month = baseDate.getMonth() + 1;
@@ -429,6 +439,7 @@ async function syncDebtorChargesAndSchedules(params: {
       (openAutoSchedules ?? []).find((schedule: any) => {
         const scheduleId = String(schedule?.id ?? "");
         if (!scheduleId || usedScheduleIds.has(scheduleId)) return false;
+        if (hasPaidScheduleConfirmation(schedule)) return false;
         const scheduleChargeId = String(schedule?.charge_id ?? "");
         if (scheduleChargeId && finalChargeIds.has(scheduleChargeId)) return false;
         const scheduleDueAt = String(schedule?.charge_due_at ?? "");
@@ -463,9 +474,7 @@ async function syncDebtorChargesAndSchedules(params: {
     } else {
       const existingStatus = String((existingSchedule as any)?.status ?? "");
       const hasFirstSent = Boolean(String((existingSchedule as any)?.first_sent_at ?? "").trim());
-      const hasPaidConfirmation =
-        existingStatus.toLowerCase() === "pago" ||
-        Boolean(String((existingSchedule as any)?.payment_received_at ?? "").trim());
+      const hasPaidConfirmation = hasPaidScheduleConfirmation(existingSchedule as any);
       const existingChargeId = String((existingSchedule as any)?.charge_id ?? "");
       const existingDueLocalDate = String((existingSchedule as any)?.charge_due_at ?? "")
         ? localDateInTimeZone(String((existingSchedule as any)?.charge_due_at ?? ""), timeZone)
@@ -505,23 +514,28 @@ async function syncDebtorChargesAndSchedules(params: {
         recurrence_day: Number.isFinite(dueDay) ? dueDay : 1,
         recurrence_time: retryTime,
       };
+      const shouldKeepPaidScheduleLocked =
+        hasPaidConfirmation && existingChargeId === chargeId;
       const shouldRefreshSchedule =
-        existingChargeId !== chargeId ||
-        !hasFirstSent ||
-        existingDueLocalDate !== dueLocalDate ||
-        existingDueLocalTime !== retryTime ||
-        existingScheduleLocalDate !== localDateInTimeZone(scheduleAt, timeZone) ||
-        existingScheduleLocalTime !== (() => {
-          try {
-            const parts = localDateTimeParts(scheduleAt, timeZone);
-            return `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
-          } catch {
-            return "";
-          }
-        })() ||
-        existingRecurrenceDay !== dueDay ||
-        existingRecurrenceTime !== retryTime ||
-        (!hasPaidConfirmation && existingStatus !== status);
+        !shouldKeepPaidScheduleLocked &&
+        (
+          existingChargeId !== chargeId ||
+          !hasFirstSent ||
+          existingDueLocalDate !== dueLocalDate ||
+          existingDueLocalTime !== retryTime ||
+          existingScheduleLocalDate !== localDateInTimeZone(scheduleAt, timeZone) ||
+          existingScheduleLocalTime !== (() => {
+            try {
+              const parts = localDateTimeParts(scheduleAt, timeZone);
+              return `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
+            } catch {
+              return "";
+            }
+          })() ||
+          existingRecurrenceDay !== dueDay ||
+          existingRecurrenceTime !== retryTime ||
+          (!hasPaidConfirmation && existingStatus !== status)
+        );
       const updatePayload =
         shouldRefreshSchedule
           ? {
