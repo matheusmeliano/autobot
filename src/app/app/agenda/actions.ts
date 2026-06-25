@@ -17,7 +17,7 @@ import {
 } from "@/lib/chargeRetry";
 import {
   localDateInTimeZone,
-  MAX_MONTHLY_RECURRENCE_OCCURRENCES,
+  MAX_MONTHLY_SCHEDULES_PER_DEBTOR,
   MAX_YEARLY_RECURRENCE_OCCURRENCES,
   monthlyRecurrenceLimitMinDate,
   recurrenceLimitMaxDate,
@@ -143,12 +143,16 @@ function validateRecurringRecurrenceLimit(params: {
     return { recurrenceUntil: null as string | null, error: null as string | null };
   }
 
-  const maxDate = recurrenceLimitMaxDate({
-    recurrence: params.recurrence,
-    currentUtcIso: params.currentUtcIso,
-    timeZone: params.timeZone,
-  });
-  const effectiveRecurrenceUntil = params.recurrenceUntil ?? maxDate;
+  const maxDate =
+    params.recurrence === "yearly"
+      ? recurrenceLimitMaxDate({
+          recurrence: params.recurrence,
+          currentUtcIso: params.currentUtcIso,
+          timeZone: params.timeZone,
+        })
+      : null;
+  const effectiveRecurrenceUntil =
+    params.recurrence === "yearly" ? params.recurrenceUntil ?? maxDate : params.recurrenceUntil ?? null;
   if (!effectiveRecurrenceUntil) {
     return { recurrenceUntil: null as string | null, error: null as string | null };
   }
@@ -175,13 +179,11 @@ function validateRecurringRecurrenceLimit(params: {
     }
   }
 
-  if (maxDate && effectiveRecurrenceUntil > maxDate) {
+  if (params.recurrence === "yearly" && maxDate && effectiveRecurrenceUntil > maxDate) {
     return {
       recurrenceUntil: null as string | null,
       error:
-        params.recurrence === "monthly"
-          ? `A recorrência mensal permite no máximo ${MAX_MONTHLY_RECURRENCE_OCCURRENCES} cobranças. Defina a data final até ${formatDateBR(maxDate)}.`
-          : `A recorrência anual permite no máximo ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças. Defina a data final até ${formatDateBR(maxDate)}.`,
+        `A recorrência anual permite no máximo ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças. Defina a data final até ${formatDateBR(maxDate)}.`,
     };
   }
 
@@ -338,9 +340,31 @@ async function debtorHasRegisteredCharges(
   return { ok: true as const, hasCharges: (count ?? 0) > 0 };
 }
 
+async function countOpenMonthlySchedulesForDebtor(params: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  debtorId: string;
+  excludeId?: string;
+}) {
+  let query = params.supabase
+    .from("schedules")
+    .select("id", { count: "exact", head: true })
+    .eq("debtor_id", params.debtorId)
+    .eq("recurrence", "monthly")
+    .is("closed_at", null);
+
+  if (params.excludeId) {
+    query = query.neq("id", params.excludeId);
+  }
+
+  const { count, error } = await query;
+  if (error) return { ok: false as const, error: error.message, count: 0 };
+  return { ok: true as const, count: count ?? 0 };
+}
+
 export async function createScheduleAction(input: unknown) {
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Dados inválidos." };
+  const recurrence = parsed.data.recurrence ?? "none";
 
   const supabase = await createSupabaseServerClient();
   const { data: userRes } = await supabase.auth.getUser();
@@ -373,6 +397,19 @@ export async function createScheduleAction(input: unknown) {
         "Esse cliente já possui cobranças cadastradas em Clientes. Os agendamentos dele são gerados automaticamente por cobrança.",
     };
   }
+  if (recurrence === "monthly") {
+    const monthlyCountCheck = await countOpenMonthlySchedulesForDebtor({
+      supabase,
+      debtorId: parsed.data.debtor_id,
+    });
+    if (!monthlyCountCheck.ok) return { ok: false, error: monthlyCountCheck.error };
+    if (monthlyCountCheck.count >= MAX_MONTHLY_SCHEDULES_PER_DEBTOR) {
+      return {
+        ok: false,
+        error: `Esse cliente pode ter no máximo ${MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais no bloco "Cobranças no mês".`,
+      };
+    }
+  }
 
   const futureValidation = validateFutureScheduleDateTime({
     date: parsed.data.data_envio_date,
@@ -388,7 +425,6 @@ export async function createScheduleAction(input: unknown) {
     enabled: await debtorSkipsWeekendsOnFirstCharge(supabase, parsed.data.debtor_id),
   });
 
-  const recurrence = parsed.data.recurrence ?? "none";
   const recurrenceValidation = validateRecurrenceUntil({
     recurrence,
     recurrenceUntil: parsed.data.recurrence_until,
@@ -434,6 +470,7 @@ export async function updateScheduleAction(input: unknown) {
 
   const supabase = await createSupabaseServerClient();
   const { id, ...data } = parsed.data;
+  const recurrence = (data as any).recurrence ?? "none";
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) return { ok: false, error: "Sem sessão." };
@@ -470,6 +507,20 @@ export async function updateScheduleAction(input: unknown) {
         "Esse cliente já possui cobranças cadastradas em Clientes. Edite as cobranças no cadastro do cliente para atualizar os agendamentos automáticos.",
     };
   }
+  if (recurrence === "monthly") {
+    const monthlyCountCheck = await countOpenMonthlySchedulesForDebtor({
+      supabase,
+      debtorId: data.debtor_id,
+      excludeId: id,
+    });
+    if (!monthlyCountCheck.ok) return { ok: false, error: monthlyCountCheck.error };
+    if (monthlyCountCheck.count >= MAX_MONTHLY_SCHEDULES_PER_DEBTOR) {
+      return {
+        ok: false,
+        error: `Esse cliente pode ter no máximo ${MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais no bloco "Cobranças no mês".`,
+      };
+    }
+  }
 
   const futureValidation = validateFutureScheduleDateTime({
     date: data.data_envio_date,
@@ -485,7 +536,6 @@ export async function updateScheduleAction(input: unknown) {
     enabled: await debtorSkipsWeekendsOnFirstCharge(supabase, data.debtor_id),
   });
 
-  const recurrence = (data as any).recurrence ?? "none";
   const recurrenceValidation = validateRecurrenceUntil({
     recurrence,
     recurrenceUntil: data.recurrence_until,

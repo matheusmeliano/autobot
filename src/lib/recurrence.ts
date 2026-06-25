@@ -1,6 +1,6 @@
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
-export const MAX_MONTHLY_RECURRENCE_OCCURRENCES = 27;
+export const MAX_MONTHLY_SCHEDULES_PER_DEBTOR = 27;
 export const MAX_YEARLY_RECURRENCE_OCCURRENCES = 300;
 
 function partsToMap(parts: Intl.DateTimeFormatPart[]) {
@@ -171,9 +171,6 @@ export function recurrenceLimitMaxDateFromLocalDate(params: {
   currentDate: string;
 }) {
   if (!params.currentDate) return null;
-  if (params.recurrence === "monthly") {
-    return addMonthsToLocalDate(params.currentDate, MAX_MONTHLY_RECURRENCE_OCCURRENCES - 1);
-  }
   if (params.recurrence === "yearly") {
     return addYearsToLocalDate(params.currentDate, MAX_YEARLY_RECURRENCE_OCCURRENCES - 1);
   }

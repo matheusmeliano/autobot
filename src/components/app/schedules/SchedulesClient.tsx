@@ -9,7 +9,7 @@ import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
 import {
   localDateInTimeZone,
-  MAX_MONTHLY_RECURRENCE_OCCURRENCES,
+  MAX_MONTHLY_SCHEDULES_PER_DEBTOR,
   MAX_YEARLY_RECURRENCE_OCCURRENCES,
   nextMonthlyIso,
   nextYearlyIso,
@@ -685,6 +685,28 @@ export function SchedulesClient({
     if (timePickerTarget.kind === "main") return String(scheduleDateValue ?? "");
     return monthlyExtras[timePickerTarget.index]?.date ?? "";
   }, [monthlyExtras, scheduleDateValue, timePickerTarget]);
+  const existingMonthlySchedulesForDebtor = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          String(row.debtor_id ?? "") === String(selectedDebtorId ?? "") &&
+          String(row.recurrence ?? "") === "monthly",
+      ).length,
+    [rows, selectedDebtorId],
+  );
+  const editingCountsAsMonthlyForSelectedDebtor = Boolean(
+    editing &&
+      String(editing.recurrence ?? "") === "monthly" &&
+      String(editing.debtor_id ?? "") === String(selectedDebtorId ?? ""),
+  );
+  const baseMonthlySchedulesCount = isMonthlyRecurrence
+    ? existingMonthlySchedulesForDebtor + (editing ? (editingCountsAsMonthlyForSelectedDebtor ? 0 : 1) : 1)
+    : 0;
+  const currentProjectedMonthlySchedulesCount = isMonthlyRecurrence
+    ? baseMonthlySchedulesCount + monthlyExtras.length
+    : 0;
+  const canAddMonthlyExtra =
+    isMonthlyRecurrence && currentProjectedMonthlySchedulesCount < MAX_MONTHLY_SCHEDULES_PER_DEBTOR;
   const recurrenceUntilMax = useMemo(
     () =>
       recurrenceLimitMaxDateFromLocalDate({
@@ -693,11 +715,6 @@ export function SchedulesClient({
       }),
     [recurrenceValue, scheduleDateValue],
   );
-  const recurrenceLimitCountLabel = isMonthlyRecurrence
-    ? String(MAX_MONTHLY_RECURRENCE_OCCURRENCES)
-    : isYearlyRecurrence
-      ? String(MAX_YEARLY_RECURRENCE_OCCURRENCES)
-      : null;
 
   useEffect(() => {
     if (recurrenceValue !== "monthly" && monthlyExtras.length > 0) {
@@ -816,6 +833,12 @@ export function SchedulesClient({
       return;
     }
     if (values.recurrence === "monthly") {
+      if (currentProjectedMonthlySchedulesCount > MAX_MONTHLY_SCHEDULES_PER_DEBTOR) {
+        modalToast.warning(
+          `Esse cliente pode ter no máximo ${MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais no bloco "Cobranças no mês".`,
+        );
+        return;
+      }
       for (const [i, c] of monthlyExtras.entries()) {
         if (!c.date || !c.time) {
           modalToast.warning(`Preencha data e hora da cobrança adicional ${i + 1}.`);
@@ -830,7 +853,11 @@ export function SchedulesClient({
         : values.data_envio_date;
     const normalizedRecurrenceUntil = normalizeDateOnly(values.recurrence_until);
     const effectiveRecurrenceUntil =
-      values.recurrence !== "none" ? normalizedRecurrenceUntil || recurrenceUntilMax || undefined : undefined;
+      values.recurrence === "yearly"
+        ? normalizedRecurrenceUntil || recurrenceUntilMax || undefined
+        : values.recurrence !== "none"
+          ? normalizedRecurrenceUntil || undefined
+          : undefined;
 
     const payload = {
       ...(values.id ? { id: values.id } : {}),
@@ -860,11 +887,9 @@ export function SchedulesClient({
       modalToast.warning("A data final deve ser igual ou posterior à primeira cobrança.");
       return;
     }
-    if (values.recurrence !== "none" && recurrenceUntilMax && normalizedRecurrenceUntil && normalizedRecurrenceUntil > recurrenceUntilMax) {
+    if (values.recurrence === "yearly" && recurrenceUntilMax && normalizedRecurrenceUntil && normalizedRecurrenceUntil > recurrenceUntilMax) {
       modalToast.warning(
-        values.recurrence === "monthly"
-          ? `A recorrência mensal permite no máximo ${MAX_MONTHLY_RECURRENCE_OCCURRENCES} cobranças até ${recurrenceUntilMax}.`
-          : `A recorrência anual permite no máximo ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças até ${recurrenceUntilMax}.`,
+        `A recorrência anual permite no máximo ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças até ${recurrenceUntilMax}.`,
       );
       return;
     }
@@ -1648,17 +1673,27 @@ export function SchedulesClient({
                         <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
                         <button
                           type="button"
-                          onClick={() =>
+                          disabled={!canAddMonthlyExtra}
+                          onClick={() => {
+                            if (!canAddMonthlyExtra) {
+                              modalToast.info(
+                                `Esse cliente pode ter no máximo ${MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais no bloco "Cobranças no mês".`,
+                              );
+                              return;
+                            }
                             setMonthlyExtras((prev) => [
                               ...prev,
                               { date: String(watch("data_envio_date") ?? ""), time: String(watch("data_envio_time") ?? "") },
-                            ])
-                          }
+                            ]);
+                          }}
                           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/[0.06]"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar
                         </button>
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Máximo de {MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais por cliente nesse bloco.
                       </div>
 
                       {monthlyExtras.length > 0 ? (
@@ -1775,8 +1810,8 @@ export function SchedulesClient({
                     </div>
                     <div className="mt-1 text-[11px] text-white/45">
                       {isYearlyRecurrence
-                        ? `Se deixar em branco, o sistema usa automaticamente o limite máximo de ${recurrenceLimitCountLabel} cobranças anuais.`
-                        : `Se deixar em branco, o sistema usa automaticamente o limite máximo de ${recurrenceLimitCountLabel} cobranças.`}
+                        ? `Se deixar em branco, o sistema usa automaticamente o limite máximo de ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças anuais.`
+                        : "Opcional. Se deixar em branco, a recorrência mensal continua sem data final."}
                       {recurrenceUntilMax ? ` Data máxima: ${recurrenceUntilMax}.` : ""}
                     </div>
                     <div className="relative mt-2">
