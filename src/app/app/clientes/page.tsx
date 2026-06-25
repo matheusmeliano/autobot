@@ -3,27 +3,17 @@ import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsC
 import Link from "next/link";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
 import { applyCurrentMonthDebtorStatuses, deriveReferenceMonthDebtorChargeProgress } from "@/lib/debtorChargeStatus";
+import { listAllClientesDebtors, listAllClientesSchedules } from "@/lib/clientesData";
 
 export default async function ClientesPage() {
   const supabase = await createSupabaseServerClient();
-  const [{ data, error }, { data: profile }, { data: schedules }] = await Promise.all([
-    supabase
-      .from("debtors")
-      .select(
-        "id, nome, telefone, valor, vencimento, pix_key, observacoes, status, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, created_at, debtor_charges(id, amount, due_day, recurrence_month, recurrence_year, created_at)",
-      )
-      .order("created_at", { ascending: false })
-      .limit(200),
+  const [{ data, error }, { data: profile }, { data: schedules, error: schedulesError }] = await Promise.all([
+    listAllClientesDebtors(supabase),
     supabase.from("profiles").select("plano").maybeSingle(),
-    supabase
-      .from("schedules")
-      .select(
-        "debtor_id, charge_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at",
-      )
-      .limit(1000),
+    listAllClientesSchedules(supabase),
   ]);
 
-  if (error) {
+  if (error || schedulesError) {
     return (
       <div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">

@@ -550,25 +550,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   };
 
   const onSubmit = handleSubmit(async (values) => {
-    // #region debug-point A:submit-start
-    void fetch("http://127.0.0.1:7777/event", {
-      method: "POST",
-      body: JSON.stringify({
-        sessionId: "clientes-popup-save",
-        runId: "pre-fix",
-        hypothesisId: "A",
-        location: "DebtorsClient.tsx:onSubmit:start",
-        msg: "[DEBUG] submit iniciado no modal de clientes",
-        data: {
-          editingId: values.id ?? null,
-          nome: values.nome,
-          chargesCount: Array.isArray(values.charges) ? values.charges.length : 0,
-          retryMaxAttempts: values.retry_max_attempts,
-        },
-        ts: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     const pixKey = values.pix_key ? normalizePixKeyForSave(values.pix_key) : null;
     const currentRecurrenceKey = currentRecurrence.year * 100 + currentRecurrence.month;
     const mappedCharges: Array<{
@@ -630,50 +611,10 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         return Number.isInteger(month) && Number.isInteger(year) && year * 100 + month < currentRecurrenceKey;
       })
     ) {
-      // #region debug-point B:frontend-recurrence-block
-      void fetch("http://127.0.0.1:7777/event", {
-        method: "POST",
-        body: JSON.stringify({
-          sessionId: "clientes-popup-save",
-          runId: "pre-fix",
-          hypothesisId: "B",
-          location: "DebtorsClient.tsx:onSubmit:recurrence-check",
-          msg: "[DEBUG] submit bloqueado por recorrencia anterior ao mes atual",
-          data: {
-            editingId: values.id ?? null,
-            charges: (values.charges ?? []).map((c) => ({
-              due_day: c.due_day,
-              recurrence_month: c.recurrence_month,
-              recurrence_year: c.recurrence_year,
-            })),
-            currentRecurrenceKey,
-          },
-          ts: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       modalToast.error("Mês e ano da recorrência devem ser do mês atual em diante.");
       return;
     }
     if (!mappedCharges.length) {
-      // #region debug-point C:frontend-empty-charges
-      void fetch("http://127.0.0.1:7777/event", {
-        method: "POST",
-        body: JSON.stringify({
-          sessionId: "clientes-popup-save",
-          runId: "pre-fix",
-          hypothesisId: "C",
-          location: "DebtorsClient.tsx:onSubmit:mapped-charges",
-          msg: "[DEBUG] submit bloqueado porque nenhuma cobranca valida restou apos sanitizacao",
-          data: {
-            editingId: values.id ?? null,
-            rawChargesCount: Array.isArray(values.charges) ? values.charges.length : 0,
-            rawCharges: values.charges ?? [],
-          },
-          ts: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       modalToast.error("Informe pelo menos 1 cobrança (valor e dia de vencimento).");
       return;
     }
@@ -707,27 +648,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     const res = editing
       ? await updateDebtorAction(payload)
       : await createDebtorAction(payload);
-
-    // #region debug-point D:action-result
-    void fetch("http://127.0.0.1:7777/event", {
-      method: "POST",
-      body: JSON.stringify({
-        sessionId: "clientes-popup-save",
-        runId: "pre-fix",
-        hypothesisId: "D",
-        location: "DebtorsClient.tsx:onSubmit:action-result",
-        msg: "[DEBUG] action de clientes concluida",
-        data: {
-          editingId: values.id ?? null,
-          payloadChargesCount: payload.charges.length,
-          ok: res.ok,
-          error: "error" in res ? (res.error ?? null) : null,
-          warning: "warning" in res ? (res.warning ?? null) : null,
-        },
-        ts: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     if (!res.ok) {
       modalToast.error(res.error ?? "Falha ao salvar.");
