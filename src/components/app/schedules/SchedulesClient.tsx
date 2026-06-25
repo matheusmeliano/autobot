@@ -522,13 +522,32 @@ export function SchedulesClient({
     return false;
   }
 
+  function displayReferenceMoment(row: ScheduleRow) {
+    const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
+    const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+    const dueYearMonth = dueMoment ? yearMonthKey(dueMoment, effectiveTimeZone) : "";
+    const executedYearMonth = lastExecutedMoment ? yearMonthKey(lastExecutedMoment, effectiveTimeZone) : "";
+
+    if (
+      executedYearMonth &&
+      executedYearMonth === operationalMonthKey &&
+      dueYearMonth !== operationalMonthKey
+    ) {
+      return lastExecutedMoment;
+    }
+
+    return dueMoment || lastExecutedMoment;
+  }
+
   const displayStatus = (row: ScheduleRow) => {
     const nowIso = new Date().toISOString();
     const currentLocalDate = localDateInTimeZone(nowIso, effectiveTimeZone);
-    const dueMoment = row.charge_due_at ?? row.data_envio;
+    const dueMoment = displayReferenceMoment(row);
     const dueLocalDate = localDateInTimeZone(String(dueMoment), effectiveTimeZone);
     const isExecuted =
       hasExecutedCurrentInstance(row) ||
+      (Boolean(String(row.last_executed_scheduled_for ?? "").trim()) &&
+        yearMonthKey(String(row.last_executed_scheduled_for), effectiveTimeZone) === operationalMonthKey) ||
       (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
 
     return isExecuted
@@ -537,7 +556,7 @@ export function SchedulesClient({
   };
 
   const displayMoments = (row: ScheduleRow) => {
-    const dueMoment = row.charge_due_at ?? row.data_envio;
+    const dueMoment = displayReferenceMoment(row);
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
     const scheduledDate = dateBR(dueMoment, effectiveTimeZone);
