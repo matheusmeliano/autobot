@@ -403,10 +403,14 @@ export function SchedulesClient({
     for (const [debtorId, debtorRows] of grouped.entries()) {
       const currentMonthRows = debtorRows
         .filter(
-          (row) => yearMonthKey(row.charge_due_at ?? row.data_envio, effectiveTimeZone) === operationalMonthKey,
+          (row) =>
+            yearMonthKey(row.operational_due_at ?? row.charge_due_at ?? row.data_envio, effectiveTimeZone) ===
+            operationalMonthKey,
         )
         .sort((a, b) =>
-          String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio)),
+          String(a.operational_due_at ?? a.charge_due_at ?? a.data_envio).localeCompare(
+            String(b.operational_due_at ?? b.charge_due_at ?? b.data_envio),
+          ),
         );
       const referenceRow = currentMonthRows[0] ?? null;
       if (referenceRow) scheduleMap.set(debtorId, referenceRow);
@@ -523,10 +527,16 @@ export function SchedulesClient({
   }
 
   function displayReferenceMoment(row: ScheduleRow) {
+    const operationalMoment = String(row.operational_due_at ?? "").trim();
     const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
     const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+    const operationalYearMonth = operationalMoment ? yearMonthKey(operationalMoment, effectiveTimeZone) : "";
     const dueYearMonth = dueMoment ? yearMonthKey(dueMoment, effectiveTimeZone) : "";
     const executedYearMonth = lastExecutedMoment ? yearMonthKey(lastExecutedMoment, effectiveTimeZone) : "";
+
+    if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
+      return operationalMoment;
+    }
 
     if (
       executedYearMonth &&

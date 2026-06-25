@@ -1,3 +1,5 @@
+import { zonedDateTimeToUtcIso } from "@/lib/timezone";
+
 type TemplateChoice = {
   id: string;
   nome?: string | null;
@@ -27,6 +29,11 @@ type ScheduleSourceRow = {
   payment_received_at?: string | null;
   created_at?: string | null;
   closed_at?: string | null;
+  charge?: {
+    due_day?: number | null;
+    recurrence_month?: number | null;
+    recurrence_year?: number | null;
+  } | null;
   pending_template?: { nome?: string | null } | null;
   overdue_template?: { nome?: string | null } | null;
 };
@@ -59,6 +66,44 @@ type AgendaRow = {
   template_pending_nome: string | null;
   template_overdue_nome: string | null;
 };
+
+function lastDayOfMonth(year: number, month1: number) {
+  return new Date(Date.UTC(year, month1, 0)).getUTCDate();
+}
+
+function buildChargeLocalDate(params: {
+  year?: number | null;
+  month?: number | null;
+  day?: number | null;
+}) {
+  const year = Number(params.year ?? 0);
+  const month = Number(params.month ?? 0);
+  const day = Number(params.day ?? 0);
+  if (!Number.isInteger(year) || year < 2000) return null;
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null;
+  if (!Number.isInteger(day) || day < 1) return null;
+  const safeDay = Math.max(1, Math.min(day, lastDayOfMonth(year, month)));
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+function extractLocalTimeFromIso(value: string | null | undefined, timeZone: string) {
+  const iso = String(value ?? "").trim();
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return map.hour && map.minute ? `${map.hour}:${map.minute}` : null;
+}
 
 export function buildAgendaRows(params: {
   debtors: DebtorRow[];
@@ -99,6 +144,23 @@ export function buildAgendaRows(params: {
       String(schedule.overdue_template?.nome ?? "").trim() ||
       String(templatesById.get(overdueTemplateId)?.nome ?? "").trim() ||
       null;
+    const scheduleTimeZone = schedule.schedule_timezone ? String(schedule.schedule_timezone) : params.defaultTimeZone || null;
+    const operationalLocalDate = buildChargeLocalDate({
+      year: schedule.charge?.recurrence_year,
+      month: schedule.charge?.recurrence_month,
+      day: schedule.charge?.due_day ?? schedule.recurrence_day,
+    });
+    const operationalTime =
+      (String(schedule.recurrence_time ?? "").trim() || extractLocalTimeFromIso(schedule.charge_due_at ?? schedule.data_envio ?? null, scheduleTimeZone || "America/Sao_Paulo")) ??
+      "09:00";
+    const operationalDueAt =
+      operationalLocalDate && scheduleTimeZone
+        ? zonedDateTimeToUtcIso({
+            date: operationalLocalDate,
+            time: operationalTime,
+            timeZone: scheduleTimeZone,
+          })
+        : null;
 
     rows.push({
       id: scheduleId,
@@ -111,14 +173,14 @@ export function buildAgendaRows(params: {
       template_overdue_id: overdueTemplateId || null,
       data_envio: String(schedule.data_envio ?? schedule.charge_due_at ?? schedule.created_at ?? ""),
       charge_due_at: schedule.charge_due_at ? String(schedule.charge_due_at) : null,
-      operational_due_at: null,
+      operational_due_at: operationalDueAt,
       next_charge_due_at: null,
       status: String(schedule.status ?? "agendado"),
       recurrence: schedule.recurrence ? String(schedule.recurrence) : "none",
       recurrence_until: schedule.recurrence_until ? String(schedule.recurrence_until) : null,
       recurrence_day: Number.isFinite(Number(schedule.recurrence_day)) ? Number(schedule.recurrence_day) : null,
       recurrence_time: schedule.recurrence_time ? String(schedule.recurrence_time) : null,
-      schedule_timezone: schedule.schedule_timezone ? String(schedule.schedule_timezone) : params.defaultTimeZone || null,
+      schedule_timezone: scheduleTimeZone,
       last_sent_at: schedule.last_sent_at ? String(schedule.last_sent_at) : null,
       payment_received_at: schedule.payment_received_at ? String(schedule.payment_received_at) : null,
       last_executed_scheduled_for: params.latestExecutedRunBySchedule.get(scheduleId) ?? null,

@@ -4,7 +4,7 @@ const AGENDAR_DEBTORS_PAGE_SIZE = 200;
 const AGENDAR_TEMPLATES_PAGE_SIZE = 200;
 
 const AGENDAR_SCHEDULES_SELECT =
-  "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)";
+  "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, charge:debtor_charges!schedules_charge_id_fkey(due_day, recurrence_month, recurrence_year), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)";
 
 const AGENDAR_DEBTORS_SELECT =
   "id, nome, observacoes, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)";
