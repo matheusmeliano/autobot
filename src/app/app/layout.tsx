@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app/AppShell";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Script from "next/script";
 
@@ -17,6 +18,30 @@ export default async function AppLayout({
   } = await supabase.auth.getSession();
 
   if (!session?.user) {
+    const hdrs = await headers();
+    const candidates = [
+      hdrs.get("x-invoke-path"),
+      hdrs.get("x-matched-path"),
+      hdrs.get("next-url"),
+      hdrs.get("x-next-url"),
+      hdrs.get("x-original-uri"),
+      hdrs.get("x-forwarded-uri"),
+    ];
+    let nextPath = candidates.find((value) => typeof value === "string" && value.startsWith("/")) ?? "";
+    if (!nextPath) {
+      const referer = hdrs.get("referer");
+      if (referer) {
+        try {
+          const refUrl = new URL(referer);
+          if (refUrl.pathname.startsWith("/app")) {
+            nextPath = `${refUrl.pathname}${refUrl.search}`;
+          }
+        } catch {}
+      }
+    }
+    if (nextPath) {
+      redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
     redirect("/login");
   }
 

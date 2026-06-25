@@ -23,7 +23,7 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
-    formState: { isSubmitting },
+    formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: { email: "", password: "" },
   });
@@ -62,8 +62,8 @@ export function LoginForm() {
       return;
     }
 
-    const next = searchParams?.get("next");
-    const nextUrl = next && next.startsWith("/") ? next : "/app";
+    const next = String(searchParams?.get("next") ?? "");
+    const nextUrl = /^\/(?!\/)/.test(next) ? next : "/app";
     router.push(nextUrl);
     router.refresh();
   });
@@ -89,8 +89,19 @@ export function LoginForm() {
             autoComplete="email"
             className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
             placeholder="voce@empresa.com"
-            {...register("email", { required: true })}
+            {...register("email", {
+              required: "Informe seu e-mail.",
+              validate: (value) => {
+                const v = String(value ?? "").trim();
+                if (!v) return "Informe seu e-mail.";
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Informe um e-mail válido.";
+                return true;
+              },
+            })}
           />
+          {errors.email?.message ? (
+            <div className="mt-2 text-xs font-medium text-rose-300">{errors.email.message}</div>
+          ) : null}
         </div>
 
         <div>
@@ -101,7 +112,7 @@ export function LoginForm() {
               autoComplete="current-password"
               className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-11 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
               placeholder="••••••••"
-              {...register("password", { required: true })}
+              {...register("password", { required: "Informe sua senha." })}
             />
             <button
               type="button"
@@ -116,6 +127,11 @@ export function LoginForm() {
               )}
             </button>
           </div>
+          {errors.password?.message ? (
+            <div className="mt-2 text-xs font-medium text-rose-300">
+              {errors.password.message}
+            </div>
+          ) : null}
           <div className="mt-2 flex justify-end">
             <Link
               href="/esqueci-senha"

@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizePlan, planLabel } from "@/lib/plans";
 import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
 import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
+import { redirect } from "next/navigation";
 
 function dateBR(v: string | null) {
   if (!v) return "-";
@@ -18,6 +19,9 @@ export default async function AssinaturaPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user?.id) {
+    redirect("/login?next=/app/assinatura");
+  }
   const { data: profile } = user?.id
     ? await supabase.from("profiles").select("plano").eq("user_id", user.id).maybeSingle()
     : { data: null };
@@ -25,6 +29,7 @@ export default async function AssinaturaPage() {
   const { data: subscription, error } = await supabase
     .from("subscriptions")
     .select("plano, status, vencimento, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

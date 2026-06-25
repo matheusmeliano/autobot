@@ -76,10 +76,13 @@ export async function middleware(request: NextRequest) {
 
   if (user && (pathname === "/app" || pathname.startsWith("/app/"))) {
     const allowAssinatura = pathname === "/app/assinatura" || pathname.startsWith("/app/assinatura/");
-    if (!allowAssinatura) {
+    const allowConfiguracoes =
+      pathname === "/app/configuracoes" || pathname.startsWith("/app/configuracoes/");
+    if (!allowAssinatura && !allowConfiguracoes) {
       const { data: sub } = await supabase
         .from("subscriptions")
         .select("id, plano, status, vencimento, created_at")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

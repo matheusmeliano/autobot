@@ -33,17 +33,21 @@ function errorToUserMessage(err: unknown) {
 }
 
 async function createPreferenceForPlan(req: Request, plan: "basico" | "pro" | "vitalicio") {
+  const reqUrl = new URL(req.url);
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? reqUrl.origin;
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user?.id || !user.email) {
-    return { error: "Sem sessão." as const, status: 401 as const };
+    return {
+      redirectUrl: `${origin}/login?next=${encodeURIComponent("/app/assinatura")}`,
+      status: 307 as const,
+    };
   }
 
-  const reqUrl = new URL(req.url);
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? reqUrl.origin;
   const notificationUrl = `${origin}/api/webhooks/mercadopago`;
 
   const base = `${origin}/app/assinatura`;
@@ -80,8 +84,8 @@ export async function GET(req: Request) {
     }
 
     const result = await createPreferenceForPlan(req, parsed.data.plan);
-    if ("error" in result) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if ("redirectUrl" in result) {
+      return NextResponse.redirect(result.redirectUrl, { status: result.status });
     }
 
     return NextResponse.redirect(result.pref.init_point, { status: 307 });
@@ -98,8 +102,8 @@ export async function POST(req: Request) {
     }
 
     const result = await createPreferenceForPlan(req, parsed.data.plan);
-    if ("error" in result) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if ("redirectUrl" in result) {
+      return NextResponse.json({ error: "Sem sessão." }, { status: 401 });
     }
 
     const pref = result.pref;
