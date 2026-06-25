@@ -1,5 +1,8 @@
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
+export const MAX_MONTHLY_RECURRENCE_OCCURRENCES = 27;
+export const MAX_YEARLY_RECURRENCE_OCCURRENCES = 300;
+
 function partsToMap(parts: Intl.DateTimeFormatPart[]) {
   const m: Record<string, string> = {};
   for (const p of parts) {
@@ -11,6 +14,32 @@ function partsToMap(parts: Intl.DateTimeFormatPart[]) {
 
 function lastDayOfMonth(year: number, month1: number) {
   return new Date(Date.UTC(year, month1, 0)).getUTCDate();
+}
+
+function parseLocalDate(localDate: string) {
+  const [year, month, day] = localDate.split("-").map(Number);
+  if (!year || !month || !day) throw new Error("Data inválida");
+  return { year, month, day };
+}
+
+function formatLocalDate(year: number, month: number, day: number) {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function addMonthsToLocalDate(localDate: string, monthsToAdd: number) {
+  const { year, month, day } = parseLocalDate(localDate);
+  const monthIndex = year * 12 + (month - 1) + monthsToAdd;
+  const nextYear = Math.floor(monthIndex / 12);
+  const nextMonth = (monthIndex % 12) + 1;
+  const safeDay = Math.max(1, Math.min(day, lastDayOfMonth(nextYear, nextMonth)));
+  return formatLocalDate(nextYear, nextMonth, safeDay);
+}
+
+function addYearsToLocalDate(localDate: string, yearsToAdd: number) {
+  const { year, month, day } = parseLocalDate(localDate);
+  const nextYear = year + yearsToAdd;
+  const safeDay = Math.max(1, Math.min(day, lastDayOfMonth(nextYear, month)));
+  return formatLocalDate(nextYear, month, safeDay);
 }
 
 function subtractOneDayFromLocalDate(localDate: string) {
@@ -135,4 +164,31 @@ export function monthlyRecurrenceLimitMinDate(params: {
   const nextY = m === 12 ? y + 1 : y;
   const nextM = m === 12 ? 1 : m + 1;
   return `${String(nextY).padStart(4, "0")}-${String(nextM).padStart(2, "0")}-01`;
+}
+
+export function recurrenceLimitMaxDateFromLocalDate(params: {
+  recurrence: "none" | "monthly" | "yearly";
+  currentDate: string;
+}) {
+  if (!params.currentDate) return null;
+  if (params.recurrence === "monthly") {
+    return addMonthsToLocalDate(params.currentDate, MAX_MONTHLY_RECURRENCE_OCCURRENCES - 1);
+  }
+  if (params.recurrence === "yearly") {
+    return addYearsToLocalDate(params.currentDate, MAX_YEARLY_RECURRENCE_OCCURRENCES - 1);
+  }
+  return null;
+}
+
+export function recurrenceLimitMaxDate(params: {
+  recurrence: "none" | "monthly" | "yearly";
+  currentUtcIso: string;
+  timeZone: string;
+}) {
+  if (params.recurrence === "none") return null;
+  const currentDate = localDateInTimeZone(params.currentUtcIso, params.timeZone);
+  return recurrenceLimitMaxDateFromLocalDate({
+    recurrence: params.recurrence,
+    currentDate,
+  });
 }

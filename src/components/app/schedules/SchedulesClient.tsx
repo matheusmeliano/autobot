@@ -9,8 +9,11 @@ import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
 import {
   localDateInTimeZone,
+  MAX_MONTHLY_RECURRENCE_OCCURRENCES,
+  MAX_YEARLY_RECURRENCE_OCCURRENCES,
   nextMonthlyIso,
   nextYearlyIso,
+  recurrenceLimitMaxDateFromLocalDate,
   shouldContinueRecurringRecurrence,
 } from "@/lib/recurrence";
 import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -427,54 +430,7 @@ export function SchedulesClient({
 
       const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
       const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
-      let executedByCurrentInstance = false;
-      // #region debug-point A:agendar-operational-status
-      try {
-        fetch("http://127.0.0.1:7780/event", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "client-load-crash",
-            runId: "pre",
-            hypothesisId: "A",
-            location: "SchedulesClient.tsx:operationalStatusByDebtor",
-            msg: "[DEBUG] Antes de calcular status operacional",
-            data: {
-              debtorId,
-              debtorName: referenceRow.debtor_nome ?? null,
-              rowId: referenceRow.id ?? null,
-              rowStatus: referenceRow.status ?? null,
-              dueMoment,
-              dueLocalDate,
-              currentLocalDate,
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-        executedByCurrentInstance = hasExecutedCurrentInstance(referenceRow);
-      } catch (error) {
-        fetch("http://127.0.0.1:7780/event", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "client-load-crash",
-            runId: "pre",
-            hypothesisId: "A",
-            location: "SchedulesClient.tsx:operationalStatusByDebtor",
-            msg: "[DEBUG] Falha ao calcular status operacional",
-            data: {
-              debtorId,
-              debtorName: referenceRow.debtor_nome ?? null,
-              rowId: referenceRow.id ?? null,
-              errorName: error instanceof Error ? error.name : typeof error,
-              errorMessage: error instanceof Error ? error.message : String(error),
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-        throw error;
-      }
-      // #endregion
+      const executedByCurrentInstance = hasExecutedCurrentInstance(referenceRow);
       const isExecuted =
         executedByCurrentInstance || (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
       statusMap.set(debtorId, {
@@ -696,6 +652,9 @@ export function SchedulesClient({
   const timeValue = watch("data_envio_time");
   const scheduleDateValue = watch("data_envio_date");
   const recurrenceValue = watch("recurrence");
+  const hasRecurringSchedule = recurrenceValue !== "none";
+  const isMonthlyRecurrence = recurrenceValue === "monthly";
+  const isYearlyRecurrence = recurrenceValue === "yearly";
   const selectedDebtorId = watch("debtor_id");
   const selectedDebtor = useMemo(
     () => debtorsById.get(String(selectedDebtorId ?? "")) ?? null,
@@ -726,6 +685,19 @@ export function SchedulesClient({
     if (timePickerTarget.kind === "main") return String(scheduleDateValue ?? "");
     return monthlyExtras[timePickerTarget.index]?.date ?? "";
   }, [monthlyExtras, scheduleDateValue, timePickerTarget]);
+  const recurrenceUntilMax = useMemo(
+    () =>
+      recurrenceLimitMaxDateFromLocalDate({
+        recurrence: recurrenceValue ?? "none",
+        currentDate: String(scheduleDateValue ?? ""),
+      }),
+    [recurrenceValue, scheduleDateValue],
+  );
+  const recurrenceLimitCountLabel = isMonthlyRecurrence
+    ? String(MAX_MONTHLY_RECURRENCE_OCCURRENCES)
+    : isYearlyRecurrence
+      ? String(MAX_YEARLY_RECURRENCE_OCCURRENCES)
+      : null;
 
   useEffect(() => {
     if (recurrenceValue !== "monthly" && monthlyExtras.length > 0) {
@@ -857,6 +829,8 @@ export function SchedulesClient({
         ? normalizeEditedDateForPersistence(editing, values.data_envio_date)
         : values.data_envio_date;
     const normalizedRecurrenceUntil = normalizeDateOnly(values.recurrence_until);
+    const effectiveRecurrenceUntil =
+      values.recurrence !== "none" ? normalizedRecurrenceUntil || recurrenceUntilMax || undefined : undefined;
 
     const payload = {
       ...(values.id ? { id: values.id } : {}),
@@ -866,8 +840,7 @@ export function SchedulesClient({
       data_envio_date: normalizedEditDate,
       data_envio_time: values.data_envio_time,
       recurrence: values.recurrence,
-      recurrence_until:
-        values.recurrence !== "none" && normalizedRecurrenceUntil ? normalizedRecurrenceUntil : undefined,
+      recurrence_until: effectiveRecurrenceUntil,
       status: values.status || "agendado",
       retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
       retry_time: values.retry_time || DEFAULT_RETRY_TIME,
@@ -880,11 +853,19 @@ export function SchedulesClient({
     };
 
     if (
-      values.recurrence === "monthly" &&
+      values.recurrence !== "none" &&
       normalizedRecurrenceUntil &&
       normalizedRecurrenceUntil < normalizedEditDate
     ) {
       modalToast.warning("A data final deve ser igual ou posterior à primeira cobrança.");
+      return;
+    }
+    if (values.recurrence !== "none" && recurrenceUntilMax && normalizedRecurrenceUntil && normalizedRecurrenceUntil > recurrenceUntilMax) {
+      modalToast.warning(
+        values.recurrence === "monthly"
+          ? `A recorrência mensal permite no máximo ${MAX_MONTHLY_RECURRENCE_OCCURRENCES} cobranças até ${recurrenceUntilMax}.`
+          : `A recorrência anual permite no máximo ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças até ${recurrenceUntilMax}.`,
+      );
       return;
     }
 
@@ -941,7 +922,7 @@ export function SchedulesClient({
           data_envio_date: c.date,
           data_envio_time: c.time,
           recurrence: "monthly",
-          recurrence_until: normalizedRecurrenceUntil ? normalizedRecurrenceUntil : undefined,
+          recurrence_until: effectiveRecurrenceUntil,
           status: values.status || "agendado",
           retry_weekdays: normalizeRetryWeekdays(values.retry_weekdays),
           retry_time: values.retry_time || DEFAULT_RETRY_TIME,
@@ -1061,32 +1042,6 @@ export function SchedulesClient({
       normalizedStatus === "pago" ||
       normalizedStatus === "executado" ||
       Boolean(String(row.payment_received_at ?? "").trim());
-    // #region debug-point A:mark-as-paid-click
-    fetch("http://127.0.0.1:7777/event", {
-      method: "POST",
-      body: JSON.stringify({
-        sessionId: "payment-repeat-popup",
-        runId: "pre-fix",
-        hypothesisId: "A",
-        location: "SchedulesClient.tsx:markAsPaid",
-        msg: "[DEBUG] Clique em Pagamento realizado",
-        data: {
-          scheduleId: row.id,
-          debtorName: row.debtor_nome,
-          recurrence: row.recurrence ?? null,
-          rowStatus: row.status ?? null,
-          normalizedStatus,
-          alreadyProcessed,
-          paymentReceivedAt: row.payment_received_at ?? null,
-          referenceMoment,
-          referenceMonthLabel,
-          nextRecurringMoment,
-          nextReferenceLabel,
-        },
-        ts: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (alreadyProcessed) {
       modalToast.info(
         `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,
@@ -1685,136 +1640,150 @@ export function SchedulesClient({
                 </div>
               </div>
 
-              {recurrenceValue !== "none" ? (
+              {hasRecurringSchedule ? (
                 <div className="mt-1">
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMonthlyExtras((prev) => [
-                          ...prev,
-                          { date: String(watch("data_envio_date") ?? ""), time: String(watch("data_envio_time") ?? "") },
-                        ])
-                      }
-                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/[0.06]"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Adicionar
-                    </button>
-                  </div>
-
-                  {monthlyExtras.length > 0 ? (
-                    <div className="mt-3 grid gap-3">
-                      {monthlyExtras.map((c, idx) => (
-                        <div
-                          key={idx}
-                          className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+                  {isMonthlyRecurrence ? (
+                    <>
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMonthlyExtras((prev) => [
+                              ...prev,
+                              { date: String(watch("data_envio_date") ?? ""), time: String(watch("data_envio_time") ?? "") },
+                            ])
+                          }
+                          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/[0.06]"
                         >
-                          <div>
-                            <div className="text-xs font-semibold text-white/60">Data</div>
-                            <div className="relative mt-2">
-                              <input
-                                type="date"
-                                min={scheduleDateMin}
-                                value={c.date}
-                                onChange={(e) =>
-                                  setMonthlyExtras((prev) =>
-                                    prev.map((x, i) => (i === idx ? { ...x, date: e.target.value } : x)),
-                                  )
-                                }
-                                onFocus={() => openExtraDatePicker(idx)}
-                                onClick={() => openExtraDatePicker(idx)}
-                                ref={(el) => {
-                                  extraDateInputRefs.current[idx] = el;
-                                }}
-                                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => openExtraDatePicker(idx)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
-                                aria-label="Selecionar data"
-                              >
-                                <Calendar className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
+                          <Plus className="h-4 w-4" />
+                          Adicionar
+                        </button>
+                      </div>
 
-                          <div>
-                            <div className="text-xs font-semibold text-white/60">Hora</div>
+                      {monthlyExtras.length > 0 ? (
+                        <div className="mt-3 grid gap-3">
+                          {monthlyExtras.map((c, idx) => (
                             <div
-                              className="relative mt-2"
-                              ref={(el) => {
-                                extraTimeAnchorRefs.current[idx] = el;
-                              }}
+                              key={idx}
+                              className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
                             >
-                              <input
-                                type="text"
-                                readOnly
-                                value={c.time}
-                                placeholder="--:--"
-                                onFocus={() =>
-                                  openTimePicker({
-                                    target: { kind: "extra", index: idx },
-                                    inputEl: extraTimeInputRefs.current[idx] ?? null,
-                                    anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
-                                  })
-                                }
-                                onClick={() =>
-                                  openTimePicker({
-                                    target: { kind: "extra", index: idx },
-                                    inputEl: extraTimeInputRefs.current[idx] ?? null,
-                                    anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
-                                  })
-                                }
-                                ref={(el) => {
-                                  extraTimeInputRefs.current[idx] = el;
-                                }}
-                                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openTimePicker({
-                                    target: { kind: "extra", index: idx },
-                                    inputEl: extraTimeInputRefs.current[idx] ?? null,
-                                    anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
-                                  })
-                                }
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
-                                aria-label="Selecionar hora"
-                              >
-                                <Clock className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
+                              <div>
+                                <div className="text-xs font-semibold text-white/60">Data</div>
+                                <div className="relative mt-2">
+                                  <input
+                                    type="date"
+                                    min={scheduleDateMin}
+                                    value={c.date}
+                                    onChange={(e) =>
+                                      setMonthlyExtras((prev) =>
+                                        prev.map((x, i) => (i === idx ? { ...x, date: e.target.value } : x)),
+                                      )
+                                    }
+                                    onFocus={() => openExtraDatePicker(idx)}
+                                    onClick={() => openExtraDatePicker(idx)}
+                                    ref={(el) => {
+                                      extraDateInputRefs.current[idx] = el;
+                                    }}
+                                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => openExtraDatePicker(idx)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
+                                    aria-label="Selecionar data"
+                                  >
+                                    <Calendar className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
 
-                          <div className="flex justify-end md:pb-0.5">
-                            <button
-                              type="button"
-                              onClick={() => setMonthlyExtras((prev) => prev.filter((_, i) => i !== idx))}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                              aria-label="Remover cobrança"
-                              title="Remover"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
+                              <div>
+                                <div className="text-xs font-semibold text-white/60">Hora</div>
+                                <div
+                                  className="relative mt-2"
+                                  ref={(el) => {
+                                    extraTimeAnchorRefs.current[idx] = el;
+                                  }}
+                                >
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={c.time}
+                                    placeholder="--:--"
+                                    onFocus={() =>
+                                      openTimePicker({
+                                        target: { kind: "extra", index: idx },
+                                        inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                        anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                      })
+                                    }
+                                    onClick={() =>
+                                      openTimePicker({
+                                        target: { kind: "extra", index: idx },
+                                        inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                        anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                      })
+                                    }
+                                    ref={(el) => {
+                                      extraTimeInputRefs.current[idx] = el;
+                                    }}
+                                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openTimePicker({
+                                        target: { kind: "extra", index: idx },
+                                        inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                        anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                      })
+                                    }
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+                                    aria-label="Selecionar hora"
+                                  >
+                                    <Clock className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-end md:pb-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setMonthlyExtras((prev) => prev.filter((_, i) => i !== idx))}
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+                                  aria-label="Remover cobrança"
+                                  title="Remover"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : null}
+                    </>
+                  ) : isYearlyRecurrence ? (
+                    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[11px] text-white/55">
+                      A recorrência anual repete a cobrança todo ano na mesma data e horário da primeira cobrança.
                     </div>
                   ) : null}
 
                   <div className="mt-4">
-                    <div className="text-xs font-semibold text-white/60">Data final (opcional)</div>
+                    <div className="text-xs font-semibold text-white/60">
+                      {isYearlyRecurrence ? "Data final da recorrência anual" : "Data final da recorrência"}
+                    </div>
                     <div className="mt-1 text-[11px] text-white/45">
-                      Se deixar em branco, a cobrança recorrente continua sem limite.
+                      {isYearlyRecurrence
+                        ? `Se deixar em branco, o sistema usa automaticamente o limite máximo de ${recurrenceLimitCountLabel} cobranças anuais.`
+                        : `Se deixar em branco, o sistema usa automaticamente o limite máximo de ${recurrenceLimitCountLabel} cobranças.`}
+                      {recurrenceUntilMax ? ` Data máxima: ${recurrenceUntilMax}.` : ""}
                     </div>
                     <div className="relative mt-2">
                       <input
                         type="date"
                         min={watch("data_envio_date") || undefined}
+                        max={recurrenceUntilMax || undefined}
                         className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
                         {...recurrenceUntilField}
                         onFocus={openRecurrenceUntilDatePicker}

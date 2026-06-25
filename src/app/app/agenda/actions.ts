@@ -17,7 +17,10 @@ import {
 } from "@/lib/chargeRetry";
 import {
   localDateInTimeZone,
+  MAX_MONTHLY_RECURRENCE_OCCURRENCES,
+  MAX_YEARLY_RECURRENCE_OCCURRENCES,
   monthlyRecurrenceLimitMinDate,
+  recurrenceLimitMaxDate,
   shouldContinueRecurringRecurrence,
 } from "@/lib/recurrence";
 import { getScheduleChargeAmount, nextRecurringIsoAfterSettlement } from "@/lib/chargeAccumulation";
@@ -101,18 +104,6 @@ function formatDateBR(value: unknown) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 }
 
-type MonthlyCycleSchedule = {
-  day: number;
-  time: string;
-};
-
-function parseMonthlyCycleSchedule(row: any): MonthlyCycleSchedule | null {
-  const day = Number(row?.recurrence_day ?? "");
-  const time = String(row?.recurrence_time ?? "");
-  if (!Number.isFinite(day) || day < 1 || !/^\d{2}:\d{2}$/.test(time)) return null;
-  return { day, time };
-}
-
 async function debtorSkipsWeekendsOnFirstCharge(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, debtorId: string) {
   const { data } = await supabase
     .from("debtors")
@@ -142,29 +133,59 @@ async function countExecutedRunsOnLocalDate(params: {
   }).length;
 }
 
-async function validateMonthlyRecurrenceLimit(params: {
+function validateRecurringRecurrenceLimit(params: {
+  recurrence: "none" | "monthly" | "yearly";
   currentUtcIso: string;
   timeZone: string;
-  currentSchedule: MonthlyCycleSchedule;
   recurrenceUntil?: string | null;
 }) {
-  if (!params.recurrenceUntil) return null;
-
-  const currentDate = localDateInTimeZone(params.currentUtcIso, params.timeZone);
-  if (params.recurrenceUntil < currentDate) {
-    return "A data final da cobrança mensal deve ser igual ou posterior à cobrança atual.";
+  if (params.recurrence === "none") {
+    return { recurrenceUntil: null as string | null, error: null as string | null };
   }
 
-  const minDate = monthlyRecurrenceLimitMinDate({
+  const maxDate = recurrenceLimitMaxDate({
+    recurrence: params.recurrence,
     currentUtcIso: params.currentUtcIso,
     timeZone: params.timeZone,
   });
-
-  if (minDate && params.recurrenceUntil < minDate) {
-    return `A data final da cobrança mensal deve ser no mínimo ${formatDateBR(minDate)}, sempre a partir do próximo mês.`;
+  const effectiveRecurrenceUntil = params.recurrenceUntil ?? maxDate;
+  if (!effectiveRecurrenceUntil) {
+    return { recurrenceUntil: null as string | null, error: null as string | null };
   }
 
-  return null;
+  const currentDate = localDateInTimeZone(params.currentUtcIso, params.timeZone);
+  if (effectiveRecurrenceUntil < currentDate) {
+    return {
+      recurrenceUntil: null as string | null,
+      error: "A data final da cobrança recorrente deve ser igual ou posterior à cobrança atual.",
+    };
+  }
+
+  if (params.recurrence === "monthly") {
+    const minDate = monthlyRecurrenceLimitMinDate({
+      currentUtcIso: params.currentUtcIso,
+      timeZone: params.timeZone,
+    });
+
+    if (minDate && effectiveRecurrenceUntil < minDate) {
+      return {
+        recurrenceUntil: null as string | null,
+        error: `A data final da cobrança mensal deve ser no mínimo ${formatDateBR(minDate)}, sempre a partir do próximo mês.`,
+      };
+    }
+  }
+
+  if (maxDate && effectiveRecurrenceUntil > maxDate) {
+    return {
+      recurrenceUntil: null as string | null,
+      error:
+        params.recurrence === "monthly"
+          ? `A recorrência mensal permite no máximo ${MAX_MONTHLY_RECURRENCE_OCCURRENCES} cobranças. Defina a data final até ${formatDateBR(maxDate)}.`
+          : `A recorrência anual permite no máximo ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças. Defina a data final até ${formatDateBR(maxDate)}.`,
+    };
+  }
+
+  return { recurrenceUntil: effectiveRecurrenceUntil, error: null as string | null };
 }
 
 async function sendZapiText(params: {
@@ -368,27 +389,22 @@ export async function createScheduleAction(input: unknown) {
   });
 
   const recurrence = parsed.data.recurrence ?? "none";
-  const recurrenceUntil = parsed.data.recurrence_until;
   const recurrenceValidation = validateRecurrenceUntil({
     recurrence,
-    recurrenceUntil,
+    recurrenceUntil: parsed.data.recurrence_until,
     currentDate: parsed.data.data_envio_date,
   });
   if (recurrenceValidation) return { ok: false, error: recurrenceValidation };
   const recurrenceDay = Number(parsed.data.data_envio_date.split("-")[2] ?? "");
   const recurrenceTime = parsed.data.data_envio_time;
-  if (recurrence === "monthly") {
-    const recurrenceLimitValidation = await validateMonthlyRecurrenceLimit({
-      currentUtcIso: dataEnvioIso,
-      timeZone,
-      currentSchedule: {
-        day: Number.isFinite(recurrenceDay) ? recurrenceDay : 1,
-        time: recurrenceTime,
-      },
-      recurrenceUntil: recurrenceUntil ?? null,
-    });
-    if (recurrenceLimitValidation) return { ok: false, error: recurrenceLimitValidation };
-  }
+  const recurrenceLimitValidation = validateRecurringRecurrenceLimit({
+    recurrence,
+    currentUtcIso: dataEnvioIso,
+    timeZone,
+    recurrenceUntil: parsed.data.recurrence_until ?? null,
+  });
+  if (recurrenceLimitValidation.error) return { ok: false, error: recurrenceLimitValidation.error };
+  const recurrenceUntil = recurrenceLimitValidation.recurrenceUntil;
 
   const retryUpdateError = await updateDebtorRetrySettings(supabase, parsed.data.debtor_id, parsed.data);
   if (retryUpdateError) return { ok: false, error: retryUpdateError.message };
@@ -404,7 +420,7 @@ export async function createScheduleAction(input: unknown) {
     schedule_timezone: recurrence !== "none" ? timeZone : null,
     recurrence_day: recurrence !== "none" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
     recurrence_time: recurrence !== "none" ? recurrenceTime : null,
-    recurrence_until: recurrence !== "none" ? recurrenceUntil ?? null : null,
+    recurrence_until: recurrence !== "none" ? recurrenceUntil : null,
     status: parsed.data.status ?? "agendado",
   });
   if (error) return { ok: false, error: error.message };
@@ -470,27 +486,22 @@ export async function updateScheduleAction(input: unknown) {
   });
 
   const recurrence = (data as any).recurrence ?? "none";
-  const recurrenceUntil = data.recurrence_until;
   const recurrenceValidation = validateRecurrenceUntil({
     recurrence,
-    recurrenceUntil,
+    recurrenceUntil: data.recurrence_until,
     currentDate: data.data_envio_date,
   });
   if (recurrenceValidation) return { ok: false, error: recurrenceValidation };
   const recurrenceDay = Number(String(data.data_envio_date ?? "").split("-")[2] ?? "");
   const recurrenceTime = String(data.data_envio_time ?? "");
-  if (recurrence === "monthly") {
-    const recurrenceLimitValidation = await validateMonthlyRecurrenceLimit({
-      currentUtcIso: dataEnvioIso,
-      timeZone,
-      currentSchedule: {
-        day: Number.isFinite(recurrenceDay) ? recurrenceDay : 1,
-        time: recurrenceTime,
-      },
-      recurrenceUntil: recurrenceUntil ?? null,
-    });
-    if (recurrenceLimitValidation) return { ok: false, error: recurrenceLimitValidation };
-  }
+  const recurrenceLimitValidation = validateRecurringRecurrenceLimit({
+    recurrence,
+    currentUtcIso: dataEnvioIso,
+    timeZone,
+    recurrenceUntil: data.recurrence_until ?? null,
+  });
+  if (recurrenceLimitValidation.error) return { ok: false, error: recurrenceLimitValidation.error };
+  const recurrenceUntil = recurrenceLimitValidation.recurrenceUntil;
 
   const retryUpdateError = await updateDebtorRetrySettings(supabase, data.debtor_id, data);
   if (retryUpdateError) return { ok: false, error: retryUpdateError.message };
@@ -508,7 +519,7 @@ export async function updateScheduleAction(input: unknown) {
       schedule_timezone: recurrence !== "none" ? timeZone : null,
       recurrence_day: recurrence !== "none" ? (Number.isFinite(recurrenceDay) ? recurrenceDay : null) : null,
       recurrence_time: recurrence !== "none" ? recurrenceTime : null,
-      recurrence_until: recurrence !== "none" ? recurrenceUntil ?? null : null,
+      recurrence_until: recurrence !== "none" ? recurrenceUntil : null,
       status: data.status ?? "agendado",
       first_sent_at: null,
       last_sent_at: null,
@@ -562,37 +573,33 @@ export async function updateScheduleRecurrenceUntilAction(input: unknown) {
   if (error) return { ok: false, error: error.message };
   if (!schedule?.id) return { ok: false, error: "Agendamento não encontrado." };
   if (String((schedule as any).user_id) !== userId) return { ok: false, error: "Sem permissão." };
-  if (String((schedule as any).recurrence ?? "none") !== "monthly") {
-    return { ok: false, error: "Essa opção está disponível apenas para agendamentos mensais." };
+  const recurrence = String((schedule as any).recurrence ?? "none") as "none" | "monthly" | "yearly";
+  if (recurrence !== "monthly" && recurrence !== "yearly") {
+    return { ok: false, error: "Essa opção está disponível apenas para agendamentos recorrentes." };
   }
 
-  const recurrenceLimitValidation = await validateMonthlyRecurrenceLimit({
+  const recurrenceLimitValidation = validateRecurringRecurrenceLimit({
+    recurrence,
     currentUtcIso: String((schedule as any).data_envio),
     timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
-    currentSchedule:
-      parseMonthlyCycleSchedule(schedule) ??
-      {
-        day: Number(localDateInTimeZone(String((schedule as any).data_envio), String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo").slice(-2)),
-        time: "00:00",
-      },
     recurrenceUntil: parsed.data.recurrence_until ?? null,
   });
-  if (recurrenceLimitValidation) {
-    return { ok: false, error: recurrenceLimitValidation };
+  if (recurrenceLimitValidation.error) {
+    return { ok: false, error: recurrenceLimitValidation.error };
   }
 
   const { error: updateError } = await admin
     .from("schedules")
-    .update({ recurrence_until: parsed.data.recurrence_until ?? null })
+    .update({ recurrence_until: recurrenceLimitValidation.recurrenceUntil })
     .eq("id", parsed.data.id);
   if (updateError) return { ok: false, error: updateError.message };
 
   await admin.from("logs").insert({
     user_id: userId,
     tipo: "agenda_recorrencia_final",
-    descricao: parsed.data.recurrence_until
-      ? `Data final da cobrança mensal definida para ${parsed.data.recurrence_until} no agendamento ${parsed.data.id}`
-      : `Data final da cobrança mensal removida do agendamento ${parsed.data.id}`,
+    descricao: recurrenceLimitValidation.recurrenceUntil
+      ? `Data final da cobrança recorrente definida para ${recurrenceLimitValidation.recurrenceUntil} no agendamento ${parsed.data.id}`
+      : `Data final da cobrança recorrente removida do agendamento ${parsed.data.id}`,
   });
 
   return { ok: true };
@@ -932,7 +939,7 @@ export async function markSchedulePaidAction(id: string) {
           last_sent_at: null,
           retry_attempts: 0,
           closed_at: null,
-          payment_received_at: nowIso,
+          payment_received_at: null,
         }
       : {
           status: "pago",
