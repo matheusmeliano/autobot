@@ -34,7 +34,7 @@ export default async function ConfiguracoesPage() {
         Conta
       </h1>
       <div className="mt-2 text-sm text-white/60">
-        Veja e atualize seus dados da conta.
+        Veja as informações da sua conta.
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
