@@ -382,11 +382,13 @@ export function SchedulesClient({
   }, [query, rows]);
   const rowTimeZone = (row: ScheduleRow) =>
     (String(row.schedule_timezone ?? "").trim() || effectiveTimeZone) as BrazilTimeZone;
+  const rowOperationalMoment = (row: ScheduleRow) =>
+    String(row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "").trim();
   const duplicateMetaByRowId = useMemo(() => {
     const grouped = new Map<string, ScheduleRow[]>();
 
     for (const row of rows) {
-      const dueMoment = row.charge_due_at ?? row.data_envio;
+      const dueMoment = rowOperationalMoment(row) || row.charge_due_at || row.data_envio;
       const dueInput = splitDateTimeForInput(dueMoment, rowTimeZone(row));
       const key = [
         String(row.debtor_id ?? ""),
@@ -483,21 +485,13 @@ export function SchedulesClient({
     const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
     if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
 
-    const lastExecutedAt = String(row.last_executed_scheduled_for ?? "").trim();
-    const scheduledFor = String(row.data_envio ?? "").trim();
-    if (lastExecutedAt && scheduledFor) {
-      const executedMs = new Date(lastExecutedAt).getTime();
-      const scheduledMs = new Date(scheduledFor).getTime();
-      if (!Number.isNaN(executedMs) && !Number.isNaN(scheduledMs) && executedMs === scheduledMs) {
-        return true;
-      }
-    }
-
-    return false;
+    const referenceYearMonth = referenceYearMonthForRow(row);
+    const executedYearMonth = executedYearMonthForRow(row);
+    return Boolean(referenceYearMonth) && Boolean(executedYearMonth) && referenceYearMonth === executedYearMonth;
   }
 
   const referenceYearMonthForRow = (row: ScheduleRow) => {
-    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    const referenceMoment = rowOperationalMoment(row) || row.charge_due_at || row.data_envio;
     return referenceMoment ? yearMonthKey(referenceMoment, rowTimeZone(row)) : "";
   };
 
@@ -544,7 +538,7 @@ export function SchedulesClient({
   };
 
   const displayMoments = (row: ScheduleRow) => {
-    const dueMoment = row.charge_due_at ?? row.data_envio;
+    const dueMoment = rowOperationalMoment(row) || row.charge_due_at || row.data_envio;
     const timeZone = rowTimeZone(row);
     const dueInput = splitDateTimeForInput(dueMoment, timeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
@@ -964,7 +958,7 @@ export function SchedulesClient({
       return;
     }
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
-    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    const referenceMoment = rowOperationalMoment(row) || row.charge_due_at || row.data_envio;
     const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
     const alreadyProcessed = isRowAlreadyProcessed(row);
     const alreadyTriggeredThisMonth = isRowAlreadyTriggeredCurrentMonth(row);
@@ -1013,7 +1007,7 @@ export function SchedulesClient({
 
   const markAsPaid = async (row: ScheduleRow) => {
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
-    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    const referenceMoment = rowOperationalMoment(row) || row.charge_due_at || row.data_envio;
     const referenceMonthLabel = referenceMoment ? monthYearBR(referenceMoment, effectiveTimeZone) : null;
     const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
     const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
