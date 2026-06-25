@@ -233,7 +233,11 @@ export function AppShell({
     if (restricted) return;
 
     const currentPath = pathname ?? "";
-    if (currentPath !== "/app/dashboard") {
+    if (
+      currentPath !== "/app/dashboard" &&
+      currentPath !== "/app/configuracoes" &&
+      !currentPath.startsWith("/app/configuracoes/")
+    ) {
       router.replace("/app/dashboard");
     }
   }, [authChecked, isAuthed, pathname, restricted, router, themeLoaded, themePreference]);

@@ -15,13 +15,16 @@ function dateTimeBR(v?: string | null) {
 
 export default async function ConfiguracoesPage() {
   const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("nome, email, plano, created_at, timezone")
     .maybeSingle();
 
-  const showPassword = !isGlobalAdminEmail(profile?.email);
+  const showPassword = !isGlobalAdminEmail(user?.email);
   const tzRaw = (profile as any)?.timezone;
   const tz = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
 

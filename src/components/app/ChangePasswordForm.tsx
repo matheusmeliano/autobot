@@ -19,7 +19,7 @@ export function ChangePasswordForm() {
   const {
     register,
     handleSubmit,
-    formState: { isSubmitting },
+    formState: { errors, isSubmitting },
     watch,
     reset,
   } = useForm<FormValues>({ defaultValues: { password: "", confirm: "" } });
@@ -45,7 +45,7 @@ export function ChangePasswordForm() {
             className="w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 pr-11 text-sm text-[var(--app-text-85)] outline-none ring-0 placeholder:text-[var(--app-text-30)] focus:border-[var(--app-border)] focus:ring-2 focus:ring-[var(--app-ring)]"
             placeholder="Mínimo 8 caracteres"
             {...register("password", {
-              required: true,
+              required: "Informe a nova senha.",
               minLength: { value: 8, message: "A senha deve ter no mínimo 8 caracteres." },
             })}
           />
@@ -58,6 +58,9 @@ export function ChangePasswordForm() {
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+        {errors.password?.message ? (
+          <div className="mt-2 text-xs font-medium text-rose-300">{errors.password.message}</div>
+        ) : null}
       </div>
 
       <div>
@@ -68,10 +71,13 @@ export function ChangePasswordForm() {
           className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm text-[var(--app-text-85)] outline-none ring-0 placeholder:text-[var(--app-text-30)] focus:border-[var(--app-border)] focus:ring-2 focus:ring-[var(--app-ring)]"
           placeholder="Repita a nova senha"
           {...register("confirm", {
-            required: true,
+            required: "Confirme a nova senha.",
             validate: (v) => v === watch("password") || "As senhas precisam ser iguais.",
           })}
         />
+        {errors.confirm?.message ? (
+          <div className="mt-2 text-xs font-medium text-rose-300">{errors.confirm.message}</div>
+        ) : null}
       </div>
 
       <button
