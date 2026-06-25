@@ -116,6 +116,21 @@ function getMatchingSchedulesForCharge(params: {
   return fallbackIndexes.map(({ row }) => row);
 }
 
+function countReferenceMonthPaidSchedules(params: {
+  schedules: DebtorScheduleStatusRow[];
+  referenceYearMonth: string;
+  scheduleTimeZone: string;
+}) {
+  return params.schedules.filter((row) => {
+    const timeZone = String(row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
+    if (!isPaidSchedule(row, timeZone)) return false;
+    const paymentLocalDate =
+      scheduleLocalDate(row.payment_received_at ?? null, timeZone) ??
+      scheduleLocalDate(row.closed_at ?? null, timeZone);
+    return Boolean(paymentLocalDate && paymentLocalDate.slice(0, 7) === params.referenceYearMonth);
+  }).length;
+}
+
 function deriveReferenceMonthDebtorStatus(
   charges: DebtorChargeRow[],
   schedules: DebtorScheduleStatusRow[],
@@ -135,7 +150,14 @@ function deriveReferenceMonthDebtorStatus(
     })
     .sort(compareChargeOrder);
 
-  if (!referenceCharges.length) return "agendado";
+  if (!referenceCharges.length) {
+    const paidSchedulesInReferenceMonth = countReferenceMonthPaidSchedules({
+      schedules,
+      referenceYearMonth,
+      scheduleTimeZone,
+    });
+    return paidSchedulesInReferenceMonth > 0 ? "pago" : "agendado";
+  }
 
   let paidCount = 0;
   let hasOverdue = false;
@@ -217,7 +239,16 @@ export function deriveReferenceMonthDebtorChargeProgress(
     .map((charge) => String(charge.id ?? "").trim())
     .filter(Boolean);
 
-  if (!referenceChargeIds.length) return { paid: 0, total: 0 };
+  if (!referenceChargeIds.length) {
+    const paidSchedulesInReferenceMonth = countReferenceMonthPaidSchedules({
+      schedules,
+      referenceYearMonth,
+      scheduleTimeZone,
+    });
+    return paidSchedulesInReferenceMonth > 0
+      ? { paid: paidSchedulesInReferenceMonth, total: paidSchedulesInReferenceMonth }
+      : { paid: 0, total: 0 };
+  }
 
   const referenceCharges = charges
     .filter((charge) => buildChargeLocalDate(charge))
