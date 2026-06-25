@@ -22,10 +22,11 @@ function chargeMonthKey(charge: { recurrence_month?: unknown; recurrence_year?: 
 }
 
 function activitySortTime(activity: {
+  operationalDueAt?: string | null;
   chargeDueAt?: string | null;
   dataEnvio?: string | null;
 }) {
-  const iso = activity.chargeDueAt ?? activity.dataEnvio ?? "";
+  const iso = activity.operationalDueAt ?? activity.chargeDueAt ?? activity.dataEnvio ?? "";
   const time = new Date(String(iso)).getTime();
   return Number.isNaN(time) ? 0 : time;
 }
@@ -250,6 +251,7 @@ export default async function DashboardPage() {
       status: String(row.status ?? ""),
       dataEnvio: String(row.data_envio ?? ""),
       chargeDueAt: row.charge_due_at ? String(row.charge_due_at) : null,
+      operationalDueAt: row.operational_due_at ? String(row.operational_due_at) : null,
       lastExecutedScheduledFor: row.last_executed_scheduled_for
         ? String(row.last_executed_scheduled_for)
         : null,

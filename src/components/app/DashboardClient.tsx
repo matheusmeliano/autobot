@@ -23,6 +23,7 @@ type ActivityRow = {
   status: string;
   dataEnvio: string;
   chargeDueAt: string | null;
+  operationalDueAt: string | null;
   lastExecutedScheduledFor: string | null;
   paymentReceivedAt: string | null;
 };
@@ -286,14 +287,56 @@ function hasExecutedCurrentInstance(activity: ActivityRow) {
   return false;
 }
 
+function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(d);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return `${map.year}-${map.month}`;
+}
+
+function getActivityReferenceMoment(activity: ActivityRow, timeZone: BrazilTimeZone) {
+  const operationalMoment = String(activity.operationalDueAt ?? "").trim();
+  const dueMoment = String(activity.chargeDueAt ?? activity.dataEnvio ?? "").trim();
+  const lastExecutedMoment = String(activity.lastExecutedScheduledFor ?? "").trim();
+  const operationalMonthKey = yearMonthKey(new Date().toISOString(), timeZone);
+  const dueYearMonth = dueMoment ? yearMonthKey(dueMoment, timeZone) : "";
+  const executedYearMonth = lastExecutedMoment ? yearMonthKey(lastExecutedMoment, timeZone) : "";
+  const operationalYearMonth = operationalMoment ? yearMonthKey(operationalMoment, timeZone) : "";
+
+  if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
+    return operationalMoment;
+  }
+  if (
+    executedYearMonth &&
+    executedYearMonth === operationalMonthKey &&
+    dueYearMonth !== operationalMonthKey
+  ) {
+    return lastExecutedMoment;
+  }
+  return dueMoment || lastExecutedMoment;
+}
+
 function getActivityVisualStatus(activity: ActivityRow, timeZone: BrazilTimeZone) {
-  const dueMoment = activity.chargeDueAt ?? activity.dataEnvio;
+  const dueMoment = getActivityReferenceMoment(activity, timeZone);
   const currentLocalDate = localDateInTimeZone(new Date().toISOString(), timeZone);
   const dueLocalDate = localDateInTimeZone(String(dueMoment), timeZone);
   const isOverdue =
     Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate;
   const label = hasExecutedCurrentInstance(activity)
     ? "Executado"
+    : (Boolean(String(activity.lastExecutedScheduledFor ?? "").trim()) &&
+        yearMonthKey(String(activity.lastExecutedScheduledFor), timeZone) ===
+          yearMonthKey(new Date().toISOString(), timeZone))
+      ? "Executado"
     : isOverdue
       ? "Atrasado"
       : normalizeActivityStatus(activity.status);
@@ -494,7 +537,7 @@ export function DashboardClient({
             {activities.length ? (
               pagedActivities.map((item) => {
                 const visualStatus = getActivityVisualStatus(item, effectiveTimeZone);
-                const dueMoment = item.chargeDueAt ?? item.dataEnvio;
+                const dueMoment = getActivityReferenceMoment(item, effectiveTimeZone);
                 return (
                   <div
                     key={item.id}
