@@ -3,10 +3,10 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 export type ReportStats = {
-  totalCharges: number;
+  totalSchedules: number;
+  scheduled: number;
   pending: number;
-  sent: number;
-  failed: number;
+  overdue: number;
   paid: number;
 };
 
@@ -46,11 +46,11 @@ export function ReportsClient({
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-5">
-        <Card title="Total" value={String(stats.totalCharges)} />
+        <Card title="Total" value={String(stats.totalSchedules)} />
+        <Card title="Agendados" value={String(stats.scheduled)} />
         <Card title="Pendentes" value={String(stats.pending)} />
-        <Card title="Enviadas" value={String(stats.sent)} />
-        <Card title="Falhas" value={String(stats.failed)} />
-        <Card title="Pagas" value={String(stats.paid)} />
+        <Card title="Atrasados" value={String(stats.overdue)} />
+        <Card title="Pagos" value={String(stats.paid)} />
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">

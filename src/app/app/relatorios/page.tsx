@@ -30,33 +30,33 @@ export default async function RelatoriosPage() {
   start30.setHours(0, 0, 0, 0);
   const start30Iso = start30.toISOString();
 
-  const [totalRes, pendingRes, sentRes, failedRes, paidRes, chartRes] =
+  const [totalRes, scheduledRes, pendingRes, overdueRes, paidRes, chartRes] =
     await Promise.all([
-      supabase.from("charges").select("id", { count: "exact", head: true }),
+      supabase.from("schedules").select("id", { count: "exact", head: true }),
       supabase
-        .from("charges")
+        .from("schedules")
         .select("id", { count: "exact", head: true })
-        .eq("status", "pendente"),
+        .in("status", ["agendado", "executando"]),
       supabase
-        .from("charges")
+        .from("schedules")
         .select("id", { count: "exact", head: true })
-        .eq("status", "enviada"),
+        .in("status", ["pendente", "suspeita_de_pagamento"]),
       supabase
-        .from("charges")
+        .from("schedules")
         .select("id", { count: "exact", head: true })
-        .eq("status", "falhou"),
+        .eq("status", "atrasado"),
       supabase
-        .from("charges")
+        .from("schedules")
         .select("id", { count: "exact", head: true })
-        .eq("status", "paga"),
-      supabase.from("charges").select("created_at").gte("created_at", start30Iso),
+        .in("status", ["pago", "executado"]),
+      supabase.from("schedules").select("created_at").gte("created_at", start30Iso),
     ]);
 
   if (
     totalRes.error ||
+    scheduledRes.error ||
     pendingRes.error ||
-    sentRes.error ||
-    failedRes.error ||
+    overdueRes.error ||
     paidRes.error ||
     chartRes.error
   ) {
@@ -74,10 +74,10 @@ export default async function RelatoriosPage() {
   }
 
   const stats: ReportStats = {
-    totalCharges: totalRes.count ?? 0,
+    totalSchedules: totalRes.count ?? 0,
+    scheduled: scheduledRes.count ?? 0,
     pending: pendingRes.count ?? 0,
-    sent: sentRes.count ?? 0,
-    failed: failedRes.count ?? 0,
+    overdue: overdueRes.count ?? 0,
     paid: paidRes.count ?? 0,
   };
 
