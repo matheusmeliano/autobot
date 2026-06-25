@@ -69,6 +69,53 @@ function buildChargeLocalDate(charge: DebtorChargeRow) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
+function scheduleReferenceLocalDate(row: DebtorScheduleStatusRow, timeZone: string) {
+  return scheduleLocalDate(row.charge_due_at ?? row.data_envio ?? null, timeZone);
+}
+
+function isPaidSchedule(row: DebtorScheduleStatusRow, timeZone: string) {
+  const status = String(row.status ?? "").trim().toLowerCase();
+  return (
+    status === "pago" ||
+    Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone)) ||
+    (status === "pago" && Boolean(scheduleLocalDate(row.closed_at ?? null, timeZone)))
+  );
+}
+
+function getMatchingSchedulesForCharge(params: {
+  charge: DebtorChargeRow;
+  schedules: DebtorScheduleStatusRow[];
+  scheduleTimeZone: string;
+  usedScheduleIndexes?: Set<number>;
+}) {
+  const chargeId = String(params.charge.id ?? "").trim();
+  const dueLocalDate = buildChargeLocalDate(params.charge);
+  const usedIndexes = params.usedScheduleIndexes ?? new Set<number>();
+
+  const exactIndexes = params.schedules
+    .map((row, index) => ({ row, index }))
+    .filter(({ row, index }) => {
+      if (usedIndexes.has(index)) return false;
+      return chargeId && String(row.charge_id ?? "").trim() === chargeId;
+    });
+  if (exactIndexes.length) {
+    for (const { index } of exactIndexes) usedIndexes.add(index);
+    return exactIndexes.map(({ row }) => row);
+  }
+
+  if (!dueLocalDate) return [];
+
+  const fallbackIndexes = params.schedules
+    .map((row, index) => ({ row, index }))
+    .filter(({ row, index }) => {
+      if (usedIndexes.has(index)) return false;
+      const timeZone = String(row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
+      return scheduleReferenceLocalDate(row, timeZone) === dueLocalDate;
+    });
+  for (const { index } of fallbackIndexes) usedIndexes.add(index);
+  return fallbackIndexes.map(({ row }) => row);
+}
+
 function deriveReferenceMonthDebtorStatus(
   charges: DebtorChargeRow[],
   schedules: DebtorScheduleStatusRow[],
@@ -92,21 +139,21 @@ function deriveReferenceMonthDebtorStatus(
 
   let paidCount = 0;
   let hasOverdue = false;
+  const usedScheduleIndexes = new Set<number>();
 
   for (const charge of referenceCharges) {
-    const chargeId = String(charge.id ?? "").trim();
     const dueLocalDate = buildChargeLocalDate(charge);
     if (!dueLocalDate) continue;
 
-    const matchingSchedules = chargeId
-      ? schedules.filter((row) => String(row.charge_id ?? "").trim() === chargeId)
-      : [];
-    const timeZone = String(matchingSchedules[0]?.schedule_timezone ?? "") || scheduleTimeZone;
+    const matchingSchedules = getMatchingSchedulesForCharge({
+      charge,
+      schedules,
+      scheduleTimeZone,
+      usedScheduleIndexes,
+    });
     const paid = matchingSchedules.some((row) => {
-      const status = String(row.status ?? "").trim().toLowerCase();
-      return (
-        status === "pago" || Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone))
-      );
+      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+      return isPaidSchedule(row, timeZone);
     });
 
     if (paid) {
@@ -172,17 +219,27 @@ export function deriveReferenceMonthDebtorChargeProgress(
 
   if (!referenceChargeIds.length) return { paid: 0, total: 0 };
 
-  const paidChargeIds = new Set(
-    schedules
-      .filter((row) => {
-        const status = String(row.status ?? "").trim().toLowerCase();
-        return status === "pago" || Boolean(String(row.payment_received_at ?? "").trim());
-      })
-      .map((row) => String(row.charge_id ?? "").trim())
-      .filter(Boolean),
-  );
-
-  const paid = referenceChargeIds.filter((chargeId) => paidChargeIds.has(chargeId)).length;
+  const referenceCharges = charges
+    .filter((charge) => buildChargeLocalDate(charge))
+    .filter((charge) => {
+      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
+      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
+      return `${year}-${month}` === referenceYearMonth;
+    })
+    .sort(compareChargeOrder);
+  const usedScheduleIndexes = new Set<number>();
+  const paid = referenceCharges.filter((charge) => {
+    const matchingSchedules = getMatchingSchedulesForCharge({
+      charge,
+      schedules,
+      scheduleTimeZone,
+      usedScheduleIndexes,
+    });
+    return matchingSchedules.some((row) => {
+      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+      return isPaidSchedule(row, timeZone);
+    });
+  }).length;
   return { paid, total: referenceChargeIds.length };
 }
 
