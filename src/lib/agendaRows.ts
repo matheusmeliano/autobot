@@ -135,6 +135,14 @@ function buildOperationalChargeIso(params: {
   return buildChargeIso(operationalCharge, params.time, params.timeZone);
 }
 
+function isChargeInCurrentOperationalMonth(charge: DebtorChargeRow, timeZone: string) {
+  const { year, month } = currentOperationalYearMonth(timeZone);
+  return (
+    Number(charge.recurrence_year ?? 0) === year &&
+    Number(charge.recurrence_month ?? 0) === month
+  );
+}
+
 function fallbackScheduleMatch(
   schedules: ScheduleSourceRow[],
   charge: DebtorChargeRow,
@@ -206,6 +214,7 @@ export function buildAgendaRows(params: {
       const rowTimeZone = matchedSchedule?.schedule_timezone
         ? String(matchedSchedule.schedule_timezone)
         : params.defaultTimeZone || "America/Sao_Paulo";
+      if (!isChargeInCurrentOperationalMonth(charge, rowTimeZone)) continue;
 
       const chargeDueAt = buildChargeIso(charge, retryTime, rowTimeZone);
       const operationalDueAt = buildOperationalChargeIso({
