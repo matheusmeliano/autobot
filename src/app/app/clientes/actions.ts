@@ -305,7 +305,7 @@ export async function createDebtorAction(input: unknown) {
     return { ok: false, error: autoScheduleResult.error ?? "Falha ao iniciar a cobrança." };
   }
 
-  return { ok: true, warning: autoScheduleResult.warning };
+  return { ok: true };
 }
 
 export async function updateDebtorAction(input: unknown) {
@@ -363,7 +363,7 @@ export async function updateDebtorAction(input: unknown) {
     return { ok: false, error: autoScheduleResult.error ?? "Falha ao iniciar a cobrança." };
   }
 
-  return { ok: true, warning: autoScheduleResult.warning };
+  return { ok: true };
 }
 
 export async function deleteDebtorAction(id: string) {
