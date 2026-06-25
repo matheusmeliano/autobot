@@ -509,8 +509,7 @@ export function SchedulesClient({
     return (
       normalizedStatus === "pago" ||
       normalizedStatus === "executado" ||
-      hasExecutedCurrentInstance(row) ||
-      Boolean(String(row.payment_received_at ?? "").trim())
+      hasExecutedCurrentInstance(row)
     );
   };
 

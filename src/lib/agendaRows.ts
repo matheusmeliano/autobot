@@ -213,7 +213,9 @@ export function buildAgendaRows(params: {
         time: retryTime,
         timeZone: rowTimeZone,
       });
-      const dataEnvio = matchedSchedule?.data_envio ?? chargeDueAt;
+      const effectiveChargeDueAt =
+        String(matchedSchedule?.charge_due_at ?? "").trim() || chargeDueAt;
+      const dataEnvio = matchedSchedule?.data_envio ?? effectiveChargeDueAt;
       const nextCharge = charges[index + 1] ?? null;
       const nextChargeDueAt = nextCharge ? buildChargeIso(nextCharge, retryTime, rowTimeZone) : null;
 
@@ -233,7 +235,7 @@ export function buildAgendaRows(params: {
           ? String(matchedSchedule.template_overdue_id)
           : templateDefaults.overdueId,
         data_envio: String(dataEnvio),
-        charge_due_at: String(chargeDueAt),
+        charge_due_at: String(effectiveChargeDueAt),
         operational_due_at: String(operationalDueAt),
         next_charge_due_at: nextChargeDueAt,
         status: String(matchedSchedule?.status ?? "agendado"),
