@@ -1,37 +1,42 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { buildAgendaRows } from "@/lib/agendaRows";
+import {
+  listAllAgendarDebtors,
+  listAllAgendarScheduleRuns,
+  listAllAgendarSchedules,
+  listAllAgendarTemplates,
+} from "@/lib/agendarData";
 import { BRAZIL_TIMEZONES } from "@/lib/timezone";
 
 export async function GET() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
-  const [{ data: schedules }, { data: scheduleRuns }, { data: debtors }, { data: templates }, profileRes] = await Promise.all([
-    supabase
-      .from("schedules")
-      .select(
-        "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
-      )
-      .order("data_envio", { ascending: true })
-      .limit(200),
-    supabase
-      .from("schedule_runs")
-      .select("schedule_id, scheduled_for")
-      .eq("status", "executado")
-      .order("scheduled_for", { ascending: false })
-      .limit(2000),
-    supabase
-      .from("debtors")
-      .select(
-        "id, nome, observacoes, retry_time, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)",
-      )
-      .order("nome", { ascending: true })
-      .limit(500),
-    supabase
-      .from("message_templates")
-      .select("id, nome, created_at")
-      .order("created_at", { ascending: true })
-      .limit(200),
+  const [
+    { data: schedules, error: schedulesError },
+    { data: scheduleRuns, error: scheduleRunsError },
+    { data: debtors, error: debtorsError },
+    { data: templates, error: templatesError },
+    profileRes,
+  ] = await Promise.all([
+    listAllAgendarSchedules(supabase),
+    listAllAgendarScheduleRuns(supabase),
+    listAllAgendarDebtors(supabase),
+    listAllAgendarTemplates(supabase),
     supabase.from("profiles").select("timezone").maybeSingle(),
   ]);
+
+  if (schedulesError || scheduleRunsError || debtorsError || templatesError) {
+    return Response.json(
+      {
+        error:
+          schedulesError?.message ??
+          scheduleRunsError?.message ??
+          debtorsError?.message ??
+          templatesError?.message ??
+          "Falha ao carregar agendamentos.",
+      },
+      { status: 500 },
+    );
+  }
 
   const latestExecutedRunBySchedule = new Map<string, string>();
   for (const run of scheduleRuns ?? []) {

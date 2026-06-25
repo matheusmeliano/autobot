@@ -380,111 +380,42 @@ export function SchedulesClient({
     if (!q) return rows;
     return rows.filter((r) => r.debtor_nome.toLowerCase().includes(q));
   }, [query, rows]);
-  const operationalMonthKey = useMemo(
-    () => yearMonthKey(new Date().toISOString(), effectiveTimeZone),
-    [effectiveTimeZone],
-  );
-  const operationalScheduleByDebtor = useMemo(() => {
+  const rowTimeZone = (row: ScheduleRow) =>
+    (String(row.schedule_timezone ?? "").trim() || effectiveTimeZone) as BrazilTimeZone;
+  const duplicateMetaByRowId = useMemo(() => {
     const grouped = new Map<string, ScheduleRow[]>();
 
     for (const row of rows) {
-      const debtorId = String(row.debtor_id ?? "");
-      if (!debtorId) continue;
-      const list = grouped.get(debtorId) ?? [];
+      const dueMoment = row.charge_due_at ?? row.data_envio;
+      const dueInput = splitDateTimeForInput(dueMoment, rowTimeZone(row));
+      const key = [
+        String(row.debtor_id ?? ""),
+        dueInput.date,
+        dueInput.time,
+        String(row.recurrence ?? ""),
+      ].join("|");
+      const list = grouped.get(key) ?? [];
       list.push(row);
-      grouped.set(debtorId, list);
+      grouped.set(key, list);
     }
 
-    const scheduleMap = new Map<string, ScheduleRow>();
-    for (const [debtorId, debtorRows] of grouped.entries()) {
-      const currentMonthRows = debtorRows
-        .filter(
-          (row) => yearMonthKey(row.charge_due_at ?? row.data_envio, effectiveTimeZone) === operationalMonthKey,
-        )
-        .sort((a, b) =>
-          String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio)),
-        );
-      const referenceRow = currentMonthRows[0] ?? null;
-      if (referenceRow) scheduleMap.set(debtorId, referenceRow);
-    }
-
-    return scheduleMap;
-  }, [effectiveTimeZone, operationalMonthKey, rows]);
-  const operationalStatusByDebtor = useMemo(() => {
-    const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
-    const statusMap = new Map<string, { label: "Agendado" | "Executado"; className: string }>();
-    for (const row of rows) {
-      const debtorId = String(row.debtor_id ?? "");
-      if (!debtorId || statusMap.has(debtorId)) continue;
-      const referenceRow = operationalScheduleByDebtor.get(debtorId) ?? null;
-      if (!referenceRow) {
-        statusMap.set(debtorId, {
-          label: "Agendado",
-          className: statusClass("pendente"),
-        });
-        continue;
-      }
-
-      const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
-      const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
-      let executedByCurrentInstance = false;
-      // #region debug-point A:agendar-operational-status
-      try {
-        fetch("http://127.0.0.1:7780/event", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "client-load-crash",
-            runId: "pre",
-            hypothesisId: "A",
-            location: "SchedulesClient.tsx:operationalStatusByDebtor",
-            msg: "[DEBUG] Antes de calcular status operacional",
-            data: {
-              debtorId,
-              debtorName: referenceRow.debtor_nome ?? null,
-              rowId: referenceRow.id ?? null,
-              rowStatus: referenceRow.status ?? null,
-              dueMoment,
-              dueLocalDate,
-              currentLocalDate,
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-        executedByCurrentInstance = hasExecutedCurrentInstance(referenceRow);
-      } catch (error) {
-        fetch("http://127.0.0.1:7780/event", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "client-load-crash",
-            runId: "pre",
-            hypothesisId: "A",
-            location: "SchedulesClient.tsx:operationalStatusByDebtor",
-            msg: "[DEBUG] Falha ao calcular status operacional",
-            data: {
-              debtorId,
-              debtorName: referenceRow.debtor_nome ?? null,
-              rowId: referenceRow.id ?? null,
-              errorName: error instanceof Error ? error.name : typeof error,
-              errorMessage: error instanceof Error ? error.message : String(error),
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-        throw error;
-      }
-      // #endregion
-      const isExecuted =
-        executedByCurrentInstance || (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
-      statusMap.set(debtorId, {
-        label: isExecuted ? "Executado" : "Agendado",
-        className: statusClass(isExecuted ? "executado" : "pendente"),
+    const meta = new Map<string, { index: number; total: number }>();
+    for (const list of grouped.values()) {
+      if (list.length < 2) continue;
+      const ordered = [...list].sort((a, b) => {
+        const createdCompare = String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+        if (createdCompare !== 0) return createdCompare;
+        const chargeCompare = String(a.charge_id ?? "").localeCompare(String(b.charge_id ?? ""));
+        if (chargeCompare !== 0) return chargeCompare;
+        return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+      });
+      ordered.forEach((row, index) => {
+        meta.set(String(row.id ?? ""), { index: index + 1, total: ordered.length });
       });
     }
 
-    return statusMap;
-  }, [effectiveTimeZone, operationalScheduleByDebtor, rows, theme]);
+    return meta;
+  }, [effectiveTimeZone, rows]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -565,36 +496,72 @@ export function SchedulesClient({
     return false;
   }
 
-  const displayStatus = (row: ScheduleRow) => {
-    const nowIso = new Date().toISOString();
-    const currentLocalDate = localDateInTimeZone(nowIso, effectiveTimeZone);
-    const dueMoment = row.charge_due_at ?? row.data_envio;
-    const dueLocalDate = localDateInTimeZone(String(dueMoment), effectiveTimeZone);
-    const isExecuted =
-      hasExecutedCurrentInstance(row) ||
-      (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
+  const referenceYearMonthForRow = (row: ScheduleRow) => {
+    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    return referenceMoment ? yearMonthKey(referenceMoment, rowTimeZone(row)) : "";
+  };
 
-    return isExecuted
-      ? { label: "Executado", className: statusClass("executado") }
-      : { label: "Agendado", className: statusClass("pendente") };
+  const executedYearMonthForRow = (row: ScheduleRow) =>
+    row.last_executed_scheduled_for ? yearMonthKey(row.last_executed_scheduled_for, rowTimeZone(row)) : "";
+
+  const isRowAlreadyProcessed = (row: ScheduleRow) => {
+    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
+    return (
+      normalizedStatus === "pago" ||
+      normalizedStatus === "executado" ||
+      hasExecutedCurrentInstance(row) ||
+      Boolean(String(row.payment_received_at ?? "").trim())
+    );
+  };
+
+  const isRowAlreadyTriggeredCurrentMonth = (row: ScheduleRow) => {
+    const referenceYearMonth = referenceYearMonthForRow(row);
+    const executedYearMonth = executedYearMonthForRow(row);
+    return Boolean(executedYearMonth) && executedYearMonth === referenceYearMonth;
+  };
+
+  const displayStatus = (row: ScheduleRow) => {
+    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
+
+    if (hasExecutedCurrentInstance(row)) {
+      return { label: "Executado", className: statusClass("executado") };
+    }
+    if (normalizedStatus === "pago") {
+      return { label: "Pago", className: statusClass("pago") };
+    }
+    if (normalizedStatus === "atrasado") {
+      return { label: "Atrasado", className: statusClass("atrasado") };
+    }
+    if (normalizedStatus === "executando") {
+      return { label: "Executando", className: statusClass("pendente") };
+    }
+    if (normalizedStatus === "suspeita_de_pagamento") {
+      return { label: "Suspeita", className: statusClass("suspeita_de_pagamento") };
+    }
+    if (normalizedStatus === "pendente") {
+      return { label: "Pendente", className: statusClass("pendente") };
+    }
+    return { label: "Agendado", className: statusClass("agendado") };
   };
 
   const displayMoments = (row: ScheduleRow) => {
     const dueMoment = row.charge_due_at ?? row.data_envio;
-    const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
+    const timeZone = rowTimeZone(row);
+    const dueInput = splitDateTimeForInput(dueMoment, timeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
-    const scheduledDate = dateBR(dueMoment, effectiveTimeZone);
+    const scheduledDate = dateBR(dueMoment, timeZone);
 
     return {
       primaryDate: dueDay,
-      primaryTime: timeBR(dueMoment, effectiveTimeZone),
+      primaryTime: timeBR(dueMoment, timeZone),
       scheduledDate,
     };
   };
 
   const getEditDateTime = (row: ScheduleRow) => {
-    const dueInput = splitDateTimeForInput(row.charge_due_at ?? row.data_envio, effectiveTimeZone);
-    const sendInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
+    const timeZone = rowTimeZone(row);
+    const dueInput = splitDateTimeForInput(row.charge_due_at ?? row.data_envio, timeZone);
+    const sendInput = splitDateTimeForInput(row.data_envio, timeZone);
     return {
       date: dueInput.date,
       time: sendInput.time || dueInput.time,
@@ -604,8 +571,9 @@ export function SchedulesClient({
   const normalizeEditedDateForPersistence = (row: ScheduleRow, date: string) => {
     if (String(row.recurrence ?? "none") !== "monthly") return date;
 
-    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
-    const nextScheduleDate = splitDateTimeForInput(row.data_envio, effectiveTimeZone).date;
+    const timeZone = rowTimeZone(row);
+    const currentMonthKey = yearMonthKey(new Date().toISOString(), timeZone);
+    const nextScheduleDate = splitDateTimeForInput(row.data_envio, timeZone).date;
     if (!nextScheduleDate) return date;
 
     const nextScheduleMonthKey = nextScheduleDate.slice(0, 7);
@@ -622,6 +590,7 @@ export function SchedulesClient({
 
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
     const scheduleUnavailable = Boolean(r.schedule_missing) || String(r.id ?? "").startsWith("charge:");
+    const alreadyProcessed = isRowAlreadyProcessed(r);
     const baseButtonClass =
       variant === "mobile"
         ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
@@ -646,6 +615,7 @@ export function SchedulesClient({
           onClick={() => markAsPaid(r)}
           disabled={
             scheduleUnavailable ||
+            alreadyProcessed ||
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id
@@ -997,15 +967,8 @@ export function SchedulesClient({
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
     const referenceMoment = row.charge_due_at ?? row.data_envio;
     const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
-    const referenceYearMonth = referenceMoment ? yearMonthKey(referenceMoment, effectiveTimeZone) : "";
-    const executedYearMonth = row.last_executed_scheduled_for
-      ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
-      : "";
-    const alreadyProcessed =
-      Boolean(String(row.payment_received_at ?? "").trim()) ||
-      String(row.status ?? "").trim().toLowerCase() === "pago" ||
-      String(row.status ?? "").trim().toLowerCase() === "executado";
-    const alreadyTriggeredThisMonth = Boolean(executedYearMonth) && executedYearMonth === referenceYearMonth;
+    const alreadyProcessed = isRowAlreadyProcessed(row);
+    const alreadyTriggeredThisMonth = isRowAlreadyTriggeredCurrentMonth(row);
     if (alreadyProcessed) {
       modalToast.info(
         `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,
@@ -1056,37 +1019,7 @@ export function SchedulesClient({
     const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
     const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
     const nextReferenceLabel = nextRecurringMoment ? monthYearBR(nextRecurringMoment, effectiveTimeZone) : null;
-    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
-    const alreadyProcessed =
-      normalizedStatus === "pago" ||
-      normalizedStatus === "executado" ||
-      Boolean(String(row.payment_received_at ?? "").trim());
-    // #region debug-point A:mark-as-paid-click
-    fetch("http://127.0.0.1:7777/event", {
-      method: "POST",
-      body: JSON.stringify({
-        sessionId: "payment-repeat-popup",
-        runId: "pre-fix",
-        hypothesisId: "A",
-        location: "SchedulesClient.tsx:markAsPaid",
-        msg: "[DEBUG] Clique em Pagamento realizado",
-        data: {
-          scheduleId: row.id,
-          debtorName: row.debtor_nome,
-          recurrence: row.recurrence ?? null,
-          rowStatus: row.status ?? null,
-          normalizedStatus,
-          alreadyProcessed,
-          paymentReceivedAt: row.payment_received_at ?? null,
-          referenceMoment,
-          referenceMonthLabel,
-          nextRecurringMoment,
-          nextReferenceLabel,
-        },
-        ts: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    const alreadyProcessed = isRowAlreadyProcessed(row);
     if (alreadyProcessed) {
       modalToast.info(
         `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,
@@ -1341,6 +1274,7 @@ export function SchedulesClient({
                 (() => {
                   const visualStatus = displayStatus(r);
                   const moments = displayMoments(r);
+                  const duplicateMeta = duplicateMetaByRowId.get(r.id);
                   return (
                 <div
                   key={r.id}
@@ -1351,6 +1285,11 @@ export function SchedulesClient({
                       <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
                         {r.debtor_nome}
                       </div>
+                      {duplicateMeta ? (
+                        <div className="mt-1 text-[11px] font-medium text-[var(--app-text-55)]">
+                          {`Cobrança ${duplicateMeta.index} de ${duplicateMeta.total}`}
+                        </div>
+                      ) : null}
                       <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                         Agendamento
                       </div>
@@ -1450,6 +1389,7 @@ export function SchedulesClient({
                     (() => {
                       const visualStatus = displayStatus(r);
                       const moments = displayMoments(r);
+                      const duplicateMeta = duplicateMetaByRowId.get(r.id);
                       return (
                       <div
                         key={r.id}
@@ -1459,6 +1399,11 @@ export function SchedulesClient({
                           <div className="truncate font-semibold text-[var(--app-text-85)]" title={r.debtor_nome}>
                             {r.debtor_nome}
                           </div>
+                          {duplicateMeta ? (
+                            <div className="mt-1 text-[11px] font-medium text-[var(--app-text-55)]">
+                              {`Cobrança ${duplicateMeta.index} de ${duplicateMeta.total}`}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="min-w-0 text-center text-[var(--app-text-70)]">
                           <div className="truncate font-semibold text-[var(--app-text-80)]">

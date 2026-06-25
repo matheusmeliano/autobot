@@ -6,37 +6,22 @@ import {
   type TemplateOption,
 } from "@/components/app/schedules/SchedulesClient";
 import { buildAgendaRows } from "@/lib/agendaRows";
+import {
+  listAllAgendarDebtors,
+  listAllAgendarScheduleRuns,
+  listAllAgendarSchedules,
+  listAllAgendarTemplates,
+} from "@/lib/agendarData";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 
 export default async function AgendarPage() {
   const supabase = await createSupabaseServerClient();
 
   const [schedulesRes, scheduleRunsRes, debtorsRes, templatesRes, profileRes, waRes] = await Promise.all([
-    supabase
-      .from("schedules")
-      .select(
-        "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
-      )
-      .order("data_envio", { ascending: true })
-      .limit(200),
-    supabase
-      .from("schedule_runs")
-      .select("schedule_id, scheduled_for")
-      .eq("status", "executado")
-      .order("scheduled_for", { ascending: false })
-      .limit(2000),
-    supabase
-      .from("debtors")
-      .select(
-        "id, nome, observacoes, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)",
-      )
-      .order("nome", { ascending: true })
-      .limit(500),
-    supabase
-      .from("message_templates")
-      .select("id, nome, created_at")
-      .order("created_at", { ascending: true })
-      .limit(200),
+    listAllAgendarSchedules(supabase),
+    listAllAgendarScheduleRuns(supabase),
+    listAllAgendarDebtors(supabase),
+    listAllAgendarTemplates(supabase),
     supabase.from("profiles").select("timezone").maybeSingle(),
     supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
   ]);
