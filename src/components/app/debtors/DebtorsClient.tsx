@@ -656,10 +656,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     }
 
     close();
-    if ("warning" in res && res.warning) {
-      const warnId = modalToast.warning(res.warning);
-      await modalToast.wait(warnId);
-    }
     const toastId = modalToast.success(editing ? "Cliente atualizado." : "Cliente criado.");
     await modalToast.wait(toastId);
     window.location.reload();
