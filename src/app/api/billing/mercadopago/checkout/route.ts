@@ -32,7 +32,14 @@ function errorToUserMessage(err: unknown) {
   return "Falha ao iniciar checkout.";
 }
 
-async function createPreferenceForPlan(req: Request, plan: "basico" | "pro" | "vitalicio") {
+type CreatePreferenceResult =
+  | { kind: "redirect"; redirectUrl: string; status: 307 }
+  | { kind: "preference"; pref: { init_point: string; id: string } };
+
+async function createPreferenceForPlan(
+  req: Request,
+  plan: "basico" | "pro" | "vitalicio",
+): Promise<CreatePreferenceResult> {
   const reqUrl = new URL(req.url);
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? reqUrl.origin;
 
@@ -43,8 +50,9 @@ async function createPreferenceForPlan(req: Request, plan: "basico" | "pro" | "v
 
   if (!user?.id || !user.email) {
     return {
+      kind: "redirect",
       redirectUrl: `${origin}/login?next=${encodeURIComponent("/app/assinatura")}`,
-      status: 307 as const,
+      status: 307,
     };
   }
 
@@ -71,7 +79,7 @@ async function createPreferenceForPlan(req: Request, plan: "basico" | "pro" | "v
       : ["debit_card", "prepaid_card", "ticket", "atm"],
   });
 
-  return { pref };
+  return { kind: "preference", pref: { init_point: pref.init_point, id: pref.id } };
 }
 
 export async function GET(req: Request) {
@@ -84,7 +92,7 @@ export async function GET(req: Request) {
     }
 
     const result = await createPreferenceForPlan(req, parsed.data.plan);
-    if ("redirectUrl" in result) {
+    if (result.kind === "redirect") {
       return NextResponse.redirect(result.redirectUrl, { status: result.status });
     }
 
@@ -102,7 +110,7 @@ export async function POST(req: Request) {
     }
 
     const result = await createPreferenceForPlan(req, parsed.data.plan);
-    if ("redirectUrl" in result) {
+    if (result.kind === "redirect") {
       return NextResponse.json({ error: "Sem sessão." }, { status: 401 });
     }
 
