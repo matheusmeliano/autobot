@@ -25,10 +25,50 @@ function activitySortTime(activity: {
   operationalDueAt?: string | null;
   chargeDueAt?: string | null;
   dataEnvio?: string | null;
-}) {
-  const iso = activity.operationalDueAt ?? activity.chargeDueAt ?? activity.dataEnvio ?? "";
+  lastExecutedScheduledFor?: string | null;
+}, timeZone: BrazilTimeZone, currentMonthKey: string) {
+  const operationalDueAt = String(activity.operationalDueAt ?? "").trim();
+  const chargeDueAt = String(activity.chargeDueAt ?? "").trim();
+  const dataEnvio = String(activity.dataEnvio ?? "").trim();
+  const lastExecutedScheduledFor = String(activity.lastExecutedScheduledFor ?? "").trim();
+  const operationalMonthKey = operationalDueAt ? scheduleLocalMonthKey(operationalDueAt, timeZone) : null;
+  if (operationalMonthKey === currentMonthKey) {
+    const time = new Date(operationalDueAt).getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+  const dueMoment = chargeDueAt || dataEnvio;
+  const dueMonthKey = dueMoment ? scheduleLocalMonthKey(dueMoment, timeZone) : null;
+  const executedMonthKey = lastExecutedScheduledFor
+    ? scheduleLocalMonthKey(lastExecutedScheduledFor, timeZone)
+    : null;
+  if (executedMonthKey === currentMonthKey && dueMonthKey !== currentMonthKey) {
+    const time = new Date(lastExecutedScheduledFor).getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+  const iso = dueMoment || lastExecutedScheduledFor;
   const time = new Date(String(iso)).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+function activityCurrentMonthPriority(activity: {
+  operationalDueAt?: string | null;
+  chargeDueAt?: string | null;
+  dataEnvio?: string | null;
+  lastExecutedScheduledFor?: string | null;
+}, timeZone: BrazilTimeZone, currentMonthKey: string) {
+  const operationalDueAt = String(activity.operationalDueAt ?? "").trim();
+  const chargeDueAt = String(activity.chargeDueAt ?? "").trim();
+  const dataEnvio = String(activity.dataEnvio ?? "").trim();
+  const lastExecutedScheduledFor = String(activity.lastExecutedScheduledFor ?? "").trim();
+  const operationalMonthKey = operationalDueAt ? scheduleLocalMonthKey(operationalDueAt, timeZone) : null;
+  if (operationalMonthKey === currentMonthKey) return 0;
+  const dueMoment = chargeDueAt || dataEnvio;
+  const dueMonthKey = dueMoment ? scheduleLocalMonthKey(dueMoment, timeZone) : null;
+  const executedMonthKey = lastExecutedScheduledFor
+    ? scheduleLocalMonthKey(lastExecutedScheduledFor, timeZone)
+    : null;
+  if (executedMonthKey === currentMonthKey && dueMonthKey !== currentMonthKey) return 0;
+  return 1;
 }
 
 export default async function DashboardPage() {
@@ -257,7 +297,16 @@ export default async function DashboardPage() {
         : null,
       paymentReceivedAt: row.payment_received_at ? String(row.payment_received_at) : null,
     }))
-    .sort((a, b) => activitySortTime(b) - activitySortTime(a));
+    .sort((a, b) => {
+      const priorityDiff =
+        activityCurrentMonthPriority(a, effectiveTimeZone, currentMonthKey) -
+        activityCurrentMonthPriority(b, effectiveTimeZone, currentMonthKey);
+      if (priorityDiff !== 0) return priorityDiff;
+      return (
+        activitySortTime(b, effectiveTimeZone, currentMonthKey) -
+        activitySortTime(a, effectiveTimeZone, currentMonthKey)
+      );
+    });
 
   return (
     <DashboardClient
