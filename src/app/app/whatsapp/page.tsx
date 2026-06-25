@@ -1,12 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { WhatsAppClient } from "@/components/app/whatsapp/WhatsAppClient";
 
-function last4(value: string | null | undefined) {
-  const v = String(value ?? "");
-  if (!v) return null;
-  return v.length <= 4 ? v : v.slice(-4);
-}
-
 export default async function WhatsAppPage() {
   const supabase = await createSupabaseServerClient();
   const first = await supabase
@@ -49,9 +43,7 @@ export default async function WhatsAppPage() {
               instance_id: data.instance_id ?? null,
               status: data.status ?? null,
               hasToken: Boolean(data.token),
-              tokenLast4: last4(data.token),
               hasClientToken: Boolean(data.client_token),
-              clientTokenLast4: last4(data.client_token),
             }
           : null
       }

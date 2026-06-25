@@ -3,6 +3,8 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+const MASK = "********";
+
 const schema = z.object({
   instance_id: z.string().min(1),
   token: z.string().optional(),
@@ -18,8 +20,10 @@ export async function upsertWhatsAppInstanceAction(input: unknown) {
   const userId = userRes.user?.id;
   if (!userId) return { ok: false, error: "Sem sessão." };
 
-  const token = String(parsed.data.token ?? "").trim() || null;
-  const clientToken = String(parsed.data.client_token ?? "").trim() || null;
+  const tokenRaw = String(parsed.data.token ?? "").trim();
+  const clientTokenRaw = String(parsed.data.client_token ?? "").trim();
+  const token = tokenRaw && tokenRaw !== MASK ? tokenRaw : null;
+  const clientToken = clientTokenRaw && clientTokenRaw !== MASK ? clientTokenRaw : null;
 
   const firstExisting = await supabase
     .from("whatsapp_instances")

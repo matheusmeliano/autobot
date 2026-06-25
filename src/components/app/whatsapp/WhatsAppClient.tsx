@@ -1,18 +1,17 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, HelpCircle } from "lucide-react";
-import { useState } from "react";
+import { HelpCircle } from "lucide-react";
 import { upsertWhatsAppInstanceAction } from "@/app/app/whatsapp/actions";
 import { modalToast } from "@/lib/modalToast";
+
+const MASK = "********";
 
 type InstanceRow = {
   instance_id: string | null;
   status: string | null;
   hasToken: boolean;
-  tokenLast4: string | null;
   hasClientToken: boolean;
-  clientTokenLast4: string | null;
 };
 
 type FormValues = {
@@ -22,31 +21,37 @@ type FormValues = {
 };
 
 export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
-  const [showToken, setShowToken] = useState(false);
-  const [showClientToken, setShowClientToken] = useState(false);
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
       instance_id: initial?.instance_id ?? "",
-      token: "",
-      client_token: "",
+      token: initial?.hasToken ? MASK : "",
+      client_token: initial?.hasClientToken ? MASK : "",
     },
   });
 
   const onSubmit = handleSubmit(async (values) => {
+    const tokenValue = String(values.token ?? "").trim();
+    const clientTokenValue = String(values.client_token ?? "").trim();
     const res = await upsertWhatsAppInstanceAction({
       instance_id: values.instance_id,
-      token: values.token || undefined,
-      client_token: values.client_token || undefined,
+      token: tokenValue && tokenValue !== MASK ? tokenValue : undefined,
+      client_token: clientTokenValue && clientTokenValue !== MASK ? clientTokenValue : undefined,
     });
     if (!res.ok) {
       modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
     modalToast.success("Configuração salva.");
+    reset({
+      instance_id: values.instance_id,
+      token: MASK,
+      client_token: initial?.hasClientToken || (clientTokenValue && clientTokenValue !== MASK) ? MASK : "",
+    });
   });
 
   const isConnected =
@@ -106,33 +111,19 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
             </div>
             <div className="min-w-0">
               <div className="text-xs font-semibold text-white/60">Token</div>
-              <div className="relative mt-2">
-                <input
-                  type={showToken ? "text" : "password"}
-                  className="w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-11 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder={initial?.hasToken ? "•••••••• (deixe em branco para manter)" : "token"}
-                  {...register("token", {
-                    validate: (value) => {
-                      const v = String(value ?? "").trim();
-                      if (!v && !initial?.hasToken) return "Informe o token.";
-                      return true;
-                    },
-                  })}
-                />
-                <button
-                  type="button"
-                  aria-label={showToken ? "Ocultar token" : "Ver token"}
-                  onClick={() => setShowToken((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/50 hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-white/20"
-                >
-                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {initial?.hasToken && initial.tokenLast4 ? (
-                <div className="mt-2 text-[11px] font-semibold text-white/45">
-                  Token atual termina com {initial.tokenLast4}
-                </div>
-              ) : null}
+              <input
+                type="password"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder={initial?.hasToken ? MASK : "token"}
+                {...register("token", {
+                  validate: (value) => {
+                    const v = String(value ?? "").trim();
+                    if (!v) return initial?.hasToken ? true : "Informe o token.";
+                    if (v === MASK) return initial?.hasToken ? true : "Informe o token.";
+                    return true;
+                  },
+                })}
+              />
               {errors.token?.message ? (
                 <div className="mt-2 text-xs font-medium text-rose-300">
                   {String(errors.token.message)}
@@ -153,29 +144,12 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
                   </span>
                 </span>
               </div>
-              <div className="relative mt-2">
-                <input
-                  type={showClientToken ? "text" : "password"}
-                  className="w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-11 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder={
-                    initial?.hasClientToken ? "•••••••• (deixe em branco para manter)" : "client-token"
-                  }
-                  {...register("client_token")}
-                />
-                <button
-                  type="button"
-                  aria-label={showClientToken ? "Ocultar client-token" : "Ver client-token"}
-                  onClick={() => setShowClientToken((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/50 hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-white/20"
-                >
-                  {showClientToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {initial?.hasClientToken && initial.clientTokenLast4 ? (
-                <div className="mt-2 text-[11px] font-semibold text-white/45">
-                  Client-Token atual termina com {initial.clientTokenLast4}
-                </div>
-              ) : null}
+              <input
+                type="password"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder={initial?.hasClientToken ? MASK : "client-token"}
+                {...register("client_token")}
+              />
             </div>
           </div>
 
