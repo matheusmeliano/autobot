@@ -300,7 +300,8 @@ function getNextRecurringMoment(row: ScheduleRow, timeZone: BrazilTimeZone) {
 
 function normalizeDebtorRetryValues(debtor: DebtorOption | null | undefined) {
   return {
-    retry_weekdays: normalizeRetryWeekdays(debtor?.retry_weekdays),
+    retry_weekdays:
+      debtor?.retry_weekdays == null ? DEFAULT_RETRY_WEEKDAYS : normalizeRetryWeekdays(debtor.retry_weekdays),
     retry_time: debtor?.retry_time ?? DEFAULT_RETRY_TIME,
     retry_max_attempts: Math.min(
       MAX_RETRY_ATTEMPTS_PER_DAY,

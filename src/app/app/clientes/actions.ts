@@ -139,6 +139,7 @@ function nextInitialOverdueAttemptUtcIso(params: {
   retryIntervalDays?: number;
 }) {
   const retryWeekdays = normalizeRetryWeekdays(params.retryWeekdays);
+  if (!retryWeekdays.length) return null;
   const retryTime = validTime(String(params.retryTime ?? "")) ? String(params.retryTime) : DEFAULT_RETRY_TIME;
   const retryIntervalDays = Math.min(
     365,
@@ -424,7 +425,7 @@ async function syncDebtorChargesAndSchedules(params: {
             retryWeekdays: params.retryWeekdays,
             retryTime,
             retryIntervalDays: params.retryIntervalDays,
-          })
+          }) ?? dueAt
         : dueAt;
 
     const status = shouldStartOverdue ? "atrasado" : "agendado";

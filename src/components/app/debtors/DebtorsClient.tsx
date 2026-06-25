@@ -538,7 +538,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       status: row.status ?? "ativo",
       accumulate_open_monthly_charges: Boolean(row.accumulate_open_monthly_charges),
       skip_weekends_on_first_charge: Boolean(row.skip_weekends_on_first_charge),
-      retry_weekdays: normalizeRetryWeekdays(row.retry_weekdays),
+      retry_weekdays:
+        row.retry_weekdays == null ? DEFAULT_RETRY_WEEKDAYS : normalizeRetryWeekdays(row.retry_weekdays),
       retry_time: row.retry_time ?? DEFAULT_RETRY_TIME,
       retry_max_attempts: Math.min(
         MAX_RETRY_ATTEMPTS_PER_DAY,

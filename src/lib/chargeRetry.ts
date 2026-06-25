@@ -84,12 +84,15 @@ export function normalizeRetryWeekdays(input: unknown) {
         .filter((item) => Number.isInteger(item) && item >= 1 && item <= 7),
     ),
   ).sort((a, b) => a - b);
-  return unique.length ? unique : DEFAULT_RETRY_WEEKDAYS;
+  return unique;
 }
 
 export function normalizeRetryConfig(input: any): RetryConfig {
+  const weekdays = Array.isArray(input?.retry_weekdays)
+    ? normalizeRetryWeekdays(input.retry_weekdays)
+    : DEFAULT_RETRY_WEEKDAYS;
   return {
-    weekdays: normalizeRetryWeekdays(input?.retry_weekdays),
+    weekdays,
     time: validTime(String(input?.retry_time ?? "")) ? String(input.retry_time) : DEFAULT_RETRY_TIME,
     maxAttempts: Math.min(
       MAX_RETRY_ATTEMPTS_PER_DAY,
@@ -132,6 +135,7 @@ export function nextRetryUtcIso(params: {
   intervalDays: number;
 }) {
   const weekdays = normalizeRetryWeekdays(params.weekdays);
+  if (!weekdays.length) return null;
   let localDate = addDaysToLocalDate(
     localDateInTimeZone(params.fromUtcIso, params.timeZone),
     Math.max(1, params.intervalDays),
