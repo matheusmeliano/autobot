@@ -338,7 +338,7 @@ export async function GET(req: Request) {
       );
 
       if (!debtorPhone) throw new Error("Cliente sem telefone");
-      if (!templateText) {
+      if (!templateText.trim()) {
         throw new Error(
           sourceStatus === "atrasado"
             ? "Template atrasado sem conteúdo."

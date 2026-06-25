@@ -695,7 +695,7 @@ export async function triggerScheduleNowAction(id: string) {
       sourceStatus === "atrasado" ? overdueTemplate?.conteudo ?? "" : pendingTemplate?.conteudo ?? "",
     );
     if (!debtorPhone) throw new Error("Cliente sem telefone");
-    if (!templateText) {
+    if (!templateText.trim()) {
       throw new Error(
         sourceStatus === "atrasado"
           ? "Template atrasado sem conteúdo."

@@ -3,14 +3,11 @@ import {
   TemplatesClient,
   type TemplateRow,
 } from "@/components/app/templates/TemplatesClient";
+import { listAllMessageTemplates } from "@/lib/messageTemplates";
 
 export default async function MensagensPage() {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("message_templates")
-    .select("id, nome, conteudo, created_at")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const { data, error } = await listAllMessageTemplates(supabase);
 
   if (error) {
     return (

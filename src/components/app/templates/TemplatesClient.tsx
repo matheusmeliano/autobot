@@ -59,7 +59,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: { nome: "", conteudo: "" },
   });
@@ -302,8 +302,15 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                 <input
                   className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
                   placeholder="Ex: Cobrança amigável"
-                  {...register("nome", { required: true })}
+                  {...register("nome", {
+                    validate: (value) =>
+                      String(value ?? "").trim().length >= 2 ||
+                      "Informe um nome com pelo menos 2 caracteres.",
+                  })}
                 />
+                {errors.nome?.message ? (
+                  <div className="mt-2 text-xs font-medium text-rose-300">{errors.nome.message}</div>
+                ) : null}
               </div>
 
               <div>
@@ -316,8 +323,16 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                   placeholder={
                     "Olá {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPIX: {pix}\n\nObrigado!"
                   }
-                  {...register("conteudo", { required: true })}
+                  {...register("conteudo", {
+                    validate: (value) =>
+                      String(value ?? "").trim().length > 0 || "Informe o conteúdo do template.",
+                  })}
                 />
+                {errors.conteudo?.message ? (
+                  <div className="mt-2 text-xs font-medium text-rose-300">
+                    {errors.conteudo.message}
+                  </div>
+                ) : null}
               </div>
 
               <button
