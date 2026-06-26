@@ -46,12 +46,14 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
       modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
-    modalToast.success("Configuração salva.");
+    const toastId = modalToast.success("Configuração salva.");
     reset({
       instance_id: values.instance_id,
       token: MASK,
       client_token: initial?.hasClientToken || (clientTokenValue && clientTokenValue !== MASK) ? MASK : "",
     });
+    await modalToast.wait(toastId);
+    window.location.reload();
   });
 
   const isConnected =
