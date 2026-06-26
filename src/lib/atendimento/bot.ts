@@ -7,6 +7,48 @@ import type { AtendimentoLead, AtendimentoStage, AtendimentoStatus, CapturedFiel
 type CapturedData = Partial<Record<CapturedFieldName, string>>;
 
 const YES_WORDS = ["sim", "quero", "vamos", "pode", "tenho interesse", "quero agendar", "agendar"];
+const NAME_CONNECTORS = new Set(["da", "de", "do", "das", "dos", "e"]);
+
+export function looksLikeFullName(value: string) {
+  const clean = value.trim().replace(/\s+/g, " ");
+  if (!clean) return false;
+  if (/\d/.test(clean)) return false;
+  if (/[/:@\\]/.test(clean)) return false;
+  if (/\b(?:america\/|gmt|utc)\b/i.test(clean)) return false;
+
+  const parts = clean.split(" ").filter(Boolean);
+  if (parts.length < 2 || parts.length > 6) return false;
+
+  let significantParts = 0;
+  for (const part of parts) {
+    const normalized = part.toLowerCase();
+    if (NAME_CONNECTORS.has(normalized)) continue;
+    if (!/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*$/.test(part)) return false;
+    significantParts += 1;
+  }
+
+  return significantParts >= 2;
+}
+
+export function filterCapturedDataForLead(params: {
+  lead: Partial<AtendimentoLead>;
+  captured: CapturedData;
+  expectedField: CapturedFieldName | null;
+}) {
+  const next: CapturedData = {};
+
+  for (const field of CAPTURED_FIELD_ORDER) {
+    const value = String(params.captured[field] ?? "").trim();
+    if (!value) continue;
+
+    const currentValue = String((params.lead as any)?.[field] ?? "").trim();
+    if (currentValue && params.expectedField !== field) continue;
+
+    next[field] = value;
+  }
+
+  return next;
+}
 
 export function initialBotMessages() {
   return [
@@ -56,8 +98,26 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
     const city = clean.match(/(?:moro em|cidade|city)\s*:?\s*([A-Za-zÀ-ÿ' -]{3,})/i);
     if (city?.[1]) result.city = city[1].trim();
   }
-  if (!result.full_name && !email && !cpf && !phone && clean.split(" ").length >= 2) {
-    result.full_name = clean.replace(/[0-9]/g, "").trim();
+  if (!result.full_name) {
+    const explicitName = clean.match(/(?:meu nome(?: completo)?\s*(?:é|e)?|sou)\s+([A-Za-zÀ-ÿ'’ -]{3,})/i);
+    const explicitValue = explicitName?.[1]?.trim() ?? "";
+    if (explicitValue && looksLikeFullName(explicitValue)) {
+      result.full_name = explicitValue;
+    }
+  }
+  if (
+    !result.full_name &&
+    !email &&
+    !cpf &&
+    !phone &&
+    !timezone &&
+    !bestTime &&
+    !result.country &&
+    !result.state &&
+    !result.city &&
+    looksLikeFullName(clean)
+  ) {
+    result.full_name = clean.replace(/\s+/g, " ").trim();
   }
 
   return result;

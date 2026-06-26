@@ -1,4 +1,10 @@
-import { botReplyForLead, extractLeadDataFromMessage, fieldFromBotPrompt, getNextMissingField } from "@/lib/atendimento/bot";
+import {
+  botReplyForLead,
+  extractLeadDataFromMessage,
+  fieldFromBotPrompt,
+  filterCapturedDataForLead,
+  getNextMissingField,
+} from "@/lib/atendimento/bot";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { appendHistoryEvent, ensureInitialBotConversationFlow, syncConversationPreview } from "@/lib/atendimento/server";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
@@ -174,16 +180,21 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: inboundError?.message ?? "message_error" }, { status: 500 });
   }
 
-  const captured = extractLeadDataFromMessage(contentText) as Record<string, string>;
+  const extracted = extractLeadDataFromMessage(contentText) as Record<string, string>;
   const expectedField = fieldFromBotPrompt(lastBotMessage?.content_text ?? "");
   if (
     expectedField &&
-    !captured[expectedField] &&
+    !extracted[expectedField] &&
     !String((lead as any)?.[expectedField] ?? "").trim() &&
     looksLikeFieldValue(expectedField, contentText)
   ) {
-    captured[expectedField] = contentText.trim();
+    extracted[expectedField] = contentText.trim();
   }
+  const captured = filterCapturedDataForLead({
+    lead: lead as any,
+    captured: extracted as any,
+    expectedField,
+  }) as Record<string, string>;
   const nextLead = {
     ...lead,
     ...captured,

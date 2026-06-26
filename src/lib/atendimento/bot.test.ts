@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractLeadDataFromMessage, getNextMissingField, initialBotMessages } from "./bot.ts";
+import { extractLeadDataFromMessage, filterCapturedDataForLead, getNextMissingField, initialBotMessages } from "./bot.ts";
 
 test("extractLeadDataFromMessage captura cpf, email e telefone", () => {
   const data = extractLeadDataFromMessage(
@@ -29,4 +29,35 @@ test("initialBotMessages inicia o fluxo com convite e pré-cadastro", () => {
   assert.equal(messages.length, 4);
   assert.match(messages[0], /bem-vindo/i);
   assert.match(messages[2], /aula experimental/i);
+});
+
+test("extractLeadDataFromMessage nao trata horario como nome", () => {
+  const data = extractLeadDataFromMessage("Às 19:h");
+
+  assert.equal(data.full_name, undefined);
+});
+
+test("extractLeadDataFromMessage nao trata timezone como nome", () => {
+  const data = extractLeadDataFromMessage("America/New_York ou GMT-4");
+
+  assert.equal(data.timezone, "America/New_York");
+  assert.equal(data.full_name, undefined);
+});
+
+test("filterCapturedDataForLead nao sobrescreve nome existente com outro campo", () => {
+  const captured = filterCapturedDataForLead({
+    lead: {
+      full_name: "Ana Divina Pereira",
+      best_contact_time: "",
+    } as any,
+    captured: {
+      full_name: "Às :h",
+      best_contact_time: "Às 19:h",
+    },
+    expectedField: "best_contact_time",
+  });
+
+  assert.deepEqual(captured, {
+    best_contact_time: "Às 19:h",
+  });
 });
