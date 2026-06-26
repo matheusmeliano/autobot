@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import type { AtendimentoLeadListItem } from "@/lib/atendimento/types";
@@ -22,15 +22,18 @@ export function AtendimentoLeadList({
   selectedLeadId,
   onSelectLead,
   onOpenConversation,
+  onListHeightChange,
 }: {
   leads: AtendimentoLeadListItem[];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
   onOpenConversation: (leadId: string) => void;
+  onListHeightChange?: (height: number) => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLead, setProfileLead] = useState<AtendimentoLeadListItem | null>(null);
   const [page, setPage] = useState(1);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(leads.length / PAGE_SIZE)), [leads.length]);
 
@@ -47,13 +50,38 @@ export function AtendimentoLeadList({
     return leads.slice(start, start + PAGE_SIZE);
   }, [leads, page]);
 
+  useLayoutEffect(() => {
+    if (!onListHeightChange) return;
+    if (!rootRef.current) return;
+
+    const emit = () => {
+      if (!rootRef.current) return;
+      const rect = rootRef.current.getBoundingClientRect();
+      const height = Math.ceil(rect.height);
+      if (!Number.isFinite(height) || height <= 0) return;
+      onListHeightChange(height);
+    };
+
+    emit();
+
+    if (typeof window === "undefined") return;
+    const ResizeObserverCtor = (window as any).ResizeObserver as
+      | (new (cb: ResizeObserverCallback) => ResizeObserver)
+      | undefined;
+
+    if (!ResizeObserverCtor) return;
+    const observer = new ResizeObserverCtor(() => emit());
+    observer.observe(rootRef.current);
+    return () => observer.disconnect();
+  }, [onListHeightChange, pagedLeads.length, page, totalPages]);
+
   function closeProfile() {
     setProfileOpen(false);
     setProfileLead(null);
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
+    <div ref={rootRef} className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">
