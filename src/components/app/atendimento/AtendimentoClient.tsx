@@ -197,7 +197,7 @@ export function AtendimentoClient() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)_340px]">
+      <div className="mt-6 grid gap-4 2xl:grid-cols-[320px_minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)]">
         <AtendimentoLeadList
           leads={leads}
           selectedLeadId={selectedLeadId}
@@ -209,7 +209,9 @@ export function AtendimentoClient() {
           disabled={sending}
           onSendMessage={handleSendMessage}
         />
-        <AtendimentoLeadSidebar lead={selectedLead} events={events} />
+        <div className="2xl:col-auto xl:col-span-2">
+          <AtendimentoLeadSidebar lead={selectedLead} events={events} />
+        </div>
       </div>
     </div>
   );

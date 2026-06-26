@@ -99,18 +99,18 @@ export function AtendimentoConversationPanel({
       </div>
 
       <form onSubmit={handleSubmit} className="border-t border-[var(--app-border)] px-4 py-4">
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={conversation?.id ? "Digite uma mensagem para o lead..." : "Selecione um atendimento"}
             disabled={!conversation?.id || disabled}
-            className="min-h-24 flex-1 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
+            className="min-h-24 w-full flex-1 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
           />
           <button
             type="submit"
             disabled={!conversation?.id || disabled || !draft.trim()}
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-12 w-full shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-12"
           >
             <Send className="h-4 w-4" />
           </button>
