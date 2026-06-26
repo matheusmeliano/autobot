@@ -53,7 +53,7 @@ export function AtendimentoLeadList({
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:max-h-[640px]">
+    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">
@@ -61,7 +61,7 @@ export function AtendimentoLeadList({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="p-2">
         {pagedLeads.length ? (
           <div className="space-y-2">
             {pagedLeads.map((lead) => {
