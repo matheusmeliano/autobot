@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import type { AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
-const PAGE_SIZE = 5;
+const VISIBLE_LEADS = 5;
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -22,30 +22,52 @@ export function AtendimentoLeadList({
   selectedLeadId,
   onSelectLead,
   onOpenConversation,
+  onListHeightChange,
 }: {
   leads: AtendimentoLeadListItem[];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
   onOpenConversation: (leadId: string) => void;
+  onListHeightChange?: (height: number) => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLead, setProfileLead] = useState<AtendimentoLeadListItem | null>(null);
-  const [page, setPage] = useState(1);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const itemsRef = useRef<HTMLDivElement | null>(null);
+  const [scrollMaxHeight, setScrollMaxHeight] = useState<number | null>(null);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(leads.length / PAGE_SIZE)), [leads.length]);
+  useLayoutEffect(() => {
+    if (!itemsRef.current) return;
 
-  useEffect(() => {
-    setPage((current) => {
-      if (current < 1) return 1;
-      if (current > totalPages) return totalPages;
-      return current;
-    });
-  }, [totalPages]);
+    if (leads.length <= VISIBLE_LEADS) {
+      setScrollMaxHeight(null);
+      return;
+    }
 
-  const pagedLeads = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return leads.slice(start, start + PAGE_SIZE);
-  }, [leads, page]);
+    const children = Array.from(itemsRef.current.children) as HTMLElement[];
+    if (children.length < VISIBLE_LEADS) {
+      setScrollMaxHeight(null);
+      return;
+    }
+
+    const firstRect = children[0].getBoundingClientRect();
+    const lastRect = children[VISIBLE_LEADS - 1].getBoundingClientRect();
+    const next = Math.ceil(lastRect.bottom - firstRect.top + 16);
+    if (!Number.isFinite(next) || next <= 0) {
+      setScrollMaxHeight(null);
+      return;
+    }
+    setScrollMaxHeight(next);
+  }, [leads]);
+
+  useLayoutEffect(() => {
+    if (!onListHeightChange) return;
+    if (!rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    const height = Math.ceil(rect.height);
+    if (!Number.isFinite(height) || height <= 0) return;
+    onListHeightChange(height);
+  }, [onListHeightChange, leads.length, scrollMaxHeight]);
 
   function closeProfile() {
     setProfileOpen(false);
@@ -53,7 +75,7 @@ export function AtendimentoLeadList({
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
+    <div ref={rootRef} className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">
@@ -61,10 +83,13 @@ export function AtendimentoLeadList({
         </div>
       </div>
 
-      <div className="p-2">
-        {pagedLeads.length ? (
-          <div className="space-y-2">
-            {pagedLeads.map((lead) => {
+      <div
+        className={["p-2", leads.length > VISIBLE_LEADS ? "overflow-y-auto" : ""].join(" ")}
+        style={leads.length > VISIBLE_LEADS && scrollMaxHeight != null ? { maxHeight: scrollMaxHeight } : undefined}
+      >
+        {leads.length ? (
+          <div ref={itemsRef} className="space-y-2">
+            {leads.map((lead) => {
               const active = selectedLeadId === lead.id;
               const unread = Number(lead.unread_count ?? 0);
               return (
@@ -148,32 +173,6 @@ export function AtendimentoLeadList({
           </div>
         )}
       </div>
-
-      {leads.length > PAGE_SIZE ? (
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--app-border)] px-4 py-3">
-          <div className="text-xs font-semibold text-[var(--app-text-55)]">
-            Página {page} de {totalPages}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={page <= 1}
-              className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-              disabled={page >= totalPages}
-              className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Próximo
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       <AppModal open={profileOpen} onClose={closeProfile} size="lg" zIndexClass="z-[120]">
         <div className="flex items-start justify-between gap-4">
