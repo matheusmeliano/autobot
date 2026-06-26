@@ -102,57 +102,84 @@ export async function ensureInitialBotConversationFlow(params: {
   conversationId: string;
 }) {
   const admin = createSupabaseAdminClient();
-  const { count, error } = await admin
+  const { count: leadCount, error: leadCountError } = await admin
     .from("atendimento_messages")
     .select("id", { count: "exact", head: true })
-    .eq("conversation_id", params.conversationId);
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "lead");
 
-  if (error) {
-    throw new Error(error.message || "Falha ao verificar mensagens iniciais.");
+  if (leadCountError) {
+    throw new Error(leadCountError.message || "Falha ao verificar mensagens do lead.");
   }
-  if (Number(count ?? 0) > 0) {
+  if (Number(leadCount ?? 0) > 0) {
     return false;
   }
 
-  const nowIso = new Date().toISOString();
-  const botMessages = initialBotMessages().map((content) => ({
-    conversation_id: params.conversationId,
-    sender_role: "bot",
-    content_text: content,
-    media_type: "text",
-    status: "lida",
-    sent_at: nowIso,
-    delivered_at: nowIso,
-    read_at: nowIso,
-  }));
+  const { count: botCount, error: botCountError } = await admin
+    .from("atendimento_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot");
 
-  const { error: insertError } = await admin.from("atendimento_messages").insert(botMessages);
+  if (botCountError) {
+    throw new Error(botCountError.message || "Falha ao verificar mensagens iniciais.");
+  }
+
+  const initialMessages = initialBotMessages();
+  const botCountNum = Number(botCount ?? 0);
+  if (botCountNum >= initialMessages.length) {
+    return false;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 1000 + Math.floor(Math.random() * 501)));
+  const nowIso = new Date().toISOString();
+  const nextContent = String(initialMessages[botCountNum] ?? "").trim();
+  if (!nextContent) return false;
+
+  const { data: inserted, error: insertError } = await admin
+    .from("atendimento_messages")
+    .insert({
+      conversation_id: params.conversationId,
+      sender_role: "bot",
+      content_text: nextContent,
+      media_type: "text",
+      status: "lida",
+      sent_at: nowIso,
+      delivered_at: nowIso,
+      read_at: nowIso,
+    })
+    .select("content_text")
+    .maybeSingle();
+
   if (insertError) {
     throw new Error(insertError.message || "Falha ao iniciar fluxo do bot.");
   }
 
-  await admin
-    .from("atendimento_leads")
-    .update({
-      status: "em_atendimento",
-      funnel_stage: "aula_experimental_convidada",
-      last_interaction_at: nowIso,
-      updated_at: nowIso,
-    })
-    .eq("id", params.leadId);
+  if (botCountNum + 1 >= initialMessages.length) {
+    await admin
+      .from("atendimento_leads")
+      .update({
+        status: "em_atendimento",
+        funnel_stage: "aula_experimental_convidada",
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", params.leadId);
+
+    await appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "stage_changed",
+      title: "Fluxo inicial do bot iniciado",
+      details: { funnel_stage: "aula_experimental_convidada" },
+      actorType: "bot",
+    });
+  }
 
   await syncConversationPreview({
     conversationId: params.conversationId,
-    contentText: botMessages[botMessages.length - 1]?.content_text ?? "",
+    contentText: String(inserted?.content_text ?? nextContent),
     createdAt: nowIso,
-  });
-  await appendHistoryEvent({
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-    eventType: "stage_changed",
-    title: "Fluxo inicial do bot iniciado",
-    details: { funnel_stage: "aula_experimental_convidada" },
-    actorType: "bot",
   });
 
   return true;

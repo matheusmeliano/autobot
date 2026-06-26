@@ -1,5 +1,6 @@
 import { createPublicLeadSession, ensureInitialBotConversationFlow } from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { initialBotMessages } from "@/lib/atendimento/bot";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
         lead: session.lead,
         conversation: session.conversation,
         publicLink: session.publicLink,
+        initial_total: initialBotMessages().length,
         messages: (initialMessages ?? []) as any[],
       },
     });

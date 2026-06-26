@@ -1,6 +1,30 @@
-import { botReplyForLead, extractLeadDataFromMessage, getNextMissingField } from "@/lib/atendimento/bot";
+import { botReplyForLead, extractLeadDataFromMessage, fieldFromBotPrompt, getNextMissingField } from "@/lib/atendimento/bot";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { appendHistoryEvent, ensureInitialBotConversationFlow, syncConversationPreview } from "@/lib/atendimento/server";
+import type { CapturedFieldName } from "@/lib/atendimento/types";
+
+function randomTypingDelayMs() {
+  return 1000 + Math.floor(Math.random() * 501);
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function looksLikeFieldValue(field: CapturedFieldName, text: string) {
+  const clean = text.trim();
+  if (!clean) return false;
+  if (field === "cpf") return /\d{11}/.test(clean.replace(/\D/g, ""));
+  if (field === "phone") return clean.replace(/\D/g, "").length >= 8;
+  if (field === "email") return /@/.test(clean);
+  if (field === "timezone") return /(america\/|gmt|utc)/i.test(clean);
+  if (field === "best_contact_time") return /\d|manhã|tarde|noite/i.test(clean);
+  if (field === "state") return /^[A-Za-zÀ-ÿ]{2,}$/i.test(clean.replace(/\s+/g, ""));
+  if (field === "country") return /[A-Za-zÀ-ÿ]/.test(clean);
+  if (field === "city") return /[A-Za-zÀ-ÿ]/.test(clean);
+  if (field === "full_name") return clean.split(/\s+/).length >= 2;
+  return true;
+}
 
 async function upsertCapturedFields(params: {
   leadId: string;
@@ -120,6 +144,15 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
   }
 
+  const { data: lastBotMessage } = await admin
+    .from("atendimento_messages")
+    .select("content_text, created_at")
+    .eq("conversation_id", String(conversation.id))
+    .eq("sender_role", "bot")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const nowIso = new Date().toISOString();
   const { data: inbound, error: inboundError } = await admin
     .from("atendimento_messages")
@@ -141,7 +174,16 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: inboundError?.message ?? "message_error" }, { status: 500 });
   }
 
-  const captured = extractLeadDataFromMessage(contentText);
+  const captured = extractLeadDataFromMessage(contentText) as Record<string, string>;
+  const expectedField = fieldFromBotPrompt(lastBotMessage?.content_text ?? "");
+  if (
+    expectedField &&
+    !captured[expectedField] &&
+    !String((lead as any)?.[expectedField] ?? "").trim() &&
+    looksLikeFieldValue(expectedField, contentText)
+  ) {
+    captured[expectedField] = contentText.trim();
+  }
   const nextLead = {
     ...lead,
     ...captured,
@@ -195,6 +237,8 @@ export async function POST(req: Request) {
     });
   }
 
+  await sleep(randomTypingDelayMs());
+  const botNowIso = new Date().toISOString();
   const { data: outbound } = await admin
     .from("atendimento_messages")
     .insert({
@@ -203,8 +247,8 @@ export async function POST(req: Request) {
       content_text: botResponse.message,
       media_type: "text",
       status: "entregue",
-      sent_at: nowIso,
-      delivered_at: nowIso,
+      sent_at: botNowIso,
+      delivered_at: botNowIso,
     })
     .select("*")
     .maybeSingle();
@@ -212,7 +256,7 @@ export async function POST(req: Request) {
   await syncConversationPreview({
     conversationId: String(conversation.id),
     contentText: botResponse.message,
-    createdAt: nowIso,
+    createdAt: botNowIso,
   });
   await appendHistoryEvent({
     leadId: String(lead.id),

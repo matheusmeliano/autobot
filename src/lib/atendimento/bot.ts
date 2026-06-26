@@ -17,6 +17,16 @@ export function initialBotMessages() {
   ];
 }
 
+export function fieldFromBotPrompt(promptText: unknown): CapturedFieldName | null {
+  const raw = String(promptText ?? "").trim();
+  if (!raw) return null;
+  const entries = Object.entries(CAPTURED_FIELD_PROMPTS) as Array<[CapturedFieldName, string]>;
+  for (const [field, prompt] of entries) {
+    if (String(prompt).trim() === raw) return field;
+  }
+  return null;
+}
+
 export function extractLeadDataFromMessage(text: string): CapturedData {
   const clean = text.trim();
   if (!clean) return {};

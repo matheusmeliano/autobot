@@ -15,6 +15,16 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [initialTotal, setInitialTotal] = useState(4);
+  const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
+
+  const botCount = useMemo(
+    () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
+    [messages],
+  );
+  const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
+  const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
+  const typing = !loading && (isInitialFlow || awaitingBotSince != null);
 
   async function loadMessages(nextPublicSlug: string) {
     if (!nextPublicSlug) return [] as AtendimentoMessage[];
@@ -23,7 +33,18 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
     });
     const json = await res.json().catch(() => null);
     const nextMessages = json?.ok ? ((json.messages ?? []) as AtendimentoMessage[]) : [];
-    if (json?.ok) setMessages(nextMessages);
+    if (json?.ok) {
+      setMessages(nextMessages);
+      if (awaitingBotSince != null) {
+        const since = awaitingBotSince;
+        const hasBotAfter = nextMessages.some((msg) => {
+          if (msg.sender_role === "lead") return false;
+          const time = new Date(msg.created_at).getTime();
+          return Number.isFinite(time) && time >= since;
+        });
+        if (hasBotAfter) setAwaitingBotSince(null);
+      }
+    }
     return nextMessages;
   }
 
@@ -53,6 +74,8 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
         const nextSlug = String(json.session?.conversation?.public_slug ?? "");
         if (!nextSlug) return;
         const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
+        const nextTotal = Number(json.session?.initial_total ?? 0);
+        if (Number.isFinite(nextTotal) && nextTotal > 0) setInitialTotal(nextTotal);
         setPublicSlug(nextSlug);
         window.localStorage.setItem(storageKey, nextSlug);
         if (initialMessages.length > 0) {
@@ -66,9 +89,23 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
 
   useEffect(() => {
     if (!publicSlug) return;
-    const id = window.setInterval(() => loadMessages(publicSlug), 2500);
-    return () => window.clearInterval(id);
-  }, [publicSlug]);
+    let active = true;
+    let timeoutId: number | null = null;
+
+    const tick = async () => {
+      if (!active) return;
+      await loadMessages(publicSlug);
+      if (!active) return;
+      timeoutId = window.setTimeout(tick, typing ? 700 : 2500);
+    };
+
+    tick();
+
+    return () => {
+      active = false;
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
+  }, [publicSlug, typing]);
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,6 +113,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
     if (!contentText || !publicSlug || sending) return;
     setSending(true);
     setDraft("");
+    setAwaitingBotSince(Date.now());
     try {
       const res = await fetch("/api/atendimento/public/messages", {
         method: "POST",
@@ -84,7 +122,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
       });
       const json = await res.json().catch(() => null);
       if (json?.ok) {
-        await loadMessages(publicSlug);
+        await loadMessagesWithRetry(publicSlug);
       }
     } finally {
       setSending(false);
@@ -107,41 +145,50 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6">
           {loading ? (
             <div className="text-sm text-white/55">Iniciando atendimento...</div>
-          ) : !messages.length ? (
-            <div className="text-sm text-white/55">Aguardando as primeiras mensagens do bot...</div>
           ) : (
-            messages.map((message) => {
-              const isLead = message.sender_role === "lead";
-              return (
-                <div key={message.id} className={`flex ${isLead ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={[
-                      "max-w-[85%] rounded-[1.5rem] border px-4 py-3",
-                      isLead
-                        ? "border-emerald-500/20 bg-emerald-500/15"
-                        : "border-white/10 bg-white/[0.04]",
-                    ].join(" ")}
-                  >
-                    {message.content_text ? (
-                      <div className="whitespace-pre-wrap text-sm text-white/90">{message.content_text}</div>
-                    ) : null}
-                    {message.media_url ? (
-                      <a
-                        href={message.media_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 inline-flex text-xs font-semibold text-emerald-200 underline"
-                      >
-                        Abrir anexo
-                      </a>
-                    ) : null}
-                    <div className="mt-3 text-[11px] text-white/45">
-                      {formatAtendimentoDateTime(message.created_at)}
+            <>
+              {messages.map((message) => {
+                const isLead = message.sender_role === "lead";
+                return (
+                  <div key={message.id} className={`flex ${isLead ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={[
+                        "max-w-[85%] rounded-[1.5rem] border px-4 py-3",
+                        isLead
+                          ? "border-emerald-500/20 bg-emerald-500/15"
+                          : "border-white/10 bg-white/[0.04]",
+                      ].join(" ")}
+                    >
+                      {message.content_text ? (
+                        <div className="whitespace-pre-wrap text-sm text-white/90">{message.content_text}</div>
+                      ) : null}
+                      {message.media_url ? (
+                        <a
+                          href={message.media_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex text-xs font-semibold text-emerald-200 underline"
+                        >
+                          Abrir anexo
+                        </a>
+                      ) : null}
+                      <div className="mt-3 text-[11px] text-white/45">
+                        {formatAtendimentoDateTime(message.created_at)}
+                      </div>
                     </div>
                   </div>
+                );
+              })}
+              {typing ? (
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70 animate-pulse">
+                    Digitando...
+                  </div>
                 </div>
-              );
-            })
+              ) : !messages.length ? (
+                <div className="text-sm text-white/55">Aguardando as primeiras mensagens do bot...</div>
+              ) : null}
+            </>
           )}
         </div>
 
