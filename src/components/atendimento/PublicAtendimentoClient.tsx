@@ -2,15 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Paperclip, Send } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import type { AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
 const STORAGE_PREFIX = "autobot_atendimento_session_";
 
-export function PublicAtendimentoClient() {
-  const searchParams = useSearchParams();
-  const linkSlug = String(searchParams.get("slug") ?? "").trim();
+export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }) {
+  const linkSlug = String(initialSlug ?? "").trim();
   const storageKey = useMemo(() => `${STORAGE_PREFIX}${linkSlug || "default"}`, [linkSlug]);
   const [publicSlug, setPublicSlug] = useState("");
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
