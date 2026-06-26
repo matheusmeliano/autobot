@@ -289,7 +289,7 @@ export function AtendimentoClient() {
             }
           }}
         />
-        <div className="hidden lg:block">
+        <div className="hidden lg:block lg:h-[34rem]">
           <AtendimentoConversationPanel
             conversation={selectedConversation}
             messages={messages}
