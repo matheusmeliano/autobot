@@ -464,7 +464,7 @@ export function AppShell({
             <LoggedInAsCard email={email} className="mt-4" />
 
             <div className="mt-4 flex-1">
-              <AppNav variant="sidebar" restricted={restricted} plan={plan} />
+              <AppNav variant="sidebar" restricted={restricted} plan={plan} userEmail={email} />
             </div>
 
             <form action={logoutAction} className="mt-4" onSubmit={handleLogoutSubmit}>
@@ -585,6 +585,7 @@ export function AppShell({
                 variant="drawer"
                 restricted={restricted}
                 plan={plan}
+                userEmail={email}
                 onNavigate={() => setMobileMenuOpen(false)}
               />
             </div>

@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ChevronRight,
   CircleUserRound,
+  Headset,
   LayoutDashboard,
   MessageSquareText,
   Settings,
@@ -27,6 +28,8 @@ type NavGroup = {
   items: NavItem[];
 };
 
+const ATENDIMENTO_MENU_EMAIL = "atendimento.usa.music@gmail.com";
+
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "Principal",
@@ -35,6 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/app/clientes", label: "Clientes", icon: CircleUserRound },
       { href: "/app/mensagens", label: "Mensagens", icon: MessageSquareText },
       { href: "/app/agendar", label: "Agendar", icon: CalendarDays },
+      { href: "/app/atendimento", label: "Atendimento", icon: Headset },
       { href: "/app/whatsapp", label: "WhatsApp", icon: Smartphone },
     ],
   },
@@ -54,15 +58,22 @@ const NAV_GROUPS: NavGroup[] = [
 function getVisibleNavGroups({
   restricted,
   plan,
+  userEmail,
 }: {
   restricted?: boolean;
   plan?: AppPlan;
+  userEmail?: string;
 }) {
+  const normalizedEmail = String(userEmail ?? "").trim().toLowerCase();
+  const canSeeAtendimento = normalizedEmail === ATENDIMENTO_MENU_EMAIL;
+
   if (restricted) {
     return NAV_GROUPS.map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => item.href === "/app/assinatura" || item.href === "/app/configuracoes",
+        (item) =>
+          item.href !== "/app/atendimento" &&
+          (item.href === "/app/assinatura" || item.href === "/app/configuracoes"),
       ),
     })).filter((group) => group.items.length > 0);
   }
@@ -70,6 +81,7 @@ function getVisibleNavGroups({
   return NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
+      if (item.href === "/app/atendimento") return canSeeAtendimento;
       if (item.href !== "/app/relatorios") return true;
       return plan === "pro" || plan === "vitalicio";
     }),
@@ -80,15 +92,17 @@ export function AppNav({
   variant,
   restricted,
   plan,
+  userEmail,
   onNavigate,
 }: {
   variant: "sidebar" | "drawer";
   restricted?: boolean;
   plan?: AppPlan;
+  userEmail?: string;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const navGroups = getVisibleNavGroups({ restricted, plan });
+  const navGroups = getVisibleNavGroups({ restricted, plan, userEmail });
   const navItems = navGroups.flatMap((group) => group.items);
 
   if (variant === "drawer") {
