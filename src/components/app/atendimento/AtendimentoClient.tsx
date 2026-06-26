@@ -150,7 +150,7 @@ export function AtendimentoClient() {
 
   return (
     <div>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div>
         <div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Atendimento</h1>
           <div className="mt-2 text-sm text-white/60">
@@ -158,7 +158,7 @@ export function AtendimentoClient() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 xl:min-w-[420px]">
+        <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 xl:max-w-[520px]">
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
             Link Público de Atendimento
           </div>
