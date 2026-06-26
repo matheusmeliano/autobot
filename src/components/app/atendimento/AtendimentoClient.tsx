@@ -206,6 +206,7 @@ export function AtendimentoClient() {
     await loadSummary();
     await loadLeads(query);
     modalToast.success("Lead excluído definitivamente.");
+    window.location.reload();
   }
 
   function openMobileConversation(leadId: string) {
