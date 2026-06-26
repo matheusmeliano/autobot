@@ -111,7 +111,7 @@ export function AtendimentoLeadList({
 
       <div className="p-2">
         {pagedLeads.length ? (
-          <div className="space-y-2">
+          <div className="space-y-4">
             {pagedLeads.map((lead) => {
               const active = selectedLeadId === lead.id;
               const unread = Number(lead.unread_count ?? 0);
