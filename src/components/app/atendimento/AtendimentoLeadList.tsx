@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import type { AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
+
+const PAGE_SIZE = 5;
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -28,6 +30,22 @@ export function AtendimentoLeadList({
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLead, setProfileLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [page, setPage] = useState(1);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(leads.length / PAGE_SIZE)), [leads.length]);
+
+  useEffect(() => {
+    setPage((current) => {
+      if (current < 1) return 1;
+      if (current > totalPages) return totalPages;
+      return current;
+    });
+  }, [totalPages]);
+
+  const pagedLeads = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return leads.slice(start, start + PAGE_SIZE);
+  }, [leads, page]);
 
   function closeProfile() {
     setProfileOpen(false);
@@ -35,7 +53,7 @@ export function AtendimentoLeadList({
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full">
+    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:max-h-[640px]">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">
@@ -44,9 +62,9 @@ export function AtendimentoLeadList({
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
-        {leads.length ? (
+        {pagedLeads.length ? (
           <div className="space-y-2">
-            {leads.map((lead) => {
+            {pagedLeads.map((lead) => {
               const active = selectedLeadId === lead.id;
               const unread = Number(lead.unread_count ?? 0);
               return (
@@ -130,6 +148,32 @@ export function AtendimentoLeadList({
           </div>
         )}
       </div>
+
+      {leads.length > PAGE_SIZE ? (
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--app-border)] px-4 py-3">
+          <div className="text-xs font-semibold text-[var(--app-text-55)]">
+            Página {page} de {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1}
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Próximo
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <AppModal open={profileOpen} onClose={closeProfile} size="lg" zIndexClass="z-[120]">
         <div className="flex items-start justify-between gap-4">
