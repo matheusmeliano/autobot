@@ -164,7 +164,7 @@ export function AtendimentoLeadList({
                     <span>{formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}</span>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                       type="button"
                       onClick={(event) => {
@@ -180,24 +180,23 @@ export function AtendimentoLeadList({
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
+                        onOpenConversation(String(lead.id));
+                      }}
+                      className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] lg:hidden"
+                    >
+                      Abrir conversa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setDeleteLead(lead);
                       }}
                       className="inline-flex items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-500"
                     >
-                      Excluir Lead
+                      Excluir lead
                     </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpenConversation(String(lead.id));
-                    }}
-                    className="mt-2 inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] lg:hidden"
-                  >
-                    Abrir conversa
-                  </button>
                 </div>
               );
             })}
