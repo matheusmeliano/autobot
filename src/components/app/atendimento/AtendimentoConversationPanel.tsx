@@ -42,7 +42,7 @@ export function AtendimentoConversationPanel({
       className={
         compact
           ? "flex min-h-0 max-h-[70vh] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]"
-          : "flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-0"
+          : "flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-[640px]"
       }
     >
       <div className="border-b border-[var(--app-border)] px-4 py-4">
