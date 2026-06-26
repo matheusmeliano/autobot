@@ -226,7 +226,7 @@ export function AtendimentoClient() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <AtendimentoLeadList
           leads={leads}
           selectedLeadId={selectedLeadId}

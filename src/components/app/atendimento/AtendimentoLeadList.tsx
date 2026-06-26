@@ -33,7 +33,7 @@ export function AtendimentoLeadList({
   }
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
+    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">
