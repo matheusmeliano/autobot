@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Paperclip, Send } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Send } from "lucide-react";
 import type { AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
@@ -17,6 +17,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
   const [sending, setSending] = useState(false);
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
@@ -25,6 +26,20 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
   const typing = !loading && (isInitialFlow || awaitingBotSince != null);
+
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+
+    element.style.height = "56px";
+    element.style.overflowY = "hidden";
+
+    const nextHeight = Math.min(element.scrollHeight, 144);
+    element.style.height = `${Math.max(56, nextHeight)}px`;
+    if (element.scrollHeight > 144) {
+      element.style.overflowY = "auto";
+    }
+  }, [draft]);
 
   async function loadMessages(nextPublicSlug: string) {
     if (!nextPublicSlug) return [] as AtendimentoMessage[];
@@ -193,20 +208,19 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
         </div>
 
         <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">
-          <div className="flex items-end gap-3">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/55">
-              <Paperclip className="h-4 w-4" />
-            </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
             <textarea
+              ref={textareaRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Digite sua mensagem..."
-              className="min-h-24 flex-1 rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30"
+              rows={1}
+              className="h-14 w-full flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-emerald-500/40 focus:bg-white/[0.06]"
             />
             <button
               type="submit"
               disabled={!draft.trim() || sending}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/20 text-emerald-100 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:min-h-14 sm:w-14"
             >
               <Send className="h-4 w-4" />
             </button>
