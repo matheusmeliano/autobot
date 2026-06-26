@@ -229,21 +229,23 @@ export function AtendimentoClient() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-            Link Público de Atendimento
+        <div className="mt-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+          <div className="flex items-center gap-3">
+            <div className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+              Link Publico de Atendimento
+            </div>
+            <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+              {publicUrl || "Carregando link..."}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            >
+              <Copy className="h-4 w-4" />
+              Copiar Link
+            </button>
           </div>
-          <div className="mt-2 break-all text-sm font-semibold text-[var(--app-text-85)]">
-            {publicUrl || "Carregando link..."}
-          </div>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-          >
-            <Copy className="h-4 w-4" />
-            Copiar Link
-          </button>
         </div>
       </div>
 
