@@ -6,7 +6,7 @@ import { AppModal } from "@/components/app/AppModal";
 import type { AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 2;
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
