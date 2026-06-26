@@ -17,19 +17,28 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
   const [sending, setSending] = useState(false);
 
   async function loadMessages(nextPublicSlug: string) {
-    if (!nextPublicSlug) return;
+    if (!nextPublicSlug) return [] as AtendimentoMessage[];
     const res = await fetch(`/api/atendimento/public/messages?public_slug=${encodeURIComponent(nextPublicSlug)}`, {
       cache: "no-store",
     });
     const json = await res.json().catch(() => null);
-    if (json?.ok) setMessages((json.messages ?? []) as AtendimentoMessage[]);
+    const nextMessages = json?.ok ? ((json.messages ?? []) as AtendimentoMessage[]) : [];
+    if (json?.ok) setMessages(nextMessages);
+    return nextMessages;
+  }
+
+  async function loadMessagesWithRetry(nextPublicSlug: string) {
+    const firstBatch = await loadMessages(nextPublicSlug);
+    if (firstBatch.length > 0) return firstBatch;
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    return loadMessages(nextPublicSlug);
   }
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : "";
     if (saved) {
       setPublicSlug(saved);
-      loadMessages(saved).finally(() => setLoading(false));
+      loadMessagesWithRetry(saved).finally(() => setLoading(false));
       return;
     }
 
@@ -43,9 +52,14 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
         if (!json?.ok) return;
         const nextSlug = String(json.session?.conversation?.public_slug ?? "");
         if (!nextSlug) return;
+        const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
         setPublicSlug(nextSlug);
         window.localStorage.setItem(storageKey, nextSlug);
-        return loadMessages(nextSlug);
+        if (initialMessages.length > 0) {
+          setMessages(initialMessages);
+          return initialMessages;
+        }
+        return loadMessagesWithRetry(nextSlug);
       })
       .finally(() => setLoading(false));
   }, [linkSlug, storageKey]);
@@ -93,6 +107,8 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6">
           {loading ? (
             <div className="text-sm text-white/55">Iniciando atendimento...</div>
+          ) : !messages.length ? (
+            <div className="text-sm text-white/55">Aguardando as primeiras mensagens do bot...</div>
           ) : (
             messages.map((message) => {
               const isLead = message.sender_role === "lead";

@@ -1,4 +1,5 @@
 import { createPublicLeadSession, ensureInitialBotConversationFlow } from "@/lib/atendimento/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -11,6 +12,12 @@ export async function POST(req: Request) {
       leadId: String(session.lead.id),
       conversationId: String(session.conversation.id),
     });
+    const admin = createSupabaseAdminClient();
+    const { data: initialMessages } = await admin
+      .from("atendimento_messages")
+      .select("*")
+      .eq("conversation_id", String(session.conversation.id))
+      .order("created_at", { ascending: true });
 
     return Response.json({
       ok: true,
@@ -18,6 +25,7 @@ export async function POST(req: Request) {
         lead: session.lead,
         conversation: session.conversation,
         publicLink: session.publicLink,
+        messages: (initialMessages ?? []) as any[],
       },
     });
   } catch (error: any) {
