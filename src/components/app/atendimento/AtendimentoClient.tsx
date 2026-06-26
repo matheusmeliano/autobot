@@ -38,7 +38,6 @@ export function AtendimentoClient() {
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
-  const [desktopListHeight, setDesktopListHeight] = useState<number | null>(null);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
@@ -128,14 +127,19 @@ export function AtendimentoClient() {
   }, [loadLeadDetail, selectedLeadId]);
 
   useEffect(() => {
-    if (!mobileConversationOpen) return;
     const media = window.matchMedia("(min-width: 1024px)");
     const sync = () => {
-      if (media.matches) setMobileConversationOpen(false);
+      if (mobileConversationOpen && media.matches) {
+        setMobileConversationOpen(false);
+      }
     };
     sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", sync);
+      return () => media.removeEventListener("change", sync);
+    }
+    media.addListener(sync);
+    return () => media.removeListener(sync);
   }, [mobileConversationOpen]);
 
   useEffect(() => {
@@ -276,7 +280,6 @@ export function AtendimentoClient() {
           selectedLeadId={selectedLeadId}
           onSelectLead={(leadId) => setSelectedLeadId(leadId)}
           onOpenConversation={openMobileConversation}
-          onListHeightChange={(height) => setDesktopListHeight(height)}
           onDeleteLead={async (lead) => {
             try {
               await handleDeleteLead(lead);
@@ -286,7 +289,7 @@ export function AtendimentoClient() {
             }
           }}
         />
-        <div className="hidden lg:block" style={desktopListHeight != null ? { height: desktopListHeight } : undefined}>
+        <div className="hidden lg:block">
           <AtendimentoConversationPanel
             conversation={selectedConversation}
             messages={messages}
