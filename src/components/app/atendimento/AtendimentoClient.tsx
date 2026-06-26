@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Search } from "lucide-react";
+import { Copy, Search, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   AtendimentoConversation,
@@ -12,6 +12,7 @@ import type {
 import { AtendimentoConversationPanel } from "@/components/app/atendimento/AtendimentoConversationPanel";
 import { AtendimentoLeadList } from "@/components/app/atendimento/AtendimentoLeadList";
 import { AtendimentoSummaryCards } from "@/components/app/atendimento/AtendimentoSummaryCards";
+import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 
 const EMPTY_SUMMARY: AtendimentoSummary = {
@@ -36,6 +37,7 @@ export function AtendimentoClient() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
@@ -125,6 +127,17 @@ export function AtendimentoClient() {
   }, [loadLeadDetail, selectedLeadId]);
 
   useEffect(() => {
+    if (!mobileConversationOpen) return;
+    const media = window.matchMedia("(min-width: 1024px)");
+    const sync = () => {
+      if (media.matches) setMobileConversationOpen(false);
+    };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, [mobileConversationOpen]);
+
+  useEffect(() => {
     const channel = supabase
       .channel("atendimento-private")
       .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, () => {
@@ -170,6 +183,11 @@ export function AtendimentoClient() {
     } finally {
       setSending(false);
     }
+  }
+
+  function openMobileConversation(leadId: string) {
+    setSelectedLeadId(leadId);
+    setMobileConversationOpen(true);
   }
 
   return (
@@ -231,13 +249,51 @@ export function AtendimentoClient() {
           leads={leads}
           selectedLeadId={selectedLeadId}
           onSelectLead={(leadId) => setSelectedLeadId(leadId)}
+          onOpenConversation={openMobileConversation}
         />
-        <AtendimentoConversationPanel
-          conversation={selectedConversation}
-          messages={messages}
-          disabled={sending}
-          onSendMessage={handleSendMessage}
-        />
+        <div className="hidden lg:block">
+          <AtendimentoConversationPanel
+            conversation={selectedConversation}
+            messages={messages}
+            disabled={sending}
+            onSendMessage={handleSendMessage}
+          />
+        </div>
+      </div>
+
+      <div className="lg:hidden">
+        <AppModal
+          open={mobileConversationOpen}
+          onClose={() => setMobileConversationOpen(false)}
+          position="bottom"
+          size="xl"
+          zIndexClass="z-[120]"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
+              <div className="mt-1 text-xs text-[var(--app-text-55)]">Envie mensagens para o lead por aqui.</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileConversationOpen(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-4">
+            <AtendimentoConversationPanel
+              compact
+              conversation={selectedConversation}
+              messages={messages}
+              disabled={sending}
+              onSendMessage={handleSendMessage}
+            />
+          </div>
+        </AppModal>
       </div>
     </div>
   );

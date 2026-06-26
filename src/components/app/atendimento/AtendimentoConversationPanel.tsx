@@ -18,11 +18,13 @@ export function AtendimentoConversationPanel({
   messages,
   disabled,
   onSendMessage,
+  compact,
 }: {
   conversation: AtendimentoConversation | null;
   messages: AtendimentoMessage[];
   disabled?: boolean;
   onSendMessage: (payload: { content_text: string }) => Promise<void>;
+  compact?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
@@ -36,7 +38,13 @@ export function AtendimentoConversationPanel({
   }
 
   return (
-    <div className="flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-[640px]">
+    <div
+      className={
+        compact
+          ? "flex min-h-0 max-h-[70vh] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]"
+          : "flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-[640px]"
+      }
+    >
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">

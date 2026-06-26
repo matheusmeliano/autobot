@@ -19,10 +19,12 @@ export function AtendimentoLeadList({
   leads,
   selectedLeadId,
   onSelectLead,
+  onOpenConversation,
 }: {
   leads: AtendimentoLeadListItem[];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
+  onOpenConversation: (leadId: string) => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLead, setProfileLead] = useState<AtendimentoLeadListItem | null>(null);
@@ -106,6 +108,17 @@ export function AtendimentoLeadList({
                     className="mt-3 inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                   >
                     Abrir perfil do lead
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenConversation(String(lead.id));
+                    }}
+                    className="mt-2 inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] lg:hidden"
+                  >
+                    Abrir conversa
                   </button>
                 </div>
               );
