@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -14,6 +14,15 @@ import { updateThemeAction } from "@/app/app/configuracoes/actions";
 import { modalToast } from "@/lib/modalToast";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
+
+function paymentToastMessage(pending: any) {
+  const name = String(pending?.debtor?.nome ?? "").trim();
+  const amount = String(pending?.amount_brl ?? "").trim();
+  const due = String(pending?.due_date_br ?? "").trim();
+  const parts = [name || "", amount || "", due ? `Venc.: ${due}` : ""].filter(Boolean);
+  const suffix = parts.length ? ` (${parts.join(" • ")})` : "";
+  return `Possível pagamento identificado. Deseja dar baixa na cobrança?${suffix}`;
+}
 
 function LoggedInAsCard({
   email,
@@ -70,6 +79,7 @@ export function AppShell({
   const [themeGateError, setThemeGateError] = useState<string>("");
   const [pendingPayment, setPendingPayment] = useState<any | null>(null);
   const [paymentResolving, setPaymentResolving] = useState<"confirm" | "reject" | null>(null);
+  const lastPaymentSuspicionRealtimeIdRef = useRef<string>("");
 
   useEffect(() => {
     let active = true;
@@ -336,6 +346,7 @@ export function AppShell({
         if (next && prev && String(next.id) === String(prev.id)) return prev;
         return next;
       });
+      return next;
     } catch {}
   }, [authChecked, isAuthed]);
 
@@ -356,6 +367,37 @@ export function AppShell({
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [authChecked, fetchPendingPayment, isAuthed]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    if (!isAuthed) return;
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`payment-suspicions:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "payment_suspicions",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const nextId = String((payload as any)?.new?.id ?? "");
+          if (nextId && lastPaymentSuspicionRealtimeIdRef.current === nextId) return;
+          if (nextId) lastPaymentSuspicionRealtimeIdRef.current = nextId;
+          fetchPendingPayment().then((next) => {
+            modalToast.info(paymentToastMessage(next));
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authChecked, fetchPendingPayment, isAuthed, supabase, userId]);
 
   const resolvePendingPayment = useCallback(
     async (decision: "confirm" | "reject") => {
@@ -564,10 +606,10 @@ export function AppShell({
           <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/60 px-4 py-10">
             <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-modal-bg)] p-6">
               <div className="text-sm font-semibold tracking-tight text-[var(--app-text-85)]">
-                Possível pagamento detectado
+                Possível pagamento identificado
               </div>
               <div className="mt-2 text-sm text-[var(--app-text-60)]">
-                Confirme se o cliente realmente pagou. Só então a cobrança será marcada como paga.
+                Possível pagamento identificado. Deseja dar baixa na cobrança?
               </div>
 
               <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm">
@@ -577,6 +619,16 @@ export function AppShell({
                     title={`Cliente: ${pendingPayment.debtor.nome}`}
                   >
                     Cliente: {pendingPayment.debtor.nome}
+                  </div>
+                ) : null}
+                {pendingPayment?.amount_brl ? (
+                  <div className={`${pendingPayment?.debtor?.nome ? "mt-2" : ""} text-xs text-[var(--app-text-60)]`}>
+                    Valor: {pendingPayment.amount_brl}
+                  </div>
+                ) : null}
+                {pendingPayment?.due_date_br ? (
+                  <div className={`${pendingPayment?.amount_brl ? "mt-1" : pendingPayment?.debtor?.nome ? "mt-2" : ""} text-xs text-[var(--app-text-60)]`}>
+                    Vencimento: {pendingPayment.due_date_br}
                   </div>
                 ) : null}
                 <div className={`${pendingPayment?.debtor?.nome ? "mt-2" : ""} text-xs text-[var(--app-text-60)]`}>
