@@ -5,15 +5,12 @@ import { Copy, Search } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   AtendimentoConversation,
-  AtendimentoHistoryEvent,
-  AtendimentoLead,
   AtendimentoLeadListItem,
   AtendimentoMessage,
   AtendimentoSummary,
 } from "@/lib/atendimento/types";
 import { AtendimentoConversationPanel } from "@/components/app/atendimento/AtendimentoConversationPanel";
 import { AtendimentoLeadList } from "@/components/app/atendimento/AtendimentoLeadList";
-import { AtendimentoLeadSidebar } from "@/components/app/atendimento/AtendimentoLeadSidebar";
 import { AtendimentoSummaryCards } from "@/components/app/atendimento/AtendimentoSummaryCards";
 import { modalToast } from "@/lib/modalToast";
 
@@ -33,10 +30,8 @@ export function AtendimentoClient() {
   const [publicUrl, setPublicUrl] = useState("");
   const [query, setQuery] = useState("");
   const [leads, setLeads] = useState<AtendimentoLeadListItem[]>([]);
-  const [selectedLead, setSelectedLead] = useState<AtendimentoLead | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<AtendimentoConversation | null>(null);
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
-  const [events, setEvents] = useState<AtendimentoHistoryEvent[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -98,9 +93,7 @@ export function AtendimentoClient() {
       modalToast.error(message);
       return;
     }
-    setSelectedLead(json.lead as AtendimentoLead);
     setSelectedConversation((json.lead?.conversation ?? null) as AtendimentoConversation | null);
-    setEvents((json.events ?? []) as AtendimentoHistoryEvent[]);
     setLoadError(null);
 
     const conversationId = String(json.lead?.conversation?.id ?? "");
@@ -233,7 +226,7 @@ export function AtendimentoClient() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 2xl:grid-cols-[320px_minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mt-6 grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
         <AtendimentoLeadList
           leads={leads}
           selectedLeadId={selectedLeadId}
@@ -245,9 +238,6 @@ export function AtendimentoClient() {
           disabled={sending}
           onSendMessage={handleSendMessage}
         />
-        <div className="2xl:col-auto xl:col-span-2">
-          <AtendimentoLeadSidebar lead={selectedLead} events={events} />
-        </div>
       </div>
     </div>
   );
