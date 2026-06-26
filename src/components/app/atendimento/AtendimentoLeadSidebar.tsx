@@ -24,7 +24,7 @@ export function AtendimentoLeadSidebar({
   if (!lead) {
     return (
       <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 text-sm text-[var(--app-text-45)]">
-        Selecione um atendimento para ver os dados do lead e o histórico.
+        Selecione um atendimento para ver os dados do lead.
       </div>
     );
   }
@@ -52,34 +52,6 @@ export function AtendimentoLeadSidebar({
             value={lead.last_interaction_at ? formatAtendimentoDateTime(lead.last_interaction_at) : "-"}
           />
           <Field label="Data base" value={formatAtendimentoDate(lead.created_at)} />
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
-        <div className="border-b border-[var(--app-border)] px-4 py-4">
-          <div className="text-sm font-semibold text-[var(--app-text-85)]">Histórico</div>
-          <div className="mt-1 text-xs text-[var(--app-text-45)]">
-            Mudanças de etapa, dados capturados e eventos do atendimento.
-          </div>
-        </div>
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-          {events.length ? (
-            events.map((event) => (
-              <div key={event.id} className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-3">
-                <div className="text-sm font-semibold text-[var(--app-text-85)]">{event.title}</div>
-                <div className="mt-1 text-xs text-[var(--app-text-55)]">
-                  {formatAtendimentoDateTime(event.created_at)}
-                </div>
-                {event.details ? (
-                  <pre className="mt-3 whitespace-pre-wrap break-words text-[11px] text-[var(--app-text-55)]">
-                    {JSON.stringify(event.details, null, 2)}
-                  </pre>
-                ) : null}
-              </div>
-            ))
-          ) : (
-            <div className="text-sm text-[var(--app-text-45)]">Ainda não há eventos registrados para este lead.</div>
-          )}
         </div>
       </div>
     </div>
