@@ -113,7 +113,8 @@ export function AtendimentoConversationPanel({
             onChange={(event) => setDraft(event.target.value)}
             placeholder={conversation?.id ? "Digite uma mensagem para o lead..." : "Selecione um atendimento"}
             disabled={!conversation?.id || disabled}
-            className="min-h-14 w-full flex-1 resize-none rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm text-[var(--app-text-85)] outline-none transition placeholder:text-[var(--app-text-35)] focus:border-emerald-500/40 focus:bg-[var(--app-hover)]"
+            rows={1}
+            className="h-14 w-full flex-1 resize-none rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm leading-6 text-[var(--app-text-85)] outline-none transition placeholder:text-[var(--app-text-35)] focus:border-emerald-500/40 focus:bg-[var(--app-hover)]"
           />
           <button
             type="submit"
