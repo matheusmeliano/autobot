@@ -113,12 +113,12 @@ export function AtendimentoConversationPanel({
             onChange={(event) => setDraft(event.target.value)}
             placeholder={conversation?.id ? "Digite uma mensagem para o lead..." : "Selecione um atendimento"}
             disabled={!conversation?.id || disabled}
-            className="min-h-24 w-full flex-1 resize-none rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text-85)] outline-none transition placeholder:text-[var(--app-text-35)] focus:border-emerald-500/40 focus:bg-[var(--app-hover)]"
+            className="min-h-16 w-full flex-1 resize-none rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text-85)] outline-none transition placeholder:text-[var(--app-text-35)] focus:border-emerald-500/40 focus:bg-[var(--app-hover)]"
           />
           <button
             type="submit"
             disabled={!conversation?.id || disabled || !draft.trim()}
-            className="inline-flex h-12 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:min-h-24 sm:w-14"
+            className="inline-flex h-11 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:min-h-16 sm:w-14"
           >
             <Send className="h-4 w-4" />
           </button>
