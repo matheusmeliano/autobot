@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import type { AtendimentoConversation, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
@@ -28,6 +28,21 @@ export function AtendimentoConversationPanel({
 }) {
   const [draft, setDraft] = useState("");
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+
+    element.style.height = "56px";
+    element.style.overflowY = "hidden";
+
+    const nextHeight = Math.min(element.scrollHeight, 144);
+    element.style.height = `${Math.max(56, nextHeight)}px`;
+    if (element.scrollHeight > 144) {
+      element.style.overflowY = "auto";
+    }
+  }, [draft]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,6 +124,7 @@ export function AtendimentoConversationPanel({
       <form onSubmit={handleSubmit} className="border-t border-[var(--app-border)] px-4 py-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={conversation?.id ? "Digite uma mensagem para o lead..." : "Selecione um atendimento"}
