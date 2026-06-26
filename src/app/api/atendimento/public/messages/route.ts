@@ -1,6 +1,6 @@
 import { botReplyForLead, extractLeadDataFromMessage, getNextMissingField } from "@/lib/atendimento/bot";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
+import { appendHistoryEvent, ensureInitialBotConversationFlow, syncConversationPreview } from "@/lib/atendimento/server";
 
 async function upsertCapturedFields(params: {
   leadId: string;
@@ -51,13 +51,18 @@ export async function GET(req: Request) {
   const admin = createSupabaseAdminClient();
   const { data: conversation } = await admin
     .from("atendimento_conversations")
-    .select("id")
+    .select("id, lead_id")
     .eq("public_slug", publicSlug)
     .maybeSingle();
 
   if (!conversation?.id) {
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
   }
+
+  await ensureInitialBotConversationFlow({
+    leadId: String(conversation.lead_id),
+    conversationId: String(conversation.id),
+  });
 
   const { data, error } = await admin
     .from("atendimento_messages")

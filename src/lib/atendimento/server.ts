@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
+import { initialBotMessages } from "@/lib/atendimento/bot";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 
 export async function requireAtendimentoUser() {
@@ -94,6 +95,67 @@ export async function createPublicLeadSession(params: { origin?: string | null; 
       public_url: publicLink.public_url,
     },
   };
+}
+
+export async function ensureInitialBotConversationFlow(params: {
+  leadId: string;
+  conversationId: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { count, error } = await admin
+    .from("atendimento_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("conversation_id", params.conversationId);
+
+  if (error) {
+    throw new Error(error.message || "Falha ao verificar mensagens iniciais.");
+  }
+  if (Number(count ?? 0) > 0) {
+    return false;
+  }
+
+  const nowIso = new Date().toISOString();
+  const botMessages = initialBotMessages().map((content) => ({
+    conversation_id: params.conversationId,
+    sender_role: "bot",
+    content_text: content,
+    media_type: "text",
+    status: "lida",
+    sent_at: nowIso,
+    delivered_at: nowIso,
+    read_at: nowIso,
+  }));
+
+  const { error: insertError } = await admin.from("atendimento_messages").insert(botMessages);
+  if (insertError) {
+    throw new Error(insertError.message || "Falha ao iniciar fluxo do bot.");
+  }
+
+  await admin
+    .from("atendimento_leads")
+    .update({
+      status: "em_atendimento",
+      funnel_stage: "aula_experimental_convidada",
+      last_interaction_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq("id", params.leadId);
+
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: botMessages[botMessages.length - 1]?.content_text ?? "",
+    createdAt: nowIso,
+  });
+  await appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "stage_changed",
+    title: "Fluxo inicial do bot iniciado",
+    details: { funnel_stage: "aula_experimental_convidada" },
+    actorType: "bot",
+  });
+
+  return true;
 }
 
 export async function syncConversationPreview(params: {
