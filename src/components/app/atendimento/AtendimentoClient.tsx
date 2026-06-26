@@ -230,8 +230,8 @@ export function AtendimentoClient() {
         </div>
 
         <div className="mt-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
-          <div className="flex items-center gap-3">
-            <div className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75 sm:shrink-0">
               Link Publico de Atendimento
             </div>
             <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
@@ -240,7 +240,7 @@ export function AtendimentoClient() {
             <button
               type="button"
               onClick={handleCopyLink}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15 sm:shrink-0"
             >
               <Copy className="h-4 w-4" />
               Copiar Link
