@@ -71,3 +71,77 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
     events: (events ?? []) as any[],
   });
 }
+
+export async function DELETE(_: Request, context: { params: Promise<{ leadId: string }> }) {
+  const auth = await requireAtendimentoUser();
+  if (!auth.ok) {
+    return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
+  const { leadId } = await context.params;
+  const admin = createSupabaseAdminClient();
+
+  const { data: lead, error: leadError } = await admin
+    .from("atendimento_leads")
+    .select("id")
+    .eq("id", leadId)
+    .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+    .maybeSingle();
+
+  if (leadError) {
+    return Response.json({ ok: false, error: leadError.message }, { status: 500 });
+  }
+
+  if (!lead?.id) {
+    return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
+  const { data: conversations, error: conversationsError } = await admin
+    .from("atendimento_conversations")
+    .select("id")
+    .eq("lead_id", leadId);
+
+  if (conversationsError) {
+    return Response.json({ ok: false, error: conversationsError.message }, { status: 500 });
+  }
+
+  const conversationIds = (conversations ?? [])
+    .map((row) => String((row as { id?: string | null }).id ?? "").trim())
+    .filter(Boolean);
+
+  if (conversationIds.length > 0) {
+    const { error: messagesError } = await admin
+      .from("atendimento_messages")
+      .delete()
+      .in("conversation_id", conversationIds);
+
+    if (messagesError) {
+      return Response.json({ ok: false, error: messagesError.message }, { status: 500 });
+    }
+  }
+
+  const { error: eventsError } = await admin.from("atendimento_history_events").delete().eq("lead_id", leadId);
+  if (eventsError) {
+    return Response.json({ ok: false, error: eventsError.message }, { status: 500 });
+  }
+
+  const { error: capturedFieldsError } = await admin.from("atendimento_captured_fields").delete().eq("lead_id", leadId);
+  if (capturedFieldsError) {
+    return Response.json({ ok: false, error: capturedFieldsError.message }, { status: 500 });
+  }
+
+  const { error: conversationsDeleteError } = await admin
+    .from("atendimento_conversations")
+    .delete()
+    .eq("lead_id", leadId);
+  if (conversationsDeleteError) {
+    return Response.json({ ok: false, error: conversationsDeleteError.message }, { status: 500 });
+  }
+
+  const { error: leadDeleteError } = await admin.from("atendimento_leads").delete().eq("id", leadId);
+  if (leadDeleteError) {
+    return Response.json({ ok: false, error: leadDeleteError.message }, { status: 500 });
+  }
+
+  return Response.json({ ok: true });
+}

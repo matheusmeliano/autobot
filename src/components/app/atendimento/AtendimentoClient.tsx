@@ -186,6 +186,28 @@ export function AtendimentoClient() {
     }
   }
 
+  async function handleDeleteLead(lead: AtendimentoLeadListItem) {
+    const res = await fetch(`/api/atendimento/leads/${lead.id}`, {
+      method: "DELETE",
+    });
+    const json = await res.json().catch(() => null);
+    if (!json?.ok) {
+      throw new Error(String(json?.error ?? "Falha ao excluir lead."));
+    }
+
+    if (selectedLeadId === lead.id) {
+      const fallbackLeadId = leads.find((item) => item.id !== lead.id)?.id ?? null;
+      setSelectedLeadId(fallbackLeadId);
+      setSelectedConversation(null);
+      setMessages([]);
+      setMobileConversationOpen(false);
+    }
+
+    await loadSummary();
+    await loadLeads(query);
+    modalToast.success("Lead excluído definitivamente.");
+  }
+
   function openMobileConversation(leadId: string) {
     setSelectedLeadId(leadId);
     setMobileConversationOpen(true);
@@ -252,6 +274,14 @@ export function AtendimentoClient() {
           onSelectLead={(leadId) => setSelectedLeadId(leadId)}
           onOpenConversation={openMobileConversation}
           onListHeightChange={(height) => setDesktopListHeight(height)}
+          onDeleteLead={async (lead) => {
+            try {
+              await handleDeleteLead(lead);
+            } catch (error) {
+              modalToast.error(error instanceof Error ? error.message : "Falha ao excluir lead.");
+              throw error;
+            }
+          }}
         />
         <div className="hidden lg:block" style={desktopListHeight != null ? { height: desktopListHeight } : undefined}>
           <AtendimentoConversationPanel

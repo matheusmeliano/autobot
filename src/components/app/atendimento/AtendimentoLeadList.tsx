@@ -23,15 +23,19 @@ export function AtendimentoLeadList({
   onSelectLead,
   onOpenConversation,
   onListHeightChange,
+  onDeleteLead,
 }: {
   leads: AtendimentoLeadListItem[];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
   onOpenConversation: (leadId: string) => void;
   onListHeightChange?: (height: number) => void;
+  onDeleteLead: (lead: AtendimentoLeadListItem) => Promise<void>;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLead, setProfileLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [deleteLead, setDeleteLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(1);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -78,6 +82,22 @@ export function AtendimentoLeadList({
   function closeProfile() {
     setProfileOpen(false);
     setProfileLead(null);
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return;
+    setDeleteLead(null);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteLead || deleting) return;
+    setDeleting(true);
+    try {
+      await onDeleteLead(deleteLead);
+      setDeleteLead(null);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -144,17 +164,29 @@ export function AtendimentoLeadList({
                     <span>{formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}</span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setProfileLead(lead);
-                      setProfileOpen(true);
-                    }}
-                    className="mt-3 inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                  >
-                    Abrir perfil do lead
-                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setProfileLead(lead);
+                        setProfileOpen(true);
+                      }}
+                      className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                    >
+                      Abrir perfil do lead
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDeleteLead(lead);
+                      }}
+                      className="inline-flex items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-500"
+                    >
+                      Excluir Lead
+                    </button>
+                  </div>
 
                   <button
                     type="button"
@@ -242,6 +274,54 @@ export function AtendimentoLeadList({
         ) : (
           <div className="mt-4 text-sm text-[var(--app-text-55)]">Carregando perfil...</div>
         )}
+      </AppModal>
+
+      <AppModal open={Boolean(deleteLead)} onClose={closeDeleteModal} size="md" zIndexClass="z-[130]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[var(--app-text-85)]">Excluir Lead</div>
+            <div className="mt-1 text-xs text-[var(--app-text-55)]">
+              Essa exclusão é permanente e remove o lead do sistema e do banco de dados sem possibilidade de recuperação.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={closeDeleteModal}
+            disabled={deleting}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-[var(--app-text-85)]">
+          {deleteLead ? (
+            <>
+              Tem certeza que deseja excluir definitivamente o lead{" "}
+              <span className="font-semibold">{deleteLead.full_name || deleteLead.phone || "Novo Lead"}</span>?
+            </>
+          ) : null}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={closeDeleteModal}
+            disabled={deleting}
+            className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmDelete}
+            disabled={deleting}
+            className="inline-flex items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {deleting ? "Excluindo..." : "Excluir definitivamente"}
+          </button>
+        </div>
       </AppModal>
     </div>
   );
