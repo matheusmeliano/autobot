@@ -13,7 +13,7 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
   const [{ data: lead, error: leadError }, { data: events, error: eventsError }] = await Promise.all([
     admin
       .from("atendimento_leads")
-      .select("*, conversation:atendimento_conversations(*)")
+      .select("*")
       .eq("id", leadId)
       .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
       .maybeSingle(),
@@ -35,12 +35,24 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
   }
 
+  const { data: conversation, error: conversationError } = await admin
+    .from("atendimento_conversations")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (conversationError) {
+    return Response.json({ ok: false, error: conversationError.message }, { status: 500 });
+  }
+
   await admin
     .from("atendimento_leads")
     .update({ unread_count: 0, updated_at: new Date().toISOString() })
     .eq("id", leadId);
 
-  const conversationId = String((lead as any)?.conversation?.id ?? "");
+  const conversationId = String((conversation as any)?.id ?? "");
   if (conversationId) {
     await admin
       .from("atendimento_messages")
@@ -54,7 +66,7 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
     ok: true,
     lead: {
       ...(lead as any),
-      conversation: (lead as any)?.conversation ?? null,
+      conversation: conversation ?? null,
     },
     events: (events ?? []) as any[],
   });
