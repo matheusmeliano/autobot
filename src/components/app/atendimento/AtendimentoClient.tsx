@@ -158,7 +158,7 @@ export function AtendimentoClient() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 xl:max-w-[520px]">
+        <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
             Link Público de Atendimento
           </div>
