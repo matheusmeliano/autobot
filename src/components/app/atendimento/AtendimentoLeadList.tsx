@@ -109,7 +109,7 @@ export function AtendimentoLeadList({
         </div>
       </div>
 
-      <div className="p-2">
+      <div className="p-3">
         {pagedLeads.length ? (
           <div className="space-y-4">
             {pagedLeads.map((lead) => {
