@@ -2,6 +2,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { applyCurrentMonthDebtorStatuses } from "@/lib/debtorChargeStatus";
 import { listAllClientesDebtors, listAllClientesSchedules } from "@/lib/clientesData";
 
+function compareCreatedAtDesc(a: { created_at?: string | null }, b: { created_at?: string | null }) {
+  return new Date(String(b.created_at ?? "")).getTime() - new Date(String(a.created_at ?? "")).getTime();
+}
+
 export async function GET() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const [{ data: debtors, error: debtorsError }, { data: schedules, error: schedulesError }] = await Promise.all([
@@ -30,6 +34,6 @@ export async function GET() {
         })),
       })),
       schedules: (schedules ?? []) as any[],
-    }),
+    }).sort(compareCreatedAtDesc),
   );
 }

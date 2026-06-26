@@ -5,6 +5,10 @@ import { normalizePlan, type PlanKey } from "@/lib/plans";
 import { applyCurrentMonthDebtorStatuses, deriveReferenceMonthDebtorChargeProgress } from "@/lib/debtorChargeStatus";
 import { listAllClientesDebtors, listAllClientesSchedules } from "@/lib/clientesData";
 
+function compareCreatedAtDesc(a: { created_at?: string | null }, b: { created_at?: string | null }) {
+  return new Date(String(b.created_at ?? "")).getTime() - new Date(String(a.created_at ?? "")).getTime();
+}
+
 export default async function ClientesPage() {
   const supabase = await createSupabaseServerClient();
   const [{ data, error }, { data: profile }, { data: schedules, error: schedulesError }] = await Promise.all([
@@ -73,14 +77,16 @@ export default async function ClientesPage() {
     schedules: (schedules ?? []) as any[],
   });
 
-  const rows = (rowsWithStatus as any[]).map((row) => {
-    const prog = deriveReferenceMonthDebtorChargeProgress(
-      row.charges ?? [],
-      schedulesByDebtor.get(String(row.id)) ?? [],
-      nowUtcIso,
-    );
-    return { ...row, progress_paid: prog.paid, progress_total: prog.total };
-  });
+  const rows = (rowsWithStatus as any[])
+    .map((row) => {
+      const prog = deriveReferenceMonthDebtorChargeProgress(
+        row.charges ?? [],
+        schedulesByDebtor.get(String(row.id)) ?? [],
+        nowUtcIso,
+      );
+      return { ...row, progress_paid: prog.paid, progress_total: prog.total };
+    })
+    .sort(compareCreatedAtDesc);
 
   return <DebtorsClient initial={rows as DebtorRow[]} plan={plan} />;
 }
