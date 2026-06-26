@@ -312,6 +312,34 @@ function normalizeDebtorRetryValues(debtor: DebtorOption | null | undefined) {
   };
 }
 
+function scheduleStatusClass(raw: unknown, theme: "light" | "dark") {
+  const s = String(raw ?? "").toLowerCase();
+  if (s === "agendado") return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
+  if (s === "pendente" || s === "suspeita_de_pagamento") {
+    return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
+  }
+  if (s === "pago" || s === "executado") return "bg-emerald-600 text-[rgb(255,255,255)]";
+  if (s === "atrasado") return "bg-rose-600 text-[rgb(255,255,255)]";
+  return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
+}
+
+function scheduleHasExecutedCurrentInstance(row: ScheduleRow) {
+  const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
+  if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
+
+  const lastExecutedAt = String(row.last_executed_scheduled_for ?? "").trim();
+  const scheduledFor = String(row.data_envio ?? "").trim();
+  if (lastExecutedAt && scheduledFor) {
+    const executedMs = new Date(lastExecutedAt).getTime();
+    const scheduledMs = new Date(scheduledFor).getTime();
+    if (!Number.isNaN(executedMs) && !Number.isNaN(scheduledMs) && executedMs === scheduledMs) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function SchedulesClient({
   initial,
   debtors,
@@ -430,26 +458,35 @@ export function SchedulesClient({
     const currentLocalDate = localDateInTimeZone(new Date().toISOString(), effectiveTimeZone);
     const statusMap = new Map<string, { label: "Agendado" | "Executado"; className: string }>();
     for (const row of rows) {
-      const debtorId = String(row.debtor_id ?? "");
-      if (!debtorId || statusMap.has(debtorId)) continue;
-      const referenceRow = operationalScheduleByDebtor.get(debtorId) ?? null;
-      if (!referenceRow) {
+      try {
+        const debtorId = String(row.debtor_id ?? "");
+        if (!debtorId || statusMap.has(debtorId)) continue;
+        const referenceRow = operationalScheduleByDebtor.get(debtorId) ?? null;
+        if (!referenceRow) {
+          statusMap.set(debtorId, {
+            label: "Agendado",
+            className: scheduleStatusClass("pendente", theme),
+          });
+          continue;
+        }
+
+        const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
+        const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
+        const executedByCurrentInstance = scheduleHasExecutedCurrentInstance(referenceRow);
+        const isExecuted =
+          executedByCurrentInstance || (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
+        statusMap.set(debtorId, {
+          label: isExecuted ? "Executado" : "Agendado",
+          className: scheduleStatusClass(isExecuted ? "executado" : "pendente", theme),
+        });
+      } catch {
+        const debtorId = String(row.debtor_id ?? "");
+        if (!debtorId || statusMap.has(debtorId)) continue;
         statusMap.set(debtorId, {
           label: "Agendado",
-          className: statusClass("pendente"),
+          className: scheduleStatusClass("pendente", theme),
         });
-        continue;
       }
-
-      const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
-      const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
-      const executedByCurrentInstance = hasExecutedCurrentInstance(referenceRow);
-      const isExecuted =
-        executedByCurrentInstance || (Boolean(dueLocalDate) && dueLocalDate < currentLocalDate);
-      statusMap.set(debtorId, {
-        label: isExecuted ? "Executado" : "Agendado",
-        className: statusClass(isExecuted ? "executado" : "pendente"),
-      });
     }
 
     return statusMap;
@@ -506,34 +543,6 @@ export function SchedulesClient({
     return s || "-";
   };
 
-  function statusClass(raw: unknown) {
-    const s = String(raw ?? "").toLowerCase();
-    if (s === "agendado") return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
-    if (s === "pendente" || s === "suspeita_de_pagamento") {
-      return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
-    }
-    if (s === "pago" || s === "executado") return "bg-emerald-600 text-[rgb(255,255,255)]";
-    if (s === "atrasado") return "bg-rose-600 text-[rgb(255,255,255)]";
-    return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
-  }
-
-  function hasExecutedCurrentInstance(row: ScheduleRow) {
-    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
-    if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
-
-    const lastExecutedAt = String(row.last_executed_scheduled_for ?? "").trim();
-    const scheduledFor = String(row.data_envio ?? "").trim();
-    if (lastExecutedAt && scheduledFor) {
-      const executedMs = new Date(lastExecutedAt).getTime();
-      const scheduledMs = new Date(scheduledFor).getTime();
-      if (!Number.isNaN(executedMs) && !Number.isNaN(scheduledMs) && executedMs === scheduledMs) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   function displayReferenceMoment(row: ScheduleRow) {
     const operationalMoment = String(row.operational_due_at ?? "").trim();
     const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
@@ -563,14 +572,14 @@ export function SchedulesClient({
     const dueMoment = displayReferenceMoment(row);
     const dueLocalDate = localDateInTimeZone(String(dueMoment), effectiveTimeZone);
     const isExecuted =
-      hasExecutedCurrentInstance(row) ||
+      scheduleHasExecutedCurrentInstance(row) ||
       (Boolean(String(row.last_executed_scheduled_for ?? "").trim()) &&
         yearMonthKey(String(row.last_executed_scheduled_for), effectiveTimeZone) === operationalMonthKey) ||
       (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
 
     return isExecuted
-      ? { label: "Executado", className: statusClass("executado") }
-      : { label: "Agendado", className: statusClass("pendente") };
+      ? { label: "Executado", className: scheduleStatusClass("executado", theme) }
+      : { label: "Agendado", className: scheduleStatusClass("pendente", theme) };
   };
 
   const displayMoments = (row: ScheduleRow) => {
