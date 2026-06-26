@@ -40,17 +40,31 @@ export function AtendimentoClient() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
     const json = await res.json().catch(() => null);
-    if (json?.ok) setSummary(json.summary as AtendimentoSummary);
+    if (json?.ok) {
+      setSummary(json.summary as AtendimentoSummary);
+      setLoadError(null);
+      return;
+    }
+    const message = String(json?.error ?? "Falha ao carregar resumo.");
+    setLoadError(message);
+    modalToast.error(message);
   }, []);
 
   const loadPublicLink = useCallback(async () => {
     const res = await fetch("/api/atendimento/link-publico", { cache: "no-store" });
     const json = await res.json().catch(() => null);
-    if (json?.ok) setPublicUrl(String(json.link?.public_url ?? ""));
+    if (json?.ok) {
+      setPublicUrl(String(json.link?.public_url ?? ""));
+      return;
+    }
+    const message = String(json?.error ?? "Falha ao carregar link público.");
+    setLoadError(message);
+    modalToast.error(message);
   }, []);
 
   const loadLeads = useCallback(
@@ -64,6 +78,11 @@ export function AtendimentoClient() {
         const nextLeads = (json.leads ?? []) as AtendimentoLeadListItem[];
         setLeads(nextLeads);
         if (!selectedLeadId && nextLeads[0]?.id) setSelectedLeadId(String(nextLeads[0].id));
+        setLoadError(null);
+      } else if (json?.error) {
+        const message = String(json?.error ?? "Falha ao carregar atendimentos.");
+        setLoadError(message);
+        modalToast.error(message);
       }
       setLoading(false);
     },
@@ -73,10 +92,16 @@ export function AtendimentoClient() {
   const loadLeadDetail = useCallback(async (leadId: string) => {
     const res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
     const json = await res.json().catch(() => null);
-    if (!json?.ok) return;
+    if (!json?.ok) {
+      const message = String(json?.error ?? "Falha ao carregar detalhes do lead.");
+      setLoadError(message);
+      modalToast.error(message);
+      return;
+    }
     setSelectedLead(json.lead as AtendimentoLead);
     setSelectedConversation((json.lead?.conversation ?? null) as AtendimentoConversation | null);
     setEvents((json.events ?? []) as AtendimentoHistoryEvent[]);
+    setLoadError(null);
 
     const conversationId = String(json.lead?.conversation?.id ?? "");
     if (!conversationId) {
@@ -86,7 +111,13 @@ export function AtendimentoClient() {
 
     const messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
     const messagesJson = await messagesRes.json().catch(() => null);
-    if (messagesJson?.ok) setMessages((messagesJson.messages ?? []) as AtendimentoMessage[]);
+    if (messagesJson?.ok) {
+      setMessages((messagesJson.messages ?? []) as AtendimentoMessage[]);
+      return;
+    }
+    const message = String(messagesJson?.error ?? "Falha ao carregar mensagens.");
+    setLoadError(message);
+    modalToast.error(message);
   }, []);
 
   useEffect(() => {
@@ -150,6 +181,11 @@ export function AtendimentoClient() {
 
   return (
     <div>
+      {loadError ? (
+        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 text-sm text-[var(--app-text-55)]">
+          {loadError}
+        </div>
+      ) : null}
       <div>
         <div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Atendimento</h1>
