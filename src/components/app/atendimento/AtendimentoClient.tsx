@@ -245,7 +245,7 @@ export function AtendimentoClient() {
             <button
               type="button"
               onClick={handleCopyLink}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15 sm:shrink-0"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-[rgba(255,255,255,0.12)] px-4 py-2 text-sm font-semibold text-[rgb(255,255,255)] transition hover:bg-[rgba(255,255,255,0.18)] sm:shrink-0"
             >
               <Copy className="h-4 w-4" />
               Copiar Link
