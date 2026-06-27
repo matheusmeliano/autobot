@@ -81,7 +81,7 @@ export function AppModal({
 
   const bottomPanel = [
     panelBase,
-    "mx-auto flex max-h-[calc(100dvh-0.5rem)] w-full flex-col overflow-hidden rounded-t-2xl rounded-b-none p-3 sm:max-h-[calc(100dvh-1rem)] sm:p-4",
+    "mx-auto max-h-[80vh] w-full overflow-y-auto rounded-t-2xl rounded-b-none p-3 sm:p-4",
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
     panelClassName,

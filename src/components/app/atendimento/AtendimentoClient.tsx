@@ -295,31 +295,29 @@ export function AtendimentoClient() {
           size="xl"
           zIndexClass="z-[120]"
         >
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
-                <div className="mt-1 text-xs text-[var(--app-text-55)]">Envie mensagens para o lead por aqui.</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileConversationOpen(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
-                aria-label="Fechar"
-              >
-                <X className="h-4 w-4" />
-              </button>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
+              <div className="mt-1 text-xs text-[var(--app-text-55)]">Envie mensagens para o lead por aqui.</div>
             </div>
+            <button
+              type="button"
+              onClick={() => setMobileConversationOpen(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-            <div className="mt-4 min-h-0 flex-1">
-              <AtendimentoConversationPanel
-                compact
-                conversation={selectedConversation}
-                messages={messages}
-                disabled={sending}
-                onSendMessage={handleSendMessage}
-              />
-            </div>
+          <div className="mt-4">
+            <AtendimentoConversationPanel
+              compact
+              conversation={selectedConversation}
+              messages={messages}
+              disabled={sending}
+              onSendMessage={handleSendMessage}
+            />
           </div>
         </AppModal>
       </div>

@@ -66,7 +66,7 @@ export function AtendimentoConversationPanel({
     <div
       className={
         compact
-          ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]"
+          ? "flex min-h-0 max-h-[70vh] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]"
           : "flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-0"
       }
     >
