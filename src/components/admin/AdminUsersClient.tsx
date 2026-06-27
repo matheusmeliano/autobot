@@ -403,7 +403,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         ) : null}
       </div>
 
-      <AppModal open={openEdit} onClose={closeEdit} size="md" zIndexClass="z-[100]">
+      <AppModal open={openEdit} onClose={closeEdit} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-white/90">Editar usuário</div>
@@ -496,7 +496,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         </form>
       </AppModal>
 
-      <AppModal open={openPassword} onClose={closePassword} size="md" zIndexClass="z-[100]">
+      <AppModal open={openPassword} onClose={closePassword} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-white/90">Redefinir senha</div>

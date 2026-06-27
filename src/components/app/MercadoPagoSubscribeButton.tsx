@@ -260,8 +260,9 @@ export function MercadoPagoSubscribeButton(props: {
       <AppModal
         open={open}
         onClose={() => setOpen(false)}
-        zIndexClass="z-[60]"
+        zIndexClass="z-[320]"
         size="lg"
+        fullScreenOnMobile
       >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">

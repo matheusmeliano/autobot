@@ -908,7 +908,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         ) : null}
       </div>
 
-      <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[100]">
+      <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-white/90">
