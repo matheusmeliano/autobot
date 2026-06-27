@@ -293,7 +293,7 @@ export function AtendimentoClient() {
           onClose={() => setMobileConversationOpen(false)}
           position="bottom"
           size="xl"
-          zIndexClass="z-[220]"
+          zIndexClass="z-[320]"
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="flex items-start justify-between gap-4">
