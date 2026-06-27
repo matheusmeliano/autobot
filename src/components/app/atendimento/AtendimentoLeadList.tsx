@@ -108,9 +108,7 @@ export function AtendimentoLeadList({
     <div ref={rootRef} className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
-        <div className="mt-1 text-xs text-[var(--app-text-45)]">
-          Leads organizados por última interação.
-        </div>
+        <div className="mt-1 text-xs text-[var(--app-text-45)]">Leads organizados do mais recente para o mais antigo.</div>
         <div className="mt-4 space-y-3">
           <label className="flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
             <Search className="h-4 w-4 text-[var(--app-text-45)]" />

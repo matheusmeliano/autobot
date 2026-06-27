@@ -17,7 +17,6 @@ export async function GET(req: Request) {
     .from("atendimento_leads")
     .select("*")
     .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-    .order("last_interaction_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(300);
 
