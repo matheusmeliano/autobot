@@ -51,11 +51,24 @@ export function AtendimentoConversationPanel({
     viewport.scrollTop = viewport.scrollHeight;
   }, [conversation?.id, orderedMessages.length]);
 
+  function restoreTextareaFocus() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const element = textareaRef.current;
+        if (!element || element.disabled) return;
+        element.focus();
+        const cursorPosition = element.value.length;
+        element.setSelectionRange(cursorPosition, cursorPosition);
+      });
+    });
+  }
+
   async function submitDraft() {
     const content = draft.trim();
     if (!content || !conversation?.id || disabled) return;
     setDraft("");
     await onSendMessage({ content_text: content });
+    restoreTextareaFocus();
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

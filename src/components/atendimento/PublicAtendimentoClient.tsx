@@ -48,6 +48,18 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
     viewport.scrollTop = viewport.scrollHeight;
   }, [publicSlug, messages.length, typing]);
 
+  function restoreTextareaFocus() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const element = textareaRef.current;
+        if (!element || element.disabled) return;
+        element.focus();
+        const cursorPosition = element.value.length;
+        element.setSelectionRange(cursorPosition, cursorPosition);
+      });
+    });
+  }
+
   async function submitDraft() {
     const contentText = draft.trim();
     if (!contentText || !publicSlug || sending) return;
@@ -66,6 +78,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
       }
     } finally {
       setSending(false);
+      restoreTextareaFocus();
     }
   }
 
