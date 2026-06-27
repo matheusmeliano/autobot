@@ -293,9 +293,10 @@ export function AtendimentoClient() {
           onClose={() => setMobileConversationOpen(false)}
           position="bottom"
           size="xl"
-          zIndexClass="z-[120]"
+          zIndexClass="z-[220]"
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
               <div className="mt-1 text-xs text-[var(--app-text-55)]">Envie mensagens para o lead por aqui.</div>
@@ -308,16 +309,17 @@ export function AtendimentoClient() {
             >
               <X className="h-4 w-4" />
             </button>
-          </div>
+            </div>
 
-          <div className="mt-4">
-            <AtendimentoConversationPanel
-              compact
-              conversation={selectedConversation}
-              messages={messages}
-              disabled={sending}
-              onSendMessage={handleSendMessage}
-            />
+            <div className="mt-4 min-h-0 flex-1 overflow-hidden">
+              <AtendimentoConversationPanel
+                compact
+                conversation={selectedConversation}
+                messages={messages}
+                disabled={sending}
+                onSendMessage={handleSendMessage}
+              />
+            </div>
           </div>
         </AppModal>
       </div>

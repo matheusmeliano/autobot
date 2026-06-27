@@ -81,7 +81,7 @@ export function AppModal({
 
   const bottomPanel = [
     panelBase,
-    "mx-auto max-h-[80vh] w-full overflow-y-auto rounded-t-2xl rounded-b-none p-3 sm:p-4",
+    "mx-auto flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 p-3 sm:p-4",
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
     panelClassName,
@@ -106,7 +106,7 @@ export function AppModal({
             <div className={centerPanel}>{children}</div>
           </div>
         ) : (
-          <div className="absolute inset-x-0 bottom-0 z-10 px-2 pb-safe">
+          <div className="absolute inset-0 z-10">
             <div className={bottomPanel}>{children}</div>
           </div>
         )}
