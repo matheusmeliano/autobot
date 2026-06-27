@@ -319,12 +319,12 @@ export function AtendimentoLeadList({
           ) : null}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <button
             type="button"
             onClick={closeDeleteModal}
             disabled={deleting}
-            className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
           >
             Cancelar
           </button>
@@ -332,7 +332,7 @@ export function AtendimentoLeadList({
             type="button"
             onClick={handleConfirmDelete}
             disabled={deleting}
-            className="inline-flex items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-4 py-2 text-sm font-semibold text-[rgb(255,255,255)] hover:bg-red-500 disabled:cursor-not-allowed disabled:text-[rgb(255,255,255)] disabled:opacity-40"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-4 py-2 text-sm font-semibold text-[rgb(255,255,255)] hover:bg-red-500 disabled:cursor-not-allowed disabled:text-[rgb(255,255,255)] disabled:opacity-40 sm:w-auto"
           >
             {deleting ? "Excluindo..." : "Excluir definitivamente"}
           </button>
