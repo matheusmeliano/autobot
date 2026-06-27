@@ -261,7 +261,7 @@ export function AtendimentoLeadList({
           <button
             type="button"
             onClick={closeProfile}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-0 text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />
@@ -305,7 +305,7 @@ export function AtendimentoLeadList({
             type="button"
             onClick={closeDeleteModal}
             disabled={deleting}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-0 text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />
@@ -334,7 +334,7 @@ export function AtendimentoLeadList({
             type="button"
             onClick={handleConfirmDelete}
             disabled={deleting}
-            className="inline-flex items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-4 py-2 text-sm font-semibold text-[rgb(255,255,255)] hover:bg-red-500 disabled:cursor-not-allowed disabled:text-[rgb(255,255,255)] disabled:opacity-40"
           >
             {deleting ? "Excluindo..." : "Excluir definitivamente"}
           </button>
