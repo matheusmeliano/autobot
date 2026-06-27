@@ -41,6 +41,27 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
     }
   }, [draft]);
 
+  async function submitDraft() {
+    const contentText = draft.trim();
+    if (!contentText || !publicSlug || sending) return;
+    setSending(true);
+    setDraft("");
+    setAwaitingBotSince(Date.now());
+    try {
+      const res = await fetch("/api/atendimento/public/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ public_slug: publicSlug, content_text: contentText }),
+      });
+      const json = await res.json().catch(() => null);
+      if (json?.ok) {
+        await loadMessagesWithRetry(publicSlug);
+      }
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function loadMessages(nextPublicSlug: string) {
     if (!nextPublicSlug) return [] as AtendimentoMessage[];
     const res = await fetch(`/api/atendimento/public/messages?public_slug=${encodeURIComponent(nextPublicSlug)}`, {
@@ -124,24 +145,13 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const contentText = draft.trim();
-    if (!contentText || !publicSlug || sending) return;
-    setSending(true);
-    setDraft("");
-    setAwaitingBotSince(Date.now());
-    try {
-      const res = await fetch("/api/atendimento/public/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_slug: publicSlug, content_text: contentText }),
-      });
-      const json = await res.json().catch(() => null);
-      if (json?.ok) {
-        await loadMessagesWithRetry(publicSlug);
-      }
-    } finally {
-      setSending(false);
-    }
+    await submitDraft();
+  }
+
+  async function handleTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    await submitDraft();
   }
 
   return (
@@ -213,6 +223,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
               ref={textareaRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleTextareaKeyDown}
               placeholder="Digite sua mensagem..."
               rows={1}
               className="h-14 w-full flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-emerald-500/40 focus:bg-white/[0.06]"

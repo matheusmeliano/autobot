@@ -44,12 +44,22 @@ export function AtendimentoConversationPanel({
     }
   }, [draft]);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitDraft() {
     const content = draft.trim();
     if (!content || !conversation?.id || disabled) return;
     setDraft("");
     await onSendMessage({ content_text: content });
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await submitDraft();
+  }
+
+  async function handleTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    await submitDraft();
   }
 
   return (
@@ -127,6 +137,7 @@ export function AtendimentoConversationPanel({
             ref={textareaRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleTextareaKeyDown}
             placeholder={conversation?.id ? "Digite uma mensagem para o lead..." : "Selecione um atendimento"}
             disabled={!conversation?.id || disabled}
             rows={1}
