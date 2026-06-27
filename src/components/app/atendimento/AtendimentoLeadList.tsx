@@ -148,7 +148,7 @@ export function AtendimentoLeadList({
                   className={[
                     "w-full rounded-2xl border px-4 py-3 text-left transition-all",
                     active
-                      ? "border-[var(--app-border)] bg-[var(--app-active)]"
+                      ? "border-[var(--app-border)] bg-[var(--app-hover)]"
                       : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                   ].join(" ")}
                 >
