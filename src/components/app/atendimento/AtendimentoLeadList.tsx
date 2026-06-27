@@ -252,7 +252,7 @@ export function AtendimentoLeadList({
         </div>
       ) : null}
 
-      <AppModal open={profileOpen} onClose={closeProfile} size="lg" zIndexClass="z-[120]">
+      <AppModal open={profileOpen} onClose={closeProfile} size="lg" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[var(--app-text-85)]">Perfil do Lead</div>

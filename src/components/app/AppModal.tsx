@@ -20,6 +20,7 @@ export function AppModal({
   size = "lg",
   zIndexClass = "z-[100]",
   panelClassName = "",
+  fullScreenOnMobile = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -28,6 +29,7 @@ export function AppModal({
   size?: ModalSize;
   zIndexClass?: string;
   panelClassName?: string;
+  fullScreenOnMobile?: boolean;
 }) {
   const [present, setPresent] = useState(open);
   const [visible, setVisible] = useState(open);
@@ -71,9 +73,9 @@ export function AppModal({
 
   const centerPanel = [
     panelBase,
-    SIZE_CLASS[size],
-    "max-h-[calc(100vh-13rem)] overflow-y-auto overscroll-contain sm:max-h-[calc(100vh-8rem)]",
-    "p-4 sm:p-5",
+    fullScreenOnMobile
+      ? `flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-y-auto rounded-none border-0 p-3 sm:${SIZE_CLASS[size]} sm:max-h-[calc(100vh-8rem)] sm:rounded-2xl sm:border sm:p-5`
+      : `${SIZE_CLASS[size]} max-h-[calc(100vh-13rem)] overflow-y-auto overscroll-contain p-4 sm:max-h-[calc(100vh-8rem)] sm:p-5`,
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
     panelClassName,
@@ -102,7 +104,12 @@ export function AppModal({
         />
 
         {position === "center" ? (
-          <div className="relative z-10 flex min-h-full items-center justify-center px-3 py-6 sm:px-4 sm:py-8">
+          <div
+            className={[
+              "relative z-10 flex min-h-full",
+              fullScreenOnMobile ? "items-stretch justify-stretch px-0 py-0 sm:items-center sm:justify-center sm:px-4 sm:py-8" : "items-center justify-center px-3 py-6 sm:px-4 sm:py-8",
+            ].join(" ")}
+          >
             <div className={centerPanel}>{children}</div>
           </div>
         ) : (
