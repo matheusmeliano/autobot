@@ -12,6 +12,12 @@ const SIZE_CLASS: Record<ModalSize, string> = {
   xl: "max-w-2xl",
 };
 
+const FULLSCREEN_MOBILE_DESKTOP_SIZE_CLASS: Record<ModalSize, string> = {
+  md: "lg:max-w-md",
+  lg: "lg:max-w-xl",
+  xl: "lg:max-w-2xl",
+};
+
 export function AppModal({
   open,
   onClose,
@@ -74,7 +80,7 @@ export function AppModal({
   const centerPanel = [
     panelBase,
     fullScreenOnMobile
-      ? `flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-y-auto rounded-none border-0 p-3 lg:${SIZE_CLASS[size]} lg:max-h-[calc(100vh-8rem)] lg:rounded-2xl lg:border lg:p-5`
+      ? `flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-y-auto rounded-none border-0 p-3 ${FULLSCREEN_MOBILE_DESKTOP_SIZE_CLASS[size]} lg:max-h-[calc(100vh-8rem)] lg:rounded-2xl lg:border lg:p-5`
       : `${SIZE_CLASS[size]} max-h-[calc(100vh-13rem)] overflow-y-auto overscroll-contain p-4 sm:max-h-[calc(100vh-8rem)] sm:p-5`,
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
