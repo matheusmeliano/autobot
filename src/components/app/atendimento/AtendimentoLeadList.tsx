@@ -208,7 +208,7 @@ export function AtendimentoLeadList({
                         event.stopPropagation();
                         setDeleteLead(lead);
                       }}
-                      className="inline-flex items-center justify-center rounded-xl border border-red-300/70 bg-red-400 px-3 py-2 text-xs font-semibold text-[rgb(255,255,255)] hover:bg-red-500"
+                      className="inline-flex items-center justify-center rounded-xl border border-red-400/70 bg-red-500 px-3 py-2 text-xs font-semibold text-[rgb(255,255,255)] hover:bg-red-600"
                     >
                       Excluir lead
                     </button>
@@ -332,7 +332,7 @@ export function AtendimentoLeadList({
             type="button"
             onClick={handleConfirmDelete}
             disabled={deleting}
-            className="inline-flex w-full items-center justify-center rounded-xl border border-red-400/70 bg-red-500 px-4 py-2 text-sm font-semibold text-[rgb(255,255,255)] hover:bg-red-600 disabled:cursor-not-allowed disabled:text-[rgb(255,255,255)] disabled:opacity-40"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-red-500/70 bg-red-600 px-4 py-2 text-sm font-semibold text-[rgb(255,255,255)] hover:bg-red-700 disabled:cursor-not-allowed disabled:text-[rgb(255,255,255)] disabled:opacity-40"
           >
             {deleting ? "Excluindo..." : "Excluir definitivamente"}
           </button>
