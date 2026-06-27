@@ -38,6 +38,7 @@ export function AtendimentoClient() {
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
+  const [desktopListHeight, setDesktopListHeight] = useState<number | null>(null);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
@@ -264,6 +265,7 @@ export function AtendimentoClient() {
           loading={loading}
           selectedLeadId={selectedLeadId}
           onQueryChange={setQuery}
+          onListHeightChange={setDesktopListHeight}
           onSelectLead={(leadId) => setSelectedLeadId(leadId)}
           onOpenConversation={openMobileConversation}
           onDeleteLead={async (lead) => {
@@ -275,7 +277,7 @@ export function AtendimentoClient() {
             }
           }}
         />
-        <div className="hidden lg:block lg:h-[34rem]">
+        <div className="hidden lg:block" style={desktopListHeight != null ? { height: desktopListHeight } : undefined}>
           <AtendimentoConversationPanel
             conversation={selectedConversation}
             messages={messages}

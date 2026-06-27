@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import type { AtendimentoLeadListItem } from "@/lib/atendimento/types";
@@ -23,6 +23,7 @@ export function AtendimentoLeadList({
   loading,
   selectedLeadId,
   onQueryChange,
+  onListHeightChange,
   onSelectLead,
   onOpenConversation,
   onDeleteLead,
@@ -32,6 +33,7 @@ export function AtendimentoLeadList({
   loading: boolean;
   selectedLeadId: string | null;
   onQueryChange: (value: string) => void;
+  onListHeightChange?: (height: number) => void;
   onSelectLead: (leadId: string) => void;
   onOpenConversation: (leadId: string) => void;
   onDeleteLead: (lead: AtendimentoLeadListItem) => Promise<void>;
@@ -41,6 +43,7 @@ export function AtendimentoLeadList({
   const [deleteLead, setDeleteLead] = useState<AtendimentoLeadListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(1);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(leads.length / PAGE_SIZE)), [leads.length]);
 
@@ -56,6 +59,29 @@ export function AtendimentoLeadList({
     const start = (page - 1) * PAGE_SIZE;
     return leads.slice(start, start + PAGE_SIZE);
   }, [leads, page]);
+
+  useLayoutEffect(() => {
+    if (!onListHeightChange) return;
+    if (!rootRef.current) return;
+
+    const emit = () => {
+      if (!rootRef.current) return;
+      const rect = rootRef.current.getBoundingClientRect();
+      const height = Math.ceil(rect.height);
+      if (!Number.isFinite(height) || height <= 0) return;
+      onListHeightChange(height);
+    };
+
+    emit();
+
+    if (typeof window === "undefined") return;
+    const ResizeObserverCtor = (window as Window & typeof globalThis).ResizeObserver;
+    if (!ResizeObserverCtor) return;
+
+    const observer = new ResizeObserverCtor(() => emit());
+    observer.observe(rootRef.current);
+    return () => observer.disconnect();
+  }, [loading, onListHeightChange, page, pagedLeads.length, query, totalPages]);
 
   function closeProfile() {
     setProfileOpen(false);
@@ -79,7 +105,7 @@ export function AtendimentoLeadList({
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full">
+    <div ref={rootRef} className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full">
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">
