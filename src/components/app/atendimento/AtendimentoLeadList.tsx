@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import type { AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
@@ -19,13 +19,19 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 
 export function AtendimentoLeadList({
   leads,
+  query,
+  loading,
   selectedLeadId,
+  onQueryChange,
   onSelectLead,
   onOpenConversation,
   onDeleteLead,
 }: {
   leads: AtendimentoLeadListItem[];
+  query: string;
+  loading: boolean;
   selectedLeadId: string | null;
+  onQueryChange: (value: string) => void;
   onSelectLead: (leadId: string) => void;
   onOpenConversation: (leadId: string) => void;
   onDeleteLead: (lead: AtendimentoLeadListItem) => Promise<void>;
@@ -78,6 +84,20 @@ export function AtendimentoLeadList({
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Lista de Atendimentos</div>
         <div className="mt-1 text-xs text-[var(--app-text-45)]">
           Leads organizados por última interação.
+        </div>
+        <div className="mt-4 space-y-3">
+          <label className="flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+            <Search className="h-4 w-4 text-[var(--app-text-45)]" />
+            <input
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Pesquisar por nome, telefone ou CPF"
+              className="w-full bg-transparent text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
+            />
+          </label>
+          <div className="text-sm text-[var(--app-text-45)]">
+            {loading ? "Atualizando atendimentos..." : `${leads.length} atendimento(s) encontrado(s)`}
+          </div>
         </div>
       </div>
 

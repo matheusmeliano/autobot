@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Search, X } from "lucide-react";
+import { Copy, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   AtendimentoConversation,
@@ -257,27 +257,13 @@ export function AtendimentoClient() {
         <AtendimentoSummaryCards summary={summary} />
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
-        <div className="flex flex-col gap-3 xl:flex-row">
-          <label className="flex flex-1 items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
-            <Search className="h-4 w-4 text-[var(--app-text-45)]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Pesquisar por nome, telefone ou CPF"
-              className="w-full bg-transparent text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
-            />
-          </label>
-          <div className="flex items-center text-sm text-[var(--app-text-45)]">
-            {loading ? "Atualizando atendimentos..." : `${leads.length} atendimento(s) encontrado(s)`}
-          </div>
-        </div>
-      </div>
-
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <AtendimentoLeadList
           leads={leads}
+          query={query}
+          loading={loading}
           selectedLeadId={selectedLeadId}
+          onQueryChange={setQuery}
           onSelectLead={(leadId) => setSelectedLeadId(leadId)}
           onOpenConversation={openMobileConversation}
           onDeleteLead={async (lead) => {
