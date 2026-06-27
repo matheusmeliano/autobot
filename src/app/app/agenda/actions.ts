@@ -133,6 +133,38 @@ async function countExecutedRunsOnLocalDate(params: {
   }).length;
 }
 
+async function ensureExecutedScheduleRun(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  userId: string;
+  scheduleId: string;
+  scheduledFor: string;
+  executedAt: string;
+}) {
+  const { data: existingRun, error: existingRunError } = await params.admin
+    .from("schedule_runs")
+    .select("id")
+    .eq("schedule_id", params.scheduleId)
+    .eq("scheduled_for", params.scheduledFor)
+    .eq("status", "executado")
+    .maybeSingle();
+
+  if (existingRunError) {
+    throw new Error(existingRunError.message);
+  }
+  if (existingRun?.id) return;
+
+  const { error: runError } = await params.admin.from("schedule_runs").insert({
+    user_id: params.userId,
+    schedule_id: params.scheduleId,
+    scheduled_for: params.scheduledFor,
+    executed_at: params.executedAt,
+    status: "executado",
+  });
+  if (runError) {
+    throw new Error(runError.message);
+  }
+}
+
 function validateRecurringRecurrenceLimit(params: {
   recurrence: "none" | "monthly" | "yearly";
   currentUtcIso: string;
@@ -925,6 +957,16 @@ export async function markSchedulePaidAction(id: string) {
 
   const recurrence = String((schedule as any).recurrence ?? "none");
   const nowIso = new Date().toISOString();
+  const scheduledFor = String((schedule as any).data_envio ?? (schedule as any).charge_due_at ?? nowIso);
+
+  await ensureExecutedScheduleRun({
+    admin,
+    userId,
+    scheduleId: String((schedule as any).id),
+    scheduledFor,
+    executedAt: nowIso,
+  });
+
   let updatePayload: Record<string, unknown>;
   if (recurrence === "monthly" || recurrence === "yearly") {
     const nextIsoBase = nextRecurringIsoAfterSettlement({
@@ -961,13 +1003,13 @@ export async function markSchedulePaidAction(id: string) {
           payment_received_at: null,
         }
       : {
-          status: "pago",
+          status: "executado",
           payment_received_at: nowIso,
           closed_at: nowIso,
         };
   } else {
     updatePayload = {
-      status: "pago",
+      status: "executado",
       payment_received_at: nowIso,
       closed_at: nowIso,
     };

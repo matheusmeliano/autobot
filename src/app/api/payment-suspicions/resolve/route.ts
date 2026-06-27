@@ -37,21 +37,9 @@ export async function POST(req: Request) {
 
   if (decision === "confirm") {
     if (scheduleId) {
-      const { data: schedule } = await admin
-        .from("schedules")
-        .select("id, user_id, debtor_id, data_envio, status, recurrence")
-        .eq("id", scheduleId)
-        .maybeSingle();
-
-      const recurrence = String((schedule as any)?.recurrence ?? "none");
-      if (recurrence === "monthly" || recurrence === "yearly") {
-        const paidRes = await markSchedulePaidAction(scheduleId);
-        if (!paidRes.ok) {
-          return Response.json({ ok: false, error: paidRes.error ?? "Falha ao marcar pagamento." }, { status: 500 });
-        }
-      } else if (schedule?.id) {
-        await admin.from("schedules").update({ status: "pago", payment_received_at: nowIso, closed_at: nowIso }).eq("id", scheduleId);
-        await syncDebtorChargeStatus(admin, userId, String((schedule as any)?.debtor_id ?? ""));
+      const paidRes = await markSchedulePaidAction(scheduleId);
+      if (!paidRes.ok) {
+        return Response.json({ ok: false, error: paidRes.error ?? "Falha ao marcar pagamento." }, { status: 500 });
       }
     }
 
