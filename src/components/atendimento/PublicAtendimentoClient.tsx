@@ -18,6 +18,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
 
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
@@ -40,6 +41,12 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
       element.style.overflowY = "auto";
     }
   }, [draft]);
+
+  useLayoutEffect(() => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [publicSlug, messages.length, typing]);
 
   async function submitDraft() {
     const contentText = draft.trim();
@@ -167,7 +174,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6">
+        <div ref={messagesViewportRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6">
           {loading ? (
             <div className="text-sm text-white/55">Iniciando atendimento...</div>
           ) : (

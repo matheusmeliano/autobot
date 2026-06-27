@@ -29,6 +29,7 @@ export function AtendimentoConversationPanel({
   const [draft, setDraft] = useState("");
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
     const element = textareaRef.current;
@@ -43,6 +44,12 @@ export function AtendimentoConversationPanel({
       element.style.overflowY = "auto";
     }
   }, [draft]);
+
+  useLayoutEffect(() => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [conversation?.id, orderedMessages.length]);
 
   async function submitDraft() {
     const content = draft.trim();
@@ -77,7 +84,7 @@ export function AtendimentoConversationPanel({
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div ref={messagesViewportRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {orderedMessages.length ? (
           orderedMessages.map((message) => {
             const isLead = message.sender_role === "lead";
