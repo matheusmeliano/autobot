@@ -231,7 +231,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
             <button
               type="submit"
               disabled={!draft.trim() || sending}
-              className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:min-h-14 sm:w-14"
+              className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/70 bg-emerald-600 text-[rgb(255,255,255)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-emerald-500/50 disabled:bg-emerald-600/60 disabled:text-[rgb(255,255,255)] disabled:opacity-100 sm:h-auto sm:min-h-14 sm:w-14"
             >
               <Send className="h-4 w-4" />
             </button>
