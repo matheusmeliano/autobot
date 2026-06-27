@@ -294,13 +294,11 @@ export function AtendimentoClient() {
           position="bottom"
           size="xl"
           zIndexClass="z-[120]"
+          panelClassName="max-h-[72dvh] sm:max-h-[76dvh]"
         >
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
-                <div className="mt-1 text-xs text-[var(--app-text-55)]">Envie mensagens para o lead por aqui.</div>
-              </div>
+              <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
               <button
                 type="button"
                 onClick={() => setMobileConversationOpen(false)}
