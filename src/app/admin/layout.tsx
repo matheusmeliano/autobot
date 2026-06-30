@@ -32,9 +32,17 @@ export default async function AdminLayout({
   const savedTheme = normalizeStoredTheme(profile?.theme);
   const initialTheme = savedTheme ?? "dark";
   const themeStorageKey = getThemeStorageKey(user.id);
+  const initialBackground = initialTheme === "light" ? "#f8fafc" : "#070A10";
 
   return (
     <>
+      <style>{`
+        html,
+        body {
+          background: ${initialBackground};
+          overscroll-behavior-y: none;
+        }
+      `}</style>
       <Script id="autobot-admin-theme-init" strategy="beforeInteractive">
         {`
           (function() {

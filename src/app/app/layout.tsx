@@ -49,9 +49,17 @@ export default async function AppLayout({
   const savedTheme = normalizeStoredTheme(profile?.theme);
   const initialTheme = savedTheme ?? "dark";
   const themeStorageKey = getThemeStorageKey(session.user.id);
+  const initialBackground = initialTheme === "light" ? "#f8fafc" : "#070A10";
 
   return (
     <>
+      <style>{`
+        html,
+        body {
+          background: ${initialBackground};
+          overscroll-behavior-y: none;
+        }
+      `}</style>
       <Script id="autobot-app-theme-init" strategy="beforeInteractive">
         {`
           (function() {
