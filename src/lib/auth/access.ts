@@ -27,6 +27,10 @@ export function getAtendimentoAccountPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
   return `/atendimento/conta?slug=${encodeURIComponent(safeSlug)}`;
 }
 
+export function isAtendimentoPath(pathname: string) {
+  return pathname === "/atendimento" || pathname.startsWith("/atendimento/");
+}
+
 export function getDefaultAuthenticatedPath(accessScope: unknown) {
   return isAtendimentoOnlyAccessScope(accessScope) ? getAtendimentoPortalPath() : "/app";
 }
@@ -45,6 +49,10 @@ export function getSafeAuthenticatedPath(accessScope: unknown, requestedPath: un
       normalizedPath === "/admin" ||
       normalizedPath.startsWith("/admin/"))
   ) {
+    return defaultPath;
+  }
+
+  if (!isAtendimentoOnlyAccessScope(accessScope) && isAtendimentoPath(normalizedPath)) {
     return defaultPath;
   }
 

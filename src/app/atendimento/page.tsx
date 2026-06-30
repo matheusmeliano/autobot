@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { PublicAtendimentoClient } from "@/components/atendimento/PublicAtendimentoClient";
-import { getAtendimentoPortalPath } from "@/lib/auth/access";
+import { getAtendimentoPortalPath, isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export default async function AtendimentoPublicPage({
   searchParams,
@@ -73,6 +74,11 @@ export default async function AtendimentoPublicPage({
     .select("nome, email, created_at, access_scope")
     .eq("user_id", user.id)
     .maybeSingle();
+
+  const accessScope = normalizeAccessScope((profile as any)?.access_scope);
+  if (!isAtendimentoOnlyAccessScope(accessScope)) {
+    redirect("/app");
+  }
 
   return (
     <>

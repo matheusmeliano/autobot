@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
 import { initialBotMessages } from "@/lib/atendimento/bot";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
-import { normalizeAccessScope } from "@/lib/auth/access";
+import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 
 export async function requireAtendimentoUser() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
@@ -31,6 +31,11 @@ export async function requireAuthenticatedAtendimentoParticipant() {
     .eq("user_id", user.id)
     .maybeSingle();
 
+  const accessScope = normalizeAccessScope((profile as any)?.access_scope);
+  if (!isAtendimentoOnlyAccessScope(accessScope)) {
+    return { ok: false as const, supabase, user: null, profile: null };
+  }
+
   return {
     ok: true as const,
     supabase,
@@ -39,7 +44,7 @@ export async function requireAuthenticatedAtendimentoParticipant() {
       nome: String((profile as any)?.nome ?? "").trim() || null,
       email: String((profile as any)?.email ?? user.email ?? "").trim().toLowerCase() || null,
       created_at: String((profile as any)?.created_at ?? "").trim() || null,
-      access_scope: normalizeAccessScope((profile as any)?.access_scope),
+      access_scope: accessScope,
     },
   };
 }

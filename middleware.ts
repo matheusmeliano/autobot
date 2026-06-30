@@ -4,6 +4,7 @@ import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import {
   getDefaultAuthenticatedPath,
   getSafeAuthenticatedPath,
+  isAtendimentoPath,
   isAtendimentoOnlyAccessScope,
   normalizeAccessScope,
 } from "@/lib/auth/access";
@@ -204,9 +205,17 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (isAtendimentoPath(pathname) && user && !isAtendimentoOnlyAccessScope(accessScope)) {
+    const redirectUrl = request.nextUrl.clone();
+    const destination = splitDestination(getDefaultAuthenticatedPath(accessScope));
+    redirectUrl.pathname = destination.pathname;
+    redirectUrl.search = destination.search;
+    return copyCookies(NextResponse.redirect(redirectUrl), cookiesToReplay);
+  }
+
   return response;
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/admin/:path*", "/login", "/signup"],
+  matcher: ["/app/:path*", "/admin/:path*", "/atendimento", "/atendimento/:path*", "/login", "/signup"],
 };
