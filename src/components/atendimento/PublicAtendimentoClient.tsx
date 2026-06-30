@@ -227,21 +227,13 @@ export function PublicAtendimentoClient({
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#09111A] px-4 py-4 text-white md:px-8 md:py-6">
       <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0E1723] shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
-        <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(14,23,35,0.9))] px-6 py-6">
-          <div className="flex items-start justify-between gap-5">
-            <div className="max-w-2xl pr-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{isAccountPage ? "Conta" : "Atendimento"}</h1>
-              <p className="mt-2 text-sm text-white/65">
-                {isAccountPage
-                  ? "Visualize os dados da sua conta de atendimento em uma area exclusiva."
-                  : "Fale com nosso bot, agende sua aula experimental e faca seu pre-cadastro em poucos minutos."}
-              </p>
-            </div>
+        <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(14,23,35,0.9))] px-6 py-5">
+          <div className="flex justify-end">
             <Link
               href={accountHref}
               aria-label="Abrir sua conta"
               className={[
-                "mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-base font-semibold transition",
+                "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-base font-semibold transition",
                 isAccountPage
                   ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-100"
                   : "border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]",
@@ -252,7 +244,7 @@ export function PublicAtendimentoClient({
           </div>
 
           {isAccountPage ? (
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Link
                 href={botHref}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
