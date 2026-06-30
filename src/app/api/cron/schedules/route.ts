@@ -82,6 +82,13 @@ function diffDaysLocalDate(fromDate: string, toDate: string) {
   return Math.floor((to - from) / (24 * 60 * 60 * 1000));
 }
 
+function weekdayFromLocalDate(localDate: string) {
+  const [year, month, day] = localDate.split("-").map(Number);
+  const base = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const weekday = base.getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+}
+
 async function countExecutedRunsOnLocalDate(params: {
   supabase: ReturnType<typeof createSupabaseAdminClient>;
   scheduleId: string;
@@ -189,7 +196,7 @@ export async function GET(req: Request) {
   const { data: pendingSchedules, error: pendingError } = await supabase
     .from("schedules")
     .select(
-      "id, user_id, debtor_id, data_envio, charge_due_at, last_sent_at, first_sent_at, retry_attempts, status, schedule_timezone, debtors(retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days)",
+      "id, user_id, debtor_id, data_envio, charge_due_at, last_sent_at, first_sent_at, retry_attempts, status, schedule_timezone, debtors(skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days)",
     )
     .eq("status", "pendente")
     .is("closed_at", null)
@@ -206,14 +213,14 @@ export async function GET(req: Request) {
       String((item as any).first_sent_at ?? "") ||
       String((item as any).charge_due_at ?? "") ||
       String((item as any).data_envio ?? nowIso);
-    const dueUtcIso = String((item as any).charge_due_at ?? "") || String((item as any).data_envio ?? "");
-    if (!referenceUtcIso || !dueUtcIso) continue;
-    const dueLocalDate = localDateInTimeZone(dueUtcIso, timeZone);
-    const nowLocalDate = localDateInTimeZone(nowIso, timeZone);
-    if (diffDaysLocalDate(dueLocalDate, nowLocalDate) < 3) continue;
+    if (!referenceUtcIso) continue;
     if (!isPastLocalDay({ referenceUtcIso, nowUtcIso: nowIso, timeZone })) continue;
 
-    const retryConfig = normalizeRetryConfig((item as any).debtors ?? {});
+    const debtor = (item as any).debtors ?? {};
+    const retryConfig = normalizeRetryConfig(debtor);
+    const effectiveRetryWeekdays = Boolean(debtor?.skip_weekends_on_first_charge)
+      ? retryConfig.weekdays.filter((weekday) => weekday >= 1 && weekday <= 5)
+      : retryConfig.weekdays;
     const shouldClose =
       hasAutoCloseExpired({
         firstSentAt: String((item as any).first_sent_at ?? "") || referenceUtcIso,
@@ -221,11 +228,11 @@ export async function GET(req: Request) {
         timeZone,
         autoCloseDays: retryConfig.autoCloseDays,
       });
-    const nextRetryAt = retryConfig.weekdays.length
+    const nextRetryAt = effectiveRetryWeekdays.length
       ? nextRetryUtcIso({
           fromUtcIso: referenceUtcIso,
           timeZone,
-          weekdays: retryConfig.weekdays,
+          weekdays: effectiveRetryWeekdays,
           time: retryConfig.time,
           intervalDays: retryConfig.intervalDays,
         })
@@ -298,9 +305,32 @@ export async function GET(req: Request) {
       const sourceStatus = String((s as any).status ?? "") === "atrasado" ? "atrasado" : "pendente";
       const timeZone = String((s as any).schedule_timezone ?? "") || "America/Sao_Paulo";
       const retryConfig = normalizeRetryConfig(debtor ?? {});
-      if (sourceStatus === "atrasado" && retryConfig.weekdays.length === 0) {
+      const effectiveRetryWeekdays = Boolean(debtor?.skip_weekends_on_first_charge)
+        ? retryConfig.weekdays.filter((weekday) => weekday >= 1 && weekday <= 5)
+        : retryConfig.weekdays;
+      if (sourceStatus === "atrasado" && effectiveRetryWeekdays.length === 0) {
         results.push({ id: scheduleId, ok: true });
         continue;
+      }
+      if (sourceStatus === "atrasado") {
+        const nowLocalDate = localDateInTimeZone(nowIso, timeZone);
+        const nowLocalWeekday = weekdayFromLocalDate(nowLocalDate);
+        if (!effectiveRetryWeekdays.includes(nowLocalWeekday)) {
+          const nextRetryAt = nextRetryUtcIso({
+            fromUtcIso: nowIso,
+            timeZone,
+            weekdays: effectiveRetryWeekdays,
+            time: retryConfig.time,
+            intervalDays: retryConfig.intervalDays,
+          });
+          await supabase
+            .from("schedules")
+            .update(nextRetryAt ? { status: "atrasado", data_envio: nextRetryAt } : { status: "atrasado" })
+            .eq("id", scheduleId);
+          await syncDebtorChargeStatus(supabase, userId, String((s as any).debtor_id ?? ""));
+          results.push({ id: scheduleId, ok: true });
+          continue;
+        }
       }
       const isFirstCharge = !String((s as any).first_sent_at ?? "");
       const shiftedFirstChargeUtcIso = shiftFirstChargeFromWeekendUtcIso({
