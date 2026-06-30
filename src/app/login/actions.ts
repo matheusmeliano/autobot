@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
+import { getDefaultAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
 
 const schema = z.object({
   email: z.string().email(),
@@ -25,5 +26,24 @@ export async function loginAction(formData: FormData) {
     return { ok: false, error: supabaseErrorToPt(error.message) };
   }
 
-  return { ok: true };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let accessScope = "app";
+  if (user?.id) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("access_scope")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    accessScope = normalizeAccessScope((profile as any)?.access_scope);
+  }
+
+  const requestedNext = String(formData.get("next") ?? "").trim();
+  const safeNext = /^\/(?!\/)/.test(requestedNext)
+    ? requestedNext
+    : getDefaultAuthenticatedPath(accessScope);
+
+  return { ok: true, next: safeNext };
 }

@@ -60,6 +60,9 @@ export function LoginForm() {
     const formData = new FormData();
     formData.append("email", values.email);
     formData.append("password", values.password);
+    if (safeNext) {
+      formData.append("next", safeNext);
+    }
 
     const res = await loginAction(formData);
     if (!res.ok) {
@@ -67,7 +70,7 @@ export function LoginForm() {
       return;
     }
 
-    const nextUrl = safeNext || "/app";
+    const nextUrl = String(res.next ?? safeNext ?? "/app");
     router.push(nextUrl);
     router.refresh();
   });
