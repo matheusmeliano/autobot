@@ -6,6 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
+import { getDefaultAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
+import { ensureAtendimentoLeadForAuthenticatedUser } from "@/lib/atendimento/server";
 
 const schema = z.object({
   email: z.string().email(),
@@ -32,6 +34,9 @@ export async function signupAction(formData: FormData) {
   }
 
   const normalizedEmail = parsed.data.email.trim().toLowerCase();
+  const accessScope = normalizeAccessScope(formData.get("access_scope"));
+  const nextValue = String(formData.get("next") ?? "").trim();
+  const safeNext = /^\/(?!\/)/.test(nextValue) ? nextValue : getDefaultAuthenticatedPath(accessScope);
 
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? null;
@@ -70,7 +75,7 @@ export async function signupAction(formData: FormData) {
     options: {
       data: parsed.data.name ? { name: parsed.data.name } : undefined,
       emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(
-        "/login?confirmed=1",
+        `/login?confirmed=1&next=${encodeURIComponent(safeNext)}`,
       )}`,
     },
   });
@@ -103,6 +108,7 @@ export async function signupAction(formData: FormData) {
         email: normalizedEmail,
         nome: parsed.data.name ?? "",
         plano: "teste",
+        access_scope: accessScope,
       },
       { onConflict: "user_id" },
     );
@@ -122,8 +128,16 @@ export async function signupAction(formData: FormData) {
         vencimento,
       });
     }
+
+    if (accessScope === "atendimento") {
+      await ensureAtendimentoLeadForAuthenticatedUser({
+        userId,
+        email: normalizedEmail,
+        name: parsed.data.name ?? "",
+      });
+    }
   }
 
   const hasSession = Boolean(data.session);
-  return { ok: true, needsEmailConfirmation: !hasSession };
+  return { ok: true, needsEmailConfirmation: !hasSession, next: safeNext };
 }

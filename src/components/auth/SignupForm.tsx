@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -17,6 +17,7 @@ type FormValues = {
 
 export function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const {
     register,
@@ -25,6 +26,10 @@ export function SignupForm() {
   } = useForm<FormValues>({
     defaultValues: { name: "", email: "", password: "" },
   });
+  const next = String(searchParams?.get("next") ?? "");
+  const safeNext = /^\/(?!\/)/.test(next) ? next : "/app";
+  const accessScope = searchParams?.get("mode") === "atendimento" ? "atendimento" : "app";
+  const loginHref = next ? `/login?next=${encodeURIComponent(safeNext)}` : "/login";
 
   const onSubmit = handleSubmit(
     async (values) => {
@@ -32,6 +37,8 @@ export function SignupForm() {
       formData.append("name", values.name);
       formData.append("email", values.email);
       formData.append("password", values.password);
+      formData.append("next", safeNext);
+      formData.append("access_scope", accessScope);
 
       const res = await signupAction(formData);
       if (!res.ok) {
@@ -41,11 +48,11 @@ export function SignupForm() {
 
       if (res.needsEmailConfirmation) {
         modalToast.success("Confirme seu email para entrar.");
-        router.push("/login");
+        router.push(loginHref);
         return;
       }
 
-      router.push("/app");
+      router.push(String(res.next ?? safeNext));
       router.refresh();
     },
     (errors) => {
@@ -64,7 +71,7 @@ export function SignupForm() {
       footer={
         <>
           Já tem conta?{" "}
-          <Link className="font-semibold text-white hover:underline" href="/login">
+          <Link className="font-semibold text-white hover:underline" href={loginHref}>
             Entrar
           </Link>
         </>

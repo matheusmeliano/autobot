@@ -27,6 +27,11 @@ export function LoginForm() {
   } = useForm<FormValues>({
     defaultValues: { email: "", password: "" },
   });
+  const next = String(searchParams?.get("next") ?? "");
+  const safeNext = /^\/(?!\/)/.test(next) ? next : "";
+  const signupHref = safeNext
+    ? `/signup?next=${encodeURIComponent(safeNext)}${safeNext.startsWith("/atendimento") ? "&mode=atendimento" : ""}`
+    : "/signup";
 
   useEffect(() => {
     if (didShowConfirmed.current) return;
@@ -62,8 +67,7 @@ export function LoginForm() {
       return;
     }
 
-    const next = String(searchParams?.get("next") ?? "");
-    const nextUrl = /^\/(?!\/)/.test(next) ? next : "/app";
+    const nextUrl = safeNext || "/app";
     router.push(nextUrl);
     router.refresh();
   });
@@ -75,7 +79,7 @@ export function LoginForm() {
       footer={
         <>
           Não tem conta?{" "}
-          <Link className="font-semibold text-white hover:underline" href="/signup">
+          <Link className="font-semibold text-white hover:underline" href={signupHref}>
             Criar conta
           </Link>
         </>

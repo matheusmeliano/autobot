@@ -1,4 +1,8 @@
-import { createPublicLeadSession, ensureInitialBotConversationFlow } from "@/lib/atendimento/server";
+import {
+  createAuthenticatedLeadSession,
+  ensureInitialBotConversationFlow,
+  requireAuthenticatedAtendimentoParticipant,
+} from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { initialBotMessages } from "@/lib/atendimento/bot";
 
@@ -8,7 +12,18 @@ export async function POST(req: Request) {
   const origin = req.headers.get("origin");
 
   try {
-    const session = await createPublicLeadSession({ origin, slug });
+    const auth = await requireAuthenticatedAtendimentoParticipant();
+    if (!auth.ok || !auth.user?.id) {
+      return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    const session = await createAuthenticatedLeadSession({
+      origin,
+      slug,
+      userId: auth.user.id,
+      email: auth.profile?.email ?? auth.user.email ?? null,
+      name: auth.profile?.nome ?? null,
+    });
     await ensureInitialBotConversationFlow({
       leadId: String(session.lead.id),
       conversationId: String(session.conversation.id),

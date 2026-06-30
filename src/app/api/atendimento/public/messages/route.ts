@@ -6,7 +6,12 @@ import {
   getNextMissingField,
 } from "@/lib/atendimento/bot";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { appendHistoryEvent, ensureInitialBotConversationFlow, syncConversationPreview } from "@/lib/atendimento/server";
+import {
+  appendHistoryEvent,
+  ensureInitialBotConversationFlow,
+  requireAuthenticatedAtendimentoParticipant,
+  syncConversationPreview,
+} from "@/lib/atendimento/server";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
 
 function randomTypingDelayMs() {
@@ -71,11 +76,10 @@ async function upsertCapturedFields(params: {
   }
 }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const publicSlug = String(searchParams.get("public_slug") ?? "").trim();
-  if (!publicSlug) {
-    return Response.json({ ok: false, error: "missing_public_slug" }, { status: 400 });
+async function getAuthenticatedConversationAccess(publicSlug: string) {
+  const auth = await requireAuthenticatedAtendimentoParticipant();
+  if (!auth.ok || !auth.user?.id) {
+    return { ok: false as const, status: 401, error: "unauthorized" };
   }
 
   const admin = createSupabaseAdminClient();
@@ -86,8 +90,38 @@ export async function GET(req: Request) {
     .maybeSingle();
 
   if (!conversation?.id) {
-    return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+    return { ok: false as const, status: 404, error: "not_found" };
   }
+
+  const { data: lead } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("id", String(conversation.lead_id))
+    .maybeSingle();
+
+  if (!lead?.id) {
+    return { ok: false as const, status: 404, error: "lead_not_found" };
+  }
+
+  if (String((lead as any).auth_user_id ?? "") !== auth.user.id) {
+    return { ok: false as const, status: 403, error: "forbidden" };
+  }
+
+  return { ok: true as const, auth, admin, conversation, lead };
+}
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const publicSlug = String(searchParams.get("public_slug") ?? "").trim();
+  if (!publicSlug) {
+    return Response.json({ ok: false, error: "missing_public_slug" }, { status: 400 });
+  }
+
+  const access = await getAuthenticatedConversationAccess(publicSlug);
+  if (!access.ok) {
+    return Response.json({ ok: false, error: access.error }, { status: access.status });
+  }
+  const { admin, conversation } = access;
 
   await ensureInitialBotConversationFlow({
     leadId: String(conversation.lead_id),
@@ -129,26 +163,11 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "empty_message" }, { status: 400 });
   }
 
-  const admin = createSupabaseAdminClient();
-  const { data: conversation } = await admin
-    .from("atendimento_conversations")
-    .select("id, lead_id")
-    .eq("public_slug", publicSlug)
-    .maybeSingle();
-
-  if (!conversation?.id) {
-    return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+  const access = await getAuthenticatedConversationAccess(publicSlug);
+  if (!access.ok) {
+    return Response.json({ ok: false, error: access.error }, { status: access.status });
   }
-
-  const { data: lead } = await admin
-    .from("atendimento_leads")
-    .select("*")
-    .eq("id", String(conversation.lead_id))
-    .maybeSingle();
-
-  if (!lead?.id) {
-    return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
-  }
+  const { admin, conversation, lead } = access;
 
   const { data: lastBotMessage } = await admin
     .from("atendimento_messages")
