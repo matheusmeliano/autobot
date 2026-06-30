@@ -114,6 +114,25 @@ export function Landing() {
   const lastCarouselInteractionAt = useRef(0);
   const [carouselPaused, setCarouselPaused] = useState(false);
 
+  useEffect(() => {
+    const previousHtmlBackground = document.documentElement.style.backgroundColor;
+    const previousHtmlOverscroll = document.documentElement.style.overscrollBehaviorY;
+    const previousBodyBackground = document.body.style.backgroundColor;
+    const previousBodyOverscroll = document.body.style.overscrollBehaviorY;
+
+    document.documentElement.style.backgroundColor = "#070A10";
+    document.documentElement.style.overscrollBehaviorY = "none";
+    document.body.style.backgroundColor = "#070A10";
+    document.body.style.overscrollBehaviorY = "none";
+
+    return () => {
+      document.documentElement.style.backgroundColor = previousHtmlBackground;
+      document.documentElement.style.overscrollBehaviorY = previousHtmlOverscroll;
+      document.body.style.backgroundColor = previousBodyBackground;
+      document.body.style.overscrollBehaviorY = previousBodyOverscroll;
+    };
+  }, []);
+
   const getCarouselStep = useCallback(() => {
     const el = carouselRef.current;
     if (!el) return 0;
@@ -811,4 +830,3 @@ export function Landing() {
     </div>
   );
 }
-

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Logo } from "@/components/ui/Logo";
 
 export function AuthCard({
@@ -13,6 +14,25 @@ export function AuthCard({
   children: React.ReactNode;
   footer: React.ReactNode;
 }) {
+  useEffect(() => {
+    const previousHtmlBackground = document.documentElement.style.backgroundColor;
+    const previousHtmlOverscroll = document.documentElement.style.overscrollBehaviorY;
+    const previousBodyBackground = document.body.style.backgroundColor;
+    const previousBodyOverscroll = document.body.style.overscrollBehaviorY;
+
+    document.documentElement.style.backgroundColor = "#070A10";
+    document.documentElement.style.overscrollBehaviorY = "none";
+    document.body.style.backgroundColor = "#070A10";
+    document.body.style.overscrollBehaviorY = "none";
+
+    return () => {
+      document.documentElement.style.backgroundColor = previousHtmlBackground;
+      document.documentElement.style.overscrollBehaviorY = previousHtmlOverscroll;
+      document.body.style.backgroundColor = previousBodyBackground;
+      document.body.style.overscrollBehaviorY = previousBodyOverscroll;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-start px-6 pb-16 pt-10 md:justify-center md:py-16">
