@@ -6,7 +6,11 @@ import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
-import { getDefaultAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
+import {
+  getDefaultAuthenticatedPath,
+  isAtendimentoOnlyAccessScope,
+  normalizeAccessScope,
+} from "@/lib/auth/access";
 import { ensureAtendimentoLeadForAuthenticatedUser } from "@/lib/atendimento/server";
 
 const schema = z.object({
@@ -35,6 +39,7 @@ export async function signupAction(formData: FormData) {
 
   const normalizedEmail = parsed.data.email.trim().toLowerCase();
   const accessScope = normalizeAccessScope(formData.get("access_scope"));
+  const isAtendimentoOnlyUser = isAtendimentoOnlyAccessScope(accessScope);
   const nextValue = String(formData.get("next") ?? "").trim();
   const safeNext = /^\/(?!\/)/.test(nextValue) ? nextValue : getDefaultAuthenticatedPath(accessScope);
 
@@ -107,7 +112,7 @@ export async function signupAction(formData: FormData) {
         user_id: userId,
         email: normalizedEmail,
         nome: parsed.data.name ?? "",
-        plano: "teste",
+        plano: isAtendimentoOnlyUser ? "vitalicio" : "teste",
         access_scope: accessScope,
       },
       { onConflict: "user_id" },
@@ -120,16 +125,25 @@ export async function signupAction(formData: FormData) {
       .limit(1)
       .maybeSingle();
 
-    if (!existingSub?.id) {
+    if (existingSub?.id) {
+      await admin
+        .from("subscriptions")
+        .update({
+          plano: isAtendimentoOnlyUser ? "vitalicio" : "teste",
+          status: "ativo",
+          vencimento: isAtendimentoOnlyUser ? null : vencimento,
+        })
+        .eq("id", existingSub.id);
+    } else {
       await admin.from("subscriptions").insert({
         user_id: userId,
-        plano: "teste",
+        plano: isAtendimentoOnlyUser ? "vitalicio" : "teste",
         status: "ativo",
-        vencimento,
+        vencimento: isAtendimentoOnlyUser ? null : vencimento,
       });
     }
 
-    if (accessScope === "atendimento") {
+    if (isAtendimentoOnlyUser) {
       await ensureAtendimentoLeadForAuthenticatedUser({
         userId,
         email: normalizedEmail,

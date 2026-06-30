@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { normalizePlan } from "@/lib/plans";
@@ -18,6 +19,15 @@ async function assertAdmin() {
   }
 
   return { ok: true as const };
+}
+
+async function getTargetProfileScope(supabase: NonNullable<ReturnType<typeof tryCreateSupabaseAdminClient>>, userId: string) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("access_scope")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (profile as any)?.access_scope;
 }
 
 const updateSchema = z.object({
@@ -50,6 +60,9 @@ export async function updateUserAdminAction(input: unknown) {
   const { data: target } = await supabase.auth.admin.getUserById(payload.id);
   if (isGlobalAdminEmail(target.user?.email)) {
     return { ok: false as const, error: "Não é possível editar este admin." };
+  }
+  if (isAtendimentoOnlyAccessScope(await getTargetProfileScope(supabase, payload.id))) {
+    return { ok: false as const, error: "Usuários do Atendimento são gerenciados apenas no módulo Atendimento." };
   }
 
   const { error: profileError } = await supabase
@@ -156,6 +169,9 @@ export async function deleteUserAdminAction(id: string) {
   const { data: target } = await supabase.auth.admin.getUserById(id);
   if (isGlobalAdminEmail(target.user?.email)) {
     return { ok: false as const, error: "Não é possível excluir este admin." };
+  }
+  if (isAtendimentoOnlyAccessScope(await getTargetProfileScope(supabase, id))) {
+    return { ok: false as const, error: "Usuários do Atendimento são gerenciados apenas no módulo Atendimento." };
   }
   const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) {

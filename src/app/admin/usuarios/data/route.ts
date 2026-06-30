@@ -29,7 +29,7 @@ export async function GET() {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("user_id, nome, email, plano, created_at")
+    .select("user_id, nome, email, plano, created_at, access_scope")
     .in("user_id", ids);
 
   const { data: subs } = await supabase
@@ -77,7 +77,9 @@ export async function GET() {
     });
   }
 
-  const rows = users.map((u) => {
+  const rows = users
+    .filter((u) => String((profileById.get(u.id) as any)?.access_scope ?? "app") !== "atendimento")
+    .map((u) => {
     const p = profileById.get(u.id);
     const s = subById.get(u.id);
     return {
@@ -90,7 +92,7 @@ export async function GET() {
       vencimento: s?.vencimento ?? null,
       criado_em: u.created_at ?? p?.created_at ?? null,
     };
-  });
+    });
 
   return Response.json(rows);
 }
