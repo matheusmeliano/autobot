@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 
 export async function GET(_: Request, context: { params: Promise<{ leadId: string }> }) {
   const auth = await requireAtendimentoUser();
@@ -83,7 +84,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
 
   const { data: lead, error: leadError } = await admin
     .from("atendimento_leads")
-    .select("id")
+    .select("id, auth_user_id")
     .eq("id", leadId)
     .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
     .maybeSingle();
@@ -94,6 +95,26 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
 
   if (!lead?.id) {
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
+  const authUserId = String((lead as { auth_user_id?: string | null }).auth_user_id ?? "").trim();
+  if (authUserId) {
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("access_scope")
+      .eq("user_id", authUserId)
+      .maybeSingle();
+
+    if (profileError) {
+      return Response.json({ ok: false, error: profileError.message }, { status: 500 });
+    }
+
+    if (isAtendimentoOnlyAccessScope(normalizeAccessScope((profile as any)?.access_scope))) {
+      const { error: deleteAuthUserError } = await admin.auth.admin.deleteUser(authUserId);
+      if (deleteAuthUserError) {
+        return Response.json({ ok: false, error: deleteAuthUserError.message }, { status: 500 });
+      }
+    }
   }
 
   const { data: conversations, error: conversationsError } = await admin

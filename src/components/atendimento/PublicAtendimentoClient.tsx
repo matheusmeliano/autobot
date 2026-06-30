@@ -7,6 +7,7 @@ import { logoutAction } from "@/app/app/actions";
 import { getAtendimentoAccountPath, getAtendimentoPortalPath } from "@/lib/auth/access";
 import type { AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type PortalPage = "bot" | "conta";
 
@@ -66,6 +67,14 @@ export function PublicAtendimentoClient({
   const accountHref = getAtendimentoAccountPath(linkSlug);
   const botHref = getAtendimentoPortalPath(linkSlug);
 
+  async function redirectToLoginAfterSessionLoss() {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+    } catch {}
+    window.location.replace("/login");
+  }
+
   useLayoutEffect(() => {
     if (isAccountPage) return;
     const element = textareaRef.current;
@@ -109,6 +118,7 @@ export function PublicAtendimentoClient({
     if (res.status === 401 || res.status === 403) {
       setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
       setMessages([]);
+      void redirectToLoginAfterSessionLoss();
       return [] as AtendimentoMessage[];
     }
     const json = await res.json().catch(() => null);
@@ -147,6 +157,7 @@ export function PublicAtendimentoClient({
       if (res.status === 401) {
         setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
         setMessages([]);
+        void redirectToLoginAfterSessionLoss();
         return;
       }
       const json = await res.json().catch(() => null);
@@ -183,6 +194,7 @@ export function PublicAtendimentoClient({
       });
       if (res.status === 401 || res.status === 403) {
         setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+        void redirectToLoginAfterSessionLoss();
         return;
       }
       const json = await res.json().catch(() => null);
