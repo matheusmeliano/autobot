@@ -180,7 +180,7 @@ export function PublicAtendimentoClient({ initialSlug }: { initialSlug: string }
         <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(14,23,35,0.9))] px-6 py-6">
           <h1 className="text-2xl font-semibold tracking-tight">Atendimento</h1>
           <p className="mt-2 max-w-2xl text-sm text-white/65">
-            Converse com nosso bot para conhecer a metodologia, receber o convite para aula experimental e concluir seu pré-cadastro sem sair desta conversa.
+            Fale com nosso bot, agende sua aula experimental e faca seu pre-cadastro em poucos minutos.
           </p>
         </div>
 
