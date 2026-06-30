@@ -237,7 +237,7 @@ export function AtendimentoClient() {
         <div className="mt-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75 sm:shrink-0">
-              Link Publico de Atendimento
+              Link de Atendimento
             </div>
             <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
               {publicUrl || "Carregando link..."}
