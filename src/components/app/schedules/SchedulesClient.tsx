@@ -604,25 +604,6 @@ export function SchedulesClient({
     };
   };
 
-  const normalizeEditedDateForPersistence = (row: ScheduleRow, date: string) => {
-    if (String(row.recurrence ?? "none") !== "monthly") return date;
-
-    const currentMonthKey = yearMonthKey(new Date().toISOString(), effectiveTimeZone);
-    const nextScheduleDate = splitDateTimeForInput(row.data_envio, effectiveTimeZone).date;
-    if (!nextScheduleDate) return date;
-
-    const nextScheduleMonthKey = nextScheduleDate.slice(0, 7);
-    if (nextScheduleMonthKey === currentMonthKey) return date;
-
-    const [yearRaw, monthRaw] = nextScheduleMonthKey.split("-");
-    const day = Number(String(date ?? "").split("-")[2] ?? "");
-    const year = Number(yearRaw);
-    const month = Number(monthRaw);
-    if (!year || !month) return date;
-    const safeDay = Math.max(1, Math.min(day || 1, lastDayOfMonth(year, month)));
-    return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
-  };
-
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
     const scheduleUnavailable = Boolean(r.schedule_missing) || String(r.id ?? "").startsWith("charge:");
     const baseButtonClass =
@@ -894,10 +875,7 @@ export function SchedulesClient({
       }
     }
 
-    const normalizedEditDate =
-      editing && values.data_envio_date
-        ? normalizeEditedDateForPersistence(editing, values.data_envio_date)
-        : values.data_envio_date;
+    const normalizedEditDate = values.data_envio_date;
     const normalizedRecurrenceUntil = normalizeDateOnly(values.recurrence_until);
     const effectiveRecurrenceUntil =
       values.recurrence === "yearly"
