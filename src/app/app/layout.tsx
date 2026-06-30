@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app/AppShell";
+import { getDefaultAuthenticatedPath, isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
@@ -45,7 +46,16 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const { data: profile } = await supabase.from("profiles").select("theme").maybeSingle();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("theme, access_scope")
+    .eq("user_id", session.user.id)
+    .maybeSingle();
+
+  if (isAtendimentoOnlyAccessScope((profile as any)?.access_scope)) {
+    redirect(getDefaultAuthenticatedPath((profile as any)?.access_scope));
+  }
+
   const savedTheme = normalizeStoredTheme(profile?.theme);
   const initialTheme = savedTheme ?? "dark";
   const themeStorageKey = getThemeStorageKey(session.user.id);

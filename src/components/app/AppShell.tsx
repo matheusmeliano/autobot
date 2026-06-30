@@ -14,6 +14,7 @@ import { updateThemeAction } from "@/app/app/configuracoes/actions";
 import { modalToast } from "@/lib/modalToast";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
+import { getDefaultAuthenticatedPath, isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
 
 function paymentToastMessage(pending: any) {
   const name = String(pending?.debtor?.nome ?? "").trim();
@@ -167,7 +168,7 @@ export function AppShell({
     let active = true;
     const checkAccess = async () => {
       const [{ data: profile }, { data: sub }] = await Promise.all([
-        supabase.from("profiles").select("plano, theme, nome").maybeSingle(),
+        supabase.from("profiles").select("plano, theme, nome, access_scope").maybeSingle(),
         supabase
           .from("subscriptions")
           .select("id, plano, status, vencimento, created_at")
@@ -178,6 +179,10 @@ export function AppShell({
 
       const plan = normalizePlan(profile?.plano ?? sub?.plano ?? "teste");
       if (!active) return;
+      if (isAtendimentoOnlyAccessScope(profile?.access_scope)) {
+        router.replace(getDefaultAuthenticatedPath(profile?.access_scope));
+        return;
+      }
       setPlan(plan);
       setProfileName(String(profile?.nome ?? "").trim());
       const rawTheme = (profile as { theme?: unknown } | null)?.theme;

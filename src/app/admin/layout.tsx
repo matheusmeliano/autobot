@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import Script from "next/script";
+import { getDefaultAuthenticatedPath, isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { AdminLogoutForm } from "@/components/admin/AdminLogoutForm";
@@ -24,11 +25,20 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("theme, access_scope")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (isAtendimentoOnlyAccessScope((profile as any)?.access_scope)) {
+    redirect(getDefaultAuthenticatedPath((profile as any)?.access_scope));
+  }
+
   if (!isGlobalAdminEmail(user.email)) {
     redirect("/app");
   }
 
-  const { data: profile } = await supabase.from("profiles").select("theme").maybeSingle();
   const savedTheme = normalizeStoredTheme(profile?.theme);
   const initialTheme = savedTheme ?? "dark";
   const themeStorageKey = getThemeStorageKey(user.id);

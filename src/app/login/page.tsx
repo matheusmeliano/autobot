@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getDefaultAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
+import { getSafeAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/LoginForm";
 
@@ -33,7 +33,7 @@ export default async function LoginPage({
 
   if (user && sp.confirmed !== "1") {
     const requestedNext = String(sp.next ?? "");
-    const safeNext = /^\/(?!\/)/.test(requestedNext) ? requestedNext : getDefaultAuthenticatedPath(accessScope);
+    const safeNext = getSafeAuthenticatedPath(accessScope, requestedNext);
     redirect(safeNext);
   }
 

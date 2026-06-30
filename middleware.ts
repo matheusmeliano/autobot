@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import {
   getDefaultAuthenticatedPath,
+  getSafeAuthenticatedPath,
   isAtendimentoOnlyAccessScope,
   normalizeAccessScope,
 } from "@/lib/auth/access";
@@ -122,9 +123,7 @@ export async function middleware(request: NextRequest) {
     }
 
     const requestedNext = String(request.nextUrl.searchParams.get("next") ?? "");
-    const safeNext = /^\/(?!\/)/.test(requestedNext)
-      ? requestedNext
-      : getDefaultAuthenticatedPath(accessScope);
+    const safeNext = getSafeAuthenticatedPath(accessScope, requestedNext);
     const redirectUrl = request.nextUrl.clone();
     const destination = splitDestination(safeNext);
     redirectUrl.pathname = destination.pathname;

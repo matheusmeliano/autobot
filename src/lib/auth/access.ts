@@ -30,3 +30,23 @@ export function getAtendimentoAccountPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
 export function getDefaultAuthenticatedPath(accessScope: unknown) {
   return isAtendimentoOnlyAccessScope(accessScope) ? getAtendimentoPortalPath() : "/app";
 }
+
+export function getSafeAuthenticatedPath(accessScope: unknown, requestedPath: unknown) {
+  const normalizedPath = String(requestedPath ?? "").trim();
+  const defaultPath = getDefaultAuthenticatedPath(accessScope);
+  if (!/^\/(?!\/)/.test(normalizedPath)) {
+    return defaultPath;
+  }
+
+  if (
+    isAtendimentoOnlyAccessScope(accessScope) &&
+    (normalizedPath === "/app" ||
+      normalizedPath.startsWith("/app/") ||
+      normalizedPath === "/admin" ||
+      normalizedPath.startsWith("/admin/"))
+  ) {
+    return defaultPath;
+  }
+
+  return normalizedPath;
+}

@@ -7,7 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import {
-  getDefaultAuthenticatedPath,
+  getSafeAuthenticatedPath,
   isAtendimentoOnlyAccessScope,
   normalizeAccessScope,
 } from "@/lib/auth/access";
@@ -41,7 +41,7 @@ export async function signupAction(formData: FormData) {
   const accessScope = normalizeAccessScope(formData.get("access_scope"));
   const isAtendimentoOnlyUser = isAtendimentoOnlyAccessScope(accessScope);
   const nextValue = String(formData.get("next") ?? "").trim();
-  const safeNext = /^\/(?!\/)/.test(nextValue) ? nextValue : getDefaultAuthenticatedPath(accessScope);
+  const safeNext = getSafeAuthenticatedPath(accessScope, nextValue);
 
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? null;

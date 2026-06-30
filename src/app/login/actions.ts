@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
-import { getDefaultAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
+import { getSafeAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
 
 const schema = z.object({
   email: z.string().email(),
@@ -41,9 +41,7 @@ export async function loginAction(formData: FormData) {
   }
 
   const requestedNext = String(formData.get("next") ?? "").trim();
-  const safeNext = /^\/(?!\/)/.test(requestedNext)
-    ? requestedNext
-    : getDefaultAuthenticatedPath(accessScope);
+  const safeNext = getSafeAuthenticatedPath(accessScope, requestedNext);
 
   return { ok: true, next: safeNext };
 }
