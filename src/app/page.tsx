@@ -29,5 +29,16 @@ export default async function HomePage({
     redirect(`/auth/callback?${qp.toString()}`);
   }
 
-  return <Landing />;
+  return (
+    <>
+      <style>{`
+        html,
+        body {
+          background: #070A10;
+          overscroll-behavior-y: none;
+        }
+      `}</style>
+      <Landing />
+    </>
+  );
 }
