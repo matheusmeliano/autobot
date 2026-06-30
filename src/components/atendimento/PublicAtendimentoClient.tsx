@@ -23,6 +23,12 @@ function getInitialLetter(value: string) {
   return normalized.charAt(0).toUpperCase();
 }
 
+function getFirstName(value: string) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "Usuario";
+  return normalized.split(/\s+/)[0] || "Usuario";
+}
+
 export function PublicAtendimentoClient({
   initialSlug,
   page,
@@ -55,6 +61,7 @@ export function PublicAtendimentoClient({
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
   const typing = !loading && !authError && !isAccountPage && (isInitialFlow || awaitingBotSince != null);
   const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
+  const firstName = getFirstName(displayName);
   const initialLetter = getInitialLetter(displayName);
   const accountHref = getAtendimentoAccountPath(linkSlug);
   const botHref = getAtendimentoPortalPath(linkSlug);
@@ -228,7 +235,10 @@ export function PublicAtendimentoClient({
     <div className="h-[100dvh] overflow-hidden bg-[#09111A] px-4 py-4 text-white md:px-8 md:py-6">
       <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0E1723] shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(14,23,35,0.9))] px-6 py-5">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="truncate text-lg font-semibold text-white">Ola, {firstName}!</div>
+            </div>
             <Link
               href={accountHref}
               aria-label="Abrir sua conta"
