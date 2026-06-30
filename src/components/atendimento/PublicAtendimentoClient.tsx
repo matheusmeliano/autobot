@@ -251,8 +251,8 @@ export function PublicAtendimentoClient({
             </Link>
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {isAccountPage ? (
+          {isAccountPage ? (
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Link
                 href={botHref}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
@@ -260,19 +260,17 @@ export function PublicAtendimentoClient({
                 <ArrowLeft className="h-4 w-4" />
                 Voltar ao bot
               </Link>
-            ) : (
-              <div className="text-sm text-white/55">Toque no icone com sua inicial para ver os dados da conta.</div>
-            )}
 
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
-              >
-                Sair
-              </button>
-            </form>
-          </div>
+              <form action={logoutAction}>
+                <button
+                  type="submit"
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
+                >
+                  Sair
+                </button>
+              </form>
+            </div>
+          ) : null}
         </div>
 
         {isAccountPage ? (
