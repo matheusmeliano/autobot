@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Send } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Send } from "lucide-react";
 import { logoutAction } from "@/app/app/actions";
+import { getAtendimentoAccountPath, getAtendimentoPortalPath } from "@/lib/auth/access";
 import type { AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
-type PortalTab = "bot" | "conta";
+type PortalPage = "bot" | "conta";
 
 function dateTimeBR(value?: string | null) {
   if (!value) return "-";
@@ -16,29 +17,33 @@ function dateTimeBR(value?: string | null) {
   return date.toLocaleString("pt-BR");
 }
 
+function getInitialLetter(value: string) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "U";
+  return normalized.charAt(0).toUpperCase();
+}
+
 export function PublicAtendimentoClient({
   initialSlug,
-  initialTab,
+  page,
   currentUser,
   profile,
 }: {
   initialSlug: string;
-  initialTab: PortalTab;
+  page: PortalPage;
   currentUser: { id: string; email: string };
   profile: { nome: string; email: string; created_at: string };
 }) {
-  const router = useRouter();
   const linkSlug = String(initialSlug ?? "").trim();
-  const [activeTab, setActiveTab] = useState<PortalTab>(initialTab);
+  const isAccountPage = page === "conta";
   const [publicSlug, setPublicSlug] = useState("");
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isAccountPage);
   const [sending, setSending] = useState(false);
   const [authError, setAuthError] = useState("");
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
-  const [isTabPending, startTabTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -48,15 +53,14 @@ export function PublicAtendimentoClient({
   );
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
-  const typing = !loading && !authError && (isInitialFlow || awaitingBotSince != null);
-  const totalMessages = messages.length;
-  const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuário";
-
-  useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
+  const typing = !loading && !authError && !isAccountPage && (isInitialFlow || awaitingBotSince != null);
+  const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
+  const initialLetter = getInitialLetter(displayName);
+  const accountHref = getAtendimentoAccountPath(linkSlug);
+  const botHref = getAtendimentoPortalPath(linkSlug);
 
   useLayoutEffect(() => {
+    if (isAccountPage) return;
     const element = textareaRef.current;
     if (!element) return;
 
@@ -68,34 +72,21 @@ export function PublicAtendimentoClient({
     if (element.scrollHeight > 144) {
       element.style.overflowY = "auto";
     }
-  }, [draft]);
+  }, [draft, isAccountPage]);
 
   useLayoutEffect(() => {
+    if (isAccountPage) return;
     const viewport = messagesViewportRef.current;
-    if (!viewport || activeTab !== "bot") return;
+    if (!viewport) return;
     viewport.scrollTop = viewport.scrollHeight;
-  }, [activeTab, publicSlug, messages.length, typing]);
-
-  function updatePortalUrl(nextTab: PortalTab) {
-    const params = new URLSearchParams();
-    if (linkSlug) params.set("slug", linkSlug);
-    params.set("tab", nextTab);
-    router.replace(`/atendimento?${params.toString()}`);
-  }
-
-  function handleTabChange(nextTab: PortalTab) {
-    if (nextTab === activeTab) return;
-    startTabTransition(() => {
-      setActiveTab(nextTab);
-      updatePortalUrl(nextTab);
-    });
-  }
+  }, [isAccountPage, publicSlug, messages.length, typing]);
 
   function restoreTextareaFocus() {
+    if (isAccountPage) return;
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         const element = textareaRef.current;
-        if (!element || element.disabled || activeTab !== "bot") return;
+        if (!element || element.disabled) return;
         element.focus();
         const cursorPosition = element.value.length;
         element.setSelectionRange(cursorPosition, cursorPosition);
@@ -173,7 +164,7 @@ export function PublicAtendimentoClient({
 
   async function submitDraft() {
     const contentText = draft.trim();
-    if (!contentText || !publicSlug || sending || authError) return;
+    if (!contentText || !publicSlug || sending || authError || isAccountPage) return;
     setSending(true);
     setDraft("");
     setAwaitingBotSince(Date.now());
@@ -198,11 +189,12 @@ export function PublicAtendimentoClient({
   }
 
   useEffect(() => {
+    if (isAccountPage) return;
     loadSession();
-  }, [linkSlug]);
+  }, [isAccountPage, linkSlug]);
 
   useEffect(() => {
-    if (!publicSlug || authError) return;
+    if (isAccountPage || !publicSlug || authError) return;
     let active = true;
     let timeoutId: number | null = null;
 
@@ -219,7 +211,7 @@ export function PublicAtendimentoClient({
       active = false;
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
-  }, [authError, publicSlug, typing]);
+  }, [authError, isAccountPage, publicSlug, typing]);
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -236,48 +228,41 @@ export function PublicAtendimentoClient({
     <div className="h-[100dvh] overflow-hidden bg-[#09111A] px-4 py-4 text-white md:px-8 md:py-6">
       <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0E1723] shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(14,23,35,0.9))] px-6 py-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Atendimento</h1>
-              <p className="mt-2 max-w-2xl text-sm text-white/65">
-                Fale com nosso bot, agende sua aula experimental e faca seu pre-cadastro em poucos minutos.
+          <div className="flex items-start justify-between gap-5">
+            <div className="max-w-2xl pr-2">
+              <h1 className="text-2xl font-semibold tracking-tight">{isAccountPage ? "Conta" : "Atendimento"}</h1>
+              <p className="mt-2 text-sm text-white/65">
+                {isAccountPage
+                  ? "Visualize os dados da sua conta de atendimento em uma area exclusiva."
+                  : "Fale com nosso bot, agende sua aula experimental e faca seu pre-cadastro em poucos minutos."}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white/75">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                Conta logada
-              </div>
-              <div className="mt-2 font-semibold text-white">{profile.email || currentUser.email}</div>
-            </div>
+            <Link
+              href={accountHref}
+              aria-label="Abrir sua conta"
+              className={[
+                "mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-base font-semibold transition",
+                isAccountPage
+                  ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-100"
+                  : "border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]",
+              ].join(" ")}
+            >
+              {initialLetter}
+            </Link>
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="grid grid-cols-2 gap-2 sm:inline-flex">
-              <button
-                type="button"
-                onClick={() => handleTabChange("bot")}
-                className={[
-                  "inline-flex min-w-[120px] items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition",
-                  activeTab === "bot"
-                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
-                    : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.07]",
-                ].join(" ")}
+            {isAccountPage ? (
+              <Link
+                href={botHref}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
               >
-                Bot
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTabChange("conta")}
-                className={[
-                  "inline-flex min-w-[120px] items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition",
-                  activeTab === "conta"
-                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
-                    : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.07]",
-                ].join(" ")}
-              >
-                Conta
-              </button>
-            </div>
+                <ArrowLeft className="h-4 w-4" />
+                Voltar ao bot
+              </Link>
+            ) : (
+              <div className="text-sm text-white/55">Toque no icone com sua inicial para ver os dados da conta.</div>
+            )}
 
             <form action={logoutAction}>
               <button
@@ -290,7 +275,7 @@ export function PublicAtendimentoClient({
           </div>
         </div>
 
-        {activeTab === "conta" ? (
+        {isAccountPage ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -299,17 +284,15 @@ export function PublicAtendimentoClient({
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Email</div>
-                <div className="mt-3 text-lg font-semibold text-white">{profile.email || currentUser.email}</div>
+                <div className="mt-3 break-all text-lg font-semibold text-white">{profile.email || currentUser.email}</div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Cadastro</div>
                 <div className="mt-3 text-lg font-semibold text-white">{dateTimeBR(profile.created_at)}</div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Bot</div>
-                <div className="mt-3 text-lg font-semibold text-white">
-                  {totalMessages} mensagem(ns) no seu historico
-                </div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Portal</div>
+                <div className="mt-3 text-lg font-semibold text-white">Conta exclusiva de atendimento</div>
               </div>
             </div>
           </div>
@@ -392,8 +375,6 @@ export function PublicAtendimentoClient({
             </form>
           </>
         )}
-
-        {isTabPending ? <div className="sr-only">Carregando aba...</div> : null}
       </div>
     </div>
   );

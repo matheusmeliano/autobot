@@ -19,7 +19,12 @@ export function isAtendimentoOnlyAccessScope(value: unknown) {
 
 export function getAtendimentoPortalPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
   const safeSlug = String(slug || ATENDIMENTO_PUBLIC_LINK_SLUG).trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
-  return `/atendimento?slug=${encodeURIComponent(safeSlug)}&tab=bot`;
+  return `/atendimento?slug=${encodeURIComponent(safeSlug)}`;
+}
+
+export function getAtendimentoAccountPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
+  const safeSlug = String(slug || ATENDIMENTO_PUBLIC_LINK_SLUG).trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
+  return `/atendimento/conta?slug=${encodeURIComponent(safeSlug)}`;
 }
 
 export function getDefaultAuthenticatedPath(accessScope: unknown) {

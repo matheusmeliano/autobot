@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { PublicAtendimentoClient } from "@/components/atendimento/PublicAtendimentoClient";
-import { getAtendimentoPortalPath } from "@/lib/auth/access";
+import { getAtendimentoAccountPath } from "@/lib/auth/access";
 import { ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default async function AtendimentoPublicPage({
+export default async function AtendimentoAccountPage({
   searchParams,
 }: {
   searchParams: Promise<{ slug?: string }>;
 }) {
   const params = await searchParams;
   const initialSlug = String(params.slug ?? "").trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
-  const nextPath = getAtendimentoPortalPath(initialSlug);
+  const nextPath = getAtendimentoAccountPath(initialSlug);
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -23,7 +23,7 @@ export default async function AtendimentoPublicPage({
       <div className="min-h-[100dvh] bg-[#09111A] px-4 py-6 text-white md:px-8 md:py-10">
         <div className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-3xl items-center justify-center">
           <div className="w-full rounded-[2rem] border border-white/10 bg-[#0E1723] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.45)] md:p-8">
-            <div className="text-2xl font-semibold tracking-tight">Atendimento</div>
+            <div className="text-2xl font-semibold tracking-tight">Conta</div>
             <p className="mt-3 text-sm text-white/70">
               <strong>Para participar desta conversa com nosso bot, você precisa se cadastrar.</strong>
             </p>
@@ -64,7 +64,7 @@ export default async function AtendimentoPublicPage({
   return (
     <PublicAtendimentoClient
       initialSlug={initialSlug}
-      page="bot"
+      page="conta"
       currentUser={{
         id: user.id,
         email: user.email ?? "",
