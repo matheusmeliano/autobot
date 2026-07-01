@@ -94,6 +94,7 @@ export function PublicAtendimentoClient({
   const sessionRequestIdRef = useRef(0);
   const sessionRefreshTimeoutRef = useRef<number | null>(null);
   const awaitingBotSinceRef = useRef<number | null>(null);
+  const optimisticLeadMessageIdRef = useRef<string | null>(null);
 
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
@@ -286,9 +287,33 @@ export function PublicAtendimentoClient({
   async function submitDraft() {
     const contentText = draft.trim();
     if (!contentText || !publicSlug || sending || authError || isAccountPage) return;
+    const optimisticMessageId = `optimistic:${Date.now()}`;
+    const optimisticCreatedAt = new Date().toISOString();
+    const optimisticMessage: AtendimentoMessage = {
+      id: optimisticMessageId,
+      conversation_id: conversationId,
+      sender_role: "lead",
+      content_text: contentText,
+      media_type: "text",
+      media_url: null,
+      mime_type: null,
+      external_message_id: null,
+      status: "recebida",
+      sent_at: optimisticCreatedAt,
+      delivered_at: optimisticCreatedAt,
+      read_at: null,
+      created_at: optimisticCreatedAt,
+    };
+
     setSending(true);
     setDraft("");
-    setAwaitingBotSince(Date.now());
+    optimisticLeadMessageIdRef.current = optimisticMessageId;
+    applyMessages([optimisticMessage], "merge");
+    window.requestAnimationFrame(() => {
+      awaitingBotSinceRef.current = Date.now();
+      setAwaitingBotSince(awaitingBotSinceRef.current);
+    });
+
     try {
       const res = await fetch("/api/atendimento/public/messages", {
         method: "POST",
@@ -296,18 +321,33 @@ export function PublicAtendimentoClient({
         body: JSON.stringify({ public_slug: publicSlug, content_text: contentText }),
       });
       if (res.status === 401 || res.status === 403) {
+        removeMessage(optimisticMessageId);
+        optimisticLeadMessageIdRef.current = null;
+        awaitingBotSinceRef.current = null;
+        setAwaitingBotSince(null);
         setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
         void redirectToLoginAfterSessionLoss();
         return;
       }
       const json = await res.json().catch(() => null);
       if (json?.ok) {
-        const optimisticMessages = [json.inbound, json.outbound].filter(Boolean) as AtendimentoMessage[];
-        if (optimisticMessages.length) {
-          applyMessages(optimisticMessages, "merge");
-        } else {
-          await loadMessages(publicSlug, "replace");
+        removeMessage(optimisticMessageId);
+        optimisticLeadMessageIdRef.current = null;
+
+        if (json.inbound?.id) {
+          applyMessages([json.inbound as AtendimentoMessage], "merge");
         }
+
+        if (json.outbound?.id) {
+          window.setTimeout(() => {
+            void loadMessages(publicSlug, "replace");
+          }, 180);
+        }
+      } else {
+        removeMessage(optimisticMessageId);
+        optimisticLeadMessageIdRef.current = null;
+        awaitingBotSinceRef.current = null;
+        setAwaitingBotSince(null);
       }
     } finally {
       setSending(false);
@@ -363,6 +403,10 @@ export function PublicAtendimentoClient({
           if (!nextMessage?.id) {
             void loadMessages(publicSlug, "replace");
             return;
+          }
+          if (nextMessage.sender_role === "lead" && optimisticLeadMessageIdRef.current) {
+            removeMessage(optimisticLeadMessageIdRef.current);
+            optimisticLeadMessageIdRef.current = null;
           }
           applyMessages([nextMessage], "merge");
         },
