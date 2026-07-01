@@ -837,7 +837,7 @@ export function PublicAtendimentoClient({
 
           {isProfilePage ? (
             <div className="mt-4 flex flex-col gap-3">
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 <Link
                   href={botHref}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07]"
