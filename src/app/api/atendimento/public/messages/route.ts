@@ -269,7 +269,7 @@ export async function POST(req: Request) {
 
   await sleep(randomTypingDelayMs());
   const botNowIso = new Date().toISOString();
-  const { data: outbound } = await admin
+  const { data: outbound, error: outboundError } = await admin
     .from("atendimento_messages")
     .insert({
       conversation_id: String(conversation.id),
@@ -282,6 +282,13 @@ export async function POST(req: Request) {
     })
     .select("*")
     .maybeSingle();
+
+  if (outboundError) {
+    const code = String((outboundError as any)?.code ?? "").trim();
+    if (code !== "23505") {
+      return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+    }
+  }
 
   await syncConversationPreview({
     conversationId: String(conversation.id),
@@ -297,5 +304,5 @@ export async function POST(req: Request) {
     actorType: "bot",
   });
 
-  return Response.json({ ok: true, inbound, outbound });
+  return Response.json({ ok: true, inbound, outbound: outboundError ? null : outbound });
 }

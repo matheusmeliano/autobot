@@ -329,6 +329,24 @@ export async function ensureInitialBotConversationFlow(params: {
   const nextContent = String(initialMessages[botCountNum] ?? "").trim();
   if (!nextContent) return false;
 
+  const { data: existingBotMessage } = await admin
+    .from("atendimento_messages")
+    .select("id")
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot")
+    .eq("content_text", nextContent)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingBotMessage?.id) {
+    await syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: nextContent,
+      createdAt: nowIso,
+    });
+    return false;
+  }
+
   const { data: inserted, error: insertError } = await admin
     .from("atendimento_messages")
     .insert({
@@ -345,7 +363,10 @@ export async function ensureInitialBotConversationFlow(params: {
     .maybeSingle();
 
   if (insertError) {
-    throw new Error(insertError.message || "Falha ao iniciar fluxo do bot.");
+    const code = String((insertError as any)?.code ?? "").trim();
+    if (code !== "23505") {
+      throw new Error(insertError.message || "Falha ao iniciar fluxo do bot.");
+    }
   }
 
   if (botCountNum + 1 >= initialMessages.length) {

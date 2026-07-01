@@ -352,26 +352,6 @@ export function PublicAtendimentoClient({
           applyMessages([nextMessage], "merge");
         },
       )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "atendimento_conversations",
-          filter: `id=eq.${conversationId}`,
-        },
-        scheduleSessionRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "atendimento_leads",
-          filter: `id=eq.${leadId}`,
-        },
-        scheduleSessionRefresh,
-      )
       .subscribe();
 
     return () => {
@@ -390,7 +370,6 @@ export function PublicAtendimentoClient({
     loadMessages,
     publicSlug,
     removeMessage,
-    scheduleSessionRefresh,
     supabase,
   ]);
 
