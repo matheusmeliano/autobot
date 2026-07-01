@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Paperclip, Send } from "lucide-react";
 import { logoutAction } from "@/app/app/actions";
+import { AppModal } from "@/components/app/AppModal";
 import { getAtendimentoAccountPath, getAtendimentoFilesPath, getAtendimentoPortalPath } from "@/lib/auth/access";
 import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFileGallery";
 import {
+  ATENDIMENTO_IMAGE_MIME_ACCEPT,
+  ATENDIMENTO_VIDEO_MIME_ACCEPT,
   formatAtendimentoFileSize,
-  getAtendimentoAcceptedMimeTypes,
   getAtendimentoAttachmentTitle,
   getAtendimentoMediaTypeFromMimeType,
   type AtendimentoUploadItem,
@@ -101,11 +103,14 @@ export function PublicAtendimentoClient({
   const [loading, setLoading] = useState(!isProfilePage);
   const [sending, setSending] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [composerError, setComposerError] = useState("");
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const messagesRequestIdRef = useRef(0);
   const sessionRequestIdRef = useRef(0);
@@ -488,7 +493,9 @@ export function PublicAtendimentoClient({
     file_size_bytes?: number | null;
     optimisticMessage?: AtendimentoMessage | null;
   }) {
-    if (!publicSlug) return false;
+    if (!publicSlug) {
+      return { ok: false as const, error: "Conversa indisponivel no momento." };
+    }
 
     const optimisticMessage = params.optimisticMessage ?? null;
     if (optimisticMessage) {
@@ -522,7 +529,7 @@ export function PublicAtendimentoClient({
         resetAwaitingBotSequence();
         setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
         void redirectToLoginAfterSessionLoss();
-        return false;
+        return { ok: false as const, error: "Sua sessão expirou. Entre novamente para continuar." };
       }
 
       const json = await res.json().catch(() => null);
@@ -533,7 +540,10 @@ export function PublicAtendimentoClient({
           optimisticLeadMessageRef.current = null;
         }
         resetAwaitingBotSequence();
-        return false;
+        return {
+          ok: false as const,
+          error: String(json?.error ?? "Falha ao enviar sua mensagem. Tente novamente."),
+        };
       }
 
       if (json.inbound?.id) {
@@ -553,7 +563,8 @@ export function PublicAtendimentoClient({
           void loadMessages(publicSlug, "replace");
         }, 180);
       }
-      return true;
+      setComposerError("");
+      return { ok: true as const };
     } finally {
       restoreTextareaFocus();
     }
@@ -584,11 +595,16 @@ export function PublicAtendimentoClient({
 
     setSending(true);
     setDraft("");
+    setComposerError("");
     try {
-      await sendLeadMessage({
+      const result = await sendLeadMessage({
         content_text: contentText,
         optimisticMessage,
       });
+      if (!result.ok) {
+        setDraft(contentText);
+        setComposerError(result.error);
+      }
     } finally {
       setSending(false);
     }
@@ -598,12 +614,13 @@ export function PublicAtendimentoClient({
     if (!publicSlug || submitLocked) return;
     const { files, errors } = validateAtendimentoFiles(fileList);
     if (errors.length) {
-      setAuthError("");
+      setComposerError(errors.join(" "));
       alert(errors.join("\n"));
       return;
     }
 
     setSending(true);
+    setComposerError("");
     try {
       for (const file of files) {
         const mediaType = getAtendimentoMediaTypeFromMimeType(file.type);
@@ -631,7 +648,7 @@ export function PublicAtendimentoClient({
             onProgress: (progress) => updateUploadItem(uploadId, { progress }),
           });
           updateUploadItem(uploadId, { status: "sending", progress: 100 });
-          const success = await sendLeadMessage({
+          const result = await sendLeadMessage({
             content_text: "",
             media_type: uploaded.media_type,
             media_url: uploaded.media_url,
@@ -639,8 +656,9 @@ export function PublicAtendimentoClient({
             file_name: uploaded.file_name,
             file_size_bytes: uploaded.file_size_bytes,
           });
-          if (!success) {
-            updateUploadItem(uploadId, { status: "error", error: "Falha ao enviar no chat." });
+          if (!result.ok) {
+            updateUploadItem(uploadId, { status: "error", error: result.error });
+            setComposerError(result.error);
             continue;
           }
           updateUploadItem(uploadId, { status: "done", progress: 100 });
@@ -654,15 +672,25 @@ export function PublicAtendimentoClient({
       }
     } finally {
       setSending(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      if (videoInputRef.current) videoInputRef.current.value = "";
     }
   }
 
   function handleFilePicker() {
     if (submitLocked) return;
-    fileInputRef.current?.click();
+    setAttachmentMenuOpen(true);
+  }
+
+  function handleAttachmentOption(kind: "image" | "video") {
+    setAttachmentMenuOpen(false);
+    window.requestAnimationFrame(() => {
+      if (kind === "image") {
+        imageInputRef.current?.click();
+        return;
+      }
+      videoInputRef.current?.click();
+    });
   }
 
   async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -966,10 +994,18 @@ export function PublicAtendimentoClient({
 
             <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">
               <input
-                ref={fileInputRef}
+                ref={imageInputRef}
                 type="file"
                 multiple
-                accept={getAtendimentoAcceptedMimeTypes()}
+                accept={ATENDIMENTO_IMAGE_MIME_ACCEPT}
+                className="hidden"
+                onChange={handleFileInputChange}
+              />
+              <input
+                ref={videoInputRef}
+                type="file"
+                multiple
+                accept={ATENDIMENTO_VIDEO_MIME_ACCEPT}
                 className="hidden"
                 onChange={handleFileInputChange}
               />
@@ -1007,6 +1043,12 @@ export function PublicAtendimentoClient({
                 </div>
               ) : null}
 
+              {composerError ? (
+                <div className="mb-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+                  {composerError}
+                </div>
+              ) : null}
+
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                 <button
                   type="button"
@@ -1039,6 +1081,26 @@ export function PublicAtendimentoClient({
           </>
         )}
       </div>
+
+      <AppModal open={attachmentMenuOpen} onClose={() => setAttachmentMenuOpen(false)} size="md" zIndexClass="z-[520]">
+        <div className="text-sm font-semibold text-[var(--app-text-85)]">Escolha o tipo de anexo</div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => handleAttachmentOption("image")}
+            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+          >
+            Foto
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAttachmentOption("video")}
+            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+          >
+            Video
+          </button>
+        </div>
+      </AppModal>
     </div>
   );
 }

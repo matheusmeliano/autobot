@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
 import {
   ATENDIMENTO_FILES_BUCKET,
+  ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES,
   buildAtendimentoStoragePath,
   getAtendimentoMediaTypeFromMimeType,
 } from "@/lib/atendimento/files";
@@ -523,6 +524,27 @@ export async function getAtendimentoLeadFiles(leadId: string) {
   }));
 }
 
+async function ensureAtendimentoFilesBucket() {
+  const admin = createSupabaseAdminClient();
+  const { data: buckets, error: bucketsError } = await admin.storage.listBuckets();
+  if (!bucketsError && buckets?.some((bucket) => String(bucket.name ?? bucket.id ?? "") === ATENDIMENTO_FILES_BUCKET)) {
+    return;
+  }
+
+  const { error: createError } = await admin.storage.createBucket(ATENDIMENTO_FILES_BUCKET, {
+    public: true,
+    fileSizeLimit: 262144000,
+    allowedMimeTypes: [...ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES],
+  });
+
+  if (createError) {
+    const message = String(createError.message ?? "").toLowerCase();
+    if (!message.includes("already exists") && !message.includes("duplicate")) {
+      throw createError;
+    }
+  }
+}
+
 export async function uploadAtendimentoFileToStorage(params: {
   conversationId: string;
   senderRole: "lead" | "attendant";
@@ -535,16 +557,26 @@ export async function uploadAtendimentoFileToStorage(params: {
   }
 
   const admin = createSupabaseAdminClient();
+  await ensureAtendimentoFilesBucket();
   const storagePath = buildAtendimentoStoragePath({
     conversationId: params.conversationId,
     senderRole: params.senderRole,
     originalFileName: params.file.name,
   });
   const arrayBuffer = await params.file.arrayBuffer();
-  const { error } = await admin.storage.from(ATENDIMENTO_FILES_BUCKET).upload(storagePath, arrayBuffer, {
+  let { error } = await admin.storage.from(ATENDIMENTO_FILES_BUCKET).upload(storagePath, arrayBuffer, {
     contentType: mimeType,
     upsert: false,
   });
+
+  if (error && String(error.message ?? "").toLowerCase().includes("bucket not found")) {
+    await ensureAtendimentoFilesBucket();
+    const retry = await admin.storage.from(ATENDIMENTO_FILES_BUCKET).upload(storagePath, arrayBuffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+    error = retry.error;
+  }
 
   if (error) {
     throw new Error(error.message || "upload_failed");

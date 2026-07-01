@@ -2,6 +2,21 @@ export const ATENDIMENTO_FILES_BUCKET = "atendimento-files";
 export const MAX_UPLOAD_FILES_PER_BATCH = 10;
 export const MAX_IMAGE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 export const MAX_VIDEO_FILE_SIZE_BYTES = 250 * 1024 * 1024;
+export const ATENDIMENTO_IMAGE_MIME_ACCEPT = "image/*";
+export const ATENDIMENTO_VIDEO_MIME_ACCEPT = "video/*";
+export const ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/x-msvideo",
+  "video/x-matroska",
+] as const;
 
 export type AtendimentoUploadStatus = "queued" | "uploading" | "sending" | "done" | "error";
 
@@ -16,6 +31,10 @@ export type AtendimentoUploadItem = {
 
 export function getAtendimentoAcceptedMimeTypes() {
   return "image/*,video/*";
+}
+
+export function getAtendimentoAcceptedMimeTypesByKind(kind: "image" | "video") {
+  return kind === "image" ? ATENDIMENTO_IMAGE_MIME_ACCEPT : ATENDIMENTO_VIDEO_MIME_ACCEPT;
 }
 
 export function getAtendimentoMediaTypeFromMimeType(mimeType: unknown) {

@@ -2,9 +2,11 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minimize2, Paperclip, Send } from "lucide-react";
+import { AppModal } from "@/components/app/AppModal";
 import {
+  ATENDIMENTO_IMAGE_MIME_ACCEPT,
+  ATENDIMENTO_VIDEO_MIME_ACCEPT,
   formatAtendimentoFileSize,
-  getAtendimentoAcceptedMimeTypes,
   getAtendimentoAttachmentTitle,
   getAtendimentoMediaTypeFromMimeType,
   type AtendimentoUploadItem,
@@ -45,9 +47,11 @@ export function AtendimentoConversationPanel({
   const [draft, setDraft] = useState("");
   const [desktopExpanded, setDesktopExpanded] = useState(false);
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -189,14 +193,24 @@ export function AtendimentoConversationPanel({
       }
     }
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    if (videoInputRef.current) videoInputRef.current.value = "";
   }
 
   function handleFilePicker() {
     if (!conversation?.id || disabled) return;
-    fileInputRef.current?.click();
+    setAttachmentMenuOpen(true);
+  }
+
+  function handleAttachmentOption(kind: "image" | "video") {
+    setAttachmentMenuOpen(false);
+    window.requestAnimationFrame(() => {
+      if (kind === "image") {
+        imageInputRef.current?.click();
+        return;
+      }
+      videoInputRef.current?.click();
+    });
   }
 
   async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -334,10 +348,18 @@ export function AtendimentoConversationPanel({
         className={desktopExpanded ? "border-t border-[var(--app-border)] bg-[var(--app-bg)] px-4 py-4" : "border-t border-[var(--app-border)] px-4 py-4"}
       >
         <input
-          ref={fileInputRef}
+          ref={imageInputRef}
           type="file"
           multiple
-          accept={getAtendimentoAcceptedMimeTypes()}
+          accept={ATENDIMENTO_IMAGE_MIME_ACCEPT}
+          className="hidden"
+          onChange={handleFileInputChange}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          multiple
+          accept={ATENDIMENTO_VIDEO_MIME_ACCEPT}
           className="hidden"
           onChange={handleFileInputChange}
         />
@@ -404,6 +426,26 @@ export function AtendimentoConversationPanel({
           </button>
         </div>
       </form>
+
+      <AppModal open={attachmentMenuOpen} onClose={() => setAttachmentMenuOpen(false)} size="md" zIndexClass="z-[520]">
+        <div className="text-sm font-semibold text-[var(--app-text-85)]">Escolha o tipo de anexo</div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => handleAttachmentOption("image")}
+            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+          >
+            Foto
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAttachmentOption("video")}
+            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+          >
+            Video
+          </button>
+        </div>
+      </AppModal>
     </div>
   );
 }
