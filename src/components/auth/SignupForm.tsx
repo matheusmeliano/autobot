@@ -30,6 +30,10 @@ export function SignupForm() {
   const safeNext = /^\/(?!\/)/.test(next) ? next : "/app";
   const accessScope = searchParams?.get("mode") === "atendimento" ? "atendimento" : "app";
   const loginHref = next ? `/login?next=${encodeURIComponent(safeNext)}` : "/login";
+  const subtitle =
+    accessScope === "atendimento"
+      ? "Gerencie conversas, conteúdos e aulas."
+      : "Automatize cobranças no WhatsApp e muito mais.";
 
   const onSubmit = handleSubmit(
     async (values) => {
@@ -67,7 +71,7 @@ export function SignupForm() {
   return (
     <AuthCard
       title="Criar conta"
-      subtitle="Automatize cobranças no WhatsApp e muito mais."
+      subtitle={subtitle}
       footer={
         <>
           Já tem conta?{" "}
