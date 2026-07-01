@@ -101,6 +101,7 @@ export function PublicAtendimentoClient({
   const [leadId, setLeadId] = useState("");
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
   const [files, setFiles] = useState<AtendimentoFileRecord[]>([]);
+  const [filesLoading, setFilesLoading] = useState(isFilesPage);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(!isProfilePage);
   const [sending, setSending] = useState(false);
@@ -250,11 +251,13 @@ export function PublicAtendimentoClient({
   }
 
   const loadFiles = useCallback(async () => {
+    setFilesLoading(true);
     const res = await fetch(`/api/atendimento/public/files?slug=${encodeURIComponent(linkSlug)}`, {
       cache: "no-store",
     });
     if (res.status === 401 || res.status === 403) {
       setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+      setFilesLoading(false);
       void redirectToLoginAfterSessionLoss();
       return;
     }
@@ -262,6 +265,7 @@ export function PublicAtendimentoClient({
     if (json?.ok) {
       setFiles((json.files ?? []) as AtendimentoFileRecord[]);
     }
+    setFilesLoading(false);
   }, [linkSlug]);
 
   const applyMessages = useCallback(
@@ -911,6 +915,21 @@ export function PublicAtendimentoClient({
             {authError ? (
               <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
                 {authError}
+              </div>
+            ) : filesLoading ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <div className="h-3 w-20 animate-pulse rounded-full bg-white/10" />
+                    <div className="mt-3 h-40 animate-pulse rounded-2xl bg-white/10" />
+                    <div className="mt-4 h-4 w-3/4 animate-pulse rounded-full bg-white/10" />
+                    <div className="mt-3 flex gap-2">
+                      <div className="h-3 w-24 animate-pulse rounded-full bg-white/10" />
+                      <div className="h-3 w-16 animate-pulse rounded-full bg-white/10" />
+                    </div>
+                    <div className="mt-4 h-3 w-20 animate-pulse rounded-full bg-white/10" />
+                  </div>
+                ))}
               </div>
             ) : (
               <AtendimentoFileGallery
