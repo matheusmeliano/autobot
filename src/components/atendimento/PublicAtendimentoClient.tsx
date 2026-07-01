@@ -44,6 +44,19 @@ function getFirstName(value: string) {
   return normalized.split(/\s+/)[0] || "Usuario";
 }
 
+function getAtendimentoDownloadLabel(mediaType?: AtendimentoMessage["media_type"] | null) {
+  if (mediaType === "image") return "Baixar imagem";
+  if (mediaType === "video") return "Baixar video";
+  return "Baixar arquivo";
+}
+
+function getAtendimentoDownloadHref(url: string | null | undefined, fileName: string | null | undefined) {
+  if (!url) return "";
+  const separator = url.includes("?") ? "&" : "?";
+  const downloadValue = fileName ? encodeURIComponent(fileName) : "";
+  return `${url}${separator}download=${downloadValue}`;
+}
+
 function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
   const unique = new Map<string, AtendimentoMessage>();
   for (const message of messageList) {
@@ -1021,12 +1034,11 @@ export function PublicAtendimentoClient({
                                 {formatAtendimentoFileSize(message.file_size_bytes)}
                               </div>
                               <a
-                                href={message.media_url}
-                                target="_blank"
-                                rel="noreferrer"
+                                href={getAtendimentoDownloadHref(message.media_url, message.file_name)}
+                                download={message.file_name ?? true}
                                 className="mt-3 inline-flex text-xs font-semibold text-emerald-200 underline"
                               >
-                                Abrir anexo
+                                {getAtendimentoDownloadLabel(message.media_type)}
                               </a>
                             </>
                           ) : null}

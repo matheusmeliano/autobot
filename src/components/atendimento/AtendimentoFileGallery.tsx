@@ -7,6 +7,19 @@ import type { AtendimentoFileRecord } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 import { formatAtendimentoFileSize, getAtendimentoAttachmentTitle } from "@/lib/atendimento/files";
 
+function getAtendimentoDownloadLabel(mediaType: AtendimentoFileRecord["media_type"]) {
+  if (mediaType === "image") return "Baixar imagem";
+  if (mediaType === "video") return "Baixar video";
+  return "Baixar arquivo";
+}
+
+function getAtendimentoDownloadHref(url: string | null | undefined, fileName: string | null | undefined) {
+  if (!url) return "";
+  const separator = url.includes("?") ? "&" : "?";
+  const downloadValue = fileName ? encodeURIComponent(fileName) : "";
+  return `${url}${separator}download=${downloadValue}`;
+}
+
 export function AtendimentoFileGallery({
   files,
   emptyMessage,
@@ -69,6 +82,8 @@ export function AtendimentoFileGallery({
               ? "mt-3 inline-flex text-xs font-semibold text-emerald-200 underline"
               : "mt-3 inline-flex text-xs font-semibold text-[var(--app-text-85)] underline";
           const isPreviewable = (file.media_type === "image" || file.media_type === "video") && Boolean(file.media_url);
+          const downloadLabel = tone === "portal" ? getAtendimentoDownloadLabel(file.media_type) : "Abrir arquivo";
+          const downloadHref = tone === "portal" ? getAtendimentoDownloadHref(file.media_url, file.file_name) : file.media_url;
 
           return (
             <div key={file.id} className={cardClassName}>
@@ -100,8 +115,14 @@ export function AtendimentoFileGallery({
                 <span>{formatAtendimentoDateTime(file.created_at)}</span>
                 <span>{formatAtendimentoFileSize(file.file_size_bytes)}</span>
               </div>
-              <a href={file.media_url} target="_blank" rel="noreferrer" className={linkClassName}>
-                Abrir arquivo
+              <a
+                href={downloadHref}
+                target={tone === "portal" ? undefined : "_blank"}
+                rel={tone === "portal" ? undefined : "noreferrer"}
+                download={tone === "portal" ? (file.file_name ?? true) : undefined}
+                className={linkClassName}
+              >
+                {downloadLabel}
               </a>
             </div>
           );
