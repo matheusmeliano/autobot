@@ -109,6 +109,7 @@ export function PublicAtendimentoClient({
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
   const typing = !loading && !authError && !isAccountPage && (isInitialFlow || awaitingBotSince != null);
+  const inputLocked = loading || sending || Boolean(authError) || isAccountPage || typing;
   const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
   const firstName = getFirstName(displayName);
   const initialLetter = getInitialLetter(displayName);
@@ -405,7 +406,7 @@ export function PublicAtendimentoClient({
 
   async function submitDraft() {
     const contentText = draft.trim();
-    if (!contentText || !publicSlug || sending || authError || isAccountPage) return;
+    if (!contentText || !publicSlug || inputLocked) return;
     const optimisticMessageId = `optimistic:${Date.now()}`;
     const optimisticCreatedAt = new Date().toISOString();
     const optimisticMessage: AtendimentoMessage = {
@@ -721,12 +722,12 @@ export function PublicAtendimentoClient({
                   onKeyDown={handleTextareaKeyDown}
                   placeholder="Digite sua mensagem..."
                   rows={1}
-                  disabled={Boolean(authError)}
+                  disabled={inputLocked}
                   className="h-14 w-full flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-emerald-500/40 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <button
                   type="submit"
-                  disabled={!draft.trim() || sending || Boolean(authError)}
+                  disabled={!draft.trim() || inputLocked}
                   className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/70 bg-emerald-600 text-[rgb(255,255,255)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-emerald-500/50 disabled:bg-emerald-600/60 disabled:text-[rgb(255,255,255)] disabled:opacity-100 sm:h-auto sm:min-h-14 sm:w-14"
                 >
                   <Send className="h-4 w-4" />
