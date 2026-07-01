@@ -111,9 +111,12 @@ export function AtendimentoClient() {
   }, []);
 
   const loadLeads = useCallback(
-    async (nextQuery: string) => {
+    async (nextQuery: string, options?: { silent?: boolean }) => {
       const requestId = ++leadsRequestIdRef.current;
-      setLoading(true);
+      const silent = Boolean(options?.silent);
+      if (!silent) {
+        setLoading(true);
+      }
       const params = new URLSearchParams();
       if (nextQuery.trim()) params.set("q", nextQuery.trim());
       const res = await fetch(`/api/atendimento/leads?${params.toString()}`, { cache: "no-store" });
@@ -128,7 +131,9 @@ export function AtendimentoClient() {
         setLoadError(message);
         modalToast.error(message);
       }
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     },
     [selectedLeadId],
   );
@@ -251,7 +256,7 @@ export function AtendimentoClient() {
     }
     listRefreshTimeoutRef.current = window.setTimeout(() => {
       void loadSummary();
-      void loadLeads(queryRef.current);
+      void loadLeads(queryRef.current, { silent: true });
     }, 120);
   }, [loadLeads, loadSummary]);
 
@@ -269,13 +274,14 @@ export function AtendimentoClient() {
   const startFallbackRefresh = useCallback(() => {
     if (fallbackRefreshIntervalRef.current != null) return;
     fallbackRefreshIntervalRef.current = window.setInterval(() => {
-      if (realtimeSuspendedRef.current || realtimeSubscribedRef.current) return;
+      if (realtimeSuspendedRef.current) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       void loadSummary();
-      void loadLeads(queryRef.current);
+      void loadLeads(queryRef.current, { silent: true });
       if (selectedLeadIdRef.current) {
         void loadLeadDetail(selectedLeadIdRef.current, { suppressNotFound: true });
       }
-    }, 2000);
+    }, 1500);
   }, [loadLeadDetail, loadLeads, loadSummary]);
 
   const stopFallbackRefresh = useCallback(() => {
@@ -284,6 +290,13 @@ export function AtendimentoClient() {
       fallbackRefreshIntervalRef.current = null;
     }
   }, []);
+
+  useEffect(() => {
+    startFallbackRefresh();
+    return () => {
+      stopFallbackRefresh();
+    };
+  }, [startFallbackRefresh, stopFallbackRefresh]);
 
   useEffect(() => {
     const channel = supabase
@@ -325,21 +338,18 @@ export function AtendimentoClient() {
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           realtimeSubscribedRef.current = true;
-          stopFallbackRefresh();
           return;
         }
 
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           realtimeSubscribedRef.current = false;
-          startFallbackRefresh();
           void loadSummary();
-          void loadLeads(queryRef.current);
+          void loadLeads(queryRef.current, { silent: true });
         }
       });
 
     return () => {
       realtimeSubscribedRef.current = false;
-      stopFallbackRefresh();
       if (listRefreshTimeoutRef.current != null) {
         window.clearTimeout(listRefreshTimeoutRef.current);
         listRefreshTimeoutRef.current = null;
