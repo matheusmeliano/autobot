@@ -1065,7 +1065,7 @@ export function PublicAtendimentoClient({
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={handleTextareaKeyDown}
-                  placeholder="Digite sua mensagem..."
+                  placeholder="Mensagem..."
                   rows={1}
                   disabled={composerDisabled}
                   className="h-14 w-full flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-emerald-500/40 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
