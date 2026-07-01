@@ -84,10 +84,18 @@ export function AtendimentoFileGallery({
           const isPreviewable = (file.media_type === "image" || file.media_type === "video") && Boolean(file.media_url);
           const downloadLabel = getAtendimentoDownloadLabel(file.media_type);
           const downloadHref = getAtendimentoDownloadHref(file.media_url, file.file_name);
+          const senderLabel =
+            tone === "portal"
+              ? file.sender_role === "lead"
+                ? "Enviado por você"
+                : "Enviado por atendimento"
+              : file.sender_role === "lead"
+                ? "Cliente"
+                : "Atendimento";
 
           return (
             <div key={file.id} className={cardClassName}>
-              <div className={eyebrowClassName}>{file.sender_role === "lead" ? "Cliente" : "Atendimento"}</div>
+              <div className={eyebrowClassName}>{senderLabel}</div>
               {isPreviewable ? (
                 <button type="button" onClick={() => setPreviewFile(file)} className={previewButtonClassName} aria-label={`Visualizar ${title}`}>
                   {file.media_type === "image" ? (
