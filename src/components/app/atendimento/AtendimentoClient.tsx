@@ -53,6 +53,8 @@ function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
       String(message.status ?? "") === String(other?.status ?? "") &&
       String(message.content_text ?? "") === String(other?.content_text ?? "") &&
       String(message.media_url ?? "") === String(other?.media_url ?? "") &&
+      String(message.file_name ?? "") === String(other?.file_name ?? "") &&
+      String(message.file_size_bytes ?? "") === String(other?.file_size_bytes ?? "") &&
       String(message.created_at ?? "") === String(other?.created_at ?? "") &&
       String(message.read_at ?? "") === String(other?.read_at ?? "")
     );
@@ -379,7 +381,14 @@ export function AtendimentoClient() {
     modalToast.success("Link copiado.");
   }
 
-  async function handleSendMessage(payload: { content_text: string }) {
+  async function handleSendMessage(payload: {
+    content_text?: string;
+    media_type?: AtendimentoMessage["media_type"];
+    media_url?: string | null;
+    mime_type?: string | null;
+    file_name?: string | null;
+    file_size_bytes?: number | null;
+  }) {
     if (!selectedConversation?.id) return;
     setSending(true);
     try {

@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2, Send } from "lucide-react";
+import { Maximize2, Minimize2, Paperclip, Send } from "lucide-react";
+import {
+  formatAtendimentoFileSize,
+  getAtendimentoAcceptedMimeTypes,
+  getAtendimentoAttachmentTitle,
+  getAtendimentoMediaTypeFromMimeType,
+  type AtendimentoUploadItem,
+  validateAtendimentoFiles,
+} from "@/lib/atendimento/files";
+import { uploadAtendimentoFileWithProgress } from "@/lib/atendimento/upload-client";
 import type { AtendimentoConversation, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
@@ -23,13 +32,22 @@ export function AtendimentoConversationPanel({
   conversation: AtendimentoConversation | null;
   messages: AtendimentoMessage[];
   disabled?: boolean;
-  onSendMessage: (payload: { content_text: string }) => Promise<void>;
+  onSendMessage: (payload: {
+    content_text?: string;
+    media_type?: AtendimentoMessage["media_type"];
+    media_url?: string | null;
+    mime_type?: string | null;
+    file_name?: string | null;
+    file_size_bytes?: number | null;
+  }) => Promise<void>;
   compact?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [desktopExpanded, setDesktopExpanded] = useState(false);
+  const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -102,12 +120,89 @@ export function AtendimentoConversationPanel({
     });
   }
 
+  function updateUploadItem(id: string, patch: Partial<AtendimentoUploadItem>) {
+    setUploadItems((currentItems) =>
+      currentItems.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }
+
+  function removeUploadItem(id: string) {
+    setUploadItems((currentItems) => currentItems.filter((item) => item.id !== id));
+  }
+
   async function submitDraft() {
     const content = draft.trim();
     if (!content || !conversation?.id || disabled) return;
     setDraft("");
     await onSendMessage({ content_text: content });
     restoreTextareaFocus();
+  }
+
+  async function uploadSelectedFiles(fileList: FileList | File[]) {
+    if (!conversation?.id || disabled) return;
+    const { files, errors } = validateAtendimentoFiles(fileList);
+    if (errors.length) {
+      alert(errors.join("\n"));
+      return;
+    }
+
+    for (const file of files) {
+      const mediaType = getAtendimentoMediaTypeFromMimeType(file.type);
+      if (!mediaType) continue;
+
+      const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setUploadItems((currentItems) => [
+        ...currentItems,
+        {
+          id: uploadId,
+          fileName: file.name,
+          fileSizeBytes: file.size,
+          progress: 0,
+          status: "queued",
+          error: null,
+        },
+      ]);
+
+      try {
+        updateUploadItem(uploadId, { status: "uploading", progress: 0, error: null });
+        const uploaded = await uploadAtendimentoFileWithProgress({
+          endpoint: `/api/atendimento/conversas/${conversation.id}/upload`,
+          file,
+          onProgress: (progress) => updateUploadItem(uploadId, { progress }),
+        });
+        updateUploadItem(uploadId, { status: "sending", progress: 100 });
+        await onSendMessage({
+          content_text: "",
+          media_type: uploaded.media_type,
+          media_url: uploaded.media_url,
+          mime_type: uploaded.mime_type,
+          file_name: uploaded.file_name,
+          file_size_bytes: uploaded.file_size_bytes,
+        });
+        updateUploadItem(uploadId, { status: "done", progress: 100 });
+        window.setTimeout(() => removeUploadItem(uploadId), 1400);
+      } catch (error) {
+        updateUploadItem(uploadId, {
+          status: "error",
+          error: error instanceof Error ? error.message : "Falha no upload.",
+        });
+      }
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function handleFilePicker() {
+    if (!conversation?.id || disabled) return;
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const nextFiles = event.target.files;
+    if (!nextFiles?.length) return;
+    await uploadSelectedFiles(nextFiles);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -158,6 +253,11 @@ export function AtendimentoConversationPanel({
           orderedMessages.map((message) => {
             const isLead = message.sender_role === "lead";
             const isBot = message.sender_role === "bot";
+            const attachmentTitle = getAtendimentoAttachmentTitle({
+              mediaType: message.media_type,
+              fileName: message.file_name,
+              contentText: message.content_text,
+            });
             return (
               <div
                 key={message.id}
@@ -176,20 +276,42 @@ export function AtendimentoConversationPanel({
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-45)]">
                     {isLead ? "Lead" : isBot ? "Bot" : "Atendente"}
                   </div>
+                  {message.media_url && message.media_type === "image" ? (
+                    <img
+                      src={message.media_url}
+                      alt={attachmentTitle}
+                      className="mt-3 max-h-64 w-full rounded-2xl object-cover"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  {message.media_url && message.media_type === "video" ? (
+                    <video
+                      src={message.media_url}
+                      controls
+                      preload="metadata"
+                      className="mt-3 max-h-72 w-full rounded-2xl bg-black"
+                    />
+                  ) : null}
                   {message.content_text ? (
                     <div className="mt-2 whitespace-pre-wrap text-sm text-[var(--app-text-85)]">
                       {message.content_text}
                     </div>
                   ) : null}
                   {message.media_url ? (
-                    <a
-                      href={message.media_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-3 inline-flex text-xs font-semibold text-[var(--app-text-85)] underline"
-                    >
-                      Abrir anexo
-                    </a>
+                    <>
+                      <div className="mt-2 text-xs font-semibold text-[var(--app-text-85)]">{attachmentTitle}</div>
+                      <div className="mt-1 text-[11px] text-[var(--app-text-45)]">
+                        {formatAtendimentoFileSize(message.file_size_bytes)}
+                      </div>
+                      <a
+                        href={message.media_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 inline-flex text-xs font-semibold text-[var(--app-text-85)] underline"
+                      >
+                        Abrir anexo
+                      </a>
+                    </>
                   ) : null}
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--app-text-45)]">
                     <span>{formatAtendimentoDateTime(message.created_at)}</span>
@@ -211,7 +333,58 @@ export function AtendimentoConversationPanel({
         onSubmit={handleSubmit}
         className={desktopExpanded ? "border-t border-[var(--app-border)] bg-[var(--app-bg)] px-4 py-4" : "border-t border-[var(--app-border)] px-4 py-4"}
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={getAtendimentoAcceptedMimeTypes()}
+          className="hidden"
+          onChange={handleFileInputChange}
+        />
+
+        {uploadItems.length ? (
+          <div className="mb-3 space-y-2">
+            {uploadItems.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+                <div className="flex items-center justify-between gap-3 text-xs text-[var(--app-text-55)]">
+                  <div className="min-w-0 truncate font-semibold text-[var(--app-text-85)]">{item.fileName}</div>
+                  <div>{formatAtendimentoFileSize(item.fileSizeBytes)}</div>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--app-hover)]">
+                  <div
+                    className={[
+                      "h-full rounded-full transition-all",
+                      item.status === "error" ? "bg-red-500" : "bg-emerald-500",
+                    ].join(" ")}
+                    style={{ width: `${Math.max(6, item.progress)}%` }}
+                  />
+                </div>
+                <div className="mt-2 text-[11px] text-[var(--app-text-45)]">
+                  {item.status === "uploading"
+                    ? `Enviando ${item.progress}%`
+                    : item.status === "sending"
+                      ? "Salvando no chat..."
+                      : item.status === "done"
+                        ? "Concluido"
+                        : item.status === "error"
+                          ? item.error || "Falha no envio."
+                          : "Na fila"}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+          <button
+            type="button"
+            onClick={handleFilePicker}
+            disabled={!conversation?.id || disabled}
+            className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 sm:h-auto sm:min-h-14 sm:w-14"
+            aria-label="Enviar arquivos"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
           <textarea
             ref={textareaRef}
             value={draft}

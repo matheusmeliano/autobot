@@ -43,14 +43,30 @@ export type AtendimentoMessage = {
   conversation_id: string;
   sender_role: "lead" | "bot" | "attendant" | "system";
   content_text: string | null;
-  media_type: "text" | "audio" | "image" | "document" | "file";
+  media_type: "text" | "audio" | "image" | "video" | "document" | "file";
   media_url: string | null;
   mime_type: string | null;
+  file_name: string | null;
+  file_size_bytes: number | null;
   external_message_id: string | null;
   status: "enviada" | "entregue" | "lida" | "recebida";
   sent_at: string | null;
   delivered_at: string | null;
   read_at: string | null;
+  created_at: string;
+};
+
+export type AtendimentoFileRecord = {
+  id: string;
+  lead_id: string;
+  conversation_id: string;
+  sender_role: AtendimentoMessage["sender_role"];
+  content_text: string | null;
+  media_type: AtendimentoMessage["media_type"];
+  media_url: string;
+  mime_type: string | null;
+  file_name: string | null;
+  file_size_bytes: number | null;
   created_at: string;
 };
 

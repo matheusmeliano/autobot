@@ -1,6 +1,11 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
+import {
+  ATENDIMENTO_FILES_BUCKET,
+  buildAtendimentoStoragePath,
+  getAtendimentoMediaTypeFromMimeType,
+} from "@/lib/atendimento/files";
 import { initialBotMessages } from "@/lib/atendimento/bot";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
@@ -435,4 +440,124 @@ export async function appendHistoryEvent(params: {
     actor_type: params.actorType,
     actor_email: params.actorEmail ?? null,
   });
+}
+
+export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: string) {
+  const auth = await requireAuthenticatedAtendimentoParticipant();
+  if (!auth.ok || !auth.user?.id) {
+    return { ok: false as const, status: 401, error: "unauthorized" };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: conversation } = await admin
+    .from("atendimento_conversations")
+    .select("id, lead_id, public_slug")
+    .eq("public_slug", publicSlug)
+    .maybeSingle();
+
+  if (!conversation?.id) {
+    return { ok: false as const, status: 404, error: "not_found" };
+  }
+
+  const { data: lead } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("id", String(conversation.lead_id))
+    .maybeSingle();
+
+  if (!lead?.id) {
+    return { ok: false as const, status: 404, error: "lead_not_found" };
+  }
+
+  if (String((lead as any).auth_user_id ?? "") !== auth.user.id) {
+    return { ok: false as const, status: 403, error: "forbidden" };
+  }
+
+  return { ok: true as const, auth, admin, conversation, lead };
+}
+
+export async function getAtendimentoConversationAccessForAttendant(conversationId: string) {
+  const auth = await requireAtendimentoUser();
+  if (!auth.ok || !auth.user?.email) {
+    return { ok: false as const, status: 403, error: "forbidden" };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data: conversation } = await admin
+    .from("atendimento_conversations")
+    .select("id, lead_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (!conversation?.id) {
+    return { ok: false as const, status: 404, error: "not_found" };
+  }
+
+  return { ok: true as const, auth, admin, conversation };
+}
+
+export async function getAtendimentoLeadFiles(leadId: string) {
+  const admin = createSupabaseAdminClient();
+  const { data: conversation } = await admin
+    .from("atendimento_conversations")
+    .select("id")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!conversation?.id) {
+    return [];
+  }
+
+  const { data: files } = await admin
+    .from("atendimento_messages")
+    .select("id, conversation_id, sender_role, content_text, media_type, media_url, mime_type, file_name, file_size_bytes, created_at")
+    .eq("conversation_id", String(conversation.id))
+    .not("media_url", "is", null)
+    .order("created_at", { ascending: false });
+
+  return (files ?? []).map((file) => ({
+    ...(file as any),
+    lead_id: leadId,
+  }));
+}
+
+export async function uploadAtendimentoFileToStorage(params: {
+  conversationId: string;
+  senderRole: "lead" | "attendant";
+  file: File;
+}) {
+  const mimeType = String(params.file.type ?? "").trim().toLowerCase();
+  const mediaType = getAtendimentoMediaTypeFromMimeType(mimeType);
+  if (!mediaType) {
+    throw new Error("unsupported_file_type");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const storagePath = buildAtendimentoStoragePath({
+    conversationId: params.conversationId,
+    senderRole: params.senderRole,
+    originalFileName: params.file.name,
+  });
+  const arrayBuffer = await params.file.arrayBuffer();
+  const { error } = await admin.storage.from(ATENDIMENTO_FILES_BUCKET).upload(storagePath, arrayBuffer, {
+    contentType: mimeType,
+    upsert: false,
+  });
+
+  if (error) {
+    throw new Error(error.message || "upload_failed");
+  }
+
+  const { data } = admin.storage.from(ATENDIMENTO_FILES_BUCKET).getPublicUrl(storagePath);
+
+  return {
+    media_url: String(data.publicUrl ?? "").trim(),
+    media_type: mediaType,
+    mime_type: mimeType || null,
+    file_name: String(params.file.name ?? "").trim() || null,
+    file_size_bytes: Number(params.file.size ?? 0) || 0,
+    storage_path: storagePath,
+  };
 }

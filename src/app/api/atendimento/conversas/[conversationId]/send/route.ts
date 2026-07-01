@@ -1,33 +1,31 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { appendHistoryEvent, requireAtendimentoUser, syncConversationPreview } from "@/lib/atendimento/server";
+import {
+  appendHistoryEvent,
+  getAtendimentoConversationAccessForAttendant,
+  syncConversationPreview,
+} from "@/lib/atendimento/server";
+import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 
 export async function POST(req: Request, context: { params: Promise<{ conversationId: string }> }) {
-  const auth = await requireAtendimentoUser();
-  if (!auth.ok) {
-    return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const { conversationId } = await context.params;
+  const access = await getAtendimentoConversationAccessForAttendant(conversationId);
+  if (!access.ok) {
+    return Response.json({ ok: false, error: access.error }, { status: access.status });
   }
 
-  const { conversationId } = await context.params;
   const body = await req.json().catch(() => null);
   const contentText = String(body?.content_text ?? "").trim();
   const mediaType = String(body?.media_type ?? "text").trim() || "text";
   const mediaUrl = String(body?.media_url ?? "").trim() || null;
   const mimeType = String(body?.mime_type ?? "").trim() || null;
+  const fileName = String(body?.file_name ?? "").trim() || null;
+  const fileSizeBytesRaw = Number(body?.file_size_bytes ?? 0);
+  const fileSizeBytes = Number.isFinite(fileSizeBytesRaw) && fileSizeBytesRaw > 0 ? fileSizeBytesRaw : null;
 
   if (!contentText && !mediaUrl) {
     return Response.json({ ok: false, error: "empty_message" }, { status: 400 });
   }
 
-  const admin = createSupabaseAdminClient();
-  const { data: conversation } = await admin
-    .from("atendimento_conversations")
-    .select("id, lead_id")
-    .eq("id", conversationId)
-    .maybeSingle();
-
-  if (!conversation?.id) {
-    return Response.json({ ok: false, error: "not_found" }, { status: 404 });
-  }
+  const { admin, auth, conversation } = access;
 
   const nowIso = new Date().toISOString();
   const { data, error } = await admin
@@ -39,6 +37,8 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
       media_type: mediaType,
       media_url: mediaUrl,
       mime_type: mimeType,
+      file_name: fileName,
+      file_size_bytes: fileSizeBytes,
       status: "entregue",
       sent_at: nowIso,
       delivered_at: nowIso,
@@ -52,7 +52,7 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
 
   await syncConversationPreview({
     conversationId,
-    contentText: contentText || `[${mediaType}]`,
+    contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
     createdAt: nowIso,
   });
   await admin
@@ -64,7 +64,14 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
     conversationId,
     eventType: "message_sent",
     title: "Mensagem enviada pelo atendente",
-    details: { content_text: contentText || null, media_type: mediaType },
+    details: {
+      content_text: contentText || null,
+      media_type: mediaType,
+      media_url: mediaUrl,
+      mime_type: mimeType,
+      file_name: fileName,
+      file_size_bytes: fileSizeBytes,
+    },
     actorType: "attendant",
     actorEmail: auth.user.email ?? null,
   });

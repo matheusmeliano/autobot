@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
-import type { AtendimentoLeadListItem } from "@/lib/atendimento/types";
+import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFileGallery";
+import type { AtendimentoFileRecord, AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
 const PAGE_SIZE = 2;
@@ -40,6 +41,10 @@ export function AtendimentoLeadList({
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLead, setProfileLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [filesOpen, setFilesOpen] = useState(false);
+  const [filesLead, setFilesLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [leadFiles, setLeadFiles] = useState<AtendimentoFileRecord[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
   const [deleteLead, setDeleteLead] = useState<AtendimentoLeadListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(1);
@@ -88,6 +93,13 @@ export function AtendimentoLeadList({
     setProfileLead(null);
   }
 
+  function closeFilesModal() {
+    setFilesOpen(false);
+    setFilesLead(null);
+    setLeadFiles([]);
+    setFilesLoading(false);
+  }
+
   function closeDeleteModal() {
     if (deleting) return;
     setDeleteLead(null);
@@ -102,6 +114,16 @@ export function AtendimentoLeadList({
     } finally {
       setDeleting(false);
     }
+  }
+
+  async function openFilesModal(lead: AtendimentoLeadListItem) {
+    setFilesLead(lead);
+    setFilesOpen(true);
+    setFilesLoading(true);
+    const res = await fetch(`/api/atendimento/leads/${lead.id}/files`, { cache: "no-store" });
+    const json = await res.json().catch(() => null);
+    setLeadFiles(((json?.ok ? json.files : []) ?? []) as AtendimentoFileRecord[]);
+    setFilesLoading(false);
   }
 
   return (
@@ -202,6 +224,16 @@ export function AtendimentoLeadList({
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
+                        void openFilesModal(lead);
+                      }}
+                      className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                    >
+                      Arquivos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setDeleteLead(lead);
                       }}
                       className="inline-flex items-center justify-center rounded-xl border border-red-400/70 bg-red-500 px-3 py-2 text-xs font-semibold text-[rgb(255,255,255)] hover:bg-red-600"
@@ -285,6 +317,36 @@ export function AtendimentoLeadList({
         ) : (
           <div className="mt-4 text-sm text-[var(--app-text-55)]">Carregando perfil...</div>
         )}
+      </AppModal>
+
+      <AppModal open={filesOpen} onClose={closeFilesModal} size="xl" zIndexClass="z-[320]" fullScreenOnMobile>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[var(--app-text-85)]">Arquivos do Lead</div>
+            <div className="mt-1 text-xs text-[var(--app-text-55)]">
+              {filesLead ? `Arquivos vinculados a ${filesLead.full_name || filesLead.phone || "Novo Lead"}.` : "Arquivos vinculados ao cliente."}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={closeFilesModal}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-0 text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          {filesLoading ? (
+            <div className="text-sm text-[var(--app-text-55)]">Carregando arquivos...</div>
+          ) : (
+            <AtendimentoFileGallery
+              files={leadFiles}
+              emptyMessage="Nenhum arquivo foi enviado ou recebido por este lead ainda."
+            />
+          )}
+        </div>
       </AppModal>
 
       <AppModal open={Boolean(deleteLead)} onClose={closeDeleteModal} size="md" zIndexClass="z-[130]">

@@ -2,14 +2,24 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Paperclip, Send } from "lucide-react";
 import { logoutAction } from "@/app/app/actions";
-import { getAtendimentoAccountPath, getAtendimentoPortalPath } from "@/lib/auth/access";
-import type { AtendimentoMessage } from "@/lib/atendimento/types";
+import { getAtendimentoAccountPath, getAtendimentoFilesPath, getAtendimentoPortalPath } from "@/lib/auth/access";
+import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFileGallery";
+import {
+  formatAtendimentoFileSize,
+  getAtendimentoAcceptedMimeTypes,
+  getAtendimentoAttachmentTitle,
+  getAtendimentoMediaTypeFromMimeType,
+  type AtendimentoUploadItem,
+  validateAtendimentoFiles,
+} from "@/lib/atendimento/files";
+import { uploadAtendimentoFileWithProgress } from "@/lib/atendimento/upload-client";
+import type { AtendimentoFileRecord, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type PortalPage = "bot" | "conta";
+type PortalPage = "bot" | "conta" | "arquivos";
 
 function dateTimeBR(value?: string | null) {
   if (!value) return "-";
@@ -58,6 +68,8 @@ function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
       String(message.status ?? "") === String(other?.status ?? "") &&
       String(message.content_text ?? "") === String(other?.content_text ?? "") &&
       String(message.media_url ?? "") === String(other?.media_url ?? "") &&
+      String(message.file_name ?? "") === String(other?.file_name ?? "") &&
+      String(message.file_size_bytes ?? "") === String(other?.file_size_bytes ?? "") &&
       String(message.created_at ?? "") === String(other?.created_at ?? "") &&
       String(message.read_at ?? "") === String(other?.read_at ?? "")
     );
@@ -78,17 +90,22 @@ export function PublicAtendimentoClient({
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const linkSlug = String(initialSlug ?? "").trim();
   const isAccountPage = page === "conta";
+  const isFilesPage = page === "arquivos";
+  const isProfilePage = isAccountPage || isFilesPage;
   const [publicSlug, setPublicSlug] = useState("");
   const [conversationId, setConversationId] = useState("");
   const [leadId, setLeadId] = useState("");
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
+  const [files, setFiles] = useState<AtendimentoFileRecord[]>([]);
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(!isAccountPage);
+  const [loading, setLoading] = useState(!isProfilePage);
   const [sending, setSending] = useState(false);
   const [authError, setAuthError] = useState("");
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
+  const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const messagesRequestIdRef = useRef(0);
   const sessionRequestIdRef = useRef(0);
@@ -109,13 +126,14 @@ export function PublicAtendimentoClient({
   );
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
-  const typing = !loading && !authError && !isAccountPage && (isInitialFlow || awaitingBotSince != null);
-  const composerDisabled = loading || Boolean(authError) || isAccountPage;
-  const submitLocked = loading || sending || Boolean(authError) || isAccountPage || typing;
+  const typing = !loading && !authError && !isProfilePage && (isInitialFlow || awaitingBotSince != null);
+  const composerDisabled = loading || Boolean(authError) || isProfilePage;
+  const submitLocked = loading || sending || Boolean(authError) || isProfilePage || typing;
   const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
   const firstName = getFirstName(displayName);
   const initialLetter = getInitialLetter(displayName);
   const accountHref = getAtendimentoAccountPath(linkSlug);
+  const filesHref = getAtendimentoFilesPath(linkSlug);
   const botHref = getAtendimentoPortalPath(linkSlug);
 
   async function redirectToLoginAfterSessionLoss() {
@@ -127,7 +145,7 @@ export function PublicAtendimentoClient({
   }
 
   useLayoutEffect(() => {
-    if (isAccountPage) return;
+    if (isProfilePage) return;
     const element = textareaRef.current;
     if (!element) return;
 
@@ -139,14 +157,14 @@ export function PublicAtendimentoClient({
     if (element.scrollHeight > 144) {
       element.style.overflowY = "auto";
     }
-  }, [draft, isAccountPage]);
+  }, [draft, isProfilePage]);
 
   useLayoutEffect(() => {
-    if (isAccountPage) return;
+    if (isProfilePage) return;
     const viewport = messagesViewportRef.current;
     if (!viewport) return;
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
-  }, [isAccountPage, publicSlug, messages, typing]);
+  }, [isProfilePage, publicSlug, messages, typing]);
 
   useEffect(() => {
     awaitingBotSinceRef.current = awaitingBotSince;
@@ -157,15 +175,15 @@ export function PublicAtendimentoClient({
   }, [messages]);
 
   useEffect(() => {
-    if (isAccountPage) return;
+    if (isProfilePage) return;
     const wasDisabled = wasComposerDisabledRef.current;
     wasComposerDisabledRef.current = composerDisabled;
     if (composerDisabled || !wasDisabled) return;
     restoreTextareaFocus();
-  }, [composerDisabled, isAccountPage]);
+  }, [composerDisabled, isProfilePage]);
 
   function restoreTextareaFocus() {
-    if (isAccountPage) return;
+    if (isProfilePage) return;
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         const element = textareaRef.current;
@@ -190,6 +208,53 @@ export function PublicAtendimentoClient({
       pendingBotFlushTimeoutRef.current = null;
     }
   }
+
+  function updateUploadItem(id: string, patch: Partial<AtendimentoUploadItem>) {
+    setUploadItems((currentItems) =>
+      currentItems.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }
+
+  function removeUploadItem(id: string) {
+    setUploadItems((currentItems) => currentItems.filter((item) => item.id !== id));
+  }
+
+  function startAwaitingBotSequence() {
+    pendingBotMessagesRef.current = [];
+    clearPendingBotFlushTimeout();
+    botReplyVisibleAtRef.current = Date.now() + 2500;
+    clearTypingIndicatorDelayTimeout();
+    typingIndicatorDelayTimeoutRef.current = window.setTimeout(() => {
+      const now = Date.now();
+      awaitingBotSinceRef.current = now;
+      setAwaitingBotSince(now);
+      typingIndicatorDelayTimeoutRef.current = null;
+    }, 1000);
+  }
+
+  function resetAwaitingBotSequence() {
+    clearTypingIndicatorDelayTimeout();
+    clearPendingBotFlushTimeout();
+    pendingBotMessagesRef.current = [];
+    botReplyVisibleAtRef.current = null;
+    awaitingBotSinceRef.current = null;
+    setAwaitingBotSince(null);
+  }
+
+  const loadFiles = useCallback(async () => {
+    const res = await fetch(`/api/atendimento/public/files?slug=${encodeURIComponent(linkSlug)}`, {
+      cache: "no-store",
+    });
+    if (res.status === 401 || res.status === 403) {
+      setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+      void redirectToLoginAfterSessionLoss();
+      return;
+    }
+    const json = await res.json().catch(() => null);
+    if (json?.ok) {
+      setFiles((json.files ?? []) as AtendimentoFileRecord[]);
+    }
+  }, [linkSlug]);
 
   const applyMessages = useCallback(
     (incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
@@ -414,6 +479,86 @@ export function PublicAtendimentoClient({
     }, 160);
   }, [loadSession]);
 
+  async function sendLeadMessage(params: {
+    content_text?: string;
+    media_type?: AtendimentoMessage["media_type"];
+    media_url?: string | null;
+    mime_type?: string | null;
+    file_name?: string | null;
+    file_size_bytes?: number | null;
+    optimisticMessage?: AtendimentoMessage | null;
+  }) {
+    if (!publicSlug) return false;
+
+    const optimisticMessage = params.optimisticMessage ?? null;
+    if (optimisticMessage) {
+      optimisticLeadMessageIdRef.current = optimisticMessage.id;
+      optimisticLeadMessageRef.current = optimisticMessage;
+      applyMessages([optimisticMessage], "merge");
+    }
+
+    startAwaitingBotSequence();
+
+    try {
+      const res = await fetch("/api/atendimento/public/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          public_slug: publicSlug,
+          content_text: params.content_text ?? "",
+          media_type: params.media_type ?? "text",
+          media_url: params.media_url ?? null,
+          mime_type: params.mime_type ?? null,
+          file_name: params.file_name ?? null,
+          file_size_bytes: params.file_size_bytes ?? null,
+        }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        if (optimisticMessage) {
+          removeMessage(optimisticMessage.id);
+          optimisticLeadMessageIdRef.current = null;
+          optimisticLeadMessageRef.current = null;
+        }
+        resetAwaitingBotSequence();
+        setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+        void redirectToLoginAfterSessionLoss();
+        return false;
+      }
+
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        if (optimisticMessage) {
+          removeMessage(optimisticMessage.id);
+          optimisticLeadMessageIdRef.current = null;
+          optimisticLeadMessageRef.current = null;
+        }
+        resetAwaitingBotSequence();
+        return false;
+      }
+
+      if (json.inbound?.id) {
+        if (optimisticMessage) {
+          replaceOptimisticLeadMessage(json.inbound as AtendimentoMessage);
+        } else {
+          applyMessages([json.inbound as AtendimentoMessage], "merge");
+        }
+      } else if (optimisticMessage) {
+        removeMessage(optimisticMessage.id);
+        optimisticLeadMessageIdRef.current = null;
+        optimisticLeadMessageRef.current = null;
+      }
+
+      if (json.outbound?.id) {
+        window.setTimeout(() => {
+          void loadMessages(publicSlug, "replace");
+        }, 180);
+      }
+      return true;
+    } finally {
+      restoreTextareaFocus();
+    }
+  }
+
   async function submitDraft() {
     const contentText = draft.trim();
     if (!contentText || !publicSlug || submitLocked) return;
@@ -427,6 +572,8 @@ export function PublicAtendimentoClient({
       media_type: "text",
       media_url: null,
       mime_type: null,
+      file_name: null,
+      file_size_bytes: null,
       external_message_id: null,
       status: "recebida",
       sent_at: optimisticCreatedAt,
@@ -437,76 +584,102 @@ export function PublicAtendimentoClient({
 
     setSending(true);
     setDraft("");
-    optimisticLeadMessageIdRef.current = optimisticMessageId;
-    optimisticLeadMessageRef.current = optimisticMessage;
-    applyMessages([optimisticMessage], "merge");
-    pendingBotMessagesRef.current = [];
-    clearPendingBotFlushTimeout();
-    botReplyVisibleAtRef.current = Date.now() + 2500;
-    clearTypingIndicatorDelayTimeout();
-    typingIndicatorDelayTimeoutRef.current = window.setTimeout(() => {
-      const now = Date.now();
-      awaitingBotSinceRef.current = now;
-      setAwaitingBotSince(now);
-      typingIndicatorDelayTimeoutRef.current = null;
-    }, 1000);
-
     try {
-      const res = await fetch("/api/atendimento/public/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_slug: publicSlug, content_text: contentText }),
+      await sendLeadMessage({
+        content_text: contentText,
+        optimisticMessage,
       });
-      if (res.status === 401 || res.status === 403) {
-        clearTypingIndicatorDelayTimeout();
-        clearPendingBotFlushTimeout();
-        removeMessage(optimisticMessageId);
-        optimisticLeadMessageIdRef.current = null;
-        optimisticLeadMessageRef.current = null;
-        pendingBotMessagesRef.current = [];
-        botReplyVisibleAtRef.current = null;
-        awaitingBotSinceRef.current = null;
-        setAwaitingBotSince(null);
-        setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
-        void redirectToLoginAfterSessionLoss();
-        return;
-      }
-      const json = await res.json().catch(() => null);
-      if (json?.ok) {
-        if (json.inbound?.id) {
-          replaceOptimisticLeadMessage(json.inbound as AtendimentoMessage);
-        } else {
-          removeMessage(optimisticMessageId);
-          optimisticLeadMessageIdRef.current = null;
-          optimisticLeadMessageRef.current = null;
-        }
-
-        if (json.outbound?.id) {
-          window.setTimeout(() => {
-            void loadMessages(publicSlug, "replace");
-          }, 180);
-        }
-      } else {
-        removeMessage(optimisticMessageId);
-        optimisticLeadMessageIdRef.current = null;
-        optimisticLeadMessageRef.current = null;
-        clearTypingIndicatorDelayTimeout();
-        clearPendingBotFlushTimeout();
-        pendingBotMessagesRef.current = [];
-        botReplyVisibleAtRef.current = null;
-        awaitingBotSinceRef.current = null;
-        setAwaitingBotSince(null);
-      }
     } finally {
       setSending(false);
-      restoreTextareaFocus();
     }
   }
 
+  async function uploadSelectedFiles(fileList: FileList | File[]) {
+    if (!publicSlug || submitLocked) return;
+    const { files, errors } = validateAtendimentoFiles(fileList);
+    if (errors.length) {
+      setAuthError("");
+      alert(errors.join("\n"));
+      return;
+    }
+
+    setSending(true);
+    try {
+      for (const file of files) {
+        const mediaType = getAtendimentoMediaTypeFromMimeType(file.type);
+        if (!mediaType) continue;
+
+        const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        setUploadItems((currentItems) => [
+          ...currentItems,
+          {
+            id: uploadId,
+            fileName: file.name,
+            fileSizeBytes: file.size,
+            progress: 0,
+            status: "queued",
+            error: null,
+          },
+        ]);
+
+        try {
+          updateUploadItem(uploadId, { status: "uploading", progress: 0, error: null });
+          const uploaded = await uploadAtendimentoFileWithProgress({
+            endpoint: "/api/atendimento/public/upload",
+            file,
+            extraFields: { public_slug: publicSlug },
+            onProgress: (progress) => updateUploadItem(uploadId, { progress }),
+          });
+          updateUploadItem(uploadId, { status: "sending", progress: 100 });
+          const success = await sendLeadMessage({
+            content_text: "",
+            media_type: uploaded.media_type,
+            media_url: uploaded.media_url,
+            mime_type: uploaded.mime_type,
+            file_name: uploaded.file_name,
+            file_size_bytes: uploaded.file_size_bytes,
+          });
+          if (!success) {
+            updateUploadItem(uploadId, { status: "error", error: "Falha ao enviar no chat." });
+            continue;
+          }
+          updateUploadItem(uploadId, { status: "done", progress: 100 });
+          window.setTimeout(() => removeUploadItem(uploadId), 1400);
+        } catch (error) {
+          updateUploadItem(uploadId, {
+            status: "error",
+            error: error instanceof Error ? error.message : "Falha no upload.",
+          });
+        }
+      }
+    } finally {
+      setSending(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  function handleFilePicker() {
+    if (submitLocked) return;
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const nextFiles = event.target.files;
+    if (!nextFiles?.length) return;
+    await uploadSelectedFiles(nextFiles);
+  }
+
   useEffect(() => {
-    if (isAccountPage) return;
+    if (isProfilePage) return;
     void loadSession();
-  }, [isAccountPage, loadSession]);
+  }, [isProfilePage, loadSession]);
+
+  useEffect(() => {
+    if (!isFilesPage) return;
+    void loadFiles();
+  }, [isFilesPage, loadFiles]);
 
   useEffect(() => {
     return () => {
@@ -519,7 +692,7 @@ export function PublicAtendimentoClient({
   }, [flushPendingBotMessages]);
 
   useEffect(() => {
-    if (isAccountPage || !publicSlug || authError || loading || !isInitialFlow) return;
+    if (isProfilePage || !publicSlug || authError || loading || !isInitialFlow) return;
     let active = true;
     let timeoutId: number | null = null;
 
@@ -536,10 +709,10 @@ export function PublicAtendimentoClient({
       active = false;
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
-  }, [authError, isAccountPage, isInitialFlow, loadMessages, loading, publicSlug]);
+  }, [authError, isInitialFlow, isProfilePage, loadMessages, loading, publicSlug]);
 
   useEffect(() => {
-    if (isAccountPage || !publicSlug || !conversationId || !leadId || authError) return;
+    if (isProfilePage || !publicSlug || !conversationId || !leadId || authError) return;
 
     const channel = supabase
       .channel(`atendimento-public:${conversationId}`)
@@ -582,7 +755,7 @@ export function PublicAtendimentoClient({
     applyMessagesWithBotTiming,
     authError,
     conversationId,
-    isAccountPage,
+    isProfilePage,
     leadId,
     loadMessages,
     publicSlug,
@@ -624,24 +797,51 @@ export function PublicAtendimentoClient({
             </Link>
           </div>
 
-          {isAccountPage ? (
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <Link
-                href={botHref}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Voltar ao bot
-              </Link>
-
-              <form action={logoutAction}>
-                <button
-                  type="submit"
-                  className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
+          {isProfilePage ? (
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Link
+                  href={botHref}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07]"
                 >
-                  Sair
-                </button>
-              </form>
+                  <ArrowLeft className="h-4 w-4" />
+                  Bot
+                </Link>
+                <Link
+                  href={accountHref}
+                  className={[
+                    "inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                    isAccountPage
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
+                      : "border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.07]",
+                  ].join(" ")}
+                >
+                  Conta
+                </Link>
+                <Link
+                  href={filesHref}
+                  className={[
+                    "inline-flex items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                    isFilesPage
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
+                      : "border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.07]",
+                  ].join(" ")}
+                >
+                  Arquivos
+                </Link>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-white/55">Acesse seus dados e os arquivos trocados no atendimento.</div>
+                <form action={logoutAction}>
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
+                  >
+                    Sair
+                  </button>
+                </form>
+              </div>
             </div>
           ) : null}
         </div>
@@ -667,6 +867,20 @@ export function PublicAtendimentoClient({
               </div>
             </div>
           </div>
+        ) : isFilesPage ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-6">
+            {authError ? (
+              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
+                {authError}
+              </div>
+            ) : (
+              <AtendimentoFileGallery
+                files={files}
+                emptyMessage="Nenhum arquivo foi trocado nesta conversa ainda."
+                tone="portal"
+              />
+            )}
+          </div>
         ) : (
           <>
             <div ref={messagesViewportRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6">
@@ -680,6 +894,11 @@ export function PublicAtendimentoClient({
                 <>
                   {messages.map((message) => {
                     const isLead = message.sender_role === "lead";
+                    const attachmentTitle = getAtendimentoAttachmentTitle({
+                      mediaType: message.media_type,
+                      fileName: message.file_name,
+                      contentText: message.content_text,
+                    });
                     return (
                       <div key={message.id} className={`flex ${isLead ? "justify-end" : "justify-start"}`}>
                         <div
@@ -690,18 +909,40 @@ export function PublicAtendimentoClient({
                               : "border-white/10 bg-white/[0.04]",
                           ].join(" ")}
                         >
+                          {message.media_url && message.media_type === "image" ? (
+                            <img
+                              src={message.media_url}
+                              alt={attachmentTitle}
+                              className="mb-3 max-h-64 w-full rounded-2xl object-cover"
+                              loading="lazy"
+                            />
+                          ) : null}
+                          {message.media_url && message.media_type === "video" ? (
+                            <video
+                              src={message.media_url}
+                              controls
+                              preload="metadata"
+                              className="mb-3 max-h-72 w-full rounded-2xl bg-black"
+                            />
+                          ) : null}
                           {message.content_text ? (
                             <div className="whitespace-pre-wrap text-sm text-white/90">{message.content_text}</div>
                           ) : null}
                           {message.media_url ? (
-                            <a
-                              href={message.media_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-3 inline-flex text-xs font-semibold text-emerald-200 underline"
-                            >
-                              Abrir anexo
-                            </a>
+                            <>
+                              <div className="mt-2 text-xs font-semibold text-white/85">{attachmentTitle}</div>
+                              <div className="mt-1 text-[11px] text-white/45">
+                                {formatAtendimentoFileSize(message.file_size_bytes)}
+                              </div>
+                              <a
+                                href={message.media_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-3 inline-flex text-xs font-semibold text-emerald-200 underline"
+                              >
+                                Abrir anexo
+                              </a>
+                            </>
                           ) : null}
                           <div className="mt-3 text-[11px] text-white/45">
                             {formatAtendimentoDateTime(message.created_at)}
@@ -724,7 +965,58 @@ export function PublicAtendimentoClient({
             </div>
 
             <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={getAtendimentoAcceptedMimeTypes()}
+                className="hidden"
+                onChange={handleFileInputChange}
+              />
+
+              {uploadItems.length ? (
+                <div className="mb-3 space-y-2">
+                  {uploadItems.map((item) => (
+                    <div key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                      <div className="flex items-center justify-between gap-3 text-xs text-white/75">
+                        <div className="min-w-0 truncate font-semibold">{item.fileName}</div>
+                        <div>{formatAtendimentoFileSize(item.fileSizeBytes)}</div>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className={[
+                            "h-full rounded-full transition-all",
+                            item.status === "error" ? "bg-red-400" : "bg-emerald-500",
+                          ].join(" ")}
+                          style={{ width: `${Math.max(6, item.progress)}%` }}
+                        />
+                      </div>
+                      <div className="mt-2 text-[11px] text-white/55">
+                        {item.status === "uploading"
+                          ? `Enviando ${item.progress}%`
+                          : item.status === "sending"
+                            ? "Salvando no chat..."
+                            : item.status === "done"
+                              ? "Concluido"
+                              : item.status === "error"
+                                ? item.error || "Falha no envio."
+                                : "Na fila"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <button
+                  type="button"
+                  onClick={handleFilePicker}
+                  disabled={submitLocked}
+                  className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60 sm:h-auto sm:min-h-14 sm:w-14"
+                  aria-label="Enviar arquivos"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
                 <textarea
                   ref={textareaRef}
                   value={draft}

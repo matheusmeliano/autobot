@@ -27,6 +27,11 @@ export function getAtendimentoAccountPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
   return `/atendimento/conta?slug=${encodeURIComponent(safeSlug)}`;
 }
 
+export function getAtendimentoFilesPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
+  const safeSlug = String(slug || ATENDIMENTO_PUBLIC_LINK_SLUG).trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
+  return `/atendimento/arquivos?slug=${encodeURIComponent(safeSlug)}`;
+}
+
 export function isAtendimentoPath(pathname: string) {
   return pathname === "/atendimento" || pathname.startsWith("/atendimento/");
 }
