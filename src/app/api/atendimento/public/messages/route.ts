@@ -14,9 +14,7 @@ import {
 } from "@/lib/atendimento/server";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
 
-function randomTypingDelayMs() {
-  return 1000 + Math.floor(Math.random() * 501);
-}
+const POST_LEAD_REPLY_DELAY_MS = 2500;
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -267,7 +265,7 @@ export async function POST(req: Request) {
     });
   }
 
-  await sleep(randomTypingDelayMs());
+  await sleep(POST_LEAD_REPLY_DELAY_MS);
   const botNowIso = new Date().toISOString();
   const { data: outbound, error: outboundError } = await admin
     .from("atendimento_messages")

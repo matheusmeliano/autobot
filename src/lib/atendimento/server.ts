@@ -294,6 +294,7 @@ export async function ensureInitialBotConversationFlow(params: {
   leadId: string;
   conversationId: string;
 }) {
+  const INITIAL_BOT_TYPING_DELAY_MS = 1500;
   const admin = createSupabaseAdminClient();
   const { count: leadCount, error: leadCountError } = await admin
     .from("atendimento_messages")
@@ -324,7 +325,7 @@ export async function ensureInitialBotConversationFlow(params: {
     return false;
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 1000 + Math.floor(Math.random() * 501)));
+  await new Promise((resolve) => setTimeout(resolve, INITIAL_BOT_TYPING_DELAY_MS));
   const nowIso = new Date().toISOString();
   const nextContent = String(initialMessages[botCountNum] ?? "").trim();
   if (!nextContent) return false;

@@ -93,6 +93,7 @@ export function PublicAtendimentoClient({
   const messagesRequestIdRef = useRef(0);
   const sessionRequestIdRef = useRef(0);
   const sessionRefreshTimeoutRef = useRef<number | null>(null);
+  const typingIndicatorDelayTimeoutRef = useRef<number | null>(null);
   const awaitingBotSinceRef = useRef<number | null>(null);
   const optimisticLeadMessageIdRef = useRef<string | null>(null);
 
@@ -154,6 +155,13 @@ export function PublicAtendimentoClient({
         element.setSelectionRange(cursorPosition, cursorPosition);
       });
     });
+  }
+
+  function clearTypingIndicatorDelayTimeout() {
+    if (typingIndicatorDelayTimeoutRef.current != null) {
+      window.clearTimeout(typingIndicatorDelayTimeoutRef.current);
+      typingIndicatorDelayTimeoutRef.current = null;
+    }
   }
 
   const applyMessages = useCallback(
@@ -309,10 +317,13 @@ export function PublicAtendimentoClient({
     setDraft("");
     optimisticLeadMessageIdRef.current = optimisticMessageId;
     applyMessages([optimisticMessage], "merge");
-    window.requestAnimationFrame(() => {
-      awaitingBotSinceRef.current = Date.now();
-      setAwaitingBotSince(awaitingBotSinceRef.current);
-    });
+    clearTypingIndicatorDelayTimeout();
+    typingIndicatorDelayTimeoutRef.current = window.setTimeout(() => {
+      const now = Date.now();
+      awaitingBotSinceRef.current = now;
+      setAwaitingBotSince(now);
+      typingIndicatorDelayTimeoutRef.current = null;
+    }, 1000);
 
     try {
       const res = await fetch("/api/atendimento/public/messages", {
@@ -321,6 +332,7 @@ export function PublicAtendimentoClient({
         body: JSON.stringify({ public_slug: publicSlug, content_text: contentText }),
       });
       if (res.status === 401 || res.status === 403) {
+        clearTypingIndicatorDelayTimeout();
         removeMessage(optimisticMessageId);
         optimisticLeadMessageIdRef.current = null;
         awaitingBotSinceRef.current = null;
@@ -346,6 +358,7 @@ export function PublicAtendimentoClient({
       } else {
         removeMessage(optimisticMessageId);
         optimisticLeadMessageIdRef.current = null;
+        clearTypingIndicatorDelayTimeout();
         awaitingBotSinceRef.current = null;
         setAwaitingBotSince(null);
       }
@@ -359,6 +372,13 @@ export function PublicAtendimentoClient({
     if (isAccountPage) return;
     void loadSession();
   }, [isAccountPage, loadSession]);
+
+  useEffect(() => {
+    return () => {
+      clearTypingIndicatorDelayTimeout();
+      awaitingBotSinceRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (isAccountPage || !publicSlug || authError || loading || !isInitialFlow) return;
