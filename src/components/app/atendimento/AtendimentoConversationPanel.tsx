@@ -1,7 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2, Send } from "lucide-react";
 import type { AtendimentoConversation, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
@@ -27,9 +27,48 @@ export function AtendimentoConversationPanel({
   compact?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [desktopExpanded, setDesktopExpanded] = useState(false);
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!desktopExpanded) return;
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(min-width: 1024px)");
+    if (!media.matches) {
+      setDesktopExpanded(false);
+      return;
+    }
+    const listener = () => {
+      if (!media.matches) setDesktopExpanded(false);
+    };
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    }
+    media.addListener(listener);
+    return () => media.removeListener(listener);
+  }, [desktopExpanded]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!desktopExpanded) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [desktopExpanded]);
+
+  useEffect(() => {
+    if (!desktopExpanded) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDesktopExpanded(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [desktopExpanded]);
 
   useLayoutEffect(() => {
     const element = textareaRef.current;
@@ -85,16 +124,36 @@ export function AtendimentoConversationPanel({
   return (
     <div
       className={
-        compact
-          ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]"
-          : "flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-0"
+        desktopExpanded
+          ? "fixed inset-0 z-[450] flex h-[100dvh] flex-col bg-[var(--app-bg)]"
+          : compact
+            ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]"
+            : "flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-0"
       }
     >
-      <div className="border-b border-[var(--app-border)] px-4 py-4">
+      <div
+        className={[
+          "flex items-start justify-between gap-3 border-b border-[var(--app-border)] px-4 py-4",
+          desktopExpanded ? "bg-[var(--app-bg)]" : "",
+        ].join(" ")}
+      >
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
+        {!compact ? (
+          <button
+            type="button"
+            onClick={() => setDesktopExpanded((current) => !current)}
+            className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] lg:inline-flex"
+            aria-label={desktopExpanded ? "Sair da tela cheia" : "Expandir conversa"}
+          >
+            {desktopExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+        ) : null}
       </div>
 
-      <div ref={messagesViewportRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div
+        ref={messagesViewportRef}
+        className={desktopExpanded ? "flex-1 space-y-3 overflow-y-auto bg-[var(--app-bg)] px-4 py-4" : "flex-1 space-y-3 overflow-y-auto px-4 py-4"}
+      >
         {orderedMessages.length ? (
           orderedMessages.map((message) => {
             const isLead = message.sender_role === "lead";
@@ -148,7 +207,10 @@ export function AtendimentoConversationPanel({
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-[var(--app-border)] px-4 py-4">
+      <form
+        onSubmit={handleSubmit}
+        className={desktopExpanded ? "border-t border-[var(--app-border)] bg-[var(--app-bg)] px-4 py-4" : "border-t border-[var(--app-border)] px-4 py-4"}
+      >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <textarea
             ref={textareaRef}
