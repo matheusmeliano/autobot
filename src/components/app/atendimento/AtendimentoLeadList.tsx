@@ -120,7 +120,7 @@ export function AtendimentoLeadList({
             />
           </label>
           <div className="text-sm text-[var(--app-text-45)]">
-            {loading ? "Atualizando atendimentos..." : `${leads.length} atendimento(s) encontrado(s)`}
+            {`${leads.length} atendimento(s) encontrado(s)`}
           </div>
         </div>
       </div>
