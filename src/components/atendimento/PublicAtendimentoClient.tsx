@@ -41,9 +41,12 @@ export function PublicAtendimentoClient({
   currentUser: { id: string; email: string };
   profile: { nome: string; email: string; created_at: string };
 }) {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const linkSlug = String(initialSlug ?? "").trim();
   const isAccountPage = page === "conta";
   const [publicSlug, setPublicSlug] = useState("");
+  const [conversationId, setConversationId] = useState("");
+  const [leadId, setLeadId] = useState("");
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(!isAccountPage);
@@ -163,9 +166,13 @@ export function PublicAtendimentoClient({
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         setAuthError(String(json?.error ?? "Não foi possível carregar o seu atendimento."));
+        setConversationId("");
+        setLeadId("");
         setMessages([]);
         return;
       }
+      setLeadId(String(json.session?.lead?.id ?? ""));
+      setConversationId(String(json.session?.conversation?.id ?? ""));
       const nextSlug = String(json.session?.conversation?.public_slug ?? "");
       const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
       const nextTotal = Number(json.session?.initial_total ?? 0);
@@ -231,6 +238,55 @@ export function PublicAtendimentoClient({
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
   }, [authError, isAccountPage, publicSlug, typing]);
+
+  useEffect(() => {
+    if (isAccountPage || !publicSlug || !conversationId || !leadId || authError) return;
+
+    const refreshMessages = () => {
+      void loadMessages(publicSlug);
+    };
+    const refreshSession = () => {
+      void loadSession();
+    };
+
+    const channel = supabase
+      .channel(`atendimento-public:${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "atendimento_messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        refreshMessages,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "atendimento_conversations",
+          filter: `id=eq.${conversationId}`,
+        },
+        refreshSession,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "atendimento_leads",
+          filter: `id=eq.${leadId}`,
+        },
+        refreshSession,
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authError, conversationId, isAccountPage, leadId, publicSlug, supabase]);
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Copy, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
@@ -39,6 +39,9 @@ export function AtendimentoClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [desktopListHeight, setDesktopListHeight] = useState<number | null>(null);
+  const selectedLeadIdRef = useRef<string | null>(null);
+  const queryRef = useRef("");
+  const realtimeRefreshTimeoutRef = useRef<number | null>(null);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
@@ -128,6 +131,14 @@ export function AtendimentoClient() {
   }, [loadLeadDetail, selectedLeadId]);
 
   useEffect(() => {
+    selectedLeadIdRef.current = selectedLeadId;
+  }, [selectedLeadId]);
+
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
+
+  useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
     const sync = () => {
       if (mobileConversationOpen && media.matches) {
@@ -143,25 +154,39 @@ export function AtendimentoClient() {
     return () => media.removeListener(sync);
   }, [mobileConversationOpen]);
 
+  const refreshAtendimentoRealtime = useCallback(() => {
+    void loadSummary();
+    void loadLeads(queryRef.current);
+    if (selectedLeadIdRef.current) {
+      void loadLeadDetail(selectedLeadIdRef.current);
+    }
+  }, [loadLeadDetail, loadLeads, loadSummary]);
+
   useEffect(() => {
+    const scheduleRefresh = () => {
+      if (realtimeRefreshTimeoutRef.current != null) {
+        window.clearTimeout(realtimeRefreshTimeoutRef.current);
+      }
+      realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
+        refreshAtendimentoRealtime();
+      }, 120);
+    };
+
     const channel = supabase
       .channel("atendimento-private")
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, () => {
-        loadSummary();
-        loadLeads(query);
-        if (selectedLeadId) loadLeadDetail(selectedLeadId);
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, () => {
-        loadSummary();
-        loadLeads(query);
-        if (selectedLeadId) loadLeadDetail(selectedLeadId);
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_conversations" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, scheduleRefresh)
       .subscribe();
 
     return () => {
+      if (realtimeRefreshTimeoutRef.current != null) {
+        window.clearTimeout(realtimeRefreshTimeoutRef.current);
+        realtimeRefreshTimeoutRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [loadLeadDetail, loadLeads, loadSummary, query, selectedLeadId, supabase]);
+  }, [refreshAtendimentoRealtime, supabase]);
 
   async function handleCopyLink() {
     if (!publicUrl) return;
