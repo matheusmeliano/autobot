@@ -452,7 +452,7 @@ export function AtendimentoClient() {
         <div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Atendimento</h1>
           <div className="mt-2 text-sm text-white/60">
-            CRM exclusivo para captação, acompanhamento e conversão dos leads do projeto Lucas Brum Online Music USA.
+            CRM exclusivo para captação, acompanhamento e conversão dos alunos do projeto Lucas Brum Online Music USA.
           </div>
         </div>
 
