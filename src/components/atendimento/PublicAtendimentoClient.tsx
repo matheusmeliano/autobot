@@ -96,6 +96,7 @@ export function PublicAtendimentoClient({
   const typingIndicatorDelayTimeoutRef = useRef<number | null>(null);
   const awaitingBotSinceRef = useRef<number | null>(null);
   const optimisticLeadMessageIdRef = useRef<string | null>(null);
+  const optimisticLeadMessageRef = useRef<AtendimentoMessage | null>(null);
   const messagesRef = useRef<AtendimentoMessage[]>([]);
   const pendingBotMessagesRef = useRef<AtendimentoMessage[]>([]);
   const botReplyVisibleAtRef = useRef<number | null>(null);
@@ -181,7 +182,31 @@ export function PublicAtendimentoClient({
 
   const applyMessages = useCallback(
     (incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
-      const normalizedMessages = sortAndDedupeMessages(incomingMessages);
+      let normalizedMessages = sortAndDedupeMessages(incomingMessages);
+      const optimisticLeadMessage = optimisticLeadMessageRef.current;
+
+      if (mode === "replace" && optimisticLeadMessage) {
+        const hasConfirmedLeadMessage = normalizedMessages.some((message) => {
+          if (message.sender_role !== "lead") return false;
+          if (String(message.content_text ?? "").trim() !== String(optimisticLeadMessage.content_text ?? "").trim()) {
+            return false;
+          }
+          const optimisticTime = new Date(optimisticLeadMessage.created_at).getTime();
+          const messageTime = new Date(message.created_at).getTime();
+          if (!Number.isFinite(optimisticTime) || !Number.isFinite(messageTime)) {
+            return true;
+          }
+          return Math.abs(messageTime - optimisticTime) <= 10000;
+        });
+
+        if (!hasConfirmedLeadMessage) {
+          normalizedMessages = sortAndDedupeMessages([...normalizedMessages, optimisticLeadMessage]);
+        } else {
+          optimisticLeadMessageRef.current = null;
+          optimisticLeadMessageIdRef.current = null;
+        }
+      }
+
       setMessages((currentMessages) => {
         const nextMessages =
           mode === "merge"
@@ -381,6 +406,7 @@ export function PublicAtendimentoClient({
     setSending(true);
     setDraft("");
     optimisticLeadMessageIdRef.current = optimisticMessageId;
+    optimisticLeadMessageRef.current = optimisticMessage;
     applyMessages([optimisticMessage], "merge");
     pendingBotMessagesRef.current = [];
     clearPendingBotFlushTimeout();
@@ -404,6 +430,7 @@ export function PublicAtendimentoClient({
         clearPendingBotFlushTimeout();
         removeMessage(optimisticMessageId);
         optimisticLeadMessageIdRef.current = null;
+        optimisticLeadMessageRef.current = null;
         pendingBotMessagesRef.current = [];
         botReplyVisibleAtRef.current = null;
         awaitingBotSinceRef.current = null;
@@ -416,6 +443,7 @@ export function PublicAtendimentoClient({
       if (json?.ok) {
         removeMessage(optimisticMessageId);
         optimisticLeadMessageIdRef.current = null;
+        optimisticLeadMessageRef.current = null;
 
         if (json.inbound?.id) {
           applyMessages([json.inbound as AtendimentoMessage], "merge");
@@ -429,6 +457,7 @@ export function PublicAtendimentoClient({
       } else {
         removeMessage(optimisticMessageId);
         optimisticLeadMessageIdRef.current = null;
+        optimisticLeadMessageRef.current = null;
         clearTypingIndicatorDelayTimeout();
         clearPendingBotFlushTimeout();
         pendingBotMessagesRef.current = [];
@@ -504,6 +533,7 @@ export function PublicAtendimentoClient({
           if (nextMessage.sender_role === "lead" && optimisticLeadMessageIdRef.current) {
             removeMessage(optimisticLeadMessageIdRef.current);
             optimisticLeadMessageIdRef.current = null;
+            optimisticLeadMessageRef.current = null;
           }
           applyMessagesWithBotTiming([nextMessage], "merge");
         },
