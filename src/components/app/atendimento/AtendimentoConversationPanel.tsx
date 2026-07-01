@@ -15,6 +15,7 @@ import {
 import { uploadAtendimentoFileWithProgress } from "@/lib/atendimento/upload-client";
 import type { AtendimentoConversation, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 function statusLabel(status: string) {
   if (status === "lida") return "Lida";
@@ -44,6 +45,7 @@ export function AtendimentoConversationPanel({
   }) => Promise<void>;
   compact?: boolean;
 }) {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [draft, setDraft] = useState("");
   const [desktopExpanded, setDesktopExpanded] = useState(false);
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
@@ -170,7 +172,9 @@ export function AtendimentoConversationPanel({
       try {
         updateUploadItem(uploadId, { status: "uploading", progress: 0, error: null });
         const uploaded = await uploadAtendimentoFileWithProgress({
-          endpoint: `/api/atendimento/conversas/${conversation.id}/upload`,
+          supabase,
+          conversationId: conversation.id,
+          senderRole: "attendant",
           file,
           onProgress: (progress) => updateUploadItem(uploadId, { progress }),
         });

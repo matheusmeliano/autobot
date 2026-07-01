@@ -642,9 +642,10 @@ export function PublicAtendimentoClient({
         try {
           updateUploadItem(uploadId, { status: "uploading", progress: 0, error: null });
           const uploaded = await uploadAtendimentoFileWithProgress({
-            endpoint: "/api/atendimento/public/upload",
+            supabase,
+            conversationId,
+            senderRole: "lead",
             file,
-            extraFields: { public_slug: publicSlug },
             onProgress: (progress) => updateUploadItem(uploadId, { progress }),
           });
           updateUploadItem(uploadId, { status: "sending", progress: 100 });
