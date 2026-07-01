@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2, Paperclip, Send, X } from "lucide-react";
+import { Maximize2, Minimize2, Paperclip, Play, Send, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import {
   ATENDIMENTO_DOCUMENT_MIME_ACCEPT,
@@ -52,12 +52,20 @@ export function AtendimentoConversationPanel({
   const [desktopExpanded, setDesktopExpanded] = useState(false);
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [previewMessage, setPreviewMessage] = useState<AtendimentoMessage | null>(null);
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const previewAttachmentTitle = previewMessage
+    ? getAtendimentoAttachmentTitle({
+        mediaType: previewMessage.media_type,
+        fileName: previewMessage.file_name,
+        contentText: previewMessage.content_text,
+      })
+    : "";
 
   useEffect(() => {
     if (!desktopExpanded) return;
@@ -304,20 +312,40 @@ export function AtendimentoConversationPanel({
                     {isLead ? "Lead" : isBot ? "Bot" : "Atendente"}
                   </div>
                   {message.media_url && message.media_type === "image" ? (
-                    <img
-                      src={message.media_url}
-                      alt={attachmentTitle}
-                      className="mt-3 max-h-64 w-full rounded-2xl object-cover"
-                      loading="lazy"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMessage(message)}
+                      className="group mt-3 block w-full overflow-hidden rounded-2xl border border-[var(--app-border)] bg-black/20 text-left transition hover:border-[var(--app-text-35)]"
+                      aria-label={`Visualizar ${attachmentTitle}`}
+                    >
+                      <img
+                        src={message.media_url}
+                        alt={attachmentTitle}
+                        className="max-h-64 w-full rounded-2xl object-cover transition duration-200 group-hover:scale-[1.02]"
+                        loading="lazy"
+                      />
+                    </button>
                   ) : null}
                   {message.media_url && message.media_type === "video" ? (
-                    <video
-                      src={message.media_url}
-                      controls
-                      preload="metadata"
-                      className="mt-3 max-h-72 w-full rounded-2xl bg-black"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMessage(message)}
+                      className="group relative mt-3 block w-full overflow-hidden rounded-2xl border border-[var(--app-border)] bg-black/20 text-left transition hover:border-[var(--app-text-35)]"
+                      aria-label={`Reproduzir ${attachmentTitle}`}
+                    >
+                      <video
+                        src={message.media_url}
+                        preload="metadata"
+                        className="max-h-72 w-full rounded-2xl bg-black object-cover"
+                        muted
+                        playsInline
+                      />
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white shadow-lg">
+                          <Play className="h-5 w-5 fill-current" />
+                        </span>
+                      </div>
+                    </button>
                   ) : null}
                   {message.content_text ? (
                     <div className="mt-2 whitespace-pre-wrap text-sm text-[var(--app-text-85)]">
@@ -490,6 +518,50 @@ export function AtendimentoConversationPanel({
             Arquivo
           </button>
         </div>
+      </AppModal>
+
+      <AppModal open={Boolean(previewMessage)} onClose={() => setPreviewMessage(null)} size="xl" zIndexClass="z-[530]" fullScreenOnMobile>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">{previewAttachmentTitle}</div>
+            {previewMessage ? (
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--app-text-45)]">
+                <span>{formatAtendimentoDateTime(previewMessage.created_at)}</span>
+                <span>{formatAtendimentoFileSize(previewMessage.file_size_bytes)}</span>
+              </div>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreviewMessage(null)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+            aria-label="Fechar visualizacao"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {previewMessage?.media_url ? (
+          <div className="mt-4 flex flex-1 items-center justify-center overflow-hidden rounded-2xl bg-black">
+            {previewMessage.media_type === "image" ? (
+              <img
+                src={previewMessage.media_url}
+                alt={previewAttachmentTitle}
+                className="max-h-[calc(100dvh-10rem)] w-full object-contain lg:max-h-[75vh]"
+                loading="eager"
+              />
+            ) : (
+              <video
+                src={previewMessage.media_url}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[calc(100dvh-10rem)] w-full bg-black object-contain lg:max-h-[75vh]"
+                preload="metadata"
+              />
+            )}
+          </div>
+        ) : null}
       </AppModal>
     </div>
   );

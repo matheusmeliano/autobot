@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Clapperboard, FileText, ImageIcon, Paperclip, Send, X } from "lucide-react";
+import { ArrowLeft, Clapperboard, FileText, ImageIcon, Paperclip, Play, Send, X } from "lucide-react";
 import { logoutAction } from "@/app/app/actions";
 import { AppModal } from "@/components/app/AppModal";
 import { getAtendimentoAccountPath, getAtendimentoFilesPath, getAtendimentoPortalPath } from "@/lib/auth/access";
@@ -111,6 +111,7 @@ export function PublicAtendimentoClient({
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [previewMessage, setPreviewMessage] = useState<AtendimentoMessage | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -144,6 +145,13 @@ export function PublicAtendimentoClient({
   const accountHref = getAtendimentoAccountPath(linkSlug);
   const filesHref = getAtendimentoFilesPath(linkSlug);
   const botHref = getAtendimentoPortalPath(linkSlug);
+  const previewAttachmentTitle = previewMessage
+    ? getAtendimentoAttachmentTitle({
+        mediaType: previewMessage.media_type,
+        fileName: previewMessage.file_name,
+        contentText: previewMessage.content_text,
+      })
+    : "";
 
   async function redirectToLoginAfterSessionLoss() {
     try {
@@ -968,20 +976,40 @@ export function PublicAtendimentoClient({
                           ].join(" ")}
                         >
                           {message.media_url && message.media_type === "image" ? (
-                            <img
-                              src={message.media_url}
-                              alt={attachmentTitle}
-                              className="mb-3 max-h-64 w-full rounded-2xl object-cover"
-                              loading="lazy"
-                            />
+                            <button
+                              type="button"
+                              onClick={() => setPreviewMessage(message)}
+                              className="group mb-3 block w-full overflow-hidden rounded-2xl border border-white/10 bg-black/20 text-left transition hover:border-emerald-400/35"
+                              aria-label={`Visualizar ${attachmentTitle}`}
+                            >
+                              <img
+                                src={message.media_url}
+                                alt={attachmentTitle}
+                                className="max-h-64 w-full rounded-2xl object-cover transition duration-200 group-hover:scale-[1.02]"
+                                loading="lazy"
+                              />
+                            </button>
                           ) : null}
                           {message.media_url && message.media_type === "video" ? (
-                            <video
-                              src={message.media_url}
-                              controls
-                              preload="metadata"
-                              className="mb-3 max-h-72 w-full rounded-2xl bg-black"
-                            />
+                            <button
+                              type="button"
+                              onClick={() => setPreviewMessage(message)}
+                              className="group relative mb-3 block w-full overflow-hidden rounded-2xl border border-white/10 bg-black/20 text-left transition hover:border-emerald-400/35"
+                              aria-label={`Reproduzir ${attachmentTitle}`}
+                            >
+                              <video
+                                src={message.media_url}
+                                preload="metadata"
+                                className="max-h-72 w-full rounded-2xl bg-black object-cover"
+                                muted
+                                playsInline
+                              />
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                                <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white shadow-lg">
+                                  <Play className="h-5 w-5 fill-current" />
+                                </span>
+                              </div>
+                            </button>
                           ) : null}
                           {message.content_text ? (
                             <div className="whitespace-pre-wrap text-sm text-white/90">{message.content_text}</div>
@@ -1180,6 +1208,50 @@ export function PublicAtendimentoClient({
             <div className="mt-1 text-xs leading-5 text-white/50">PDF, DOC, XLS, ZIP e outros documentos compativeis.</div>
           </button>
         </div>
+      </AppModal>
+
+      <AppModal open={Boolean(previewMessage)} onClose={() => setPreviewMessage(null)} size="xl" zIndexClass="z-[540]" fullScreenOnMobile>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="truncate text-base font-semibold text-white">{previewAttachmentTitle}</div>
+            {previewMessage ? (
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/50">
+                <span>{formatAtendimentoDateTime(previewMessage.created_at)}</span>
+                <span>{formatAtendimentoFileSize(previewMessage.file_size_bytes)}</span>
+              </div>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreviewMessage(null)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.08]"
+            aria-label="Fechar visualizacao"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {previewMessage?.media_url ? (
+          <div className="mt-4 flex flex-1 items-center justify-center overflow-hidden rounded-2xl bg-black">
+            {previewMessage.media_type === "image" ? (
+              <img
+                src={previewMessage.media_url}
+                alt={previewAttachmentTitle}
+                className="max-h-[calc(100dvh-10rem)] w-full object-contain lg:max-h-[75vh]"
+                loading="eager"
+              />
+            ) : (
+              <video
+                src={previewMessage.media_url}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[calc(100dvh-10rem)] w-full bg-black object-contain lg:max-h-[75vh]"
+                preload="metadata"
+              />
+            )}
+          </div>
+        ) : null}
       </AppModal>
     </div>
   );
