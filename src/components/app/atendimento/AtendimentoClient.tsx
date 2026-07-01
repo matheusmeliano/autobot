@@ -78,7 +78,9 @@ export function AtendimentoClient() {
   const queryRef = useRef("");
   const listRefreshTimeoutRef = useRef<number | null>(null);
   const detailRefreshTimeoutRef = useRef<number | null>(null);
+  const fallbackRefreshIntervalRef = useRef<number | null>(null);
   const realtimeSuspendedRef = useRef(false);
+  const realtimeSubscribedRef = useRef(false);
   const leadsRequestIdRef = useRef(0);
   const detailRequestIdRef = useRef(0);
   const messagesRequestIdRef = useRef(0);
@@ -264,6 +266,25 @@ export function AtendimentoClient() {
     }, 120);
   }, [loadLeadDetail]);
 
+  const startFallbackRefresh = useCallback(() => {
+    if (fallbackRefreshIntervalRef.current != null) return;
+    fallbackRefreshIntervalRef.current = window.setInterval(() => {
+      if (realtimeSuspendedRef.current || realtimeSubscribedRef.current) return;
+      void loadSummary();
+      void loadLeads(queryRef.current);
+      if (selectedLeadIdRef.current) {
+        void loadLeadDetail(selectedLeadIdRef.current, { suppressNotFound: true });
+      }
+    }, 2000);
+  }, [loadLeadDetail, loadLeads, loadSummary]);
+
+  const stopFallbackRefresh = useCallback(() => {
+    if (fallbackRefreshIntervalRef.current != null) {
+      window.clearInterval(fallbackRefreshIntervalRef.current);
+      fallbackRefreshIntervalRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     const channel = supabase
       .channel("atendimento-private")
@@ -301,9 +322,24 @@ export function AtendimentoClient() {
         }
         scheduleListRefresh();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          realtimeSubscribedRef.current = true;
+          stopFallbackRefresh();
+          return;
+        }
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          realtimeSubscribedRef.current = false;
+          startFallbackRefresh();
+          void loadSummary();
+          void loadLeads(queryRef.current);
+        }
+      });
 
     return () => {
+      realtimeSubscribedRef.current = false;
+      stopFallbackRefresh();
       if (listRefreshTimeoutRef.current != null) {
         window.clearTimeout(listRefreshTimeoutRef.current);
         listRefreshTimeoutRef.current = null;
@@ -314,7 +350,18 @@ export function AtendimentoClient() {
       }
       supabase.removeChannel(channel);
     };
-  }, [applyMessages, loadConversationMessages, removeMessage, scheduleListRefresh, scheduleSelectedLeadRefresh, supabase]);
+  }, [
+    applyMessages,
+    loadConversationMessages,
+    loadLeads,
+    loadSummary,
+    removeMessage,
+    scheduleListRefresh,
+    scheduleSelectedLeadRefresh,
+    startFallbackRefresh,
+    stopFallbackRefresh,
+    supabase,
+  ]);
 
   async function handleCopyLink() {
     if (!publicUrl) return;
