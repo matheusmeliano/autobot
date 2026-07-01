@@ -322,7 +322,7 @@ export function AtendimentoConversationPanel({
                   ].join(" ")}
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-45)]">
-                    {isLead ? "Lead" : isBot ? "Bot" : "Atendente"}
+                    {isLead ? "Enviado por aluno" : isBot ? "Bot" : "Enviado por você"}
                   </div>
                   {message.media_url && message.media_type === "image" ? (
                     <button
