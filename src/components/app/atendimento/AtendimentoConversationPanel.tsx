@@ -505,9 +505,9 @@ export function AtendimentoConversationPanel({
           <button
             type="button"
             onClick={() => handleAttachmentOption("image")}
-            className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-emerald-400/55 hover:bg-white/[0.09] hover:shadow-[0_20px_45px_rgba(16,185,129,0.12)]"
+            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5"
           >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/12 text-emerald-200 transition duration-200 group-hover:border-emerald-400/40 group-hover:bg-emerald-500/18 group-hover:text-emerald-100">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/12 text-emerald-200">
               <ImageIcon className="h-4 w-4" />
             </div>
             <div className="mt-4 text-sm font-semibold text-white">Foto</div>
@@ -516,9 +516,9 @@ export function AtendimentoConversationPanel({
           <button
             type="button"
             onClick={() => handleAttachmentOption("video")}
-            className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-sky-400/55 hover:bg-white/[0.09] hover:shadow-[0_20px_45px_rgba(56,189,248,0.12)]"
+            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5"
           >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/12 text-sky-200 transition duration-200 group-hover:border-sky-300/45 group-hover:bg-sky-400/18 group-hover:text-sky-100">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/12 text-sky-200">
               <Clapperboard className="h-4 w-4" />
             </div>
             <div className="mt-4 text-sm font-semibold text-white">Video</div>
@@ -527,9 +527,9 @@ export function AtendimentoConversationPanel({
           <button
             type="button"
             onClick={() => handleAttachmentOption("file")}
-            className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-violet-400/55 hover:bg-white/[0.09] hover:shadow-[0_20px_45px_rgba(168,85,247,0.12)]"
+            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5"
           >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/12 text-violet-200 transition duration-200 group-hover:border-violet-300/45 group-hover:bg-violet-400/18 group-hover:text-violet-100">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/12 text-violet-200">
               <FileText className="h-4 w-4" />
             </div>
             <div className="mt-4 text-sm font-semibold text-white">Arquivo</div>
