@@ -316,12 +316,21 @@ export function PublicAtendimentoClient({
 
   useEffect(() => {
     if (isAccountPage || !publicSlug || authError || loading || !isInitialFlow) return;
-    const timeoutId = window.setTimeout(() => {
-      void loadMessages(publicSlug, "replace");
-    }, 180);
+    let active = true;
+    let timeoutId: number | null = null;
+
+    const tick = async () => {
+      if (!active) return;
+      await loadMessages(publicSlug, "replace");
+      if (!active) return;
+      timeoutId = window.setTimeout(tick, 950);
+    };
+
+    timeoutId = window.setTimeout(tick, 180);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      active = false;
+      if (timeoutId != null) window.clearTimeout(timeoutId);
     };
   }, [authError, isAccountPage, isInitialFlow, loadMessages, loading, publicSlug]);
 
