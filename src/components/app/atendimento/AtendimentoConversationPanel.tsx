@@ -446,12 +446,12 @@ export function AtendimentoConversationPanel({
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        <div className="flex items-stretch gap-2">
           <button
             type="button"
             onClick={handleFilePicker}
             disabled={!conversation?.id || disabled}
-            className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 sm:h-auto sm:min-h-14 sm:w-14"
+            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Enviar arquivos"
           >
             <Paperclip className="h-4 w-4" />
@@ -461,7 +461,7 @@ export function AtendimentoConversationPanel({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleTextareaKeyDown}
-            placeholder={conversation?.id ? "Digite uma mensagem para o lead..." : "Selecione um atendimento"}
+            placeholder={conversation?.id ? "Mensagem..." : "Selecione um atendimento"}
             disabled={!conversation?.id || disabled}
             rows={1}
             className="h-14 w-full flex-1 resize-none rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm leading-6 text-[var(--app-text-85)] outline-none transition placeholder:text-[var(--app-text-35)] focus:border-emerald-500/40 focus:bg-[var(--app-hover)]"
@@ -469,7 +469,7 @@ export function AtendimentoConversationPanel({
           <button
             type="submit"
             disabled={!conversation?.id || disabled || !draft.trim()}
-            className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/70 bg-emerald-600 text-[rgb(255,255,255)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-emerald-500/50 disabled:bg-emerald-600/60 disabled:text-[rgb(255,255,255)] disabled:opacity-100 sm:h-auto sm:min-h-14 sm:w-14"
+            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/70 bg-emerald-600 text-[rgb(255,255,255)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-emerald-500/50 disabled:bg-emerald-600/60 disabled:text-[rgb(255,255,255)] disabled:opacity-100"
           >
             <Send className="h-4 w-4" />
           </button>
