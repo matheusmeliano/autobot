@@ -813,6 +813,11 @@ export function PublicAtendimentoClient({
     await submitDraft();
   }
 
+  function handleLogoutSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (window.confirm("Tem certeza que deseja sair?")) return;
+    event.preventDefault();
+  }
+
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#09111A] px-4 py-4 text-white md:px-8 md:py-6">
       <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0E1723] shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
@@ -867,7 +872,7 @@ export function PublicAtendimentoClient({
                 >
                   Arquivos
                 </Link>
-                <form action={logoutAction}>
+                <form action={logoutAction} onSubmit={handleLogoutSubmit}>
                   <button
                     type="submit"
                     className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07]"
