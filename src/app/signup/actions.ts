@@ -52,15 +52,18 @@ export async function signupAction(formData: FormData) {
     process.env.SUPABASE_SERVICE ??
     null;
 
-  if (url && serviceKey) {
-    const admin = createClient(url, serviceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    });
+  const admin =
+    url && serviceKey
+      ? createClient(url, serviceKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        })
+      : null;
 
+  if (admin) {
     const { data: existingProfile } = await admin
       .from("profiles")
       .select("user_id")
@@ -74,16 +77,54 @@ export async function signupAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
-  const { data, error } = await supabase.auth.signUp({
-    email: normalizedEmail,
-    password: parsed.data.password,
-    options: {
-      data: parsed.data.name ? { name: parsed.data.name } : undefined,
-      emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(
-        `/login?confirmed=1&next=${encodeURIComponent(safeNext)}`,
-      )}`,
-    },
-  });
+  let data:
+    | {
+        user: { id?: string | null } | null;
+        session: unknown;
+      }
+    | undefined;
+  let error: { message?: string | null } | null = null;
+
+  if (isAtendimentoOnlyUser) {
+    if (!admin) {
+      return { ok: false, error: "Não foi possível finalizar o cadastro do Atendimento." };
+    }
+
+    const { data: createdUser, error: createUserError } = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      password: parsed.data.password,
+      email_confirm: true,
+      user_metadata: parsed.data.name ? { name: parsed.data.name } : undefined,
+    });
+
+    if (createUserError) {
+      return { ok: false, error: supabaseErrorToPt(createUserError.message) };
+    }
+
+    const { data: signedInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password: parsed.data.password,
+    });
+
+    data = {
+      user: signedInData.user ?? createdUser.user ?? null,
+      session: signedInData.session,
+    };
+    error = signInError ? { message: signInError.message } : null;
+  } else {
+    const signUpResult = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password: parsed.data.password,
+      options: {
+        data: parsed.data.name ? { name: parsed.data.name } : undefined,
+        emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(
+          `/login?confirmed=1&next=${encodeURIComponent(safeNext)}`,
+        )}`,
+      },
+    });
+    data = signUpResult.data;
+    error = signUpResult.error;
+  }
 
   if (error) {
     return { ok: false, error: supabaseErrorToPt(error.message) };
@@ -94,15 +135,7 @@ export async function signupAction(formData: FormData) {
   }
 
   const userId = data.user?.id ?? null;
-  if (userId && url && serviceKey) {
-    const admin = createClient(url, serviceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    });
-
+  if (userId && admin) {
     const vencimento = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);
