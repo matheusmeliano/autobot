@@ -1177,7 +1177,7 @@ export function PublicAtendimentoClient({
           <button
             type="button"
             onClick={() => handleAttachmentOption("image")}
-            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transform-gpu transition-transform duration-200 ease-out will-change-transform hover:-translate-y-0.5"
+            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transform-gpu transition-transform duration-200 ease-linear will-change-transform hover:-translate-y-0.5"
           >
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/12 text-emerald-200">
               <ImageIcon className="h-4 w-4" />
@@ -1188,7 +1188,7 @@ export function PublicAtendimentoClient({
           <button
             type="button"
             onClick={() => handleAttachmentOption("video")}
-            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transform-gpu transition-transform duration-200 ease-out will-change-transform hover:-translate-y-0.5"
+            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transform-gpu transition-transform duration-200 ease-linear will-change-transform hover:-translate-y-0.5"
           >
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/12 text-sky-200">
               <Clapperboard className="h-4 w-4" />
@@ -1199,7 +1199,7 @@ export function PublicAtendimentoClient({
           <button
             type="button"
             onClick={() => handleAttachmentOption("file")}
-            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transform-gpu transition-transform duration-200 ease-out will-change-transform hover:-translate-y-0.5"
+            className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transform-gpu transition-transform duration-200 ease-linear will-change-transform hover:-translate-y-0.5"
           >
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/12 text-violet-200">
               <FileText className="h-4 w-4" />
