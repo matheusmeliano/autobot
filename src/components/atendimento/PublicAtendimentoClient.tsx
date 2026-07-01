@@ -973,6 +973,7 @@ export function PublicAtendimentoClient({
                 <>
                   {messages.map((message) => {
                     const isLead = message.sender_role === "lead";
+                    const senderLabel = isLead ? "Enviado por você" : "Enviado por atendimento";
                     const attachmentTitle = getAtendimentoAttachmentTitle({
                       mediaType: message.media_type,
                       fileName: message.file_name,
@@ -988,6 +989,7 @@ export function PublicAtendimentoClient({
                               : "border-white/10 bg-white/[0.04]",
                           ].join(" ")}
                         >
+                          <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">{senderLabel}</div>
                           {message.media_url && message.media_type === "image" ? (
                             <button
                               type="button"
