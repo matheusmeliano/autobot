@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Send } from "lucide-react";
 import { logoutAction } from "@/app/app/actions";
 import { getAtendimentoAccountPath, getAtendimentoPortalPath } from "@/lib/auth/access";
@@ -30,6 +30,40 @@ function getFirstName(value: string) {
   return normalized.split(/\s+/)[0] || "Usuario";
 }
 
+function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
+  const unique = new Map<string, AtendimentoMessage>();
+  for (const message of messageList) {
+    const key =
+      String(message.id ?? "").trim() ||
+      `${message.created_at}:${message.sender_role}:${message.content_text ?? ""}:${message.media_url ?? ""}`;
+    unique.set(key, message);
+  }
+
+  return Array.from(unique.values()).sort((left, right) => {
+    const leftTime = new Date(left.created_at).getTime();
+    const rightTime = new Date(right.created_at).getTime();
+    if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+    return String(left.id ?? "").localeCompare(String(right.id ?? ""));
+  });
+}
+
+function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
+  if (left.length !== right.length) return false;
+  return left.every((message, index) => {
+    const other = right[index];
+    return (
+      String(message.id ?? "") === String(other?.id ?? "") &&
+      String(message.status ?? "") === String(other?.status ?? "") &&
+      String(message.content_text ?? "") === String(other?.content_text ?? "") &&
+      String(message.media_url ?? "") === String(other?.media_url ?? "") &&
+      String(message.created_at ?? "") === String(other?.created_at ?? "") &&
+      String(message.read_at ?? "") === String(other?.read_at ?? "")
+    );
+  });
+}
+
 export function PublicAtendimentoClient({
   initialSlug,
   page,
@@ -56,6 +90,9 @@ export function PublicAtendimentoClient({
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesRequestIdRef = useRef(0);
+  const sessionRequestIdRef = useRef(0);
+  const sessionRefreshTimeoutRef = useRef<number | null>(null);
 
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
@@ -113,79 +150,132 @@ export function PublicAtendimentoClient({
     });
   }
 
-  async function loadMessages(nextPublicSlug: string) {
-    if (!nextPublicSlug) return [] as AtendimentoMessage[];
-    const res = await fetch(`/api/atendimento/public/messages?public_slug=${encodeURIComponent(nextPublicSlug)}`, {
-      cache: "no-store",
-    });
-    if (res.status === 401 || res.status === 403) {
-      setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
-      setMessages([]);
-      void redirectToLoginAfterSessionLoss();
-      return [] as AtendimentoMessage[];
-    }
-    const json = await res.json().catch(() => null);
-    const nextMessages = json?.ok ? ((json.messages ?? []) as AtendimentoMessage[]) : [];
-    if (json?.ok) {
-      setMessages(nextMessages);
+  const applyMessages = useCallback(
+    (incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
+      const normalizedMessages = sortAndDedupeMessages(incomingMessages);
+      setMessages((currentMessages) => {
+        const nextMessages =
+          mode === "merge"
+            ? sortAndDedupeMessages([...currentMessages, ...normalizedMessages])
+            : normalizedMessages;
+        return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
+      });
+
       if (awaitingBotSince != null) {
         const since = awaitingBotSince;
-        const hasBotAfter = nextMessages.some((msg) => {
-          if (msg.sender_role === "lead") return false;
-          const time = new Date(msg.created_at).getTime();
-          return Number.isFinite(time) && time >= since;
+        const hasBotAfter = normalizedMessages.some((message) => {
+          if (message.sender_role === "lead") return false;
+          const createdAt = new Date(message.created_at).getTime();
+          return Number.isFinite(createdAt) && createdAt >= since;
         });
-        if (hasBotAfter) setAwaitingBotSince(null);
+        if (hasBotAfter) {
+          setAwaitingBotSince(null);
+        }
       }
-    }
-    return nextMessages;
-  }
+    },
+    [awaitingBotSince],
+  );
 
-  async function loadMessagesWithRetry(nextPublicSlug: string) {
-    const firstBatch = await loadMessages(nextPublicSlug);
-    if (firstBatch.length > 0) return firstBatch;
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
-    return loadMessages(nextPublicSlug);
-  }
+  const removeMessage = useCallback((messageId: string) => {
+    setMessages((currentMessages) => {
+      const nextMessages = currentMessages.filter((message) => String(message.id) !== messageId);
+      return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
+    });
+  }, []);
 
-  async function loadSession() {
-    setLoading(true);
-    setAuthError("");
-    try {
-      const res = await fetch("/api/atendimento/public/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: linkSlug }),
+  const loadMessages = useCallback(
+    async (nextPublicSlug: string, mode: "replace" | "merge" = "replace") => {
+      if (!nextPublicSlug) return [] as AtendimentoMessage[];
+      const requestId = ++messagesRequestIdRef.current;
+      const res = await fetch(`/api/atendimento/public/messages?public_slug=${encodeURIComponent(nextPublicSlug)}`, {
+        cache: "no-store",
       });
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
         setMessages([]);
         void redirectToLoginAfterSessionLoss();
-        return;
+        return [] as AtendimentoMessage[];
       }
+
       const json = await res.json().catch(() => null);
-      if (!json?.ok) {
-        setAuthError(String(json?.error ?? "Não foi possível carregar o seu atendimento."));
-        setConversationId("");
-        setLeadId("");
-        setMessages([]);
-        return;
+      const nextMessages = json?.ok ? ((json.messages ?? []) as AtendimentoMessage[]) : [];
+      if (json?.ok && requestId === messagesRequestIdRef.current) {
+        applyMessages(nextMessages, mode);
       }
-      setLeadId(String(json.session?.lead?.id ?? ""));
-      setConversationId(String(json.session?.conversation?.id ?? ""));
-      const nextSlug = String(json.session?.conversation?.public_slug ?? "");
-      const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
-      const nextTotal = Number(json.session?.initial_total ?? 0);
-      if (Number.isFinite(nextTotal) && nextTotal > 0) setInitialTotal(nextTotal);
-      setPublicSlug(nextSlug);
-      setMessages(initialMessages);
-      if (!initialMessages.length) {
-        await loadMessagesWithRetry(nextSlug);
+      return nextMessages;
+    },
+    [applyMessages],
+  );
+
+  const loadSession = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = Boolean(options?.silent);
+      const requestId = ++sessionRequestIdRef.current;
+      if (!silent) {
+        setLoading(true);
       }
-    } finally {
-      setLoading(false);
+      setAuthError("");
+
+      try {
+        const res = await fetch("/api/atendimento/public/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug: linkSlug }),
+        });
+
+        if (res.status === 401) {
+          setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+          setMessages([]);
+          void redirectToLoginAfterSessionLoss();
+          return;
+        }
+
+        const json = await res.json().catch(() => null);
+        if (!json?.ok) {
+          if (!silent) {
+            setAuthError(String(json?.error ?? "Não foi possível carregar o seu atendimento."));
+            setConversationId("");
+            setLeadId("");
+            setMessages([]);
+          }
+          return;
+        }
+
+        if (requestId !== sessionRequestIdRef.current) {
+          return;
+        }
+
+        setLeadId(String(json.session?.lead?.id ?? ""));
+        setConversationId(String(json.session?.conversation?.id ?? ""));
+        const nextSlug = String(json.session?.conversation?.public_slug ?? "");
+        const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
+        const nextTotal = Number(json.session?.initial_total ?? 0);
+        if (Number.isFinite(nextTotal) && nextTotal > 0) {
+          setInitialTotal(nextTotal);
+        }
+        setPublicSlug(nextSlug);
+        applyMessages(initialMessages, "replace");
+
+        if (!initialMessages.length) {
+          await loadMessages(nextSlug, "replace");
+        }
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [applyMessages, linkSlug, loadMessages],
+  );
+
+  const scheduleSessionRefresh = useCallback(() => {
+    if (sessionRefreshTimeoutRef.current != null) {
+      window.clearTimeout(sessionRefreshTimeoutRef.current);
     }
-  }
+    sessionRefreshTimeoutRef.current = window.setTimeout(() => {
+      void loadSession({ silent: true });
+    }, 160);
+  }, [loadSession]);
 
   async function submitDraft() {
     const contentText = draft.trim();
@@ -206,7 +296,12 @@ export function PublicAtendimentoClient({
       }
       const json = await res.json().catch(() => null);
       if (json?.ok) {
-        await loadMessagesWithRetry(publicSlug);
+        const optimisticMessages = [json.inbound, json.outbound].filter(Boolean) as AtendimentoMessage[];
+        if (optimisticMessages.length) {
+          applyMessages(optimisticMessages, "merge");
+        } else {
+          await loadMessages(publicSlug, "replace");
+        }
       }
     } finally {
       setSending(false);
@@ -216,38 +311,22 @@ export function PublicAtendimentoClient({
 
   useEffect(() => {
     if (isAccountPage) return;
-    loadSession();
-  }, [isAccountPage, linkSlug]);
+    void loadSession();
+  }, [isAccountPage, loadSession]);
 
   useEffect(() => {
-    if (isAccountPage || !publicSlug || authError) return;
-    let active = true;
-    let timeoutId: number | null = null;
-
-    const tick = async () => {
-      if (!active) return;
-      await loadMessages(publicSlug);
-      if (!active) return;
-      timeoutId = window.setTimeout(tick, typing ? 700 : 2500);
-    };
-
-    tick();
+    if (isAccountPage || !publicSlug || authError || loading || !isInitialFlow) return;
+    const timeoutId = window.setTimeout(() => {
+      void loadMessages(publicSlug, "replace");
+    }, 180);
 
     return () => {
-      active = false;
-      if (timeoutId != null) window.clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
     };
-  }, [authError, isAccountPage, publicSlug, typing]);
+  }, [authError, isAccountPage, isInitialFlow, loadMessages, loading, publicSlug]);
 
   useEffect(() => {
     if (isAccountPage || !publicSlug || !conversationId || !leadId || authError) return;
-
-    const refreshMessages = () => {
-      void loadMessages(publicSlug);
-    };
-    const refreshSession = () => {
-      void loadSession();
-    };
 
     const channel = supabase
       .channel(`atendimento-public:${conversationId}`)
@@ -259,7 +338,19 @@ export function PublicAtendimentoClient({
           table: "atendimento_messages",
           filter: `conversation_id=eq.${conversationId}`,
         },
-        refreshMessages,
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            removeMessage(String(payload.old?.id ?? ""));
+            return;
+          }
+
+          const nextMessage = (payload.new ?? null) as AtendimentoMessage | null;
+          if (!nextMessage?.id) {
+            void loadMessages(publicSlug, "replace");
+            return;
+          }
+          applyMessages([nextMessage], "merge");
+        },
       )
       .on(
         "postgres_changes",
@@ -269,7 +360,7 @@ export function PublicAtendimentoClient({
           table: "atendimento_conversations",
           filter: `id=eq.${conversationId}`,
         },
-        refreshSession,
+        scheduleSessionRefresh,
       )
       .on(
         "postgres_changes",
@@ -279,14 +370,29 @@ export function PublicAtendimentoClient({
           table: "atendimento_leads",
           filter: `id=eq.${leadId}`,
         },
-        refreshSession,
+        scheduleSessionRefresh,
       )
       .subscribe();
 
     return () => {
+      if (sessionRefreshTimeoutRef.current != null) {
+        window.clearTimeout(sessionRefreshTimeoutRef.current);
+        sessionRefreshTimeoutRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [authError, conversationId, isAccountPage, leadId, publicSlug, supabase]);
+  }, [
+    applyMessages,
+    authError,
+    conversationId,
+    isAccountPage,
+    leadId,
+    loadMessages,
+    publicSlug,
+    removeMessage,
+    scheduleSessionRefresh,
+    supabase,
+  ]);
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

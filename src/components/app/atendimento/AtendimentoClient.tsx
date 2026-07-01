@@ -25,6 +25,40 @@ const EMPTY_SUMMARY: AtendimentoSummary = {
   conversasNaoLidas: 0,
 };
 
+function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
+  const unique = new Map<string, AtendimentoMessage>();
+  for (const message of messageList) {
+    const key =
+      String(message.id ?? "").trim() ||
+      `${message.created_at}:${message.sender_role}:${message.content_text ?? ""}:${message.media_url ?? ""}`;
+    unique.set(key, message);
+  }
+
+  return Array.from(unique.values()).sort((left, right) => {
+    const leftTime = new Date(left.created_at).getTime();
+    const rightTime = new Date(right.created_at).getTime();
+    if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+    return String(left.id ?? "").localeCompare(String(right.id ?? ""));
+  });
+}
+
+function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
+  if (left.length !== right.length) return false;
+  return left.every((message, index) => {
+    const other = right[index];
+    return (
+      String(message.id ?? "") === String(other?.id ?? "") &&
+      String(message.status ?? "") === String(other?.status ?? "") &&
+      String(message.content_text ?? "") === String(other?.content_text ?? "") &&
+      String(message.media_url ?? "") === String(other?.media_url ?? "") &&
+      String(message.created_at ?? "") === String(other?.created_at ?? "") &&
+      String(message.read_at ?? "") === String(other?.read_at ?? "")
+    );
+  });
+}
+
 export function AtendimentoClient() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [summary, setSummary] = useState<AtendimentoSummary>(EMPTY_SUMMARY);
@@ -40,9 +74,14 @@ export function AtendimentoClient() {
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [desktopListHeight, setDesktopListHeight] = useState<number | null>(null);
   const selectedLeadIdRef = useRef<string | null>(null);
+  const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
-  const realtimeRefreshTimeoutRef = useRef<number | null>(null);
+  const listRefreshTimeoutRef = useRef<number | null>(null);
+  const detailRefreshTimeoutRef = useRef<number | null>(null);
   const realtimeSuspendedRef = useRef(false);
+  const leadsRequestIdRef = useRef(0);
+  const detailRequestIdRef = useRef(0);
+  const messagesRequestIdRef = useRef(0);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
@@ -71,12 +110,13 @@ export function AtendimentoClient() {
 
   const loadLeads = useCallback(
     async (nextQuery: string) => {
+      const requestId = ++leadsRequestIdRef.current;
       setLoading(true);
       const params = new URLSearchParams();
       if (nextQuery.trim()) params.set("q", nextQuery.trim());
       const res = await fetch(`/api/atendimento/leads?${params.toString()}`, { cache: "no-store" });
       const json = await res.json().catch(() => null);
-      if (json?.ok) {
+      if (json?.ok && requestId === leadsRequestIdRef.current) {
         const nextLeads = (json.leads ?? []) as AtendimentoLeadListItem[];
         setLeads(nextLeads);
         if (!selectedLeadId && nextLeads[0]?.id) setSelectedLeadId(String(nextLeads[0].id));
@@ -91,34 +131,77 @@ export function AtendimentoClient() {
     [selectedLeadId],
   );
 
-  const loadLeadDetail = useCallback(async (leadId: string) => {
-    const res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
-    const json = await res.json().catch(() => null);
-    if (!json?.ok) {
-      const message = String(json?.error ?? "Falha ao carregar detalhes do lead.");
+  const applyMessages = useCallback((incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
+    const normalizedMessages = sortAndDedupeMessages(incomingMessages);
+    setMessages((currentMessages) => {
+      const nextMessages =
+        mode === "merge"
+          ? sortAndDedupeMessages([...currentMessages, ...normalizedMessages])
+          : normalizedMessages;
+      return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
+    });
+  }, []);
+
+  const removeMessage = useCallback((messageId: string) => {
+    setMessages((currentMessages) => {
+      const nextMessages = currentMessages.filter((message) => String(message.id) !== messageId);
+      return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
+    });
+  }, []);
+
+  const loadConversationMessages = useCallback(
+    async (conversationId: string, mode: "replace" | "merge" = "replace") => {
+      if (!conversationId) return;
+      const requestId = ++messagesRequestIdRef.current;
+      const messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
+      const messagesJson = await messagesRes.json().catch(() => null);
+      if (messagesJson?.ok && requestId === messagesRequestIdRef.current) {
+        applyMessages((messagesJson.messages ?? []) as AtendimentoMessage[], mode);
+        return;
+      }
+      const message = String(messagesJson?.error ?? "Falha ao carregar mensagens.");
       setLoadError(message);
       modalToast.error(message);
-      return;
-    }
-    setSelectedConversation((json.lead?.conversation ?? null) as AtendimentoConversation | null);
-    setLoadError(null);
+    },
+    [applyMessages],
+  );
 
-    const conversationId = String(json.lead?.conversation?.id ?? "");
-    if (!conversationId) {
-      setMessages([]);
-      return;
-    }
+  const loadLeadDetail = useCallback(
+    async (leadId: string, options?: { skipMessages?: boolean; suppressNotFound?: boolean }) => {
+      const requestId = ++detailRequestIdRef.current;
+      const res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        const errorMessage = String(json?.error ?? "Falha ao carregar detalhes do lead.");
+        if (options?.suppressNotFound && errorMessage === "not_found") {
+          return;
+        }
+        setLoadError(errorMessage);
+        modalToast.error(errorMessage);
+        return;
+      }
 
-    const messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
-    const messagesJson = await messagesRes.json().catch(() => null);
-    if (messagesJson?.ok) {
-      setMessages((messagesJson.messages ?? []) as AtendimentoMessage[]);
-      return;
-    }
-    const message = String(messagesJson?.error ?? "Falha ao carregar mensagens.");
-    setLoadError(message);
-    modalToast.error(message);
-  }, []);
+      if (requestId !== detailRequestIdRef.current) {
+        return;
+      }
+
+      const nextConversation = (json.lead?.conversation ?? null) as AtendimentoConversation | null;
+      setSelectedConversation(nextConversation);
+      selectedConversationIdRef.current = String(nextConversation?.id ?? "") || null;
+      setLoadError(null);
+
+      const conversationId = String(nextConversation?.id ?? "");
+      if (!conversationId) {
+        setMessages([]);
+        return;
+      }
+
+      if (!options?.skipMessages) {
+        await loadConversationMessages(conversationId, "replace");
+      }
+    },
+    [loadConversationMessages],
+  );
 
   useEffect(() => {
     loadSummary();
@@ -134,6 +217,10 @@ export function AtendimentoClient() {
   useEffect(() => {
     selectedLeadIdRef.current = selectedLeadId;
   }, [selectedLeadId]);
+
+  useEffect(() => {
+    selectedConversationIdRef.current = String(selectedConversation?.id ?? "") || null;
+  }, [selectedConversation]);
 
   useEffect(() => {
     queryRef.current = query;
@@ -155,40 +242,75 @@ export function AtendimentoClient() {
     return () => media.removeListener(sync);
   }, [mobileConversationOpen]);
 
-  const refreshAtendimentoRealtime = useCallback(() => {
-    void loadSummary();
-    void loadLeads(queryRef.current);
-    if (selectedLeadIdRef.current) {
-      void loadLeadDetail(selectedLeadIdRef.current);
+  const scheduleListRefresh = useCallback(() => {
+    if (realtimeSuspendedRef.current) return;
+    if (listRefreshTimeoutRef.current != null) {
+      window.clearTimeout(listRefreshTimeoutRef.current);
     }
-  }, [loadLeadDetail, loadLeads, loadSummary]);
+    listRefreshTimeoutRef.current = window.setTimeout(() => {
+      void loadSummary();
+      void loadLeads(queryRef.current);
+    }, 120);
+  }, [loadLeads, loadSummary]);
+
+  const scheduleSelectedLeadRefresh = useCallback(() => {
+    if (realtimeSuspendedRef.current || !selectedLeadIdRef.current) return;
+    if (detailRefreshTimeoutRef.current != null) {
+      window.clearTimeout(detailRefreshTimeoutRef.current);
+    }
+    detailRefreshTimeoutRef.current = window.setTimeout(() => {
+      if (!selectedLeadIdRef.current) return;
+      void loadLeadDetail(selectedLeadIdRef.current, { skipMessages: true, suppressNotFound: true });
+    }, 120);
+  }, [loadLeadDetail]);
 
   useEffect(() => {
-    const scheduleRefresh = () => {
-      if (realtimeSuspendedRef.current) return;
-      if (realtimeRefreshTimeoutRef.current != null) {
-        window.clearTimeout(realtimeRefreshTimeoutRef.current);
-      }
-      realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
-        refreshAtendimentoRealtime();
-      }, 120);
-    };
-
     const channel = supabase
       .channel("atendimento-private")
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, scheduleRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_conversations" }, scheduleRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, (payload) => {
+        scheduleListRefresh();
+        const affectedLeadId = String(payload.new?.id ?? payload.old?.id ?? "");
+        if (affectedLeadId && affectedLeadId === selectedLeadIdRef.current) {
+          scheduleSelectedLeadRefresh();
+        }
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_conversations" }, (payload) => {
+        scheduleListRefresh();
+        const affectedConversationId = String(payload.new?.id ?? payload.old?.id ?? "");
+        if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
+          scheduleSelectedLeadRefresh();
+        }
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, (payload) => {
+        const affectedConversationId = String(payload.new?.conversation_id ?? payload.old?.conversation_id ?? "");
+        if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
+          if (payload.eventType === "DELETE") {
+            removeMessage(String(payload.old?.id ?? ""));
+          } else {
+            const nextMessage = (payload.new ?? null) as AtendimentoMessage | null;
+            if (nextMessage?.id) {
+              applyMessages([nextMessage], "merge");
+            } else {
+              void loadConversationMessages(affectedConversationId, "replace");
+            }
+          }
+        }
+        scheduleListRefresh();
+      })
       .subscribe();
 
     return () => {
-      if (realtimeRefreshTimeoutRef.current != null) {
-        window.clearTimeout(realtimeRefreshTimeoutRef.current);
-        realtimeRefreshTimeoutRef.current = null;
+      if (listRefreshTimeoutRef.current != null) {
+        window.clearTimeout(listRefreshTimeoutRef.current);
+        listRefreshTimeoutRef.current = null;
+      }
+      if (detailRefreshTimeoutRef.current != null) {
+        window.clearTimeout(detailRefreshTimeoutRef.current);
+        detailRefreshTimeoutRef.current = null;
       }
       supabase.removeChannel(channel);
     };
-  }, [refreshAtendimentoRealtime, supabase]);
+  }, [applyMessages, loadConversationMessages, removeMessage, scheduleListRefresh, scheduleSelectedLeadRefresh, supabase]);
 
   async function handleCopyLink() {
     if (!publicUrl) return;
@@ -210,9 +332,10 @@ export function AtendimentoClient() {
         modalToast.error(json?.error ?? "Falha ao enviar mensagem.");
         return;
       }
-      await loadLeadDetail(selectedLeadId || "");
-      await loadSummary();
-      await loadLeads(query);
+      if (json.message?.id) {
+        applyMessages([json.message as AtendimentoMessage], "merge");
+      }
+      scheduleListRefresh();
     } finally {
       setSending(false);
     }
