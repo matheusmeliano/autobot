@@ -27,6 +27,8 @@ export function AppModal({
   zIndexClass = "z-[100]",
   panelClassName = "",
   fullScreenOnMobile = false,
+  closeOnBackdrop = true,
+  closeOnEscape = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,6 +38,8 @@ export function AppModal({
   zIndexClass?: string;
   panelClassName?: string;
   fullScreenOnMobile?: boolean;
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
 }) {
   const [present, setPresent] = useState(open);
   const [visible, setVisible] = useState(open);
@@ -66,11 +70,11 @@ export function AppModal({
   useEffect(() => {
     if (!present) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (closeOnEscape && e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [present, onClose]);
+  }, [closeOnEscape, present, onClose]);
 
   if (!present) return null;
 
@@ -101,7 +105,7 @@ export function AppModal({
         <button
           type="button"
           aria-label="Fechar"
-          onClick={onClose}
+          onClick={closeOnBackdrop ? onClose : undefined}
           className={[
             "absolute inset-0 z-0 bg-transparent",
             "transition-opacity duration-200 ease-out",

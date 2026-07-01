@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2, Paperclip, Send } from "lucide-react";
+import { Maximize2, Minimize2, Paperclip, Send, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import {
   ATENDIMENTO_IMAGE_MIME_ACCEPT,
@@ -431,8 +431,25 @@ export function AtendimentoConversationPanel({
         </div>
       </form>
 
-      <AppModal open={attachmentMenuOpen} onClose={() => setAttachmentMenuOpen(false)} size="md" zIndexClass="z-[520]">
-        <div className="text-sm font-semibold text-[var(--app-text-85)]">Escolha o tipo de anexo</div>
+      <AppModal
+        open={attachmentMenuOpen}
+        onClose={() => setAttachmentMenuOpen(false)}
+        size="md"
+        zIndexClass="z-[520]"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-sm font-semibold text-[var(--app-text-85)]">Escolha o tipo de anexo</div>
+          <button
+            type="button"
+            onClick={() => setAttachmentMenuOpen(false)}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
