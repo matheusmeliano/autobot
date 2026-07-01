@@ -338,7 +338,7 @@ export function PublicAtendimentoClient({
           table: "atendimento_messages",
           filter: `conversation_id=eq.${conversationId}`,
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === "DELETE") {
             removeMessage(String(payload.old?.id ?? ""));
             return;

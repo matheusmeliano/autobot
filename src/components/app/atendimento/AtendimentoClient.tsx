@@ -267,21 +267,25 @@ export function AtendimentoClient() {
   useEffect(() => {
     const channel = supabase
       .channel("atendimento-private")
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, (payload) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, (payload: any) => {
         scheduleListRefresh();
         const affectedLeadId = String(payload.new?.id ?? payload.old?.id ?? "");
         if (affectedLeadId && affectedLeadId === selectedLeadIdRef.current) {
           scheduleSelectedLeadRefresh();
         }
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_conversations" }, (payload) => {
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "atendimento_conversations" },
+        (payload: any) => {
         scheduleListRefresh();
         const affectedConversationId = String(payload.new?.id ?? payload.old?.id ?? "");
         if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
           scheduleSelectedLeadRefresh();
         }
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, (payload) => {
+      },
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, (payload: any) => {
         const affectedConversationId = String(payload.new?.conversation_id ?? payload.old?.conversation_id ?? "");
         if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
           if (payload.eventType === "DELETE") {
