@@ -1050,12 +1050,12 @@ export function PublicAtendimentoClient({
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+              <div className="flex items-stretch gap-2">
                 <button
                   type="button"
                   onClick={handleFilePicker}
                   disabled={submitLocked}
-                  className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60 sm:h-auto sm:min-h-14 sm:w-14"
+                  className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
                   aria-label="Enviar arquivos"
                 >
                   <Paperclip className="h-4 w-4" />
@@ -1073,7 +1073,7 @@ export function PublicAtendimentoClient({
                 <button
                   type="submit"
                   disabled={!draft.trim() || submitLocked}
-                  className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-emerald-500/70 bg-emerald-600 text-[rgb(255,255,255)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-emerald-500/50 disabled:bg-emerald-600/60 disabled:text-[rgb(255,255,255)] disabled:opacity-100 sm:h-auto sm:min-h-14 sm:w-14"
+                  className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/70 bg-emerald-600 text-[rgb(255,255,255)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:border-emerald-500/50 disabled:bg-emerald-600/60 disabled:text-[rgb(255,255,255)] disabled:opacity-100"
                 >
                   <Send className="h-4 w-4" />
                 </button>
