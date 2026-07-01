@@ -9,7 +9,7 @@ import { formatAtendimentoFileSize, getAtendimentoAttachmentTitle } from "@/lib/
 
 function getAtendimentoDownloadLabel(mediaType: AtendimentoFileRecord["media_type"]) {
   if (mediaType === "image") return "Baixar imagem";
-  if (mediaType === "video") return "Baixar video";
+  if (mediaType === "video") return "Baixar vídeo";
   return "Baixar arquivo";
 }
 
@@ -82,8 +82,8 @@ export function AtendimentoFileGallery({
               ? "mt-3 inline-flex text-xs font-semibold text-emerald-200 underline"
               : "mt-3 inline-flex text-xs font-semibold text-[var(--app-text-85)] underline";
           const isPreviewable = (file.media_type === "image" || file.media_type === "video") && Boolean(file.media_url);
-          const downloadLabel = tone === "portal" ? getAtendimentoDownloadLabel(file.media_type) : "Abrir arquivo";
-          const downloadHref = tone === "portal" ? getAtendimentoDownloadHref(file.media_url, file.file_name) : file.media_url;
+          const downloadLabel = getAtendimentoDownloadLabel(file.media_type);
+          const downloadHref = getAtendimentoDownloadHref(file.media_url, file.file_name);
 
           return (
             <div key={file.id} className={cardClassName}>
@@ -117,9 +117,7 @@ export function AtendimentoFileGallery({
               </div>
               <a
                 href={downloadHref}
-                target={tone === "portal" ? undefined : "_blank"}
-                rel={tone === "portal" ? undefined : "noreferrer"}
-                download={tone === "portal" ? (file.file_name ?? true) : undefined}
+                download={file.file_name ?? true}
                 className={linkClassName}
               >
                 {downloadLabel}

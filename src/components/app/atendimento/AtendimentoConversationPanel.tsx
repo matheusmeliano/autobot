@@ -27,6 +27,19 @@ function statusLabel(status: string) {
   return status || "-";
 }
 
+function getAtendimentoDownloadLabel(mediaType?: AtendimentoMessage["media_type"] | null) {
+  if (mediaType === "image") return "Baixar imagem";
+  if (mediaType === "video") return "Baixar vídeo";
+  return "Baixar arquivo";
+}
+
+function getAtendimentoDownloadHref(url: string | null | undefined, fileName: string | null | undefined) {
+  if (!url) return "";
+  const separator = url.includes("?") ? "&" : "?";
+  const downloadValue = fileName ? encodeURIComponent(fileName) : "";
+  return `${url}${separator}download=${downloadValue}`;
+}
+
 export function AtendimentoConversationPanel({
   conversation,
   messages,
@@ -359,12 +372,11 @@ export function AtendimentoConversationPanel({
                         {formatAtendimentoFileSize(message.file_size_bytes)}
                       </div>
                       <a
-                        href={message.media_url}
-                        target="_blank"
-                        rel="noreferrer"
+                        href={getAtendimentoDownloadHref(message.media_url, message.file_name)}
+                        download={message.file_name ?? true}
                         className="mt-3 inline-flex text-xs font-semibold text-[var(--app-text-85)] underline"
                       >
-                        Abrir anexo
+                        {getAtendimentoDownloadLabel(message.media_type)}
                       </a>
                     </>
                   ) : null}
@@ -521,8 +533,8 @@ export function AtendimentoConversationPanel({
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/12 text-sky-200">
               <Clapperboard className="h-4 w-4" />
             </div>
-            <div className="mt-4 text-sm font-semibold text-white">Video</div>
-            <div className="mt-1 text-xs leading-5 text-white/50">Gravacoes curtas ou videos para complementar a conversa.</div>
+            <div className="mt-4 text-sm font-semibold text-white">Vídeo</div>
+            <div className="mt-1 text-xs leading-5 text-white/50">Gravacoes curtas ou vídeos para complementar a conversa.</div>
           </button>
           <button
             type="button"

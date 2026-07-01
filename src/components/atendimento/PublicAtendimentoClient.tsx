@@ -46,7 +46,7 @@ function getFirstName(value: string) {
 
 function getAtendimentoDownloadLabel(mediaType?: AtendimentoMessage["media_type"] | null) {
   if (mediaType === "image") return "Baixar imagem";
-  if (mediaType === "video") return "Baixar video";
+  if (mediaType === "video") return "Baixar vídeo";
   return "Baixar arquivo";
 }
 
@@ -1205,8 +1205,8 @@ export function PublicAtendimentoClient({
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/12 text-sky-200">
               <Clapperboard className="h-4 w-4" />
             </div>
-            <div className="mt-4 text-sm font-semibold text-white">Video</div>
-            <div className="mt-1 text-xs leading-5 text-white/50">Gravacoes curtas ou videos para complementar a conversa.</div>
+            <div className="mt-4 text-sm font-semibold text-white">Vídeo</div>
+            <div className="mt-1 text-xs leading-5 text-white/50">Gravacoes curtas ou vídeos para complementar a conversa.</div>
           </button>
           <button
             type="button"
