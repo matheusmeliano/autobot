@@ -1151,7 +1151,7 @@ export function PublicAtendimentoClient({
       <AppModal
         open={attachmentMenuOpen}
         onClose={() => setAttachmentMenuOpen(false)}
-        size="md"
+        size="lg"
         zIndexClass="z-[520]"
         closeOnBackdrop={false}
         closeOnEscape={false}
