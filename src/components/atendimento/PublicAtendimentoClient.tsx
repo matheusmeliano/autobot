@@ -973,7 +973,8 @@ export function PublicAtendimentoClient({
                 <>
                   {messages.map((message) => {
                     const isLead = message.sender_role === "lead";
-                    const senderLabel = isLead ? "Enviado por você" : "Enviado por atendimento";
+                    const senderLabel =
+                      message.sender_role === "bot" ? "Bot" : isLead ? "Enviado por você" : "Enviado por atendimento";
                     const attachmentTitle = getAtendimentoAttachmentTitle({
                       mediaType: message.media_type,
                       fileName: message.file_name,
