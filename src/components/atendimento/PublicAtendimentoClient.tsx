@@ -8,11 +8,13 @@ import { AppModal } from "@/components/app/AppModal";
 import { getAtendimentoAccountPath, getAtendimentoFilesPath, getAtendimentoPortalPath } from "@/lib/auth/access";
 import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFileGallery";
 import {
+  ATENDIMENTO_DOCUMENT_MIME_ACCEPT,
   ATENDIMENTO_IMAGE_MIME_ACCEPT,
   ATENDIMENTO_VIDEO_MIME_ACCEPT,
   formatAtendimentoFileSize,
   getAtendimentoAttachmentTitle,
   getAtendimentoMediaTypeFromMimeType,
+  isAtendimentoDocumentExtensionAllowed,
   type AtendimentoUploadItem,
   validateAtendimentoFiles,
 } from "@/lib/atendimento/files";
@@ -109,6 +111,7 @@ export function PublicAtendimentoClient({
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const documentInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
@@ -623,7 +626,8 @@ export function PublicAtendimentoClient({
     setComposerError("");
     try {
       for (const file of files) {
-        const mediaType = getAtendimentoMediaTypeFromMimeType(file.type);
+        const mediaType =
+          getAtendimentoMediaTypeFromMimeType(file.type) ?? (isAtendimentoDocumentExtensionAllowed(file.name) ? "file" : null);
         if (!mediaType) continue;
 
         const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -673,6 +677,7 @@ export function PublicAtendimentoClient({
       }
     } finally {
       setSending(false);
+      if (documentInputRef.current) documentInputRef.current.value = "";
       if (imageInputRef.current) imageInputRef.current.value = "";
       if (videoInputRef.current) videoInputRef.current.value = "";
     }
@@ -683,11 +688,15 @@ export function PublicAtendimentoClient({
     setAttachmentMenuOpen(true);
   }
 
-  function handleAttachmentOption(kind: "image" | "video") {
+  function handleAttachmentOption(kind: "image" | "video" | "file") {
     setAttachmentMenuOpen(false);
     window.requestAnimationFrame(() => {
       if (kind === "image") {
         imageInputRef.current?.click();
+        return;
+      }
+      if (kind === "file") {
+        documentInputRef.current?.click();
         return;
       }
       videoInputRef.current?.click();
@@ -995,6 +1004,14 @@ export function PublicAtendimentoClient({
 
             <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">
               <input
+                ref={documentInputRef}
+                type="file"
+                multiple
+                accept={ATENDIMENTO_DOCUMENT_MIME_ACCEPT}
+                className="hidden"
+                onChange={handleFileInputChange}
+              />
+              <input
                 ref={imageInputRef}
                 type="file"
                 multiple
@@ -1102,7 +1119,7 @@ export function PublicAtendimentoClient({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <button
             type="button"
             onClick={() => handleAttachmentOption("image")}
@@ -1116,6 +1133,13 @@ export function PublicAtendimentoClient({
             className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
           >
             Video
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAttachmentOption("file")}
+            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+          >
+            Arquivo
           </button>
         </div>
       </AppModal>

@@ -3,11 +3,12 @@ import {
   ATENDIMENTO_FILES_BUCKET,
   buildAtendimentoStoragePath,
   getAtendimentoMediaTypeFromMimeType,
+  isAtendimentoDocumentExtensionAllowed,
 } from "@/lib/atendimento/files";
 
 export type AtendimentoUploadedFilePayload = {
   media_url: string;
-  media_type: "image" | "video";
+  media_type: "image" | "video" | "file";
   mime_type: string | null;
   file_name: string | null;
   file_size_bytes: number;
@@ -20,7 +21,9 @@ export async function uploadAtendimentoFileWithProgress(params: {
   file: File;
   onProgress?: (progress: number) => void;
 }) {
-  const mediaType = getAtendimentoMediaTypeFromMimeType(params.file.type);
+  const mediaType =
+    getAtendimentoMediaTypeFromMimeType(params.file.type) ??
+    (isAtendimentoDocumentExtensionAllowed(params.file.name) ? "file" : null);
   if (!mediaType) {
     throw new Error("unsupported_file_type");
   }

@@ -2,8 +2,50 @@ export const ATENDIMENTO_FILES_BUCKET = "atendimento-files";
 export const MAX_UPLOAD_FILES_PER_BATCH = 10;
 export const MAX_IMAGE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 export const MAX_VIDEO_FILE_SIZE_BYTES = 250 * 1024 * 1024;
+export const MAX_DOCUMENT_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 export const ATENDIMENTO_IMAGE_MIME_ACCEPT = "image/*";
 export const ATENDIMENTO_VIDEO_MIME_ACCEPT = "video/*";
+export const ATENDIMENTO_DOCUMENT_MIME_ACCEPT = [
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".txt",
+  ".rtf",
+  ".csv",
+  ".zip",
+  ".rar",
+  ".7z",
+  ".json",
+  ".xml",
+  ".odt",
+  ".ods",
+  ".odp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/rtf",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-rar-compressed",
+  "application/vnd.rar",
+  "application/x-7z-compressed",
+  "application/json",
+  "application/xml",
+  "text/xml",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.oasis.opendocument.presentation",
+].join(",");
 export const ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES = [
   "image/jpeg",
   "image/png",
@@ -16,6 +58,47 @@ export const ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES = [
   "video/webm",
   "video/x-msvideo",
   "video/x-matroska",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/rtf",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-rar-compressed",
+  "application/vnd.rar",
+  "application/x-7z-compressed",
+  "application/json",
+  "application/xml",
+  "text/xml",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.oasis.opendocument.presentation",
+] as const;
+export const ATENDIMENTO_DOCUMENT_EXTENSIONS = [
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "txt",
+  "rtf",
+  "csv",
+  "zip",
+  "rar",
+  "7z",
+  "json",
+  "xml",
+  "odt",
+  "ods",
+  "odp",
 ] as const;
 
 export type AtendimentoUploadStatus = "queued" | "uploading" | "sending" | "done" | "error";
@@ -30,24 +113,41 @@ export type AtendimentoUploadItem = {
 };
 
 export function getAtendimentoAcceptedMimeTypes() {
-  return "image/*,video/*";
+  return `image/*,video/*,${ATENDIMENTO_DOCUMENT_MIME_ACCEPT}`;
 }
 
-export function getAtendimentoAcceptedMimeTypesByKind(kind: "image" | "video") {
-  return kind === "image" ? ATENDIMENTO_IMAGE_MIME_ACCEPT : ATENDIMENTO_VIDEO_MIME_ACCEPT;
+export function getAtendimentoAcceptedMimeTypesByKind(kind: "image" | "video" | "file") {
+  return kind === "image"
+    ? ATENDIMENTO_IMAGE_MIME_ACCEPT
+    : kind === "video"
+      ? ATENDIMENTO_VIDEO_MIME_ACCEPT
+      : ATENDIMENTO_DOCUMENT_MIME_ACCEPT;
 }
 
 export function getAtendimentoMediaTypeFromMimeType(mimeType: unknown) {
   const normalizedMimeType = String(mimeType ?? "").trim().toLowerCase();
   if (normalizedMimeType.startsWith("image/")) return "image" as const;
   if (normalizedMimeType.startsWith("video/")) return "video" as const;
+  if (normalizedMimeType) return "file" as const;
   return null;
+}
+
+export function getAtendimentoDocumentExtension(fileName: unknown) {
+  const normalized = String(fileName ?? "").trim().toLowerCase();
+  const extension = normalized.includes(".") ? normalized.split(".").pop() : "";
+  return extension || "";
+}
+
+export function isAtendimentoDocumentExtensionAllowed(fileName: unknown) {
+  const extension = getAtendimentoDocumentExtension(fileName);
+  return Boolean(extension) && ATENDIMENTO_DOCUMENT_EXTENSIONS.includes(extension as (typeof ATENDIMENTO_DOCUMENT_EXTENSIONS)[number]);
 }
 
 export function getAtendimentoMaxFileSizeBytes(mimeType: unknown) {
   const mediaType = getAtendimentoMediaTypeFromMimeType(mimeType);
   if (mediaType === "image") return MAX_IMAGE_FILE_SIZE_BYTES;
   if (mediaType === "video") return MAX_VIDEO_FILE_SIZE_BYTES;
+  if (mediaType === "file") return MAX_DOCUMENT_FILE_SIZE_BYTES;
   return 0;
 }
 
@@ -121,14 +221,23 @@ export function validateAtendimentoFiles(fileList: FileList | File[]) {
     errors.push(`Voce pode enviar no maximo ${MAX_UPLOAD_FILES_PER_BATCH} arquivos por vez.`);
   }
   files.forEach((file) => {
-    const mediaType = getAtendimentoMediaTypeFromMimeType(file.type);
+    const mediaType = getAtendimentoMediaTypeFromMimeType(file.type) ?? (isAtendimentoDocumentExtensionAllowed(file.name) ? "file" : null);
     if (!mediaType) {
-      errors.push(`${file.name}: apenas fotos e videos sao permitidos.`);
+      errors.push(`${file.name}: formato de arquivo nao suportado.`);
       return;
     }
-    const maxSize = getAtendimentoMaxFileSizeBytes(file.type);
+    if (
+      mediaType === "file" &&
+      String(file.type ?? "").trim() &&
+      !ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES.includes(String(file.type ?? "").trim().toLowerCase() as any) &&
+      !isAtendimentoDocumentExtensionAllowed(file.name)
+    ) {
+      errors.push(`${file.name}: formato de arquivo nao suportado.`);
+      return;
+    }
+    const maxSize = mediaType === "file" ? MAX_DOCUMENT_FILE_SIZE_BYTES : getAtendimentoMaxFileSizeBytes(file.type);
     if (file.size > maxSize) {
-      const limitLabel = mediaType === "image" ? "25 MB" : "250 MB";
+      const limitLabel = mediaType === "image" ? "25 MB" : mediaType === "video" ? "250 MB" : "100 MB";
       errors.push(`${file.name}: limite de ${limitLabel} por arquivo.`);
     }
   });
