@@ -96,6 +96,10 @@ export function PublicAtendimentoClient({
   const typingIndicatorDelayTimeoutRef = useRef<number | null>(null);
   const awaitingBotSinceRef = useRef<number | null>(null);
   const optimisticLeadMessageIdRef = useRef<string | null>(null);
+  const messagesRef = useRef<AtendimentoMessage[]>([]);
+  const pendingBotMessagesRef = useRef<AtendimentoMessage[]>([]);
+  const botReplyVisibleAtRef = useRef<number | null>(null);
+  const pendingBotFlushTimeoutRef = useRef<number | null>(null);
 
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
@@ -144,6 +148,10 @@ export function PublicAtendimentoClient({
     awaitingBotSinceRef.current = awaitingBotSince;
   }, [awaitingBotSince]);
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   function restoreTextareaFocus() {
     if (isAccountPage) return;
     window.requestAnimationFrame(() => {
@@ -161,6 +169,13 @@ export function PublicAtendimentoClient({
     if (typingIndicatorDelayTimeoutRef.current != null) {
       window.clearTimeout(typingIndicatorDelayTimeoutRef.current);
       typingIndicatorDelayTimeoutRef.current = null;
+    }
+  }
+
+  function clearPendingBotFlushTimeout() {
+    if (pendingBotFlushTimeoutRef.current != null) {
+      window.clearTimeout(pendingBotFlushTimeoutRef.current);
+      pendingBotFlushTimeoutRef.current = null;
     }
   }
 
@@ -198,6 +213,56 @@ export function PublicAtendimentoClient({
     });
   }, []);
 
+  const flushPendingBotMessages = useCallback(() => {
+    clearPendingBotFlushTimeout();
+    const pendingMessages = pendingBotMessagesRef.current;
+    pendingBotMessagesRef.current = [];
+    botReplyVisibleAtRef.current = null;
+    if (pendingMessages.length) {
+      applyMessages(pendingMessages, "merge");
+    }
+  }, [applyMessages]);
+
+  const applyMessagesWithBotTiming = useCallback(
+    (incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
+      const visibleAt = botReplyVisibleAtRef.current;
+      if (!visibleAt) {
+        applyMessages(incomingMessages, mode);
+        return;
+      }
+
+      const remainingMs = visibleAt - Date.now();
+      if (remainingMs <= 0) {
+        flushPendingBotMessages();
+        applyMessages(incomingMessages, mode);
+        return;
+      }
+
+      const existingVisibleIds = new Set(messagesRef.current.map((message) => String(message.id ?? "")));
+      const pendingIds = new Set(pendingBotMessagesRef.current.map((message) => String(message.id ?? "")));
+      const gatedBotMessages = incomingMessages.filter((message) => {
+        if (message.sender_role !== "bot") return false;
+        const messageId = String(message.id ?? "");
+        return Boolean(messageId) && !existingVisibleIds.has(messageId) && !pendingIds.has(messageId);
+      });
+
+      if (!gatedBotMessages.length) {
+        applyMessages(incomingMessages, mode);
+        return;
+      }
+
+      const gatedIds = new Set(gatedBotMessages.map((message) => String(message.id ?? "")));
+      const immediateMessages = incomingMessages.filter((message) => !gatedIds.has(String(message.id ?? "")));
+      pendingBotMessagesRef.current = sortAndDedupeMessages([...pendingBotMessagesRef.current, ...gatedBotMessages]);
+      clearPendingBotFlushTimeout();
+      pendingBotFlushTimeoutRef.current = window.setTimeout(() => {
+        flushPendingBotMessages();
+      }, remainingMs);
+      applyMessages(immediateMessages, mode);
+    },
+    [applyMessages, flushPendingBotMessages],
+  );
+
   const loadMessages = useCallback(
     async (nextPublicSlug: string, mode: "replace" | "merge" = "replace") => {
       if (!nextPublicSlug) return [] as AtendimentoMessage[];
@@ -215,11 +280,11 @@ export function PublicAtendimentoClient({
       const json = await res.json().catch(() => null);
       const nextMessages = json?.ok ? ((json.messages ?? []) as AtendimentoMessage[]) : [];
       if (json?.ok && requestId === messagesRequestIdRef.current) {
-        applyMessages(nextMessages, mode);
+        applyMessagesWithBotTiming(nextMessages, mode);
       }
       return nextMessages;
     },
-    [applyMessages],
+    [applyMessagesWithBotTiming],
   );
 
   const loadSession = useCallback(
@@ -317,6 +382,9 @@ export function PublicAtendimentoClient({
     setDraft("");
     optimisticLeadMessageIdRef.current = optimisticMessageId;
     applyMessages([optimisticMessage], "merge");
+    pendingBotMessagesRef.current = [];
+    clearPendingBotFlushTimeout();
+    botReplyVisibleAtRef.current = Date.now() + 2500;
     clearTypingIndicatorDelayTimeout();
     typingIndicatorDelayTimeoutRef.current = window.setTimeout(() => {
       const now = Date.now();
@@ -333,8 +401,11 @@ export function PublicAtendimentoClient({
       });
       if (res.status === 401 || res.status === 403) {
         clearTypingIndicatorDelayTimeout();
+        clearPendingBotFlushTimeout();
         removeMessage(optimisticMessageId);
         optimisticLeadMessageIdRef.current = null;
+        pendingBotMessagesRef.current = [];
+        botReplyVisibleAtRef.current = null;
         awaitingBotSinceRef.current = null;
         setAwaitingBotSince(null);
         setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
@@ -359,6 +430,9 @@ export function PublicAtendimentoClient({
         removeMessage(optimisticMessageId);
         optimisticLeadMessageIdRef.current = null;
         clearTypingIndicatorDelayTimeout();
+        clearPendingBotFlushTimeout();
+        pendingBotMessagesRef.current = [];
+        botReplyVisibleAtRef.current = null;
         awaitingBotSinceRef.current = null;
         setAwaitingBotSince(null);
       }
@@ -376,9 +450,12 @@ export function PublicAtendimentoClient({
   useEffect(() => {
     return () => {
       clearTypingIndicatorDelayTimeout();
+      clearPendingBotFlushTimeout();
+      pendingBotMessagesRef.current = [];
+      botReplyVisibleAtRef.current = null;
       awaitingBotSinceRef.current = null;
     };
-  }, []);
+  }, [flushPendingBotMessages]);
 
   useEffect(() => {
     if (isAccountPage || !publicSlug || authError || loading || !isInitialFlow) return;
@@ -428,7 +505,7 @@ export function PublicAtendimentoClient({
             removeMessage(optimisticLeadMessageIdRef.current);
             optimisticLeadMessageIdRef.current = null;
           }
-          applyMessages([nextMessage], "merge");
+          applyMessagesWithBotTiming([nextMessage], "merge");
         },
       )
       .subscribe();
@@ -441,7 +518,7 @@ export function PublicAtendimentoClient({
       supabase.removeChannel(channel);
     };
   }, [
-    applyMessages,
+    applyMessagesWithBotTiming,
     authError,
     conversationId,
     isAccountPage,
