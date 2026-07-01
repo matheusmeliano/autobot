@@ -32,6 +32,9 @@ export function LoginForm() {
   const signupHref = safeNext
     ? `/signup?next=${encodeURIComponent(safeNext)}${safeNext.startsWith("/atendimento") ? "&mode=atendimento" : ""}`
     : "/signup";
+  const forgotPasswordHref = safeNext
+    ? `/esqueci-senha?next=${encodeURIComponent(safeNext)}`
+    : "/esqueci-senha";
 
   useEffect(() => {
     if (didShowConfirmed.current) return;
@@ -138,7 +141,7 @@ export function LoginForm() {
             <div className="mt-2 text-xs font-medium text-rose-300">{errors.password.message}</div>
           ) : null}
           <div className="mt-2 flex justify-end">
-            <Link href="/esqueci-senha" className="text-xs font-semibold text-white/55 hover:text-white">
+            <Link href={forgotPasswordHref} className="text-xs font-semibold text-white/55 hover:text-white">
               Esqueceu a senha?
             </Link>
           </div>

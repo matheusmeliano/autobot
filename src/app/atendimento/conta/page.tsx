@@ -58,7 +58,10 @@ export default async function AtendimentoAccountPage({
                 </Link>
               </div>
               <div className="mt-4 text-center text-sm text-white/55">
-                <Link href="/esqueci-senha" className="font-semibold text-white/75 hover:text-white">
+                <Link
+                  href={`/esqueci-senha?next=${encodeURIComponent(nextPath)}`}
+                  className="font-semibold text-white/75 hover:text-white"
+                >
                   Esqueci minha senha
                 </Link>
               </div>

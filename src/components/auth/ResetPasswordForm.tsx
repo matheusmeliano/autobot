@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getSafeAuthenticatedPath } from "@/lib/auth/access";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { modalToast } from "@/lib/modalToast";
@@ -17,9 +18,16 @@ type FormValues = {
 
 export function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const next = String(searchParams?.get("next") ?? "");
+  const safeNext = /^\/(?!\/)/.test(next) ? next : "";
+  const loginHref = safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : "/login";
+  const forgotPasswordHref = safeNext
+    ? `/esqueci-senha?next=${encodeURIComponent(safeNext)}`
+    : "/esqueci-senha";
 
   const {
     register,
@@ -62,7 +70,6 @@ export function ResetPasswordForm() {
           return;
         }
         url.searchParams.delete("code");
-        url.searchParams.delete("next");
         url.searchParams.delete("type");
         window.history.replaceState({}, "", `${url.pathname}${url.search}`);
       } else if (tokenHash && type) {
@@ -105,13 +112,13 @@ export function ResetPasswordForm() {
         title="Não foi possível redefinir"
         subtitle={urlError}
         footer={
-          <Link className="font-semibold text-white hover:underline" href="/login">
+          <Link className="font-semibold text-white hover:underline" href={loginHref}>
             Voltar para entrar
           </Link>
         }
       >
         <Link
-          href="/esqueci-senha"
+          href={forgotPasswordHref}
           className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
         >
           Solicitar novo link
@@ -129,8 +136,21 @@ export function ResetPasswordForm() {
         return;
       }
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      let accessScope: unknown = "app";
+      if (user?.id) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("access_scope")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        accessScope = profile?.access_scope;
+      }
+
       modalToast.success("Senha atualizada com sucesso.");
-      router.push("/app");
+      router.push(getSafeAuthenticatedPath(accessScope, safeNext));
       router.refresh();
     },
     (errors) => {
@@ -152,13 +172,13 @@ export function ResetPasswordForm() {
         title="Link inválido"
         subtitle="Seu link expirou ou já foi usado. Solicite um novo link."
         footer={
-          <Link className="font-semibold text-white hover:underline" href="/login">
+          <Link className="font-semibold text-white hover:underline" href={loginHref}>
             Voltar para entrar
           </Link>
         }
       >
         <Link
-          href="/esqueci-senha"
+          href={forgotPasswordHref}
           className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
         >
           Solicitar novo link
@@ -172,7 +192,7 @@ export function ResetPasswordForm() {
       title="Redefinir senha"
       subtitle="Crie uma nova senha para sua conta."
       footer={
-        <Link className="font-semibold text-white hover:underline" href="/login">
+        <Link className="font-semibold text-white hover:underline" href={loginHref}>
           Voltar para entrar
         </Link>
       }

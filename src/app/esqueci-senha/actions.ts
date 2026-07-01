@@ -9,11 +9,13 @@ import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 
 const schema = z.object({
   email: z.string().email(),
+  next: z.string().optional(),
 });
 
 export async function forgotPasswordAction(formData: FormData) {
   const parsed = schema.safeParse({
     email: formData.get("email"),
+    next: formData.get("next"),
   });
 
   if (!parsed.success) {
@@ -21,6 +23,8 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const normalizedEmail = parsed.data.email.trim().toLowerCase();
+  const requestedNext = String(parsed.data.next ?? "").trim();
+  const safeNext = /^\/(?!\/)/.test(requestedNext) ? requestedNext : "";
 
   const hdrs = await headers();
   const baseUrl = resolveBaseUrlFromHeaders(hdrs);
@@ -67,8 +71,12 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
+  const redirectUrl = new URL("/redefinir-senha", baseUrl);
+  if (safeNext) {
+    redirectUrl.searchParams.set("next", safeNext);
+  }
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo: `${baseUrl}/redefinir-senha`,
+    redirectTo: redirectUrl.toString(),
   });
 
   if (error) {

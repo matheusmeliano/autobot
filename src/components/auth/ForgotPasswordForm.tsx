@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { forgotPasswordAction } from "@/app/esqueci-senha/actions";
@@ -11,6 +12,7 @@ type FormValues = {
 };
 
 export function ForgotPasswordForm() {
+  const searchParams = useSearchParams();
   const {
     register,
     handleSubmit,
@@ -18,10 +20,16 @@ export function ForgotPasswordForm() {
   } = useForm<FormValues>({
     defaultValues: { email: "" },
   });
+  const next = String(searchParams?.get("next") ?? "");
+  const safeNext = /^\/(?!\/)/.test(next) ? next : "";
+  const loginHref = safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : "/login";
 
   const onSubmit = handleSubmit(async (values) => {
     const formData = new FormData();
     formData.append("email", values.email);
+    if (safeNext) {
+      formData.append("next", safeNext);
+    }
 
     const res = await forgotPasswordAction(formData);
     if (!res.ok) {
@@ -37,7 +45,7 @@ export function ForgotPasswordForm() {
       title="Recuperar senha"
       subtitle="Enviaremos um link para redefinir sua senha."
       footer={
-        <Link className="font-semibold text-white hover:underline" href="/login">
+        <Link className="font-semibold text-white hover:underline" href={loginHref}>
           Voltar para entrar
         </Link>
       }
