@@ -90,8 +90,8 @@ export function AtendimentoFileGallery({
                 ? "Enviado por você"
                 : "Enviado por atendimento"
               : file.sender_role === "lead"
-                ? "Cliente"
-                : "Atendimento";
+                ? "Enviado por aluno"
+                : "Enviado por você";
 
           return (
             <div key={file.id} className={cardClassName}>
