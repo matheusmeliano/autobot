@@ -127,10 +127,11 @@ export async function signupAction(formData: FormData) {
   }
 
   if (error) {
-    return { ok: false, error: supabaseErrorToPt(error.message) };
+    return { ok: false, error: supabaseErrorToPt(error.message ?? "Falha ao criar conta.") };
   }
 
-  if ((data.user?.identities?.length ?? 0) === 0) {
+  const createdUserIdentities = (data?.user as { identities?: unknown[] | null } | null)?.identities;
+  if (!isAtendimentoOnlyUser && (createdUserIdentities?.length ?? 0) === 0) {
     return { ok: false, error: "Este e-mail já possui cadastro. Faça login." };
   }
 
