@@ -93,6 +93,7 @@ export function PublicAtendimentoClient({
   const messagesRequestIdRef = useRef(0);
   const sessionRequestIdRef = useRef(0);
   const sessionRefreshTimeoutRef = useRef<number | null>(null);
+  const awaitingBotSinceRef = useRef<number | null>(null);
 
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
@@ -134,8 +135,12 @@ export function PublicAtendimentoClient({
     if (isAccountPage) return;
     const viewport = messagesViewportRef.current;
     if (!viewport) return;
-    viewport.scrollTop = viewport.scrollHeight;
-  }, [isAccountPage, publicSlug, messages.length, typing]);
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
+  }, [isAccountPage, publicSlug, messages, typing]);
+
+  useEffect(() => {
+    awaitingBotSinceRef.current = awaitingBotSince;
+  }, [awaitingBotSince]);
 
   function restoreTextareaFocus() {
     if (isAccountPage) return;
@@ -161,19 +166,20 @@ export function PublicAtendimentoClient({
         return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
       });
 
-      if (awaitingBotSince != null) {
-        const since = awaitingBotSince;
+      if (awaitingBotSinceRef.current != null) {
+        const since = awaitingBotSinceRef.current;
         const hasBotAfter = normalizedMessages.some((message) => {
           if (message.sender_role === "lead") return false;
           const createdAt = new Date(message.created_at).getTime();
           return Number.isFinite(createdAt) && createdAt >= since;
         });
         if (hasBotAfter) {
+          awaitingBotSinceRef.current = null;
           setAwaitingBotSince(null);
         }
       }
     },
-    [awaitingBotSince],
+    [],
   );
 
   const removeMessage = useCallback((messageId: string) => {
