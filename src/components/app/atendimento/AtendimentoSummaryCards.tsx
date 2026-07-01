@@ -24,7 +24,7 @@ export function AtendimentoSummaryCards({ summary }: { summary: AtendimentoSumma
         </div>
       ))}
 
-      <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
+      <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 sm:col-span-2 lg:col-span-1">
         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
           Contratos
         </div>
