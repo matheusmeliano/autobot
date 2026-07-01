@@ -33,8 +33,8 @@ export default async function AtendimentoPublicPage({
     return (
       <>
         {rootStyle}
-        <div className="min-h-[100dvh] bg-[#09111A] px-4 py-6 text-white md:px-8 md:py-10">
-          <div className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-3xl items-center justify-center">
+        <div className="h-[100dvh] overflow-hidden bg-[#09111A] px-4 py-6 text-white md:px-8 md:py-10">
+          <div className="mx-auto flex h-full max-w-3xl items-center justify-center">
             <div className="w-full rounded-[2rem] border border-white/10 bg-[#0E1723] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.45)] md:p-8">
               <div className="text-2xl font-semibold tracking-tight">Atendimento</div>
               <p className="mt-3 text-sm text-white/70">
