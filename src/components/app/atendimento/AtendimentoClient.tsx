@@ -42,6 +42,7 @@ export function AtendimentoClient() {
   const selectedLeadIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
   const realtimeRefreshTimeoutRef = useRef<number | null>(null);
+  const realtimeSuspendedRef = useRef(false);
 
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
@@ -164,6 +165,7 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     const scheduleRefresh = () => {
+      if (realtimeSuspendedRef.current) return;
       if (realtimeRefreshTimeoutRef.current != null) {
         window.clearTimeout(realtimeRefreshTimeoutRef.current);
       }
@@ -217,16 +219,19 @@ export function AtendimentoClient() {
   }
 
   async function handleDeleteLead(lead: AtendimentoLeadListItem) {
+    realtimeSuspendedRef.current = true;
     const res = await fetch(`/api/atendimento/leads/${lead.id}`, {
       method: "DELETE",
     });
     const json = await res.json().catch(() => null);
     if (!json?.ok) {
+      realtimeSuspendedRef.current = false;
       throw new Error(String(json?.error ?? "Falha ao excluir lead."));
     }
 
     if (selectedLeadId === lead.id) {
       const fallbackLeadId = leads.find((item) => item.id !== lead.id)?.id ?? null;
+      selectedLeadIdRef.current = fallbackLeadId;
       setSelectedLeadId(fallbackLeadId);
       setSelectedConversation(null);
       setMessages([]);
@@ -235,7 +240,7 @@ export function AtendimentoClient() {
 
     await loadSummary();
     await loadLeads(query);
-    modalToast.success("Lead excluído definitivamente.");
+    realtimeSuspendedRef.current = false;
   }
 
   function openMobileConversation(leadId: string) {
