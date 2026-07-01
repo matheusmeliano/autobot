@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2, Paperclip, Play, Send, X } from "lucide-react";
+import { Clapperboard, FileText, ImageIcon, Maximize2, Minimize2, Paperclip, Play, Send, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import {
   ATENDIMENTO_DOCUMENT_MIME_ACCEPT,
@@ -483,13 +483,19 @@ export function AtendimentoConversationPanel({
         zIndexClass="z-[520]"
         closeOnBackdrop={false}
         closeOnEscape={false}
+        fullScreenOnMobile
+        panelClassName="border-white/10 bg-[#0E1723] shadow-[0_32px_120px_rgba(0,0,0,0.45)]"
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="text-sm font-semibold text-[var(--app-text-85)]">Escolha o tipo de anexo</div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Anexos</div>
+            <div className="mt-2 text-base font-semibold text-white">Escolha o tipo de anexo</div>
+            <div className="mt-1 text-sm text-white/55">Selecione como deseja enviar seu conteudo nesta conversa.</div>
+          </div>
           <button
             type="button"
             onClick={() => setAttachmentMenuOpen(false)}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.08]"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />
@@ -499,23 +505,35 @@ export function AtendimentoConversationPanel({
           <button
             type="button"
             onClick={() => handleAttachmentOption("image")}
-            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+            className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition hover:border-emerald-500/35 hover:bg-white/[0.07]"
           >
-            Foto
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/12 text-emerald-200">
+              <ImageIcon className="h-4 w-4" />
+            </div>
+            <div className="mt-4 text-sm font-semibold text-white">Foto</div>
+            <div className="mt-1 text-xs leading-5 text-white/50">Imagens e capturas para compartilhar no atendimento.</div>
           </button>
           <button
             type="button"
             onClick={() => handleAttachmentOption("video")}
-            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+            className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition hover:border-emerald-500/35 hover:bg-white/[0.07]"
           >
-            Video
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/12 text-sky-200">
+              <Clapperboard className="h-4 w-4" />
+            </div>
+            <div className="mt-4 text-sm font-semibold text-white">Video</div>
+            <div className="mt-1 text-xs leading-5 text-white/50">Gravacoes curtas ou videos para complementar a conversa.</div>
           </button>
           <button
             type="button"
             onClick={() => handleAttachmentOption("file")}
-            className="inline-flex items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+            className="group rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left transition hover:border-emerald-500/35 hover:bg-white/[0.07]"
           >
-            Arquivo
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/12 text-violet-200">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="mt-4 text-sm font-semibold text-white">Arquivo</div>
+            <div className="mt-1 text-xs leading-5 text-white/50">PDF, DOC, XLS, ZIP e outros documentos compativeis.</div>
           </button>
         </div>
       </AppModal>
