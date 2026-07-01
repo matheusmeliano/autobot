@@ -92,9 +92,6 @@ export function AtendimentoConversationPanel({
     >
       <div className="border-b border-[var(--app-border)] px-4 py-4">
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
-        <div className="mt-1 text-xs text-[var(--app-text-45)]">
-          Conversa completa do lead dentro do módulo Atendimento.
-        </div>
       </div>
 
       <div ref={messagesViewportRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
