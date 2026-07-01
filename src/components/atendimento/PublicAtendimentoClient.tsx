@@ -238,6 +238,27 @@ export function PublicAtendimentoClient({
     });
   }, []);
 
+  const replaceOptimisticLeadMessage = useCallback((confirmedMessage: AtendimentoMessage) => {
+    const optimisticId = optimisticLeadMessageIdRef.current;
+    const optimisticMessage = optimisticLeadMessageRef.current;
+
+    setMessages((currentMessages) => {
+      const withoutOptimisticMessage = optimisticId
+        ? currentMessages.filter((message) => String(message.id) !== optimisticId)
+        : currentMessages;
+      const nextMessages = sortAndDedupeMessages([...withoutOptimisticMessage, confirmedMessage]);
+      return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
+    });
+
+    if (
+      optimisticMessage &&
+      String(confirmedMessage.content_text ?? "").trim() === String(optimisticMessage.content_text ?? "").trim()
+    ) {
+      optimisticLeadMessageIdRef.current = null;
+      optimisticLeadMessageRef.current = null;
+    }
+  }, []);
+
   const flushPendingBotMessages = useCallback(() => {
     clearPendingBotFlushTimeout();
     const pendingMessages = pendingBotMessagesRef.current;
@@ -441,12 +462,12 @@ export function PublicAtendimentoClient({
       }
       const json = await res.json().catch(() => null);
       if (json?.ok) {
-        removeMessage(optimisticMessageId);
-        optimisticLeadMessageIdRef.current = null;
-        optimisticLeadMessageRef.current = null;
-
         if (json.inbound?.id) {
-          applyMessages([json.inbound as AtendimentoMessage], "merge");
+          replaceOptimisticLeadMessage(json.inbound as AtendimentoMessage);
+        } else {
+          removeMessage(optimisticMessageId);
+          optimisticLeadMessageIdRef.current = null;
+          optimisticLeadMessageRef.current = null;
         }
 
         if (json.outbound?.id) {
@@ -531,9 +552,8 @@ export function PublicAtendimentoClient({
             return;
           }
           if (nextMessage.sender_role === "lead" && optimisticLeadMessageIdRef.current) {
-            removeMessage(optimisticLeadMessageIdRef.current);
-            optimisticLeadMessageIdRef.current = null;
-            optimisticLeadMessageRef.current = null;
+            replaceOptimisticLeadMessage(nextMessage);
+            return;
           }
           applyMessagesWithBotTiming([nextMessage], "merge");
         },
@@ -555,6 +575,7 @@ export function PublicAtendimentoClient({
     leadId,
     loadMessages,
     publicSlug,
+    replaceOptimisticLeadMessage,
     removeMessage,
     supabase,
   ]);
