@@ -837,7 +837,7 @@ export function PublicAtendimentoClient({
 
           {isProfilePage ? (
             <div className="mt-4 flex flex-col gap-3">
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <Link
                   href={botHref}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07]"
@@ -867,14 +867,10 @@ export function PublicAtendimentoClient({
                 >
                   Arquivos
                 </Link>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-white/55">Acesse seus dados e os arquivos trocados no atendimento.</div>
                 <form action={logoutAction}>
                   <button
                     type="submit"
-                    className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07] sm:w-auto"
+                    className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.07]"
                   >
                     Sair
                   </button>
