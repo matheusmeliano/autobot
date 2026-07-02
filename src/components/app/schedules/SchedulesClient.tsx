@@ -34,14 +34,24 @@ import {
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
 
+type DebtorChargeOption = {
+  id?: string | null;
+  due_day?: number | null;
+  recurrence_month?: number | null;
+  recurrence_year?: number | null;
+  created_at?: string | null;
+};
+
 export type DebtorOption = {
   id: string;
   nome: string;
+  vencimento?: string | null;
   retry_weekdays?: number[] | null;
   retry_time?: string | null;
   retry_max_attempts?: number | null;
   retry_interval_days?: number | null;
   retry_auto_close_days?: number | null;
+  debtor_charges?: DebtorChargeOption[] | null;
 };
 export type TemplateOption = { id: string; nome: string };
 
@@ -145,6 +155,13 @@ function normalizeDateOnly(v: unknown) {
   return "";
 }
 
+function localDateBR(v: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const d = new Date(`${v}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
+}
+
 function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return "";
@@ -172,6 +189,40 @@ function buildLocalDate(yearMonth: string, day: number) {
   if (!year || !month) return "";
   const safeDay = Math.max(1, Math.min(Number(day) || 1, lastDayOfMonth(year, month)));
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+function compareDebtorChargeOrder(a: DebtorChargeOption, b: DebtorChargeOption) {
+  const yearA = Number(a.recurrence_year ?? 0);
+  const yearB = Number(b.recurrence_year ?? 0);
+  if (yearA !== yearB) return yearA - yearB;
+  const monthA = Number(a.recurrence_month ?? 0);
+  const monthB = Number(b.recurrence_month ?? 0);
+  if (monthA !== monthB) return monthA - monthB;
+  const dayA = Number(a.due_day ?? 0);
+  const dayB = Number(b.due_day ?? 0);
+  if (dayA !== dayB) return dayA - dayB;
+  return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+}
+
+function debtorReferenceLocalDate(debtor: DebtorOption | null | undefined) {
+  const charges = Array.isArray(debtor?.debtor_charges) ? debtor.debtor_charges.slice() : [];
+  const firstCharge = charges
+    .filter((charge) => {
+      const year = Number(charge.recurrence_year ?? 0);
+      const month = Number(charge.recurrence_month ?? 0);
+      const day = Number(charge.due_day ?? 0);
+      return year >= 2000 && month >= 1 && month <= 12 && day >= 1;
+    })
+    .sort(compareDebtorChargeOrder)[0];
+
+  if (firstCharge) {
+    return buildLocalDate(
+      `${String(Number(firstCharge.recurrence_year)).padStart(4, "0")}-${String(Number(firstCharge.recurrence_month)).padStart(2, "0")}`,
+      Number(firstCharge.due_day),
+    );
+  }
+
+  return normalizeDateOnly(debtor?.vencimento);
 }
 
 function monthDistance(fromYearMonth: string, toYearMonth: string) {
@@ -363,7 +414,6 @@ export function SchedulesClient({
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
-  const dateInputRef = useRef<HTMLInputElement | null>(null);
   const recurrenceUntilInputRef = useRef<HTMLInputElement | null>(null);
   const [monthlyExtras, setMonthlyExtras] = useState<Array<{ date: string; time: string }>>([]);
   const extraDateInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -688,6 +738,10 @@ export function SchedulesClient({
     () => debtorsById.get(String(selectedDebtorId ?? "")) ?? null,
     [debtorsById, selectedDebtorId],
   );
+  const selectedDebtorReferenceDate = useMemo(
+    () => debtorReferenceLocalDate(selectedDebtor),
+    [selectedDebtor],
+  );
 
   useEffect(() => {
     if (!open || !selectedDebtorId) return;
@@ -698,6 +752,11 @@ export function SchedulesClient({
     setValue("retry_interval_days", retryDefaults.retry_interval_days, { shouldDirty: false });
     setValue("retry_auto_close_days", retryDefaults.retry_auto_close_days, { shouldDirty: false });
   }, [open, selectedDebtor, selectedDebtorId, setValue]);
+
+  useEffect(() => {
+    if (!open) return;
+    setValue("data_envio_date", selectedDebtorReferenceDate, { shouldDirty: false, shouldTouch: false });
+  }, [open, selectedDebtorReferenceDate, setValue]);
 
   const currentTimeForPicker = useMemo(() => {
     if (!timePickerTarget) return "";
@@ -808,12 +867,13 @@ export function SchedulesClient({
     setMonthlyExtras([]);
     const retryDefaults = normalizeDebtorRetryValues(debtorsById.get(String(row.debtor_id)) ?? null);
     const dt = getEditDateTime(row);
+    const debtorReferenceDate = debtorReferenceLocalDate(debtorsById.get(String(row.debtor_id)) ?? null);
     reset({
       id: row.id,
       debtor_id: row.debtor_id,
       template_pending_id: row.template_pending_id ?? row.template_id ?? "",
       template_overdue_id: row.template_overdue_id ?? row.template_id ?? "",
-      data_envio_date: dt.date,
+      data_envio_date: debtorReferenceDate || dt.date,
       data_envio_time: dt.time,
       recurrence:
         String((row as any).recurrence ?? "none") === "yearly"
@@ -856,8 +916,12 @@ export function SchedulesClient({
       modalToast.warning("Selecione o template atrasado.");
       return;
     }
-    if (!values.data_envio_date || !values.data_envio_time) {
-      modalToast.warning("Selecione a data e a hora.");
+    if (!selectedDebtorReferenceDate) {
+      modalToast.warning("Esse cliente não possui data cadastrada para o agendamento.");
+      return;
+    }
+    if (!values.data_envio_time) {
+      modalToast.warning("Selecione a hora.");
       return;
     }
     if (values.recurrence === "monthly") {
@@ -875,7 +939,7 @@ export function SchedulesClient({
       }
     }
 
-    const normalizedEditDate = values.data_envio_date;
+    const normalizedEditDate = selectedDebtorReferenceDate;
     const normalizedRecurrenceUntil = normalizeDateOnly(values.recurrence_until);
     const effectiveRecurrenceUntil =
       values.recurrence === "yearly"
@@ -1133,13 +1197,8 @@ export function SchedulesClient({
     });
   };
 
-  const dateField = register("data_envio_date", { required: true });
   const timeField = register("data_envio_time", { required: true });
   const recurrenceUntilField = register("recurrence_until");
-  const openDatePicker = () => {
-    dateInputRef.current?.showPicker?.();
-    dateInputRef.current?.focus();
-  };
   const openExtraDatePicker = (index: number) => {
     extraDateInputRefs.current[index]?.showPicker?.();
     extraDateInputRefs.current[index]?.focus();
@@ -1619,29 +1678,17 @@ export function SchedulesClient({
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <div className="text-xs font-semibold text-white/60">
-                    Data
+                    Data do cliente
                   </div>
-                  <div className="relative mt-2">
-                    <input
-                      type="date"
-                      min={scheduleDateMin}
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-                      {...dateField}
-                      onFocus={openDatePicker}
-                      onClick={openDatePicker}
-                      ref={(el) => {
-                        dateField.ref(el);
-                        dateInputRef.current = el;
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={openDatePicker}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
-                      aria-label="Selecionar data"
-                    >
-                      <Calendar className="h-4 w-4" />
-                    </button>
+                  <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white">
+                    {selectedDebtorReferenceDate ? (
+                      localDateBR(selectedDebtorReferenceDate)
+                    ) : (
+                      <span className="text-white/45">Selecione um cliente com data cadastrada.</span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-[11px] text-white/45">
+                    A data do agendamento e obtida automaticamente a partir do cadastro do cliente.
                   </div>
                 </div>
                 <div>

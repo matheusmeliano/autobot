@@ -276,7 +276,7 @@ const createSchema = z.object({
   debtor_id: z.string().uuid(),
   template_pending_id: z.string().uuid().optional(),
   template_overdue_id: z.string().uuid().optional(),
-  data_envio_date: z.string().min(10),
+  data_envio_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   data_envio_time: z.string().min(4),
   recurrence: z.enum(["none", "monthly", "yearly"]).optional(),
   recurrence_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -334,6 +334,95 @@ function validateFutureScheduleDateTime(params: {
   }
 
   return { ok: true as const, scheduledIso };
+}
+
+type DebtorScheduleChargeRow = {
+  due_day?: number | null;
+  recurrence_month?: number | null;
+  recurrence_year?: number | null;
+  created_at?: string | null;
+};
+
+function referenceLastDayOfMonth(year: number, month1: number) {
+  return new Date(Date.UTC(year, month1, 0)).getUTCDate();
+}
+
+function buildReferenceLocalDate(params: {
+  day?: number | null;
+  month?: number | null;
+  year?: number | null;
+}) {
+  const year = Number(params.year ?? 0);
+  const month = Number(params.month ?? 0);
+  const day = Number(params.day ?? 0);
+  if (!Number.isInteger(year) || year < 2000) return "";
+  if (!Number.isInteger(month) || month < 1 || month > 12) return "";
+  if (!Number.isInteger(day) || day < 1) return "";
+  const safeDay = Math.max(1, Math.min(day, referenceLastDayOfMonth(year, month)));
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+function compareReferenceChargeOrder(a: DebtorScheduleChargeRow, b: DebtorScheduleChargeRow) {
+  const yearA = Number(a.recurrence_year ?? 0);
+  const yearB = Number(b.recurrence_year ?? 0);
+  if (yearA !== yearB) return yearA - yearB;
+  const monthA = Number(a.recurrence_month ?? 0);
+  const monthB = Number(b.recurrence_month ?? 0);
+  if (monthA !== monthB) return monthA - monthB;
+  const dayA = Number(a.due_day ?? 0);
+  const dayB = Number(b.due_day ?? 0);
+  if (dayA !== dayB) return dayA - dayB;
+  return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+}
+
+async function resolveScheduleLocalDate(params: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  debtorId: string;
+  providedDate?: string | null;
+}) {
+  const providedDate = String(params.providedDate ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(providedDate)) {
+    return { ok: true as const, localDate: providedDate };
+  }
+
+  const { data, error } = await params.supabase
+    .from("debtors")
+    .select("vencimento, debtor_charges(due_day, recurrence_month, recurrence_year, created_at)")
+    .eq("id", params.debtorId)
+    .maybeSingle();
+
+  if (error) return { ok: false as const, error: error.message };
+
+  const charges = (Array.isArray((data as any)?.debtor_charges) ? (data as any).debtor_charges : [])
+    .filter((charge: DebtorScheduleChargeRow) => {
+      const year = Number(charge.recurrence_year ?? 0);
+      const month = Number(charge.recurrence_month ?? 0);
+      const day = Number(charge.due_day ?? 0);
+      return year >= 2000 && month >= 1 && month <= 12 && day >= 1;
+    })
+    .sort(compareReferenceChargeOrder);
+
+  const firstCharge = charges[0] as DebtorScheduleChargeRow | undefined;
+  const chargeLocalDate = firstCharge
+    ? buildReferenceLocalDate({
+        day: firstCharge.due_day,
+        month: firstCharge.recurrence_month,
+        year: firstCharge.recurrence_year,
+      })
+    : "";
+  if (chargeLocalDate) {
+    return { ok: true as const, localDate: chargeLocalDate };
+  }
+
+  const legacyDueDate = String((data as any)?.vencimento ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(legacyDueDate)) {
+    return { ok: true as const, localDate: legacyDueDate };
+  }
+
+  return {
+    ok: false as const,
+    error: "Esse cliente não possui data cadastrada para o agendamento.",
+  };
 }
 
 async function updateDebtorRetrySettings(
@@ -422,8 +511,16 @@ export async function createScheduleAction(input: unknown) {
     }
   }
 
+  const scheduleLocalDateResult = await resolveScheduleLocalDate({
+    supabase,
+    debtorId: parsed.data.debtor_id,
+    providedDate: parsed.data.data_envio_date,
+  });
+  if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
+  const scheduleLocalDate = scheduleLocalDateResult.localDate;
+
   const futureValidation = validateFutureScheduleDateTime({
-    date: parsed.data.data_envio_date,
+    date: scheduleLocalDate,
     time: parsed.data.data_envio_time,
     timeZone,
   });
@@ -439,10 +536,10 @@ export async function createScheduleAction(input: unknown) {
   const recurrenceValidation = validateRecurrenceUntil({
     recurrence,
     recurrenceUntil: parsed.data.recurrence_until,
-    currentDate: parsed.data.data_envio_date,
+    currentDate: scheduleLocalDate,
   });
   if (recurrenceValidation) return { ok: false, error: recurrenceValidation };
-  const recurrenceDay = Number(parsed.data.data_envio_date.split("-")[2] ?? "");
+  const recurrenceDay = Number(scheduleLocalDate.split("-")[2] ?? "");
   const recurrenceTime = parsed.data.data_envio_time;
   const recurrenceLimitValidation = validateRecurringRecurrenceLimit({
     recurrence,
@@ -523,8 +620,16 @@ export async function updateScheduleAction(input: unknown) {
     }
   }
 
+  const scheduleLocalDateResult = await resolveScheduleLocalDate({
+    supabase,
+    debtorId: data.debtor_id,
+    providedDate: data.data_envio_date,
+  });
+  if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
+  const scheduleLocalDate = scheduleLocalDateResult.localDate;
+
   const futureValidation = validateFutureScheduleDateTime({
-    date: data.data_envio_date,
+    date: scheduleLocalDate,
     time: data.data_envio_time,
     timeZone,
   });
@@ -540,10 +645,10 @@ export async function updateScheduleAction(input: unknown) {
   const recurrenceValidation = validateRecurrenceUntil({
     recurrence,
     recurrenceUntil: data.recurrence_until,
-    currentDate: data.data_envio_date,
+    currentDate: scheduleLocalDate,
   });
   if (recurrenceValidation) return { ok: false, error: recurrenceValidation };
-  const recurrenceDay = Number(String(data.data_envio_date ?? "").split("-")[2] ?? "");
+  const recurrenceDay = Number(scheduleLocalDate.split("-")[2] ?? "");
   const recurrenceTime = String(data.data_envio_time ?? "");
   const recurrenceLimitValidation = validateRecurringRecurrenceLimit({
     recurrence,
