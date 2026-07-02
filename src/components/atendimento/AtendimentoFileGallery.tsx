@@ -63,8 +63,8 @@ export function AtendimentoFileGallery({
           });
           const cardClassName =
             tone === "portal"
-              ? "rounded-2xl border border-white/10 bg-white/[0.04] p-4"
-              : "rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4";
+              ? "min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+              : "min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4";
           const eyebrowClassName =
             tone === "portal"
               ? "text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45"
