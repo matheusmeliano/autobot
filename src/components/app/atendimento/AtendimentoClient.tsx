@@ -69,6 +69,7 @@ export function AtendimentoClient() {
   const [leads, setLeads] = useState<AtendimentoLeadListItem[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<AtendimentoConversation | null>(null);
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -159,18 +160,21 @@ export function AtendimentoClient() {
   }, []);
 
   const loadConversationMessages = useCallback(
-    async (conversationId: string, mode: "replace" | "merge" = "replace") => {
+    async (conversationId: string, mode: "replace" | "merge" = "replace", options?: { showLoading?: boolean }) => {
       if (!conversationId) return;
       const requestId = ++messagesRequestIdRef.current;
+      if (options?.showLoading) setMessagesLoading(true);
       const messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
       const messagesJson = await messagesRes.json().catch(() => null);
       if (messagesJson?.ok && requestId === messagesRequestIdRef.current) {
         applyMessages((messagesJson.messages ?? []) as AtendimentoMessage[], mode);
+        if (options?.showLoading) setMessagesLoading(false);
         return;
       }
       const message = String(messagesJson?.error ?? "Falha ao carregar mensagens.");
       setLoadError(message);
       modalToast.error(message);
+      if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
     },
     [applyMessages],
   );
@@ -202,11 +206,14 @@ export function AtendimentoClient() {
       const conversationId = String(nextConversation?.id ?? "");
       if (!conversationId) {
         setMessages([]);
+        setMessagesLoading(false);
         return;
       }
 
       if (!options?.skipMessages) {
-        await loadConversationMessages(conversationId, "replace");
+        await loadConversationMessages(conversationId, "replace", { showLoading: true });
+      } else {
+        setMessagesLoading(false);
       }
     },
     [loadConversationMessages],
@@ -503,6 +510,7 @@ export function AtendimentoClient() {
           <AtendimentoConversationPanel
             conversation={selectedConversation}
             messages={messages}
+            messagesLoading={messagesLoading}
             disabled={sending}
             onSendMessage={handleSendMessage}
           />
@@ -538,6 +546,7 @@ export function AtendimentoClient() {
                 compact
                 conversation={selectedConversation}
                 messages={messages}
+                messagesLoading={messagesLoading}
                 disabled={sending}
                 onSendMessage={handleSendMessage}
               />

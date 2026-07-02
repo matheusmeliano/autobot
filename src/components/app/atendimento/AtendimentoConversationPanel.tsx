@@ -43,12 +43,14 @@ function getAtendimentoDownloadHref(url: string | null | undefined, fileName: st
 export function AtendimentoConversationPanel({
   conversation,
   messages,
+  messagesLoading,
   disabled,
   onSendMessage,
   compact,
 }: {
   conversation: AtendimentoConversation | null;
   messages: AtendimentoMessage[];
+  messagesLoading?: boolean;
   disabled?: boolean;
   onSendMessage: (payload: {
     content_text?: string;
@@ -389,6 +391,13 @@ export function AtendimentoConversationPanel({
               </div>
             );
           })
+        ) : messagesLoading ? (
+          <div className="flex h-full min-h-56 items-center justify-center text-sm text-[var(--app-text-45)]">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500/70" />
+              Carregando...
+            </div>
+          </div>
         ) : (
           <div className="flex h-full min-h-56 items-center justify-center text-sm text-[var(--app-text-45)]">
             Nenhuma mensagem nesta conversa.
