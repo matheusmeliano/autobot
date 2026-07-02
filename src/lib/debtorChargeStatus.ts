@@ -131,6 +131,18 @@ function countReferenceMonthPaidSchedules(params: {
   }).length;
 }
 
+function getReferenceMonthSchedules(params: {
+  schedules: DebtorScheduleStatusRow[];
+  referenceYearMonth: string;
+  scheduleTimeZone: string;
+}) {
+  return params.schedules.filter((row) => {
+    const timeZone = String(row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
+    const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
+    return Boolean(referenceLocalDate && referenceLocalDate.slice(0, 7) === params.referenceYearMonth);
+  });
+}
+
 function hasOpenOverdueSchedule(params: {
   schedules: DebtorScheduleStatusRow[];
   currentLocalDate: string;
@@ -179,12 +191,30 @@ function deriveReferenceMonthDebtorStatus(
     .sort(compareChargeOrder);
 
   if (!referenceCharges.length) {
-    const paidSchedulesInReferenceMonth = countReferenceMonthPaidSchedules({
+    const referenceSchedules = getReferenceMonthSchedules({
       schedules,
       referenceYearMonth,
       scheduleTimeZone,
     });
-    return paidSchedulesInReferenceMonth > 0 ? "pago" : "agendado";
+    if (!referenceSchedules.length) return "agendado";
+
+    const paidSchedulesInReferenceMonth = referenceSchedules.filter((row) => {
+      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+      return isPaidSchedule(row, timeZone);
+    }).length;
+
+    if (paidSchedulesInReferenceMonth >= referenceSchedules.length) return "pago";
+
+    const hasReferenceMonthOverdue = referenceSchedules.some((row) => {
+      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+      if (isPaidSchedule(row, timeZone)) return false;
+      if (String(row.closed_at ?? "").trim()) return false;
+      const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
+      return Boolean(referenceLocalDate && referenceLocalDate < currentLocalDate);
+    });
+
+    if (hasReferenceMonthOverdue) return "atrasado";
+    return "agendado";
   }
 
   let paidCount = 0;
@@ -268,14 +298,19 @@ export function deriveReferenceMonthDebtorChargeProgress(
     .filter(Boolean);
 
   if (!referenceChargeIds.length) {
-    const paidSchedulesInReferenceMonth = countReferenceMonthPaidSchedules({
+    const referenceSchedules = getReferenceMonthSchedules({
       schedules,
       referenceYearMonth,
       scheduleTimeZone,
     });
-    return paidSchedulesInReferenceMonth > 0
-      ? { paid: paidSchedulesInReferenceMonth, total: paidSchedulesInReferenceMonth }
-      : { paid: 0, total: 0 };
+    if (!referenceSchedules.length) return { paid: 0, total: 0 };
+
+    const paidSchedulesInReferenceMonth = referenceSchedules.filter((row) => {
+      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+      return isPaidSchedule(row, timeZone);
+    }).length;
+
+    return { paid: paidSchedulesInReferenceMonth, total: referenceSchedules.length };
   }
 
   const referenceCharges = charges
