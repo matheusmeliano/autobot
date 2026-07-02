@@ -338,9 +338,9 @@ export function AtendimentoLeadList({
       <AppModal open={Boolean(deleteLead)} onClose={closeDeleteModal} size="md" zIndexClass="z-[130]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-[var(--app-text-85)]">Excluir Lead</div>
+            <div className="text-sm font-semibold text-[var(--app-text-85)]">Excluir aluno</div>
             <div className="mt-1 text-xs text-[var(--app-text-55)]">
-              Essa exclusão é permanente e remove o lead do sistema e do banco de dados sem possibilidade de recuperação.
+              Essa exclusão é permanente e remove o aluno do sistema e do banco de dados sem possibilidade de recuperação.
             </div>
           </div>
           <button
@@ -357,7 +357,7 @@ export function AtendimentoLeadList({
         <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-[var(--app-text-85)]">
           {deleteLead ? (
             <>
-              Tem certeza que deseja excluir definitivamente o lead{" "}
+              Tem certeza que deseja excluir definitivamente o(a) aluno(a){" "}
               <span className="font-semibold">{deleteLead.full_name || deleteLead.phone || "Novo Lead"}</span>?
             </>
           ) : null}
