@@ -308,7 +308,7 @@ export function AtendimentoLeadList({
       <AppModal open={filesOpen} onClose={closeFilesModal} size="xl" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-[var(--app-text-85)]">Arquivos do Lead</div>
+            <div className="text-sm font-semibold text-[var(--app-text-85)]">Arquivos do aluno</div>
             <div className="mt-1 text-xs text-[var(--app-text-55)]">
               {filesLead ? `Arquivos vinculados a ${filesLead.full_name || filesLead.phone || "Novo Lead"}.` : "Arquivos vinculados ao cliente."}
             </div>
