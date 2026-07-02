@@ -566,14 +566,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         id: c.charge_id,
         amount: c.amount ? parseBRLToNumber(c.amount) : null,
         dueDay: Number(String(c.due_day ?? "").trim()),
-        recurrenceMonth: Number(String(c.recurrence_month ?? "").trim()),
-        recurrenceYear: Number(String(c.recurrence_year ?? "").trim()),
+        recurrenceMonth: currentRecurrence.month,
+        recurrenceYear: currentRecurrence.year,
       }))
-      .filter(
-        (c) =>
-          !(Number.isInteger(c.recurrenceMonth) && Number.isInteger(c.recurrenceYear)) ||
-          c.recurrenceYear * 100 + c.recurrenceMonth >= currentRecurrenceKey,
-      )
       .filter(
         (c) =>
           typeof c.amount === "number" &&
@@ -605,16 +600,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         return order !== 0 ? order : a.index - b.index;
       });
 
-    if (
-      (values.charges ?? []).some((c) => {
-        const month = Number(String(c.recurrence_month ?? "").trim());
-        const year = Number(String(c.recurrence_year ?? "").trim());
-        return Number.isInteger(month) && Number.isInteger(year) && year * 100 + month < currentRecurrenceKey;
-      })
-    ) {
-      modalToast.error("Mês e ano da recorrência devem ser do mês atual em diante.");
-      return;
-    }
     if (!mappedCharges.length) {
       modalToast.error("Informe pelo menos 1 cobrança (valor e dia de vencimento).");
       return;
@@ -986,15 +971,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           key={field.id}
                           className="rounded-2xl border border-white/10 bg-white/[0.02] p-3"
                         >
-                          {(() => {
-                            const selectedYear = Number(watchedCharges?.[index]?.recurrence_year ?? currentRecurrence.year);
-                            const availableMonthOptions =
-                              selectedYear === currentRecurrence.year
-                                ? monthOptions.filter((option) => Number(option.value) >= currentRecurrence.month)
-                                : monthOptions;
-                            return (
-                              <>
                           <input type="hidden" {...register(`charges.${index}.charge_id`)} />
+                          <input type="hidden" value={String(currentRecurrence.month)} {...register(`charges.${index}.recurrence_month` as const)} />
+                          <input type="hidden" value={String(currentRecurrence.year)} {...register(`charges.${index}.recurrence_year` as const)} />
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="w-full">
                               <div className="text-xs font-semibold text-white/60">Valor</div>
@@ -1037,31 +1016,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             </div>
                           </div>
 
-                          <div className="mt-3">
-                            <div className="text-xs font-semibold text-white/60">Mês</div>
-                            <select
-                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                              {...register(`charges.${index}.recurrence_month` as const)}
-                            >
-                              {availableMonthOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="mt-3">
-                            <div className="text-xs font-semibold text-white/60">Ano</div>
-                            <input
-                              type="number"
-                              min={currentRecurrence.year}
-                              max={9999}
-                              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                              {...register(`charges.${index}.recurrence_year` as const)}
-                            />
-                          </div>
-
                           {chargeFields.length > 1 ? (
                             <button
                               type="button"
@@ -1071,15 +1025,8 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                               Remover cobrança
                             </button>
                           ) : null}
-                              </>
-                            );
-                          })()}
                         </div>
                       ))}
-                    </div>
-
-                    <div className="mt-2 text-[11px] text-white/45">
-                      Ordena automaticamente por vencimento e permite definir por cobrança o mês e o ano da próxima recorrência.
                     </div>
                   </div>
 
