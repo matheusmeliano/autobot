@@ -64,6 +64,10 @@ export function SignupForm() {
         modalToast.error(String(errors.password.message));
         return;
       }
+      if (errors.email?.message) {
+        modalToast.error(String(errors.email.message));
+        return;
+      }
       modalToast.warning("Confira os campos.");
     },
   );
@@ -100,7 +104,13 @@ export function SignupForm() {
             autoComplete="email"
             className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
             placeholder="voce@empresa.com"
-            {...register("email", { required: true })}
+            {...register("email", {
+              required: "Informe seu e-mail.",
+              pattern: {
+                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: "Informe um e-mail válido.",
+              },
+            })}
           />
         </div>
 
