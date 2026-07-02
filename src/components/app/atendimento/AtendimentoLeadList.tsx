@@ -184,20 +184,6 @@ export function AtendimentoLeadList({
                     ) : null}
                   </div>
 
-                  <div className="mt-3 truncate text-xs text-[var(--app-text-60)]">
-                    {lead.conversation?.last_message_preview || "Sem mensagens ainda."}
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--app-text-45)]">
-                    <span className="rounded-full border border-[var(--app-border)] px-2 py-1">
-                      {atendimentoStatusLabel(lead.status)}
-                    </span>
-                    <span className="rounded-full border border-[var(--app-border)] px-2 py-1">
-                      {atendimentoStageLabel(lead.funnel_stage)}
-                    </span>
-                    <span>{formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}</span>
-                  </div>
-
                   <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                       type="button"
