@@ -194,7 +194,7 @@ export function AtendimentoLeadList({
                       }}
                       className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                     >
-                      Abrir perfil do lead
+                      Perfil do aluno
                     </button>
                     <button
                       type="button"
