@@ -184,7 +184,7 @@ export function AtendimentoLeadList({
                     ) : null}
                   </div>
 
-                  <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  <div className="mt-3 flex flex-col items-stretch gap-2">
                     <button
                       type="button"
                       onClick={(event) => {
