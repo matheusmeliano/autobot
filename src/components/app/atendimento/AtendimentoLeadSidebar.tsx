@@ -32,7 +32,7 @@ export function AtendimentoLeadSidebar({
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
-        <div className="text-sm font-semibold text-[var(--app-text-85)]">Perfil do Lead</div>
+        <div className="text-sm font-semibold text-[var(--app-text-85)]">Perfil do aluno</div>
         <div className="mt-4 grid gap-3">
           <Field label="Nome" value={lead.full_name} />
           <Field label="Telefone" value={lead.phone} />
