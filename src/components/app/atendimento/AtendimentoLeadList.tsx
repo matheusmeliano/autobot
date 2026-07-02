@@ -174,7 +174,7 @@ export function AtendimentoLeadList({
                         {lead.full_name || "Novo Lead"}
                       </div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
-                        {lead.phone || "Telefone ainda não informado"}
+                        {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
                       </div>
                     </div>
                     {unread > 0 ? (
