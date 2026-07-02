@@ -131,6 +131,24 @@ function countReferenceMonthPaidSchedules(params: {
   }).length;
 }
 
+function hasOpenOverdueSchedule(params: {
+  schedules: DebtorScheduleStatusRow[];
+  currentLocalDate: string;
+  scheduleTimeZone: string;
+}) {
+  return params.schedules.some((row) => {
+    const status = String(row.status ?? "").trim().toLowerCase();
+    if (!status || status === "pago" || status === "pausado") return false;
+
+    const timeZone = String(row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
+    if (isPaidSchedule(row, timeZone)) return false;
+    if (String(row.closed_at ?? "").trim()) return false;
+
+    const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
+    return Boolean(referenceLocalDate && referenceLocalDate < params.currentLocalDate);
+  });
+}
+
 function deriveReferenceMonthDebtorStatus(
   charges: DebtorChargeRow[],
   schedules: DebtorScheduleStatusRow[],
@@ -140,6 +158,16 @@ function deriveReferenceMonthDebtorStatus(
   const currentLocalDate = scheduleLocalDate(nowUtcIso, scheduleTimeZone);
   if (!currentLocalDate) return "agendado";
   const referenceYearMonth = currentLocalDate.slice(0, 7);
+
+  if (
+    hasOpenOverdueSchedule({
+      schedules,
+      currentLocalDate,
+      scheduleTimeZone,
+    })
+  ) {
+    return "atrasado";
+  }
 
   const referenceCharges = charges
     .filter((charge) => buildChargeLocalDate(charge))
