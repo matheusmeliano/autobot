@@ -88,8 +88,15 @@ export function AtendimentoClient() {
   const detailRequestIdRef = useRef(0);
   const messagesRequestIdRef = useRef(0);
 
+  function handleForbiddenResponse(res: Response) {
+    if (res.status !== 401 && res.status !== 403) return false;
+    window.location.replace("/login");
+    return true;
+  }
+
   const loadSummary = useCallback(async () => {
     const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
+    if (handleForbiddenResponse(res)) return;
     const json = await res.json().catch(() => null);
     if (json?.ok) {
       setSummary(json.summary as AtendimentoSummary);
@@ -103,6 +110,7 @@ export function AtendimentoClient() {
 
   const loadPublicLink = useCallback(async () => {
     const res = await fetch("/api/atendimento/link-publico", { cache: "no-store" });
+    if (handleForbiddenResponse(res)) return;
     const json = await res.json().catch(() => null);
     if (json?.ok) {
       setPublicUrl(String(json.link?.public_url ?? ""));
@@ -123,6 +131,10 @@ export function AtendimentoClient() {
       const params = new URLSearchParams();
       if (nextQuery.trim()) params.set("q", nextQuery.trim());
       const res = await fetch(`/api/atendimento/leads?${params.toString()}`, { cache: "no-store" });
+    if (handleForbiddenResponse(res)) {
+      if (!silent) setLoading(false);
+      return;
+    }
       const json = await res.json().catch(() => null);
       if (json?.ok && requestId === leadsRequestIdRef.current) {
         const nextLeads = (json.leads ?? []) as AtendimentoLeadListItem[];
@@ -165,6 +177,10 @@ export function AtendimentoClient() {
       const requestId = ++messagesRequestIdRef.current;
       if (options?.showLoading) setMessagesLoading(true);
       const messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
+      if (handleForbiddenResponse(messagesRes)) {
+        if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
+        return;
+      }
       const messagesJson = await messagesRes.json().catch(() => null);
       if (messagesJson?.ok && requestId === messagesRequestIdRef.current) {
         applyMessages((messagesJson.messages ?? []) as AtendimentoMessage[], mode);
@@ -183,6 +199,7 @@ export function AtendimentoClient() {
     async (leadId: string, options?: { skipMessages?: boolean; suppressNotFound?: boolean }) => {
       const requestId = ++detailRequestIdRef.current;
       const res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
+      if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         const errorMessage = String(json?.error ?? "Falha ao carregar detalhes do lead.");
@@ -404,6 +421,7 @@ export function AtendimentoClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         modalToast.error(json?.error ?? "Falha ao enviar mensagem.");
@@ -423,6 +441,7 @@ export function AtendimentoClient() {
     const res = await fetch(`/api/atendimento/leads/${lead.id}`, {
       method: "DELETE",
     });
+    if (handleForbiddenResponse(res)) return;
     const json = await res.json().catch(() => null);
     if (!json?.ok) {
       realtimeSuspendedRef.current = false;
