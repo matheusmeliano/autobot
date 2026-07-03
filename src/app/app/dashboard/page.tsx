@@ -133,6 +133,7 @@ export default async function DashboardPage() {
       .from("schedules")
       .select("created_at")
       .eq("user_id", userId)
+      .is("closed_at", null)
       .order("created_at", { ascending: true })
       .limit(5000),
     supabase.from("whatsapp_instances").select("status").maybeSingle(),
@@ -156,6 +157,7 @@ export default async function DashboardPage() {
         "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, charge:debtor_charges!schedules_charge_id_fkey(due_day, recurrence_month, recurrence_year), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
       )
       .eq("user_id", userId)
+      .is("closed_at", null)
       .limit(2000),
     supabase
       .from("schedules")
