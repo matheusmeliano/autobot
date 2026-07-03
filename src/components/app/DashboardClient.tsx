@@ -378,6 +378,17 @@ export function DashboardClient({
   const isConnected =
     stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
+  const visibleStats = hasCurrentMonthSchedules
+    ? stats
+    : {
+        ...stats,
+        clients: 0,
+        templates: 0,
+        activeSchedules: 0,
+        receivableMonthTotal: 0,
+        receivableMonthPaid: 0,
+        receivableMonthRemaining: 0,
+      };
   const operationMonthLabel = useMemo(() => {
     const month = new Intl.DateTimeFormat("pt-BR", {
       timeZone: effectiveTimeZone,
@@ -420,58 +431,49 @@ export function DashboardClient({
         </div>
       </motion.div>
 
-      {!hasCurrentMonthSchedules ? (
-        <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-5">
-          <div className="text-sm font-semibold">Sem agendamentos no mês atual</div>
-          <div className="mt-1 text-sm text-[var(--app-text-55)]">
-            O dashboard só exibe métricas e indicadores quando existir ao menos um agendamento no mês de operação atual.
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="mt-0 grid gap-4 min-[1201px]:mt-6 min-[1201px]:grid-cols-3">
-            <Card
-              title="Total a receber (mês)"
-              value={brl(stats.receivableMonthTotal)}
-              subtitle=""
-              icon={<Wallet className="h-5 w-5" />}
-            />
-            <Card
-              title="Já recebidos (mês)"
-              value={brl(stats.receivableMonthPaid)}
-              subtitle=""
-              icon={<Wallet className="h-5 w-5" />}
-            />
-            <Card
-              title="Falta receber (mês)"
-              value={brl(stats.receivableMonthRemaining)}
-              subtitle=""
-              icon={<Wallet className="h-5 w-5" />}
-            />
-          </div>
+      <div className="mt-0 grid gap-4 min-[1201px]:mt-6 min-[1201px]:grid-cols-3">
+        <Card
+          title="Total a receber (mês)"
+          value={brl(visibleStats.receivableMonthTotal)}
+          subtitle=""
+          icon={<Wallet className="h-5 w-5" />}
+        />
+        <Card
+          title="Já recebidos (mês)"
+          value={brl(visibleStats.receivableMonthPaid)}
+          subtitle=""
+          icon={<Wallet className="h-5 w-5" />}
+        />
+        <Card
+          title="Falta receber (mês)"
+          value={brl(visibleStats.receivableMonthRemaining)}
+          subtitle=""
+          icon={<Wallet className="h-5 w-5" />}
+        />
+      </div>
 
-          <div className="mt-4 grid gap-4 min-[1201px]:grid-cols-3">
-            <Card
-              title="Clientes"
-              value={String(stats.clients)}
-              subtitle=""
-              icon={<Users className="h-5 w-5" />}
-            />
-            <Card
-              title="Mensagens (template)"
-              value={String(stats.templates)}
-              subtitle=""
-              icon={<MessageSquareText className="h-5 w-5" />}
-            />
-            <Card
-              title="Agendamentos ativos"
-              value={String(stats.activeSchedules)}
-              subtitle=""
-              icon={<CalendarDays className="h-5 w-5" />}
-            />
-          </div>
+      <div className="mt-4 grid gap-4 min-[1201px]:grid-cols-3">
+        <Card
+          title="Clientes"
+          value={String(visibleStats.clients)}
+          subtitle=""
+          icon={<Users className="h-5 w-5" />}
+        />
+        <Card
+          title="Mensagens (template)"
+          value={String(visibleStats.templates)}
+          subtitle=""
+          icon={<MessageSquareText className="h-5 w-5" />}
+        />
+        <Card
+          title="Agendamentos ativos"
+          value={String(visibleStats.activeSchedules)}
+          subtitle=""
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
+      </div>
 
-          <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5">
+      <div className="mt-6 grid gap-4 min-[1201px]:grid-cols-5">
         <div className="flex h-full min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 min-[1201px]:col-span-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -601,9 +603,7 @@ export function DashboardClient({
             </div>
           ) : null}
         </div>
-          </div>
-        </>
-      )}
+      </div>
     </div>
   );
 }
