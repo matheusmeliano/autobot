@@ -1273,6 +1273,7 @@ export function SchedulesClient({
     if (!timePickerOpen) return;
     const onUpdate = () => {
       if (!timePickerTarget) return;
+      if (timePickerTarget.kind !== "extra") return;
       const idx = timePickerTarget.index;
       openTimePicker({
         target: timePickerTarget,
