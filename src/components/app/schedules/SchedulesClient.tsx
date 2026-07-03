@@ -864,6 +864,37 @@ export function SchedulesClient({
     }
     return occupied;
   }, [editing, effectiveTimeZone, rows, selectedDebtorId]);
+  const selectableDebtorIds = useMemo(() => {
+    const occupiedDatesByDebtor = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (editing && String(row.id ?? "") === String(editing.id ?? "")) continue;
+      const debtorId = String(row.debtor_id ?? "").trim();
+      if (!debtorId) continue;
+      const date = scheduleReferenceLocalDate(row, effectiveTimeZone);
+      if (!date) continue;
+      const current = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
+      current.add(date);
+      occupiedDatesByDebtor.set(debtorId, current);
+    }
+
+    const selectable = new Set<string>();
+    for (const debtor of debtors) {
+      const debtorId = String(debtor.id ?? "").trim();
+      if (!debtorId) continue;
+      const options = debtorReferenceDateOptions(debtor);
+      const occupied = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
+      const hasAvailableDate = options.some((option) => !occupied.has(option.value));
+      if (hasAvailableDate) {
+        selectable.add(debtorId);
+      }
+    }
+
+    if (editing?.debtor_id) {
+      selectable.add(String(editing.debtor_id));
+    }
+
+    return selectable;
+  }, [debtors, editing, effectiveTimeZone, rows]);
   const selectedDebtorReferenceOptions = useMemo(
     () =>
       debtorReferenceOptions.filter(
@@ -1767,7 +1798,11 @@ export function SchedulesClient({
                 >
                   <option value="">Selecione...</option>
                   {debtors.map((d) => (
-                    <option key={d.id} value={d.id}>
+                    <option
+                      key={d.id}
+                      value={d.id}
+                      disabled={!selectableDebtorIds.has(String(d.id ?? ""))}
+                    >
                       {d.nome}
                     </option>
                   ))}
