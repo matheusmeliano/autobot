@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardClient } from "@/components/app/DashboardClient";
 import { localDateInTimeZone } from "@/lib/recurrence";
 import { buildAgendaRows } from "@/lib/agendaRows";
+import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 
 function scheduleLocalMonthKey(value: string | null | undefined, timeZone: string) {
@@ -19,6 +20,17 @@ function chargeMonthKey(charge: { recurrence_month?: unknown; recurrence_year?: 
   const month = Number(charge.recurrence_month);
   if (!year || !month) return null;
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
+}
+
+function isPaidSchedule(row: {
+  status?: string | null;
+  payment_received_at?: string | null;
+  closed_at?: string | null;
+}) {
+  const status = String(row.status ?? "").trim().toLowerCase();
+  if (status === "pago") return true;
+  if (String(row.closed_at ?? "").trim()) return true;
+  return Boolean(String(row.payment_received_at ?? "").trim());
 }
 
 function activitySortTime(activity: {
@@ -164,102 +176,68 @@ export default async function DashboardPage() {
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const currentMonthKey = localDateInTimeZone(now.toISOString(), effectiveTimeZone).slice(0, 7);
-  const schedulesByDebtor = new Map<string, any[]>();
-
-  for (const schedule of schedules) {
-    const debtorId = String((schedule as any)?.debtor_id ?? "");
-    if (!debtorId) continue;
-    const list = schedulesByDebtor.get(debtorId) ?? [];
-    list.push(schedule);
-    schedulesByDebtor.set(debtorId, list);
-  }
 
   let receivableMonthTotal = 0;
   let receivableMonthPaid = 0;
 
+  const debtorsById = new Map<
+    string,
+    { valor: number | null; accumulate_open_monthly_charges?: boolean | null; charges: any[] }
+  >();
+  const chargeAmountById = new Map<string, number>();
   for (const debtor of (debtorsRes.data ?? []) as any[]) {
-    const debtorSchedules = schedulesByDebtor.get(String((debtor as any)?.id ?? "")) ?? [];
-    const hasCurrentMonthCharge = debtorSchedules.some((row) => {
-      const timeZone = String((row as any)?.schedule_timezone ?? "") || "America/Sao_Paulo";
-      const dueMonthKey = scheduleLocalMonthKey(
-        String((row as any)?.charge_due_at ?? "") || String((row as any)?.data_envio ?? "") || null,
-        timeZone,
-      );
-      const paymentMonthKey = scheduleLocalMonthKey(
-        String((row as any)?.payment_received_at ?? "") || null,
-        timeZone,
-      );
-      return dueMonthKey === currentMonthKey || paymentMonthKey === currentMonthKey;
+    const debtorId = String((debtor as any)?.id ?? "");
+    if (!debtorId) continue;
+    const charges = Array.isArray((debtor as any)?.debtor_charges) ? ((debtor as any).debtor_charges as any[]) : [];
+    debtorsById.set(debtorId, {
+      valor: typeof (debtor as any)?.valor === "number" && !Number.isNaN((debtor as any).valor) ? Number((debtor as any).valor) : null,
+      accumulate_open_monthly_charges: Boolean((debtor as any)?.accumulate_open_monthly_charges),
+      charges,
     });
+    for (const c of charges) {
+      const chargeId = String((c as any)?.id ?? "");
+      const amount = Number((c as any)?.amount) || 0;
+      if (chargeId && amount > 0) chargeAmountById.set(chargeId, amount);
+    }
+  }
 
-    if (!hasCurrentMonthCharge) continue;
+  for (const schedule of schedules) {
+    const closedAt = String((schedule as any)?.closed_at ?? "").trim();
+    if (closedAt) continue;
+    const debtorId = String((schedule as any)?.debtor_id ?? "");
+    if (!debtorId) continue;
 
-    const currentMonthCharges = Array.isArray((debtor as any)?.debtor_charges)
-      ? ((debtor as any).debtor_charges as any[]).filter((charge) => chargeMonthKey(charge) === currentMonthKey)
-      : [];
-    const currentMonthAmount = currentMonthCharges.reduce(
-      (sum, charge) => sum + (Number((charge as any)?.amount) || 0),
-      0,
+    const scheduleTimeZone = String((schedule as any)?.schedule_timezone ?? "") || effectiveTimeZone;
+    const dueMonthKey = scheduleLocalMonthKey(
+      String((schedule as any)?.charge_due_at ?? "") || String((schedule as any)?.data_envio ?? "") || null,
+      scheduleTimeZone,
     );
+    if (dueMonthKey !== currentMonthKey) continue;
 
-    const fallbackAmount =
-      currentMonthAmount > 0
-        ? currentMonthAmount
-        : typeof (debtor as any)?.valor === "number" && !Number.isNaN((debtor as any).valor)
-          ? Number((debtor as any).valor)
-          : 0;
+    const debtor = debtorsById.get(debtorId) ?? null;
+    const chargeId = String((schedule as any)?.charge_id ?? "");
+    const baseAmount =
+      (chargeId ? chargeAmountById.get(chargeId) ?? null : null) ??
+      (debtor?.valor ?? null);
+    if (baseAmount == null || baseAmount <= 0) continue;
 
-    if (fallbackAmount <= 0) continue;
+    const amount = getScheduleChargeAmount({
+      baseAmount,
+      accumulateOpenMonthlyCharges: debtor?.accumulate_open_monthly_charges ?? null,
+      recurrence: (schedule as any)?.recurrence ?? null,
+      status: (schedule as any)?.status ?? null,
+      closedAt: (schedule as any)?.closed_at ?? null,
+      chargeDueAt: (schedule as any)?.charge_due_at ?? null,
+      dataEnvio: (schedule as any)?.data_envio ?? null,
+      nowUtcIso: now.toISOString(),
+      timeZone: scheduleTimeZone,
+    });
+    if (amount == null || amount <= 0) continue;
 
-    let currentMonthPaidAmount = 0;
-    for (const charge of currentMonthCharges) {
-      const chargeId = String((charge as any)?.id ?? "");
-      if (!chargeId) continue;
-      const chargeAmount = Number((charge as any)?.amount) || 0;
-      if (chargeAmount <= 0) continue;
-      const chargePaid = debtorSchedules.some((row) => {
-        if (String((row as any)?.charge_id ?? "") !== chargeId) return false;
-        const timeZone = String((row as any)?.schedule_timezone ?? "") || effectiveTimeZone;
-        const paymentMonthKey = scheduleLocalMonthKey(
-          String((row as any)?.payment_received_at ?? "") || null,
-          timeZone,
-        );
-        if (paymentMonthKey === currentMonthKey) return true;
-
-        const dueMonthKey = scheduleLocalMonthKey(
-          String((row as any)?.charge_due_at ?? "") || String((row as any)?.data_envio ?? "") || null,
-          timeZone,
-        );
-        return String((row as any)?.status ?? "").trim().toLowerCase() === "pago" && dueMonthKey === currentMonthKey;
-      });
-      if (chargePaid) currentMonthPaidAmount += chargeAmount;
+    receivableMonthTotal += amount;
+    if (isPaidSchedule(schedule as any)) {
+      receivableMonthPaid += amount;
     }
-
-    if (!currentMonthCharges.length) {
-      const hasCurrentMonthPayment = debtorSchedules.some((row) => {
-        const timeZone = String((row as any)?.schedule_timezone ?? "") || effectiveTimeZone;
-        const paymentMonthKey = scheduleLocalMonthKey(
-          String((row as any)?.payment_received_at ?? "") || null,
-          timeZone,
-        );
-        if (paymentMonthKey === currentMonthKey) return true;
-
-        const dueMonthKey = scheduleLocalMonthKey(
-          String((row as any)?.charge_due_at ?? "") || String((row as any)?.data_envio ?? "") || null,
-          timeZone,
-        );
-        return String((row as any)?.status ?? "").trim().toLowerCase() === "pago" && dueMonthKey === currentMonthKey;
-      });
-
-      receivableMonthTotal += fallbackAmount;
-      if (hasCurrentMonthPayment) {
-        receivableMonthPaid += fallbackAmount;
-      }
-      continue;
-    }
-
-    receivableMonthTotal += fallbackAmount;
-    receivableMonthPaid += Math.min(fallbackAmount, currentMonthPaidAmount);
   }
 
   const receivableMonthRemaining = Math.max(0, receivableMonthTotal - receivableMonthPaid);
