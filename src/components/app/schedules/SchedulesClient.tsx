@@ -649,7 +649,11 @@ export function SchedulesClient({
   }
 
   const displayStatus = (row: ScheduleRow) => {
-    const scheduleUnavailable = Boolean((row as any).schedule_missing) || String(row.id ?? "").startsWith("charge:");
+    const sourceKind = String((row as any).source_kind ?? "").trim().toLowerCase();
+    const scheduleUnavailable =
+      sourceKind === "charge" ||
+      Boolean((row as any).schedule_missing) ||
+      String(row.id ?? "").startsWith("charge:");
     const hasReferenceMoment = Boolean(String(displayReferenceMoment(row) ?? "").trim());
     if (scheduleUnavailable || !hasReferenceMoment) {
       return {
@@ -695,7 +699,9 @@ export function SchedulesClient({
   };
 
   const renderActionButtons = (r: ScheduleRow, variant: "desktop" | "mobile") => {
-    const scheduleUnavailable = Boolean(r.schedule_missing) || String(r.id ?? "").startsWith("charge:");
+    const sourceKind = String((r as any).source_kind ?? "").trim().toLowerCase();
+    const scheduleUnavailable =
+      sourceKind === "charge" || Boolean(r.schedule_missing) || String(r.id ?? "").startsWith("charge:");
     const baseButtonClass =
       variant === "mobile"
         ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
