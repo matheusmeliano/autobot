@@ -742,7 +742,8 @@ export function SchedulesClient({
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id ||
-            visualStatus.label !== "Agendado" ||
+            visualStatus.label !== "Executado" ||
+            visualStatus.isPaid ||
             String(r.status ?? "") === "executando" ||
             (visualStatus.isCurrentMonth && String(r.status ?? "") === "suspeita_de_pagamento")
           }
