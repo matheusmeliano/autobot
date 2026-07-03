@@ -885,10 +885,12 @@ export function SchedulesClient({
   const selectableDebtorIds = useMemo(() => {
     const occupiedDatesByDebtor = new Map<string, Set<string>>();
     const occupiedChargeIdsByDebtor = new Map<string, Set<string>>();
+    const openSchedulesCountByDebtor = new Map<string, number>();
     for (const row of rows) {
       if (editing && String(row.id ?? "") === String(editing.id ?? "")) continue;
       const debtorId = String(row.debtor_id ?? "").trim();
       if (!debtorId) continue;
+      openSchedulesCountByDebtor.set(debtorId, (openSchedulesCountByDebtor.get(debtorId) ?? 0) + 1);
       const date = scheduleReferenceLocalDate(row, effectiveTimeZone);
       if (date) {
         const current = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
@@ -908,6 +910,9 @@ export function SchedulesClient({
       const debtorId = String(debtor.id ?? "").trim();
       if (!debtorId) continue;
       const options = debtorReferenceDateOptions(debtor);
+      if (!options.length) continue;
+      const openSchedulesCount = openSchedulesCountByDebtor.get(debtorId) ?? 0;
+      if (openSchedulesCount >= options.length) continue;
       const occupied = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
       const occupiedChargeIds = occupiedChargeIdsByDebtor.get(debtorId) ?? new Set<string>();
       const hasAvailableDate = options.some((option) =>
