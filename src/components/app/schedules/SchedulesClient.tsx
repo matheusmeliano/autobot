@@ -448,7 +448,6 @@ export function SchedulesClient({
   const [editing, setEditing] = useState<ScheduleRow | null>(null);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
-  const mainTimeInputRef = useRef<HTMLInputElement | null>(null);
   const recurrenceUntilInputRef = useRef<HTMLInputElement | null>(null);
   const [monthlyExtras, setMonthlyExtras] = useState<Array<{ date: string; time: string }>>([]);
   const extraDateInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -1245,10 +1244,6 @@ export function SchedulesClient({
     recurrenceUntilInputRef.current?.showPicker?.();
     recurrenceUntilInputRef.current?.focus();
   };
-  const openMainTimePicker = () => {
-    mainTimeInputRef.current?.showPicker?.();
-    mainTimeInputRef.current?.focus();
-  };
   const openTimePicker = (params: {
     target: { kind: "main" } | { kind: "extra"; index: number };
     inputEl: HTMLInputElement | null;
@@ -1734,18 +1729,7 @@ export function SchedulesClient({
                       ))}
                     </select>
                   ) : (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={openMainTimePicker}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          openMainTimePicker();
-                        }
-                      }}
-                      className="mt-2 flex h-[42px] cursor-pointer items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white outline-none focus:border-white/20"
-                    >
+                    <div className="mt-2 flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white">
                       {selectedDebtorReferenceDate ? (
                         localDateBR(selectedDebtorReferenceDate)
                       ) : (
@@ -1762,12 +1746,11 @@ export function SchedulesClient({
                     <input
                       type="time"
                       step={60}
-                      {...timeField}
-                      ref={(el) => {
-                        timeField.ref(el);
-                        mainTimeInputRef.current = el;
-                      }}
                       className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                      onClick={(e) => {
+                        e.currentTarget.showPicker?.();
+                      }}
+                      {...timeField}
                     />
                   </div>
                 </div>
