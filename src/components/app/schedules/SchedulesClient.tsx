@@ -1003,7 +1003,7 @@ export function SchedulesClient({
     setMonthlyExtras([]);
     const retryDefaults = normalizeDebtorRetryValues(debtorsById.get(String(row.debtor_id)) ?? null);
     const dt = getEditDateTime(row);
-    const debtorReferenceDate = debtorReferenceLocalDate(debtorsById.get(String(row.debtor_id)) ?? null);
+    const debtorReferenceDate = scheduleReferenceLocalDate(row, effectiveTimeZone);
     reset({
       id: row.id,
       debtor_id: row.debtor_id,

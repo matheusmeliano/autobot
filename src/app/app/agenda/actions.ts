@@ -425,6 +425,48 @@ async function resolveScheduleLocalDate(params: {
   };
 }
 
+async function ensureScheduleLocalDateAvailable(params: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  debtorId: string;
+  localDate: string;
+  defaultTimeZone: string;
+  excludeId?: string;
+}) {
+  let query = params.supabase
+    .from("schedules")
+    .select("id, charge_due_at, data_envio, schedule_timezone, closed_at")
+    .eq("debtor_id", params.debtorId)
+    .is("closed_at", null)
+    .limit(200);
+
+  if (params.excludeId) {
+    query = query.neq("id", params.excludeId);
+  }
+
+  const { data, error } = await query;
+  if (error) return { ok: false as const, error: error.message };
+
+  const conflict = (data ?? []).some((row: any) => {
+    const referenceMoment = String(row?.charge_due_at ?? row?.data_envio ?? "").trim();
+    if (!referenceMoment) return false;
+    const rowTimeZone = String(row?.schedule_timezone ?? "").trim() || params.defaultTimeZone;
+    try {
+      return localDateInTimeZone(referenceMoment, rowTimeZone) === params.localDate;
+    } catch {
+      return referenceMoment.slice(0, 10) === params.localDate;
+    }
+  });
+
+  if (conflict) {
+    return {
+      ok: false as const,
+      error: "Essa data do cliente já está em uso em outro agendamento.",
+    };
+  }
+
+  return { ok: true as const };
+}
+
 async function updateDebtorRetrySettings(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   debtorId: string,
@@ -518,6 +560,13 @@ export async function createScheduleAction(input: unknown) {
   });
   if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
   const scheduleLocalDate = scheduleLocalDateResult.localDate;
+  const dateAvailability = await ensureScheduleLocalDateAvailable({
+    supabase,
+    debtorId: parsed.data.debtor_id,
+    localDate: scheduleLocalDate,
+    defaultTimeZone: timeZone,
+  });
+  if (!dateAvailability.ok) return { ok: false, error: dateAvailability.error };
 
   const futureValidation = validateFutureScheduleDateTime({
     date: scheduleLocalDate,
@@ -627,6 +676,14 @@ export async function updateScheduleAction(input: unknown) {
   });
   if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
   const scheduleLocalDate = scheduleLocalDateResult.localDate;
+  const dateAvailability = await ensureScheduleLocalDateAvailable({
+    supabase,
+    debtorId: data.debtor_id,
+    localDate: scheduleLocalDate,
+    defaultTimeZone: timeZone,
+    excludeId: id,
+  });
+  if (!dateAvailability.ok) return { ok: false, error: dateAvailability.error };
 
   const futureValidation = validateFutureScheduleDateTime({
     date: scheduleLocalDate,
