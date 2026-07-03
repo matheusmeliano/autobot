@@ -5,8 +5,8 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 export type ReportStats = {
   totalSchedules: number;
   scheduled: number;
-  pending: number;
-  overdue: number;
+  executed: number;
+  unpaid: number;
   paid: number;
 };
 
@@ -41,15 +41,15 @@ export function ReportsClient({
           Visão geral
         </h1>
         <div className="mt-2 text-sm text-white/60">
-          Dados reais dos agendamentos cadastrados.
+          Dados reais em tempo real com a mesma base visível de `agendar`.
         </div>
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-5">
         <Card title="Total" value={String(stats.totalSchedules)} />
         <Card title="Agendados" value={String(stats.scheduled)} />
-        <Card title="Pendentes" value={String(stats.pending)} />
-        <Card title="Atrasados" value={String(stats.overdue)} />
+        <Card title="Executados" value={String(stats.executed)} />
+        <Card title="Não pagos" value={String(stats.unpaid)} />
         <Card title="Pagos" value={String(stats.paid)} />
       </div>
 

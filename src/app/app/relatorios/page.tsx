@@ -6,11 +6,19 @@ import {
   type ReportChartPoint,
   type ReportStats,
 } from "@/components/app/reports/ReportsClient";
+import { buildAgendaRows } from "@/lib/agendaRows";
+import {
+  listAllAgendarDebtors,
+  listAllAgendarScheduleRuns,
+  listAllAgendarSchedules,
+} from "@/lib/agendarData";
+import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
+import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 
 export default async function RelatoriosPage() {
   const supabase = await createSupabaseServerClient();
   const [{ data: profile }, { data: sub }] = await Promise.all([
-    supabase.from("profiles").select("plano").maybeSingle(),
+    supabase.from("profiles").select("plano, timezone").maybeSingle(),
     supabase
       .from("subscriptions")
       .select("plano, created_at")
@@ -30,36 +38,13 @@ export default async function RelatoriosPage() {
   start30.setHours(0, 0, 0, 0);
   const start30Iso = start30.toISOString();
 
-  const [totalRes, scheduledRes, pendingRes, overdueRes, paidRes, chartRes] =
-    await Promise.all([
-      supabase.from("schedules").select("id", { count: "exact", head: true }),
-      supabase
-        .from("schedules")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["agendado", "executando"]),
-      supabase
-        .from("schedules")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["pendente", "suspeita_de_pagamento"]),
-      supabase
-        .from("schedules")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "atrasado"),
-      supabase
-        .from("schedules")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["pago", "executado"]),
-      supabase.from("schedules").select("created_at").gte("created_at", start30Iso),
-    ]);
+  const [schedulesRes, scheduleRunsRes, debtorsRes] = await Promise.all([
+    listAllAgendarSchedules(supabase),
+    listAllAgendarScheduleRuns(supabase),
+    listAllAgendarDebtors(supabase),
+  ]);
 
-  if (
-    totalRes.error ||
-    scheduledRes.error ||
-    pendingRes.error ||
-    overdueRes.error ||
-    paidRes.error ||
-    chartRes.error
-  ) {
+  if (schedulesRes.error || scheduleRunsRes.error || debtorsRes.error) {
     return (
       <div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
@@ -73,12 +58,34 @@ export default async function RelatoriosPage() {
     );
   }
 
+  const latestExecutedRunBySchedule = new Map<string, string>();
+  for (const run of scheduleRunsRes.data ?? []) {
+    const scheduleId = String((run as any)?.schedule_id ?? "");
+    const scheduledFor = String((run as any)?.scheduled_for ?? "");
+    if (!scheduleId || !scheduledFor || latestExecutedRunBySchedule.has(scheduleId)) continue;
+    latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
+  }
+
+  const tzRaw = (profile as any)?.timezone;
+  const timeZone: BrazilTimeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : "America/Sao_Paulo";
+  const rows = buildAgendaRows({
+    debtors: (debtorsRes.data ?? []) as any[],
+    schedules: (schedulesRes.data ?? []) as any[],
+    latestExecutedRunBySchedule,
+    defaultTimeZone: timeZone,
+  });
+
+  const visualStatuses = rows.map((row) => deriveAgendarVisualStatus(row, timeZone));
   const stats: ReportStats = {
-    totalSchedules: totalRes.count ?? 0,
-    scheduled: scheduledRes.count ?? 0,
-    pending: pendingRes.count ?? 0,
-    overdue: overdueRes.count ?? 0,
-    paid: paidRes.count ?? 0,
+    totalSchedules: rows.length,
+    scheduled: visualStatuses.filter((status) => status.label === "Agendado").length,
+    executed: visualStatuses.filter((status) => status.label === "Executado").length,
+    unpaid: visualStatuses.filter(
+      (status) => status.label === "Executado" && status.subtitle === "Não pago",
+    ).length,
+    paid: visualStatuses.filter(
+      (status) => status.label === "Executado" && status.subtitle === "Pago",
+    ).length,
   };
 
   const days = Array.from({ length: 30 }).map((_, i) => {
@@ -91,10 +98,10 @@ export default async function RelatoriosPage() {
     };
   });
 
-  const chartRows = (chartRes.data ?? []) as Array<{ created_at: string }>;
+  const chartRows = rows.filter((row) => String(row.created_at ?? "").trim() >= start30Iso);
   const chart: ReportChartPoint[] = days.map((d) => ({
     name: d.name,
-    value: chartRows.filter((r) => r.created_at.slice(0, 10) === d.key).length,
+    value: chartRows.filter((row) => String(row.created_at ?? "").slice(0, 10) === d.key).length,
   }));
 
   return <ReportsClient stats={stats} chart={chart} />;

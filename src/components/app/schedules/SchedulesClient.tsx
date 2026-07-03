@@ -33,6 +33,11 @@ import {
   MAX_RETRY_ATTEMPTS_PER_DAY,
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
+import {
+  agendarYearMonthKey as yearMonthKey,
+  deriveAgendarVisualStatus,
+  getAgendarDisplayReferenceMoment,
+} from "@/lib/agendarStatus";
 
 type DebtorChargeOption = {
   id?: string | null;
@@ -160,22 +165,6 @@ function localDateBR(v: string) {
   const d = new Date(`${v}T00:00:00`);
   if (Number.isNaN(d.getTime())) return v;
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
-}
-
-function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "";
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(d);
-  const map: Record<string, string> = {};
-  for (const part of parts) {
-    if (part.type === "literal") continue;
-    map[part.type] = part.value;
-  }
-  return `${map.year}-${map.month}`;
 }
 
 function lastDayOfMonth(year: number, month1: number) {
@@ -644,37 +633,13 @@ export function SchedulesClient({
   };
 
   function displayReferenceMoment(row: ScheduleRow) {
-    const operationalMoment = String(row.operational_due_at ?? "").trim();
-    const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
-    const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
-    const operationalYearMonth = operationalMoment ? yearMonthKey(operationalMoment, effectiveTimeZone) : "";
-    const dueYearMonth = dueMoment ? yearMonthKey(dueMoment, effectiveTimeZone) : "";
-    const executedYearMonth = lastExecutedMoment ? yearMonthKey(lastExecutedMoment, effectiveTimeZone) : "";
-
-    if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
-      return operationalMoment;
-    }
-
-    if (
-      executedYearMonth &&
-      executedYearMonth === operationalMonthKey &&
-      dueYearMonth !== operationalMonthKey
-    ) {
-      return lastExecutedMoment;
-    }
-
-    return dueMoment || lastExecutedMoment;
+    return getAgendarDisplayReferenceMoment(row, effectiveTimeZone, operationalMonthKey);
   }
 
   const displayStatus = (row: ScheduleRow) => {
-    const sourceKind = String((row as any).source_kind ?? "").trim().toLowerCase();
-    const scheduleUnavailable =
-      sourceKind === "charge" ||
-      Boolean((row as any).schedule_missing) ||
-      String(row.id ?? "").startsWith("charge:");
-    const referenceMoment = String(displayReferenceMoment(row) ?? "").trim();
-    const hasReferenceMoment = Boolean(referenceMoment);
-    if (scheduleUnavailable || !hasReferenceMoment) {
+    const derived = deriveAgendarVisualStatus(row, effectiveTimeZone, operationalMonthKey);
+
+    if (derived.label === "-") {
       return {
         label: "-",
         subtitle: null as "Não pago" | "Pago" | null,
@@ -686,60 +651,29 @@ export function SchedulesClient({
         isCurrentMonth: false,
       };
     }
-    const referenceMonthKey = yearMonthKey(referenceMoment, effectiveTimeZone);
-    const currentCycleMoment = String(
-      row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "",
-    ).trim();
-    const currentCycleMonthKey = currentCycleMoment
-      ? yearMonthKey(currentCycleMoment, effectiveTimeZone)
-      : "";
-    const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
-    const lastExecutedMonthKey = lastExecutedMoment
-      ? yearMonthKey(lastExecutedMoment, effectiveTimeZone)
-      : "";
-    const paymentMoment = String(row.payment_received_at ?? "").trim();
-    const paymentMonthKey = paymentMoment ? yearMonthKey(paymentMoment, effectiveTimeZone) : "";
-    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
-    const isCurrentMonth = referenceMonthKey === operationalMonthKey;
-    const isExecuted =
-      Boolean(referenceMonthKey) &&
-      ((Boolean(lastExecutedMoment) && lastExecutedMonthKey === referenceMonthKey) ||
-        normalizedStatus === "executado" ||
-        normalizedStatus === "pago" ||
-        (Boolean(paymentMoment) && paymentMonthKey === referenceMonthKey));
-    const isPaid =
-      Boolean(referenceMonthKey) &&
-      ((Boolean(paymentMoment) && paymentMonthKey === referenceMonthKey) ||
-        (normalizedStatus === "pago" && isCurrentMonth) ||
-        (isCurrentMonth &&
-          normalizedStatus === "agendado" &&
-          Boolean(lastExecutedMoment) &&
-          lastExecutedMonthKey === operationalMonthKey &&
-          Boolean(currentCycleMonthKey) &&
-          currentCycleMonthKey !== operationalMonthKey));
 
-    if (!isCurrentMonth || !isExecuted) {
+    if (derived.label === "Agendado") {
       return {
         label: "Agendado",
         subtitle: null as "Não pago" | "Pago" | null,
         className: scheduleStatusClass("pendente", theme),
         isExecuted: false,
         isPaid: false,
-        referenceMoment: isCurrentMonth ? referenceMoment : null,
-        referenceMonthKey,
-        isCurrentMonth,
+        referenceMoment: derived.referenceMoment,
+        referenceMonthKey: derived.referenceMonthKey,
+        isCurrentMonth: derived.isCurrentMonth,
       };
     }
 
     return {
       label: "Executado",
-      subtitle: isPaid ? "Pago" : "Não pago",
+      subtitle: derived.subtitle,
       className: scheduleStatusClass("executado", theme),
       isExecuted: true,
-      isPaid,
-      referenceMoment,
-      referenceMonthKey,
-      isCurrentMonth,
+      isPaid: derived.isPaid,
+      referenceMoment: derived.referenceMoment,
+      referenceMonthKey: derived.referenceMonthKey,
+      isCurrentMonth: derived.isCurrentMonth,
     };
   };
 
