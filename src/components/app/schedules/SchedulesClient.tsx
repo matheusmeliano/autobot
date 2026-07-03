@@ -259,6 +259,17 @@ function debtorReferenceDateOptions(debtor: DebtorOption | null | undefined) {
   return Array.from(uniqueOptions.values());
 }
 
+function scheduleReferenceLocalDate(row: ScheduleRow, fallbackTimeZone: BrazilTimeZone) {
+  const referenceMoment = String(row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "").trim();
+  if (!referenceMoment) return "";
+  const rowTimeZone = (String(row.schedule_timezone ?? "").trim() || fallbackTimeZone) as BrazilTimeZone;
+  try {
+    return localDateInTimeZone(referenceMoment, rowTimeZone);
+  } catch {
+    return normalizeDateOnly(referenceMoment);
+  }
+}
+
 function monthDistance(fromYearMonth: string, toYearMonth: string) {
   const [fromYear, fromMonth] = fromYearMonth.split("-").map(Number);
   const [toYear, toMonth] = toYearMonth.split("-").map(Number);
@@ -838,10 +849,30 @@ export function SchedulesClient({
     () => debtorsById.get(String(selectedDebtorId ?? "")) ?? null,
     [debtorsById, selectedDebtorId],
   );
+  const debtorReferenceOptions = useMemo(() => debtorReferenceDateOptions(selectedDebtor), [selectedDebtor]);
+  const editingReferenceDate = useMemo(() => {
+    if (!editing) return "";
+    return scheduleReferenceLocalDate(editing, effectiveTimeZone);
+  }, [editing, effectiveTimeZone]);
+  const occupiedDebtorReferenceDates = useMemo(() => {
+    const occupied = new Set<string>();
+    for (const row of rows) {
+      if (String(row.debtor_id ?? "") !== String(selectedDebtorId ?? "")) continue;
+      if (editing && String(row.id ?? "") === String(editing.id ?? "")) continue;
+      const date = scheduleReferenceLocalDate(row, effectiveTimeZone);
+      if (date) occupied.add(date);
+    }
+    return occupied;
+  }, [editing, effectiveTimeZone, rows, selectedDebtorId]);
   const selectedDebtorReferenceOptions = useMemo(
-    () => debtorReferenceDateOptions(selectedDebtor),
-    [selectedDebtor],
+    () =>
+      debtorReferenceOptions.filter(
+        (option) => !occupiedDebtorReferenceDates.has(option.value) || option.value === editingReferenceDate,
+      ),
+    [debtorReferenceOptions, editingReferenceDate, occupiedDebtorReferenceDates],
   );
+  const noAvailableReferenceDates =
+    debtorReferenceOptions.length > 0 && selectedDebtorReferenceOptions.length === 0;
   const selectedDebtorReferenceDate = useMemo(() => {
     const currentDate = normalizeDateOnly(scheduleDateValue);
     if (currentDate && selectedDebtorReferenceOptions.some((option) => option.value === currentDate)) {
@@ -1022,7 +1053,11 @@ export function SchedulesClient({
       return;
     }
     if (!selectedDebtorReferenceDate) {
-      modalToast.warning("Esse cliente não possui data cadastrada para o agendamento.");
+      modalToast.warning(
+        noAvailableReferenceDates
+          ? "Todas as datas desse cliente já estão em uso em Agendar."
+          : "Esse cliente não possui data cadastrada para o agendamento.",
+      );
       return;
     }
     if (!values.data_envio_time) {
@@ -1816,7 +1851,11 @@ export function SchedulesClient({
                       {selectedDebtorReferenceDate ? (
                         localDateBR(selectedDebtorReferenceDate)
                       ) : (
-                        <span className="text-white/45">Selecione um cliente com data cadastrada.</span>
+                        <span className="text-white/45">
+                          {noAvailableReferenceDates
+                            ? "Todas as datas deste cliente já estão em uso."
+                            : "Selecione um cliente com data cadastrada."}
+                        </span>
                       )}
                     </div>
                   )}
