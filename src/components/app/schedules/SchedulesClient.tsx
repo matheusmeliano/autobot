@@ -1657,9 +1657,6 @@ export function SchedulesClient({
               <div className="grid gap-3">
                 <div>
                   <div className="text-xs font-semibold text-white/60">Template Agendado</div>
-                  <div className="mt-1 text-[11px] text-white/45">
-                    Utilizado no primeiro envio da cobrança.
-                  </div>
                   <select
                     className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                     {...register("template_pending_id")}
@@ -1674,9 +1671,6 @@ export function SchedulesClient({
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-white/60">Template Atrasado</div>
-                  <div className="mt-1 text-[11px] text-white/45">
-                    Utilizado em todas as tentativas após o vencimento.
-                  </div>
                   <select
                     className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                     {...register("template_overdue_id")}
@@ -1903,9 +1897,6 @@ export function SchedulesClient({
                 <div className="text-xs font-semibold text-white/70">
                   Reenvio de cobrança em atraso
                 </div>
-                <div className="mt-1 text-[11px] text-white/45">
-                  Define em quais dias, horários e quantos envios podem acontecer no mesmo dia para cobranças não pagas.
-                </div>
 
                 <div className="mt-4">
                   <div className="text-xs font-semibold text-white/60">Dias permitidos</div>
@@ -1967,9 +1958,6 @@ export function SchedulesClient({
                       className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
                       {...register("retry_max_attempts", { valueAsNumber: true })}
                     />
-                    <div className="mt-2 text-[11px] text-white/45">
-                      Distribui automaticamente as demais cobranças ao longo do mesmo dia.
-                    </div>
                   </div>
                   <input type="hidden" {...register("retry_interval_days", { valueAsNumber: true })} />
                 </div>
