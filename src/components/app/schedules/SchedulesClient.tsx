@@ -1871,15 +1871,7 @@ export function SchedulesClient({
                   ) : null}
 
                   <div className="mt-4">
-                    <div className="text-xs font-semibold text-white/60">
-                      {isYearlyRecurrence ? "Data final da recorrência anual" : "Data final da recorrência"}
-                    </div>
-                    <div className="mt-1 text-[11px] text-white/45">
-                      {isYearlyRecurrence
-                        ? `Se deixar em branco, o sistema usa automaticamente o limite máximo de ${MAX_YEARLY_RECURRENCE_OCCURRENCES} cobranças anuais.`
-                        : "Opcional. Se deixar em branco, a recorrência mensal continua sem data final."}
-                      {recurrenceUntilMax ? ` Data máxima: ${recurrenceUntilMax}.` : ""}
-                    </div>
+                    <div className="text-xs font-semibold text-white/60">Encerrar em</div>
                     <div className="relative mt-2">
                       <input
                         type="date"
