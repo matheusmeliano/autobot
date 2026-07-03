@@ -1299,7 +1299,7 @@ export async function markSchedulePaidAction(id: string) {
   if (loaded.visualStatus.isPaid) {
     return { ok: false, error: "Esse agendamento já foi marcado como pago." };
   }
-  if (loaded.visualStatus.label !== "Executado") {
+  if (loaded.visualStatus.label !== "Agendado") {
     return {
       ok: false,
       error: "Esse agendamento não pode ser marcado manualmente como pago nesse status.",

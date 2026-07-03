@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarDays, MessageSquareText, Users, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { localDateInTimeZone } from "@/lib/recurrence";
+import { deriveAgendarVisualStatus, getAgendarDisplayReferenceMoment } from "@/lib/agendarStatus";
 import { type BrazilTimeZone } from "@/lib/timezone";
 
 type StatPack = {
@@ -240,51 +240,11 @@ function brl(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
-function statusToLabel(status: string) {
-  const s = status.trim().toLowerCase();
-  if (s === "agendado") return "Agendado";
-  if (s === "pendente") return "Agendado";
-  if (s === "suspeita_de_pagamento") return "Agendado";
-  if (s === "pausado") return "Pausado";
-  if (s === "executado") return "Executado";
-  if (s === "cancelado") return "Cancelado";
-  if (s === "pago") return "Executado";
-  if (s === "atrasado") return "Atrasado";
-  return status;
-}
-
 function statusBadgeClassName(status: string) {
   const s = status.trim().toLowerCase();
   if (s === "executado" || s === "pago") return "bg-emerald-600 text-[rgb(255,255,255)]";
   if (s === "atrasado" || s === "cancelado") return "bg-rose-600 text-[rgb(255,255,255)]";
   return "bg-yellow-600 text-[rgb(255,255,255)]";
-}
-
-function normalizeActivityStatus(status: string) {
-  const s = status.trim().toLowerCase();
-  if (s === "executado" || s === "pago") return "Executado";
-  if (s === "atrasado") return "Atrasado";
-  if (s === "cancelado") return "Cancelado";
-  if (s === "pausado") return "Pausado";
-  return "Agendado";
-}
-
-function hasExecutedCurrentInstance(activity: ActivityRow) {
-  const normalizedStatus = String(activity.status ?? "").trim().toLowerCase();
-  if (normalizedStatus === "executado" || normalizedStatus === "pago") return true;
-  if (String(activity.paymentReceivedAt ?? "").trim()) return true;
-
-  const lastExecutedAt = String(activity.lastExecutedScheduledFor ?? "").trim();
-  const scheduledFor = String(activity.dataEnvio ?? "").trim();
-  if (lastExecutedAt && scheduledFor) {
-    const executedMs = new Date(lastExecutedAt).getTime();
-    const scheduledMs = new Date(scheduledFor).getTime();
-    if (!Number.isNaN(executedMs) && !Number.isNaN(scheduledMs) && executedMs === scheduledMs) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
@@ -304,34 +264,34 @@ function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
 }
 
 function getActivityReferenceMoment(activity: ActivityRow, timeZone: BrazilTimeZone) {
-  const operationalMoment = String(activity.operationalDueAt ?? "").trim();
-  const dueMoment = String(activity.chargeDueAt ?? activity.dataEnvio ?? "").trim();
-  const lastExecutedMoment = String(activity.lastExecutedScheduledFor ?? "").trim();
-  const operationalMonthKey = yearMonthKey(new Date().toISOString(), timeZone);
-  const dueYearMonth = dueMoment ? yearMonthKey(dueMoment, timeZone) : "";
-  const executedYearMonth = lastExecutedMoment ? yearMonthKey(lastExecutedMoment, timeZone) : "";
-  const operationalYearMonth = operationalMoment ? yearMonthKey(operationalMoment, timeZone) : "";
-
-  if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
-    return operationalMoment;
-  }
-  if (
-    executedYearMonth &&
-    executedYearMonth === operationalMonthKey &&
-    dueYearMonth !== operationalMonthKey
-  ) {
-    return lastExecutedMoment;
-  }
-  return dueMoment || lastExecutedMoment;
+  return getAgendarDisplayReferenceMoment(
+    {
+      status: activity.status,
+      data_envio: activity.dataEnvio,
+      charge_due_at: activity.chargeDueAt,
+      operational_due_at: activity.operationalDueAt,
+      payment_received_at: activity.paymentReceivedAt,
+      last_executed_scheduled_for: activity.lastExecutedScheduledFor,
+    },
+    timeZone,
+    yearMonthKey(new Date().toISOString(), timeZone),
+  );
 }
 
 function getActivityVisualStatus(activity: ActivityRow, timeZone: BrazilTimeZone) {
-  const operationalMonthKey = yearMonthKey(new Date().toISOString(), timeZone);
-  const isExecuted =
-    hasExecutedCurrentInstance(activity) ||
-    (Boolean(String(activity.lastExecutedScheduledFor ?? "").trim()) &&
-      yearMonthKey(String(activity.lastExecutedScheduledFor), timeZone) === operationalMonthKey);
-  const label = isExecuted ? "Executado" : normalizeActivityStatus(String(activity.status ?? ""));
+  const visualStatus = deriveAgendarVisualStatus(
+    {
+      status: activity.status,
+      data_envio: activity.dataEnvio,
+      charge_due_at: activity.chargeDueAt,
+      operational_due_at: activity.operationalDueAt,
+      payment_received_at: activity.paymentReceivedAt,
+      last_executed_scheduled_for: activity.lastExecutedScheduledFor,
+    },
+    timeZone,
+    yearMonthKey(new Date().toISOString(), timeZone),
+  );
+  const label = visualStatus.label === "Executado" ? "Executado" : "Agendado";
   return { label, className: statusBadgeClassName(label) };
 }
 
@@ -378,7 +338,6 @@ export function DashboardClient({
     ? stats
     : {
         ...stats,
-        activeSchedules: 0,
         receivableMonthTotal: 0,
         receivableMonthPaid: 0,
         receivableMonthRemaining: 0,

@@ -2,35 +2,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardClient } from "@/components/app/DashboardClient";
 import { localDateInTimeZone } from "@/lib/recurrence";
 import { buildAgendaRows } from "@/lib/agendaRows";
+import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
-
-function scheduleLocalMonthKey(value: string | null | undefined, timeZone: string) {
-  const iso = String(value ?? "").trim();
-  if (!iso) return null;
-  try {
-    return localDateInTimeZone(iso, timeZone).slice(0, 7);
-  } catch {
-    return null;
-  }
-}
-
-function chargeMonthKey(charge: { recurrence_month?: unknown; recurrence_year?: unknown }) {
-  const year = Number(charge.recurrence_year);
-  const month = Number(charge.recurrence_month);
-  if (!year || !month) return null;
-  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
-}
-
-function isPaidSchedule(row: {
-  status?: string | null;
-  payment_received_at?: string | null;
-  closed_at?: string | null;
-}) {
-  const status = String(row.status ?? "").trim().toLowerCase();
-  if (status === "pago") return true;
-  return Boolean(String(row.payment_received_at ?? "").trim());
-}
 
 function activitySortTime(activity: {
   operationalDueAt?: string | null;
@@ -163,18 +137,27 @@ export default async function DashboardPage() {
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const currentMonthKey = localDateInTimeZone(now.toISOString(), effectiveTimeZone).slice(0, 7);
-  const currentMonthSchedules = schedules.filter((schedule) => {
-    const scheduleTimeZone = String((schedule as any)?.schedule_timezone ?? "") || effectiveTimeZone;
-    const dueMonthKey = scheduleLocalMonthKey(
-      String((schedule as any)?.charge_due_at ?? "") || String((schedule as any)?.data_envio ?? "") || null,
-      scheduleTimeZone,
-    );
-    return dueMonthKey === currentMonthKey;
+  const agendaRows = buildAgendaRows({
+    debtors: (debtorsRes.data ?? []) as any[],
+    schedules,
+    latestExecutedRunBySchedule,
+    templates: (templatesRes.data ?? []) as any[],
+    defaultTimeZone: timeZone,
   });
-  const currentMonthVisibleSchedules = currentMonthSchedules.filter(
-    (schedule) => !String((schedule as any)?.closed_at ?? "").trim(),
+  const schedulesById = new Map<string, any>();
+  for (const schedule of schedules) {
+    const scheduleId = String((schedule as any)?.id ?? "");
+    if (!scheduleId) continue;
+    schedulesById.set(scheduleId, schedule);
+  }
+  const agendaRowsWithVisualStatus = agendaRows.map((row) => ({
+    row,
+    visualStatus: deriveAgendarVisualStatus(row, effectiveTimeZone, currentMonthKey),
+  }));
+  const currentMonthAgendaRows = agendaRowsWithVisualStatus.filter(
+    ({ visualStatus }) => visualStatus.isCurrentMonth && visualStatus.label !== "-",
   );
-  const hasCurrentMonthSchedules = currentMonthVisibleSchedules.length > 0;
+  const hasCurrentMonthSchedules = currentMonthAgendaRows.length > 0;
 
   let receivableMonthTotal = 0;
   let receivableMonthPaid = 0;
@@ -200,7 +183,9 @@ export default async function DashboardPage() {
     }
   }
 
-  for (const schedule of currentMonthVisibleSchedules) {
+  for (const { row, visualStatus } of currentMonthAgendaRows) {
+    const schedule = schedulesById.get(String(row.id ?? ""));
+    if (!schedule) continue;
     const debtorId = String((schedule as any)?.debtor_id ?? "");
     if (!debtorId) continue;
 
@@ -226,7 +211,7 @@ export default async function DashboardPage() {
     if (amount == null || amount <= 0) continue;
 
     receivableMonthTotal += amount;
-    if (isPaidSchedule(schedule as any)) {
+    if (visualStatus.isPaid) {
       receivableMonthPaid += amount;
     }
   }
@@ -236,12 +221,10 @@ export default async function DashboardPage() {
   const stats = {
     clients: (debtorsRes.data ?? []).length,
     templates: (templatesRes.data ?? []).length,
-    activeSchedules: currentMonthVisibleSchedules.filter((schedule) => {
-      const closedAt = String((schedule as any)?.closed_at ?? "").trim();
-      const status = String((schedule as any)?.status ?? "").trim().toLowerCase();
-      if (closedAt) return false;
-      return ["agendado", "pendente", "atrasado", "suspeita_de_pagamento", "executando"].includes(status);
-    }).length,
+    activeSchedules: agendaRowsWithVisualStatus.filter(
+      ({ visualStatus, row }) =>
+        visualStatus.label === "Agendado" || String(row.status ?? "").trim().toLowerCase() === "executando",
+    ).length,
     whatsappStatus: whatsappRes.data?.status ?? "disconnected",
     receivableMonthTotal,
     receivableMonthPaid,
@@ -249,17 +232,11 @@ export default async function DashboardPage() {
   };
 
   const chartDates = hasCurrentMonthSchedules
-    ? currentMonthVisibleSchedules.map((row) => String((row as any)?.created_at ?? "")).filter(Boolean)
+    ? currentMonthAgendaRows.map(({ row }) => String(row.created_at ?? "")).filter(Boolean)
     : [];
 
-  const activities = buildAgendaRows({
-    debtors: (debtorsRes.data ?? []) as any[],
-    schedules: currentMonthVisibleSchedules,
-    latestExecutedRunBySchedule,
-    templates: (templatesRes.data ?? []) as any[],
-    defaultTimeZone: timeZone,
-  })
-    .map((row) => ({
+  const activities = currentMonthAgendaRows
+    .map(({ row }) => ({
       id: String(row.id),
       debtorName: String(row.debtor_nome ?? "-"),
       status: String(row.status ?? ""),
