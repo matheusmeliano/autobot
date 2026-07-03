@@ -9,6 +9,8 @@ type DebtorScheduleStatusRow = {
   recurrence?: string | null;
   data_envio?: string | null;
   charge_due_at?: string | null;
+  first_sent_at?: string | null;
+  last_sent_at?: string | null;
   payment_received_at?: string | null;
   schedule_timezone?: string | null;
   closed_at?: string | null;
@@ -70,7 +72,10 @@ function buildChargeLocalDate(charge: DebtorChargeRow) {
 }
 
 function scheduleReferenceLocalDate(row: DebtorScheduleStatusRow, timeZone: string) {
-  return scheduleLocalDate(row.charge_due_at ?? row.data_envio ?? null, timeZone);
+  return scheduleLocalDate(
+    row.charge_due_at ?? row.first_sent_at ?? row.last_sent_at ?? row.data_envio ?? null,
+    timeZone,
+  );
 }
 
 function isPaidSchedule(row: DebtorScheduleStatusRow, timeZone: string) {
@@ -409,7 +414,9 @@ export async function syncDebtorChargeStatus(admin: any, userId: string, debtorI
   const [{ data: schedules }, { data: charges }] = await Promise.all([
     admin
       .from("schedules")
-      .select("charge_id, status, recurrence, data_envio, charge_due_at, payment_received_at, schedule_timezone, closed_at")
+      .select(
+        "charge_id, status, recurrence, data_envio, charge_due_at, first_sent_at, last_sent_at, payment_received_at, schedule_timezone, closed_at",
+      )
       .eq("user_id", userId)
       .eq("debtor_id", debtorId)
       .order("data_envio", { ascending: false })
