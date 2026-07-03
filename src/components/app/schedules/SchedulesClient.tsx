@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
-import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { Calendar, Check, Clock, Pencil, Send, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
@@ -455,9 +455,7 @@ export function SchedulesClient({
   const extraTimeAnchorRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const timePickerAnchorRef = useRef<HTMLDivElement | null>(null);
-  const mainTimeAnchorRef = useRef<HTMLDivElement | null>(null);
   const timePickerPanelRef = useRef<HTMLDivElement | null>(null);
-  const timeInputBoxRef = useRef<HTMLInputElement | null>(null);
   const [timePickerTarget, setTimePickerTarget] = useState<
     { kind: "main" } | { kind: "extra"; index: number } | null
   >(null);
@@ -833,8 +831,6 @@ export function SchedulesClient({
   const currentProjectedMonthlySchedulesCount = isMonthlyRecurrence
     ? baseMonthlySchedulesCount + monthlyExtras.length
     : 0;
-  const canAddMonthlyExtra =
-    isMonthlyRecurrence && currentProjectedMonthlySchedulesCount < MAX_MONTHLY_SCHEDULES_PER_DEBTOR;
   const recurrenceUntilMax = useMemo(
     () =>
       recurrenceLimitMaxDateFromLocalDate({
@@ -1277,14 +1273,6 @@ export function SchedulesClient({
     if (!timePickerOpen) return;
     const onUpdate = () => {
       if (!timePickerTarget) return;
-      if (timePickerTarget.kind === "main") {
-        openTimePicker({
-          target: timePickerTarget,
-          inputEl: timeInputBoxRef.current,
-          anchorEl: mainTimeAnchorRef.current,
-        });
-        return;
-      }
       const idx = timePickerTarget.index;
       openTimePicker({
         target: timePickerTarget,
@@ -1758,44 +1746,13 @@ export function SchedulesClient({
                   <div className="text-xs font-semibold text-white/60">
                     Hora
                   </div>
-                  <div className="relative mt-2" ref={mainTimeAnchorRef}>
-                    <input type="hidden" {...timeField} />
+                  <div className="relative mt-2">
                     <input
-                      type="text"
-                      readOnly
-                      value={timeValue || ""}
-                      placeholder="--:--"
-                      onFocus={() =>
-                        openTimePicker({
-                          target: { kind: "main" },
-                          inputEl: timeInputBoxRef.current,
-                          anchorEl: mainTimeAnchorRef.current,
-                        })
-                      }
-                      onClick={() =>
-                        openTimePicker({
-                          target: { kind: "main" },
-                          inputEl: timeInputBoxRef.current,
-                          anchorEl: mainTimeAnchorRef.current,
-                        })
-                      }
-                      ref={timeInputBoxRef}
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
+                      type="time"
+                      step={60}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                      {...timeField}
                     />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openTimePicker({
-                          target: { kind: "main" },
-                          inputEl: timeInputBoxRef.current,
-                          anchorEl: mainTimeAnchorRef.current,
-                        })
-                      }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
-                      aria-label="Selecionar hora"
-                    >
-                      <Clock className="h-4 w-4" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1804,33 +1761,6 @@ export function SchedulesClient({
                 <div className="mt-1">
                   {isMonthlyRecurrence ? (
                     <>
-                      <div className="mt-4 flex items-center justify-between gap-3">
-                        <div className="text-xs font-semibold text-white/60">Cobranças no mês</div>
-                        <button
-                          type="button"
-                          disabled={!canAddMonthlyExtra}
-                          onClick={() => {
-                            if (!canAddMonthlyExtra) {
-                              modalToast.info(
-                                `Esse cliente pode ter no máximo ${MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais no bloco "Cobranças no mês".`,
-                              );
-                              return;
-                            }
-                            setMonthlyExtras((prev) => [
-                              ...prev,
-                              { date: String(watch("data_envio_date") ?? ""), time: String(watch("data_envio_time") ?? "") },
-                            ]);
-                          }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/[0.06]"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Adicionar
-                        </button>
-                      </div>
-                      <div className="mt-1 text-[11px] text-white/45">
-                        Máximo de {MAX_MONTHLY_SCHEDULES_PER_DEBTOR} cobranças mensais.
-                      </div>
-
                       {monthlyExtras.length > 0 ? (
                         <div className="mt-3 grid gap-3">
                           {monthlyExtras.map((c, idx) => (
