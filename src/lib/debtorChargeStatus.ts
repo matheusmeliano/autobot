@@ -78,6 +78,22 @@ function scheduleReferenceLocalDate(row: DebtorScheduleStatusRow, timeZone: stri
   );
 }
 
+function rolledForwardReferenceYearMonth(row: DebtorScheduleStatusRow, timeZone: string) {
+  const status = String(row.status ?? "").trim().toLowerCase();
+  if (status !== "agendado") return null;
+
+  const nextReferenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
+  const lastSentLocalDate = scheduleLocalDate(row.last_sent_at ?? null, timeZone);
+  if (!nextReferenceLocalDate || !lastSentLocalDate) return null;
+
+  const nextReferenceYearMonth = nextReferenceLocalDate.slice(0, 7);
+  const lastSentYearMonth = lastSentLocalDate.slice(0, 7);
+  if (!nextReferenceYearMonth || !lastSentYearMonth) return null;
+  if (nextReferenceYearMonth <= lastSentYearMonth) return null;
+
+  return lastSentYearMonth;
+}
+
 function isPaidSchedule(row: DebtorScheduleStatusRow, timeZone: string) {
   const status = String(row.status ?? "").trim().toLowerCase();
   return (
@@ -85,6 +101,22 @@ function isPaidSchedule(row: DebtorScheduleStatusRow, timeZone: string) {
     Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone)) ||
     (status === "pago" && Boolean(scheduleLocalDate(row.closed_at ?? null, timeZone)))
   );
+}
+
+function isSchedulePaidForReferenceMonth(params: {
+  row: DebtorScheduleStatusRow;
+  referenceYearMonth: string;
+  scheduleTimeZone: string;
+}) {
+  const timeZone = String(params.row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
+  if (isPaidSchedule(params.row, timeZone)) {
+    const paymentLocalDate =
+      scheduleLocalDate(params.row.payment_received_at ?? null, timeZone) ??
+      scheduleLocalDate(params.row.closed_at ?? null, timeZone);
+    if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
+  }
+
+  return rolledForwardReferenceYearMonth(params.row, timeZone) === params.referenceYearMonth;
 }
 
 function getMatchingSchedulesForCharge(params: {
@@ -148,6 +180,19 @@ function getReferenceMonthSchedules(params: {
   });
 }
 
+function getReferenceMonthOperationalSchedules(params: {
+  schedules: DebtorScheduleStatusRow[];
+  referenceYearMonth: string;
+  scheduleTimeZone: string;
+}) {
+  return params.schedules.filter((row) => {
+    const timeZone = String(row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
+    const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
+    if (referenceLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
+    return rolledForwardReferenceYearMonth(row, timeZone) === params.referenceYearMonth;
+  });
+}
+
 function hasOpenOverdueSchedule(params: {
   schedules: DebtorScheduleStatusRow[];
   currentLocalDate: string;
@@ -186,73 +231,43 @@ function deriveReferenceMonthDebtorStatus(
     return "atrasado";
   }
 
-  const referenceCharges = charges
-    .filter((charge) => buildChargeLocalDate(charge))
-    .filter((charge) => {
-      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
-      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
-      return `${year}-${month}` === referenceYearMonth;
-    })
-    .sort(compareChargeOrder);
+  const referenceSchedules = getReferenceMonthOperationalSchedules({
+    schedules,
+    referenceYearMonth,
+    scheduleTimeZone,
+  });
+  if (!referenceSchedules.length) return "agendado";
 
-  if (!referenceCharges.length) {
-    const referenceSchedules = getReferenceMonthSchedules({
-      schedules,
+  const paidSchedulesInReferenceMonth = referenceSchedules.filter((row) =>
+    isSchedulePaidForReferenceMonth({
+      row,
       referenceYearMonth,
       scheduleTimeZone,
-    });
-    if (!referenceSchedules.length) return "agendado";
+    }),
+  ).length;
+  if (paidSchedulesInReferenceMonth >= referenceSchedules.length) return "pago";
 
-    const paidSchedulesInReferenceMonth = referenceSchedules.filter((row) => {
-      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
-      return isPaidSchedule(row, timeZone);
-    }).length;
-
-    if (paidSchedulesInReferenceMonth >= referenceSchedules.length) return "pago";
-
-    const hasReferenceMonthOverdue = referenceSchedules.some((row) => {
-      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
-      if (isPaidSchedule(row, timeZone)) return false;
-      if (String(row.closed_at ?? "").trim()) return false;
-      const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
-      return Boolean(referenceLocalDate && referenceLocalDate < currentLocalDate);
-    });
-
-    if (hasReferenceMonthOverdue) return "atrasado";
-    return "agendado";
-  }
-
-  let paidCount = 0;
-  let hasOverdue = false;
-  const usedScheduleIndexes = new Set<number>();
-
-  for (const charge of referenceCharges) {
-    const dueLocalDate = buildChargeLocalDate(charge);
-    if (!dueLocalDate) continue;
-
-    const matchingSchedules = getMatchingSchedulesForCharge({
-      charge,
-      schedules,
-      scheduleTimeZone,
-      usedScheduleIndexes,
-    });
-    const paid = matchingSchedules.some((row) => {
-      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
-      return isPaidSchedule(row, timeZone);
-    });
-
-    if (paid) {
-      paidCount += 1;
-      continue;
+  const hasReferenceMonthOverdue = referenceSchedules.some((row) => {
+    const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+    if (
+      isSchedulePaidForReferenceMonth({
+        row,
+        referenceYearMonth,
+        scheduleTimeZone,
+      })
+    ) {
+      return false;
     }
+    if (String(row.closed_at ?? "").trim()) return false;
+    const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
+    return Boolean(
+      referenceLocalDate &&
+        referenceLocalDate.slice(0, 7) === referenceYearMonth &&
+        referenceLocalDate < currentLocalDate,
+    );
+  });
 
-    if (dueLocalDate < currentLocalDate) {
-      hasOverdue = true;
-    }
-  }
-
-  if (paidCount >= referenceCharges.length) return "pago";
-  if (hasOverdue) return "atrasado";
+  if (hasReferenceMonthOverdue) return "atrasado";
   return "agendado";
 }
 
@@ -291,55 +306,21 @@ export function deriveReferenceMonthDebtorChargeProgress(
   if (!currentLocalDate) return { paid: 0, total: 0 };
   const referenceYearMonth = currentLocalDate.slice(0, 7);
 
-  const referenceChargeIds = charges
-    .filter((charge) => buildChargeLocalDate(charge))
-    .filter((charge) => {
-      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
-      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
-      return `${year}-${month}` === referenceYearMonth;
-    })
-    .sort(compareChargeOrder)
-    .map((charge) => String(charge.id ?? "").trim())
-    .filter(Boolean);
+  const referenceSchedules = getReferenceMonthOperationalSchedules({
+    schedules,
+    referenceYearMonth,
+    scheduleTimeZone,
+  });
+  if (!referenceSchedules.length) return { paid: 0, total: 0 };
 
-  if (!referenceChargeIds.length) {
-    const referenceSchedules = getReferenceMonthSchedules({
-      schedules,
+  const paid = referenceSchedules.filter((row) =>
+    isSchedulePaidForReferenceMonth({
+      row,
       referenceYearMonth,
       scheduleTimeZone,
-    });
-    if (!referenceSchedules.length) return { paid: 0, total: 0 };
-
-    const paidSchedulesInReferenceMonth = referenceSchedules.filter((row) => {
-      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
-      return isPaidSchedule(row, timeZone);
-    }).length;
-
-    return { paid: paidSchedulesInReferenceMonth, total: referenceSchedules.length };
-  }
-
-  const referenceCharges = charges
-    .filter((charge) => buildChargeLocalDate(charge))
-    .filter((charge) => {
-      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
-      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
-      return `${year}-${month}` === referenceYearMonth;
-    })
-    .sort(compareChargeOrder);
-  const usedScheduleIndexes = new Set<number>();
-  const paid = referenceCharges.filter((charge) => {
-    const matchingSchedules = getMatchingSchedulesForCharge({
-      charge,
-      schedules,
-      scheduleTimeZone,
-      usedScheduleIndexes,
-    });
-    return matchingSchedules.some((row) => {
-      const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
-      return isPaidSchedule(row, timeZone);
-    });
-  }).length;
-  return { paid, total: referenceChargeIds.length };
+    }),
+  ).length;
+  return { paid, total: referenceSchedules.length };
 }
 
 export function applyCurrentMonthDebtorStatuses<
@@ -367,11 +348,10 @@ export function applyCurrentMonthDebtorStatuses<
     ...debtor,
     status: (() => {
       const schedules = schedulesByDebtor.get(String(debtor.id)) ?? [];
-      const openSchedules = schedules.filter((row) => !String(row.closed_at ?? "").trim());
-      if (!openSchedules.length) return "-";
+      if (!schedules.length) return "-";
       return deriveReferenceMonthDebtorStatus(
         Array.isArray(debtor.charges) ? debtor.charges : [],
-        openSchedules,
+        schedules,
         params.nowUtcIso,
       );
     })(),
@@ -428,14 +408,12 @@ export async function syncDebtorChargeStatus(admin: any, userId: string, debtorI
       .limit(20),
   ]);
 
-  const openSchedules = ((schedules ?? []) as DebtorScheduleStatusRow[]).filter(
-    (row) => !String(row.closed_at ?? "").trim(),
-  );
-  const nextStatus = !openSchedules.length
+  const debtorSchedules = (schedules ?? []) as DebtorScheduleStatusRow[];
+  const nextStatus = !debtorSchedules.length
     ? "-"
     : deriveReferenceMonthDebtorStatus(
         (charges ?? []) as DebtorChargeRow[],
-        openSchedules,
+        debtorSchedules,
       );
 
   await admin
