@@ -1868,7 +1868,7 @@ export function SchedulesClient({
                     </>
                   ) : null}
 
-                  <div className="mt-3">
+                  <div>
                     <div className="text-xs font-semibold text-white/60">Encerrar em</div>
                     <div className="relative mt-2">
                       <input
