@@ -3,7 +3,7 @@ import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsC
 import Link from "next/link";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
 import { applyCurrentMonthDebtorStatuses, deriveReferenceMonthDebtorChargeProgress } from "@/lib/debtorChargeStatus";
-import { listAllClientesDebtors, listAllClientesSchedules } from "@/lib/clientesData";
+import { listAllClientesDebtors, listAllClientesScheduleRuns, listAllClientesSchedules } from "@/lib/clientesData";
 
 function compareCreatedAtDesc(a: { created_at?: string | null }, b: { created_at?: string | null }) {
   return new Date(String(b.created_at ?? "")).getTime() - new Date(String(a.created_at ?? "")).getTime();
@@ -11,13 +11,14 @@ function compareCreatedAtDesc(a: { created_at?: string | null }, b: { created_at
 
 export default async function ClientesPage() {
   const supabase = await createSupabaseServerClient();
-  const [{ data, error }, { data: profile }, { data: schedules, error: schedulesError }] = await Promise.all([
+  const [{ data, error }, { data: profile }, { data: schedules, error: schedulesError }, { data: scheduleRuns, error: scheduleRunsError }] = await Promise.all([
     listAllClientesDebtors(supabase),
     supabase.from("profiles").select("plano").maybeSingle(),
     listAllClientesSchedules(supabase),
+    listAllClientesScheduleRuns(supabase),
   ]);
 
-  if (error || schedulesError) {
+  if (error || schedulesError || scheduleRunsError) {
     return (
       <div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
@@ -53,8 +54,20 @@ export default async function ClientesPage() {
 
   const plan = normalizePlan((profile as any)?.plano) as PlanKey;
   const nowUtcIso = new Date().toISOString();
+  const latestExecutedRunBySchedule = new Map<string, string>();
+  for (const run of (scheduleRuns ?? []) as any[]) {
+    const scheduleId = String((run as any)?.schedule_id ?? "").trim();
+    const scheduledFor = String((run as any)?.scheduled_for ?? "").trim();
+    if (!scheduleId || !scheduledFor || latestExecutedRunBySchedule.has(scheduleId)) continue;
+    latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
+  }
+  const schedulesWithRuns = ((schedules ?? []) as any[]).map((schedule) => ({
+    ...schedule,
+    last_executed_scheduled_for:
+      latestExecutedRunBySchedule.get(String((schedule as any)?.id ?? "").trim()) ?? null,
+  }));
   const schedulesByDebtor = new Map<string, any[]>();
-  for (const s of (schedules ?? []) as any[]) {
+  for (const s of schedulesWithRuns) {
     const debtorId = String((s as any)?.debtor_id ?? "");
     if (!debtorId) continue;
     const list = schedulesByDebtor.get(debtorId) ?? [];
@@ -74,7 +87,7 @@ export default async function ClientesPage() {
         recurrence_year: typeof c?.recurrence_year === "number" ? c.recurrence_year : Number(c?.recurrence_year),
       })),
     })),
-    schedules: (schedules ?? []) as any[],
+    schedules: schedulesWithRuns as any[],
   });
 
   const rows = (rowsWithStatus as any[])

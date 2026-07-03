@@ -3,6 +3,7 @@ import { localDateInTimeZone } from "@/lib/recurrence";
 export type DebtorChargeStatus = "agendado" | "atrasado" | "pago";
 
 type DebtorScheduleStatusRow = {
+  id?: string | null;
   debtor_id?: string | null;
   charge_id?: string | null;
   status?: string | null;
@@ -14,6 +15,7 @@ type DebtorScheduleStatusRow = {
   payment_received_at?: string | null;
   schedule_timezone?: string | null;
   closed_at?: string | null;
+  last_executed_scheduled_for?: string | null;
 };
 
 type DebtorChargeRow = {
@@ -83,15 +85,15 @@ function rolledForwardReferenceYearMonth(row: DebtorScheduleStatusRow, timeZone:
   if (status !== "agendado") return null;
 
   const nextReferenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
-  const lastSentLocalDate = scheduleLocalDate(row.last_sent_at ?? null, timeZone);
-  if (!nextReferenceLocalDate || !lastSentLocalDate) return null;
+  const lastExecutedLocalDate = scheduleLocalDate(row.last_executed_scheduled_for ?? null, timeZone);
+  if (!nextReferenceLocalDate || !lastExecutedLocalDate) return null;
 
   const nextReferenceYearMonth = nextReferenceLocalDate.slice(0, 7);
-  const lastSentYearMonth = lastSentLocalDate.slice(0, 7);
-  if (!nextReferenceYearMonth || !lastSentYearMonth) return null;
-  if (nextReferenceYearMonth <= lastSentYearMonth) return null;
+  const lastExecutedYearMonth = lastExecutedLocalDate.slice(0, 7);
+  if (!nextReferenceYearMonth || !lastExecutedYearMonth) return null;
+  if (nextReferenceYearMonth <= lastExecutedYearMonth) return null;
 
-  return lastSentYearMonth;
+  return lastExecutedYearMonth;
 }
 
 function isPaidSchedule(row: DebtorScheduleStatusRow, timeZone: string) {
@@ -391,11 +393,11 @@ function normalizeDebtorChargeStatus(status: string) {
 }
 
 export async function syncDebtorChargeStatus(admin: any, userId: string, debtorId: string) {
-  const [{ data: schedules }, { data: charges }] = await Promise.all([
+  const [{ data: schedules }, { data: charges }, { data: scheduleRuns }] = await Promise.all([
     admin
       .from("schedules")
       .select(
-        "charge_id, status, recurrence, data_envio, charge_due_at, first_sent_at, last_sent_at, payment_received_at, schedule_timezone, closed_at",
+        "id, charge_id, status, recurrence, data_envio, charge_due_at, first_sent_at, last_sent_at, payment_received_at, schedule_timezone, closed_at",
       )
       .eq("user_id", userId)
       .eq("debtor_id", debtorId)
@@ -406,9 +408,27 @@ export async function syncDebtorChargeStatus(admin: any, userId: string, debtorI
       .select("id, due_day, recurrence_month, recurrence_year, created_at")
       .eq("debtor_id", debtorId)
       .limit(20),
+    admin
+      .from("schedule_runs")
+      .select("schedule_id, scheduled_for")
+      .eq("user_id", userId)
+      .eq("status", "executado")
+      .order("scheduled_for", { ascending: false })
+      .limit(400),
   ]);
 
-  const debtorSchedules = (schedules ?? []) as DebtorScheduleStatusRow[];
+  const latestExecutedRunBySchedule = new Map<string, string>();
+  for (const run of (scheduleRuns ?? []) as any[]) {
+    const scheduleId = String((run as any)?.schedule_id ?? "").trim();
+    const scheduledFor = String((run as any)?.scheduled_for ?? "").trim();
+    if (!scheduleId || !scheduledFor || latestExecutedRunBySchedule.has(scheduleId)) continue;
+    latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
+  }
+
+  const debtorSchedules = ((schedules ?? []) as DebtorScheduleStatusRow[]).map((row) => ({
+    ...row,
+    last_executed_scheduled_for: latestExecutedRunBySchedule.get(String(row.id ?? "").trim()) ?? null,
+  }));
   const nextStatus = !debtorSchedules.length
     ? "-"
     : deriveReferenceMonthDebtorStatus(
