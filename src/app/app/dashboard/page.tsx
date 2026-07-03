@@ -6,6 +6,16 @@ import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 
+function scheduleLocalMonthKey(value: string | null | undefined, timeZone: string) {
+  const iso = String(value ?? "").trim();
+  if (!iso) return null;
+  try {
+    return localDateInTimeZone(iso, timeZone).slice(0, 7);
+  } catch {
+    return null;
+  }
+}
+
 function activitySortTime(activity: {
   operationalDueAt?: string | null;
   chargeDueAt?: string | null;
