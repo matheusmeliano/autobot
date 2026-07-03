@@ -100,6 +100,10 @@ export function deriveAgendarVisualStatus(
   const currentCycleMonthKey = currentCycleMoment
     ? agendarYearMonthKey(currentCycleMoment, timeZone)
     : "";
+  const scheduledCycleMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
+  const scheduledCycleMonthKey = scheduledCycleMoment
+    ? agendarYearMonthKey(scheduledCycleMoment, timeZone)
+    : "";
   const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
   const lastExecutedMonthKey = lastExecutedMoment
     ? agendarYearMonthKey(lastExecutedMoment, timeZone)
@@ -122,8 +126,8 @@ export function deriveAgendarVisualStatus(
         normalizedStatus === "agendado" &&
         Boolean(lastExecutedMoment) &&
         lastExecutedMonthKey === operationalMonthKey &&
-        Boolean(currentCycleMonthKey) &&
-        currentCycleMonthKey !== operationalMonthKey));
+        ((Boolean(scheduledCycleMonthKey) && scheduledCycleMonthKey !== operationalMonthKey) ||
+          (Boolean(currentCycleMonthKey) && currentCycleMonthKey !== operationalMonthKey))));
 
   if (!isCurrentMonth || !isExecuted) {
     return {
