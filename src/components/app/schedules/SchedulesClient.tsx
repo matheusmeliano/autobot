@@ -765,7 +765,12 @@ export function SchedulesClient({
       <div className={variant === "mobile" ? "grid grid-cols-2 gap-2" : "flex flex-nowrap justify-end gap-2"}>
         <button
           onClick={() => openEdit(r)}
-          disabled={scheduleUnavailable || isPending || markingPaidId === r.id}
+          disabled={
+            scheduleUnavailable ||
+            isPending ||
+            markingPaidId === r.id ||
+            visualStatus.label !== "Agendado"
+          }
           className={baseButtonClass}
           title="Editar"
         >
