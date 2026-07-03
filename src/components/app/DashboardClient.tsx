@@ -382,8 +382,6 @@ export function DashboardClient({
     ? stats
     : {
         ...stats,
-        clients: 0,
-        templates: 0,
         activeSchedules: 0,
         receivableMonthTotal: 0,
         receivableMonthPaid: 0,
