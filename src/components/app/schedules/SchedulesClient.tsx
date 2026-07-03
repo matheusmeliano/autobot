@@ -1680,7 +1680,7 @@ export function SchedulesClient({
                   <div className="text-xs font-semibold text-white/60">
                     Data do cliente
                   </div>
-                  <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white">
+                  <div className="mt-2 flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white">
                     {selectedDebtorReferenceDate ? (
                       localDateBR(selectedDebtorReferenceDate)
                     ) : (
