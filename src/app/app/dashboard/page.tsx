@@ -161,6 +161,7 @@ export default async function DashboardPage() {
       .from("schedules")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
+      .is("closed_at", null)
       .in("status", ["agendado", "pendente", "atrasado", "suspeita_de_pagamento", "executando"]),
   ]);
 
