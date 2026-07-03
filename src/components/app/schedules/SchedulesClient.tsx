@@ -1656,7 +1656,7 @@ export function SchedulesClient({
 
               <div className="grid gap-3">
                 <div>
-                  <div className="text-xs font-semibold text-white/60">Template Pendente</div>
+                  <div className="text-xs font-semibold text-white/60">Template Agendado</div>
                   <div className="mt-1 text-[11px] text-white/45">
                     Utilizado no primeiro envio da cobrança.
                   </div>
