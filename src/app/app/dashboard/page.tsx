@@ -106,6 +106,7 @@ export default async function DashboardPage() {
         }}
         chartDates={[]}
         activities={[]}
+        hasCurrentMonthSchedules={false}
         timeZone={null}
       />
     );
@@ -115,26 +116,17 @@ export default async function DashboardPage() {
 
   const [
     templatesRes,
-    chartRes,
     whatsappRes,
     profileRes,
     scheduleRunsRes,
     debtorsRes,
     schedulesRes,
-    activeSchedulesRes,
   ] = await Promise.all([
     supabase
       .from("message_templates")
       .select("id, nome, created_at")
       .order("created_at", { ascending: true })
       .limit(200),
-    supabase
-      .from("schedules")
-      .select("created_at")
-      .eq("user_id", userId)
-      .is("closed_at", null)
-      .order("created_at", { ascending: true })
-      .limit(5000),
     supabase.from("whatsapp_instances").select("status").maybeSingle(),
     supabase.from("profiles").select("nome, timezone").eq("user_id", userId).maybeSingle(),
     supabase
@@ -157,12 +149,6 @@ export default async function DashboardPage() {
       )
       .eq("user_id", userId)
       .limit(2000),
-    supabase
-      .from("schedules")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .is("closed_at", null)
-      .in("status", ["agendado", "pendente", "atrasado", "suspeita_de_pagamento", "executando"]),
   ]);
 
   const schedules = (schedulesRes.data ?? []) as any[];
@@ -177,6 +163,15 @@ export default async function DashboardPage() {
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const currentMonthKey = localDateInTimeZone(now.toISOString(), effectiveTimeZone).slice(0, 7);
+  const currentMonthSchedules = schedules.filter((schedule) => {
+    const scheduleTimeZone = String((schedule as any)?.schedule_timezone ?? "") || effectiveTimeZone;
+    const dueMonthKey = scheduleLocalMonthKey(
+      String((schedule as any)?.charge_due_at ?? "") || String((schedule as any)?.data_envio ?? "") || null,
+      scheduleTimeZone,
+    );
+    return dueMonthKey === currentMonthKey;
+  });
+  const hasCurrentMonthSchedules = currentMonthSchedules.length > 0;
 
   let receivableMonthTotal = 0;
   let receivableMonthPaid = 0;
@@ -202,17 +197,11 @@ export default async function DashboardPage() {
     }
   }
 
-  for (const schedule of schedules) {
+  for (const schedule of currentMonthSchedules) {
     const debtorId = String((schedule as any)?.debtor_id ?? "");
     if (!debtorId) continue;
 
     const scheduleTimeZone = String((schedule as any)?.schedule_timezone ?? "") || effectiveTimeZone;
-    const dueMonthKey = scheduleLocalMonthKey(
-      String((schedule as any)?.charge_due_at ?? "") || String((schedule as any)?.data_envio ?? "") || null,
-      scheduleTimeZone,
-    );
-    if (dueMonthKey !== currentMonthKey) continue;
-
     const debtor = debtorsById.get(debtorId) ?? null;
     const chargeId = String((schedule as any)?.charge_id ?? "");
     const baseAmount =
@@ -244,20 +233,25 @@ export default async function DashboardPage() {
   const stats = {
     clients: (debtorsRes.data ?? []).length,
     templates: (templatesRes.data ?? []).length,
-    activeSchedules: activeSchedulesRes.count ?? 0,
+    activeSchedules: currentMonthSchedules.filter((schedule) => {
+      const closedAt = String((schedule as any)?.closed_at ?? "").trim();
+      const status = String((schedule as any)?.status ?? "").trim().toLowerCase();
+      if (closedAt) return false;
+      return ["agendado", "pendente", "atrasado", "suspeita_de_pagamento", "executando"].includes(status);
+    }).length,
     whatsappStatus: whatsappRes.data?.status ?? "disconnected",
     receivableMonthTotal,
     receivableMonthPaid,
     receivableMonthRemaining,
   };
 
-  const chartDates = ((chartRes.data ?? []) as Array<{ created_at: string }>).map((row) =>
-    String(row.created_at ?? ""),
-  );
+  const chartDates = hasCurrentMonthSchedules
+    ? currentMonthSchedules.map((row) => String((row as any)?.created_at ?? "")).filter(Boolean)
+    : [];
 
   const activities = buildAgendaRows({
     debtors: (debtorsRes.data ?? []) as any[],
-    schedules,
+    schedules: currentMonthSchedules,
     latestExecutedRunBySchedule,
     templates: (templatesRes.data ?? []) as any[],
     defaultTimeZone: timeZone,
@@ -292,6 +286,7 @@ export default async function DashboardPage() {
       stats={stats}
       chartDates={chartDates}
       activities={activities}
+      hasCurrentMonthSchedules={hasCurrentMonthSchedules}
       timeZone={timeZone}
     />
   );
