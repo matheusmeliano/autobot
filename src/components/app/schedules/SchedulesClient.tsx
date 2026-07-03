@@ -1729,7 +1729,11 @@ export function SchedulesClient({
                       ))}
                     </select>
                   ) : (
-                    <div className="mt-2 flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white">
+                    <div
+                      className="mt-2 flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {selectedDebtorReferenceDate ? (
                         localDateBR(selectedDebtorReferenceDate)
                       ) : (
