@@ -199,6 +199,20 @@ function currentMonthYear(baseDate: Date) {
   };
 }
 
+function resolveChargeRecurrenceFromDueDay(dueDay: number, baseDate: Date) {
+  const currentMonth = baseDate.getMonth() + 1;
+  const currentYear = baseDate.getFullYear();
+  const currentDay = baseDate.getDate();
+  if (!Number.isInteger(dueDay) || dueDay < 1) {
+    return { month: currentMonth, year: currentYear };
+  }
+  if (dueDay < currentDay) {
+    const next = nextMonthYear(baseDate);
+    return { month: Number(next.month), year: Number(next.year) };
+  }
+  return { month: currentMonth, year: currentYear };
+}
+
 function defaultChargeFormValue(day: string, baseDate: Date): ChargeFormValue {
   const current = currentMonthYear(baseDate);
   return {
@@ -556,7 +570,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
 
   const onSubmit = handleSubmit(async (values) => {
     const pixKey = values.pix_key ? normalizePixKeyForSave(values.pix_key) : null;
-    const currentRecurrenceKey = currentRecurrence.year * 100 + currentRecurrence.month;
     const mappedCharges: Array<{
       index: number;
       id?: string;
@@ -565,14 +578,18 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
       recurrenceMonth: number;
       recurrenceYear: number;
     }> = (values.charges ?? [])
-      .map((c, index) => ({
-        index,
-        id: c.charge_id,
-        amount: c.amount ? parseBRLToNumber(c.amount) : null,
-        dueDay: Number(String(c.due_day ?? "").trim()),
-        recurrenceMonth: currentRecurrence.month,
-        recurrenceYear: currentRecurrence.year,
-      }))
+      .map((c, index) => {
+        const dueDay = Number(String(c.due_day ?? "").trim());
+        const recurrence = resolveChargeRecurrenceFromDueDay(dueDay, currentDate);
+        return {
+          index,
+          id: c.charge_id,
+          amount: c.amount ? parseBRLToNumber(c.amount) : null,
+          dueDay,
+          recurrenceMonth: recurrence.month,
+          recurrenceYear: recurrence.year,
+        };
+      })
       .filter(
         (c) =>
           typeof c.amount === "number" &&
@@ -1018,6 +1035,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                                 {...register(`charges.${index}.due_day` as const)}
                               />
                             </div>
+                          </div>
+
+                          <div className="mt-3 text-[11px] text-white/45">
+                            Caso o dia configurado no mês atual já tenha passado, o sistema deverá
+                            considerar automaticamente o mesmo dia no mês seguinte.
                           </div>
 
                           {chargeFields.length > 1 ? (
