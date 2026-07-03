@@ -308,11 +308,41 @@ export function deriveReferenceMonthDebtorChargeProgress(
   if (!currentLocalDate) return { paid: 0, total: 0 };
   const referenceYearMonth = currentLocalDate.slice(0, 7);
 
+  const referenceCharges = charges
+    .filter((charge) => buildChargeLocalDate(charge))
+    .filter((charge) => {
+      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
+      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
+      return `${year}-${month}` === referenceYearMonth;
+    })
+    .sort(compareChargeOrder);
+
+  if (referenceCharges.length) {
+    const usedScheduleIndexes = new Set<number>();
+    const paid = referenceCharges.filter((charge) => {
+      const matchingSchedules = getMatchingSchedulesForCharge({
+        charge,
+        schedules,
+        scheduleTimeZone,
+        usedScheduleIndexes,
+      });
+      return matchingSchedules.some((row) =>
+        isSchedulePaidForReferenceMonth({
+          row,
+          referenceYearMonth,
+          scheduleTimeZone,
+        }),
+      );
+    }).length;
+
+    return { paid, total: referenceCharges.length };
+  }
+
   const referenceSchedules = getReferenceMonthOperationalSchedules({
     schedules,
     referenceYearMonth,
     scheduleTimeZone,
-  });
+  }).filter((row) => !String(row.closed_at ?? "").trim());
   if (!referenceSchedules.length) return { paid: 0, total: 0 };
 
   const paid = referenceSchedules.filter((row) =>
