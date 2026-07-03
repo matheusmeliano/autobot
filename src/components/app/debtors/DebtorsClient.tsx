@@ -986,6 +986,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       </button>
                     </div>
 
+                    <div className="mt-3 text-[11px] text-white/45">
+                      Caso o dia configurado no mês atual já tenha passado, o sistema deverá
+                      considerar automaticamente o mesmo dia no mês seguinte.
+                    </div>
+
                     <div className="mt-2 grid gap-3">
                       {chargeFields.map((field, index) => (
                         <div
@@ -1035,11 +1040,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                                 {...register(`charges.${index}.due_day` as const)}
                               />
                             </div>
-                          </div>
-
-                          <div className="mt-3 text-[11px] text-white/45">
-                            Caso o dia configurado no mês atual já tenha passado, o sistema deverá
-                            considerar automaticamente o mesmo dia no mês seguinte.
                           </div>
 
                           {chargeFields.length > 1 ? (
