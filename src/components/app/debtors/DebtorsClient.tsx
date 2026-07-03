@@ -1131,10 +1131,10 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     />
                     <div>
                       <div className="text-xs font-semibold text-white/75">
-                        Pular finais de semana na primeira cobrança
+                        Pular finais de semana
                       </div>
                       <div className="mt-1 text-[11px] text-white/45">
-                        Quando ativado, a primeira tentativa agendada para sábado ou domingo é movida automaticamente para o próximo dia útil. Reenvios e cobranças em atraso seguem a programação normal.
+                        Quando ativado, o bot evita cobranças aos sábados e domingos, movendo automaticamente o envio para o próximo dia útil sempre que necessario.
                       </div>
                     </div>
                   </label>
