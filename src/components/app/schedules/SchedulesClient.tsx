@@ -1750,8 +1750,10 @@ export function SchedulesClient({
                     <input
                       type="time"
                       step={60}
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                      disabled={!selectedDebtorReferenceDate}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:dark]"
                       onClick={(e) => {
+                        if (!selectedDebtorReferenceDate) return;
                         e.currentTarget.showPicker?.();
                       }}
                       {...timeField}
