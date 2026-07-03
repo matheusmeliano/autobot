@@ -1,6 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { markSchedulePaidAction } from "@/app/app/agenda/actions";
+import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { getResumeStatusAfterSuspicion } from "@/lib/chargeRetry";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
   if (decision === "confirm") {
     if (scheduleId) {
-      const paidRes = await markSchedulePaidAction(scheduleId);
+      const paidRes = await confirmExecutedSchedulePaymentForUser({ scheduleId, userId });
       if (!paidRes.ok) {
         return Response.json({ ok: false, error: paidRes.error ?? "Falha ao marcar pagamento." }, { status: 500 });
       }

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 export const runtime = "nodejs";
@@ -463,34 +464,67 @@ export async function POST(req: Request) {
     });
   }
 
+  const nowIso = new Date().toISOString();
+
   if (scheduleId) {
-    await admin.from("schedules").update({ status: "suspeita_de_pagamento" }).eq("id", scheduleId);
-    if (debtorId) {
-      await syncDebtorChargeStatus(admin, userId, debtorId);
+    const paymentRes = await confirmExecutedSchedulePaymentForUser({ scheduleId, userId });
+    if (!paymentRes.ok) {
+      return Response.json(
+        { ok: false, error: paymentRes.error ?? "Falha ao confirmar pagamento." },
+        { status: 500 },
+      );
     }
+
+    await admin.from("payment_suspicions").upsert(
+      {
+        user_id: userId,
+        schedule_id: scheduleId,
+        debtor_id: debtorId,
+        provider: "zapi",
+        event_id: eventId,
+        from_phone: normalizedFrom || fromPhone || null,
+        message_text: messageText || null,
+        media_url: mediaUrl || null,
+        ai_confidence: finalResult.confidence,
+        ai_reason: finalResult.reason || null,
+        ai_result: finalResult.raw,
+        status: "confirmed",
+        resolved_at: nowIso,
+      },
+      { onConflict: "provider,event_id" },
+    );
+
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "pagamento_confirmado",
+      descricao: `Pagamento confirmado automaticamente para o agendamento ${scheduleId}`,
+    });
+
+    return Response.json({ ok: true, analyzed: true, created: true, scheduleId, confirmed: true });
   }
 
-  await admin.from("payment_suspicions").insert({
-    user_id: userId,
-    schedule_id: scheduleId,
-    debtor_id: debtorId,
-    provider: "zapi",
-    event_id: eventId,
-    from_phone: normalizedFrom || fromPhone || null,
-    message_text: messageText || null,
-    media_url: mediaUrl || null,
-    ai_confidence: finalResult.confidence,
-    ai_reason: finalResult.reason || null,
-    ai_result: finalResult.raw,
-    status: "pending",
-  });
+  await admin.from("payment_suspicions").upsert(
+    {
+      user_id: userId,
+      schedule_id: scheduleId,
+      debtor_id: debtorId,
+      provider: "zapi",
+      event_id: eventId,
+      from_phone: normalizedFrom || fromPhone || null,
+      message_text: messageText || null,
+      media_url: mediaUrl || null,
+      ai_confidence: finalResult.confidence,
+      ai_reason: finalResult.reason || null,
+      ai_result: finalResult.raw,
+      status: "pending",
+    },
+    { onConflict: "provider,event_id" },
+  );
 
   await admin.from("logs").insert({
     user_id: userId,
     tipo: "pagamento_suspeito",
-    descricao: scheduleId
-      ? `Suspeita de pagamento detectada para o agendamento ${scheduleId}`
-      : "Suspeita de pagamento detectada (sem agendamento associado)",
+    descricao: "Suspeita de pagamento detectada (sem agendamento associado)",
   });
 
   return Response.json({ ok: true, analyzed: true, created: true, scheduleId });

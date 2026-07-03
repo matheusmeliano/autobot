@@ -742,7 +742,9 @@ export function SchedulesClient({
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id ||
-            visualStatus.isPaid
+            visualStatus.label !== "Agendado" ||
+            String(r.status ?? "") === "executando" ||
+            (visualStatus.isCurrentMonth && String(r.status ?? "") === "suspeita_de_pagamento")
           }
           className={baseButtonClass}
           title="Pagamento realizado"

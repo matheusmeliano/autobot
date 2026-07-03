@@ -24,6 +24,7 @@ import {
   shouldContinueRecurringRecurrence,
 } from "@/lib/recurrence";
 import { getScheduleChargeAmount, nextRecurringIsoAfterSettlement } from "@/lib/chargeAccumulation";
+import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 
 // #region debug-point extra-send-manual-bootstrap
@@ -163,6 +164,167 @@ async function ensureExecutedScheduleRun(params: {
   if (runError) {
     throw new Error(runError.message);
   }
+}
+
+async function loadScheduleWithVisualStatus(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  scheduleId: string;
+}) {
+  const { data: schedule, error } = await params.admin
+    .from("schedules")
+    .select(
+      "id, user_id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, last_sent_at, retry_attempts, payment_received_at, closed_at, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), charge:debtor_charges!schedules_charge_id_fkey(amount, due_day, recurrence_month, recurrence_year), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
+    )
+    .eq("id", params.scheduleId)
+    .maybeSingle();
+
+  if (error) return { ok: false as const, error: error.message };
+  if (!schedule?.id) return { ok: false as const, error: "Agendamento não encontrado." };
+
+  const { data: latestRun, error: latestRunError } = await params.admin
+    .from("schedule_runs")
+    .select("scheduled_for, executed_at")
+    .eq("schedule_id", params.scheduleId)
+    .eq("status", "executado")
+    .order("executed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestRunError) {
+    return { ok: false as const, error: latestRunError.message };
+  }
+
+  const timeZone = String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo";
+  const lastExecutedScheduledFor = String((latestRun as any)?.scheduled_for ?? "") || null;
+  const visualStatus = deriveAgendarVisualStatus(
+    {
+      ...(schedule as any),
+      last_executed_scheduled_for: lastExecutedScheduledFor,
+    },
+    timeZone as any,
+  );
+
+  return {
+    ok: true as const,
+    schedule,
+    timeZone,
+    visualStatus,
+    lastExecutedScheduledFor,
+  };
+}
+
+async function applySchedulePaymentSettlement(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  userId: string;
+  schedule: any;
+}) {
+  const recurrence = String((params.schedule as any).recurrence ?? "none");
+  const nowIso = new Date().toISOString();
+  const scheduledFor = String(
+    (params.schedule as any).data_envio ?? (params.schedule as any).charge_due_at ?? nowIso,
+  );
+
+  await ensureExecutedScheduleRun({
+    admin: params.admin,
+    userId: params.userId,
+    scheduleId: String((params.schedule as any).id),
+    scheduledFor,
+    executedAt: nowIso,
+  });
+
+  let updatePayload: Record<string, unknown>;
+  if (recurrence === "monthly" || recurrence === "yearly") {
+    const nextIsoBase = nextRecurringIsoAfterSettlement({
+      accumulateOpenMonthlyCharges: Boolean(
+        (params.schedule as any).debtors?.accumulate_open_monthly_charges,
+      ),
+      chargeDueAt: String((params.schedule as any).charge_due_at ?? "") || null,
+      dataEnvio: String((params.schedule as any).data_envio ?? "") || null,
+      nowUtcIso: nowIso,
+      timeZone: String((params.schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+      day: Number((params.schedule as any).recurrence_day ?? 1),
+      time: String((params.schedule as any).recurrence_time ?? "") || "00:00",
+      recurrence,
+      targetMonth: Number((params.schedule as any).charge?.recurrence_month ?? 0) || null,
+      targetYear: Number((params.schedule as any).charge?.recurrence_year ?? 0) || null,
+    });
+    const nextIso = shiftFirstChargeFromWeekendUtcIso({
+      utcIso: nextIsoBase,
+      timeZone: String((params.schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+      enabled: Boolean((params.schedule as any).debtors?.skip_weekends_on_first_charge),
+    });
+    const shouldContinue = shouldContinueRecurringRecurrence({
+      nextUtcIso: nextIso,
+      recurrenceUntil: String((params.schedule as any).recurrence_until ?? "") || null,
+      timeZone: String((params.schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+    });
+    updatePayload = shouldContinue
+      ? {
+          status: "agendado",
+          data_envio: nextIso,
+          charge_due_at: nextIso,
+          first_sent_at: null,
+          last_sent_at: null,
+          retry_attempts: 0,
+          closed_at: null,
+          payment_received_at: null,
+        }
+      : {
+          status: "executado",
+          payment_received_at: nowIso,
+          closed_at: nowIso,
+        };
+  } else {
+    updatePayload = {
+      status: "executado",
+      payment_received_at: nowIso,
+      closed_at: nowIso,
+    };
+  }
+
+  const { error: updateError } = await params.admin
+    .from("schedules")
+    .update(updatePayload)
+    .eq("id", String((params.schedule as any).id));
+  if (updateError) return { ok: false as const, error: updateError.message };
+
+  await syncDebtorChargeStatus(
+    params.admin,
+    params.userId,
+    String((params.schedule as any).debtor_id ?? ""),
+  );
+
+  return { ok: true as const };
+}
+
+export async function confirmExecutedSchedulePaymentForUser(params: {
+  scheduleId: string;
+  userId: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const loaded = await loadScheduleWithVisualStatus({
+    admin,
+    scheduleId: params.scheduleId,
+  });
+  if (!loaded.ok) return loaded;
+  if (String((loaded.schedule as any).user_id) !== params.userId) {
+    return { ok: false as const, error: "Sem permissão." };
+  }
+  if (loaded.visualStatus.isPaid) {
+    return { ok: true as const, alreadyProcessed: true };
+  }
+  if (loaded.visualStatus.label !== "Executado") {
+    return {
+      ok: false as const,
+      error: "Esse agendamento ainda não possui uma cobrança executada para confirmar pagamento.",
+    };
+  }
+
+  return applySchedulePaymentSettlement({
+    admin,
+    userId: params.userId,
+    schedule: loaded.schedule,
+  });
 }
 
 function validateRecurringRecurrenceLimit(params: {
@@ -671,11 +833,15 @@ export async function updateScheduleAction(input: unknown) {
     context: "editar agendamentos",
   });
   if (msg) return { ok: false, error: msg };
-  const { data: previous } = await supabase
-    .from("schedules")
-    .select("debtor_id")
-    .eq("id", id)
-    .maybeSingle();
+  const admin = createSupabaseAdminClient();
+  const loaded = await loadScheduleWithVisualStatus({ admin, scheduleId: id });
+  if (!loaded.ok) return loaded;
+  if (String((loaded.schedule as any).user_id) !== userId) {
+    return { ok: false, error: "Sem permissão." };
+  }
+  if (loaded.visualStatus.label === "Executado") {
+    return { ok: false, error: "Agendamentos executados não podem ser editados." };
+  }
   if (recurrence === "monthly") {
     const monthlyCountCheck = await countOpenMonthlySchedulesForDebtor({
       supabase,
@@ -768,9 +934,8 @@ export async function updateScheduleAction(input: unknown) {
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
-  const admin = createSupabaseAdminClient();
   await syncDebtorChargeStatus(admin, userId, data.debtor_id);
-  const previousDebtorId = String((previous as any)?.debtor_id ?? "");
+  const previousDebtorId = String((loaded.schedule as any)?.debtor_id ?? "");
   if (previousDebtorId && previousDebtorId !== data.debtor_id) {
     await syncDebtorChargeStatus(admin, userId, previousDebtorId);
   }
@@ -872,17 +1037,13 @@ export async function triggerScheduleNowAction(id: string) {
   if (msg) return { ok: false, error: msg };
 
   const admin = createSupabaseAdminClient();
-  const { data: schedule, error } = await admin
-    .from("schedules")
-    .select(
-      "id, user_id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, first_sent_at, retry_attempts, closed_at, debtors(nome, telefone, pix_key, valor, vencimento, accumulate_open_monthly_charges, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days), charge:debtor_charges!schedules_charge_id_fkey(amount, due_day), pending_template:message_templates!schedules_template_pending_id_fkey(conteudo), overdue_template:message_templates!schedules_template_overdue_id_fkey(conteudo)",
-    )
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) return { ok: false, error: error.message };
-  if (!schedule?.id) return { ok: false, error: "Agendamento não encontrado." };
+  const loaded = await loadScheduleWithVisualStatus({ admin, scheduleId: id });
+  if (!loaded.ok) return loaded;
+  const schedule = loaded.schedule;
   if (String((schedule as any).user_id) !== userId) return { ok: false, error: "Sem permissão." };
+  if (loaded.visualStatus.label === "Executado") {
+    return { ok: false, error: "Esse agendamento não pode ser reenviado manualmente agora." };
+  }
 
   // #region debug-point extra-send-manual-schedule
   __dbg(__dbgTraceId, "B", "manual-trigger-loaded-schedule", {
@@ -1127,87 +1288,30 @@ export async function markSchedulePaidAction(id: string) {
   if (!userId) return { ok: false, error: "Sem sessão." };
 
   const admin = createSupabaseAdminClient();
-  const { data: schedule, error } = await admin
-    .from("schedules")
-    .select("id, user_id, debtor_id, data_envio, charge_due_at, status, recurrence, schedule_timezone, recurrence_day, recurrence_time, recurrence_until, debtors(accumulate_open_monthly_charges, skip_weekends_on_first_charge), charge:debtor_charges!schedules_charge_id_fkey(recurrence_month, recurrence_year)")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) return { ok: false, error: error.message };
-  if (!schedule?.id) return { ok: false, error: "Agendamento não encontrado." };
+  const loaded = await loadScheduleWithVisualStatus({ admin, scheduleId: id });
+  if (!loaded.ok) return loaded;
+  const schedule = loaded.schedule;
   if (String((schedule as any).user_id) !== userId) return { ok: false, error: "Sem permissão." };
-
   const currentStatus = String((schedule as any).status ?? "");
   if (currentStatus === "executando") {
     return { ok: false, error: "Esse agendamento está sendo processado no momento." };
   }
-
-  const recurrence = String((schedule as any).recurrence ?? "none");
-  const nowIso = new Date().toISOString();
-  const scheduledFor = String((schedule as any).data_envio ?? (schedule as any).charge_due_at ?? nowIso);
-
-  await ensureExecutedScheduleRun({
-    admin,
-    userId,
-    scheduleId: String((schedule as any).id),
-    scheduledFor,
-    executedAt: nowIso,
-  });
-
-  let updatePayload: Record<string, unknown>;
-  if (recurrence === "monthly" || recurrence === "yearly") {
-    const nextIsoBase = nextRecurringIsoAfterSettlement({
-      accumulateOpenMonthlyCharges: Boolean((schedule as any).debtors?.accumulate_open_monthly_charges),
-      chargeDueAt: String((schedule as any).charge_due_at ?? "") || null,
-      dataEnvio: String((schedule as any).data_envio ?? "") || null,
-      nowUtcIso: nowIso,
-      timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
-      day: Number((schedule as any).recurrence_day ?? 1),
-      time: String((schedule as any).recurrence_time ?? "") || "00:00",
-      recurrence,
-      targetMonth: Number((schedule as any).charge?.recurrence_month ?? 0) || null,
-      targetYear: Number((schedule as any).charge?.recurrence_year ?? 0) || null,
-    });
-    const nextIso = shiftFirstChargeFromWeekendUtcIso({
-      utcIso: nextIsoBase,
-      timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
-      enabled: Boolean((schedule as any).debtors?.skip_weekends_on_first_charge),
-    });
-    const shouldContinue = shouldContinueRecurringRecurrence({
-      nextUtcIso: nextIso,
-      recurrenceUntil: String((schedule as any).recurrence_until ?? "") || null,
-      timeZone: String((schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
-    });
-    updatePayload = shouldContinue
-      ? {
-          status: "agendado",
-          data_envio: nextIso,
-          charge_due_at: nextIso,
-          first_sent_at: null,
-          last_sent_at: null,
-          retry_attempts: 0,
-          closed_at: null,
-          payment_received_at: null,
-        }
-      : {
-          status: "executado",
-          payment_received_at: nowIso,
-          closed_at: nowIso,
-        };
-  } else {
-    updatePayload = {
-      status: "executado",
-      payment_received_at: nowIso,
-      closed_at: nowIso,
+  if (loaded.visualStatus.isPaid) {
+    return { ok: false, error: "Esse agendamento já foi marcado como pago." };
+  }
+  if (loaded.visualStatus.label !== "Agendado") {
+    return {
+      ok: false,
+      error: "Esse agendamento não pode ser marcado manualmente como pago nesse status.",
     };
   }
 
-  const { error: updateError } = await admin
-    .from("schedules")
-    .update(updatePayload)
-    .eq("id", String((schedule as any).id));
-  if (updateError) return { ok: false, error: updateError.message };
-  await syncDebtorChargeStatus(admin, userId, String((schedule as any).debtor_id ?? ""));
+  const settlement = await applySchedulePaymentSettlement({
+    admin,
+    userId,
+    schedule,
+  });
+  if (!settlement.ok) return settlement;
 
   await admin.from("logs").insert({
     user_id: userId,
