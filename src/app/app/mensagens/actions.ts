@@ -13,6 +13,8 @@ const updateSchema = createSchema.extend({
   id: z.string().uuid(),
 });
 
+const deleteSchema = z.string().uuid();
+
 function templateErrorToPt(message: string, action: "save" | "delete") {
   const translated = supabaseErrorToPt(message);
   if (translated && translated !== message) return translated;
@@ -59,8 +61,32 @@ export async function updateTemplateAction(input: unknown) {
 }
 
 export async function deleteTemplateAction(id: string) {
+  const parsedId = deleteSchema.safeParse(id);
+  if (!parsedId.success) {
+    return { ok: false, error: "Template inválido." };
+  }
+
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("message_templates").delete().eq("id", id);
+  const { count, error: usageError } = await supabase
+    .from("schedules")
+    .select("id", { count: "exact", head: true })
+    .is("closed_at", null)
+    .or(
+      `template_id.eq.${parsedId.data},template_pending_id.eq.${parsedId.data},template_overdue_id.eq.${parsedId.data}`,
+    );
+
+  if (usageError) {
+    return { ok: false, error: templateErrorToPt(usageError.message ?? "", "delete") };
+  }
+
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: "Este template está em uso em agendamentos e não pode ser excluído.",
+    };
+  }
+
+  const { error } = await supabase.from("message_templates").delete().eq("id", parsedId.data);
   if (error) return { ok: false, error: templateErrorToPt(error.message ?? "", "delete") };
   return { ok: true };
 }
