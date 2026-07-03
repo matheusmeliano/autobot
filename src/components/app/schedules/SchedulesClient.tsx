@@ -1624,7 +1624,7 @@ export function SchedulesClient({
                 </select>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3">
                 <div>
                   <div className="text-xs font-semibold text-white/60">Template Pendente</div>
                   <div className="mt-1 text-[11px] text-white/45">
@@ -1687,7 +1687,7 @@ export function SchedulesClient({
                       <span className="text-white/45">Selecione um cliente com data cadastrada.</span>
                     )}
                   </div>
-                  <div className="mt-1 text-[11px] text-white/45">
+                  <div className="mt-1 truncate text-[11px] text-white/45">
                     A data do agendamento e obtida automaticamente a partir do cadastro do cliente.
                   </div>
                 </div>
