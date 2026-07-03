@@ -924,6 +924,10 @@ export function SchedulesClient({
 
     return selectable;
   }, [debtors, editing, effectiveTimeZone, rows]);
+  const selectableDebtors = useMemo(
+    () => debtors.filter((debtor) => selectableDebtorIds.has(String(debtor.id ?? ""))),
+    [debtors, selectableDebtorIds],
+  );
   const selectedDebtorReferenceOptions = useMemo(
     () =>
       debtorReferenceOptions.filter(
@@ -1829,12 +1833,8 @@ export function SchedulesClient({
                   {...register("debtor_id", { required: true })}
                 >
                   <option value="">Selecione...</option>
-                  {debtors.map((d) => (
-                    <option
-                      key={d.id}
-                      value={d.id}
-                      disabled={!selectableDebtorIds.has(String(d.id ?? ""))}
-                    >
+                  {selectableDebtors.map((d) => (
+                    <option key={d.id} value={d.id}>
                       {d.nome}
                     </option>
                   ))}
