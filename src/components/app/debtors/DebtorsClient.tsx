@@ -987,8 +987,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
 
                     <div className="mt-3 text-[11px] text-white/45">
-                      Caso o dia configurado no mês atual já tenha passado, o sistema deverá
-                      considerar automaticamente o mesmo dia no mês seguinte.
+                      Se o dia já passou, utiliza o mesmo dia no próximo mês.
                     </div>
 
                     <div className="mt-2 grid gap-3">
