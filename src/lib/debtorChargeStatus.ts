@@ -360,11 +360,16 @@ export function applyCurrentMonthDebtorStatuses<
 
   return params.debtors.map((debtor) => ({
     ...debtor,
-    status: deriveReferenceMonthDebtorStatus(
-      Array.isArray(debtor.charges) ? debtor.charges : [],
-      schedulesByDebtor.get(String(debtor.id)) ?? [],
-      params.nowUtcIso,
-    ),
+    status: (() => {
+      const schedules = schedulesByDebtor.get(String(debtor.id)) ?? [];
+      const openSchedules = schedules.filter((row) => !String(row.closed_at ?? "").trim());
+      if (!openSchedules.length) return "-";
+      return deriveReferenceMonthDebtorStatus(
+        Array.isArray(debtor.charges) ? debtor.charges : [],
+        openSchedules,
+        params.nowUtcIso,
+      );
+    })(),
   }));
 }
 

@@ -212,16 +212,20 @@ function defaultChargeFormValue(day: string, baseDate: Date): ChargeFormValue {
 
 function debtorStatusLabel(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
+  if (!s || s === "-") return "-";
   if (s === "agendado") return "Agendado";
   if (s === "pago") return "Pago";
   if (s === "atrasado") return "Atrasado";
   if (s === "pendente") return "Atrasado";
   if (s === "suspeita_de_pagamento") return "Agendado";
-  return "Agendado";
+  return "-";
 }
 
 function debtorStatusClass(status: string | null | undefined, theme: "light" | "dark") {
   const s = String(status ?? "").trim().toLowerCase();
+  if (!s || s === "-") {
+    return theme === "dark" ? "bg-white/10 text-white/75" : "bg-black/10 text-black/70";
+  }
   if (s === "pago") {
     return "bg-emerald-600 text-[rgb(255,255,255)]";
   }
@@ -234,7 +238,7 @@ function debtorStatusClass(status: string | null | undefined, theme: "light" | "
   if (s === "pendente") {
     return "bg-rose-600 text-[rgb(255,255,255)]";
   }
-  return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
+  return theme === "dark" ? "bg-white/10 text-white/75" : "bg-black/10 text-black/70";
 }
 
 function digitsOnly(v: string) {
