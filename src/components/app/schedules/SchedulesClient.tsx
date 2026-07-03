@@ -225,6 +225,40 @@ function debtorReferenceLocalDate(debtor: DebtorOption | null | undefined) {
   return normalizeDateOnly(debtor?.vencimento);
 }
 
+function debtorReferenceDateOptions(debtor: DebtorOption | null | undefined) {
+  const charges = Array.isArray(debtor?.debtor_charges) ? debtor.debtor_charges.slice() : [];
+  const chargeOptions = charges
+    .filter((charge) => {
+      const year = Number(charge.recurrence_year ?? 0);
+      const month = Number(charge.recurrence_month ?? 0);
+      const day = Number(charge.due_day ?? 0);
+      return year >= 2000 && month >= 1 && month <= 12 && day >= 1;
+    })
+    .sort(compareDebtorChargeOrder)
+    .map((charge) => {
+      const value = buildLocalDate(
+        `${String(Number(charge.recurrence_year)).padStart(4, "0")}-${String(Number(charge.recurrence_month)).padStart(2, "0")}`,
+        Number(charge.due_day),
+      );
+      return value ? { value, label: localDateBR(value) } : null;
+    })
+    .filter(Boolean) as Array<{ value: string; label: string }>;
+
+  const uniqueOptions = new Map<string, { value: string; label: string }>();
+  for (const option of chargeOptions) {
+    if (!uniqueOptions.has(option.value)) {
+      uniqueOptions.set(option.value, option);
+    }
+  }
+
+  const legacyDate = normalizeDateOnly(debtor?.vencimento);
+  if (legacyDate && !uniqueOptions.has(legacyDate)) {
+    uniqueOptions.set(legacyDate, { value: legacyDate, label: localDateBR(legacyDate) });
+  }
+
+  return Array.from(uniqueOptions.values());
+}
+
 function monthDistance(fromYearMonth: string, toYearMonth: string) {
   const [fromYear, fromMonth] = fromYearMonth.split("-").map(Number);
   const [toYear, toMonth] = toYearMonth.split("-").map(Number);
@@ -738,10 +772,17 @@ export function SchedulesClient({
     () => debtorsById.get(String(selectedDebtorId ?? "")) ?? null,
     [debtorsById, selectedDebtorId],
   );
-  const selectedDebtorReferenceDate = useMemo(
-    () => debtorReferenceLocalDate(selectedDebtor),
+  const selectedDebtorReferenceOptions = useMemo(
+    () => debtorReferenceDateOptions(selectedDebtor),
     [selectedDebtor],
   );
+  const selectedDebtorReferenceDate = useMemo(() => {
+    const currentDate = normalizeDateOnly(scheduleDateValue);
+    if (currentDate && selectedDebtorReferenceOptions.some((option) => option.value === currentDate)) {
+      return currentDate;
+    }
+    return selectedDebtorReferenceOptions[0]?.value ?? "";
+  }, [scheduleDateValue, selectedDebtorReferenceOptions]);
 
   useEffect(() => {
     if (!open || !selectedDebtorId) return;
@@ -756,7 +797,7 @@ export function SchedulesClient({
   useEffect(() => {
     if (!open) return;
     setValue("data_envio_date", selectedDebtorReferenceDate, { shouldDirty: false, shouldTouch: false });
-  }, [open, selectedDebtorReferenceDate, setValue]);
+  }, [open, selectedDebtorId, selectedDebtorReferenceDate, setValue]);
 
   const currentTimeForPicker = useMemo(() => {
     if (!timePickerTarget) return "";
@@ -1680,15 +1721,37 @@ export function SchedulesClient({
                   <div className="text-xs font-semibold text-white/60">
                     Data do cliente
                   </div>
-                  <div className="mt-2 flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white">
-                    {selectedDebtorReferenceDate ? (
-                      localDateBR(selectedDebtorReferenceDate)
-                    ) : (
-                      <span className="text-white/45">Selecione um cliente com data cadastrada.</span>
-                    )}
-                  </div>
+                  {selectedDebtorReferenceOptions.length > 1 ? (
+                    <select
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
+                      value={selectedDebtorReferenceDate}
+                      onChange={(e) =>
+                        setValue("data_envio_date", e.target.value, {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        })
+                      }
+                    >
+                      {selectedDebtorReferenceOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="mt-2 flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white">
+                      {selectedDebtorReferenceDate ? (
+                        localDateBR(selectedDebtorReferenceDate)
+                      ) : (
+                        <span className="text-white/45">Selecione um cliente com data cadastrada.</span>
+                      )}
+                    </div>
+                  )}
                   <div className="mt-1 truncate text-[11px] text-white/45">
-                    A data do agendamento e obtida automaticamente a partir do cadastro do cliente.
+                    {selectedDebtorReferenceOptions.length > 1
+                      ? "Escolha qual data cadastrada do cliente deve ser usada neste agendamento."
+                      : "A data do agendamento e obtida automaticamente a partir do cadastro do cliente."}
                   </div>
                 </div>
                 <div>
