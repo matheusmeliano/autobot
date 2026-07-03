@@ -1950,7 +1950,7 @@ export function SchedulesClient({
                   ) : null}
 
                   <div>
-                    <div className="text-xs font-semibold text-white/60">Encerrar em</div>
+                    <div className="text-xs font-semibold text-white/60">Encerrar em (Opcional)</div>
                     <div className="relative mt-2">
                       <input
                         type="date"
