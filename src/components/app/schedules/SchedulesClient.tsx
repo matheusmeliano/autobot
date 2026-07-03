@@ -1866,10 +1866,6 @@ export function SchedulesClient({
                         </div>
                       ) : null}
                     </>
-                  ) : isYearlyRecurrence ? (
-                    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[11px] text-white/55">
-                      A recorrência anual repete a cobrança todo ano na mesma data e horário da primeira cobrança.
-                    </div>
                   ) : null}
 
                   <div className="mt-4">
