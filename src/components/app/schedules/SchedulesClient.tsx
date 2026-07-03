@@ -1654,7 +1654,7 @@ export function SchedulesClient({
                 </select>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <div className="text-xs font-semibold text-white/60">Template Agendado</div>
                   <select
