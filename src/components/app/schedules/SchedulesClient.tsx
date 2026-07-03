@@ -260,7 +260,7 @@ function debtorReferenceDateOptions(debtor: DebtorOption | null | undefined) {
 }
 
 function scheduleReferenceLocalDate(row: ScheduleRow, fallbackTimeZone: BrazilTimeZone) {
-  const referenceMoment = String(row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "").trim();
+  const referenceMoment = String(row.charge_due_at ?? row.data_envio ?? row.operational_due_at ?? "").trim();
   if (!referenceMoment) return "";
   const rowTimeZone = (String(row.schedule_timezone ?? "").trim() || fallbackTimeZone) as BrazilTimeZone;
   try {
