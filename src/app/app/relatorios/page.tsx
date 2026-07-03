@@ -12,8 +12,26 @@ import {
   listAllAgendarScheduleRuns,
   listAllAgendarSchedules,
 } from "@/lib/agendarData";
+import { localDateInTimeZone } from "@/lib/recurrence";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
 import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
+
+function addDaysToLocalDate(localDate: string, days: number) {
+  const [year, month, day] = localDate.split("-").map(Number);
+  const base = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  base.setUTCDate(base.getUTCDate() + days);
+  return base.toISOString().slice(0, 10);
+}
+
+function localDateLabel(localDate: string) {
+  const [year, month, day] = localDate.split("-").map(Number);
+  const base = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(base);
+}
 
 export default async function RelatoriosPage() {
   const supabase = await createSupabaseServerClient();
@@ -31,12 +49,6 @@ export default async function RelatoriosPage() {
   if (!canAccess) {
     redirect("/app/dashboard");
   }
-
-  const now = new Date();
-  const start30 = new Date(now);
-  start30.setDate(now.getDate() - 29);
-  start30.setHours(0, 0, 0, 0);
-  const start30Iso = start30.toISOString();
 
   const [schedulesRes, scheduleRunsRes, debtorsRes] = await Promise.all([
     listAllAgendarSchedules(supabase),
@@ -68,6 +80,8 @@ export default async function RelatoriosPage() {
 
   const tzRaw = (profile as any)?.timezone;
   const timeZone: BrazilTimeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : "America/Sao_Paulo";
+  const todayLocalDate = localDateInTimeZone(new Date().toISOString(), timeZone);
+  const start30LocalDate = addDaysToLocalDate(todayLocalDate, -29);
   const rows = buildAgendaRows({
     debtors: (debtorsRes.data ?? []) as any[],
     schedules: (schedulesRes.data ?? []) as any[],
@@ -89,19 +103,21 @@ export default async function RelatoriosPage() {
   };
 
   const days = Array.from({ length: 30 }).map((_, i) => {
-    const d = new Date(now);
-    d.setDate(now.getDate() - (29 - i));
-    const key = d.toISOString().slice(0, 10);
+    const key = addDaysToLocalDate(start30LocalDate, i);
     return {
       key,
-      name: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      name: localDateLabel(key),
     };
   });
 
-  const chartRows = rows.filter((row) => String(row.created_at ?? "").trim() >= start30Iso);
+  const chartRows = rows.filter((row) => {
+    const createdAt = String(row.created_at ?? "").trim();
+    if (!createdAt) return false;
+    return localDateInTimeZone(createdAt, timeZone) >= start30LocalDate;
+  });
   const chart: ReportChartPoint[] = days.map((d) => ({
     name: d.name,
-    value: chartRows.filter((row) => String(row.created_at ?? "").slice(0, 10) === d.key).length,
+    value: chartRows.filter((row) => localDateInTimeZone(String(row.created_at ?? ""), timeZone) === d.key).length,
   }));
 
   return <ReportsClient stats={stats} chart={chart} />;

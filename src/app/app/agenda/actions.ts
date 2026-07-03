@@ -274,6 +274,7 @@ async function sendZapiText(params: {
 
 const createSchema = z.object({
   debtor_id: z.string().uuid(),
+  charge_id: z.string().uuid().optional(),
   template_pending_id: z.string().uuid().optional(),
   template_overdue_id: z.string().uuid().optional(),
   data_envio_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -337,6 +338,7 @@ function validateFutureScheduleDateTime(params: {
 }
 
 type DebtorScheduleChargeRow = {
+  id?: string | null;
   due_day?: number | null;
   recurrence_month?: number | null;
   recurrence_year?: number | null;
@@ -378,16 +380,15 @@ function compareReferenceChargeOrder(a: DebtorScheduleChargeRow, b: DebtorSchedu
 async function resolveScheduleLocalDate(params: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   debtorId: string;
+  chargeId?: string | null;
   providedDate?: string | null;
 }) {
   const providedDate = String(params.providedDate ?? "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(providedDate)) {
-    return { ok: true as const, localDate: providedDate };
-  }
+  const providedChargeId = String(params.chargeId ?? "").trim();
 
   const { data, error } = await params.supabase
     .from("debtors")
-    .select("vencimento, debtor_charges(due_day, recurrence_month, recurrence_year, created_at)")
+    .select("vencimento, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)")
     .eq("id", params.debtorId)
     .maybeSingle();
 
@@ -402,21 +403,32 @@ async function resolveScheduleLocalDate(params: {
     })
     .sort(compareReferenceChargeOrder);
 
-  const firstCharge = charges[0] as DebtorScheduleChargeRow | undefined;
-  const chargeLocalDate = firstCharge
+  const matchedCharge =
+    charges.find((charge: DebtorScheduleChargeRow) => String(charge.id ?? "").trim() === providedChargeId) ??
+    null;
+  const resolvedCharge = matchedCharge ?? ((charges[0] as DebtorScheduleChargeRow | undefined) ?? null);
+  const chargeLocalDate = resolvedCharge
     ? buildReferenceLocalDate({
-        day: firstCharge.due_day,
-        month: firstCharge.recurrence_month,
-        year: firstCharge.recurrence_year,
+        day: resolvedCharge.due_day,
+        month: resolvedCharge.recurrence_month,
+        year: resolvedCharge.recurrence_year,
       })
     : "";
   if (chargeLocalDate) {
-    return { ok: true as const, localDate: chargeLocalDate };
+    return {
+      ok: true as const,
+      localDate: chargeLocalDate,
+      chargeId: String(resolvedCharge?.id ?? "").trim() || null,
+    };
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(providedDate)) {
+    return { ok: true as const, localDate: providedDate, chargeId: null };
   }
 
   const legacyDueDate = String((data as any)?.vencimento ?? "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(legacyDueDate)) {
-    return { ok: true as const, localDate: legacyDueDate };
+    return { ok: true as const, localDate: legacyDueDate, chargeId: null };
   }
 
   return {
@@ -429,12 +441,13 @@ async function ensureScheduleLocalDateAvailable(params: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   debtorId: string;
   localDate: string;
+  chargeId?: string | null;
   defaultTimeZone: string;
   excludeId?: string;
 }) {
   let query = params.supabase
     .from("schedules")
-    .select("id, charge_due_at, data_envio, schedule_timezone, closed_at")
+    .select("id, charge_id, charge_due_at, data_envio, schedule_timezone, closed_at")
     .eq("debtor_id", params.debtorId)
     .is("closed_at", null)
     .limit(200);
@@ -445,16 +458,22 @@ async function ensureScheduleLocalDateAvailable(params: {
 
   const { data, error } = await query;
   if (error) return { ok: false as const, error: error.message };
+  const incomingChargeId = String(params.chargeId ?? "").trim();
 
   const conflict = (data ?? []).some((row: any) => {
     const referenceMoment = String(row?.charge_due_at ?? row?.data_envio ?? "").trim();
     if (!referenceMoment) return false;
+    const rowChargeId = String(row?.charge_id ?? "").trim();
     const rowTimeZone = String(row?.schedule_timezone ?? "").trim() || params.defaultTimeZone;
+    let sameLocalDate = false;
     try {
-      return localDateInTimeZone(referenceMoment, rowTimeZone) === params.localDate;
+      sameLocalDate = localDateInTimeZone(referenceMoment, rowTimeZone) === params.localDate;
     } catch {
-      return referenceMoment.slice(0, 10) === params.localDate;
+      sameLocalDate = referenceMoment.slice(0, 10) === params.localDate;
     }
+    if (!sameLocalDate) return false;
+    if (!incomingChargeId || !rowChargeId) return true;
+    return rowChargeId === incomingChargeId;
   });
 
   if (conflict) {
@@ -556,6 +575,7 @@ export async function createScheduleAction(input: unknown) {
   const scheduleLocalDateResult = await resolveScheduleLocalDate({
     supabase,
     debtorId: parsed.data.debtor_id,
+    chargeId: parsed.data.charge_id,
     providedDate: parsed.data.data_envio_date,
   });
   if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
@@ -564,6 +584,7 @@ export async function createScheduleAction(input: unknown) {
     supabase,
     debtorId: parsed.data.debtor_id,
     localDate: scheduleLocalDate,
+    chargeId: scheduleLocalDateResult.chargeId,
     defaultTimeZone: timeZone,
   });
   if (!dateAvailability.ok) return { ok: false, error: dateAvailability.error };
@@ -604,6 +625,7 @@ export async function createScheduleAction(input: unknown) {
 
   const { error } = await supabase.from("schedules").insert({
     debtor_id: parsed.data.debtor_id,
+    charge_id: scheduleLocalDateResult.chargeId,
     template_id: parsed.data.template_pending_id ?? null,
     template_pending_id: parsed.data.template_pending_id ?? null,
     template_overdue_id: parsed.data.template_overdue_id ?? null,
@@ -672,6 +694,7 @@ export async function updateScheduleAction(input: unknown) {
   const scheduleLocalDateResult = await resolveScheduleLocalDate({
     supabase,
     debtorId: data.debtor_id,
+    chargeId: data.charge_id,
     providedDate: data.data_envio_date,
   });
   if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
@@ -680,6 +703,7 @@ export async function updateScheduleAction(input: unknown) {
     supabase,
     debtorId: data.debtor_id,
     localDate: scheduleLocalDate,
+    chargeId: scheduleLocalDateResult.chargeId,
     defaultTimeZone: timeZone,
     excludeId: id,
   });
@@ -723,6 +747,7 @@ export async function updateScheduleAction(input: unknown) {
     .from("schedules")
     .update({
       debtor_id: data.debtor_id,
+      charge_id: scheduleLocalDateResult.chargeId,
       template_id: data.template_pending_id ?? null,
       template_pending_id: data.template_pending_id ?? null,
       template_overdue_id: data.template_overdue_id ?? null,

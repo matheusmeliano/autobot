@@ -55,8 +55,14 @@ export async function updateTemplateAction(input: unknown) {
 
   const supabase = await createSupabaseServerClient();
   const { id, ...data } = parsed.data;
-  const { error } = await supabase.from("message_templates").update(data).eq("id", id);
+  const { data: updated, error } = await supabase
+    .from("message_templates")
+    .update(data)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) return { ok: false, error: templateErrorToPt(error.message ?? "", "save") };
+  if (!updated?.id) return { ok: false, error: "Template não encontrado." };
   return { ok: true };
 }
 
@@ -86,7 +92,13 @@ export async function deleteTemplateAction(id: string) {
     };
   }
 
-  const { error } = await supabase.from("message_templates").delete().eq("id", parsedId.data);
+  const { data: deleted, error } = await supabase
+    .from("message_templates")
+    .delete()
+    .eq("id", parsedId.data)
+    .select("id")
+    .maybeSingle();
   if (error) return { ok: false, error: templateErrorToPt(error.message ?? "", "delete") };
+  if (!deleted?.id) return { ok: false, error: "Template não encontrado." };
   return { ok: true };
 }

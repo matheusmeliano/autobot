@@ -326,16 +326,12 @@ function getActivityReferenceMoment(activity: ActivityRow, timeZone: BrazilTimeZ
 }
 
 function getActivityVisualStatus(activity: ActivityRow, timeZone: BrazilTimeZone) {
-  const dueMoment = getActivityReferenceMoment(activity, timeZone);
-  const currentLocalDate = localDateInTimeZone(new Date().toISOString(), timeZone);
-  const dueLocalDate = localDateInTimeZone(String(dueMoment), timeZone);
   const operationalMonthKey = yearMonthKey(new Date().toISOString(), timeZone);
   const isExecuted =
     hasExecutedCurrentInstance(activity) ||
     (Boolean(String(activity.lastExecutedScheduledFor ?? "").trim()) &&
-      yearMonthKey(String(activity.lastExecutedScheduledFor), timeZone) === operationalMonthKey) ||
-    (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
-  const label = isExecuted ? "Executado" : "Agendado";
+      yearMonthKey(String(activity.lastExecutedScheduledFor), timeZone) === operationalMonthKey);
+  const label = isExecuted ? "Executado" : normalizeActivityStatus(String(activity.status ?? ""));
   return { label, className: statusBadgeClassName(label) };
 }
 

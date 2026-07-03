@@ -92,6 +92,7 @@ export type ScheduleRow = {
 type FormValues = {
   id?: string;
   debtor_id: string;
+  charge_id?: string;
   template_pending_id?: string;
   template_overdue_id?: string;
   data_envio_date: string;
@@ -253,6 +254,10 @@ function debtorReferenceDateOptions(debtor: DebtorOption | null | undefined) {
   }
 
   return Array.from(uniqueOptions.values());
+}
+
+function debtorReferenceOptionKey(option: { value: string; chargeId: string | null }) {
+  return option.chargeId || option.value;
 }
 
 function scheduleReferenceLocalDate(row: ScheduleRow, fallbackTimeZone: BrazilTimeZone) {
@@ -605,6 +610,7 @@ export function SchedulesClient({
   } = useForm<FormValues>({
     defaultValues: {
       debtor_id: "",
+      charge_id: "",
       template_pending_id: "",
       template_overdue_id: "",
       data_envio_date: "",
@@ -786,6 +792,7 @@ export function SchedulesClient({
   const isMonthlyRecurrence = recurrenceValue === "monthly";
   const isYearlyRecurrence = recurrenceValue === "yearly";
   const selectedDebtorId = watch("debtor_id");
+  const selectedChargeId = String(watch("charge_id") ?? "").trim();
   const selectedDebtor = useMemo(
     () => debtorsById.get(String(selectedDebtorId ?? "")) ?? null,
     [debtorsById, selectedDebtorId],
@@ -879,13 +886,24 @@ export function SchedulesClient({
   );
   const noAvailableReferenceDates =
     debtorReferenceOptions.length > 0 && selectedDebtorReferenceOptions.length === 0;
-  const selectedDebtorReferenceDate = useMemo(() => {
-    const currentDate = normalizeDateOnly(scheduleDateValue);
-    if (currentDate && selectedDebtorReferenceOptions.some((option) => option.value === currentDate)) {
-      return currentDate;
+  const selectedDebtorReferenceOption = useMemo(() => {
+    if (selectedChargeId) {
+      const matchedByCharge = selectedDebtorReferenceOptions.find(
+        (option) => String(option.chargeId ?? "").trim() === selectedChargeId,
+      );
+      if (matchedByCharge) return matchedByCharge;
     }
-    return selectedDebtorReferenceOptions[0]?.value ?? "";
-  }, [scheduleDateValue, selectedDebtorReferenceOptions]);
+    const currentDate = normalizeDateOnly(scheduleDateValue);
+    if (currentDate) {
+      const matchedByDate = selectedDebtorReferenceOptions.find((option) => option.value === currentDate);
+      if (matchedByDate) return matchedByDate;
+    }
+    return selectedDebtorReferenceOptions[0] ?? null;
+  }, [scheduleDateValue, selectedChargeId, selectedDebtorReferenceOptions]);
+  const selectedDebtorReferenceDate = selectedDebtorReferenceOption?.value ?? "";
+  const selectedDebtorReferenceKey = selectedDebtorReferenceOption
+    ? debtorReferenceOptionKey(selectedDebtorReferenceOption)
+    : "";
 
   useEffect(() => {
     if (!open || !selectedDebtorId) return;
@@ -900,7 +918,11 @@ export function SchedulesClient({
   useEffect(() => {
     if (!open) return;
     setValue("data_envio_date", selectedDebtorReferenceDate, { shouldDirty: false, shouldTouch: false });
-  }, [open, selectedDebtorId, selectedDebtorReferenceDate, setValue]);
+    setValue("charge_id", selectedDebtorReferenceOption?.chargeId ?? "", {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+  }, [open, selectedDebtorId, selectedDebtorReferenceDate, selectedDebtorReferenceOption, setValue]);
 
   const currentTimeForPicker = useMemo(() => {
     if (!timePickerTarget) return "";
@@ -973,6 +995,7 @@ export function SchedulesClient({
     setMonthlyExtras([]);
     reset({
       debtor_id: "",
+      charge_id: "",
       template_pending_id: "",
       template_overdue_id: "",
       data_envio_date: "",
@@ -1013,6 +1036,7 @@ export function SchedulesClient({
     reset({
       id: row.id,
       debtor_id: row.debtor_id,
+      charge_id: row.charge_id ?? "",
       template_pending_id: row.template_pending_id ?? row.template_id ?? "",
       template_overdue_id: row.template_overdue_id ?? row.template_id ?? "",
       data_envio_date: debtorReferenceDate || dt.date,
@@ -1051,7 +1075,7 @@ export function SchedulesClient({
       return;
     }
     if (!values.template_pending_id) {
-      modalToast.warning("Selecione o template pendente.");
+      modalToast.warning("Selecione o template agendado.");
       return;
     }
     if (!values.template_overdue_id) {
@@ -1097,6 +1121,7 @@ export function SchedulesClient({
     const payload = {
       ...(values.id ? { id: values.id } : {}),
       debtor_id: values.debtor_id,
+      charge_id: selectedDebtorReferenceOption?.chargeId ?? undefined,
       template_pending_id: values.template_pending_id ? values.template_pending_id : undefined,
       template_overdue_id: values.template_overdue_id ? values.template_overdue_id : undefined,
       data_envio_date: normalizedEditDate,
@@ -1177,6 +1202,7 @@ export function SchedulesClient({
       for (const c of monthlyExtras) {
         const extraRes = await createScheduleAction({
           debtor_id: values.debtor_id,
+          charge_id: undefined,
           template_pending_id: values.template_pending_id ? values.template_pending_id : undefined,
           template_overdue_id: values.template_overdue_id ? values.template_overdue_id : undefined,
           data_envio_date: c.date,
@@ -1763,6 +1789,7 @@ export function SchedulesClient({
 
         <form onSubmit={onSubmit} className="mt-4 grid gap-3">
               <input type="hidden" {...register("status")} />
+              <input type="hidden" {...register("charge_id")} />
               <div>
                 <div className="text-xs font-semibold text-white/60">
                   Cliente
@@ -1787,7 +1814,7 @@ export function SchedulesClient({
                     className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                     {...register("template_pending_id")}
                   >
-                    <option value="">Sem template</option>
+                    <option value="">Selecione...</option>
                     {templates.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.nome}
@@ -1801,7 +1828,7 @@ export function SchedulesClient({
                     className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
                     {...register("template_overdue_id")}
                   >
-                    <option value="">Sem template</option>
+                    <option value="">Selecione...</option>
                     {templates.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.nome}
@@ -1833,17 +1860,26 @@ export function SchedulesClient({
                   {selectedDebtorReferenceOptions.length > 1 ? (
                     <select
                       className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                      value={selectedDebtorReferenceDate}
-                      onChange={(e) =>
-                        setValue("data_envio_date", e.target.value, {
+                      value={selectedDebtorReferenceKey}
+                      onChange={(e) => {
+                        const option =
+                          selectedDebtorReferenceOptions.find(
+                            (item) => debtorReferenceOptionKey(item) === e.target.value,
+                          ) ?? null;
+                        setValue("data_envio_date", option?.value ?? "", {
                           shouldDirty: true,
                           shouldTouch: true,
                           shouldValidate: true,
-                        })
-                      }
+                        });
+                        setValue("charge_id", option?.chargeId ?? "", {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        });
+                      }}
                     >
                       {selectedDebtorReferenceOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
+                        <option key={debtorReferenceOptionKey(option)} value={debtorReferenceOptionKey(option)}>
                           {option.label}
                         </option>
                       ))}
