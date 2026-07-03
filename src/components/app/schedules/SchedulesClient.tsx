@@ -649,6 +649,14 @@ export function SchedulesClient({
   }
 
   const displayStatus = (row: ScheduleRow) => {
+    const scheduleUnavailable = Boolean((row as any).schedule_missing) || String(row.id ?? "").startsWith("charge:");
+    const hasReferenceMoment = Boolean(String(displayReferenceMoment(row) ?? "").trim());
+    if (scheduleUnavailable || !hasReferenceMoment) {
+      return {
+        label: "-",
+        className: theme === "dark" ? "bg-white/10 text-white/75" : "bg-black/10 text-black/70",
+      };
+    }
     const nowIso = new Date().toISOString();
     const currentLocalDate = localDateInTimeZone(nowIso, effectiveTimeZone);
     const dueMoment = displayReferenceMoment(row);
