@@ -428,15 +428,19 @@ export async function syncDebtorChargeStatus(admin: any, userId: string, debtorI
       .limit(20),
   ]);
 
-  const nextStatus =
-    deriveReferenceMonthDebtorStatus(
-      (charges ?? []) as DebtorChargeRow[],
-      (schedules ?? []) as DebtorScheduleStatusRow[],
-    );
+  const openSchedules = ((schedules ?? []) as DebtorScheduleStatusRow[]).filter(
+    (row) => !String(row.closed_at ?? "").trim(),
+  );
+  const nextStatus = !openSchedules.length
+    ? "-"
+    : deriveReferenceMonthDebtorStatus(
+        (charges ?? []) as DebtorChargeRow[],
+        openSchedules,
+      );
 
   await admin
     .from("debtors")
-    .update({ status: normalizeDebtorChargeStatus(nextStatus) })
+    .update({ status: nextStatus === "-" ? "-" : normalizeDebtorChargeStatus(nextStatus) })
     .eq("user_id", userId)
     .eq("id", debtorId);
 }
