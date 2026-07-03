@@ -654,26 +654,75 @@ export function SchedulesClient({
       sourceKind === "charge" ||
       Boolean((row as any).schedule_missing) ||
       String(row.id ?? "").startsWith("charge:");
-    const hasReferenceMoment = Boolean(String(displayReferenceMoment(row) ?? "").trim());
+    const referenceMoment = String(displayReferenceMoment(row) ?? "").trim();
+    const hasReferenceMoment = Boolean(referenceMoment);
     if (scheduleUnavailable || !hasReferenceMoment) {
       return {
         label: "-",
+        subtitle: null as "Não pago" | "Pago" | null,
         className: theme === "dark" ? "bg-white/10 text-white/75" : "bg-black/10 text-black/70",
+        isExecuted: false,
+        isPaid: false,
+        referenceMoment: null as string | null,
+        referenceMonthKey: "",
+        isCurrentMonth: false,
       };
     }
-    const nowIso = new Date().toISOString();
-    const currentLocalDate = localDateInTimeZone(nowIso, effectiveTimeZone);
-    const dueMoment = displayReferenceMoment(row);
-    const dueLocalDate = localDateInTimeZone(String(dueMoment), effectiveTimeZone);
+    const referenceMonthKey = yearMonthKey(referenceMoment, effectiveTimeZone);
+    const currentCycleMoment = String(
+      row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "",
+    ).trim();
+    const currentCycleMonthKey = currentCycleMoment
+      ? yearMonthKey(currentCycleMoment, effectiveTimeZone)
+      : "";
+    const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+    const lastExecutedMonthKey = lastExecutedMoment
+      ? yearMonthKey(lastExecutedMoment, effectiveTimeZone)
+      : "";
+    const paymentMoment = String(row.payment_received_at ?? "").trim();
+    const paymentMonthKey = paymentMoment ? yearMonthKey(paymentMoment, effectiveTimeZone) : "";
+    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
+    const isCurrentMonth = referenceMonthKey === operationalMonthKey;
     const isExecuted =
-      scheduleHasExecutedCurrentInstance(row) ||
-      (Boolean(String(row.last_executed_scheduled_for ?? "").trim()) &&
-        yearMonthKey(String(row.last_executed_scheduled_for), effectiveTimeZone) === operationalMonthKey) ||
-      (Boolean(dueLocalDate) && Boolean(currentLocalDate) && dueLocalDate < currentLocalDate);
+      Boolean(referenceMonthKey) &&
+      ((Boolean(lastExecutedMoment) && lastExecutedMonthKey === referenceMonthKey) ||
+        normalizedStatus === "executado" ||
+        normalizedStatus === "pago" ||
+        (Boolean(paymentMoment) && paymentMonthKey === referenceMonthKey));
+    const isPaid =
+      Boolean(referenceMonthKey) &&
+      ((Boolean(paymentMoment) && paymentMonthKey === referenceMonthKey) ||
+        (normalizedStatus === "pago" && isCurrentMonth) ||
+        (isCurrentMonth &&
+          normalizedStatus === "agendado" &&
+          Boolean(lastExecutedMoment) &&
+          lastExecutedMonthKey === operationalMonthKey &&
+          Boolean(currentCycleMonthKey) &&
+          currentCycleMonthKey !== operationalMonthKey));
 
-    return isExecuted
-      ? { label: "Executado", className: scheduleStatusClass("executado", theme) }
-      : { label: "Agendado", className: scheduleStatusClass("pendente", theme) };
+    if (!isCurrentMonth || !isExecuted) {
+      return {
+        label: "Agendado",
+        subtitle: null as "Não pago" | "Pago" | null,
+        className: scheduleStatusClass("pendente", theme),
+        isExecuted: false,
+        isPaid: false,
+        referenceMoment: isCurrentMonth ? referenceMoment : null,
+        referenceMonthKey,
+        isCurrentMonth,
+      };
+    }
+
+    return {
+      label: "Executado",
+      subtitle: isPaid ? "Pago" : "Não pago",
+      className: scheduleStatusClass("executado", theme),
+      isExecuted: true,
+      isPaid,
+      referenceMoment,
+      referenceMonthKey,
+      isCurrentMonth,
+    };
   };
 
   const displayMoments = (row: ScheduleRow) => {
@@ -702,6 +751,7 @@ export function SchedulesClient({
     const sourceKind = String((r as any).source_kind ?? "").trim().toLowerCase();
     const scheduleUnavailable =
       sourceKind === "charge" || Boolean(r.schedule_missing) || String(r.id ?? "").startsWith("charge:");
+    const visualStatus = displayStatus(r);
     const baseButtonClass =
       variant === "mobile"
         ? "inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
@@ -728,7 +778,8 @@ export function SchedulesClient({
             scheduleUnavailable ||
             isPending ||
             triggeringId === r.id ||
-            markingPaidId === r.id
+            markingPaidId === r.id ||
+            visualStatus.isPaid
           }
           className={baseButtonClass}
           title="Pagamento realizado"
@@ -743,11 +794,9 @@ export function SchedulesClient({
             isPending ||
             triggeringId === r.id ||
             markingPaidId === r.id ||
-            String(r.status ?? "") === "executado" ||
-            String(r.status ?? "") === "pendente" ||
-            String(r.status ?? "") === "pago" ||
+            visualStatus.isExecuted ||
             String(r.status ?? "") === "executando" ||
-            String(r.status ?? "") === "suspeita_de_pagamento"
+            (visualStatus.isCurrentMonth && String(r.status ?? "") === "suspeita_de_pagamento")
           }
           className={triggerButtonClass}
           title="Disparar agora"
@@ -1140,18 +1189,26 @@ export function SchedulesClient({
       modalToast.error(msg);
       return;
     }
+    const visualStatus = displayStatus(row);
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
-    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    const referenceMoment =
+      visualStatus.isCurrentMonth && visualStatus.referenceMoment
+        ? visualStatus.referenceMoment
+        : new Date().toISOString();
     const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
-    const referenceYearMonth = referenceMoment ? yearMonthKey(referenceMoment, effectiveTimeZone) : "";
+    const referenceYearMonth = visualStatus.isCurrentMonth
+      ? visualStatus.referenceMonthKey
+      : operationalMonthKey;
     const executedYearMonth = row.last_executed_scheduled_for
       ? yearMonthKey(row.last_executed_scheduled_for, effectiveTimeZone)
       : "";
-    const alreadyProcessed =
-      Boolean(String(row.payment_received_at ?? "").trim()) ||
-      String(row.status ?? "").trim().toLowerCase() === "pago" ||
-      String(row.status ?? "").trim().toLowerCase() === "executado";
-    const alreadyTriggeredThisMonth = Boolean(executedYearMonth) && executedYearMonth === referenceYearMonth;
+    const alreadyProcessed = visualStatus.isPaid;
+    const alreadyTriggeredThisMonth =
+      visualStatus.isCurrentMonth &&
+      visualStatus.isExecuted &&
+      !visualStatus.isPaid &&
+      Boolean(executedYearMonth) &&
+      executedYearMonth === referenceYearMonth;
     if (alreadyProcessed) {
       modalToast.info(
         `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,
@@ -1164,16 +1221,12 @@ export function SchedulesClient({
       );
       return;
     }
-    if (String(row.status ?? "") === "suspeita_de_pagamento") {
+    if (visualStatus.isCurrentMonth && String(row.status ?? "") === "suspeita_de_pagamento") {
       modalToast.info("Pagamento em análise. Confirme no painel para continuar.");
       return;
     }
-    if (String(row.status ?? "") === "pendente") {
+    if (visualStatus.isExecuted && !visualStatus.isPaid) {
       modalToast.info("Essa cobrança já foi enviada e está aguardando pagamento.");
-      return;
-    }
-    if (String(row.status ?? "") === "pago" || String(row.status ?? "") === "executado") {
-      modalToast.info("Essa cobrança já foi finalizada.");
       return;
     }
     if (String(row.status ?? "") === "executando") {
@@ -1196,18 +1249,17 @@ export function SchedulesClient({
   };
 
   const markAsPaid = async (row: ScheduleRow) => {
+    const visualStatus = displayStatus(row);
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
-    const referenceMoment = row.charge_due_at ?? row.data_envio;
+    const referenceMoment =
+      visualStatus.isCurrentMonth && visualStatus.referenceMoment
+        ? visualStatus.referenceMoment
+        : new Date().toISOString();
     const referenceMonthLabel = referenceMoment ? monthYearBR(referenceMoment, effectiveTimeZone) : null;
     const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
     const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
     const nextReferenceLabel = nextRecurringMoment ? monthYearBR(nextRecurringMoment, effectiveTimeZone) : null;
-    const normalizedStatus = String(row.status ?? "").trim().toLowerCase();
-    const alreadyProcessed =
-      normalizedStatus === "pago" ||
-      normalizedStatus === "executado" ||
-      Boolean(String(row.payment_received_at ?? "").trim());
-    if (alreadyProcessed) {
+    if (visualStatus.isPaid) {
       modalToast.info(
         `Você já marcou a cobrança de ${referenceMonthCompactLabel ?? "referência atual"} de "${row.debtor_nome}" como pagamento realizado. Isso evita registros duplicados e deixa claro que a cobrança já foi processada.`,
       );
@@ -1463,9 +1515,16 @@ export function SchedulesClient({
                         Agendamento
                       </div>
                     </div>
-                    <span className={`inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
-                      {visualStatus.label}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
+                        {visualStatus.label}
+                      </span>
+                      {visualStatus.subtitle ? (
+                        <div className="mt-1 text-[10px] font-medium text-[var(--app-text-60)]">
+                          {visualStatus.subtitle}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1588,9 +1647,16 @@ export function SchedulesClient({
                           </div>
                         </div>
                         <div className="flex justify-center">
-                          <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
-                            {visualStatus.label}
-                          </span>
+                          <div className="flex flex-col items-center">
+                            <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
+                              {visualStatus.label}
+                            </span>
+                            {visualStatus.subtitle ? (
+                              <div className="mt-1 text-[10px] font-medium text-[var(--app-text-55)]">
+                                {visualStatus.subtitle}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                         <div className="flex justify-end">
                           {renderActionButtons(r, "desktop")}
