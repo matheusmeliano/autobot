@@ -1762,9 +1762,12 @@ export function SchedulesClient({
                     <input
                       type="time"
                       step={60}
-                      ref={mainTimeInputRef}
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
                       {...timeField}
+                      ref={(el) => {
+                        timeField.ref(el);
+                        mainTimeInputRef.current = el;
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
                     />
                   </div>
                 </div>
