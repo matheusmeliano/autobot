@@ -171,7 +171,10 @@ export default async function DashboardPage() {
     );
     return dueMonthKey === currentMonthKey;
   });
-  const hasCurrentMonthSchedules = currentMonthSchedules.length > 0;
+  const currentMonthVisibleSchedules = currentMonthSchedules.filter(
+    (schedule) => !String((schedule as any)?.closed_at ?? "").trim(),
+  );
+  const hasCurrentMonthSchedules = currentMonthVisibleSchedules.length > 0;
 
   let receivableMonthTotal = 0;
   let receivableMonthPaid = 0;
@@ -197,7 +200,7 @@ export default async function DashboardPage() {
     }
   }
 
-  for (const schedule of currentMonthSchedules) {
+  for (const schedule of currentMonthVisibleSchedules) {
     const debtorId = String((schedule as any)?.debtor_id ?? "");
     if (!debtorId) continue;
 
@@ -233,7 +236,7 @@ export default async function DashboardPage() {
   const stats = {
     clients: (debtorsRes.data ?? []).length,
     templates: (templatesRes.data ?? []).length,
-    activeSchedules: currentMonthSchedules.filter((schedule) => {
+    activeSchedules: currentMonthVisibleSchedules.filter((schedule) => {
       const closedAt = String((schedule as any)?.closed_at ?? "").trim();
       const status = String((schedule as any)?.status ?? "").trim().toLowerCase();
       if (closedAt) return false;
@@ -246,12 +249,12 @@ export default async function DashboardPage() {
   };
 
   const chartDates = hasCurrentMonthSchedules
-    ? currentMonthSchedules.map((row) => String((row as any)?.created_at ?? "")).filter(Boolean)
+    ? currentMonthVisibleSchedules.map((row) => String((row as any)?.created_at ?? "")).filter(Boolean)
     : [];
 
   const activities = buildAgendaRows({
     debtors: (debtorsRes.data ?? []) as any[],
-    schedules: currentMonthSchedules,
+    schedules: currentMonthVisibleSchedules,
     latestExecutedRunBySchedule,
     templates: (templatesRes.data ?? []) as any[],
     defaultTimeZone: timeZone,
