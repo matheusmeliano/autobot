@@ -351,11 +351,14 @@ export function applyCurrentMonthDebtorStatuses<
     status: (() => {
       const schedules = schedulesByDebtor.get(String(debtor.id)) ?? [];
       if (!schedules.length) return "-";
-      return deriveReferenceMonthDebtorStatus(
+      const openSchedules = schedules.filter((row) => !String(row.closed_at ?? "").trim());
+      const nextStatus = deriveReferenceMonthDebtorStatus(
         Array.isArray(debtor.charges) ? debtor.charges : [],
         schedules,
         params.nowUtcIso,
       );
+      if (!openSchedules.length && nextStatus !== "pago") return "-";
+      return nextStatus;
     })(),
   }));
 }
@@ -429,12 +432,11 @@ export async function syncDebtorChargeStatus(admin: any, userId: string, debtorI
     ...row,
     last_executed_scheduled_for: latestExecutedRunBySchedule.get(String(row.id ?? "").trim()) ?? null,
   }));
-  const nextStatus = !debtorSchedules.length
+  const openSchedules = debtorSchedules.filter((row) => !String(row.closed_at ?? "").trim());
+  const derivedStatus = !debtorSchedules.length
     ? "-"
-    : deriveReferenceMonthDebtorStatus(
-        (charges ?? []) as DebtorChargeRow[],
-        debtorSchedules,
-      );
+    : deriveReferenceMonthDebtorStatus((charges ?? []) as DebtorChargeRow[], debtorSchedules);
+  const nextStatus = !openSchedules.length && derivedStatus !== "pago" ? "-" : derivedStatus;
 
   await admin
     .from("debtors")
