@@ -240,20 +240,27 @@ function debtorReferenceDateOptions(debtor: DebtorOption | null | undefined) {
         `${String(Number(charge.recurrence_year)).padStart(4, "0")}-${String(Number(charge.recurrence_month)).padStart(2, "0")}`,
         Number(charge.due_day),
       );
-      return value ? { value, label: localDateBR(value) } : null;
+      return value
+        ? {
+            value,
+            label: localDateBR(value),
+            chargeId: String(charge.id ?? "").trim() || null,
+          }
+        : null;
     })
-    .filter(Boolean) as Array<{ value: string; label: string }>;
+    .filter(Boolean) as Array<{ value: string; label: string; chargeId: string | null }>;
 
-  const uniqueOptions = new Map<string, { value: string; label: string }>();
+  const uniqueOptions = new Map<string, { value: string; label: string; chargeId: string | null }>();
   for (const option of chargeOptions) {
-    if (!uniqueOptions.has(option.value)) {
-      uniqueOptions.set(option.value, option);
+    const optionKey = option.chargeId || option.value;
+    if (!uniqueOptions.has(optionKey)) {
+      uniqueOptions.set(optionKey, option);
     }
   }
 
   const legacyDate = normalizeDateOnly(debtor?.vencimento);
   if (legacyDate && !uniqueOptions.has(legacyDate)) {
-    uniqueOptions.set(legacyDate, { value: legacyDate, label: localDateBR(legacyDate) });
+    uniqueOptions.set(legacyDate, { value: legacyDate, label: localDateBR(legacyDate), chargeId: null });
   }
 
   return Array.from(uniqueOptions.values());
@@ -854,6 +861,7 @@ export function SchedulesClient({
     if (!editing) return "";
     return scheduleReferenceLocalDate(editing, effectiveTimeZone);
   }, [editing, effectiveTimeZone]);
+  const editingChargeId = String(editing?.charge_id ?? "").trim();
   const occupiedDebtorReferenceDates = useMemo(() => {
     const occupied = new Set<string>();
     for (const row of rows) {
@@ -864,17 +872,35 @@ export function SchedulesClient({
     }
     return occupied;
   }, [editing, effectiveTimeZone, rows, selectedDebtorId]);
+  const occupiedDebtorChargeIds = useMemo(() => {
+    const occupied = new Set<string>();
+    for (const row of rows) {
+      if (String(row.debtor_id ?? "") !== String(selectedDebtorId ?? "")) continue;
+      if (editing && String(row.id ?? "") === String(editing.id ?? "")) continue;
+      const chargeId = String(row.charge_id ?? "").trim();
+      if (chargeId) occupied.add(chargeId);
+    }
+    return occupied;
+  }, [editing, rows, selectedDebtorId]);
   const selectableDebtorIds = useMemo(() => {
     const occupiedDatesByDebtor = new Map<string, Set<string>>();
+    const occupiedChargeIdsByDebtor = new Map<string, Set<string>>();
     for (const row of rows) {
       if (editing && String(row.id ?? "") === String(editing.id ?? "")) continue;
       const debtorId = String(row.debtor_id ?? "").trim();
       if (!debtorId) continue;
       const date = scheduleReferenceLocalDate(row, effectiveTimeZone);
-      if (!date) continue;
-      const current = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
-      current.add(date);
-      occupiedDatesByDebtor.set(debtorId, current);
+      if (date) {
+        const current = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
+        current.add(date);
+        occupiedDatesByDebtor.set(debtorId, current);
+      }
+      const chargeId = String(row.charge_id ?? "").trim();
+      if (chargeId) {
+        const currentChargeIds = occupiedChargeIdsByDebtor.get(debtorId) ?? new Set<string>();
+        currentChargeIds.add(chargeId);
+        occupiedChargeIdsByDebtor.set(debtorId, currentChargeIds);
+      }
     }
 
     const selectable = new Set<string>();
@@ -883,7 +909,10 @@ export function SchedulesClient({
       if (!debtorId) continue;
       const options = debtorReferenceDateOptions(debtor);
       const occupied = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
-      const hasAvailableDate = options.some((option) => !occupied.has(option.value));
+      const occupiedChargeIds = occupiedChargeIdsByDebtor.get(debtorId) ?? new Set<string>();
+      const hasAvailableDate = options.some((option) =>
+        option.chargeId ? !occupiedChargeIds.has(option.chargeId) : !occupied.has(option.value),
+      );
       if (hasAvailableDate) {
         selectable.add(debtorId);
       }
@@ -898,9 +927,12 @@ export function SchedulesClient({
   const selectedDebtorReferenceOptions = useMemo(
     () =>
       debtorReferenceOptions.filter(
-        (option) => !occupiedDebtorReferenceDates.has(option.value) || option.value === editingReferenceDate,
+        (option) =>
+          option.chargeId
+            ? !occupiedDebtorChargeIds.has(option.chargeId) || option.chargeId === editingChargeId
+            : !occupiedDebtorReferenceDates.has(option.value) || option.value === editingReferenceDate,
       ),
-    [debtorReferenceOptions, editingReferenceDate, occupiedDebtorReferenceDates],
+    [debtorReferenceOptions, editingChargeId, editingReferenceDate, occupiedDebtorChargeIds, occupiedDebtorReferenceDates],
   );
   const noAvailableReferenceDates =
     debtorReferenceOptions.length > 0 && selectedDebtorReferenceOptions.length === 0;
