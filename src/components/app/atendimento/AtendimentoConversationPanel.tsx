@@ -528,7 +528,7 @@ export function AtendimentoConversationPanel({
             onClick={() => handleAttachmentOption("image")}
             className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left"
           >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/12 text-emerald-200">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/12 text-emerald-700">
               <ImageIcon className="h-4 w-4" />
             </div>
             <div className="mt-4 text-sm font-semibold text-white">Foto</div>
@@ -539,7 +539,7 @@ export function AtendimentoConversationPanel({
             onClick={() => handleAttachmentOption("video")}
             className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left"
           >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/12 text-sky-200">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-500/30 bg-sky-500/12 text-sky-700">
               <Clapperboard className="h-4 w-4" />
             </div>
             <div className="mt-4 text-sm font-semibold text-white">Vídeo</div>
@@ -550,7 +550,7 @@ export function AtendimentoConversationPanel({
             onClick={() => handleAttachmentOption("file")}
             className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 text-left"
           >
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/12 text-violet-200">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/12 text-violet-700">
               <FileText className="h-4 w-4" />
             </div>
             <div className="mt-4 text-sm font-semibold text-white">Arquivo</div>
