@@ -130,6 +130,7 @@ export function PublicAtendimentoClient({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRequestIdRef = useRef(0);
   const sessionRequestIdRef = useRef(0);
   const sessionRefreshTimeoutRef = useRef<number | null>(null);
@@ -189,12 +190,29 @@ export function PublicAtendimentoClient({
     }
   }, [draft, isProfilePage]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (isProfilePage) return;
     const viewport = messagesViewportRef.current;
-    if (!viewport) return;
-    viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
-  }, [isProfilePage, publicSlug, messages, typing]);
+    const end = messagesEndRef.current;
+    if (!viewport || !end) return;
+
+    let frameA = 0;
+    let frameB = 0;
+    const scrollToBottom = () => {
+      end.scrollIntoView({ block: "end", behavior: "auto" });
+      viewport.scrollTop = viewport.scrollHeight;
+    };
+
+    frameA = window.requestAnimationFrame(() => {
+      scrollToBottom();
+      frameB = window.requestAnimationFrame(scrollToBottom);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameA);
+      window.cancelAnimationFrame(frameB);
+    };
+  }, [isProfilePage, publicSlug, messages.length, loading, typing]);
 
   useEffect(() => {
     awaitingBotSinceRef.current = awaitingBotSince;
@@ -1063,6 +1081,7 @@ export function PublicAtendimentoClient({
                   ) : null}
                 </>
               )}
+              <div ref={messagesEndRef} aria-hidden="true" />
             </div>
 
             <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">

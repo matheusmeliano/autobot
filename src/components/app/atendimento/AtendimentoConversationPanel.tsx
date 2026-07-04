@@ -74,6 +74,7 @@ export function AtendimentoConversationPanel({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const previewAttachmentTitle = previewMessage
     ? getAtendimentoAttachmentTitle({
         mediaType: previewMessage.media_type,
@@ -134,11 +135,28 @@ export function AtendimentoConversationPanel({
     }
   }, [draft]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const viewport = messagesViewportRef.current;
-    if (!viewport) return;
-    viewport.scrollTop = viewport.scrollHeight;
-  }, [conversation?.id, orderedMessages.length]);
+    const end = messagesEndRef.current;
+    if (!viewport || !end) return;
+
+    let frameA = 0;
+    let frameB = 0;
+    const scrollToBottom = () => {
+      end.scrollIntoView({ block: "end", behavior: "auto" });
+      viewport.scrollTop = viewport.scrollHeight;
+    };
+
+    frameA = window.requestAnimationFrame(() => {
+      scrollToBottom();
+      frameB = window.requestAnimationFrame(scrollToBottom);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameA);
+      window.cancelAnimationFrame(frameB);
+    };
+  }, [conversation?.id, orderedMessages.length, messagesLoading]);
 
   function restoreTextareaFocus() {
     window.requestAnimationFrame(() => {
@@ -403,6 +421,7 @@ export function AtendimentoConversationPanel({
             Nenhuma mensagem nesta conversa.
           </div>
         )}
+        <div ref={messagesEndRef} aria-hidden="true" />
       </div>
 
       <form
