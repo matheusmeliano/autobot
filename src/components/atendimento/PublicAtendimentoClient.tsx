@@ -198,6 +198,8 @@ export function PublicAtendimentoClient({
 
     let frameA = 0;
     let frameB = 0;
+    let timeoutA = 0;
+    let timeoutB = 0;
     const scrollToBottom = () => {
       end.scrollIntoView({ block: "end", behavior: "auto" });
       viewport.scrollTop = viewport.scrollHeight;
@@ -208,9 +210,25 @@ export function PublicAtendimentoClient({
       frameB = window.requestAnimationFrame(scrollToBottom);
     });
 
+    timeoutA = window.setTimeout(scrollToBottom, 120);
+    timeoutB = window.setTimeout(scrollToBottom, 320);
+
+    const mediaElements = Array.from(
+      viewport.querySelectorAll("img, video"),
+    ) as Array<HTMLImageElement | HTMLVideoElement>;
+    const removeListeners = mediaElements.map((element) => {
+      const eventName = element.tagName === "VIDEO" ? "loadedmetadata" : "load";
+      const onReady = () => scrollToBottom();
+      element.addEventListener(eventName, onReady, { once: true });
+      return () => element.removeEventListener(eventName, onReady);
+    });
+
     return () => {
       window.cancelAnimationFrame(frameA);
       window.cancelAnimationFrame(frameB);
+      window.clearTimeout(timeoutA);
+      window.clearTimeout(timeoutB);
+      removeListeners.forEach((remove) => remove());
     };
   }, [isProfilePage, publicSlug, messages.length, loading, typing]);
 
@@ -1081,7 +1099,7 @@ export function PublicAtendimentoClient({
                   ) : null}
                 </>
               )}
-              <div ref={messagesEndRef} aria-hidden="true" />
+              <div ref={messagesEndRef} aria-hidden="true" className="h-6 shrink-0" />
             </div>
 
             <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">
