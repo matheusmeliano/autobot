@@ -505,7 +505,7 @@ export function AtendimentoConversationPanel({
         closeOnBackdrop={false}
         closeOnEscape={false}
         fullScreenOnMobile
-        panelClassName="border-white/10 bg-[#0E1723] shadow-[0_32px_120px_rgba(0,0,0,0.45)]"
+        panelClassName="border-white/10 bg-[#0E1723]"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
