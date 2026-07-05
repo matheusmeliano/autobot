@@ -169,6 +169,7 @@ export function PublicAtendimentoClient({
   const botReplyVisibleAtRef = useRef<number | null>(null);
   const pendingBotFlushTimeoutRef = useRef<number | null>(null);
   const composerCooldownTimeoutRef = useRef<number | null>(null);
+  const initialSessionLoadSlugRef = useRef<string>("");
   const wasComposerDisabledRef = useRef(true);
   const lastPublicSlugRef = useRef("");
   const lastMessageKeyRef = useRef("");
@@ -990,9 +991,11 @@ export function PublicAtendimentoClient({
   }
 
   useEffect(() => {
-    if (isProfilePage) return;
+    if (isProfilePage || !linkSlug) return;
+    if (initialSessionLoadSlugRef.current === linkSlug) return;
+    initialSessionLoadSlugRef.current = linkSlug;
     void loadSession();
-  }, [isProfilePage, loadSession]);
+  }, [isProfilePage, linkSlug, loadSession]);
 
   useEffect(() => {
     if (!isFilesPage) return;
@@ -1252,7 +1255,7 @@ export function PublicAtendimentoClient({
               ref={messagesViewportRef}
               className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6"
             >
-              {loading ? (
+              {loading && !messages.length ? (
                 <div className="text-sm text-white/55">Iniciando atendimento...</div>
               ) : authError ? (
                 <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
