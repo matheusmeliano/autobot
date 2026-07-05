@@ -118,15 +118,13 @@ export async function sendAtendimentoWhatsAppText(params: {
     throw new Error("WhatsApp do atendimento não configurado.");
   }
 
-  await sendZapiText({
+  return await sendZapiText({
     instance_id: config.instance_id,
     token: config.token,
     client_token: config.client_token,
     phone: params.phone,
     message: params.message,
   });
-
-  return true;
 }
 
 async function notifyNewAtendimentoLead() {

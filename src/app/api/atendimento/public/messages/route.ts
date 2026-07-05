@@ -17,11 +17,43 @@ import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
-const WHATSAPP_TEST_MESSAGE =
-  "Olá! Este é um teste rápido para confirmar o seu WhatsApp no atendimento da Lucas Brum Online Music USA.";
 const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
 const WHATSAPP_INVALID_MESSAGE =
   "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.";
+
+function firstNameFromLead(lead: { full_name?: string | null }) {
+  const clean = String(lead.full_name ?? "").trim().replace(/\s+/g, " ");
+  if (!clean) return "";
+  return clean.split(" ")[0] ?? "";
+}
+
+function buildWhatsAppWelcomeMessage(lead: { full_name?: string | null }) {
+  const firstName = firstNameFromLead(lead) || "aluno(a)";
+  return `Olá, ${firstName}! 👋
+
+Seja muito bem-vindo(a) ao Lucas Brum Online Music USA!
+
+Estamos muito felizes em ter você conosco e ansiosos para iniciar essa jornada musical ao seu lado.
+
+Para finalizar seu cadastro, basta concluir as etapas solicitadas pelo bot. Assim que tudo estiver concluído, entraremos em contato e aguardaremos você na sua primeira aula.
+
+Nos vemos em breve!`;
+}
+
+function wasWhatsAppSendAccepted(payload: unknown) {
+  if (!payload || typeof payload !== "object") return false;
+  const data = payload as Record<string, unknown>;
+  if (data.error) return false;
+  if (data.success === false) return false;
+  return Boolean(
+    data.messageId ||
+      data.zaapId ||
+      data.id ||
+      data.zapId ||
+      data.text?.toString().trim() ||
+      data.message?.toString().trim(),
+  );
+}
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -196,10 +228,13 @@ export async function POST(req: Request) {
     const candidatePhone = String(captured.phone ?? extracted.phone ?? "").trim();
     if (candidatePhone) {
       try {
-        await sendAtendimentoWhatsAppText({
+        const sendResult = await sendAtendimentoWhatsAppText({
           phone: candidatePhone,
-          message: WHATSAPP_TEST_MESSAGE,
+          message: buildWhatsAppWelcomeMessage(lead as any),
         });
+        if (!wasWhatsAppSendAccepted(sendResult)) {
+          throw new Error("Mensagem de teste não confirmada.");
+        }
       } catch {
         delete captured.phone;
         phoneValidationFailed = true;
