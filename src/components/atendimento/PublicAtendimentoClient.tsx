@@ -185,12 +185,9 @@ export function PublicAtendimentoClient({
   const latestVisibleMessage = messages.length ? messages[messages.length - 1] : null;
   const hasPhoneValidationFinalBlockMessage = useMemo(
     () =>
-      messages.some(
-        (message) =>
-          message.sender_role === "bot" &&
-          String(message.content_text ?? "").trim() === PHONE_VALIDATION_FINAL_BLOCK_MESSAGE,
-      ),
-    [messages],
+      latestVisibleMessage?.sender_role === "bot" &&
+      String(latestVisibleMessage.content_text ?? "").trim() === PHONE_VALIDATION_FINAL_BLOCK_MESSAGE,
+    [latestVisibleMessage],
   );
   const isAwaitingWhatsAppValidation = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
