@@ -25,7 +25,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type PortalPage = "bot" | "conta" | "arquivos";
 
-const BOT_TYPING_LEAD_IN_MS = 2_000;
+const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 5_000;
 
 function dateTimeBR(value?: string | null) {
@@ -58,10 +58,6 @@ function getAtendimentoDownloadHref(url: string | null | undefined, fileName: st
   const separator = url.includes("?") ? "&" : "?";
   const downloadValue = fileName ? encodeURIComponent(fileName) : "";
   return `${url}${separator}download=${downloadValue}`;
-}
-
-function isViewportNearBottom(element: HTMLDivElement, threshold = 40) {
-  return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold;
 }
 
 function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
@@ -156,8 +152,6 @@ export function PublicAtendimentoClient({
   const wasComposerDisabledRef = useRef(true);
   const lastPublicSlugRef = useRef("");
   const lastMessageKeyRef = useRef("");
-  const shouldStickToBottomRef = useRef(true);
-
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
     [messages],
@@ -234,8 +228,7 @@ export function PublicAtendimentoClient({
       !conversationChanged &&
       Boolean(nextMessageKey) &&
       nextMessageKey !== lastMessageKeyRef.current;
-    const shouldAutoScroll =
-      conversationChanged || (newMessageArrived && shouldStickToBottomRef.current);
+    const shouldAutoScroll = conversationChanged || newMessageArrived;
 
     lastPublicSlugRef.current = currentPublicSlug;
     lastMessageKeyRef.current = nextMessageKey;
@@ -249,7 +242,6 @@ export function PublicAtendimentoClient({
     const scrollToBottom = () => {
       end.scrollIntoView({ block: "end", behavior: "auto" });
       viewport.scrollTop = viewport.scrollHeight;
-      shouldStickToBottomRef.current = true;
     };
 
     frameA = window.requestAnimationFrame(() => {
@@ -476,17 +468,30 @@ export function PublicAtendimentoClient({
 
   const flushPendingBotMessages = useCallback(() => {
     clearPendingBotFlushTimeout();
-    const pendingMessages = pendingBotMessagesRef.current;
-    pendingBotMessagesRef.current = [];
+    const nextPendingMessage = pendingBotMessagesRef.current.shift() ?? null;
     botReplyVisibleAtRef.current = null;
     awaitingBotSinceRef.current = null;
     botResponsePendingSinceRef.current = null;
     setAwaitingBotSince(null);
     setBotResponsePendingSince(null);
-    if (pendingMessages.length) {
-      applyMessages(pendingMessages, "merge");
-      startComposerCooldown();
+    if (!nextPendingMessage) {
+      return;
     }
+
+    applyMessages([nextPendingMessage], "merge");
+
+    if (pendingBotMessagesRef.current.length) {
+      const nextTypingStartedAt = Date.now();
+      botReplyVisibleAtRef.current = nextTypingStartedAt + BOT_TYPING_LEAD_IN_MS;
+      awaitingBotSinceRef.current = nextTypingStartedAt;
+      setAwaitingBotSince(nextTypingStartedAt);
+      pendingBotFlushTimeoutRef.current = window.setTimeout(() => {
+        flushPendingBotMessages();
+      }, BOT_TYPING_LEAD_IN_MS);
+      return;
+    }
+
+    startComposerCooldown();
   }, [applyMessages]);
 
   const applyMessagesWithBotTiming = useCallback(
@@ -504,24 +509,24 @@ export function PublicAtendimentoClient({
         return;
       }
 
-      const now = Date.now();
-      let visibleAt = botReplyVisibleAtRef.current;
-      if (!visibleAt || visibleAt <= now) {
-        visibleAt = now + BOT_TYPING_LEAD_IN_MS;
-        botReplyVisibleAtRef.current = visibleAt;
-        awaitingBotSinceRef.current = now;
-        setAwaitingBotSince(now);
-      }
-
-      const remainingMs = Math.max(visibleAt - now, 0);
       const gatedIds = new Set(gatedBotMessages.map((message) => String(message.id ?? "")));
       const immediateMessages = incomingMessages.filter((message) => !gatedIds.has(String(message.id ?? "")));
       pendingBotMessagesRef.current = sortAndDedupeMessages([...pendingBotMessagesRef.current, ...gatedBotMessages]);
+      applyMessages(immediateMessages, mode);
+
+      const now = Date.now();
+      const visibleAt = botReplyVisibleAtRef.current;
+      if (visibleAt != null && visibleAt > now) {
+        return;
+      }
+
+      botReplyVisibleAtRef.current = now + BOT_TYPING_LEAD_IN_MS;
+      awaitingBotSinceRef.current = now;
+      setAwaitingBotSince(now);
       clearPendingBotFlushTimeout();
       pendingBotFlushTimeoutRef.current = window.setTimeout(() => {
         flushPendingBotMessages();
-      }, remainingMs);
-      applyMessages(immediateMessages, mode);
+      }, BOT_TYPING_LEAD_IN_MS);
     },
     [applyMessages, flushPendingBotMessages],
   );
@@ -1113,9 +1118,6 @@ export function PublicAtendimentoClient({
           <>
             <div
               ref={messagesViewportRef}
-              onScroll={(event) => {
-                shouldStickToBottomRef.current = isViewportNearBottom(event.currentTarget);
-              }}
               className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6"
             >
               {loading ? (
