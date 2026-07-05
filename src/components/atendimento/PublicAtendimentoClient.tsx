@@ -27,7 +27,6 @@ type PortalPage = "bot" | "conta" | "arquivos";
 
 const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 5_000;
-const BLOCKED_CONVERSATION_MESSAGE = "Este atendimento foi encerrado e não aceita novas mensagens.";
 const PHONE_VALIDATION_FINAL_BLOCK_MESSAGE =
   "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
 // #region debug-point A:bootstrap
@@ -922,7 +921,7 @@ export function PublicAtendimentoClient({
       if (!result.ok && !result.blocked) {
         setDraft(contentText);
       }
-      if (!result.ok) {
+      if (!result.ok && !result.blocked) {
         setComposerError(result.error);
       }
     } finally {
@@ -980,7 +979,9 @@ export function PublicAtendimentoClient({
           });
           if (!result.ok) {
             updateUploadItem(uploadId, { status: "error", error: result.error });
-            setComposerError(result.error);
+            if (!result.blocked) {
+              setComposerError(result.error);
+            }
             continue;
           }
           updateUploadItem(uploadId, { status: "done", progress: 100 });
@@ -1453,15 +1454,9 @@ export function PublicAtendimentoClient({
                 </div>
               ) : null}
 
-              {composerError &&
-              !(conversationBlocked && hasPhoneValidationFinalBlockMessage && composerError === BLOCKED_CONVERSATION_MESSAGE) ? (
+              {composerError ? (
                 <div className="mb-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
                   {composerError}
-                </div>
-              ) : null}
-              {conversationBlocked && !hasPhoneValidationFinalBlockMessage ? (
-                <div className="mb-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
-                  {BLOCKED_CONVERSATION_MESSAGE}
                 </div>
               ) : null}
 
