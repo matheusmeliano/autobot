@@ -1131,7 +1131,7 @@ export function PublicAtendimentoClient({
                   ) : null}
                 </>
               )}
-              <div ref={messagesEndRef} aria-hidden="true" className="h-2 shrink-0" />
+              <div ref={messagesEndRef} aria-hidden="true" className="h-px shrink-0 scroll-mb-3" />
             </div>
 
             <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">
