@@ -147,6 +147,7 @@ export function PublicAtendimentoClient({
   const [authError, setAuthError] = useState("");
   const [composerError, setComposerError] = useState("");
   const [conversationBlocked, setConversationBlocked] = useState(false);
+  const [pendingConversationBlock, setPendingConversationBlock] = useState(false);
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const [botResponsePendingSince, setBotResponsePendingSince] = useState<number | null>(null);
@@ -205,9 +206,22 @@ export function PublicAtendimentoClient({
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
   const typing = !loading && !authError && !conversationBlocked && !isProfilePage && awaitingBotSince != null;
   const composerDisabled =
-    loading || Boolean(authError) || isProfilePage || conversationBlocked || typing || composerCooldownActive;
+    loading ||
+    Boolean(authError) ||
+    isProfilePage ||
+    conversationBlocked ||
+    pendingConversationBlock ||
+    typing ||
+    composerCooldownActive;
   const submitLocked =
-    loading || sending || Boolean(authError) || isProfilePage || conversationBlocked || typing || composerCooldownActive;
+    loading ||
+    sending ||
+    Boolean(authError) ||
+    isProfilePage ||
+    conversationBlocked ||
+    pendingConversationBlock ||
+    typing ||
+    composerCooldownActive;
   const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
   const firstName = getFirstName(displayName);
   const initialLetter = getInitialLetter(displayName);
@@ -327,6 +341,12 @@ export function PublicAtendimentoClient({
   useEffect(() => {
     botResponsePendingSinceRef.current = botResponsePendingSince;
   }, [botResponsePendingSince]);
+
+  useEffect(() => {
+    if (!pendingConversationBlock || !hasPhoneValidationFinalBlockMessage) return;
+    setPendingConversationBlock(false);
+    setConversationBlocked(true);
+  }, [hasPhoneValidationFinalBlockMessage, pendingConversationBlock]);
 
   useEffect(() => {
     if (isProfilePage) return;
@@ -726,7 +746,8 @@ export function PublicAtendimentoClient({
 
         setLeadId(String(json.session?.lead?.id ?? ""));
         setConversationId(String(json.session?.conversation?.id ?? ""));
-        setConversationBlocked(Boolean(json.session?.conversation?.bot_enabled === false));
+        const nextConversationBlocked = Boolean(json.session?.conversation?.bot_enabled === false);
+        setConversationBlocked(nextConversationBlocked && !(pendingConversationBlock && !hasPhoneValidationFinalBlockMessage));
         const nextSlug = String(json.session?.conversation?.public_slug ?? "");
         const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
         const nextTotal = Number(json.session?.initial_total ?? 0);
@@ -749,7 +770,7 @@ export function PublicAtendimentoClient({
         }
       }
     },
-    [applyMessages, applyMessagesWithBotTiming, linkSlug, loadMessages],
+    [applyMessages, applyMessagesWithBotTiming, hasPhoneValidationFinalBlockMessage, linkSlug, loadMessages, pendingConversationBlock],
   );
 
   const scheduleSessionRefresh = useCallback(() => {
@@ -828,6 +849,7 @@ export function PublicAtendimentoClient({
         }
         resetAwaitingBotSequence();
         if (json?.blocked || json?.code === "conversation_blocked") {
+          setPendingConversationBlock(false);
           setConversationBlocked(true);
         }
         return {
@@ -855,7 +877,12 @@ export function PublicAtendimentoClient({
         }, 180);
       }
       if (json?.blocked || json?.conversation?.bot_enabled === false) {
-        setConversationBlocked(true);
+        if (json.outbound?.id) {
+          setPendingConversationBlock(true);
+        } else {
+          setPendingConversationBlock(false);
+          setConversationBlocked(true);
+        }
       }
       setComposerError("");
       return { ok: true as const, blocked: Boolean(json?.blocked || json?.conversation?.bot_enabled === false) };
