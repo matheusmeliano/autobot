@@ -409,6 +409,11 @@ export async function ensureInitialBotConversationFlow(params: {
 }) {
   const INITIAL_BOT_TYPING_DELAY_MS = 1500;
   const admin = createSupabaseAdminClient();
+  const { data: lead } = await admin
+    .from("atendimento_leads")
+    .select("full_name")
+    .eq("id", params.leadId)
+    .maybeSingle();
   const { count: leadCount, error: leadCountError } = await admin
     .from("atendimento_messages")
     .select("id", { count: "exact", head: true })
@@ -432,7 +437,9 @@ export async function ensureInitialBotConversationFlow(params: {
     throw new Error(botCountError.message || "Falha ao verificar mensagens iniciais.");
   }
 
-  const initialMessages = initialBotMessages();
+  const initialMessages = initialBotMessages({
+    userName: String((lead as any)?.full_name ?? "").trim() || null,
+  });
   const botCountNum = Number(botCount ?? 0);
   if (botCountNum >= initialMessages.length) {
     return false;

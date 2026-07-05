@@ -9,6 +9,12 @@ type CapturedData = Partial<Record<CapturedFieldName, string>>;
 const YES_WORDS = ["sim", "quero", "vamos", "pode", "tenho interesse", "quero agendar", "agendar"];
 const NAME_CONNECTORS = new Set(["da", "de", "do", "das", "dos", "e"]);
 
+function firstNameFromFullName(value: string | null | undefined) {
+  const clean = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!clean) return "";
+  return clean.split(" ")[0] ?? "";
+}
+
 export function looksLikeFullName(value: string) {
   const clean = value.trim().replace(/\s+/g, " ");
   if (!clean) return false;
@@ -50,9 +56,13 @@ export function filterCapturedDataForLead(params: {
   return next;
 }
 
-export function initialBotMessages() {
+export function initialBotMessages(params?: { userName?: string | null }) {
+  const firstName = firstNameFromFullName(params?.userName);
+  const welcomeMessage = firstName
+    ? `Olá, ${firstName}! Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.`
+    : "Olá. Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.";
   return [
-    "Olá. Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.",
+    welcomeMessage,
     "Nossa metodologia inclui uma aula online ao vivo por semana, com acompanhamento individual.",
     "Quero te convidar para uma aula experimental e já adiantar o seu pré-cadastro por aqui.",
     CAPTURED_FIELD_PROMPTS.full_name,

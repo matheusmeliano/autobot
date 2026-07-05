@@ -31,6 +31,12 @@ test("initialBotMessages inicia o fluxo com convite e pré-cadastro", () => {
   assert.match(messages[2], /aula experimental/i);
 });
 
+test("initialBotMessages inclui o primeiro nome quando ele estiver disponivel", () => {
+  const messages = initialBotMessages({ userName: "Ana Maria" });
+
+  assert.equal(messages[0], "Olá, Ana! Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.");
+});
+
 test("extractLeadDataFromMessage nao trata horario como nome", () => {
   const data = extractLeadDataFromMessage("Às 19:h");
 
