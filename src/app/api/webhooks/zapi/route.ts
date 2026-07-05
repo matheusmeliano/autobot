@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
@@ -7,6 +8,40 @@ import { botReplyForLead } from "@/lib/atendimento/bot";
 import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
 
 export const runtime = "nodejs";
+
+// #region debug-point A:bootstrap
+const __dbgEnvPath = ".dbg/zapi-webhook-auth.env";
+const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
+const __dbgMap = Object.fromEntries(
+  __dbgEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
+const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
+const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  if (!__dbgUrl || !__dbgSession) return;
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre-fix",
+      hypothesisId,
+      traceId,
+      location: "src/app/api/webhooks/zapi/route.ts",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
 
 function normalizePhone(phone: string) {
   const d = phone.replace(/\D/g, "");
@@ -315,7 +350,25 @@ Regras:
 }
 
 export async function POST(req: Request) {
+  const traceId = `zapi-webhook-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const authUrl = new URL(req.url);
+  const authHeader = req.headers.get("authorization") ?? "";
+  // #region debug-point A:auth-check
+  __dbg(traceId, "A", "[DEBUG] zapi_webhook_auth_check", {
+    hasSecretEnv: Boolean(process.env.ZAPI_WEBHOOK_SECRET),
+    hasSecretQuery: Boolean(authUrl.searchParams.get("secret")),
+    hasBearer: authHeader.startsWith("Bearer "),
+    instanceIdQuery: authUrl.searchParams.get("instanceId") ?? authUrl.searchParams.get("instance_id") ?? null,
+  });
+  // #endregion
   if (!isAuthorized(req)) {
+    // #region debug-point A:auth-rejected
+    __dbg(traceId, "A", "[DEBUG] zapi_webhook_auth_rejected", {
+      hasSecretEnv: Boolean(process.env.ZAPI_WEBHOOK_SECRET),
+      hasSecretQuery: Boolean(authUrl.searchParams.get("secret")),
+      hasBearer: authHeader.startsWith("Bearer "),
+    });
+    // #endregion
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
@@ -432,10 +485,29 @@ export async function POST(req: Request) {
     ),
   );
   if (eventType === "DeliveryCallback" || eventType === "MessageStatusCallback") {
+    // #region debug-point C:callback-match-start
+    __dbg(traceId, "C", "[DEBUG] zapi_webhook_callback_match_start", {
+      eventType,
+      rawEventId,
+      callbackMessageIds,
+      instanceId,
+      userId,
+    });
+    // #endregion
     const pendingEvent = await findPendingPhoneValidationEvent({
       admin,
       messageIds: callbackMessageIds,
     });
+
+    // #region debug-point C:callback-match-result
+    __dbg(traceId, "C", "[DEBUG] zapi_webhook_callback_match_result", {
+      eventType,
+      callbackMessageIds,
+      matchedPendingEventId: pendingEvent?.id ?? null,
+      matchedLeadId: (pendingEvent as any)?.lead_id ?? null,
+      matchedConversationId: (pendingEvent as any)?.conversation_id ?? null,
+    });
+    // #endregion
 
     if (!pendingEvent?.id) {
       return Response.json({ ok: true, ignored: true, reason: "no_pending_phone_validation" });

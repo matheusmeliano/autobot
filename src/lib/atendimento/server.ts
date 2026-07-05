@@ -22,7 +22,7 @@ Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 https://www.autobot.business/app/atendimento`;
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/public-whatsapp-send.env";
+const __dbgEnvPath = ".dbg/zapi-webhook-auth.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -60,6 +60,15 @@ function normalizePhone(phone: string) {
   if (!digits) return "";
   if (digits.startsWith("55")) return digits;
   return digits;
+}
+
+function buildAuthorizedZapiWebhookUrl(baseUrl: string) {
+  const webhookUrl = new URL(`${baseUrl}/api/webhooks/zapi`);
+  const secret = String(process.env.ZAPI_WEBHOOK_SECRET ?? "").trim();
+  if (secret) {
+    webhookUrl.searchParams.set("secret", secret);
+  }
+  return webhookUrl.toString();
 }
 
 async function sendZapiText(params: {
@@ -193,7 +202,16 @@ export async function sendAtendimentoWhatsAppText(params: {
 
   const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
   if (baseUrl) {
-    const webhookUrl = `${baseUrl}/api/webhooks/zapi`;
+    const webhookUrl = buildAuthorizedZapiWebhookUrl(baseUrl);
+    // #region debug-point B:webhook-config
+    __dbg(traceId, "B", "[DEBUG] atendimento_whatsapp_webhook_config", {
+      baseUrl,
+      webhookUrl,
+      hasClientToken: Boolean(config.client_token),
+      hasWebhookSecret: Boolean(process.env.ZAPI_WEBHOOK_SECRET),
+      instanceId: config.instance_id,
+    });
+    // #endregion
     await updateZapiWebhook({
       instance_id: config.instance_id,
       token: config.token,
