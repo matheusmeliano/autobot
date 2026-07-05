@@ -124,6 +124,7 @@ export function PublicAtendimentoClient({
   const [sending, setSending] = useState(false);
   const [authError, setAuthError] = useState("");
   const [composerError, setComposerError] = useState("");
+  const [conversationBlocked, setConversationBlocked] = useState(false);
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
@@ -157,9 +158,9 @@ export function PublicAtendimentoClient({
   );
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
-  const typing = !loading && !authError && !isProfilePage && (isInitialFlow || awaitingBotSince != null);
-  const composerDisabled = loading || Boolean(authError) || isProfilePage;
-  const submitLocked = loading || sending || Boolean(authError) || isProfilePage || typing;
+  const typing = !loading && !authError && !conversationBlocked && !isProfilePage && (isInitialFlow || awaitingBotSince != null);
+  const composerDisabled = loading || Boolean(authError) || isProfilePage || conversationBlocked;
+  const submitLocked = loading || sending || Boolean(authError) || isProfilePage || conversationBlocked || typing;
   const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
   const firstName = getFirstName(displayName);
   const initialLetter = getInitialLetter(displayName);
@@ -544,6 +545,7 @@ export function PublicAtendimentoClient({
 
         setLeadId(String(json.session?.lead?.id ?? ""));
         setConversationId(String(json.session?.conversation?.id ?? ""));
+        setConversationBlocked(Boolean(json.session?.conversation?.bot_enabled === false));
         const nextSlug = String(json.session?.conversation?.public_slug ?? "");
         const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
         const nextTotal = Number(json.session?.initial_total ?? 0);
@@ -619,7 +621,7 @@ export function PublicAtendimentoClient({
         resetAwaitingBotSequence();
         setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
         void redirectToLoginAfterSessionLoss();
-        return { ok: false as const, error: "Sua sessão expirou. Entre novamente para continuar." };
+        return { ok: false as const, error: "Sua sessão expirou. Entre novamente para continuar.", blocked: false as const };
       }
 
       const json = await res.json().catch(() => null);
@@ -630,9 +632,13 @@ export function PublicAtendimentoClient({
           optimisticLeadMessageRef.current = null;
         }
         resetAwaitingBotSequence();
+        if (json?.blocked || json?.code === "conversation_blocked") {
+          setConversationBlocked(true);
+        }
         return {
           ok: false as const,
           error: String(json?.error ?? "Falha ao enviar sua mensagem. Tente novamente."),
+          blocked: Boolean(json?.blocked || json?.code === "conversation_blocked"),
         };
       }
 
@@ -653,8 +659,11 @@ export function PublicAtendimentoClient({
           void loadMessages(publicSlug, "replace");
         }, 180);
       }
+      if (json?.blocked || json?.conversation?.bot_enabled === false) {
+        setConversationBlocked(true);
+      }
       setComposerError("");
-      return { ok: true as const };
+      return { ok: true as const, blocked: Boolean(json?.blocked || json?.conversation?.bot_enabled === false) };
     } finally {
       restoreTextareaFocus();
     }
@@ -691,8 +700,10 @@ export function PublicAtendimentoClient({
         content_text: contentText,
         optimisticMessage,
       });
-      if (!result.ok) {
+      if (!result.ok && !result.blocked) {
         setDraft(contentText);
+      }
+      if (!result.ok) {
         setComposerError(result.error);
       }
     } finally {
@@ -1203,6 +1214,11 @@ export function PublicAtendimentoClient({
                   {composerError}
                 </div>
               ) : null}
+              {conversationBlocked ? (
+                <div className="mb-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+                  Este atendimento foi encerrado e não aceita novas mensagens.
+                </div>
+              ) : null}
 
               <div className="flex items-stretch gap-2">
                 <button
@@ -1219,7 +1235,7 @@ export function PublicAtendimentoClient({
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={handleTextareaKeyDown}
-                  placeholder="Mensagem..."
+                  placeholder={conversationBlocked ? "Atendimento encerrado." : "Mensagem..."}
                   rows={1}
                   disabled={composerDisabled}
                   className="h-14 w-full flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-emerald-500/40 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"

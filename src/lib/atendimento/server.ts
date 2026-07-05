@@ -721,7 +721,7 @@ export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: 
   const admin = createSupabaseAdminClient();
   const { data: conversation } = await admin
     .from("atendimento_conversations")
-    .select("id, lead_id, public_slug")
+    .select("id, lead_id, public_slug, bot_enabled")
     .eq("public_slug", publicSlug)
     .maybeSingle();
 
