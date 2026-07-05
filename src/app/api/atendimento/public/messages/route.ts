@@ -120,7 +120,7 @@ function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldNam
   const mapped = fieldFromBotPrompt(raw);
   if (mapped) return mapped;
   if (
-    raw === WHATSAPP_INVALID_MESSAGE ||
+    raw.startsWith(WHATSAPP_INVALID_MESSAGE) ||
     raw.startsWith(WHATSAPP_INVALID_FORMAT_MESSAGE) ||
     raw === WHATSAPP_PENDING_MESSAGE
   ) {
