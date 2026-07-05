@@ -721,7 +721,11 @@ export function PublicAtendimentoClient({
           setInitialTotal(nextTotal);
         }
         setPublicSlug(nextSlug);
-        applyMessages(initialMessages, "replace");
+        if (silent) {
+          applyMessagesWithBotTiming(initialMessages, "replace");
+        } else {
+          applyMessages(initialMessages, "replace");
+        }
 
         if (!initialMessages.length) {
           await loadMessages(nextSlug, "replace");
@@ -732,7 +736,7 @@ export function PublicAtendimentoClient({
         }
       }
     },
-    [applyMessages, linkSlug, loadMessages],
+    [applyMessages, applyMessagesWithBotTiming, linkSlug, loadMessages],
   );
 
   const scheduleSessionRefresh = useCallback(() => {
