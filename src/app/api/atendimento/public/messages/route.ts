@@ -26,7 +26,7 @@ const WHATSAPP_INVALID_MESSAGE =
   "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/zapi-webhook-auth.env";
+const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -258,6 +258,14 @@ export async function POST(req: Request) {
   }
 
   const extracted = extractLeadDataFromMessage(contentText) as Record<string, string>;
+  // #region debug-point B:phone-extraction
+  __dbg(traceId, "B", "[DEBUG] atendimento_phone_extraction", {
+    contentText,
+    expectedField: null,
+    extractedPhone: extracted.phone ?? null,
+    extractedKeys: Object.keys(extracted),
+  });
+  // #endregion
   const expectedField = fieldFromBotPrompt(lastBotMessage?.content_text ?? "");
   if (
     expectedField &&
@@ -287,6 +295,7 @@ export async function POST(req: Request) {
     __dbg(traceId, "E", "[DEBUG] atendimento_phone_candidate", {
       candidatePhone,
       extractedPhone: extracted.phone ?? null,
+      contentText,
       leadPhone: (lead as any)?.phone ?? null,
       expectedField,
       leadId: String((lead as any)?.id ?? ""),

@@ -79,9 +79,12 @@ function prereqError(params: {
 }
 
 function normalizePhone(phone: string) {
-  const d = phone.replace(/\D/g, "");
+  const raw = String(phone ?? "").trim();
+  const d = raw.replace(/\D/g, "");
   if (!d) return "";
+  if (raw.startsWith("+")) return d;
   if (d.startsWith("55")) return d;
+  if (d.startsWith("1") && d.length === 11) return d;
   if (d.length === 11) return `55${d}`;
   return d;
 }

@@ -10,7 +10,7 @@ import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/s
 export const runtime = "nodejs";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/zapi-webhook-auth.env";
+const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -44,9 +44,12 @@ const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<
 // #endregion
 
 function normalizePhone(phone: string) {
-  const d = phone.replace(/\D/g, "");
+  const raw = String(phone ?? "").trim();
+  const d = raw.replace(/\D/g, "");
   if (!d) return "";
+  if (raw.startsWith("+")) return d;
   if (d.startsWith("55")) return d;
+  if (d.startsWith("1") && d.length === 11) return d;
   if (d.length === 11) return `55${d}`;
   return d;
 }
@@ -522,6 +525,15 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
 
     if (eventType === "DeliveryCallback" && deliveryError) {
+      // #region debug-point D:delivery-error
+      __dbg(traceId, "D", "[DEBUG] zapi_webhook_delivery_error", {
+        callbackMessageIds,
+        pendingPhone,
+        deliveryError,
+        instanceId,
+        body,
+      });
+      // #endregion
       await admin
         .from("atendimento_history_events")
         .update({

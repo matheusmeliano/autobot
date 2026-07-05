@@ -22,7 +22,7 @@ Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 https://www.autobot.business/app/atendimento`;
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/zapi-webhook-auth.env";
+const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -56,9 +56,12 @@ const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<
 // #endregion
 
 function normalizePhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
+  const raw = String(phone ?? "").trim();
+  const digits = raw.replace(/\D/g, "");
   if (!digits) return "";
+  if (raw.startsWith("+")) return digits;
   if (digits.startsWith("55")) return digits;
+  if (digits.startsWith("1") && digits.length === 11) return digits;
   if (digits.length === 11) return `55${digits}`;
   return digits;
 }
@@ -227,6 +230,8 @@ export async function sendAtendimentoWhatsAppText(params: {
   __dbg(traceId, "B", "[DEBUG] atendimento_whatsapp_before_send", {
     phoneOriginal: params.phone,
     phoneNormalized: normalizePhone(params.phone),
+    originalDigitsLength: params.phone.replace(/\D/g, "").length,
+    normalizedDigitsLength: normalizePhone(params.phone).length,
     messagePreview: params.message.slice(0, 160),
     instanceId: config.instance_id,
     hasClientToken: Boolean(config.client_token),
@@ -245,6 +250,8 @@ export async function sendAtendimentoWhatsAppText(params: {
   __dbg(traceId, "A", "[DEBUG] atendimento_whatsapp_send_result", {
     phoneOriginal: params.phone,
     phoneNormalized: normalizePhone(params.phone),
+    originalDigitsLength: params.phone.replace(/\D/g, "").length,
+    normalizedDigitsLength: normalizePhone(params.phone).length,
     result,
   });
   // #endregion
