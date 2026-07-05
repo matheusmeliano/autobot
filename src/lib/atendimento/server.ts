@@ -77,7 +77,7 @@ async function sendZapiText(params: {
   );
 }
 
-async function notifyNewAtendimentoLead() {
+async function getAtendimentoWhatsAppConfig() {
   const admin = createSupabaseAdminClient();
   const { data: profile } = await admin
     .from("profiles")
@@ -86,7 +86,7 @@ async function notifyNewAtendimentoLead() {
     .maybeSingle();
 
   const userId = String((profile as any)?.user_id ?? "").trim();
-  if (!userId) return false;
+  if (!userId) return null;
 
   const { data: wa } = await admin
     .from("whatsapp_instances")
@@ -100,12 +100,37 @@ async function notifyNewAtendimentoLead() {
     Boolean((wa as any)?.token) &&
     (waStatus === "configured" || waStatus === "connected");
 
-  if (!canSend) return false;
+  if (!canSend) return null;
 
-  await sendZapiText({
+  return {
     instance_id: String((wa as any).instance_id),
     token: String((wa as any).token),
     client_token: String((wa as any)?.client_token ?? "").trim() || null,
+  };
+}
+
+export async function sendAtendimentoWhatsAppText(params: {
+  phone: string;
+  message: string;
+}) {
+  const config = await getAtendimentoWhatsAppConfig();
+  if (!config) {
+    throw new Error("WhatsApp do atendimento não configurado.");
+  }
+
+  await sendZapiText({
+    instance_id: config.instance_id,
+    token: config.token,
+    client_token: config.client_token,
+    phone: params.phone,
+    message: params.message,
+  });
+
+  return true;
+}
+
+async function notifyNewAtendimentoLead() {
+  await sendAtendimentoWhatsAppText({
     phone: ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE,
     message: ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE,
   });

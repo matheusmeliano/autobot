@@ -10,12 +10,18 @@ import {
   appendHistoryEvent,
   ensureInitialBotConversationFlow,
   getAuthenticatedAtendimentoConversationAccess,
+  sendAtendimentoWhatsAppText,
   syncConversationPreview,
 } from "@/lib/atendimento/server";
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
+const WHATSAPP_TEST_MESSAGE =
+  "Olá! Este é um teste rápido para confirmar o seu WhatsApp no atendimento da Lucas Brum Online Music USA.";
+const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
+const WHATSAPP_INVALID_MESSAGE =
+  "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.";
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -184,12 +190,45 @@ export async function POST(req: Request) {
     captured: extracted as any,
     expectedField,
   }) as Record<string, string>;
+  let phoneValidationFailed = false;
+
+  if (expectedField === "phone") {
+    const candidatePhone = String(captured.phone ?? extracted.phone ?? "").trim();
+    if (candidatePhone) {
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: candidatePhone,
+          message: WHATSAPP_TEST_MESSAGE,
+        });
+      } catch {
+        delete captured.phone;
+        phoneValidationFailed = true;
+      }
+    } else {
+      phoneValidationFailed = true;
+    }
+  }
+
   const nextLead = {
     ...lead,
     ...captured,
   };
   const nextMissingField = getNextMissingField(nextLead as any);
-  const botResponse = botReplyForLead({ lead: nextLead as any, messageText: contentText });
+  const defaultBotResponse = botReplyForLead({ lead: nextLead as any, messageText: contentText });
+  const botResponse = phoneValidationFailed
+    ? {
+        ...defaultBotResponse,
+        message: WHATSAPP_INVALID_MESSAGE,
+      }
+    : expectedField === "phone" && captured.phone
+      ? {
+          ...defaultBotResponse,
+          message:
+            defaultBotResponse.message === WHATSAPP_REGISTERED_SUCCESS
+              ? WHATSAPP_REGISTERED_SUCCESS
+              : `${WHATSAPP_REGISTERED_SUCCESS} ${defaultBotResponse.message}`,
+        }
+      : defaultBotResponse;
   const nextStage = nextMissingField ? botResponse.stage : "pre_cadastro_concluido";
   const nextStatus = nextMissingField ? botResponse.status : "matricula_pendente";
 
@@ -240,6 +279,21 @@ export async function POST(req: Request) {
       eventType: "data_captured",
       title: "Dados capturados automaticamente",
       details: captured,
+      actorType: "system",
+    });
+  }
+
+  if (expectedField === "phone") {
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: phoneValidationFailed ? "phone_validation_failed" : "phone_validated",
+      title: phoneValidationFailed
+        ? "WhatsApp informado não passou no teste"
+        : "WhatsApp validado e salvo",
+      details: {
+        phone: phoneValidationFailed ? extracted.phone ?? contentText : captured.phone,
+      },
       actorType: "system",
     });
   }

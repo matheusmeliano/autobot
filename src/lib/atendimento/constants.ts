@@ -35,7 +35,7 @@ export const CAPTURED_FIELD_ORDER = [
 
 export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number], string> = {
   full_name: "Perfeito. Para começarmos, me diga seu nome completo.",
-  phone: "Qual é o melhor número de telefone para falarmos com você?",
+  phone: "Perfeito! Para começar, informe seu número de WhatsApp.",
   cpf: "Pode me informar seu CPF para adiantarmos o pré-cadastro?",
   email: "Qual é o seu melhor e-mail?",
   city: "Em qual cidade você mora?",
