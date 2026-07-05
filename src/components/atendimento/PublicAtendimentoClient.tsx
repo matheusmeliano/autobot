@@ -27,6 +27,9 @@ type PortalPage = "bot" | "conta" | "arquivos";
 
 const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 5_000;
+const BLOCKED_CONVERSATION_MESSAGE = "Este atendimento foi encerrado e não aceita novas mensagens.";
+const PHONE_VALIDATION_FINAL_BLOCK_MESSAGE =
+  "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
 // #region debug-point A:bootstrap
 const __dbgUrl = "http://127.0.0.1:7777/event";
 const __dbgSession = "chat-timing-flicker";
@@ -179,6 +182,15 @@ export function PublicAtendimentoClient({
   );
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
   const latestVisibleMessage = messages.length ? messages[messages.length - 1] : null;
+  const hasPhoneValidationFinalBlockMessage = useMemo(
+    () =>
+      messages.some(
+        (message) =>
+          message.sender_role === "bot" &&
+          String(message.content_text ?? "").trim() === PHONE_VALIDATION_FINAL_BLOCK_MESSAGE,
+      ),
+    [messages],
+  );
   const isAwaitingWhatsAppValidation = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
@@ -1417,14 +1429,15 @@ export function PublicAtendimentoClient({
                 </div>
               ) : null}
 
-              {composerError ? (
+              {composerError &&
+              !(conversationBlocked && hasPhoneValidationFinalBlockMessage && composerError === BLOCKED_CONVERSATION_MESSAGE) ? (
                 <div className="mb-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
                   {composerError}
                 </div>
               ) : null}
-              {conversationBlocked ? (
+              {conversationBlocked && !hasPhoneValidationFinalBlockMessage ? (
                 <div className="mb-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">
-                  Este atendimento foi encerrado e não aceita novas mensagens.
+                  {BLOCKED_CONVERSATION_MESSAGE}
                 </div>
               ) : null}
 
