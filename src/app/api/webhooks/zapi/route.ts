@@ -260,6 +260,21 @@ async function findPendingPhoneValidationEvent(params: {
   return null;
 }
 
+async function getPhoneValidationFailureCount(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+}) {
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .in("event_type", ["phone_validation_format_failed", "phone_validation_failed"]);
+
+  return Number(count ?? 0);
+}
+
 function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null; hasPaymentMedia?: boolean }) {
   const t = normalizeText(params.text || "");
   const hasMedia = Boolean(params.hasPaymentMedia || (params.mediaUrl || "").trim());
@@ -530,6 +545,7 @@ export async function POST(req: Request) {
         callbackMessageIds,
         pendingPhone,
         deliveryError,
+        pendingDetails,
         instanceId,
         body,
       });
@@ -548,13 +564,22 @@ export async function POST(req: Request) {
         })
         .eq("id", String((pendingEvent as any).id));
 
+      const failureAttempts = await getPhoneValidationFailureCount({
+        admin,
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+      });
+      const shouldBlockConversation = failureAttempts >= 3;
+
       const { data: failureMessage } = await admin
         .from("atendimento_messages")
         .insert({
           conversation_id: String((pendingEvent as any).conversation_id ?? ""),
           sender_role: "bot",
           content_text:
-            "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.",
+            shouldBlockConversation
+              ? "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail."
+              : `Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).\n\nTentativa ${failureAttempts} de 3.`,
           media_type: "text",
           status: "entregue",
           sent_at: nowIso,
@@ -565,18 +590,43 @@ export async function POST(req: Request) {
 
       const { data: leadRow } = await admin
         .from("atendimento_leads")
-        .select("id, unread_count")
+        .select("id, unread_count, status, funnel_stage")
         .eq("id", String((pendingEvent as any).lead_id ?? ""))
         .maybeSingle();
 
       await admin
         .from("atendimento_leads")
         .update({
+          status: shouldBlockConversation ? "encerrado" : (leadRow as any)?.status ?? null,
+          funnel_stage: shouldBlockConversation ? "encerrado" : (leadRow as any)?.funnel_stage ?? null,
           unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
           last_interaction_at: nowIso,
           updated_at: nowIso,
         })
         .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+      if (shouldBlockConversation) {
+        await admin
+          .from("atendimento_conversations")
+          .update({
+            bot_enabled: false,
+            updated_at: nowIso,
+          })
+          .eq("id", String((pendingEvent as any).conversation_id ?? ""));
+
+        await admin.from("atendimento_history_events").insert({
+          lead_id: String((pendingEvent as any).lead_id ?? ""),
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          event_type: "conversation_closed",
+          title: "Atendimento encerrado após 3 tentativas inválidas de WhatsApp",
+          details: {
+            invalid_attempts: failureAttempts,
+            source: "delivery_callback",
+          },
+          actor_type: "system",
+          actor_email: null,
+        });
+      }
 
       await syncConversationPreview({
         conversationId: String((pendingEvent as any).conversation_id ?? ""),

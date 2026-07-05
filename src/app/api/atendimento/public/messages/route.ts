@@ -28,7 +28,7 @@ const WHATSAPP_INVALID_MESSAGE =
 const WHATSAPP_INVALID_FORMAT_MESSAGE =
   "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE =
-  "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado e não aceita novas mensagens.";
+  "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
 
 // #region debug-point A:bootstrap
 const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
@@ -113,6 +113,21 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldName | null {
+  const raw = String(promptText ?? "").trim();
+  if (!raw) return null;
+  const mapped = fieldFromBotPrompt(raw);
+  if (mapped) return mapped;
+  if (
+    raw === WHATSAPP_INVALID_MESSAGE ||
+    raw.startsWith(WHATSAPP_INVALID_FORMAT_MESSAGE) ||
+    raw === WHATSAPP_PENDING_MESSAGE
+  ) {
+    return "phone";
+  }
+  return null;
+}
+
 function hasSupportedWhatsAppCountryCode(value: string) {
   const raw = String(value ?? "").trim();
   const digits = raw.replace(/\D/g, "");
@@ -132,7 +147,7 @@ async function getPhoneFormatFailureCount(params: {
     .select("id", { count: "exact", head: true })
     .eq("lead_id", params.leadId)
     .eq("conversation_id", params.conversationId)
-    .eq("event_type", "phone_validation_format_failed");
+    .in("event_type", ["phone_validation_format_failed", "phone_validation_failed"]);
 
   return Number(count ?? 0);
 }
@@ -307,7 +322,7 @@ export async function POST(req: Request) {
     extractedKeys: Object.keys(extracted),
   });
   // #endregion
-  const expectedField = fieldFromBotPrompt(lastBotMessage?.content_text ?? "");
+  const expectedField = inferExpectedFieldFromBotMessage(lastBotMessage?.content_text ?? "");
   if (
     expectedField &&
     !extracted[expectedField] &&
@@ -322,6 +337,13 @@ export async function POST(req: Request) {
     expectedField,
   }) as Record<string, string>;
   let phoneValidationFailed = false;
+  let phoneValidationFailureAttempt:
+    | {
+        attempts: number;
+        shouldBlock: boolean;
+        rawPhone: string;
+      }
+    | null = null;
   let phoneFormatInvalid:
     | {
         attempts: number;
@@ -390,6 +412,16 @@ export async function POST(req: Request) {
         } catch {
           delete captured.phone;
           phoneValidationFailed = true;
+          const attempts = (await getPhoneFormatFailureCount({
+            admin,
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+          })) + 1;
+          phoneValidationFailureAttempt = {
+            attempts,
+            shouldBlock: attempts >= MAX_PHONE_FORMAT_ATTEMPTS,
+            rawPhone: candidatePhone,
+          };
           // #region debug-point D:validation-failed
           __dbg(traceId, "D", "[DEBUG] atendimento_phone_validation_failed", {
             candidatePhone,
@@ -417,7 +449,8 @@ export async function POST(req: Request) {
     }
   }
 
-  const conversationShouldBeBlocked = Boolean(phoneFormatInvalid?.shouldBlock);
+  const phoneAttemptFailure = phoneFormatInvalid ?? phoneValidationFailureAttempt;
+  const conversationShouldBeBlocked = Boolean(phoneAttemptFailure?.shouldBlock);
   const nextLead = {
     ...lead,
     ...captured,
@@ -430,14 +463,16 @@ export async function POST(req: Request) {
         status: "encerrado" as const,
         message: WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE,
       }
-    : phoneFormatInvalid
+    : phoneAttemptFailure
       ? {
-          ...defaultBotResponse,
-          message: `${WHATSAPP_INVALID_FORMAT_MESSAGE}\n\nTentativa ${phoneFormatInvalid.attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`,
+          stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
+          status: (lead as any)?.status ?? defaultBotResponse.status,
+          message: `${WHATSAPP_INVALID_FORMAT_MESSAGE}\n\nTentativa ${phoneAttemptFailure.attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`,
         }
       : phoneValidationFailed
         ? {
-            ...defaultBotResponse,
+            stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
+            status: (lead as any)?.status ?? defaultBotResponse.status,
             message: WHATSAPP_INVALID_MESSAGE,
           }
         : phoneValidationPending
@@ -451,7 +486,10 @@ export async function POST(req: Request) {
   __dbg(traceId, "B", "[DEBUG] atendimento_phone_save_decision", {
     expectedField,
     phoneValidationFailed,
+    phoneValidationFailureAttempt,
     phoneFormatInvalid,
+    leadPhone: String((lead as any)?.phone ?? ""),
+    leadCpf: String((lead as any)?.cpf ?? ""),
     capturedPhone: captured.phone ?? null,
     phoneValidationPending,
     nextMissingField,
@@ -551,12 +589,12 @@ export async function POST(req: Request) {
             ? "WhatsApp aguardando confirmação de entrega"
             : "WhatsApp validado e salvo",
       details: {
-        phone: phoneFormatInvalid
-          ? phoneFormatInvalid.rawPhone
+        phone: phoneAttemptFailure
+          ? phoneAttemptFailure.rawPhone
           : phoneValidationFailed
             ? extracted.phone ?? contentText
             : phoneValidationPending?.phone ?? captured.phone,
-        invalid_attempts: phoneFormatInvalid?.attempts ?? null,
+        invalid_attempts: phoneAttemptFailure?.attempts ?? null,
         conversation_blocked: conversationShouldBeBlocked,
         external_message_id: phoneValidationPending?.messageId ?? null,
         zaap_id: phoneValidationPending?.zaapId ?? null,
@@ -572,7 +610,7 @@ export async function POST(req: Request) {
       eventType: "conversation_closed",
       title: "Atendimento encerrado após 3 tentativas inválidas de WhatsApp",
       details: {
-        invalid_attempts: phoneFormatInvalid?.attempts ?? MAX_PHONE_FORMAT_ATTEMPTS,
+        invalid_attempts: phoneAttemptFailure?.attempts ?? MAX_PHONE_FORMAT_ATTEMPTS,
       },
       actorType: "system",
     });

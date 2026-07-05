@@ -875,6 +875,9 @@ export function PublicAtendimentoClient({
             replaceOptimisticLeadMessage(nextMessage);
             return;
           }
+          if (nextMessage.sender_role !== "lead") {
+            scheduleSessionRefresh();
+          }
           applyMessagesWithBotTiming([nextMessage], "merge");
         },
       )
@@ -897,6 +900,7 @@ export function PublicAtendimentoClient({
     publicSlug,
     replaceOptimisticLeadMessage,
     removeMessage,
+    scheduleSessionRefresh,
     supabase,
   ]);
 

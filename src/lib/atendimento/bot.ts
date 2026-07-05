@@ -84,13 +84,11 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
   if (!clean) return {};
 
   const result: CapturedData = {};
-  const cpf = clean.match(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/);
   const email = clean.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const phone = clean.match(/(?:\+?\d{1,3}\s*)?(?:\(?\d{2,3}\)?\s*)?\d(?:[\d\s-]){7,}\d/);
   const timezone = clean.match(/\b(?:America\/[A-Za-z_]+|GMT[+-]\d{1,2}|UTC[+-]\d{1,2})\b/i);
   const bestTime = clean.match(/\b(\d{1,2}[:h]\d{2}|\d{1,2}\s*(?:da manhã|da tarde|da noite))\b/i);
 
-  if (cpf) result.cpf = cpf[0];
   if (email) result.email = email[0];
   if (phone) result.phone = phone[0];
   if (timezone) result.timezone = timezone[0];
@@ -118,7 +116,6 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
   if (
     !result.full_name &&
     !email &&
-    !cpf &&
     !phone &&
     !timezone &&
     !bestTime &&
