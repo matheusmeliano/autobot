@@ -228,7 +228,7 @@ export function PublicAtendimentoClient({
       !conversationChanged &&
       Boolean(nextMessageKey) &&
       nextMessageKey !== lastMessageKeyRef.current;
-    const shouldAutoScroll = conversationChanged || newMessageArrived;
+    const shouldAutoScroll = conversationChanged || newMessageArrived || typing;
 
     lastPublicSlugRef.current = currentPublicSlug;
     lastMessageKeyRef.current = nextMessageKey;
@@ -287,12 +287,8 @@ export function PublicAtendimentoClient({
     if (isProfilePage) return;
     if (conversationBlocked) {
       resetAwaitingBotSequence();
-      return;
     }
-    if (latestVisibleMessage && latestVisibleMessage.sender_role !== "lead") {
-      resetAwaitingBotSequence();
-    }
-  }, [conversationBlocked, isProfilePage, latestVisibleMessage]);
+  }, [conversationBlocked, isProfilePage]);
 
   useEffect(() => {
     if (isProfilePage) return;
@@ -479,6 +475,7 @@ export function PublicAtendimentoClient({
     }
 
     applyMessages([nextPendingMessage], "merge");
+    startComposerCooldown();
 
     if (pendingBotMessagesRef.current.length) {
       const nextTypingStartedAt = Date.now();
@@ -491,11 +488,20 @@ export function PublicAtendimentoClient({
       return;
     }
 
-    startComposerCooldown();
   }, [applyMessages]);
 
   const applyMessagesWithBotTiming = useCallback(
     (incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
+      const shouldGateBotMessages =
+        hasLeadMessage ||
+        botResponsePendingSinceRef.current != null ||
+        pendingBotMessagesRef.current.length > 0 ||
+        awaitingBotSinceRef.current != null;
+      if (!shouldGateBotMessages) {
+        applyMessages(incomingMessages, mode);
+        return;
+      }
+
       const existingVisibleIds = new Set(messagesRef.current.map((message) => String(message.id ?? "")));
       const pendingIds = new Set(pendingBotMessagesRef.current.map((message) => String(message.id ?? "")));
       const gatedBotMessages = incomingMessages.filter((message) => {
@@ -528,7 +534,7 @@ export function PublicAtendimentoClient({
         flushPendingBotMessages();
       }, BOT_TYPING_LEAD_IN_MS);
     },
-    [applyMessages, flushPendingBotMessages],
+    [applyMessages, flushPendingBotMessages, hasLeadMessage],
   );
 
   const loadMessages = useCallback(
