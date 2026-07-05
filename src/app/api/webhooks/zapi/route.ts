@@ -548,6 +548,18 @@ export async function POST(req: Request) {
     ).toUpperCase();
     const nowIso = new Date().toISOString();
 
+    // #region debug-point G:callback-classification
+    __dbg(traceId, "G", "[DEBUG] zapi_webhook_callback_classification", {
+      eventType,
+      callbackMessageIds,
+      pendingEventId: String((pendingEvent as any)?.id ?? ""),
+      pendingPhone,
+      deliveryError,
+      statusChange,
+      body,
+    });
+    // #endregion
+
     if (eventType === "DeliveryCallback" && deliveryError) {
       // #region debug-point D:delivery-error
       __dbg(traceId, "D", "[DEBUG] zapi_webhook_delivery_error", {
@@ -645,6 +657,17 @@ export async function POST(req: Request) {
 
       return Response.json({ ok: true, validated: false, reason: "delivery_error" });
     }
+
+    // #region debug-point G:callback-awaiting-status
+    __dbg(traceId, "G", "[DEBUG] zapi_webhook_callback_awaiting_final_status", {
+      eventType,
+      callbackMessageIds,
+      pendingEventId: String((pendingEvent as any)?.id ?? ""),
+      pendingPhone,
+      deliveryError,
+      statusChange,
+    });
+    // #endregion
 
     if (eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ")) {
       const { data: leadRecord } = await admin

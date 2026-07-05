@@ -157,6 +157,17 @@ export function PublicAtendimentoClient({
     [messages],
   );
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
+  const isAwaitingWhatsAppValidation = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.sender_role !== "bot") continue;
+      return (
+        String(message.content_text ?? "").trim() ===
+        "Perfeito! Estou validando seu WhatsApp. Aguarde um instante."
+      );
+    }
+    return false;
+  }, [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
   const typing = !loading && !authError && !conversationBlocked && !isProfilePage && (isInitialFlow || awaitingBotSince != null);
   const composerDisabled = loading || Boolean(authError) || isProfilePage || conversationBlocked;
@@ -828,7 +839,9 @@ export function PublicAtendimentoClient({
   }, [flushPendingBotMessages]);
 
   useEffect(() => {
-    if (isProfilePage || !publicSlug || authError || loading || !isInitialFlow) return;
+    if (isProfilePage || !publicSlug || authError || loading || (!isInitialFlow && !isAwaitingWhatsAppValidation)) {
+      return;
+    }
     let active = true;
     let timeoutId: number | null = null;
 
@@ -845,7 +858,7 @@ export function PublicAtendimentoClient({
       active = false;
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
-  }, [authError, isInitialFlow, isProfilePage, loadMessages, loading, publicSlug]);
+  }, [authError, isAwaitingWhatsAppValidation, isInitialFlow, isProfilePage, loadMessages, loading, publicSlug]);
 
   useEffect(() => {
     if (isProfilePage || !publicSlug || !conversationId || !leadId || authError) return;

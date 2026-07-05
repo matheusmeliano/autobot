@@ -20,7 +20,7 @@ import fs from "node:fs";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
-const PHONE_VALIDATION_TIMEOUT_MS = 60_000;
+const PHONE_VALIDATION_TIMEOUT_MS = 20_000;
 const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
 const WHATSAPP_PENDING_MESSAGE =
   "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
@@ -179,6 +179,16 @@ async function expirePendingPhoneValidationIfNeeded(params: {
   if (!pendingEvent?.id) return false;
 
   const createdAtMs = new Date(String((pendingEvent as any).created_at ?? "")).getTime();
+  // #region debug-point F:pending-timeout-check
+  __dbg(`pending-timeout-${params.conversationId}`, "F", "[DEBUG] atendimento_pending_timeout_check", {
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    pendingEventId: String((pendingEvent as any).id ?? ""),
+    pendingCreatedAt: String((pendingEvent as any).created_at ?? ""),
+    pendingAgeMs: Number.isNaN(createdAtMs) ? null : Date.now() - createdAtMs,
+    timeoutMs: PHONE_VALIDATION_TIMEOUT_MS,
+  });
+  // #endregion
   if (Number.isNaN(createdAtMs) || Date.now() - createdAtMs < PHONE_VALIDATION_TIMEOUT_MS) {
     return false;
   }
@@ -203,6 +213,13 @@ async function expirePendingPhoneValidationIfNeeded(params: {
     .maybeSingle();
 
   if (!updatedPendingEvent?.id) {
+    // #region debug-point F:pending-timeout-race
+    __dbg(`pending-timeout-${params.conversationId}`, "F", "[DEBUG] atendimento_pending_timeout_update_skipped", {
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      pendingEventId: String((pendingEvent as any).id ?? ""),
+    });
+    // #endregion
     return false;
   }
 
@@ -270,6 +287,17 @@ async function expirePendingPhoneValidationIfNeeded(params: {
     contentText: timeoutMessage,
     createdAt: nowIso,
   });
+
+  // #region debug-point F:pending-timeout-expired
+  __dbg(`pending-timeout-${params.conversationId}`, "F", "[DEBUG] atendimento_pending_timeout_expired", {
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    pendingEventId: String((pendingEvent as any).id ?? ""),
+    failureAttempts,
+    shouldBlockConversation,
+    timeoutMs: PHONE_VALIDATION_TIMEOUT_MS,
+  });
+  // #endregion
 
   return true;
 }
