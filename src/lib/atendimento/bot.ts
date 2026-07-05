@@ -53,7 +53,7 @@ export function filterCapturedDataForLead(params: {
 export function initialBotMessages() {
   return [
     "Olá. Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.",
-    "Nossa metodologia foi criada para acelerar sua evolução musical com acompanhamento individual, clareza de rotina e foco prático.",
+    "Nossa metodologia inclui uma aula online ao vivo por semana, com acompanhamento individual.",
     "Quero te convidar para uma aula experimental e já adiantar o seu pré-cadastro por aqui.",
     CAPTURED_FIELD_PROMPTS.full_name,
   ];
