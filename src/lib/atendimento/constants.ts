@@ -35,7 +35,8 @@ export const CAPTURED_FIELD_ORDER = [
 
 export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number], string> = {
   full_name: "Perfeito. Para começarmos, me diga seu nome completo.",
-  phone: "Perfeito! Para começar, informe seu número de WhatsApp.",
+  phone:
+    "Perfeito! Para começarmos, informe o número do seu WhatsApp no formato internacional.\n\nExemplo: +1 (407) 555-1234\n\nImportante: inclua o código do país +1 no início do número.",
   cpf: "Pode me informar seu CPF para adiantarmos o pré-cadastro?",
   email: "Qual é o seu melhor e-mail?",
   city: "Em qual cidade você mora?",

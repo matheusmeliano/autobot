@@ -29,7 +29,10 @@ test("initialBotMessages inicia o fluxo com convite e pré-cadastro", () => {
   assert.equal(messages.length, 4);
   assert.match(messages[0], /bem-vindo/i);
   assert.match(messages[2], /aula experimental/i);
-  assert.equal(messages[3], "Perfeito! Para começar, informe seu número de WhatsApp.");
+  assert.equal(
+    messages[3],
+    "Perfeito! Para começarmos, informe o número do seu WhatsApp no formato internacional.\n\nExemplo: +1 (407) 555-1234\n\nImportante: inclua o código do país +1 no início do número.",
+  );
 });
 
 test("initialBotMessages inclui o primeiro nome quando ele estiver disponivel", () => {
