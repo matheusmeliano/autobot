@@ -11,6 +11,108 @@ import { initialBotMessages } from "@/lib/atendimento/bot";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 
+const ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE = "+1 321 297 3565";
+const ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE = `🔔 Novo interessado recebido no Bot!
+
+Um novo interessado acabou de entrar na fila de atendimento.
+
+Acesse o painel para visualizar os detalhes e iniciar o atendimento:
+
+https://www.autobot.business/app/atendimento`;
+
+function normalizePhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("55")) return digits;
+  return digits;
+}
+
+async function sendZapiText(params: {
+  instance_id: string;
+  token: string;
+  client_token?: string | null;
+  phone: string;
+  message: string;
+}) {
+  const body = JSON.stringify({ phone: normalizePhone(params.phone), message: params.message });
+  const baseUrl = `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}`;
+  const urlWithTokenInPath = `${baseUrl}/token/${encodeURIComponent(params.token)}/send-text`;
+  const urlWithHeader = `${baseUrl}/send-text`;
+
+  const trySend = async (url: string, includeHeaderToken: boolean) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(includeHeaderToken && params.client_token ? { "Client-Token": params.client_token } : {}),
+      },
+      body,
+    });
+    const data = await response.json().catch(() => null);
+    return { response, data };
+  };
+
+  const first = await trySend(urlWithTokenInPath, Boolean(params.client_token));
+  if (first.response.ok) return first.data;
+
+  const errText = JSON.stringify(first.data ?? "");
+  const mentionsClientToken = /client-token/i.test(errText);
+  const isForbidden = first.response.status === 403;
+  const isBadRequest = first.response.status === 400;
+
+  if (mentionsClientToken && !params.client_token) {
+    throw new Error("Client-Token não configurado no WhatsApp.");
+  }
+
+  if ((isBadRequest || isForbidden) && mentionsClientToken) {
+    const second = await trySend(urlWithHeader, Boolean(params.client_token));
+    if (second.response.ok) return second.data;
+    throw new Error(
+      `Falha ao enviar: ${second.response.status} ${JSON.stringify(second.data) ?? ""}`.trim(),
+    );
+  }
+
+  throw new Error(
+    `Falha ao enviar: ${first.response.status} ${JSON.stringify(first.data) ?? ""}`.trim(),
+  );
+}
+
+async function notifyNewAtendimentoLead() {
+  const admin = createSupabaseAdminClient();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("user_id, email")
+    .ilike("email", ATENDIMENTO_EMAIL)
+    .maybeSingle();
+
+  const userId = String((profile as any)?.user_id ?? "").trim();
+  if (!userId) return false;
+
+  const { data: wa } = await admin
+    .from("whatsapp_instances")
+    .select("instance_id, token, client_token, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const waStatus = String((wa as any)?.status ?? "").trim().toLowerCase();
+  const canSend =
+    Boolean((wa as any)?.instance_id) &&
+    Boolean((wa as any)?.token) &&
+    (waStatus === "configured" || waStatus === "connected");
+
+  if (!canSend) return false;
+
+  await sendZapiText({
+    instance_id: String((wa as any).instance_id),
+    token: String((wa as any).token),
+    client_token: String((wa as any)?.client_token ?? "").trim() || null,
+    phone: ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE,
+    message: ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE,
+  });
+
+  return true;
+}
+
 export async function requireAtendimentoUser() {
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
   const {
@@ -110,6 +212,8 @@ export async function createPublicLeadSession(params: { origin?: string | null; 
   if (!lead?.id) {
     throw new Error("Não foi possível criar o lead.");
   }
+
+  await notifyNewAtendimentoLead().catch(() => {});
 
   const { data: conversation } = await admin
     .from("atendimento_conversations")
@@ -211,6 +315,9 @@ export async function ensureAtendimentoLeadForAuthenticatedUser(params: {
       .maybeSingle();
 
     lead = createdLead;
+    if (createdLead?.id) {
+      await notifyNewAtendimentoLead().catch(() => {});
+    }
   } else {
     const nextLeadPatch: Record<string, unknown> = {
       auth_user_id: params.userId,
