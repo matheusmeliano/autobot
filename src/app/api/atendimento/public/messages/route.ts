@@ -155,7 +155,6 @@ async function getPhoneFormatFailureCount(params: {
 function looksLikeFieldValue(field: CapturedFieldName, text: string) {
   const clean = text.trim();
   if (!clean) return false;
-  if (field === "cpf") return /\d{11}/.test(clean.replace(/\D/g, ""));
   if (field === "phone") return clean.replace(/\D/g, "").length >= 8;
   if (field === "email") return /@/.test(clean);
   if (field === "timezone") return /(america\/|gmt|utc)/i.test(clean);
