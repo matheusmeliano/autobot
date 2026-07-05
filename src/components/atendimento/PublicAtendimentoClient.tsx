@@ -157,6 +157,7 @@ export function PublicAtendimentoClient({
     [messages],
   );
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
+  const latestVisibleMessage = messages.length ? messages[messages.length - 1] : null;
   const isAwaitingWhatsAppValidation = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
@@ -277,6 +278,17 @@ export function PublicAtendimentoClient({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    if (isProfilePage) return;
+    if (conversationBlocked) {
+      resetAwaitingBotSequence();
+      return;
+    }
+    if (latestVisibleMessage && latestVisibleMessage.sender_role !== "lead") {
+      resetAwaitingBotSequence();
+    }
+  }, [conversationBlocked, isProfilePage, latestVisibleMessage]);
 
   useEffect(() => {
     if (isProfilePage) return;
