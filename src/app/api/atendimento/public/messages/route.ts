@@ -21,12 +21,12 @@ import fs from "node:fs";
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
 const WHATSAPP_PENDING_MESSAGE =
-  "Perfeito. Estou validando esse WhatsApp agora. Assim que a entrega for confirmada, continuo seu cadastro automaticamente.";
+  "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
 const WHATSAPP_INVALID_MESSAGE =
   "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/public-whatsapp-send.env";
+const __dbgEnvPath = ".dbg/zapi-webhook-auth.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
