@@ -20,11 +20,12 @@ import fs from "node:fs";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
+const PHONE_VALIDATION_TIMEOUT_MS = 60_000;
 const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
 const WHATSAPP_PENDING_MESSAGE =
   "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
 const WHATSAPP_INVALID_MESSAGE =
-  "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.";
+  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FORMAT_MESSAGE =
   "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE =
@@ -152,6 +153,127 @@ async function getPhoneFormatFailureCount(params: {
   return Number(count ?? 0);
 }
 
+function buildPhoneValidationRetryMessage(attempts: number) {
+  return `${WHATSAPP_INVALID_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`;
+}
+
+function buildPhoneFormatRetryMessage(attempts: number) {
+  return `${WHATSAPP_INVALID_FORMAT_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`;
+}
+
+async function expirePendingPhoneValidationIfNeeded(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+}) {
+  const { data: pendingEvent } = await params.admin
+    .from("atendimento_history_events")
+    .select("id, details, created_at")
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", "phone_validation_pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!pendingEvent?.id) return false;
+
+  const createdAtMs = new Date(String((pendingEvent as any).created_at ?? "")).getTime();
+  if (Number.isNaN(createdAtMs) || Date.now() - createdAtMs < PHONE_VALIDATION_TIMEOUT_MS) {
+    return false;
+  }
+
+  const nowIso = new Date().toISOString();
+  const pendingDetails = ((pendingEvent as any).details ?? {}) as Record<string, unknown>;
+  const { data: updatedPendingEvent } = await params.admin
+    .from("atendimento_history_events")
+    .update({
+      event_type: "phone_validation_failed",
+      title: "WhatsApp informado não passou no teste",
+      details: {
+        ...pendingDetails,
+        final_status: "TIMEOUT",
+        error: "validation_timeout",
+        failed_at: nowIso,
+      },
+    })
+    .eq("id", String((pendingEvent as any).id))
+    .eq("event_type", "phone_validation_pending")
+    .select("id")
+    .maybeSingle();
+
+  if (!updatedPendingEvent?.id) {
+    return false;
+  }
+
+  const failureAttempts = await getPhoneFormatFailureCount({
+    admin: params.admin,
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+  });
+  const shouldBlockConversation = failureAttempts >= MAX_PHONE_FORMAT_ATTEMPTS;
+  const timeoutMessage = shouldBlockConversation
+    ? WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE
+    : buildPhoneValidationRetryMessage(failureAttempts);
+
+  await params.admin.from("atendimento_messages").insert({
+    conversation_id: params.conversationId,
+    sender_role: "bot",
+    content_text: timeoutMessage,
+    media_type: "text",
+    status: "entregue",
+    sent_at: nowIso,
+    delivered_at: nowIso,
+  });
+
+  const { data: leadRow } = await params.admin
+    .from("atendimento_leads")
+    .select("unread_count, status, funnel_stage")
+    .eq("id", params.leadId)
+    .maybeSingle();
+
+  await params.admin
+    .from("atendimento_leads")
+    .update({
+      status: shouldBlockConversation ? "encerrado" : (leadRow as any)?.status ?? null,
+      funnel_stage: shouldBlockConversation ? "encerrado" : (leadRow as any)?.funnel_stage ?? null,
+      unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
+      last_interaction_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq("id", params.leadId);
+
+  if (shouldBlockConversation) {
+    await params.admin
+      .from("atendimento_conversations")
+      .update({
+        bot_enabled: false,
+        updated_at: nowIso,
+      })
+      .eq("id", params.conversationId);
+
+    await appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "conversation_closed",
+      title: "Atendimento encerrado após 3 tentativas inválidas de WhatsApp",
+      details: {
+        invalid_attempts: failureAttempts,
+        source: "validation_timeout",
+      },
+      actorType: "system",
+    });
+  }
+
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: timeoutMessage,
+    createdAt: nowIso,
+  });
+
+  return true;
+}
+
 function looksLikeFieldValue(field: CapturedFieldName, text: string) {
   const clean = text.trim();
   if (!clean) return false;
@@ -219,6 +341,12 @@ export async function GET(req: Request) {
   const { admin, conversation } = access;
 
   await ensureInitialBotConversationFlow({
+    leadId: String(conversation.lead_id),
+    conversationId: String(conversation.id),
+  });
+
+  await expirePendingPhoneValidationIfNeeded({
+    admin,
     leadId: String(conversation.lead_id),
     conversationId: String(conversation.id),
   });
@@ -462,17 +590,17 @@ export async function POST(req: Request) {
         status: "encerrado" as const,
         message: WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE,
       }
-    : phoneAttemptFailure
+    : phoneFormatInvalid
       ? {
           stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
           status: (lead as any)?.status ?? defaultBotResponse.status,
-          message: `${WHATSAPP_INVALID_FORMAT_MESSAGE}\n\nTentativa ${phoneAttemptFailure.attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`,
+          message: buildPhoneFormatRetryMessage(phoneFormatInvalid.attempts),
         }
-      : phoneValidationFailed
+      : phoneValidationFailureAttempt
         ? {
             stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
             status: (lead as any)?.status ?? defaultBotResponse.status,
-            message: WHATSAPP_INVALID_MESSAGE,
+            message: buildPhoneValidationRetryMessage(phoneValidationFailureAttempt.attempts),
           }
         : phoneValidationPending
           ? {

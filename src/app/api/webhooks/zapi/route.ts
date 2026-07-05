@@ -8,6 +8,15 @@ import { botReplyForLead } from "@/lib/atendimento/bot";
 import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
 
 export const runtime = "nodejs";
+const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
+const WHATSAPP_INVALID_MESSAGE =
+  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
+const WHATSAPP_INVALID_FINAL_MESSAGE =
+  "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
+
+function buildPhoneValidationRetryMessage(attempts: number) {
+  return `${WHATSAPP_INVALID_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_VALIDATION_ATTEMPTS}.`;
+}
 
 // #region debug-point A:bootstrap
 const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
@@ -578,8 +587,8 @@ export async function POST(req: Request) {
           sender_role: "bot",
           content_text:
             shouldBlockConversation
-              ? "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail."
-              : `Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).\n\nTentativa ${failureAttempts} de 3.`,
+              ? WHATSAPP_INVALID_FINAL_MESSAGE
+              : buildPhoneValidationRetryMessage(failureAttempts),
           media_type: "text",
           status: "entregue",
           sent_at: nowIso,
