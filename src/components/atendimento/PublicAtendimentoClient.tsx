@@ -11,7 +11,6 @@ import {
   ATENDIMENTO_DOCUMENT_MIME_ACCEPT,
   ATENDIMENTO_IMAGE_MIME_ACCEPT,
   ATENDIMENTO_VIDEO_MIME_ACCEPT,
-  CAPTURED_FIELD_PROMPTS,
   formatAtendimentoFileSize,
   getAtendimentoAttachmentTitle,
   getAtendimentoMediaTypeFromMimeType,
@@ -19,6 +18,7 @@ import {
   type AtendimentoUploadItem,
   validateAtendimentoFiles,
 } from "@/lib/atendimento/files";
+import { CAPTURED_FIELD_PROMPTS } from "@/lib/atendimento/constants";
 import { uploadAtendimentoFileWithProgress } from "@/lib/atendimento/upload-client";
 import type { AtendimentoFileRecord, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
