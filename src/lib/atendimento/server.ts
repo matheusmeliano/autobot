@@ -10,6 +10,7 @@ import {
 import { initialBotMessages } from "@/lib/atendimento/bot";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
+import fs from "node:fs";
 
 const ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE = "+1 321 297 3565";
 const ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE = `🔔 Novo interessado recebido no Bot!
@@ -19,6 +20,40 @@ Um novo interessado acabou de entrar na fila de atendimento.
 Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 
 https://www.autobot.business/app/atendimento`;
+
+// #region debug-point A:bootstrap
+const __dbgEnvPath = ".dbg/public-whatsapp-send.env";
+const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
+const __dbgMap = Object.fromEntries(
+  __dbgEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
+const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
+const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  if (!__dbgUrl || !__dbgSession) return;
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre-fix",
+      hypothesisId,
+      traceId,
+      location: "src/lib/atendimento/server.ts",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
 
 function normalizePhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -77,6 +112,37 @@ async function sendZapiText(params: {
   );
 }
 
+async function updateZapiWebhook(params: {
+  instance_id: string;
+  token: string;
+  client_token?: string | null;
+  endpoint: string;
+  value: string;
+  extraBody?: Record<string, unknown>;
+}) {
+  const response = await fetch(
+    `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}/token/${encodeURIComponent(params.token)}/${params.endpoint}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(params.client_token ? { "Client-Token": params.client_token } : {}),
+      },
+      body: JSON.stringify({
+        value: params.value,
+        ...(params.extraBody ?? {}),
+      }),
+    },
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      `Falha ao configurar webhook ${params.endpoint}: ${response.status} ${JSON.stringify(data) ?? ""}`.trim(),
+    );
+  }
+  return data;
+}
+
 async function getAtendimentoWhatsAppConfig() {
   const admin = createSupabaseAdminClient();
   const { data: profile } = await admin
@@ -112,19 +178,59 @@ async function getAtendimentoWhatsAppConfig() {
 export async function sendAtendimentoWhatsAppText(params: {
   phone: string;
   message: string;
+  baseUrl?: string | null;
 }) {
+  const traceId = `wa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const config = await getAtendimentoWhatsAppConfig();
   if (!config) {
+    // #region debug-point C:missing-config
+    __dbg(traceId, "C", "[DEBUG] atendimento_whatsapp_missing_config", {
+      phone: params.phone,
+    });
+    // #endregion
     throw new Error("WhatsApp do atendimento não configurado.");
   }
 
-  return await sendZapiText({
+  const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
+  if (baseUrl) {
+    const webhookUrl = `${baseUrl}/api/webhooks/zapi`;
+    await updateZapiWebhook({
+      instance_id: config.instance_id,
+      token: config.token,
+      client_token: config.client_token,
+      endpoint: "update-every-webhooks",
+      value: webhookUrl,
+      extraBody: { notifySentByMe: true },
+    });
+  }
+
+  // #region debug-point B:before-send
+  __dbg(traceId, "B", "[DEBUG] atendimento_whatsapp_before_send", {
+    phoneOriginal: params.phone,
+    phoneNormalized: normalizePhone(params.phone),
+    messagePreview: params.message.slice(0, 160),
+    instanceId: config.instance_id,
+    hasClientToken: Boolean(config.client_token),
+  });
+  // #endregion
+
+  const result = await sendZapiText({
     instance_id: config.instance_id,
     token: config.token,
     client_token: config.client_token,
     phone: params.phone,
     message: params.message,
   });
+
+  // #region debug-point A:send-result
+  __dbg(traceId, "A", "[DEBUG] atendimento_whatsapp_send_result", {
+    phoneOriginal: params.phone,
+    phoneNormalized: normalizePhone(params.phone),
+    result,
+  });
+  // #endregion
+
+  return result;
 }
 
 async function notifyNewAtendimentoLead() {

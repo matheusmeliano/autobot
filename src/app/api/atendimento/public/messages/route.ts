@@ -14,12 +14,50 @@ import {
   syncConversationPreview,
 } from "@/lib/atendimento/server";
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
+import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
+import fs from "node:fs";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
+const WHATSAPP_PENDING_MESSAGE =
+  "Perfeito. Estou validando esse WhatsApp agora. Assim que a entrega for confirmada, continuo seu cadastro automaticamente.";
 const WHATSAPP_INVALID_MESSAGE =
   "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.";
+
+// #region debug-point A:bootstrap
+const __dbgEnvPath = ".dbg/public-whatsapp-send.env";
+const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
+const __dbgMap = Object.fromEntries(
+  __dbgEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
+const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
+const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  if (!__dbgUrl || !__dbgSession) return;
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre-fix",
+      hypothesisId,
+      traceId,
+      location: "src/app/api/atendimento/public/messages/route.ts",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
 
 function firstNameFromLead(lead: { full_name?: string | null }) {
   const clean = String(lead.full_name ?? "").trim().replace(/\s+/g, " ");
@@ -53,6 +91,17 @@ function wasWhatsAppSendAccepted(payload: unknown) {
       data.text?.toString().trim() ||
       data.message?.toString().trim(),
   );
+}
+
+function extractWhatsAppMessageIds(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return { messageId: null, zaapId: null };
+  }
+  const data = payload as Record<string, unknown>;
+  return {
+    messageId: String(data.messageId ?? data.id ?? "").trim() || null,
+    zaapId: String(data.zaapId ?? "").trim() || null,
+  };
 }
 
 async function sleep(ms: number) {
@@ -152,6 +201,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const traceId = `public-wa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const body = await req.json().catch(() => null);
   const publicSlug = String(body?.public_slug ?? "").trim();
   const contentText = String(body?.content_text ?? "").trim();
@@ -223,24 +273,66 @@ export async function POST(req: Request) {
     expectedField,
   }) as Record<string, string>;
   let phoneValidationFailed = false;
+  let phoneValidationPending:
+    | {
+        phone: string;
+        messageId: string | null;
+        zaapId: string | null;
+      }
+    | null = null;
 
   if (expectedField === "phone") {
     const candidatePhone = String(captured.phone ?? extracted.phone ?? "").trim();
+    // #region debug-point E:phone-candidate
+    __dbg(traceId, "E", "[DEBUG] atendimento_phone_candidate", {
+      candidatePhone,
+      extractedPhone: extracted.phone ?? null,
+      leadPhone: (lead as any)?.phone ?? null,
+      expectedField,
+      leadId: String((lead as any)?.id ?? ""),
+    });
+    // #endregion
     if (candidatePhone) {
       try {
         const sendResult = await sendAtendimentoWhatsAppText({
           phone: candidatePhone,
           message: buildWhatsAppWelcomeMessage(lead as any),
+          baseUrl: resolveBaseUrlFromHeaders(req.headers),
         });
+        const sendIds = extractWhatsAppMessageIds(sendResult);
+        // #region debug-point A:acceptance-check
+        __dbg(traceId, "A", "[DEBUG] atendimento_phone_send_acceptance_check", {
+          candidatePhone,
+          sendResult,
+          accepted: wasWhatsAppSendAccepted(sendResult),
+          sendIds,
+        });
+        // #endregion
         if (!wasWhatsAppSendAccepted(sendResult)) {
           throw new Error("Mensagem de teste não confirmada.");
         }
+        delete captured.phone;
+        phoneValidationPending = {
+          phone: candidatePhone,
+          messageId: sendIds.messageId,
+          zaapId: sendIds.zaapId,
+        };
       } catch {
         delete captured.phone;
         phoneValidationFailed = true;
+        // #region debug-point D:validation-failed
+        __dbg(traceId, "D", "[DEBUG] atendimento_phone_validation_failed", {
+          candidatePhone,
+        });
+        // #endregion
       }
     } else {
       phoneValidationFailed = true;
+      // #region debug-point D:missing-phone
+      __dbg(traceId, "D", "[DEBUG] atendimento_phone_missing_candidate", {
+        contentText,
+      });
+      // #endregion
     }
   }
 
@@ -255,15 +347,23 @@ export async function POST(req: Request) {
         ...defaultBotResponse,
         message: WHATSAPP_INVALID_MESSAGE,
       }
-    : expectedField === "phone" && captured.phone
+    : phoneValidationPending
       ? {
-          ...defaultBotResponse,
-          message:
-            defaultBotResponse.message === WHATSAPP_REGISTERED_SUCCESS
-              ? WHATSAPP_REGISTERED_SUCCESS
-              : `${WHATSAPP_REGISTERED_SUCCESS} ${defaultBotResponse.message}`,
+          stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
+          status: (lead as any)?.status ?? defaultBotResponse.status,
+          message: WHATSAPP_PENDING_MESSAGE,
         }
       : defaultBotResponse;
+  // #region debug-point B:save-decision
+  __dbg(traceId, "B", "[DEBUG] atendimento_phone_save_decision", {
+    expectedField,
+    phoneValidationFailed,
+    capturedPhone: captured.phone ?? null,
+    phoneValidationPending,
+    nextMissingField,
+    botMessage: botResponse.message,
+  });
+  // #endregion
   const nextStage = nextMissingField ? botResponse.stage : "pre_cadastro_concluido";
   const nextStatus = nextMissingField ? botResponse.status : "matricula_pendente";
 
@@ -322,12 +422,22 @@ export async function POST(req: Request) {
     await appendHistoryEvent({
       leadId: String(lead.id),
       conversationId: String(conversation.id),
-      eventType: phoneValidationFailed ? "phone_validation_failed" : "phone_validated",
+      eventType: phoneValidationFailed
+        ? "phone_validation_failed"
+        : phoneValidationPending
+          ? "phone_validation_pending"
+          : "phone_validated",
       title: phoneValidationFailed
         ? "WhatsApp informado não passou no teste"
-        : "WhatsApp validado e salvo",
+        : phoneValidationPending
+          ? "WhatsApp aguardando confirmação de entrega"
+          : "WhatsApp validado e salvo",
       details: {
-        phone: phoneValidationFailed ? extracted.phone ?? contentText : captured.phone,
+        phone: phoneValidationFailed
+          ? extracted.phone ?? contentText
+          : phoneValidationPending?.phone ?? captured.phone,
+        external_message_id: phoneValidationPending?.messageId ?? null,
+        zaap_id: phoneValidationPending?.zaapId ?? null,
       },
       actorType: "system",
     });

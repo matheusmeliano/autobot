@@ -3,6 +3,8 @@ import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
+import { botReplyForLead } from "@/lib/atendimento/bot";
+import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
 
 export const runtime = "nodejs";
 
@@ -162,6 +164,62 @@ function extractMediaInfo(body: any) {
     mediaUrl,
     hasPaymentMedia: Boolean(mediaUrl || hasImageFlag || hasDocumentFlag),
   };
+}
+
+async function upsertCapturedPhoneField(params: {
+  leadId: string;
+  sourceMessageId: string;
+  phone: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data: existing } = await admin
+    .from("atendimento_captured_fields")
+    .select("id")
+    .eq("lead_id", params.leadId)
+    .eq("field_name", "phone")
+    .maybeSingle();
+
+  if (existing?.id) {
+    await admin
+      .from("atendimento_captured_fields")
+      .update({
+        field_value: params.phone,
+        source_message_id: params.sourceMessageId,
+        confidence: 0.92,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", String(existing.id));
+    return;
+  }
+
+  await admin.from("atendimento_captured_fields").insert({
+    lead_id: params.leadId,
+    field_name: "phone",
+    field_value: params.phone,
+    source_message_id: params.sourceMessageId,
+    confidence: 0.92,
+  });
+}
+
+async function findPendingPhoneValidationEvent(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  messageIds: string[];
+}) {
+  for (const messageId of params.messageIds) {
+    if (!messageId) continue;
+    const { data } = await params.admin
+      .from("atendimento_history_events")
+      .select("id, lead_id, conversation_id, details")
+      .eq("event_type", "phone_validation_pending")
+      .contains("details", { external_message_id: messageId })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) {
+      return data as any;
+    }
+  }
+  return null;
 }
 
 function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null; hasPaymentMedia?: boolean }) {
@@ -362,6 +420,184 @@ export async function POST(req: Request) {
     },
     { onConflict: "provider,event_id" },
   );
+
+  const callbackMessageIds = Array.from(
+    new Set(
+      [
+        rawEventId,
+        ...(Array.isArray((body as any).ids)
+          ? (body as any).ids.map((value: unknown) => String(value ?? "").trim())
+          : []),
+      ].filter(Boolean),
+    ),
+  );
+  if (eventType === "DeliveryCallback" || eventType === "MessageStatusCallback") {
+    const pendingEvent = await findPendingPhoneValidationEvent({
+      admin,
+      messageIds: callbackMessageIds,
+    });
+
+    if (!pendingEvent?.id) {
+      return Response.json({ ok: true, ignored: true, reason: "no_pending_phone_validation" });
+    }
+
+    const pendingDetails = (pendingEvent as any)?.details ?? {};
+    const pendingPhone = String((pendingDetails as any)?.phone ?? "").trim();
+    const deliveryError = getFirstNonEmpty((body as any).error, (body as any).data?.error);
+    const statusChange = normalizeText(
+      getFirstNonEmpty((body as any).status, (body as any).data?.status),
+    ).toUpperCase();
+    const nowIso = new Date().toISOString();
+
+    if (eventType === "DeliveryCallback" && deliveryError) {
+      await admin
+        .from("atendimento_history_events")
+        .update({
+          event_type: "phone_validation_failed",
+          title: "WhatsApp informado não passou no teste",
+          details: {
+            ...(pendingDetails as Record<string, unknown>),
+            final_status: "DELIVERY_ERROR",
+            error: deliveryError,
+            failed_at: nowIso,
+          },
+        })
+        .eq("id", String((pendingEvent as any).id));
+
+      const { data: failureMessage } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          sender_role: "bot",
+          content_text:
+            "Não consegui entregar a mensagem de teste nesse WhatsApp. Por favor, informe um WhatsApp válido.",
+          media_type: "text",
+          status: "entregue",
+          sent_at: nowIso,
+          delivered_at: nowIso,
+        })
+        .select("id, content_text")
+        .maybeSingle();
+
+      const { data: leadRow } = await admin
+        .from("atendimento_leads")
+        .select("id, unread_count")
+        .eq("id", String((pendingEvent as any).lead_id ?? ""))
+        .maybeSingle();
+
+      await admin
+        .from("atendimento_leads")
+        .update({
+          unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+      await syncConversationPreview({
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        contentText: String((failureMessage as any)?.content_text ?? ""),
+        createdAt: nowIso,
+      });
+
+      return Response.json({ ok: true, validated: false, reason: "delivery_error" });
+    }
+
+    if (eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ")) {
+      const { data: leadRecord } = await admin
+        .from("atendimento_leads")
+        .select("*")
+        .eq("id", String((pendingEvent as any).lead_id ?? ""))
+        .maybeSingle();
+
+      if (!leadRecord?.id || !pendingPhone) {
+        return Response.json({ ok: true, ignored: true, reason: "missing_pending_lead_or_phone" });
+      }
+
+      const nextLead = {
+        ...(leadRecord as any),
+        phone: pendingPhone,
+      };
+      const botResponse = botReplyForLead({
+        lead: nextLead,
+        messageText: "",
+      });
+      const successMessage =
+        botResponse.message === "WhatsApp registrado com sucesso."
+          ? "WhatsApp registrado com sucesso."
+          : `WhatsApp registrado com sucesso. ${botResponse.message}`;
+      const nextStatus = botResponse.message
+        ? botResponse.status
+        : "matricula_pendente";
+      const nextStage = botResponse.message
+        ? botResponse.stage
+        : "pre_cadastro_concluido";
+
+      await admin
+        .from("atendimento_leads")
+        .update({
+          phone: pendingPhone,
+          status: nextStatus,
+          funnel_stage: nextStage,
+          unread_count: Number((leadRecord as any)?.unread_count ?? 0) + 1,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+      await upsertCapturedPhoneField({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        sourceMessageId: callbackMessageIds[0] ?? String((pendingEvent as any).id ?? ""),
+        phone: pendingPhone,
+      });
+
+      await admin
+        .from("atendimento_history_events")
+        .update({
+          event_type: "phone_validated",
+          title: "WhatsApp validado e salvo",
+          details: {
+            ...(pendingDetails as Record<string, unknown>),
+            final_status: statusChange,
+            confirmed_at: nowIso,
+          },
+        })
+        .eq("id", String((pendingEvent as any).id));
+
+      const { data: outbound } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          sender_role: "bot",
+          content_text: successMessage,
+          media_type: "text",
+          status: "entregue",
+          sent_at: nowIso,
+          delivered_at: nowIso,
+        })
+        .select("content_text")
+        .maybeSingle();
+
+      await syncConversationPreview({
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        contentText: String((outbound as any)?.content_text ?? successMessage),
+        createdAt: nowIso,
+      });
+
+      await appendHistoryEvent({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        eventType: "stage_changed",
+        title: "Etapa do funil atualizada automaticamente",
+        details: { status: nextStatus, funnel_stage: nextStage },
+        actorType: "bot",
+      });
+
+      return Response.json({ ok: true, validated: true, reason: "message_received" });
+    }
+
+    return Response.json({ ok: true, ignored: true, reason: "awaiting_final_phone_status" });
+  }
 
   const hasContent = Boolean((messageText || "").trim() || mediaInfo.hasPaymentMedia);
   if (!hasContent) {
