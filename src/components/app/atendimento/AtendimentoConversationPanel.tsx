@@ -40,6 +40,10 @@ function getAtendimentoDownloadHref(url: string | null | undefined, fileName: st
   return `${url}${separator}download=${downloadValue}`;
 }
 
+function isViewportNearBottom(element: HTMLDivElement, threshold = 40) {
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold;
+}
+
 export function AtendimentoConversationPanel({
   conversation,
   messages,
@@ -75,6 +79,9 @@ export function AtendimentoConversationPanel({
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const lastConversationIdRef = useRef<string>("");
+  const lastMessageKeyRef = useRef<string>("");
+  const shouldStickToBottomRef = useRef(true);
   const previewAttachmentTitle = previewMessage
     ? getAtendimentoAttachmentTitle({
         mediaType: previewMessage.media_type,
@@ -140,11 +147,30 @@ export function AtendimentoConversationPanel({
     const end = messagesEndRef.current;
     if (!viewport || !end) return;
 
+    const currentConversationId = String(conversation?.id ?? "");
+    const lastMessage = orderedMessages[orderedMessages.length - 1];
+    const nextMessageKey = lastMessage
+      ? `${String(lastMessage.id ?? "")}:${String(lastMessage.created_at ?? "")}`
+      : "";
+    const conversationChanged = currentConversationId !== lastConversationIdRef.current;
+    const newMessageArrived =
+      !conversationChanged &&
+      Boolean(nextMessageKey) &&
+      nextMessageKey !== lastMessageKeyRef.current;
+    const shouldAutoScroll =
+      conversationChanged || (newMessageArrived && shouldStickToBottomRef.current);
+
+    lastConversationIdRef.current = currentConversationId;
+    lastMessageKeyRef.current = nextMessageKey;
+
+    if (!shouldAutoScroll) return;
+
     let frameA = 0;
     let frameB = 0;
     const scrollToBottom = () => {
       end.scrollIntoView({ block: "end", behavior: "auto" });
       viewport.scrollTop = viewport.scrollHeight;
+      shouldStickToBottomRef.current = true;
     };
 
     frameA = window.requestAnimationFrame(() => {
@@ -156,7 +182,7 @@ export function AtendimentoConversationPanel({
       window.cancelAnimationFrame(frameA);
       window.cancelAnimationFrame(frameB);
     };
-  }, [conversation?.id, orderedMessages.length, messagesLoading]);
+  }, [conversation?.id, orderedMessages, messagesLoading]);
 
   function restoreTextareaFocus() {
     window.requestAnimationFrame(() => {
@@ -315,6 +341,9 @@ export function AtendimentoConversationPanel({
 
       <div
         ref={messagesViewportRef}
+        onScroll={(event) => {
+          shouldStickToBottomRef.current = isViewportNearBottom(event.currentTarget);
+        }}
         className={desktopExpanded ? "flex-1 space-y-3 overflow-y-auto bg-[var(--app-bg)] px-4 py-4" : "flex-1 space-y-3 overflow-y-auto px-4 py-4"}
       >
         {orderedMessages.length ? (

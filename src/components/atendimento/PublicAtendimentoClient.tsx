@@ -57,6 +57,10 @@ function getAtendimentoDownloadHref(url: string | null | undefined, fileName: st
   return `${url}${separator}download=${downloadValue}`;
 }
 
+function isViewportNearBottom(element: HTMLDivElement, threshold = 40) {
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold;
+}
+
 function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
   const unique = new Map<string, AtendimentoMessage>();
   for (const message of messageList) {
@@ -143,6 +147,9 @@ export function PublicAtendimentoClient({
   const botReplyVisibleAtRef = useRef<number | null>(null);
   const pendingBotFlushTimeoutRef = useRef<number | null>(null);
   const wasComposerDisabledRef = useRef(true);
+  const lastPublicSlugRef = useRef("");
+  const lastMessageKeyRef = useRef("");
+  const shouldStickToBottomRef = useRef(true);
 
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
@@ -196,6 +203,24 @@ export function PublicAtendimentoClient({
     const end = messagesEndRef.current;
     if (!viewport || !end) return;
 
+    const currentPublicSlug = String(publicSlug ?? "");
+    const lastMessage = messages[messages.length - 1];
+    const nextMessageKey = lastMessage
+      ? `${String(lastMessage.id ?? "")}:${String(lastMessage.created_at ?? "")}`
+      : "";
+    const conversationChanged = currentPublicSlug !== lastPublicSlugRef.current;
+    const newMessageArrived =
+      !conversationChanged &&
+      Boolean(nextMessageKey) &&
+      nextMessageKey !== lastMessageKeyRef.current;
+    const shouldAutoScroll =
+      conversationChanged || (newMessageArrived && shouldStickToBottomRef.current);
+
+    lastPublicSlugRef.current = currentPublicSlug;
+    lastMessageKeyRef.current = nextMessageKey;
+
+    if (!shouldAutoScroll) return;
+
     let frameA = 0;
     let frameB = 0;
     let timeoutA = 0;
@@ -203,6 +228,7 @@ export function PublicAtendimentoClient({
     const scrollToBottom = () => {
       end.scrollIntoView({ block: "end", behavior: "auto" });
       viewport.scrollTop = viewport.scrollHeight;
+      shouldStickToBottomRef.current = true;
     };
 
     frameA = window.requestAnimationFrame(() => {
@@ -230,7 +256,7 @@ export function PublicAtendimentoClient({
       window.clearTimeout(timeoutB);
       removeListeners.forEach((remove) => remove());
     };
-  }, [isProfilePage, publicSlug, messages.length, loading, typing]);
+  }, [isProfilePage, publicSlug, messages, loading, typing]);
 
   useEffect(() => {
     awaitingBotSinceRef.current = awaitingBotSince;
@@ -998,7 +1024,13 @@ export function PublicAtendimentoClient({
           </div>
         ) : (
           <>
-            <div ref={messagesViewportRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6">
+            <div
+              ref={messagesViewportRef}
+              onScroll={(event) => {
+                shouldStickToBottomRef.current = isViewportNearBottom(event.currentTarget);
+              }}
+              className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 md:px-6"
+            >
               {loading ? (
                 <div className="text-sm text-white/55">Iniciando atendimento...</div>
               ) : authError ? (
@@ -1099,7 +1131,7 @@ export function PublicAtendimentoClient({
                   ) : null}
                 </>
               )}
-              <div ref={messagesEndRef} aria-hidden="true" className="h-6 shrink-0" />
+              <div ref={messagesEndRef} aria-hidden="true" className="h-2 shrink-0" />
             </div>
 
             <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 px-4 py-4 md:px-6">
