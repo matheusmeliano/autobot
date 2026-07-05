@@ -851,7 +851,13 @@ export function PublicAtendimentoClient({
   }, [flushPendingBotMessages]);
 
   useEffect(() => {
-    if (isProfilePage || !publicSlug || authError || loading || (!isInitialFlow && !isAwaitingWhatsAppValidation)) {
+    if (
+      isProfilePage ||
+      !publicSlug ||
+      authError ||
+      loading ||
+      (!isInitialFlow && !isAwaitingWhatsAppValidation && awaitingBotSince == null)
+    ) {
       return;
     }
     let active = true;
@@ -870,7 +876,16 @@ export function PublicAtendimentoClient({
       active = false;
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
-  }, [authError, isAwaitingWhatsAppValidation, isInitialFlow, isProfilePage, loadMessages, loading, publicSlug]);
+  }, [
+    authError,
+    awaitingBotSince,
+    isAwaitingWhatsAppValidation,
+    isInitialFlow,
+    isProfilePage,
+    loadMessages,
+    loading,
+    publicSlug,
+  ]);
 
   useEffect(() => {
     if (isProfilePage || !publicSlug || !conversationId || !leadId || authError) return;
