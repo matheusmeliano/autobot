@@ -911,8 +911,11 @@ export function PublicAtendimentoClient({
         <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(14,23,35,0.9))] px-6 py-5">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <div className="truncate text-lg font-semibold text-white">
-                Seja bem-vindo(a), {firstName}!
+              <div
+                className="truncate text-lg font-semibold text-white"
+                title={`Bem-vindo(a), ${firstName}!`}
+              >
+                {`Bem-vindo(a), ${firstName}!`}
               </div>
             </div>
             <Link

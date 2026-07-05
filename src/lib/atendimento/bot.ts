@@ -64,7 +64,7 @@ export function initialBotMessages(params?: { userName?: string | null }) {
   return [
     welcomeMessage,
     "Nossa metodologia inclui uma aula online ao vivo por semana, com acompanhamento individual.",
-    "Quero te convidar para uma aula experimental e já adiantar o seu pré-cadastro por aqui.",
+    "Quero te convidar para uma aula experimental!",
     CAPTURED_FIELD_PROMPTS.full_name,
   ];
 }
