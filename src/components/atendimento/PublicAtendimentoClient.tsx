@@ -27,6 +27,26 @@ type PortalPage = "bot" | "conta" | "arquivos";
 
 const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 5_000;
+// #region debug-point A:bootstrap
+const __dbgUrl = "http://127.0.0.1:7777/event";
+const __dbgSession = "chat-timing-flicker";
+const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre-fix",
+      hypothesisId,
+      traceId,
+      location: "src/components/atendimento/PublicAtendimentoClient.tsx",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
 
 function dateTimeBR(value?: string | null) {
   if (!value) return "-";
@@ -230,6 +250,18 @@ export function PublicAtendimentoClient({
       nextMessageKey !== lastMessageKeyRef.current;
     const shouldAutoScroll = conversationChanged || newMessageArrived || typing;
 
+    // #region debug-point D:auto-scroll
+    __dbg(`scroll:${currentPublicSlug}:${nextMessageKey || "none"}`, "D", "[DEBUG] auto_scroll_evaluated", {
+      currentPublicSlug,
+      nextMessageKey,
+      conversationChanged,
+      newMessageArrived,
+      typing,
+      shouldAutoScroll,
+      messageCount: messages.length,
+    });
+    // #endregion
+
     lastPublicSlugRef.current = currentPublicSlug;
     lastMessageKeyRef.current = nextMessageKey;
 
@@ -337,6 +369,14 @@ export function PublicAtendimentoClient({
 
   function startAwaitingBotSequence() {
     const now = Date.now();
+    // #region debug-point B:lead-send
+    __dbg(`await:${publicSlug || "no-slug"}:${now}`, "B", "[DEBUG] awaiting_bot_started", {
+      publicSlug,
+      conversationId,
+      leadId,
+      pendingQueueSize: pendingBotMessagesRef.current.length,
+    });
+    // #endregion
     pendingBotMessagesRef.current = [];
     clearPendingBotFlushTimeout();
     botReplyVisibleAtRef.current = null;
@@ -347,6 +387,16 @@ export function PublicAtendimentoClient({
   }
 
   function resetAwaitingBotSequence() {
+    // #region debug-point B:await-reset
+    __dbg(`await-reset:${publicSlug || "no-slug"}:${Date.now()}`, "B", "[DEBUG] awaiting_bot_reset", {
+      publicSlug,
+      conversationId,
+      leadId,
+      pendingQueueSize: pendingBotMessagesRef.current.length,
+      awaitingBotSince: awaitingBotSinceRef.current,
+      botResponsePendingSince: botResponsePendingSinceRef.current,
+    });
+    // #endregion
     clearPendingBotFlushTimeout();
     pendingBotMessagesRef.current = [];
     botReplyVisibleAtRef.current = null;
@@ -358,6 +408,15 @@ export function PublicAtendimentoClient({
 
   function startComposerCooldown() {
     if (isProfilePage) return;
+    // #region debug-point C:composer-cooldown
+    __dbg(`cooldown:${publicSlug || "no-slug"}:${Date.now()}`, "C", "[DEBUG] composer_cooldown_started", {
+      publicSlug,
+      conversationId,
+      leadId,
+      cooldownMs: BOT_COMPOSER_COOLDOWN_MS,
+      pendingQueueSize: pendingBotMessagesRef.current.length,
+    });
+    // #endregion
     clearComposerCooldownTimeout();
     setComposerCooldownActive(true);
     composerCooldownTimeoutRef.current = window.setTimeout(() => {
@@ -417,6 +476,16 @@ export function PublicAtendimentoClient({
           mode === "merge"
             ? sortAndDedupeMessages([...currentMessages, ...normalizedMessages])
             : normalizedMessages;
+        // #region debug-point A:message-apply
+        __dbg(`apply:${publicSlug || "no-slug"}:${Date.now()}`, "A", "[DEBUG] messages_applied", {
+          mode,
+          currentCount: currentMessages.length,
+          incomingCount: incomingMessages.length,
+          normalizedCount: normalizedMessages.length,
+          nextCount: nextMessages.length,
+          hasOptimisticLeadMessage: Boolean(optimisticLeadMessageRef.current),
+        });
+        // #endregion
         return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
       });
 
@@ -465,6 +534,15 @@ export function PublicAtendimentoClient({
   const flushPendingBotMessages = useCallback(() => {
     clearPendingBotFlushTimeout();
     const nextPendingMessage = pendingBotMessagesRef.current.shift() ?? null;
+    // #region debug-point B:queue-flush
+    __dbg(`flush:${publicSlug || "no-slug"}:${Date.now()}`, "B", "[DEBUG] bot_queue_flushed", {
+      publicSlug,
+      conversationId,
+      leadId,
+      nextPendingMessageId: String(nextPendingMessage?.id ?? ""),
+      remainingQueueSize: pendingBotMessagesRef.current.length,
+    });
+    // #endregion
     botReplyVisibleAtRef.current = null;
     awaitingBotSinceRef.current = null;
     botResponsePendingSinceRef.current = null;
@@ -510,6 +588,22 @@ export function PublicAtendimentoClient({
         return Boolean(messageId) && !existingVisibleIds.has(messageId) && !pendingIds.has(messageId);
       });
 
+      // #region debug-point E:bot-gating
+      __dbg(`gate:${publicSlug || "no-slug"}:${Date.now()}`, "E", "[DEBUG] bot_message_gating_evaluated", {
+        publicSlug,
+        conversationId,
+        leadId,
+        mode,
+        shouldGateBotMessages,
+        incomingCount: incomingMessages.length,
+        gatedBotCount: gatedBotMessages.length,
+        existingVisibleCount: existingVisibleIds.size,
+        pendingQueueSize: pendingBotMessagesRef.current.length,
+        awaitingBotSince: awaitingBotSinceRef.current,
+        botResponsePendingSince: botResponsePendingSinceRef.current,
+      });
+      // #endregion
+
       if (!gatedBotMessages.length) {
         applyMessages(incomingMessages, mode);
         return;
@@ -529,6 +623,15 @@ export function PublicAtendimentoClient({
       botReplyVisibleAtRef.current = now + BOT_TYPING_LEAD_IN_MS;
       awaitingBotSinceRef.current = now;
       setAwaitingBotSince(now);
+      // #region debug-point E:typing-start
+      __dbg(`typing:${publicSlug || "no-slug"}:${now}`, "E", "[DEBUG] bot_typing_started", {
+        publicSlug,
+        conversationId,
+        leadId,
+        typingLeadInMs: BOT_TYPING_LEAD_IN_MS,
+        pendingQueueSize: pendingBotMessagesRef.current.length,
+      });
+      // #endregion
       clearPendingBotFlushTimeout();
       pendingBotFlushTimeoutRef.current = window.setTimeout(() => {
         flushPendingBotMessages();
@@ -652,6 +755,16 @@ export function PublicAtendimentoClient({
       applyMessages([optimisticMessage], "merge");
     }
 
+    // #region debug-point B:lead-submit
+    __dbg(`lead-send:${publicSlug || "no-slug"}:${Date.now()}`, "B", "[DEBUG] lead_message_send_started", {
+      publicSlug,
+      conversationId,
+      leadId,
+      hasOptimisticMessage: Boolean(optimisticMessage),
+      mediaType: params.media_type ?? "text",
+      hasContentText: Boolean(String(params.content_text ?? "").trim()),
+    });
+    // #endregion
     startAwaitingBotSequence();
 
     try {
