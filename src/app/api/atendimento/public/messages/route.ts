@@ -71,11 +71,11 @@ function buildWhatsAppWelcomeMessage(lead: { full_name?: string | null }) {
 
 Seja muito bem-vindo(a) ao Lucas Brum Online Music USA!
 
-Estamos muito felizes em ter você conosco e ansiosos para iniciar essa jornada musical ao seu lado.
+Estamos felizes em ter você conosco.
 
-Para finalizar seu cadastro, basta concluir as etapas solicitadas pelo bot. Assim que tudo estiver concluído, entraremos em contato e aguardaremos você na sua primeira aula.
+Conclua as etapas do bot para agendar sua aula experimental. No dia e horário escolhidos, entraremos em contato.
 
-Nos vemos em breve!`;
+Nos vemos em breve ${firstName}. 🤝`;
 }
 
 function wasWhatsAppSendAccepted(payload: unknown) {
