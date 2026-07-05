@@ -340,6 +340,16 @@ export function PublicAtendimentoClient({
 
   useEffect(() => {
     if (!pendingConversationBlock || !hasPhoneValidationFinalBlockMessage) return;
+    // #region debug-point F:pending-block-release
+    __dbg(`block-release:${publicSlug || "no-slug"}:${Date.now()}`, "F", "[DEBUG] pending_conversation_block_released", {
+      publicSlug,
+      conversationId,
+      leadId,
+      pendingQueueSize: pendingBotMessagesRef.current.length,
+      awaitingBotSince: awaitingBotSinceRef.current,
+      botResponsePendingSince: botResponsePendingSinceRef.current,
+    });
+    // #endregion
     setPendingConversationBlock(false);
     setConversationBlocked(true);
   }, [hasPhoneValidationFinalBlockMessage, pendingConversationBlock]);
@@ -347,9 +357,20 @@ export function PublicAtendimentoClient({
   useEffect(() => {
     if (isProfilePage) return;
     if (conversationBlocked) {
+      // #region debug-point F:block-reset
+      __dbg(`block-reset:${publicSlug || "no-slug"}:${Date.now()}`, "F", "[DEBUG] conversation_blocked_resetting_queue", {
+        publicSlug,
+        conversationId,
+        leadId,
+        pendingQueueSize: pendingBotMessagesRef.current.length,
+        awaitingBotSince: awaitingBotSinceRef.current,
+        botResponsePendingSince: botResponsePendingSinceRef.current,
+        pendingConversationBlock,
+      });
+      // #endregion
       resetAwaitingBotSequence();
     }
-  }, [conversationBlocked, isProfilePage]);
+  }, [conversationBlocked, conversationId, isProfilePage, leadId, pendingConversationBlock, publicSlug]);
 
   useEffect(() => {
     if (isProfilePage) return;
@@ -743,7 +764,34 @@ export function PublicAtendimentoClient({
         setLeadId(String(json.session?.lead?.id ?? ""));
         setConversationId(String(json.session?.conversation?.id ?? ""));
         const nextConversationBlocked = Boolean(json.session?.conversation?.bot_enabled === false);
-        setConversationBlocked(nextConversationBlocked && !(pendingConversationBlock && !hasPhoneValidationFinalBlockMessage));
+        const shouldDeferBlockedState =
+          nextConversationBlocked &&
+          !hasPhoneValidationFinalBlockMessage &&
+          (pendingConversationBlock ||
+            pendingBotMessagesRef.current.length > 0 ||
+            awaitingBotSinceRef.current != null ||
+            botResponsePendingSinceRef.current != null);
+        // #region debug-point F:session-block-decision
+        __dbg(`session-block:${linkSlug || "no-slug"}:${Date.now()}`, "F", "[DEBUG] session_block_state_evaluated", {
+          publicSlug: String(json.session?.conversation?.public_slug ?? ""),
+          conversationId: String(json.session?.conversation?.id ?? ""),
+          leadId: String(json.session?.lead?.id ?? ""),
+          nextConversationBlocked,
+          shouldDeferBlockedState,
+          pendingConversationBlock,
+          hasPhoneValidationFinalBlockMessage,
+          pendingQueueSize: pendingBotMessagesRef.current.length,
+          awaitingBotSince: awaitingBotSinceRef.current,
+          botResponsePendingSince: botResponsePendingSinceRef.current,
+          silent,
+        });
+        // #endregion
+        if (shouldDeferBlockedState) {
+          setPendingConversationBlock(true);
+          setConversationBlocked(false);
+        } else {
+          setConversationBlocked(nextConversationBlocked && !(pendingConversationBlock && !hasPhoneValidationFinalBlockMessage));
+        }
         const nextSlug = String(json.session?.conversation?.public_slug ?? "");
         const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
         const nextTotal = Number(json.session?.initial_total ?? 0);
