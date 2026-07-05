@@ -25,6 +25,9 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type PortalPage = "bot" | "conta" | "arquivos";
 
+const BOT_TYPING_LEAD_IN_MS = 2_000;
+const BOT_COMPOSER_COOLDOWN_MS = 5_000;
+
 function dateTimeBR(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
@@ -127,6 +130,8 @@ export function PublicAtendimentoClient({
   const [conversationBlocked, setConversationBlocked] = useState(false);
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
+  const [botResponsePendingSince, setBotResponsePendingSince] = useState<number | null>(null);
+  const [composerCooldownActive, setComposerCooldownActive] = useState(false);
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<AtendimentoMessage | null>(null);
@@ -139,14 +144,15 @@ export function PublicAtendimentoClient({
   const messagesRequestIdRef = useRef(0);
   const sessionRequestIdRef = useRef(0);
   const sessionRefreshTimeoutRef = useRef<number | null>(null);
-  const typingIndicatorDelayTimeoutRef = useRef<number | null>(null);
   const awaitingBotSinceRef = useRef<number | null>(null);
+  const botResponsePendingSinceRef = useRef<number | null>(null);
   const optimisticLeadMessageIdRef = useRef<string | null>(null);
   const optimisticLeadMessageRef = useRef<AtendimentoMessage | null>(null);
   const messagesRef = useRef<AtendimentoMessage[]>([]);
   const pendingBotMessagesRef = useRef<AtendimentoMessage[]>([]);
   const botReplyVisibleAtRef = useRef<number | null>(null);
   const pendingBotFlushTimeoutRef = useRef<number | null>(null);
+  const composerCooldownTimeoutRef = useRef<number | null>(null);
   const wasComposerDisabledRef = useRef(true);
   const lastPublicSlugRef = useRef("");
   const lastMessageKeyRef = useRef("");
@@ -170,9 +176,11 @@ export function PublicAtendimentoClient({
     return false;
   }, [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
-  const typing = !loading && !authError && !conversationBlocked && !isProfilePage && (isInitialFlow || awaitingBotSince != null);
-  const composerDisabled = loading || Boolean(authError) || isProfilePage || conversationBlocked;
-  const submitLocked = loading || sending || Boolean(authError) || isProfilePage || conversationBlocked || typing;
+  const typing = !loading && !authError && !conversationBlocked && !isProfilePage && awaitingBotSince != null;
+  const composerDisabled =
+    loading || Boolean(authError) || isProfilePage || conversationBlocked || typing || composerCooldownActive;
+  const submitLocked =
+    loading || sending || Boolean(authError) || isProfilePage || conversationBlocked || typing || composerCooldownActive;
   const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
   const firstName = getFirstName(displayName);
   const initialLetter = getInitialLetter(displayName);
@@ -280,6 +288,10 @@ export function PublicAtendimentoClient({
   }, [messages]);
 
   useEffect(() => {
+    botResponsePendingSinceRef.current = botResponsePendingSince;
+  }, [botResponsePendingSince]);
+
+  useEffect(() => {
     if (isProfilePage) return;
     if (conversationBlocked) {
       resetAwaitingBotSequence();
@@ -311,17 +323,17 @@ export function PublicAtendimentoClient({
     });
   }
 
-  function clearTypingIndicatorDelayTimeout() {
-    if (typingIndicatorDelayTimeoutRef.current != null) {
-      window.clearTimeout(typingIndicatorDelayTimeoutRef.current);
-      typingIndicatorDelayTimeoutRef.current = null;
-    }
-  }
-
   function clearPendingBotFlushTimeout() {
     if (pendingBotFlushTimeoutRef.current != null) {
       window.clearTimeout(pendingBotFlushTimeoutRef.current);
       pendingBotFlushTimeoutRef.current = null;
+    }
+  }
+
+  function clearComposerCooldownTimeout() {
+    if (composerCooldownTimeoutRef.current != null) {
+      window.clearTimeout(composerCooldownTimeoutRef.current);
+      composerCooldownTimeoutRef.current = null;
     }
   }
 
@@ -336,25 +348,34 @@ export function PublicAtendimentoClient({
   }
 
   function startAwaitingBotSequence() {
+    const now = Date.now();
     pendingBotMessagesRef.current = [];
     clearPendingBotFlushTimeout();
-    botReplyVisibleAtRef.current = Date.now() + 2500;
-    clearTypingIndicatorDelayTimeout();
-    typingIndicatorDelayTimeoutRef.current = window.setTimeout(() => {
-      const now = Date.now();
-      awaitingBotSinceRef.current = now;
-      setAwaitingBotSince(now);
-      typingIndicatorDelayTimeoutRef.current = null;
-    }, 1000);
+    botReplyVisibleAtRef.current = null;
+    awaitingBotSinceRef.current = null;
+    setAwaitingBotSince(null);
+    botResponsePendingSinceRef.current = now;
+    setBotResponsePendingSince(now);
   }
 
   function resetAwaitingBotSequence() {
-    clearTypingIndicatorDelayTimeout();
     clearPendingBotFlushTimeout();
     pendingBotMessagesRef.current = [];
     botReplyVisibleAtRef.current = null;
     awaitingBotSinceRef.current = null;
+    botResponsePendingSinceRef.current = null;
     setAwaitingBotSince(null);
+    setBotResponsePendingSince(null);
+  }
+
+  function startComposerCooldown() {
+    if (isProfilePage) return;
+    clearComposerCooldownTimeout();
+    setComposerCooldownActive(true);
+    composerCooldownTimeoutRef.current = window.setTimeout(() => {
+      composerCooldownTimeoutRef.current = null;
+      setComposerCooldownActive(false);
+    }, BOT_COMPOSER_COOLDOWN_MS);
   }
 
   const loadFiles = useCallback(async () => {
@@ -379,6 +400,7 @@ export function PublicAtendimentoClient({
     (incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
       let normalizedMessages = sortAndDedupeMessages(incomingMessages);
       const optimisticLeadMessage = optimisticLeadMessageRef.current;
+      const currentVisibleIds = new Set(messagesRef.current.map((message) => String(message.id ?? "")));
 
       if (mode === "replace" && optimisticLeadMessage) {
         const hasConfirmedLeadMessage = normalizedMessages.some((message) => {
@@ -410,16 +432,14 @@ export function PublicAtendimentoClient({
         return sameMessages(currentMessages, nextMessages) ? currentMessages : nextMessages;
       });
 
-      if (awaitingBotSinceRef.current != null) {
-        const since = awaitingBotSinceRef.current;
-        const hasBotAfter = normalizedMessages.some((message) => {
+      if (botResponsePendingSinceRef.current != null) {
+        const hasNewVisibleBotMessage = normalizedMessages.some((message) => {
           if (message.sender_role === "lead") return false;
-          const createdAt = new Date(message.created_at).getTime();
-          return Number.isFinite(createdAt) && createdAt >= since;
+          return !currentVisibleIds.has(String(message.id ?? ""));
         });
-        if (hasBotAfter) {
-          awaitingBotSinceRef.current = null;
-          setAwaitingBotSince(null);
+        if (hasNewVisibleBotMessage) {
+          botResponsePendingSinceRef.current = null;
+          setBotResponsePendingSince(null);
         }
       }
     },
@@ -459,26 +479,18 @@ export function PublicAtendimentoClient({
     const pendingMessages = pendingBotMessagesRef.current;
     pendingBotMessagesRef.current = [];
     botReplyVisibleAtRef.current = null;
+    awaitingBotSinceRef.current = null;
+    botResponsePendingSinceRef.current = null;
+    setAwaitingBotSince(null);
+    setBotResponsePendingSince(null);
     if (pendingMessages.length) {
       applyMessages(pendingMessages, "merge");
+      startComposerCooldown();
     }
   }, [applyMessages]);
 
   const applyMessagesWithBotTiming = useCallback(
     (incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
-      const visibleAt = botReplyVisibleAtRef.current;
-      if (!visibleAt) {
-        applyMessages(incomingMessages, mode);
-        return;
-      }
-
-      const remainingMs = visibleAt - Date.now();
-      if (remainingMs <= 0) {
-        flushPendingBotMessages();
-        applyMessages(incomingMessages, mode);
-        return;
-      }
-
       const existingVisibleIds = new Set(messagesRef.current.map((message) => String(message.id ?? "")));
       const pendingIds = new Set(pendingBotMessagesRef.current.map((message) => String(message.id ?? "")));
       const gatedBotMessages = incomingMessages.filter((message) => {
@@ -492,6 +504,16 @@ export function PublicAtendimentoClient({
         return;
       }
 
+      const now = Date.now();
+      let visibleAt = botReplyVisibleAtRef.current;
+      if (!visibleAt || visibleAt <= now) {
+        visibleAt = now + BOT_TYPING_LEAD_IN_MS;
+        botReplyVisibleAtRef.current = visibleAt;
+        awaitingBotSinceRef.current = now;
+        setAwaitingBotSince(now);
+      }
+
+      const remainingMs = Math.max(visibleAt - now, 0);
       const gatedIds = new Set(gatedBotMessages.map((message) => String(message.id ?? "")));
       const immediateMessages = incomingMessages.filter((message) => !gatedIds.has(String(message.id ?? "")));
       pendingBotMessagesRef.current = sortAndDedupeMessages([...pendingBotMessagesRef.current, ...gatedBotMessages]);
@@ -842,11 +864,12 @@ export function PublicAtendimentoClient({
 
   useEffect(() => {
     return () => {
-      clearTypingIndicatorDelayTimeout();
+      clearComposerCooldownTimeout();
       clearPendingBotFlushTimeout();
       pendingBotMessagesRef.current = [];
       botReplyVisibleAtRef.current = null;
       awaitingBotSinceRef.current = null;
+      botResponsePendingSinceRef.current = null;
     };
   }, [flushPendingBotMessages]);
 
@@ -856,7 +879,10 @@ export function PublicAtendimentoClient({
       !publicSlug ||
       authError ||
       loading ||
-      (!isInitialFlow && !isAwaitingWhatsAppValidation && awaitingBotSince == null)
+      (!isInitialFlow &&
+        !isAwaitingWhatsAppValidation &&
+        awaitingBotSince == null &&
+        botResponsePendingSince == null)
     ) {
       return;
     }
@@ -879,6 +905,7 @@ export function PublicAtendimentoClient({
   }, [
     authError,
     awaitingBotSince,
+    botResponsePendingSince,
     isAwaitingWhatsAppValidation,
     isInitialFlow,
     isProfilePage,
