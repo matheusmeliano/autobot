@@ -209,6 +209,7 @@ export function PublicAtendimentoClient({
     return false;
   }, [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
+  const shouldHoldComposerUntilPhonePrompt = !hasLeadMessage && !loading && !isProfilePage && !isLatestVisiblePhonePrompt;
   const typing = !loading && !authError && !conversationBlocked && !isProfilePage && awaitingBotSince != null;
   const composerDisabled =
     loading ||
@@ -216,6 +217,7 @@ export function PublicAtendimentoClient({
     isProfilePage ||
     conversationBlocked ||
     pendingConversationBlock ||
+    shouldHoldComposerUntilPhonePrompt ||
     typing ||
     composerCooldownActive;
   const submitLocked =
@@ -225,6 +227,7 @@ export function PublicAtendimentoClient({
     isProfilePage ||
     conversationBlocked ||
     pendingConversationBlock ||
+    shouldHoldComposerUntilPhonePrompt ||
     typing ||
     composerCooldownActive;
   const displayName = profile.nome || currentUser.email.split("@")[0] || "Usuario";
