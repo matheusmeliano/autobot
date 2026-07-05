@@ -36,7 +36,7 @@ const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       sessionId: __dbgSession,
-      runId: "pre-fix",
+      runId: "post-fix",
       hypothesisId,
       traceId,
       location: "src/components/atendimento/PublicAtendimentoClient.tsx",
@@ -605,12 +605,21 @@ export function PublicAtendimentoClient({
       // #endregion
 
       if (!gatedBotMessages.length) {
-        applyMessages(incomingMessages, mode);
+        const visibleMessages = incomingMessages.filter((message) => {
+          if (message.sender_role === "lead") return true;
+          return !pendingIds.has(String(message.id ?? ""));
+        });
+        applyMessages(visibleMessages, mode);
         return;
       }
 
       const gatedIds = new Set(gatedBotMessages.map((message) => String(message.id ?? "")));
-      const immediateMessages = incomingMessages.filter((message) => !gatedIds.has(String(message.id ?? "")));
+      const immediateMessages = incomingMessages.filter((message) => {
+        const messageId = String(message.id ?? "");
+        if (gatedIds.has(messageId)) return false;
+        if (message.sender_role === "lead") return true;
+        return !pendingIds.has(messageId);
+      });
       pendingBotMessagesRef.current = sortAndDedupeMessages([...pendingBotMessagesRef.current, ...gatedBotMessages]);
       applyMessages(immediateMessages, mode);
 
