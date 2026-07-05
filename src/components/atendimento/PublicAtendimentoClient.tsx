@@ -11,6 +11,7 @@ import {
   ATENDIMENTO_DOCUMENT_MIME_ACCEPT,
   ATENDIMENTO_IMAGE_MIME_ACCEPT,
   ATENDIMENTO_VIDEO_MIME_ACCEPT,
+  CAPTURED_FIELD_PROMPTS,
   formatAtendimentoFileSize,
   getAtendimentoAttachmentTitle,
   getAtendimentoMediaTypeFromMimeType,
@@ -27,6 +28,7 @@ type PortalPage = "bot" | "conta" | "arquivos";
 
 const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 5_000;
+const PHONE_PROMPT_MESSAGE = CAPTURED_FIELD_PROMPTS.phone;
 const PHONE_VALIDATION_FINAL_BLOCK_MESSAGE =
   "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
 // #region debug-point A:bootstrap
@@ -172,6 +174,7 @@ export function PublicAtendimentoClient({
   const botReplyVisibleAtRef = useRef<number | null>(null);
   const pendingBotFlushTimeoutRef = useRef<number | null>(null);
   const composerCooldownTimeoutRef = useRef<number | null>(null);
+  const initialPhonePromptCooldownKeyRef = useRef("");
   const initialSessionLoadSlugRef = useRef<string>("");
   const wasComposerDisabledRef = useRef(true);
   const lastPublicSlugRef = useRef("");
@@ -186,6 +189,12 @@ export function PublicAtendimentoClient({
     () =>
       latestVisibleMessage?.sender_role === "bot" &&
       String(latestVisibleMessage.content_text ?? "").trim() === PHONE_VALIDATION_FINAL_BLOCK_MESSAGE,
+    [latestVisibleMessage],
+  );
+  const isLatestVisiblePhonePrompt = useMemo(
+    () =>
+      latestVisibleMessage?.sender_role === "bot" &&
+      String(latestVisibleMessage.content_text ?? "").trim() === PHONE_PROMPT_MESSAGE,
     [latestVisibleMessage],
   );
   const isAwaitingWhatsAppValidation = useMemo(() => {
@@ -353,6 +362,32 @@ export function PublicAtendimentoClient({
     setPendingConversationBlock(false);
     setConversationBlocked(true);
   }, [hasPhoneValidationFinalBlockMessage, pendingConversationBlock]);
+
+  useEffect(() => {
+    if (
+      isProfilePage ||
+      loading ||
+      hasLeadMessage ||
+      typing ||
+      composerCooldownActive ||
+      !isLatestVisiblePhonePrompt
+    ) {
+      return;
+    }
+    const latestMessageKey = `${String(latestVisibleMessage?.id ?? "")}:${String(latestVisibleMessage?.created_at ?? "")}`;
+    if (!latestMessageKey || latestMessageKey === ":") return;
+    if (initialPhonePromptCooldownKeyRef.current === latestMessageKey) return;
+    initialPhonePromptCooldownKeyRef.current = latestMessageKey;
+    startComposerCooldown();
+  }, [
+    composerCooldownActive,
+    hasLeadMessage,
+    isLatestVisiblePhonePrompt,
+    isProfilePage,
+    latestVisibleMessage,
+    loading,
+    typing,
+  ]);
 
   useEffect(() => {
     if (isProfilePage) return;
