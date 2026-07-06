@@ -174,12 +174,36 @@ async function getAtendimentoWhatsAppConfig() {
     .maybeSingle();
 
   const waStatus = String((wa as any)?.status ?? "").trim().toLowerCase();
+  // #region debug-point G:wa-config-loaded
+  __dbg(`wa-config-${userId}`, "G", "[DEBUG] atendimento_whatsapp_config_loaded", {
+    userId,
+    instanceId: String((wa as any)?.instance_id ?? ""),
+    hasToken: Boolean((wa as any)?.token),
+    hasClientToken: Boolean((wa as any)?.client_token),
+    waStatus,
+  });
+  // #endregion
   const canSend =
     Boolean((wa as any)?.instance_id) &&
     Boolean((wa as any)?.token) &&
-    waStatus === "connected";
+    (waStatus === "connected" || waStatus === "configured");
 
-  if (!canSend) return null;
+  if (!canSend) {
+    // #region debug-point G:wa-config-rejected
+    __dbg(`wa-config-${userId}`, "G", "[DEBUG] atendimento_whatsapp_config_rejected", {
+      userId,
+      instanceId: String((wa as any)?.instance_id ?? ""),
+      hasToken: Boolean((wa as any)?.token),
+      waStatus,
+      rejectionReason: !((wa as any)?.instance_id)
+        ? "missing_instance_id"
+        : !((wa as any)?.token)
+          ? "missing_token"
+          : "status_not_connected",
+    });
+    // #endregion
+    return null;
+  }
 
   return {
     instance_id: String((wa as any).instance_id),
