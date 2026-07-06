@@ -29,8 +29,6 @@ type PortalPage = "bot" | "conta" | "arquivos";
 const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 5_000;
 const PHONE_PROMPT_MESSAGE = CAPTURED_FIELD_PROMPTS.phone;
-const PHONE_VALIDATION_FINAL_BLOCK_MESSAGE =
-  "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
 // #region debug-point A:bootstrap
 const __dbgUrl = "http://127.0.0.1:7777/event";
 const __dbgSession = "chat-timing-flicker";
@@ -148,7 +146,6 @@ export function PublicAtendimentoClient({
   const [authError, setAuthError] = useState("");
   const [composerError, setComposerError] = useState("");
   const [conversationBlocked, setConversationBlocked] = useState(false);
-  const [pendingConversationBlock, setPendingConversationBlock] = useState(false);
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const [botResponsePendingSince, setBotResponsePendingSince] = useState<number | null>(null);
@@ -185,29 +182,12 @@ export function PublicAtendimentoClient({
   );
   const hasLeadMessage = useMemo(() => messages.some((msg) => msg.sender_role === "lead"), [messages]);
   const latestVisibleMessage = messages.length ? messages[messages.length - 1] : null;
-  const hasPhoneValidationFinalBlockMessage = useMemo(
-    () =>
-      latestVisibleMessage?.sender_role === "bot" &&
-      String(latestVisibleMessage.content_text ?? "").trim() === PHONE_VALIDATION_FINAL_BLOCK_MESSAGE,
-    [latestVisibleMessage],
-  );
   const isLatestVisiblePhonePrompt = useMemo(
     () =>
       latestVisibleMessage?.sender_role === "bot" &&
       String(latestVisibleMessage.content_text ?? "").trim() === PHONE_PROMPT_MESSAGE,
     [latestVisibleMessage],
   );
-  const isAwaitingWhatsAppValidation = useMemo(() => {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      if (message?.sender_role !== "bot") continue;
-      return (
-        String(message.content_text ?? "").trim() ===
-        "Perfeito! Estou validando seu WhatsApp. Aguarde um instante."
-      );
-    }
-    return false;
-  }, [messages]);
   const isInitialFlow = !hasLeadMessage && initialTotal > 0 && botCount < initialTotal;
   const shouldHoldComposerUntilPhonePrompt = !hasLeadMessage && !loading && !isProfilePage && !isLatestVisiblePhonePrompt;
   const typing = !loading && !authError && !conversationBlocked && !isProfilePage && awaitingBotSince != null;
@@ -216,7 +196,6 @@ export function PublicAtendimentoClient({
     Boolean(authError) ||
     isProfilePage ||
     conversationBlocked ||
-    pendingConversationBlock ||
     shouldHoldComposerUntilPhonePrompt ||
     typing ||
     composerCooldownActive;
@@ -226,7 +205,6 @@ export function PublicAtendimentoClient({
     Boolean(authError) ||
     isProfilePage ||
     conversationBlocked ||
-    pendingConversationBlock ||
     shouldHoldComposerUntilPhonePrompt ||
     typing ||
     composerCooldownActive;
@@ -351,22 +329,6 @@ export function PublicAtendimentoClient({
   }, [botResponsePendingSince]);
 
   useEffect(() => {
-    if (!pendingConversationBlock || !hasPhoneValidationFinalBlockMessage) return;
-    // #region debug-point F:pending-block-release
-    __dbg(`block-release:${publicSlug || "no-slug"}:${Date.now()}`, "F", "[DEBUG] pending_conversation_block_released", {
-      publicSlug,
-      conversationId,
-      leadId,
-      pendingQueueSize: pendingBotMessagesRef.current.length,
-      awaitingBotSince: awaitingBotSinceRef.current,
-      botResponsePendingSince: botResponsePendingSinceRef.current,
-    });
-    // #endregion
-    setPendingConversationBlock(false);
-    setConversationBlocked(true);
-  }, [hasPhoneValidationFinalBlockMessage, pendingConversationBlock]);
-
-  useEffect(() => {
     if (
       isProfilePage ||
       loading ||
@@ -403,12 +365,11 @@ export function PublicAtendimentoClient({
         pendingQueueSize: pendingBotMessagesRef.current.length,
         awaitingBotSince: awaitingBotSinceRef.current,
         botResponsePendingSince: botResponsePendingSinceRef.current,
-        pendingConversationBlock,
       });
       // #endregion
       resetAwaitingBotSequence();
     }
-  }, [conversationBlocked, conversationId, isProfilePage, leadId, pendingConversationBlock, publicSlug]);
+  }, [conversationBlocked, conversationId, isProfilePage, leadId, publicSlug]);
 
   useEffect(() => {
     if (isProfilePage) return;
@@ -802,34 +763,19 @@ export function PublicAtendimentoClient({
         setLeadId(String(json.session?.lead?.id ?? ""));
         setConversationId(String(json.session?.conversation?.id ?? ""));
         const nextConversationBlocked = Boolean(json.session?.conversation?.bot_enabled === false);
-        const shouldDeferBlockedState =
-          nextConversationBlocked &&
-          !hasPhoneValidationFinalBlockMessage &&
-          (pendingConversationBlock ||
-            pendingBotMessagesRef.current.length > 0 ||
-            awaitingBotSinceRef.current != null ||
-            botResponsePendingSinceRef.current != null);
         // #region debug-point F:session-block-decision
         __dbg(`session-block:${linkSlug || "no-slug"}:${Date.now()}`, "F", "[DEBUG] session_block_state_evaluated", {
           publicSlug: String(json.session?.conversation?.public_slug ?? ""),
           conversationId: String(json.session?.conversation?.id ?? ""),
           leadId: String(json.session?.lead?.id ?? ""),
           nextConversationBlocked,
-          shouldDeferBlockedState,
-          pendingConversationBlock,
-          hasPhoneValidationFinalBlockMessage,
           pendingQueueSize: pendingBotMessagesRef.current.length,
           awaitingBotSince: awaitingBotSinceRef.current,
           botResponsePendingSince: botResponsePendingSinceRef.current,
           silent,
         });
         // #endregion
-        if (shouldDeferBlockedState) {
-          setPendingConversationBlock(true);
-          setConversationBlocked(false);
-        } else {
-          setConversationBlocked(nextConversationBlocked && !(pendingConversationBlock && !hasPhoneValidationFinalBlockMessage));
-        }
+        setConversationBlocked(nextConversationBlocked);
         const nextSlug = String(json.session?.conversation?.public_slug ?? "");
         const initialMessages = (json.session?.messages ?? []) as AtendimentoMessage[];
         const nextTotal = Number(json.session?.initial_total ?? 0);
@@ -852,7 +798,7 @@ export function PublicAtendimentoClient({
         }
       }
     },
-    [applyMessages, applyMessagesWithBotTiming, hasPhoneValidationFinalBlockMessage, linkSlug, loadMessages, pendingConversationBlock],
+    [applyMessages, applyMessagesWithBotTiming, linkSlug, loadMessages],
   );
 
   const scheduleSessionRefresh = useCallback(() => {
@@ -1142,10 +1088,7 @@ export function PublicAtendimentoClient({
       !publicSlug ||
       authError ||
       loading ||
-      (!isInitialFlow &&
-        !isAwaitingWhatsAppValidation &&
-        awaitingBotSince == null &&
-        botResponsePendingSince == null)
+      (!isInitialFlow && awaitingBotSince == null && botResponsePendingSince == null)
     ) {
       return;
     }
@@ -1169,7 +1112,6 @@ export function PublicAtendimentoClient({
     authError,
     awaitingBotSince,
     botResponsePendingSince,
-    isAwaitingWhatsAppValidation,
     isInitialFlow,
     isProfilePage,
     loadMessages,

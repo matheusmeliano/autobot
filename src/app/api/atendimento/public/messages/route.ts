@@ -296,12 +296,6 @@ function looksLikeFieldValue(field: CapturedFieldName, text: string) {
   const clean = text.trim();
   if (!clean) return false;
   if (field === "phone") return clean.replace(/\D/g, "").length >= 8;
-  if (field === "email") return /@/.test(clean);
-  if (field === "timezone") return /(america\/|gmt|utc)/i.test(clean);
-  if (field === "best_contact_time") return /\d|manhã|tarde|noite/i.test(clean);
-  if (field === "state") return /^[A-Za-zÀ-ÿ]{2,}$/i.test(clean.replace(/\s+/g, ""));
-  if (field === "country") return /[A-Za-zÀ-ÿ]/.test(clean);
-  if (field === "city") return /[A-Za-zÀ-ÿ]/.test(clean);
   if (field === "full_name") return clean.split(/\s+/).length >= 2;
   return true;
 }
@@ -359,12 +353,6 @@ export async function GET(req: Request) {
   const { admin, conversation } = access;
 
   await ensureInitialBotConversationFlow({
-    leadId: String(conversation.lead_id),
-    conversationId: String(conversation.id),
-  });
-
-  await expirePendingPhoneValidationIfNeeded({
-    admin,
     leadId: String(conversation.lead_id),
     conversationId: String(conversation.id),
   });
@@ -481,6 +469,51 @@ export async function POST(req: Request) {
     captured: extracted as any,
     expectedField,
   }) as Record<string, string>;
+
+  if (expectedField === "phone") {
+    await admin
+      .from("atendimento_leads")
+      .update({
+        unread_count: Number(lead.unread_count ?? 0) + 1,
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", String(lead.id));
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+      createdAt: nowIso,
+    });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "message_received",
+      title: "Mensagem recebida do lead",
+      details: {
+        content_text: contentText || null,
+        media_type: mediaType,
+        media_url: mediaUrl,
+        mime_type: mimeType,
+        file_name: fileName,
+        file_size_bytes: fileSizeBytes,
+      },
+      actorType: "lead",
+    });
+
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: null,
+      blocked: false,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: true,
+      },
+    });
+  }
+
   let phoneValidationFailed = false;
   let phoneValidationFailureAttempt:
     | {

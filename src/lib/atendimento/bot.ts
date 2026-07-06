@@ -84,28 +84,9 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
   if (!clean) return {};
 
   const result: CapturedData = {};
-  const email = clean.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const phone = clean.match(/(?:\+?\d{1,3}\s*)?(?:\(?\d{2,3}\)?\s*)?\d(?:[\d\s-]){7,}\d/);
-  const timezone = clean.match(/\b(?:America\/[A-Za-z_]+|GMT[+-]\d{1,2}|UTC[+-]\d{1,2})\b/i);
-  const bestTime = clean.match(/\b(\d{1,2}[:h]\d{2}|\d{1,2}\s*(?:da manhã|da tarde|da noite))\b/i);
 
-  if (email) result.email = email[0];
   if (phone) result.phone = phone[0];
-  if (timezone) result.timezone = timezone[0];
-  if (bestTime) result.best_contact_time = bestTime[0];
-
-  if (!result.country) {
-    const country = clean.match(/\b(brasil|brazil|estados unidos|usa|united states|canadá|canada|portugal)\b/i);
-    if (country) result.country = country[0];
-  }
-  if (!result.state) {
-    const state = clean.match(/\b(ac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|sp|se|to)\b/i);
-    if (state) result.state = state[0].toUpperCase();
-  }
-  if (!result.city) {
-    const city = clean.match(/(?:moro em|cidade|city)\s*:?\s*([A-Za-zÀ-ÿ' -]{3,})/i);
-    if (city?.[1]) result.city = city[1].trim();
-  }
   if (!result.full_name) {
     const explicitName = clean.match(/(?:meu nome(?: completo)?\s*(?:é|e)?|sou)\s+([A-Za-zÀ-ÿ'’ -]{3,})/i);
     const explicitValue = explicitName?.[1]?.trim() ?? "";
@@ -115,13 +96,7 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
   }
   if (
     !result.full_name &&
-    !email &&
     !phone &&
-    !timezone &&
-    !bestTime &&
-    !result.country &&
-    !result.state &&
-    !result.city &&
     looksLikeFullName(clean)
   ) {
     result.full_name = clean.replace(/\s+/g, " ").trim();
