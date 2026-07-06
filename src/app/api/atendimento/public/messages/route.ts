@@ -702,22 +702,55 @@ export async function POST(req: Request) {
           .eq("event_type", "phone_confirmation_pending");
       }
 
-      await admin
-        .from("atendimento_conversations")
-        .update({
-          bot_enabled: false,
-          updated_at: nowIso,
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: "phone_confirmation_pending",
+        title: "Aguardando confirmação do número de WhatsApp",
+        details: {
+          phone: pendingPhone || null,
+          retried_after_negative: true,
+        },
+        actorType: "system",
+      });
+
+      await sleep(POST_LEAD_REPLY_DELAY_MS);
+      const botNowIso = new Date().toISOString();
+      const { data: outbound, error: outboundError } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String(conversation.id),
+          sender_role: "bot",
+          content_text: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+          media_type: "text",
+          status: "entregue",
+          sent_at: botNowIso,
+          delivered_at: botNowIso,
         })
-        .eq("id", String(conversation.id));
+        .select("*")
+        .maybeSingle();
+
+      if (outboundError) {
+        const code = String((outboundError as any)?.code ?? "").trim();
+        if (code !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+      }
+
+      await syncConversationPreview({
+        conversationId: String(conversation.id),
+        contentText: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+        createdAt: botNowIso,
+      });
 
       return Response.json({
         ok: true,
         inbound,
-        outbound: null,
-        blocked: true,
+        outbound: outboundError ? null : outbound,
+        blocked: false,
         conversation: {
           id: String(conversation.id),
-          bot_enabled: false,
+          bot_enabled: true,
         },
       });
     }
