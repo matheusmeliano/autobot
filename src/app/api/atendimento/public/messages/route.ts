@@ -38,7 +38,7 @@ const NUMERIC_ONLY_TEXT_MESSAGE =
 const NUMERIC_ONLY_MIXED_MESSAGE =
   "Por favor, responda somente com números.";
 const PHONE_CONFIRMATION_PROMPT_MESSAGE =
-  "Irei precisar validar esse número. Você tem certeza que enviou o número correto? Posso seguir com a validação do número?";
+  "Antes de prosseguir, preciso confirmar uma informação. Você tem certeza de que esse é o número correto? Posso fazer uma validação?";
 
 // #region debug-point A:bootstrap
 const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
