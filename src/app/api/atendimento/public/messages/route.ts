@@ -39,9 +39,13 @@ const NUMERIC_ONLY_MIXED_MESSAGE =
   "Por favor, responda somente com números.";
 const PHONE_CONFIRMATION_PROMPT_MESSAGE =
   "Antes de prosseguir, preciso confirmar uma informação. Você tem certeza de que esse é o número correto? Posso fazer uma validação?";
+const PHONE_CONFIRMATION_SUCCESS_MESSAGE =
+  "Perfeito! Enviei uma mensagem de boas-vindas para o WhatsApp informado.";
+const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
+  "Recebi sua confirmação, mas não consegui enviar a mensagem para o WhatsApp informado agora. Tente novamente em instantes.";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
+const __dbgEnvPath = ".dbg/phone-confirmation-positive-phrase.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -764,6 +768,20 @@ export async function POST(req: Request) {
 
     if (decision === "positive") {
       const baseUrl = resolveBaseUrlFromHeaders(req.headers);
+      let positiveFollowUpMessage: string | null = null;
+      // #region debug-point A:phone-confirmation-positive-branch
+      __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_branch", {
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        inboundMessageId: String(inbound.id),
+        contentText,
+        decision,
+        pendingPhone,
+        pendingConfirmationId: String(pendingPhoneConfirmation?.id ?? ""),
+        lastBotMessage: String(lastBotMessage?.content_text ?? ""),
+        baseUrl,
+      });
+      // #endregion
       if (pendingPhoneConfirmation?.id) {
         await admin
           .from("atendimento_history_events")
@@ -813,6 +831,16 @@ export async function POST(req: Request) {
 
           const accepted = wasWhatsAppSendAccepted(sendResult);
           const ids = extractWhatsAppMessageIds(sendResult);
+          // #region debug-point A:phone-confirmation-positive-send
+          __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_send", {
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+            accepted,
+            messageId: ids.messageId,
+            zaapId: ids.zaapId,
+            pendingPhone,
+          });
+          // #endregion
 
           await appendHistoryEvent({
             leadId: String(lead.id),
@@ -829,7 +857,16 @@ export async function POST(req: Request) {
             },
             actorType: "system",
           });
+          positiveFollowUpMessage = PHONE_CONFIRMATION_SUCCESS_MESSAGE;
         } catch (error) {
+          // #region debug-point A:phone-confirmation-positive-send-failed
+          __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_send_failed", {
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+            pendingPhone,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // #endregion
           await appendHistoryEvent({
             leadId: String(lead.id),
             conversationId: String(conversation.id),
@@ -841,13 +878,56 @@ export async function POST(req: Request) {
             },
             actorType: "system",
           });
+          positiveFollowUpMessage = PHONE_CONFIRMATION_SEND_FAILED_MESSAGE;
         }
       }
 
+      let outbound: Record<string, unknown> | null = null;
+      if (positiveFollowUpMessage) {
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const { data: outboundMessage, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String(conversation.id),
+            sender_role: "bot",
+            content_text: positiveFollowUpMessage,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+
+        if (outboundError) {
+          const code = String((outboundError as any)?.code ?? "").trim();
+          if (code !== "23505") {
+            return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+          }
+        }
+
+        await syncConversationPreview({
+          conversationId: String(conversation.id),
+          contentText: positiveFollowUpMessage,
+          createdAt: botNowIso,
+        });
+        outbound = outboundError ? null : ((outboundMessage as Record<string, unknown> | null) ?? null);
+      }
+
+      // #region debug-point A:phone-confirmation-positive-return
+      __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_return", {
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        pendingPhone,
+        returnsOutboundNull: !outbound,
+        positiveFollowUpMessage,
+      });
+      // #endregion
       return Response.json({
         ok: true,
         inbound,
-        outbound: null,
+        outbound,
         blocked: false,
         conversation: {
           id: String(conversation.id),
