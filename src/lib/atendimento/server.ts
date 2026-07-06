@@ -177,7 +177,7 @@ async function getAtendimentoWhatsAppConfig() {
   const canSend =
     Boolean((wa as any)?.instance_id) &&
     Boolean((wa as any)?.token) &&
-    (waStatus === "configured" || waStatus === "connected");
+    waStatus === "connected";
 
   if (!canSend) return null;
 

@@ -525,6 +525,23 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, ignored: true, reason: "unknown_instance" });
   }
 
+  const normalizedEventType = String(eventType ?? "").trim();
+  const nextInstanceStatus =
+    normalizedEventType === "DisconnectedCallback"
+      ? "disconnected"
+      : normalizedEventType === "ReceivedCallback" ||
+          normalizedEventType === "MessageStatusCallback" ||
+          normalizedEventType === "DeliveryCallback"
+        ? "connected"
+        : null;
+
+  if (nextInstanceStatus) {
+    await admin
+      .from("whatsapp_instances")
+      .update({ status: nextInstanceStatus })
+      .eq("instance_id", instanceId);
+  }
+
   await admin.from("whatsapp_events").upsert(
     {
       user_id: userId,
