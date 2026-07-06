@@ -877,7 +877,6 @@ export function PublicAtendimentoClient({
         }
         resetAwaitingBotSequence();
         if (json?.blocked || json?.code === "conversation_blocked") {
-          setPendingConversationBlock(false);
           setConversationBlocked(true);
         }
         return {
@@ -905,12 +904,7 @@ export function PublicAtendimentoClient({
         }, 180);
       }
       if (json?.blocked || json?.conversation?.bot_enabled === false) {
-        if (json.outbound?.id) {
-          setPendingConversationBlock(true);
-        } else {
-          setPendingConversationBlock(false);
-          setConversationBlocked(true);
-        }
+        setConversationBlocked(true);
       }
       setComposerError("");
       return { ok: true as const, blocked: Boolean(json?.blocked || json?.conversation?.bot_enabled === false) };
