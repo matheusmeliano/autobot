@@ -205,6 +205,8 @@ function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldNam
   if (
     raw.startsWith(WHATSAPP_INVALID_MESSAGE) ||
     raw.startsWith(WHATSAPP_INVALID_FORMAT_MESSAGE) ||
+    raw === NUMERIC_ONLY_TEXT_MESSAGE ||
+    raw === NUMERIC_ONLY_MIXED_MESSAGE ||
     raw.startsWith(WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE) ||
     raw === WHATSAPP_PENDING_MESSAGE
   ) {
