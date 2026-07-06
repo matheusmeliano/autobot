@@ -86,11 +86,11 @@ function buildWhatsAppWelcomeMessage(lead: { full_name?: string | null }) {
 
 Seja muito bem-vindo(a) ao Lucas Brum Online Music USA!
 
-Estamos felizes em ter você conosco.
+Estamos muito felizes em ter você conosco e ansiosos para iniciar essa jornada musical ao seu lado.
 
-Conclua as etapas do bot para agendar sua aula experimental. No dia e horário escolhidos, entraremos em contato.
+Para finalizar seu cadastro, basta concluir as etapas solicitadas pelo bot. Assim que tudo estiver concluído, entraremos em contato e aguardaremos você na sua primeira aula.
 
-Nos vemos em breve ${firstName}. 🤝`;
+Nos vemos em breve ${firstName}!`;
 }
 
 function wasWhatsAppSendAccepted(payload: unknown) {
@@ -763,6 +763,7 @@ export async function POST(req: Request) {
     }
 
     if (decision === "positive") {
+      const baseUrl = resolveBaseUrlFromHeaders(req.headers);
       if (pendingPhoneConfirmation?.id) {
         await admin
           .from("atendimento_history_events")
@@ -802,6 +803,45 @@ export async function POST(req: Request) {
           details: { phone: pendingPhone },
           actorType: "system",
         });
+
+        try {
+          const sendResult = await sendAtendimentoWhatsAppText({
+            phone: pendingPhone,
+            message: buildWhatsAppWelcomeMessage(lead as { full_name?: string | null }),
+            baseUrl,
+          });
+
+          const accepted = wasWhatsAppSendAccepted(sendResult);
+          const ids = extractWhatsAppMessageIds(sendResult);
+
+          await appendHistoryEvent({
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+            eventType: accepted ? "phone_confirmation_whatsapp_sent" : "phone_confirmation_whatsapp_send_uncertain",
+            title: accepted
+              ? "Mensagem de boas-vindas enviada para o WhatsApp confirmado"
+              : "Envio da mensagem de boas-vindas sem confirmação clara",
+            details: {
+              phone: pendingPhone,
+              message_id: ids.messageId,
+              zaap_id: ids.zaapId,
+              payload: sendResult,
+            },
+            actorType: "system",
+          });
+        } catch (error) {
+          await appendHistoryEvent({
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+            eventType: "phone_confirmation_whatsapp_send_failed",
+            title: "Falha ao enviar mensagem de boas-vindas para o WhatsApp confirmado",
+            details: {
+              phone: pendingPhone,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            actorType: "system",
+          });
+        }
       }
 
       return Response.json({
