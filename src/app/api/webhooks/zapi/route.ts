@@ -19,7 +19,7 @@ function buildPhoneValidationRetryMessage(attempts: number) {
 }
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
+const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -263,9 +263,22 @@ async function findPendingPhoneValidationEvent(params: {
       .limit(1)
       .maybeSingle();
     if (data?.id) {
+      // #region debug-point C:pending-match-hit
+      __dbg(`pending-match-${messageId}`, "C", "[DEBUG] zapi_webhook_pending_match_hit", {
+        messageId,
+        pendingEventId: String((data as any)?.id ?? ""),
+        leadId: String((data as any)?.lead_id ?? ""),
+        conversationId: String((data as any)?.conversation_id ?? ""),
+      });
+      // #endregion
       return data as any;
     }
   }
+  // #region debug-point C:pending-match-miss
+  __dbg(`pending-match-${params.messageIds.join(",") || "none"}`, "C", "[DEBUG] zapi_webhook_pending_match_miss", {
+    messageIds: params.messageIds,
+  });
+  // #endregion
   return null;
 }
 

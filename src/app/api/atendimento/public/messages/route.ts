@@ -32,7 +32,7 @@ const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE =
   "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
+const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -585,6 +585,12 @@ export async function POST(req: Request) {
             messageId: sendIds.messageId,
             zaapId: sendIds.zaapId,
           };
+          // #region debug-point B:pending-created
+          __dbg(traceId, "B", "[DEBUG] atendimento_phone_pending_created", {
+            candidatePhone,
+            phoneValidationPending,
+          });
+          // #endregion
         } catch (error) {
           if (!isExplicitInvalidWhatsAppError(error)) {
             // #region debug-point D:validation-send-error
@@ -793,6 +799,25 @@ export async function POST(req: Request) {
       },
       actorType: "system",
     });
+    // #region debug-point B:pending-event-persisted
+    __dbg(traceId, "B", "[DEBUG] atendimento_phone_event_persisted", {
+      eventType: phoneFormatInvalid
+        ? "phone_validation_format_failed"
+        : phoneValidationFailed
+          ? "phone_validation_failed"
+          : phoneValidationPending
+            ? "phone_validation_pending"
+            : "phone_validated",
+      phone: phoneAttemptFailure
+        ? phoneAttemptFailure.rawPhone
+        : phoneValidationFailed
+          ? extracted.phone ?? contentText
+          : phoneValidationPending?.phone ?? captured.phone ?? null,
+      externalMessageId: phoneValidationPending?.messageId ?? null,
+      zaapId: phoneValidationPending?.zaapId ?? null,
+      conversationShouldBeBlocked,
+    });
+    // #endregion
   }
 
   if (conversationShouldBeBlocked) {
@@ -830,6 +855,18 @@ export async function POST(req: Request) {
       return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
     }
   }
+
+  // #region debug-point E:post-response-shape
+  __dbg(traceId, "E", "[DEBUG] atendimento_public_post_response_shape", {
+    inboundId: String((inbound as any)?.id ?? ""),
+    outboundId: String((outbound as any)?.id ?? ""),
+    outboundMessage: String((outbound as any)?.content_text ?? ""),
+    blocked: conversationShouldBeBlocked,
+    pendingValidation: Boolean(phoneValidationPending),
+    phoneValidationFailed,
+    phoneFormatInvalid: Boolean(phoneFormatInvalid),
+  });
+  // #endregion
 
   await syncConversationPreview({
     conversationId: String(conversation.id),

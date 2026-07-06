@@ -22,7 +22,7 @@ Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 https://www.autobot.business/app/atendimento`;
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/us-whatsapp-send.env";
+const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -253,6 +253,17 @@ export async function sendAtendimentoWhatsAppText(params: {
     originalDigitsLength: params.phone.replace(/\D/g, "").length,
     normalizedDigitsLength: normalizePhone(params.phone).length,
     result,
+  });
+  // #endregion
+
+  // #region debug-point A:send-result-shape
+  __dbg(traceId, "A", "[DEBUG] atendimento_whatsapp_send_result_shape", {
+    topLevelKeys: result && typeof result === "object" ? Object.keys(result as Record<string, unknown>) : [],
+    messageId: String((result as Record<string, unknown> | null)?.messageId ?? ""),
+    id: String((result as Record<string, unknown> | null)?.id ?? ""),
+    zaapId: String((result as Record<string, unknown> | null)?.zaapId ?? ""),
+    success: (result as Record<string, unknown> | null)?.success ?? null,
+    error: (result as Record<string, unknown> | null)?.error ?? null,
   });
   // #endregion
 
