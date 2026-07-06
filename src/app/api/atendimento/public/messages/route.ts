@@ -176,6 +176,13 @@ function interpretPhoneConfirmationDecision(value: string) {
   if (!normalized) return "unknown" as const;
   if (/\bnao\b/.test(normalized)) return "negative" as const;
   if (/\bsim\b/.test(normalized)) return "positive" as const;
+  if (
+    /\b(pode|podemos)\s+(seguir|prosseguir|validar|fazer)\b/.test(normalized) ||
+    /\b(confirmo|confirmado|afirmativo|claro|perfeito|correto)\b/.test(normalized) ||
+    /\b(tenho\s+certeza|esta\s+certo|esta\s+correto|numero\s+certo|numero\s+correto)\b/.test(normalized)
+  ) {
+    return "positive" as const;
+  }
   return "unknown" as const;
 }
 
