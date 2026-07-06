@@ -161,6 +161,27 @@ function buildPhoneFormatRetryMessage(attempts: number) {
   return `${WHATSAPP_INVALID_FORMAT_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`;
 }
 
+function normalizeValidationErrorText(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function isExplicitInvalidWhatsAppError(error: unknown) {
+  const message = normalizeValidationErrorText(error instanceof Error ? error.message : error);
+  if (!message) return false;
+  return (
+    message.includes("phone number does not exist") ||
+    message.includes("numero nao existe") ||
+    message.includes("number does not exist") ||
+    message.includes("nao possui whatsapp") ||
+    message.includes("not on whatsapp") ||
+    message.includes("whatsapp number does not exist")
+  );
+}
+
 async function expirePendingPhoneValidationIfNeeded(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -564,7 +585,22 @@ export async function POST(req: Request) {
             messageId: sendIds.messageId,
             zaapId: sendIds.zaapId,
           };
-        } catch {
+        } catch (error) {
+          if (!isExplicitInvalidWhatsAppError(error)) {
+            // #region debug-point D:validation-send-error
+            __dbg(traceId, "D", "[DEBUG] atendimento_phone_validation_send_error", {
+              candidatePhone,
+              errorMessage: error instanceof Error ? error.message : String(error ?? ""),
+            });
+            // #endregion
+            return Response.json(
+              {
+                ok: false,
+                error: "Nao foi possivel validar seu WhatsApp neste momento. Tente novamente em instantes.",
+              },
+              { status: 503 },
+            );
+          }
           delete captured.phone;
           phoneValidationFailed = true;
           const attempts = (await getPhoneFormatFailureCount({
@@ -580,6 +616,7 @@ export async function POST(req: Request) {
           // #region debug-point D:validation-failed
           __dbg(traceId, "D", "[DEBUG] atendimento_phone_validation_failed", {
             candidatePhone,
+            errorMessage: error instanceof Error ? error.message : String(error ?? ""),
           });
           // #endregion
         }
