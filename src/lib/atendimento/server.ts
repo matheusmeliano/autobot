@@ -22,7 +22,7 @@ Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 https://www.autobot.business/app/atendimento`;
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/welcome-whatsapp-send.env";
+const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -257,21 +257,7 @@ export async function sendAtendimentoWhatsAppText(params: {
   });
   const runtimeConnected = Boolean((runtimeInfo as Record<string, unknown> | null)?.connected);
 
-  // #region debug-point G:wa-runtime-status
-  __dbg(traceId, "G", "[DEBUG] atendimento_whatsapp_runtime_status", {
-    instanceId: config.instance_id,
-    runtimeConnected,
-    runtimeInfo,
-  });
-  // #endregion
-
   if (!runtimeConnected) {
-    // #region debug-point G:wa-runtime-disconnected
-    __dbg(traceId, "G", "[DEBUG] atendimento_whatsapp_runtime_disconnected", {
-      instanceId: config.instance_id,
-      runtimeInfo,
-    });
-    // #endregion
     throw new Error("Instancia do WhatsApp desconectada na Z-API.");
   }
 
