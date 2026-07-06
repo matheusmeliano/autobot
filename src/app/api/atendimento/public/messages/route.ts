@@ -20,7 +20,7 @@ import fs from "node:fs";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
-const PHONE_VALIDATION_TIMEOUT_MS = 20_000;
+const PHONE_VALIDATION_TIMEOUT_MS = 60_000;
 const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
 const WHATSAPP_PENDING_MESSAGE =
   "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
