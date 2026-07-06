@@ -37,6 +37,8 @@ const NUMERIC_ONLY_TEXT_MESSAGE =
   "Essa resposta não me parece válida. Responda somente com números.";
 const NUMERIC_ONLY_MIXED_MESSAGE =
   "Por favor, responda somente com números.";
+const PHONE_CONFIRMATION_PROMPT_MESSAGE =
+  "Irei precisar validar esse número. Você tem certeza que enviou o número correto? Posso seguir com a validação do número?";
 
 // #region debug-point A:bootstrap
 const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
@@ -157,6 +159,42 @@ function classifyNumericOnlyResponse(value: string) {
   return {
     ok: true as const,
   };
+}
+
+function normalizeDecisionText(value: string) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function interpretPhoneConfirmationDecision(value: string) {
+  const normalized = normalizeDecisionText(value);
+  if (!normalized) return "unknown" as const;
+  if (/\bnao\b/.test(normalized)) return "negative" as const;
+  if (/\bsim\b/.test(normalized)) return "positive" as const;
+  return "unknown" as const;
+}
+
+async function getPendingPhoneConfirmation(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+}) {
+  const { data } = await params.admin
+    .from("atendimento_history_events")
+    .select("id, details")
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", "phone_confirmation_pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data as { id: string; details: Record<string, unknown> | null } | null;
 }
 
 function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldName | null {
@@ -498,6 +536,8 @@ export async function POST(req: Request) {
     extractedKeys: Object.keys(extracted),
   });
   // #endregion
+  const isAwaitingPhoneConfirmation =
+    String(lastBotMessage?.content_text ?? "").trim() === PHONE_CONFIRMATION_PROMPT_MESSAGE;
   const expectedField = inferExpectedFieldFromBotMessage(lastBotMessage?.content_text ?? "") ?? getNextMissingField(lead as any);
   if (
     expectedField &&
@@ -513,7 +553,7 @@ export async function POST(req: Request) {
     expectedField,
   }) as Record<string, string>;
 
-  const numericOnlyValidation = isNumericOnlyField(expectedField)
+  const numericOnlyValidation = !isAwaitingPhoneConfirmation && isNumericOnlyField(expectedField)
     ? classifyNumericOnlyResponse(contentText)
     : null;
 
@@ -603,11 +643,18 @@ export async function POST(req: Request) {
     });
   }
 
-  if (expectedField === "phone") {
+  if (isAwaitingPhoneConfirmation) {
+    const pendingPhoneConfirmation = await getPendingPhoneConfirmation({
+      admin,
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+    });
+    const decision = interpretPhoneConfirmationDecision(contentText);
+    const pendingPhone = String((pendingPhoneConfirmation?.details ?? {}).phone ?? "").trim();
+
     await admin
       .from("atendimento_leads")
       .update({
-        ...captured,
         unread_count: Number(lead.unread_count ?? 0) + 1,
         last_interaction_at: nowIso,
         updated_at: nowIso,
@@ -636,22 +683,253 @@ export async function POST(req: Request) {
       actorType: "lead",
     });
 
-    if (Object.keys(captured).length > 0) {
-      await upsertCapturedFields({
-        leadId: String(lead.id),
-        sourceMessageId: String(inbound.id),
-        values: captured as Record<string, string>,
-      });
+    if (decision === "negative") {
+      if (pendingPhoneConfirmation?.id) {
+        await admin
+          .from("atendimento_history_events")
+          .update({
+            event_type: "phone_confirmation_rejected",
+            title: "Lead não confirmou o número de WhatsApp",
+            details: {
+              ...((pendingPhoneConfirmation.details ?? {}) as Record<string, unknown>),
+              decision: "negative",
+              rejected_at: nowIso,
+            },
+          })
+          .eq("id", String(pendingPhoneConfirmation.id))
+          .eq("event_type", "phone_confirmation_pending");
+      }
 
-      await appendHistoryEvent({
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-        eventType: "data_captured",
-        title: "Dados capturados automaticamente",
-        details: captured,
-        actorType: "system",
+      await admin
+        .from("atendimento_conversations")
+        .update({
+          bot_enabled: false,
+          updated_at: nowIso,
+        })
+        .eq("id", String(conversation.id));
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: null,
+        blocked: true,
+        conversation: {
+          id: String(conversation.id),
+          bot_enabled: false,
+        },
       });
     }
+
+    if (decision === "positive") {
+      if (pendingPhoneConfirmation?.id) {
+        await admin
+          .from("atendimento_history_events")
+          .update({
+            event_type: "phone_confirmation_confirmed",
+            title: "Lead confirmou o número de WhatsApp",
+            details: {
+              ...((pendingPhoneConfirmation.details ?? {}) as Record<string, unknown>),
+              decision: "positive",
+              confirmed_at: nowIso,
+            },
+          })
+          .eq("id", String(pendingPhoneConfirmation.id))
+          .eq("event_type", "phone_confirmation_pending");
+      }
+
+      if (pendingPhone) {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            phone: pendingPhone,
+            updated_at: nowIso,
+          })
+          .eq("id", String(lead.id));
+
+        await upsertCapturedFields({
+          leadId: String(lead.id),
+          sourceMessageId: String(inbound.id),
+          values: { phone: pendingPhone },
+        });
+
+        await appendHistoryEvent({
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+          eventType: "data_captured",
+          title: "Dados capturados automaticamente",
+          details: { phone: pendingPhone },
+          actorType: "system",
+        });
+      }
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: null,
+        blocked: false,
+        conversation: {
+          id: String(conversation.id),
+          bot_enabled: true,
+        },
+      });
+    }
+
+    await sleep(POST_LEAD_REPLY_DELAY_MS);
+    const botNowIso = new Date().toISOString();
+    const { data: outbound, error: outboundError } = await admin
+      .from("atendimento_messages")
+      .insert({
+        conversation_id: String(conversation.id),
+        sender_role: "bot",
+        content_text: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+        media_type: "text",
+        status: "entregue",
+        sent_at: botNowIso,
+        delivered_at: botNowIso,
+      })
+      .select("*")
+      .maybeSingle();
+
+    if (outboundError) {
+      const code = String((outboundError as any)?.code ?? "").trim();
+      if (code !== "23505") {
+        return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+      }
+    }
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+      createdAt: botNowIso,
+    });
+
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: outboundError ? null : outbound,
+      blocked: false,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: true,
+      },
+    });
+  }
+
+  if (expectedField === "phone") {
+    await admin
+      .from("atendimento_leads")
+      .update({
+        unread_count: Number(lead.unread_count ?? 0) + 1,
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", String(lead.id));
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+      createdAt: nowIso,
+    });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "message_received",
+      title: "Mensagem recebida do lead",
+      details: {
+        content_text: contentText || null,
+        media_type: mediaType,
+        media_url: mediaUrl,
+        mime_type: mimeType,
+        file_name: fileName,
+        file_size_bytes: fileSizeBytes,
+      },
+      actorType: "lead",
+    });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "phone_confirmation_pending",
+      title: "Aguardando confirmação do número de WhatsApp",
+      details: {
+        phone: String(captured.phone ?? contentText ?? "").trim(),
+      },
+      actorType: "system",
+    });
+
+    await sleep(POST_LEAD_REPLY_DELAY_MS);
+    const botNowIso = new Date().toISOString();
+    const { data: outbound, error: outboundError } = await admin
+      .from("atendimento_messages")
+      .insert({
+        conversation_id: String(conversation.id),
+        sender_role: "bot",
+        content_text: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+        media_type: "text",
+        status: "entregue",
+        sent_at: botNowIso,
+        delivered_at: botNowIso,
+      })
+      .select("*")
+      .maybeSingle();
+
+    if (outboundError) {
+      const code = String((outboundError as any)?.code ?? "").trim();
+      if (code !== "23505") {
+        return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+      }
+    }
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+      createdAt: botNowIso,
+    });
+
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: outboundError ? null : outbound,
+      blocked: false,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: true,
+      },
+    });
+  }
+
+  if (!expectedField && String((lead as any)?.phone ?? "").trim()) {
+    await admin
+      .from("atendimento_leads")
+      .update({
+        unread_count: Number(lead.unread_count ?? 0) + 1,
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", String(lead.id));
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+      createdAt: nowIso,
+    });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "message_received",
+      title: "Mensagem recebida do lead",
+      details: {
+        content_text: contentText || null,
+        media_type: mediaType,
+        media_url: mediaUrl,
+        mime_type: mimeType,
+        file_name: fileName,
+        file_size_bytes: fileSizeBytes,
+      },
+      actorType: "lead",
+    });
 
     return Response.json({
       ok: true,
