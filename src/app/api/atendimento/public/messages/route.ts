@@ -41,7 +41,7 @@ const PHONE_CONFIRMATION_PROMPT_MESSAGE =
   "Antes de prosseguir, preciso confirmar uma informação. Você tem certeza de que esse é o número correto? Posso fazer uma validação?";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
+const __dbgEnvPath = ".dbg/welcome-whatsapp-send.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -764,6 +764,18 @@ export async function POST(req: Request) {
 
     if (decision === "positive") {
       const baseUrl = resolveBaseUrlFromHeaders(req.headers);
+      // #region debug-point A:phone-confirmation-positive-entry
+      __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_entry", {
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        inboundMessageId: String(inbound.id),
+        decision,
+        pendingPhone,
+        hasPendingPhoneConfirmation: Boolean(pendingPhoneConfirmation?.id),
+        baseUrl,
+        leadFullName: String((lead as any)?.full_name ?? ""),
+      });
+      // #endregion
       if (pendingPhoneConfirmation?.id) {
         await admin
           .from("atendimento_history_events")
@@ -805,6 +817,15 @@ export async function POST(req: Request) {
         });
 
         try {
+          // #region debug-point A:phone-confirmation-before-send
+          __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_before_send", {
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+            pendingPhone,
+            baseUrl,
+            welcomeMessagePreview: buildWhatsAppWelcomeMessage(lead as { full_name?: string | null }).slice(0, 160),
+          });
+          // #endregion
           const sendResult = await sendAtendimentoWhatsAppText({
             phone: pendingPhone,
             message: buildWhatsAppWelcomeMessage(lead as { full_name?: string | null }),
@@ -813,6 +834,17 @@ export async function POST(req: Request) {
 
           const accepted = wasWhatsAppSendAccepted(sendResult);
           const ids = extractWhatsAppMessageIds(sendResult);
+          // #region debug-point A:phone-confirmation-send-result
+          __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_send_result", {
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+            pendingPhone,
+            accepted,
+            messageId: ids.messageId,
+            zaapId: ids.zaapId,
+            result: sendResult,
+          });
+          // #endregion
 
           await appendHistoryEvent({
             leadId: String(lead.id),
@@ -830,6 +862,14 @@ export async function POST(req: Request) {
             actorType: "system",
           });
         } catch (error) {
+          // #region debug-point A:phone-confirmation-send-error
+          __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_send_error", {
+            leadId: String(lead.id),
+            conversationId: String(conversation.id),
+            pendingPhone,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // #endregion
           await appendHistoryEvent({
             leadId: String(lead.id),
             conversationId: String(conversation.id),
@@ -842,6 +882,16 @@ export async function POST(req: Request) {
             actorType: "system",
           });
         }
+      } else {
+        // #region debug-point A:phone-confirmation-missing-phone
+        __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_missing_phone", {
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+          pendingPhone,
+          hasPendingPhoneConfirmation: Boolean(pendingPhoneConfirmation?.id),
+          pendingPhoneConfirmationDetails: pendingPhoneConfirmation?.details ?? null,
+        });
+        // #endregion
       }
 
       return Response.json({

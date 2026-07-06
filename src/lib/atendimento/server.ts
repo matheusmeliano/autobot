@@ -22,7 +22,7 @@ Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 https://www.autobot.business/app/atendimento`;
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
+const __dbgEnvPath = ".dbg/welcome-whatsapp-send.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -125,6 +125,29 @@ async function sendZapiText(params: {
   );
 }
 
+async function getZapiInstanceMeta(params: {
+  instance_id: string;
+  token: string;
+  client_token?: string | null;
+}) {
+  const response = await fetch(
+    `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}/token/${encodeURIComponent(params.token)}/me`,
+    {
+      method: "GET",
+      headers: {
+        ...(params.client_token ? { "Client-Token": params.client_token } : {}),
+      },
+    },
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(
+      `Falha ao consultar instância Z-API: ${response.status} ${JSON.stringify(data) ?? ""}`.trim(),
+    );
+  }
+  return data;
+}
+
 async function updateZapiWebhook(params: {
   instance_id: string;
   token: string;
@@ -185,8 +208,7 @@ async function getAtendimentoWhatsAppConfig() {
   // #endregion
   const canSend =
     Boolean((wa as any)?.instance_id) &&
-    Boolean((wa as any)?.token) &&
-    (waStatus === "connected" || waStatus === "configured");
+    Boolean((wa as any)?.token);
 
   if (!canSend) {
     // #region debug-point G:wa-config-rejected
@@ -199,7 +221,7 @@ async function getAtendimentoWhatsAppConfig() {
         ? "missing_instance_id"
         : !((wa as any)?.token)
           ? "missing_token"
-          : "status_not_connected",
+          : "unknown",
     });
     // #endregion
     return null;
@@ -226,6 +248,31 @@ export async function sendAtendimentoWhatsAppText(params: {
     });
     // #endregion
     throw new Error("WhatsApp do atendimento não configurado.");
+  }
+
+  const runtimeInfo = await getZapiInstanceMeta({
+    instance_id: config.instance_id,
+    token: config.token,
+    client_token: config.client_token,
+  });
+  const runtimeConnected = Boolean((runtimeInfo as Record<string, unknown> | null)?.connected);
+
+  // #region debug-point G:wa-runtime-status
+  __dbg(traceId, "G", "[DEBUG] atendimento_whatsapp_runtime_status", {
+    instanceId: config.instance_id,
+    runtimeConnected,
+    runtimeInfo,
+  });
+  // #endregion
+
+  if (!runtimeConnected) {
+    // #region debug-point G:wa-runtime-disconnected
+    __dbg(traceId, "G", "[DEBUG] atendimento_whatsapp_runtime_disconnected", {
+      instanceId: config.instance_id,
+      runtimeInfo,
+    });
+    // #endregion
+    throw new Error("Instancia do WhatsApp desconectada na Z-API.");
   }
 
   const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
