@@ -28,6 +28,8 @@ const WHATSAPP_INVALID_MESSAGE =
   "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FORMAT_MESSAGE =
   "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
+const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
+  "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE =
   "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
 
@@ -122,6 +124,7 @@ function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldNam
   if (
     raw.startsWith(WHATSAPP_INVALID_MESSAGE) ||
     raw.startsWith(WHATSAPP_INVALID_FORMAT_MESSAGE) ||
+    raw.startsWith(WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE) ||
     raw === WHATSAPP_PENDING_MESSAGE
   ) {
     return "phone";
@@ -219,8 +222,8 @@ async function expirePendingPhoneValidationIfNeeded(params: {
   const { data: updatedPendingEvent } = await params.admin
     .from("atendimento_history_events")
     .update({
-      event_type: "phone_validation_failed",
-      title: "WhatsApp informado não passou no teste",
+      event_type: "phone_validation_timeout",
+      title: "Validacao do WhatsApp expirou sem confirmacao",
       details: {
         ...pendingDetails,
         final_status: "TIMEOUT",
@@ -244,20 +247,10 @@ async function expirePendingPhoneValidationIfNeeded(params: {
     return false;
   }
 
-  const failureAttempts = await getPhoneFormatFailureCount({
-    admin: params.admin,
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-  });
-  const shouldBlockConversation = failureAttempts >= MAX_PHONE_FORMAT_ATTEMPTS;
-  const timeoutMessage = shouldBlockConversation
-    ? WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE
-    : buildPhoneValidationRetryMessage(failureAttempts);
-
   await params.admin.from("atendimento_messages").insert({
     conversation_id: params.conversationId,
     sender_role: "bot",
-    content_text: timeoutMessage,
+    content_text: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
     media_type: "text",
     status: "entregue",
     sent_at: nowIso,
@@ -273,39 +266,17 @@ async function expirePendingPhoneValidationIfNeeded(params: {
   await params.admin
     .from("atendimento_leads")
     .update({
-      status: shouldBlockConversation ? "encerrado" : (leadRow as any)?.status ?? null,
-      funnel_stage: shouldBlockConversation ? "encerrado" : (leadRow as any)?.funnel_stage ?? null,
+      status: (leadRow as any)?.status ?? null,
+      funnel_stage: (leadRow as any)?.funnel_stage ?? null,
       unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
       last_interaction_at: nowIso,
       updated_at: nowIso,
     })
     .eq("id", params.leadId);
 
-  if (shouldBlockConversation) {
-    await params.admin
-      .from("atendimento_conversations")
-      .update({
-        bot_enabled: false,
-        updated_at: nowIso,
-      })
-      .eq("id", params.conversationId);
-
-    await appendHistoryEvent({
-      leadId: params.leadId,
-      conversationId: params.conversationId,
-      eventType: "conversation_closed",
-      title: "Atendimento encerrado após 3 tentativas inválidas de WhatsApp",
-      details: {
-        invalid_attempts: failureAttempts,
-        source: "validation_timeout",
-      },
-      actorType: "system",
-    });
-  }
-
   await syncConversationPreview({
     conversationId: params.conversationId,
-    contentText: timeoutMessage,
+    contentText: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
     createdAt: nowIso,
   });
 
@@ -314,8 +285,6 @@ async function expirePendingPhoneValidationIfNeeded(params: {
     leadId: params.leadId,
     conversationId: params.conversationId,
     pendingEventId: String((pendingEvent as any).id ?? ""),
-    failureAttempts,
-    shouldBlockConversation,
     timeoutMs: PHONE_VALIDATION_TIMEOUT_MS,
   });
   // #endregion

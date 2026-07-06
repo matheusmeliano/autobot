@@ -13,9 +13,32 @@ const WHATSAPP_INVALID_MESSAGE =
   "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FINAL_MESSAGE =
   "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
+const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
+  "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
 
 function buildPhoneValidationRetryMessage(attempts: number) {
   return `${WHATSAPP_INVALID_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_VALIDATION_ATTEMPTS}.`;
+}
+
+function normalizeValidationErrorText(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function isExplicitInvalidWhatsAppError(error: unknown) {
+  const message = normalizeValidationErrorText(error);
+  if (!message) return false;
+  return (
+    message.includes("phone number does not exist") ||
+    message.includes("numero nao existe") ||
+    message.includes("number does not exist") ||
+    message.includes("nao possui whatsapp") ||
+    message.includes("not on whatsapp") ||
+    message.includes("whatsapp number does not exist")
+  );
 }
 
 // #region debug-point A:bootstrap
@@ -584,19 +607,63 @@ export async function POST(req: Request) {
         body,
       });
       // #endregion
+      const isRealInvalidWhatsApp = isExplicitInvalidWhatsAppError(deliveryError);
       await admin
         .from("atendimento_history_events")
         .update({
-          event_type: "phone_validation_failed",
-          title: "WhatsApp informado não passou no teste",
+          event_type: isRealInvalidWhatsApp ? "phone_validation_failed" : "phone_validation_timeout",
+          title: isRealInvalidWhatsApp
+            ? "WhatsApp informado não passou no teste"
+            : "Validacao do WhatsApp falhou por indisponibilidade tecnica",
           details: {
             ...(pendingDetails as Record<string, unknown>),
-            final_status: "DELIVERY_ERROR",
+            final_status: isRealInvalidWhatsApp ? "DELIVERY_ERROR" : "DELIVERY_TECHNICAL_ERROR",
             error: deliveryError,
             failed_at: nowIso,
           },
         })
         .eq("id", String((pendingEvent as any).id));
+
+      const { data: leadRow } = await admin
+        .from("atendimento_leads")
+        .select("id, unread_count, status, funnel_stage")
+        .eq("id", String((pendingEvent as any).lead_id ?? ""))
+        .maybeSingle();
+
+      if (!isRealInvalidWhatsApp) {
+        const { data: technicalMessage } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+            sender_role: "bot",
+            content_text: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
+            media_type: "text",
+            status: "entregue",
+            sent_at: nowIso,
+            delivered_at: nowIso,
+          })
+          .select("id, content_text")
+          .maybeSingle();
+
+        await admin
+          .from("atendimento_leads")
+          .update({
+            status: (leadRow as any)?.status ?? null,
+            funnel_stage: (leadRow as any)?.funnel_stage ?? null,
+            unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
+            last_interaction_at: nowIso,
+            updated_at: nowIso,
+          })
+          .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+        await syncConversationPreview({
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          contentText: String((technicalMessage as any)?.content_text ?? WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE),
+          createdAt: nowIso,
+        });
+
+        return Response.json({ ok: true, validated: false, reason: "delivery_error_technical" });
+      }
 
       const failureAttempts = await getPhoneValidationFailureCount({
         admin,
@@ -620,12 +687,6 @@ export async function POST(req: Request) {
           delivered_at: nowIso,
         })
         .select("id, content_text")
-        .maybeSingle();
-
-      const { data: leadRow } = await admin
-        .from("atendimento_leads")
-        .select("id, unread_count, status, funnel_stage")
-        .eq("id", String((pendingEvent as any).lead_id ?? ""))
         .maybeSingle();
 
       await admin
