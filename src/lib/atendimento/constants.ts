@@ -26,6 +26,10 @@ export const CAPTURED_FIELD_ORDER = [
   "phone",
 ] as const;
 
+export const NUMERIC_ONLY_FIELDS = [
+  "phone",
+] as const;
+
 export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number], string> = {
   full_name: "Perfeito. Para começarmos, me diga seu nome completo.",
   phone:

@@ -5,6 +5,7 @@ import {
   filterCapturedDataForLead,
   getNextMissingField,
 } from "@/lib/atendimento/bot";
+import { NUMERIC_ONLY_FIELDS } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   appendHistoryEvent,
@@ -32,6 +33,10 @@ const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
   "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE =
   "Não foi possível validar o número de WhatsApp após 3 tentativas. Este atendimento foi encerrado definitivamente. Para tentar novamente, entre em contato com o suporte para remover o bloqueio do e-mail utilizado ou faça um novo cadastro com outro e-mail.";
+const NUMERIC_ONLY_TEXT_MESSAGE =
+  "Essa resposta não me parece válida. Responda somente com números.";
+const NUMERIC_ONLY_MIXED_MESSAGE =
+  "Por favor, responda somente com números.";
 
 // #region debug-point A:bootstrap
 const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
@@ -114,6 +119,44 @@ function extractWhatsAppMessageIds(payload: unknown) {
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isNumericOnlyField(field: CapturedFieldName | null): field is CapturedFieldName {
+  return Boolean(field && (NUMERIC_ONLY_FIELDS as readonly string[]).includes(field));
+}
+
+function classifyNumericOnlyResponse(value: string) {
+  const raw = String(value ?? "").trim();
+  const hasDigits = /\d/.test(raw);
+  const hasLetters = /[A-Za-zÀ-ÿ]/.test(raw);
+
+  if (hasLetters && !hasDigits) {
+    return {
+      ok: false as const,
+      reason: "text_only" as const,
+      message: NUMERIC_ONLY_TEXT_MESSAGE,
+    };
+  }
+
+  if (hasLetters && hasDigits) {
+    return {
+      ok: false as const,
+      reason: "mixed" as const,
+      message: NUMERIC_ONLY_MIXED_MESSAGE,
+    };
+  }
+
+  if (!hasDigits) {
+    return {
+      ok: false as const,
+      reason: "text_only" as const,
+      message: NUMERIC_ONLY_TEXT_MESSAGE,
+    };
+  }
+
+  return {
+    ok: true as const,
+  };
 }
 
 function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldName | null {
@@ -455,7 +498,7 @@ export async function POST(req: Request) {
     extractedKeys: Object.keys(extracted),
   });
   // #endregion
-  const expectedField = inferExpectedFieldFromBotMessage(lastBotMessage?.content_text ?? "");
+  const expectedField = inferExpectedFieldFromBotMessage(lastBotMessage?.content_text ?? "") ?? getNextMissingField(lead as any);
   if (
     expectedField &&
     !extracted[expectedField] &&
@@ -470,7 +513,11 @@ export async function POST(req: Request) {
     expectedField,
   }) as Record<string, string>;
 
-  if (expectedField === "phone") {
+  const numericOnlyValidation = isNumericOnlyField(expectedField)
+    ? classifyNumericOnlyResponse(contentText)
+    : null;
+
+  if (numericOnlyValidation && !numericOnlyValidation.ok) {
     await admin
       .from("atendimento_leads")
       .update({
@@ -501,6 +548,110 @@ export async function POST(req: Request) {
       },
       actorType: "lead",
     });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "numeric_field_validation_failed",
+      title: "Resposta inválida para campo numérico",
+      details: {
+        field: expectedField,
+        reason: numericOnlyValidation.reason,
+        content_text: contentText || null,
+      },
+      actorType: "system",
+    });
+
+    await sleep(POST_LEAD_REPLY_DELAY_MS);
+    const botNowIso = new Date().toISOString();
+    const { data: outbound, error: outboundError } = await admin
+      .from("atendimento_messages")
+      .insert({
+        conversation_id: String(conversation.id),
+        sender_role: "bot",
+        content_text: numericOnlyValidation.message,
+        media_type: "text",
+        status: "entregue",
+        sent_at: botNowIso,
+        delivered_at: botNowIso,
+      })
+      .select("*")
+      .maybeSingle();
+
+    if (outboundError) {
+      const code = String((outboundError as any)?.code ?? "").trim();
+      if (code !== "23505") {
+        return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+      }
+    }
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: numericOnlyValidation.message,
+      createdAt: botNowIso,
+    });
+
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: outboundError ? null : outbound,
+      blocked: false,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: true,
+      },
+    });
+  }
+
+  if (expectedField === "phone") {
+    await admin
+      .from("atendimento_leads")
+      .update({
+        ...captured,
+        unread_count: Number(lead.unread_count ?? 0) + 1,
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", String(lead.id));
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+      createdAt: nowIso,
+    });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "message_received",
+      title: "Mensagem recebida do lead",
+      details: {
+        content_text: contentText || null,
+        media_type: mediaType,
+        media_url: mediaUrl,
+        mime_type: mimeType,
+        file_name: fileName,
+        file_size_bytes: fileSizeBytes,
+      },
+      actorType: "lead",
+    });
+
+    if (Object.keys(captured).length > 0) {
+      await upsertCapturedFields({
+        leadId: String(lead.id),
+        sourceMessageId: String(inbound.id),
+        values: captured as Record<string, string>,
+      });
+
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: "data_captured",
+        title: "Dados capturados automaticamente",
+        details: captured,
+        actorType: "system",
+      });
+    }
 
     return Response.json({
       ok: true,
