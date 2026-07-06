@@ -514,198 +514,24 @@ export async function POST(req: Request) {
     });
   }
 
-  let phoneValidationFailed = false;
-  let phoneValidationFailureAttempt:
-    | {
-        attempts: number;
-        shouldBlock: boolean;
-        rawPhone: string;
-      }
-    | null = null;
-  let phoneFormatInvalid:
-    | {
-        attempts: number;
-        shouldBlock: boolean;
-        rawPhone: string;
-      }
-    | null = null;
-  let phoneValidationPending:
-    | {
-        phone: string;
-        messageId: string | null;
-        zaapId: string | null;
-      }
-    | null = null;
-
-  if (expectedField === "phone") {
-    const candidatePhone = String(captured.phone ?? extracted.phone ?? "").trim();
-    // #region debug-point E:phone-candidate
-    __dbg(traceId, "E", "[DEBUG] atendimento_phone_candidate", {
-      candidatePhone,
-      extractedPhone: extracted.phone ?? null,
-      contentText,
-      leadPhone: (lead as any)?.phone ?? null,
-      expectedField,
-      leadId: String((lead as any)?.id ?? ""),
-    });
-    // #endregion
-    if (candidatePhone) {
-      if (!hasSupportedWhatsAppCountryCode(candidatePhone)) {
-        delete captured.phone;
-        const attempts = (await getPhoneFormatFailureCount({
-          admin,
-          leadId: String(lead.id),
-          conversationId: String(conversation.id),
-        })) + 1;
-        phoneFormatInvalid = {
-          attempts,
-          shouldBlock: attempts >= MAX_PHONE_FORMAT_ATTEMPTS,
-          rawPhone: candidatePhone,
-        };
-      } else {
-        try {
-          const sendResult = await sendAtendimentoWhatsAppText({
-            phone: candidatePhone,
-            message: buildWhatsAppWelcomeMessage(lead as any),
-            baseUrl: resolveBaseUrlFromHeaders(req.headers),
-          });
-          const sendIds = extractWhatsAppMessageIds(sendResult);
-          // #region debug-point A:acceptance-check
-          __dbg(traceId, "A", "[DEBUG] atendimento_phone_send_acceptance_check", {
-            candidatePhone,
-            sendResult,
-            accepted: wasWhatsAppSendAccepted(sendResult),
-            sendIds,
-          });
-          // #endregion
-          if (!wasWhatsAppSendAccepted(sendResult)) {
-            throw new Error("Mensagem de teste não confirmada.");
-          }
-          delete captured.phone;
-          phoneValidationPending = {
-            phone: candidatePhone,
-            messageId: sendIds.messageId,
-            zaapId: sendIds.zaapId,
-          };
-          // #region debug-point B:pending-created
-          __dbg(traceId, "B", "[DEBUG] atendimento_phone_pending_created", {
-            candidatePhone,
-            phoneValidationPending,
-          });
-          // #endregion
-        } catch (error) {
-          if (!isExplicitInvalidWhatsAppError(error)) {
-            // #region debug-point D:validation-send-error
-            __dbg(traceId, "D", "[DEBUG] atendimento_phone_validation_send_error", {
-              candidatePhone,
-              errorMessage: error instanceof Error ? error.message : String(error ?? ""),
-            });
-            // #endregion
-            return Response.json(
-              {
-                ok: false,
-                error: "Nao foi possivel validar seu WhatsApp neste momento. Tente novamente em instantes.",
-              },
-              { status: 503 },
-            );
-          }
-          delete captured.phone;
-          phoneValidationFailed = true;
-          const attempts = (await getPhoneFormatFailureCount({
-            admin,
-            leadId: String(lead.id),
-            conversationId: String(conversation.id),
-          })) + 1;
-          phoneValidationFailureAttempt = {
-            attempts,
-            shouldBlock: attempts >= MAX_PHONE_FORMAT_ATTEMPTS,
-            rawPhone: candidatePhone,
-          };
-          // #region debug-point D:validation-failed
-          __dbg(traceId, "D", "[DEBUG] atendimento_phone_validation_failed", {
-            candidatePhone,
-            errorMessage: error instanceof Error ? error.message : String(error ?? ""),
-          });
-          // #endregion
-        }
-      }
-    } else {
-      const attempts = (await getPhoneFormatFailureCount({
-        admin,
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-      })) + 1;
-      phoneFormatInvalid = {
-        attempts,
-        shouldBlock: attempts >= MAX_PHONE_FORMAT_ATTEMPTS,
-        rawPhone: contentText,
-      };
-      delete captured.phone;
-      // #region debug-point D:missing-phone
-      __dbg(traceId, "D", "[DEBUG] atendimento_phone_missing_candidate", {
-        contentText,
-      });
-      // #endregion
-    }
-  }
-
-  const phoneAttemptFailure = phoneFormatInvalid ?? phoneValidationFailureAttempt;
-  const conversationShouldBeBlocked = Boolean(phoneAttemptFailure?.shouldBlock);
   const nextLead = {
     ...lead,
     ...captured,
   };
   const nextMissingField = getNextMissingField(nextLead as any);
-  const defaultBotResponse = botReplyForLead({ lead: nextLead as any, messageText: contentText });
-  const botResponse = conversationShouldBeBlocked
-    ? {
-        stage: "encerrado" as const,
-        status: "encerrado" as const,
-        message: WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE,
-      }
-    : phoneFormatInvalid
-      ? {
-          stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
-          status: (lead as any)?.status ?? defaultBotResponse.status,
-          message: buildPhoneFormatRetryMessage(phoneFormatInvalid.attempts),
-        }
-      : phoneValidationFailureAttempt
-        ? {
-            stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
-            status: (lead as any)?.status ?? defaultBotResponse.status,
-            message: buildPhoneValidationRetryMessage(phoneValidationFailureAttempt.attempts),
-          }
-        : phoneValidationPending
-          ? {
-              stage: (lead as any)?.funnel_stage ?? defaultBotResponse.stage,
-              status: (lead as any)?.status ?? defaultBotResponse.status,
-              message: WHATSAPP_PENDING_MESSAGE,
-            }
-          : defaultBotResponse;
+  const botResponse = botReplyForLead({ lead: nextLead as any, messageText: contentText });
   // #region debug-point B:save-decision
   __dbg(traceId, "B", "[DEBUG] atendimento_phone_save_decision", {
     expectedField,
-    phoneValidationFailed,
-    phoneValidationFailureAttempt,
-    phoneFormatInvalid,
     leadPhone: String((lead as any)?.phone ?? ""),
     leadCpf: String((lead as any)?.cpf ?? ""),
     capturedPhone: captured.phone ?? null,
-    phoneValidationPending,
     nextMissingField,
     botMessage: botResponse.message,
   });
   // #endregion
-  const nextStage = conversationShouldBeBlocked
-    ? "encerrado"
-    : nextMissingField
-      ? botResponse.stage
-      : "pre_cadastro_concluido";
-  const nextStatus = conversationShouldBeBlocked
-    ? "encerrado"
-    : nextMissingField
-      ? botResponse.status
-      : "matricula_pendente";
+  const nextStage = nextMissingField ? botResponse.stage : "pre_cadastro_concluido";
+  const nextStatus = nextMissingField ? botResponse.status : "matricula_pendente";
 
   await admin
     .from("atendimento_leads")
@@ -718,16 +544,6 @@ export async function POST(req: Request) {
       updated_at: nowIso,
     })
     .eq("id", String(lead.id));
-
-  if (conversationShouldBeBlocked) {
-    await admin
-      .from("atendimento_conversations")
-      .update({
-        bot_enabled: false,
-        updated_at: nowIso,
-      })
-      .eq("id", String(conversation.id));
-  }
 
   await upsertCapturedFields({
     leadId: String(lead.id),
@@ -768,73 +584,6 @@ export async function POST(req: Request) {
     });
   }
 
-  if (expectedField === "phone") {
-    await appendHistoryEvent({
-      leadId: String(lead.id),
-      conversationId: String(conversation.id),
-      eventType: phoneFormatInvalid
-        ? "phone_validation_format_failed"
-        : phoneValidationFailed
-          ? "phone_validation_failed"
-          : phoneValidationPending
-            ? "phone_validation_pending"
-            : "phone_validated",
-      title: phoneFormatInvalid
-        ? phoneFormatInvalid.shouldBlock
-          ? "WhatsApp inválido e atendimento encerrado"
-          : "WhatsApp sem DDI válido informado"
-        : phoneValidationFailed
-          ? "WhatsApp informado não passou no teste"
-          : phoneValidationPending
-            ? "WhatsApp aguardando confirmação de entrega"
-            : "WhatsApp validado e salvo",
-      details: {
-        phone: phoneAttemptFailure
-          ? phoneAttemptFailure.rawPhone
-          : phoneValidationFailed
-            ? extracted.phone ?? contentText
-            : phoneValidationPending?.phone ?? captured.phone,
-        invalid_attempts: phoneAttemptFailure?.attempts ?? null,
-        conversation_blocked: conversationShouldBeBlocked,
-        external_message_id: phoneValidationPending?.messageId ?? null,
-        zaap_id: phoneValidationPending?.zaapId ?? null,
-      },
-      actorType: "system",
-    });
-    // #region debug-point B:pending-event-persisted
-    __dbg(traceId, "B", "[DEBUG] atendimento_phone_event_persisted", {
-      eventType: phoneFormatInvalid
-        ? "phone_validation_format_failed"
-        : phoneValidationFailed
-          ? "phone_validation_failed"
-          : phoneValidationPending
-            ? "phone_validation_pending"
-            : "phone_validated",
-      phone: phoneAttemptFailure
-        ? phoneAttemptFailure.rawPhone
-        : phoneValidationFailed
-          ? extracted.phone ?? contentText
-          : phoneValidationPending?.phone ?? captured.phone ?? null,
-      externalMessageId: phoneValidationPending?.messageId ?? null,
-      zaapId: phoneValidationPending?.zaapId ?? null,
-      conversationShouldBeBlocked,
-    });
-    // #endregion
-  }
-
-  if (conversationShouldBeBlocked) {
-    await appendHistoryEvent({
-      leadId: String(lead.id),
-      conversationId: String(conversation.id),
-      eventType: "conversation_closed",
-      title: "Atendimento encerrado após 3 tentativas inválidas de WhatsApp",
-      details: {
-        invalid_attempts: phoneAttemptFailure?.attempts ?? MAX_PHONE_FORMAT_ATTEMPTS,
-      },
-      actorType: "system",
-    });
-  }
-
   await sleep(POST_LEAD_REPLY_DELAY_MS);
   const botNowIso = new Date().toISOString();
   const { data: outbound, error: outboundError } = await admin
@@ -863,10 +612,7 @@ export async function POST(req: Request) {
     inboundId: String((inbound as any)?.id ?? ""),
     outboundId: String((outbound as any)?.id ?? ""),
     outboundMessage: String((outbound as any)?.content_text ?? ""),
-    blocked: conversationShouldBeBlocked,
-    pendingValidation: Boolean(phoneValidationPending),
-    phoneValidationFailed,
-    phoneFormatInvalid: Boolean(phoneFormatInvalid),
+    blocked: false,
   });
   // #endregion
 
@@ -888,10 +634,10 @@ export async function POST(req: Request) {
     ok: true,
     inbound,
     outbound: outboundError ? null : outbound,
-    blocked: conversationShouldBeBlocked,
+    blocked: false,
     conversation: {
       id: String(conversation.id),
-      bot_enabled: !conversationShouldBeBlocked,
+      bot_enabled: true,
     },
   });
 }
