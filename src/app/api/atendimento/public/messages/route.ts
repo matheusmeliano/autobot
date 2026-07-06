@@ -45,7 +45,7 @@ const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
   "Recebi sua confirmação, mas não consegui enviar a mensagem para o WhatsApp informado agora. Tente novamente em instantes.";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/phone-confirmation-positive-phrase.env";
+const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -769,19 +769,6 @@ export async function POST(req: Request) {
     if (decision === "positive") {
       const baseUrl = resolveBaseUrlFromHeaders(req.headers);
       let positiveFollowUpMessage: string | null = null;
-      // #region debug-point A:phone-confirmation-positive-branch
-      __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_branch", {
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-        inboundMessageId: String(inbound.id),
-        contentText,
-        decision,
-        pendingPhone,
-        pendingConfirmationId: String(pendingPhoneConfirmation?.id ?? ""),
-        lastBotMessage: String(lastBotMessage?.content_text ?? ""),
-        baseUrl,
-      });
-      // #endregion
       if (pendingPhoneConfirmation?.id) {
         await admin
           .from("atendimento_history_events")
@@ -831,16 +818,6 @@ export async function POST(req: Request) {
 
           const accepted = wasWhatsAppSendAccepted(sendResult);
           const ids = extractWhatsAppMessageIds(sendResult);
-          // #region debug-point A:phone-confirmation-positive-send
-          __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_send", {
-            leadId: String(lead.id),
-            conversationId: String(conversation.id),
-            accepted,
-            messageId: ids.messageId,
-            zaapId: ids.zaapId,
-            pendingPhone,
-          });
-          // #endregion
 
           await appendHistoryEvent({
             leadId: String(lead.id),
@@ -859,14 +836,6 @@ export async function POST(req: Request) {
           });
           positiveFollowUpMessage = PHONE_CONFIRMATION_SUCCESS_MESSAGE;
         } catch (error) {
-          // #region debug-point A:phone-confirmation-positive-send-failed
-          __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_send_failed", {
-            leadId: String(lead.id),
-            conversationId: String(conversation.id),
-            pendingPhone,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // #endregion
           await appendHistoryEvent({
             leadId: String(lead.id),
             conversationId: String(conversation.id),
@@ -915,15 +884,6 @@ export async function POST(req: Request) {
         outbound = outboundError ? null : ((outboundMessage as Record<string, unknown> | null) ?? null);
       }
 
-      // #region debug-point A:phone-confirmation-positive-return
-      __dbg(traceId, "A", "[DEBUG] atendimento_phone_confirmation_positive_return", {
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-        pendingPhone,
-        returnsOutboundNull: !outbound,
-        positiveFollowUpMessage,
-      });
-      // #endregion
       return Response.json({
         ok: true,
         inbound,
