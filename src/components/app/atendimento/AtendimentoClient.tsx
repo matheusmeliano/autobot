@@ -61,6 +61,60 @@ function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
   });
 }
 
+type AtendimentoWorkspaceView = "link-1" | "link-2";
+
+const WORKSPACE_VIEWS: Array<{
+  id: AtendimentoWorkspaceView;
+  eyebrow: string;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "link-1",
+    eyebrow: "Pagina Interna 01",
+    label: "Link de Atendimento 01",
+    description: "Primeira pagina interna do menu com acesso rapido ao link publico de atendimento.",
+  },
+  {
+    id: "link-2",
+    eyebrow: "Pagina Interna 02",
+    label: "Link de Atendimento 02",
+    description: "Segunda pagina interna do menu com o mesmo bloco de link para operacao rapida.",
+  },
+];
+
+function AtendimentoLinkCard({
+  publicUrl,
+  onCopy,
+}: {
+  publicUrl: string;
+  onCopy: () => Promise<void>;
+}) {
+  return (
+    <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75 sm:shrink-0">
+          Link de Atendimento
+        </div>
+        <div
+          className="min-w-0 flex-1 truncate text-sm font-semibold text-white"
+          title={publicUrl || undefined}
+        >
+          {publicUrl || "Carregando link..."}
+        </div>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] sm:shrink-0"
+        >
+          <Copy className="h-4 w-4" />
+          Copiar Link
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AtendimentoClient() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [summary, setSummary] = useState<AtendimentoSummary>(EMPTY_SUMMARY);
@@ -75,7 +129,7 @@ export function AtendimentoClient() {
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
-  const [desktopListHeight, setDesktopListHeight] = useState<number | null>(null);
+  const [activeView, setActiveView] = useState<AtendimentoWorkspaceView>("link-1");
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
@@ -507,71 +561,123 @@ export function AtendimentoClient() {
     setMobileConversationOpen(true);
   }
 
+  const activeWorkspaceView = WORKSPACE_VIEWS.find((view) => view.id === activeView) ?? WORKSPACE_VIEWS[0];
+
   return (
-    <div>
+    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 flex-col gap-4 overflow-hidden">
       {loadError ? (
-        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 text-sm text-[var(--app-text-55)]">
+        <div className="shrink-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 text-sm text-[var(--app-text-55)]">
           {loadError}
         </div>
       ) : null}
-      <div>
+      <div className="shrink-0">
         <div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Atendimento</h1>
-          <div className="mt-2 text-sm text-white/60">
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Atendimento</h1>
+          <div className="mt-2 max-w-3xl text-sm text-white/60">
             CRM exclusivo para captação, acompanhamento e conversão dos alunos do projeto Lucas Brum Online Music USA.
           </div>
         </div>
+      </div>
 
-        <div className="mt-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75 sm:shrink-0">
-              Link de Atendimento
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto xl:grid-cols-[220px_minmax(0,1fr)_320px] xl:overflow-hidden">
+        <aside className="flex min-h-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3 xl:h-full">
+          <div className="px-2 pt-2">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+              Menu Interno
             </div>
-            <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
-              {publicUrl || "Carregando link..."}
+            <div className="mt-2 text-sm font-semibold text-[var(--app-text-85)]">Paginas do atendimento</div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2">
+            {WORKSPACE_VIEWS.map((view, index) => {
+              const active = view.id === activeView;
+              return (
+                <button
+                  key={view.id}
+                  type="button"
+                  onClick={() => setActiveView(view.id)}
+                  className={[
+                    "flex items-start gap-3 rounded-2xl border px-3 py-3 text-left transition",
+                    active
+                      ? "border-yellow-500/30 bg-yellow-500/10 text-[var(--app-text-85)]"
+                      : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
+                  ].join(" ")}
+                >
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] text-[11px] font-semibold">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{view.label}</span>
+                    <span className="mt-1 block text-xs text-[var(--app-text-45)]">{view.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 xl:mt-auto">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+              Estrutura
             </div>
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] sm:shrink-0"
-            >
-              <Copy className="h-4 w-4" />
-              Copiar Link
-            </button>
+            <div className="mt-2 text-sm text-[var(--app-text-60)]">
+              Area interna travada em 100vh, com scroll apenas onde for necessario.
+            </div>
+          </div>
+        </aside>
+
+        <div className="flex min-h-0 flex-col gap-4 xl:h-full">
+          <div className="shrink-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  {activeWorkspaceView.eyebrow}
+                </div>
+                <div className="mt-2 truncate text-xl font-semibold tracking-tight text-[var(--app-text-85)]">
+                  {activeWorkspaceView.label}
+                </div>
+                <div className="mt-2 max-w-2xl text-sm text-[var(--app-text-60)]">
+                  {activeWorkspaceView.description}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />
+            </div>
+
+            <div className="mt-4">
+              <AtendimentoSummaryCards summary={summary} />
+            </div>
+          </div>
+
+          <div className="hidden min-h-0 flex-1 lg:block">
+            <AtendimentoConversationPanel
+              conversation={selectedConversation}
+              messages={messages}
+              messagesLoading={messagesLoading}
+              disabled={sending}
+              onSendMessage={handleSendMessage}
+            />
           </div>
         </div>
-      </div>
 
-      <div className="mt-6">
-        <AtendimentoSummaryCards summary={summary} />
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <AtendimentoLeadList
-          leads={leads}
-          query={query}
-          loading={loading}
-          selectedLeadId={selectedLeadId}
-          onQueryChange={setQuery}
-          onListHeightChange={setDesktopListHeight}
-          onSelectLead={(leadId) => setSelectedLeadId(leadId)}
-          onOpenConversation={openMobileConversation}
-          onDeleteLead={async (lead) => {
-            try {
-              await handleDeleteLead(lead);
-            } catch (error) {
-              modalToast.error(error instanceof Error ? error.message : "Falha ao excluir lead.");
-              throw error;
-            }
-          }}
-        />
-        <div className="hidden lg:block" style={desktopListHeight != null ? { height: desktopListHeight } : undefined}>
-          <AtendimentoConversationPanel
-            conversation={selectedConversation}
-            messages={messages}
-            messagesLoading={messagesLoading}
-            disabled={sending}
-            onSendMessage={handleSendMessage}
+        <div className="min-h-0 xl:h-full">
+          <AtendimentoLeadList
+            leads={leads}
+            query={query}
+            loading={loading}
+            selectedLeadId={selectedLeadId}
+            onQueryChange={setQuery}
+            onSelectLead={(leadId) => setSelectedLeadId(leadId)}
+            onOpenConversation={openMobileConversation}
+            onDeleteLead={async (lead) => {
+              try {
+                await handleDeleteLead(lead);
+              } catch (error) {
+                modalToast.error(error instanceof Error ? error.message : "Falha ao excluir lead.");
+                throw error;
+              }
+            }}
           />
         </div>
       </div>
