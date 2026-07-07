@@ -15,27 +15,6 @@ import { AtendimentoSummaryCards } from "@/components/app/atendimento/Atendiment
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 
-// #region debug-point A:bootstrap
-const __dbgUrl = "http://127.0.0.1:7777/event";
-const __dbgSession = "atendimento-lead-detail";
-const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  fetch(__dbgUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSession,
-      runId: "pre-fix",
-      hypothesisId,
-      traceId,
-      location: "src/components/app/atendimento/AtendimentoClient.tsx",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
-
 const EMPTY_SUMMARY: AtendimentoSummary = {
   totalLeads: 0,
   novosLeads: 0,
@@ -234,62 +213,18 @@ export function AtendimentoClient() {
   const loadLeadDetail = useCallback(
     async (leadId: string, options?: { skipMessages?: boolean; suppressNotFound?: boolean }) => {
       const requestId = ++detailRequestIdRef.current;
-      const traceId = `lead-detail-${leadId}-${requestId}`;
-      // #region debug-point B:detail-fetch-start
-      __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_fetch_start", {
-        leadId,
-        requestId,
-        suppressNotFound: Boolean(options?.suppressNotFound),
-        skipMessages: Boolean(options?.skipMessages),
-        selectedLeadIdRef: selectedLeadIdRef.current,
-      });
-      // #endregion
       let res: Response;
       try {
         res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
       } catch (error) {
-        // #region debug-point C:detail-fetch-transport-error
-        __dbg(traceId, "C", "[DEBUG] atendimento_lead_detail_fetch_transport_error", {
-          leadId,
-          requestId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // #endregion
         setLoadError("Falha ao carregar detalhes do lead.");
         modalToast.error("Falha ao carregar detalhes do lead.");
         return;
       }
-      // #region debug-point B:detail-fetch-response
-      __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_fetch_response", {
-        leadId,
-        requestId,
-        status: res.status,
-        ok: res.ok,
-        contentType: res.headers.get("content-type"),
-      });
-      // #endregion
       if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
-      // #region debug-point B:detail-fetch-json
-      __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_fetch_json", {
-        leadId,
-        requestId,
-        hasJson: Boolean(json),
-        jsonOk: Boolean(json?.ok),
-        error: String(json?.error ?? ""),
-        conversationId: String(json?.lead?.conversation?.id ?? ""),
-      });
-      // #endregion
       if (!json?.ok) {
         const errorMessage = String(json?.error ?? (res.status === 404 ? "not_found" : "Falha ao carregar detalhes do lead."));
-        // #region debug-point C:detail-fetch-error
-        __dbg(traceId, "C", "[DEBUG] atendimento_lead_detail_fetch_error", {
-          leadId,
-          requestId,
-          errorMessage,
-          suppressNotFound: Boolean(options?.suppressNotFound),
-        });
-        // #endregion
         if (errorMessage === "not_found") {
           const fallbackLeadId =
             leads.find((lead) => String(lead.id ?? "").trim() !== String(leadId).trim())?.id ?? null;

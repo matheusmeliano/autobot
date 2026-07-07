@@ -5,44 +5,14 @@ import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/a
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// #region debug-point A:bootstrap
-const __dbgUrl = "http://127.0.0.1:7777/event";
-const __dbgSession = "atendimento-lead-detail";
-const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  fetch(__dbgUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSession,
-      runId: "pre-fix",
-      hypothesisId,
-      traceId,
-      location: "src/app/api/atendimento/leads/[leadId]/route.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
-
 export async function GET(_: Request, context: { params: Promise<{ leadId: string }> }) {
-  const traceId = `lead-route-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   try {
     const auth = await requireAtendimentoUser();
     if (!auth.ok) {
-      // #region debug-point B:auth-forbidden
-      __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_route_forbidden", {});
-      // #endregion
       return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
     }
 
     const { leadId } = await context.params;
-    // #region debug-point B:route-start
-    __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_route_start", {
-      leadId,
-    });
-    // #endregion
     const admin = createSupabaseAdminClient();
 
     const [{ data: lead, error: leadError }, { data: events, error: eventsError }] = await Promise.all([
@@ -61,29 +31,12 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
     ]);
 
     if (leadError) {
-      // #region debug-point C:lead-query-error
-      __dbg(traceId, "C", "[DEBUG] atendimento_lead_detail_route_lead_error", {
-        leadId,
-        error: leadError.message,
-      });
-      // #endregion
       return Response.json({ ok: false, error: leadError.message }, { status: 500 });
     }
     if (eventsError) {
-      // #region debug-point C:events-query-error
-      __dbg(traceId, "C", "[DEBUG] atendimento_lead_detail_route_events_error", {
-        leadId,
-        error: eventsError.message,
-      });
-      // #endregion
       return Response.json({ ok: false, error: eventsError.message }, { status: 500 });
     }
     if (!lead?.id) {
-      // #region debug-point D:not-found
-      __dbg(traceId, "D", "[DEBUG] atendimento_lead_detail_route_not_found", {
-        leadId,
-      });
-      // #endregion
       return Response.json({ ok: false, error: "not_found" }, { status: 404 });
     }
 
@@ -96,12 +49,6 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
       .maybeSingle();
 
     if (conversationError) {
-      // #region debug-point C:conversation-query-error
-      __dbg(traceId, "C", "[DEBUG] atendimento_lead_detail_route_conversation_error", {
-        leadId,
-        error: conversationError.message,
-      });
-      // #endregion
       return Response.json({ ok: false, error: conversationError.message }, { status: 500 });
     }
 
@@ -120,15 +67,6 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
         .is("read_at", null);
     }
 
-    // #region debug-point E:route-success
-    __dbg(traceId, "E", "[DEBUG] atendimento_lead_detail_route_success", {
-      leadId,
-      conversationId,
-      eventsCount: Array.isArray(events) ? events.length : 0,
-      assignedUserEmail: String((lead as { assigned_user_email?: string | null })?.assigned_user_email ?? ""),
-    });
-    // #endregion
-
     return Response.json({
       ok: true,
       lead: {
@@ -138,11 +76,6 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
       events: (events ?? []) as any[],
     });
   } catch (error) {
-    // #region debug-point F:unexpected-error
-    __dbg(traceId, "F", "[DEBUG] atendimento_lead_detail_route_unexpected_error", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    // #endregion
     return Response.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }
