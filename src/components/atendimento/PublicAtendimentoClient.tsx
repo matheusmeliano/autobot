@@ -27,7 +27,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 type PortalPage = "bot" | "conta" | "arquivos";
 
 const BOT_TYPING_LEAD_IN_MS = 5_000;
-const BOT_COMPOSER_COOLDOWN_MS = 5_000;
+const BOT_COMPOSER_COOLDOWN_MS = 2_500;
 const PHONE_PROMPT_MESSAGE = CAPTURED_FIELD_PROMPTS.phone;
 // #region debug-point A:bootstrap
 const __dbgUrl = "http://127.0.0.1:7777/event";
