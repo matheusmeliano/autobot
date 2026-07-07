@@ -62,6 +62,7 @@ function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
 }
 
 type AtendimentoSidebarModule = "public-link" | "summary";
+type AtendimentoRightPanel = "conversation" | AtendimentoSidebarModule;
 
 const SIDEBAR_MODULES: Array<{
   id: AtendimentoSidebarModule;
@@ -127,6 +128,7 @@ export function AtendimentoClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [activeView, setActiveView] = useState<AtendimentoSidebarModule>("public-link");
+  const [rightPanel, setRightPanel] = useState<AtendimentoRightPanel>("conversation");
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
@@ -555,17 +557,28 @@ export function AtendimentoClient() {
 
   function openMobileConversation(leadId: string) {
     setSelectedLeadId(leadId);
+    setRightPanel("conversation");
     setMobileConversationOpen(true);
   }
 
-  const activeSidebarModule = SIDEBAR_MODULES.find((module) => module.id === activeView) ?? SIDEBAR_MODULES[0];
-
-  function renderSidebarModule() {
-    if (activeView === "public-link") {
+  function renderRightPanelContent() {
+    if (rightPanel === "public-link") {
       return <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />;
     }
 
-    return <AtendimentoSummaryCards summary={summary} />;
+    if (rightPanel === "summary") {
+      return <AtendimentoSummaryCards summary={summary} />;
+    }
+
+    return (
+      <AtendimentoConversationPanel
+        conversation={selectedConversation}
+        messages={messages}
+        messagesLoading={messagesLoading}
+        disabled={sending}
+        onSendMessage={handleSendMessage}
+      />
+    );
   }
 
   return (
@@ -587,12 +600,15 @@ export function AtendimentoClient() {
 
           <div className="space-y-2">
             {SIDEBAR_MODULES.map((module) => {
-              const active = module.id === activeView;
+              const active = module.id === activeView && rightPanel === module.id;
               return (
                 <button
                   key={module.id}
                   type="button"
-                  onClick={() => setActiveView(module.id)}
+                  onClick={() => {
+                    setActiveView(module.id);
+                    setRightPanel(module.id);
+                  }}
                   className={[
                     "w-full rounded-2xl border px-4 py-3 text-left transition",
                     active
@@ -606,15 +622,6 @@ export function AtendimentoClient() {
               );
             })}
           </div>
-
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-              Página Ativa
-            </div>
-            <div className="mt-2 text-sm font-semibold text-[var(--app-text-85)]">{activeSidebarModule.label}</div>
-            <div className="mt-1 text-xs text-[var(--app-text-55)]">{activeSidebarModule.description}</div>
-            <div className="mt-4">{renderSidebarModule()}</div>
-          </div>
         </div>
 
         <div className="min-h-0 flex-1 p-4">
@@ -624,7 +631,10 @@ export function AtendimentoClient() {
             loading={loading}
             selectedLeadId={selectedLeadId}
             onQueryChange={setQuery}
-            onSelectLead={(leadId) => setSelectedLeadId(leadId)}
+            onSelectLead={(leadId) => {
+              setSelectedLeadId(leadId);
+              setRightPanel("conversation");
+            }}
             onOpenConversation={openMobileConversation}
             onDeleteLead={async (lead) => {
               try {
@@ -639,13 +649,25 @@ export function AtendimentoClient() {
       </aside>
 
       <div className="hidden min-w-0 flex-1 lg:block">
-        <AtendimentoConversationPanel
-          conversation={selectedConversation}
-          messages={messages}
-          messagesLoading={messagesLoading}
-          disabled={sending}
-          onSendMessage={handleSendMessage}
-        />
+        <div className="h-full min-h-0">
+          {rightPanel === "conversation" ? (
+            renderRightPanelContent()
+          ) : (
+            <div className="flex h-full min-h-0 flex-col border-l border-[var(--app-border)] bg-[var(--app-bg)]">
+              <div className="border-b border-[var(--app-border)] px-6 py-5">
+                <div className="text-sm font-semibold text-[var(--app-text-85)]">
+                  {rightPanel === "public-link" ? "Link de Atendimento" : "Indicadores"}
+                </div>
+                <div className="mt-1 text-xs text-[var(--app-text-55)]">
+                  {rightPanel === "public-link"
+                    ? "Acesso rapido ao link publico do atendimento."
+                    : "Resumo consolidado dos indicadores do atendimento."}
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-6">{renderRightPanelContent()}</div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="lg:hidden">
