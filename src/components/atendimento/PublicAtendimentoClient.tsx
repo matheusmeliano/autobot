@@ -1187,8 +1187,8 @@ export function PublicAtendimentoClient({
   }
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-[#09111A] px-4 py-4 text-white md:px-8 md:py-6">
-      <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0E1723] shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
+    <div className="h-[100dvh] w-screen overflow-hidden bg-[#09111A] text-white md:px-8 md:py-6">
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-none border border-white/10 bg-[#0E1723] shadow-none md:mx-auto md:max-w-5xl md:rounded-[2rem] md:shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(14,23,35,0.9))] px-6 py-5">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
