@@ -61,25 +61,22 @@ function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
   });
 }
 
-type AtendimentoWorkspaceView = "link-1" | "link-2";
+type AtendimentoSidebarModule = "public-link" | "summary";
 
-const WORKSPACE_VIEWS: Array<{
-  id: AtendimentoWorkspaceView;
-  eyebrow: string;
+const SIDEBAR_MODULES: Array<{
+  id: AtendimentoSidebarModule;
   label: string;
   description: string;
 }> = [
   {
-    id: "link-1",
-    eyebrow: "Pagina Interna 01",
-    label: "Link de Atendimento 01",
-    description: "Primeira pagina interna do menu com acesso rapido ao link publico de atendimento.",
+    id: "public-link",
+    label: "Link de Atendimento",
+    description: "Abre a pagina exclusiva do link publico para copia rapida.",
   },
   {
-    id: "link-2",
-    eyebrow: "Pagina Interna 02",
-    label: "Link de Atendimento 02",
-    description: "Segunda pagina interna do menu com o mesmo bloco de link para operacao rapida.",
+    id: "summary",
+    label: "Indicadores",
+    description: "Abre a pagina exclusiva com os cards de acompanhamento do atendimento.",
   },
 ];
 
@@ -129,7 +126,7 @@ export function AtendimentoClient() {
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
-  const [activeView, setActiveView] = useState<AtendimentoWorkspaceView>("link-1");
+  const [activeView, setActiveView] = useState<AtendimentoSidebarModule>("public-link");
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
@@ -561,107 +558,66 @@ export function AtendimentoClient() {
     setMobileConversationOpen(true);
   }
 
-  const activeWorkspaceView = WORKSPACE_VIEWS.find((view) => view.id === activeView) ?? WORKSPACE_VIEWS[0];
+  const activeSidebarModule = SIDEBAR_MODULES.find((module) => module.id === activeView) ?? SIDEBAR_MODULES[0];
+
+  function renderSidebarModule() {
+    if (activeView === "public-link") {
+      return <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />;
+    }
+
+    return <AtendimentoSummaryCards summary={summary} />;
+  }
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 flex-col gap-4 overflow-hidden">
-      {loadError ? (
-        <div className="shrink-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 text-sm text-[var(--app-text-55)]">
-          {loadError}
-        </div>
-      ) : null}
-      <div className="shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Atendimento</h1>
-          <div className="mt-2 max-w-3xl text-sm text-white/60">
+    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 overflow-hidden">
+      <aside className="flex h-full min-h-0 w-full min-w-0 flex-col border-r border-[var(--app-border)] bg-[var(--app-card-2)] lg:max-w-[420px] lg:min-w-[420px]">
+        <div className="shrink-0 border-b border-[var(--app-border)] px-4 py-4">
+          <div className="text-2xl font-semibold tracking-tight text-[var(--app-text-85)]">Atendimento</div>
+          <div className="mt-2 text-sm text-[var(--app-text-55)]">
             CRM exclusivo para captação, acompanhamento e conversão dos alunos do projeto Lucas Brum Online Music USA.
           </div>
         </div>
-      </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto xl:grid-cols-[220px_minmax(0,1fr)_320px] xl:overflow-hidden">
-        <aside className="flex min-h-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3 xl:h-full">
-          <div className="px-2 pt-2">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-              Menu Interno
+        <div className="shrink-0 space-y-4 border-b border-[var(--app-border)] px-4 py-4">
+          {loadError ? (
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
+              {loadError}
             </div>
-            <div className="mt-2 text-sm font-semibold text-[var(--app-text-85)]">Paginas do atendimento</div>
-          </div>
+          ) : null}
 
-          <div className="mt-4 flex flex-col gap-2">
-            {WORKSPACE_VIEWS.map((view, index) => {
-              const active = view.id === activeView;
+          <div className="space-y-2">
+            {SIDEBAR_MODULES.map((module) => {
+              const active = module.id === activeView;
               return (
                 <button
-                  key={view.id}
+                  key={module.id}
                   type="button"
-                  onClick={() => setActiveView(view.id)}
+                  onClick={() => setActiveView(module.id)}
                   className={[
-                    "flex items-start gap-3 rounded-2xl border px-3 py-3 text-left transition",
+                    "w-full rounded-2xl border px-4 py-3 text-left transition",
                     active
                       ? "border-yellow-500/30 bg-yellow-500/10 text-[var(--app-text-85)]"
                       : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
                   ].join(" ")}
                 >
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] text-[11px] font-semibold">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{view.label}</span>
-                    <span className="mt-1 block text-xs text-[var(--app-text-45)]">{view.description}</span>
-                  </span>
+                  <div className="truncate text-sm font-semibold">{module.label}</div>
+                  <div className="mt-1 text-xs text-[var(--app-text-45)]">{module.description}</div>
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 xl:mt-auto">
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-              Estrutura
+              Página Ativa
             </div>
-            <div className="mt-2 text-sm text-[var(--app-text-60)]">
-              Area interna travada em 100vh, com scroll apenas onde for necessario.
-            </div>
-          </div>
-        </aside>
-
-        <div className="flex min-h-0 flex-col gap-4 xl:h-full">
-          <div className="shrink-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  {activeWorkspaceView.eyebrow}
-                </div>
-                <div className="mt-2 truncate text-xl font-semibold tracking-tight text-[var(--app-text-85)]">
-                  {activeWorkspaceView.label}
-                </div>
-                <div className="mt-2 max-w-2xl text-sm text-[var(--app-text-60)]">
-                  {activeWorkspaceView.description}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />
-            </div>
-
-            <div className="mt-4">
-              <AtendimentoSummaryCards summary={summary} />
-            </div>
-          </div>
-
-          <div className="hidden min-h-0 flex-1 lg:block">
-            <AtendimentoConversationPanel
-              conversation={selectedConversation}
-              messages={messages}
-              messagesLoading={messagesLoading}
-              disabled={sending}
-              onSendMessage={handleSendMessage}
-            />
+            <div className="mt-2 text-sm font-semibold text-[var(--app-text-85)]">{activeSidebarModule.label}</div>
+            <div className="mt-1 text-xs text-[var(--app-text-55)]">{activeSidebarModule.description}</div>
+            <div className="mt-4">{renderSidebarModule()}</div>
           </div>
         </div>
 
-        <div className="min-h-0 xl:h-full">
+        <div className="min-h-0 flex-1 p-4">
           <AtendimentoLeadList
             leads={leads}
             query={query}
@@ -680,6 +636,16 @@ export function AtendimentoClient() {
             }}
           />
         </div>
+      </aside>
+
+      <div className="hidden min-w-0 flex-1 lg:block">
+        <AtendimentoConversationPanel
+          conversation={selectedConversation}
+          messages={messages}
+          messagesLoading={messagesLoading}
+          disabled={sending}
+          onSendMessage={handleSendMessage}
+        />
       </div>
 
       <div className="lg:hidden">
