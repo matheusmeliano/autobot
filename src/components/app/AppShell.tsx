@@ -508,7 +508,14 @@ export function AppShell({
               <Menu className="h-5 w-5" />
             </button>
             </div>
-          <div className="flex-1 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6">
+          <div
+            className={[
+              "flex-1",
+              drawerOnlyNav
+                ? ""
+                : "rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 min-[1201px]:p-6",
+            ].join(" ")}
+          >
             {children}
           </div>
           <div className="mt-3 flex justify-end text-xs text-[var(--app-text-35)]">
