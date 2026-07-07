@@ -584,14 +584,14 @@ export function AtendimentoClient() {
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 gap-6 overflow-hidden bg-[var(--app-bg)] p-5">
       <aside className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 lg:max-w-[340px] lg:min-w-[340px]">
-        <div className="shrink-0 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-5 py-5">
+        <div className="shrink-0 px-2 py-2">
           <div className="text-2xl font-semibold tracking-tight text-[var(--app-text-85)]">Atendimento</div>
           <div className="mt-2 text-sm leading-6 text-[var(--app-text-55)]">
             CRM exclusivo para captação, acompanhamento e conversão dos alunos do projeto Lucas Brum Online Music USA.
           </div>
         </div>
 
-        <div className="shrink-0 space-y-4 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
+        <div className="shrink-0 space-y-4 px-2 py-2">
           {loadError ? (
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
               {loadError}
@@ -610,10 +610,10 @@ export function AtendimentoClient() {
                     setRightPanel(module.id);
                   }}
                   className={[
-                    "w-full rounded-2xl border px-4 py-3 text-left transition",
+                    "w-full rounded-2xl px-4 py-3 text-left transition",
                     active
-                      ? "border-yellow-500/30 bg-yellow-500/10 text-[var(--app-text-85)]"
-                      : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
+                      ? "bg-yellow-500/10 text-[var(--app-text-85)]"
+                      : "bg-transparent text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
                   ].join(" ")}
                 >
                   <div className="truncate text-sm font-semibold">{module.label}</div>
@@ -624,7 +624,7 @@ export function AtendimentoClient() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 px-2">
           <AtendimentoLeadList
             leads={leads}
             query={query}
@@ -653,8 +653,8 @@ export function AtendimentoClient() {
           {rightPanel === "conversation" ? (
             renderRightPanelContent()
           ) : (
-            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-[var(--app-border)] bg-[var(--app-card-2)]">
-              <div className="border-b border-[var(--app-border)] px-6 py-5">
+            <div className="flex h-full min-h-0 flex-col overflow-hidden px-3 py-2">
+              <div className="px-3 py-3">
                 <div className="text-sm font-semibold text-[var(--app-text-85)]">
                   {rightPanel === "public-link" ? "Link de Atendimento" : "Indicadores"}
                 </div>
@@ -664,7 +664,7 @@ export function AtendimentoClient() {
                     : "Resumo consolidado dos indicadores do atendimento."}
                 </div>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-6">{renderRightPanelContent()}</div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">{renderRightPanelContent()}</div>
             </div>
           )}
         </div>
