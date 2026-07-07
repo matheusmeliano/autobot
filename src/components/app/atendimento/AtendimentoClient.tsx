@@ -15,6 +15,27 @@ import { AtendimentoSummaryCards } from "@/components/app/atendimento/Atendiment
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 
+// #region debug-point A:bootstrap
+const __dbgUrl = "http://127.0.0.1:7777/event";
+const __dbgSession = "atendimento-lead-detail";
+const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre-fix",
+      hypothesisId,
+      traceId,
+      location: "src/components/app/atendimento/AtendimentoClient.tsx",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
+
 const EMPTY_SUMMARY: AtendimentoSummary = {
   totalLeads: 0,
   novosLeads: 0,
@@ -138,8 +159,23 @@ export function AtendimentoClient() {
       const json = await res.json().catch(() => null);
       if (json?.ok && requestId === leadsRequestIdRef.current) {
         const nextLeads = (json.leads ?? []) as AtendimentoLeadListItem[];
+        const currentSelectedLeadId = String(selectedLeadIdRef.current ?? "").trim();
+        const preservedSelectedLeadId =
+          nextLeads.find((lead) => String(lead.id ?? "").trim() === currentSelectedLeadId)?.id ?? null;
+        const fallbackSelectedLeadId = preservedSelectedLeadId ?? nextLeads[0]?.id ?? null;
         setLeads(nextLeads);
-        if (!selectedLeadId && nextLeads[0]?.id) setSelectedLeadId(String(nextLeads[0].id));
+        const normalizedFallbackSelectedLeadId =
+          fallbackSelectedLeadId != null ? String(fallbackSelectedLeadId) : null;
+        if (normalizedFallbackSelectedLeadId !== selectedLeadIdRef.current) {
+          selectedLeadIdRef.current = normalizedFallbackSelectedLeadId;
+          setSelectedLeadId(normalizedFallbackSelectedLeadId);
+        }
+        if (!normalizedFallbackSelectedLeadId) {
+          selectedConversationIdRef.current = null;
+          setSelectedConversation(null);
+          setMessages([]);
+          setMessagesLoading(false);
+        }
         setLoadError(null);
       } else if (json?.error) {
         const message = String(json?.error ?? "Falha ao carregar atendimentos.");
@@ -150,7 +186,7 @@ export function AtendimentoClient() {
         setLoading(false);
       }
     },
-    [selectedLeadId],
+    [],
   );
 
   const applyMessages = useCallback((incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
@@ -198,12 +234,81 @@ export function AtendimentoClient() {
   const loadLeadDetail = useCallback(
     async (leadId: string, options?: { skipMessages?: boolean; suppressNotFound?: boolean }) => {
       const requestId = ++detailRequestIdRef.current;
-      const res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
+      const traceId = `lead-detail-${leadId}-${requestId}`;
+      // #region debug-point B:detail-fetch-start
+      __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_fetch_start", {
+        leadId,
+        requestId,
+        suppressNotFound: Boolean(options?.suppressNotFound),
+        skipMessages: Boolean(options?.skipMessages),
+        selectedLeadIdRef: selectedLeadIdRef.current,
+      });
+      // #endregion
+      let res: Response;
+      try {
+        res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
+      } catch (error) {
+        // #region debug-point C:detail-fetch-transport-error
+        __dbg(traceId, "C", "[DEBUG] atendimento_lead_detail_fetch_transport_error", {
+          leadId,
+          requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // #endregion
+        setLoadError("Falha ao carregar detalhes do lead.");
+        modalToast.error("Falha ao carregar detalhes do lead.");
+        return;
+      }
+      // #region debug-point B:detail-fetch-response
+      __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_fetch_response", {
+        leadId,
+        requestId,
+        status: res.status,
+        ok: res.ok,
+        contentType: res.headers.get("content-type"),
+      });
+      // #endregion
       if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
+      // #region debug-point B:detail-fetch-json
+      __dbg(traceId, "B", "[DEBUG] atendimento_lead_detail_fetch_json", {
+        leadId,
+        requestId,
+        hasJson: Boolean(json),
+        jsonOk: Boolean(json?.ok),
+        error: String(json?.error ?? ""),
+        conversationId: String(json?.lead?.conversation?.id ?? ""),
+      });
+      // #endregion
       if (!json?.ok) {
-        const errorMessage = String(json?.error ?? "Falha ao carregar detalhes do lead.");
-        if (options?.suppressNotFound && errorMessage === "not_found") {
+        const errorMessage = String(json?.error ?? (res.status === 404 ? "not_found" : "Falha ao carregar detalhes do lead."));
+        // #region debug-point C:detail-fetch-error
+        __dbg(traceId, "C", "[DEBUG] atendimento_lead_detail_fetch_error", {
+          leadId,
+          requestId,
+          errorMessage,
+          suppressNotFound: Boolean(options?.suppressNotFound),
+        });
+        // #endregion
+        if (errorMessage === "not_found") {
+          const fallbackLeadId =
+            leads.find((lead) => String(lead.id ?? "").trim() !== String(leadId).trim())?.id ?? null;
+          const normalizedFallbackLeadId = fallbackLeadId != null ? String(fallbackLeadId) : null;
+          selectedLeadIdRef.current = normalizedFallbackLeadId;
+          setSelectedLeadId(normalizedFallbackLeadId);
+          if (!normalizedFallbackLeadId) {
+            selectedConversationIdRef.current = null;
+            setSelectedConversation(null);
+            setMessages([]);
+            setMessagesLoading(false);
+          }
+          setLoadError(null);
+          if (options?.suppressNotFound) {
+            return;
+          }
+          return;
+        }
+        if (options?.suppressNotFound) {
           return;
         }
         setLoadError(errorMessage);
@@ -233,7 +338,7 @@ export function AtendimentoClient() {
         setMessagesLoading(false);
       }
     },
-    [loadConversationMessages],
+    [leads, loadConversationMessages],
   );
 
   useEffect(() => {
