@@ -435,6 +435,8 @@ export function AppShell({
   if (authChecked && !isAuthed) return null;
 
   const currentPath = pathname ?? "";
+  const drawerOnlyNav =
+    currentPath === "/app/atendimento" || currentPath.startsWith("/app/atendimento/");
   const shouldHoldRender =
     restricted &&
     currentPath !== "/app/assinatura" &&
@@ -449,7 +451,12 @@ export function AppShell({
     <AppThemeProvider value={themeProviderValue}>
       <div className="min-h-screen">
         <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-6">
-        <aside className="hidden w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:block min-[1201px]:h-[calc(100vh-3rem)]">
+        <aside
+          className={[
+            "w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:h-[calc(100vh-3rem)]",
+            drawerOnlyNav ? "hidden" : "hidden min-[1201px]:block",
+          ].join(" ")}
+        >
           <div className="flex h-full flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -484,7 +491,12 @@ export function AppShell({
         </aside>
 
         <div className="flex min-h-[calc(100vh-3rem)] w-full flex-col pb-0 min-[1201px]:pb-6">
-          <div className="fixed right-4 top-4 z-[250] flex items-center justify-end gap-2 min-[1201px]:hidden">
+          <div
+            className={[
+              "fixed right-4 top-4 z-[250] flex items-center justify-end gap-2",
+              drawerOnlyNav ? "" : "min-[1201px]:hidden",
+            ].join(" ")}
+          >
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
@@ -516,7 +528,8 @@ export function AppShell({
 
         <div
           className={[
-            "fixed inset-0 z-[260] min-[1201px]:hidden",
+            "fixed inset-0 z-[260]",
+            drawerOnlyNav ? "" : "min-[1201px]:hidden",
             mobileMenuOpen ? "pointer-events-auto" : "pointer-events-none",
           ].join(" ")}
           aria-hidden={!mobileMenuOpen}
