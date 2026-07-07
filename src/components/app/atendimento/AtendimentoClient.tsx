@@ -582,16 +582,16 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 overflow-hidden">
-      <aside className="flex h-full min-h-0 w-full min-w-0 flex-col border-r border-[var(--app-border)] bg-[var(--app-card-2)] lg:max-w-[420px] lg:min-w-[420px]">
-        <div className="shrink-0 border-b border-[var(--app-border)] px-4 py-4">
+    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 gap-6 overflow-hidden bg-[var(--app-bg)] p-5">
+      <aside className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 lg:max-w-[340px] lg:min-w-[340px]">
+        <div className="shrink-0 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-5 py-5">
           <div className="text-2xl font-semibold tracking-tight text-[var(--app-text-85)]">Atendimento</div>
-          <div className="mt-2 text-sm text-[var(--app-text-55)]">
+          <div className="mt-2 text-sm leading-6 text-[var(--app-text-55)]">
             CRM exclusivo para captação, acompanhamento e conversão dos alunos do projeto Lucas Brum Online Music USA.
           </div>
         </div>
 
-        <div className="shrink-0 space-y-4 border-b border-[var(--app-border)] px-4 py-4">
+        <div className="shrink-0 space-y-4 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
           {loadError ? (
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
               {loadError}
@@ -624,7 +624,7 @@ export function AtendimentoClient() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 p-4">
+        <div className="min-h-0 flex-1">
           <AtendimentoLeadList
             leads={leads}
             query={query}
@@ -653,7 +653,7 @@ export function AtendimentoClient() {
           {rightPanel === "conversation" ? (
             renderRightPanelContent()
           ) : (
-            <div className="flex h-full min-h-0 flex-col border-l border-[var(--app-border)] bg-[var(--app-bg)]">
+            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-[var(--app-border)] bg-[var(--app-card-2)]">
               <div className="border-b border-[var(--app-border)] px-6 py-5">
                 <div className="text-sm font-semibold text-[var(--app-text-85)]">
                   {rightPanel === "public-link" ? "Link de Atendimento" : "Indicadores"}
