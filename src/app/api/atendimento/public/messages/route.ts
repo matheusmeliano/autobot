@@ -38,7 +38,7 @@ const NUMERIC_ONLY_TEXT_MESSAGE =
 const NUMERIC_ONLY_MIXED_MESSAGE =
   "Por favor, responda somente com números.";
 const PHONE_CONFIRMATION_PROMPT_MESSAGE =
-  "Antes de prosseguir, preciso confirmar uma informação. Você tem certeza de que esse é o número correto? Posso fazer uma validação?";
+  'Antes de continuar, preciso confirmar uma informação. Você confirma que esse é o número correto? Posso realizar a validação? Responda com "sim" para continuar.';
 const PHONE_CONFIRMATION_SUCCESS_MESSAGE =
   "Perfeito! Enviei uma mensagem de boas-vindas para o WhatsApp informado.";
 const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
