@@ -157,6 +157,7 @@ export function AtendimentoClient() {
   const [activeView, setActiveView] = useState<AtendimentoSidebarModule>("public-link");
   const [rightPanel, setRightPanel] = useState<AtendimentoRightPanel>("conversation");
   const [mobileModuleOpen, setMobileModuleOpen] = useState<AtendimentoSidebarModule | null>(null);
+  const leadsRef = useRef<AtendimentoLeadListItem[]>([]);
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
@@ -416,7 +417,7 @@ export function AtendimentoClient() {
         const errorMessage = String(json?.error ?? (res.status === 404 ? "not_found" : "Falha ao carregar detalhes do lead."));
         if (errorMessage === "not_found") {
           const fallbackLeadId =
-            leads.find((lead) => String(lead.id ?? "").trim() !== String(leadId).trim())?.id ?? null;
+            leadsRef.current.find((lead) => String(lead.id ?? "").trim() !== String(leadId).trim())?.id ?? null;
           const normalizedFallbackLeadId = fallbackLeadId != null ? String(fallbackLeadId) : null;
           selectedLeadIdRef.current = normalizedFallbackLeadId;
           setSelectedLeadId(normalizedFallbackLeadId);
@@ -468,7 +469,7 @@ export function AtendimentoClient() {
         void loadConversationMessages(conversationId, "replace", { showLoading: true });
       }
     },
-    [leads, loadConversationMessages],
+    [loadConversationMessages],
   );
 
   useEffect(() => {
@@ -489,6 +490,10 @@ export function AtendimentoClient() {
   useEffect(() => {
     selectedLeadIdRef.current = selectedLeadId;
   }, [selectedLeadId]);
+
+  useEffect(() => {
+    leadsRef.current = leads;
+  }, [leads]);
 
   useEffect(() => {
     selectedConversationIdRef.current = String(selectedConversation?.id ?? "") || null;
