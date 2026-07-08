@@ -20,6 +20,7 @@ Um novo interessado acabou de entrar na fila de atendimento.
 Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 
 https://www.autobot.business/app/atendimento`;
+export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 75_000;
 
 // #region debug-point A:bootstrap
 const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
@@ -64,6 +65,34 @@ function normalizePhone(phone: string) {
   if (digits.startsWith("1") && digits.length === 11) return digits;
   if (digits.length === 11) return `55${digits}`;
   return digits;
+}
+
+function getLeadFirstName(name: string | null | undefined) {
+  const parts = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return parts[0] ?? "Aluno";
+}
+
+export function buildAtendimentoConversationPublicUrl(publicSlug: string) {
+  const safeSlug = String(publicSlug ?? "").trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
+  return `https://www.autobot.business/atendimento?slug=${encodeURIComponent(safeSlug)}`;
+}
+
+export function buildOfflineAttendantNotificationMessage(params: {
+  leadName?: string | null;
+  publicSlug: string;
+}) {
+  const firstName = getLeadFirstName(params.leadName);
+  const conversationUrl = buildAtendimentoConversationPublicUrl(params.publicSlug);
+  return `Olá, ${firstName}! 👋
+
+Você recebeu uma nova mensagem no AutoBot.
+
+Entre agora na plataforma para visualizar a mensagem e continuar a conversa com o atendente. Estamos aguardando sua resposta.
+
+${conversationUrl}`;
 }
 
 function buildAuthorizedZapiWebhookUrl(baseUrl: string) {
@@ -782,6 +811,52 @@ export async function appendHistoryEvent(params: {
   });
 }
 
+export async function upsertAtendimentoPresenceSession(params: {
+  sessionId: string;
+  conversationId: string;
+  leadId: string;
+  publicSlug: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const nowIso = new Date().toISOString();
+
+  await admin.from("atendimento_presence_sessions").upsert(
+    {
+      id: params.sessionId,
+      conversation_id: params.conversationId,
+      lead_id: params.leadId,
+      public_slug: params.publicSlug,
+      updated_at: nowIso,
+    },
+    { onConflict: "id" },
+  );
+
+  await admin
+    .from("atendimento_conversations")
+    .update({
+      offline_message_notification_sent: false,
+      offline_message_notification_sent_at: null,
+    })
+    .eq("id", params.conversationId);
+}
+
+export async function removeAtendimentoPresenceSession(sessionId: string) {
+  if (!String(sessionId ?? "").trim()) return;
+  const admin = createSupabaseAdminClient();
+  await admin.from("atendimento_presence_sessions").delete().eq("id", sessionId);
+}
+
+export async function getAtendimentoActivePresenceCount(conversationId: string) {
+  const admin = createSupabaseAdminClient();
+  const activeSinceIso = new Date(Date.now() - ATENDIMENTO_PRESENCE_SESSION_TTL_MS).toISOString();
+  const { count } = await admin
+    .from("atendimento_presence_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("conversation_id", conversationId)
+    .gte("updated_at", activeSinceIso);
+  return Number(count ?? 0);
+}
+
 export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: string) {
   const auth = await requireAuthenticatedAtendimentoParticipant();
   if (!auth.ok || !auth.user?.id) {
@@ -825,7 +900,7 @@ export async function getAtendimentoConversationAccessForAttendant(conversationI
   const admin = createSupabaseAdminClient();
   const { data: conversation } = await admin
     .from("atendimento_conversations")
-    .select("id, lead_id")
+    .select("id, lead_id, public_slug, offline_message_notification_sent, offline_message_notification_sent_at")
     .eq("id", conversationId)
     .maybeSingle();
 

@@ -1,6 +1,9 @@
 import {
   appendHistoryEvent,
+  buildOfflineAttendantNotificationMessage,
+  getAtendimentoActivePresenceCount,
   getAtendimentoConversationAccessForAttendant,
+  sendAtendimentoWhatsAppText,
   syncConversationPreview,
 } from "@/lib/atendimento/server";
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
@@ -75,6 +78,88 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
     actorType: "attendant",
     actorEmail: auth.user.email ?? null,
   });
+
+  const { data: lead } = await admin
+    .from("atendimento_leads")
+    .select("id, full_name, phone")
+    .eq("id", String(conversation.lead_id))
+    .maybeSingle();
+
+  const activePresenceCount = await getAtendimentoActivePresenceCount(conversationId);
+  if (activePresenceCount === 0) {
+    const { data: notificationLease } = await admin
+      .from("atendimento_conversations")
+      .update({
+        offline_message_notification_sent: true,
+        offline_message_notification_sent_at: nowIso,
+      })
+      .eq("id", conversationId)
+      .eq("offline_message_notification_sent", false)
+      .select("id")
+      .maybeSingle();
+
+    if (notificationLease?.id) {
+      const leadPhone = String((lead as { phone?: string | null } | null)?.phone ?? "").trim();
+      const leadName = String((lead as { full_name?: string | null } | null)?.full_name ?? "").trim() || "Aluno";
+
+      if (leadPhone) {
+        const notificationMessage = buildOfflineAttendantNotificationMessage({
+          leadName,
+          publicSlug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
+        });
+
+        try {
+          await sendAtendimentoWhatsAppText({
+            phone: leadPhone,
+            message: notificationMessage,
+          });
+
+          await appendHistoryEvent({
+            leadId: String(conversation.lead_id),
+            conversationId,
+            eventType: "offline_message_notification_sent",
+            title: "Notificação enviada para lead offline",
+            details: {
+              phone: leadPhone,
+              public_slug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
+            },
+            actorType: "system",
+          });
+        } catch (notificationError) {
+          await admin
+            .from("atendimento_conversations")
+            .update({
+              offline_message_notification_sent: false,
+              offline_message_notification_sent_at: null,
+            })
+            .eq("id", conversationId);
+
+          await appendHistoryEvent({
+            leadId: String(conversation.lead_id),
+            conversationId,
+            eventType: "offline_message_notification_failed",
+            title: "Falha ao notificar lead offline",
+            details: {
+              phone: leadPhone,
+              error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+            },
+            actorType: "system",
+          });
+        }
+      } else {
+        await appendHistoryEvent({
+          leadId: String(conversation.lead_id),
+          conversationId,
+          eventType: "offline_message_notification_skipped",
+          title: "Notificação offline ignorada por falta de telefone",
+          details: {
+            public_slug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
+          },
+          actorType: "system",
+        });
+      }
+    }
+  }
 
   return Response.json({ ok: true, message: data });
 }

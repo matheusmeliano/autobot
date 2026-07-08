@@ -70,6 +70,22 @@ function getFirstName(value: string) {
   return normalized.split(/\s+/)[0] || "Usuario";
 }
 
+function getAtendimentoPresenceSessionId() {
+  if (typeof window === "undefined") {
+    return `presence-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  try {
+    const storageKey = "atendimento-presence-session-id";
+    const existing = sessionStorage.getItem(storageKey);
+    if (existing) return existing;
+    const next = `presence-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    sessionStorage.setItem(storageKey, next);
+    return next;
+  } catch {
+    return `presence-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
 function getAtendimentoDownloadLabel(mediaType?: AtendimentoMessage["media_type"] | null) {
   if (mediaType === "image") return "Baixar imagem";
   if (mediaType === "video") return "Baixar vídeo";
@@ -180,6 +196,7 @@ export function PublicAtendimentoClient({
   const wasComposerDisabledRef = useRef(true);
   const lastPublicSlugRef = useRef("");
   const lastMessageKeyRef = useRef("");
+  const presenceSessionIdRef = useRef("");
   const botCount = useMemo(
     () => messages.reduce((acc, msg) => acc + (msg.sender_role === "bot" ? 1 : 0), 0),
     [messages],
@@ -225,8 +242,8 @@ export function PublicAtendimentoClient({
         contentText: previewMessage.content_text,
       })
     : "";
-  const shouldTrackLeadPresence =
-    !authError && Boolean(publicSlug) && Boolean(conversationId) && Boolean(leadId) && pageVisible;
+  const canSyncLeadPresence = !authError && Boolean(publicSlug) && Boolean(conversationId) && Boolean(leadId);
+  const shouldTrackLeadPresence = canSyncLeadPresence && pageVisible;
 
   async function redirectToLoginAfterSessionLoss() {
     try {
@@ -326,6 +343,11 @@ export function PublicAtendimentoClient({
       document.removeEventListener("visibilitychange", syncVisibility);
       window.removeEventListener("pageshow", syncVisibility);
     };
+  }, []);
+
+  useEffect(() => {
+    if (presenceSessionIdRef.current) return;
+    presenceSessionIdRef.current = getAtendimentoPresenceSessionId();
   }, []);
 
   useEffect(() => {
@@ -1216,6 +1238,48 @@ export function PublicAtendimentoClient({
       supabase.removeChannel(channel);
     };
   }, [conversationId, leadId, publicSlug, shouldTrackLeadPresence, supabase]);
+
+  useEffect(() => {
+    if (!canSyncLeadPresence) return;
+
+    const sessionId = presenceSessionIdRef.current || getAtendimentoPresenceSessionId();
+    presenceSessionIdRef.current = sessionId;
+    let heartbeatInterval = 0;
+
+    const syncPresenceState = async (state: "visible" | "hidden", keepalive = false) => {
+      await fetch("/api/atendimento/public/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          public_slug: publicSlug,
+          session_id: sessionId,
+          state,
+        }),
+        keepalive,
+      }).catch(() => null);
+    };
+
+    const handlePageHide = () => {
+      void syncPresenceState("hidden", true);
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+
+    if (pageVisible) {
+      void syncPresenceState("visible");
+      heartbeatInterval = window.setInterval(() => {
+        void syncPresenceState("visible");
+      }, 30_000);
+    } else {
+      void syncPresenceState("hidden", true);
+    }
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      if (heartbeatInterval) window.clearInterval(heartbeatInterval);
+      void syncPresenceState("hidden", true);
+    };
+  }, [canSyncLeadPresence, pageVisible, publicSlug]);
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
