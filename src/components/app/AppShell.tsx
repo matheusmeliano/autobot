@@ -449,8 +449,13 @@ export function AppShell({
 
   return (
     <AppThemeProvider value={themeProviderValue}>
-      <div className="min-h-screen">
-        <div className="relative flex w-full gap-6 px-4 py-6 min-[1201px]:px-6">
+      <div className={drawerOnlyNav ? "h-[100dvh] overflow-hidden" : "min-h-screen"}>
+        <div
+          className={[
+            "relative flex w-full",
+            drawerOnlyNav ? "h-full overflow-hidden" : "gap-6 px-4 py-6 min-[1201px]:px-6",
+          ].join(" ")}
+        >
         <aside
           className={[
             "w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:h-[calc(100vh-3rem)]",
@@ -490,7 +495,12 @@ export function AppShell({
           </div>
         </aside>
 
-        <div className="flex min-h-[calc(100vh-3rem)] w-full flex-col pb-0 min-[1201px]:pb-6">
+        <div
+          className={[
+            "flex w-full flex-col",
+            drawerOnlyNav ? "h-full min-h-0 overflow-hidden pb-0" : "min-h-[calc(100vh-3rem)] pb-0 min-[1201px]:pb-6",
+          ].join(" ")}
+        >
           <div
             className={[
               "fixed right-4 top-4 z-[250] flex items-center justify-end gap-2",
@@ -515,18 +525,20 @@ export function AppShell({
               {children}
             </div>
           )}
-          <div className="mt-3 flex justify-end text-xs text-[var(--app-text-35)]">
-            Desenvolvido pela
-            <a
-              href="https://heybrothers.vercel.app/"
-              target="_blank"
-              rel="noreferrer"
-              className="ml-1 font-semibold text-[var(--app-text-60)] hover:text-[var(--app-text-85)]"
-            >
-              HEYBROTHERS
-            </a>
-            .
-          </div>
+          {drawerOnlyNav ? null : (
+            <div className="mt-3 flex justify-end text-xs text-[var(--app-text-35)]">
+              Desenvolvido pela
+              <a
+                href="https://heybrothers.vercel.app/"
+                target="_blank"
+                rel="noreferrer"
+                className="ml-1 font-semibold text-[var(--app-text-60)] hover:text-[var(--app-text-85)]"
+              >
+                HEYBROTHERS
+              </a>
+              .
+            </div>
+          )}
         </div>
       </div>
 
