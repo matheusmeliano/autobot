@@ -582,7 +582,7 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex min-h-screen min-w-0 flex-col gap-4 bg-[var(--app-bg)] lg:gap-6 min-[1400px]:h-[100dvh] min-[1400px]:min-h-[100dvh] min-[1400px]:overflow-hidden lg:flex-row">
+    <div className="flex min-h-screen min-w-0 flex-col gap-4 bg-[var(--app-bg)] lg:gap-6 min-[1400px]:h-full min-[1400px]:min-h-0 min-[1400px]:overflow-hidden lg:flex-row">
       <aside className="flex min-h-0 w-full min-w-0 flex-col gap-4 lg:max-w-[340px] lg:min-w-[340px] min-[1400px]:h-full">
         <div className="shrink-0 space-y-4 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
           {loadError ? (

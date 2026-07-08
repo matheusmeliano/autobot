@@ -457,7 +457,9 @@ export function AppShell({
         <div
           className={[
             "relative flex w-full",
-            drawerOnlyNav ? "min-h-screen flex-col overflow-visible min-[1400px]:h-full min-[1400px]:overflow-hidden" : "gap-6 px-4 py-6 min-[1201px]:px-6",
+            drawerOnlyNav
+              ? "min-h-screen flex-col gap-4 overflow-visible px-4 py-6 min-[1201px]:px-6 lg:gap-6 min-[1400px]:h-full min-[1400px]:overflow-hidden"
+              : "gap-6 px-4 py-6 min-[1201px]:px-6",
           ].join(" ")}
         >
         <aside
