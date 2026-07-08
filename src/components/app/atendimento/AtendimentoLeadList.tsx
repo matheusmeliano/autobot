@@ -381,7 +381,7 @@ export function AtendimentoLeadList({
             disabled={deleting}
             className="inline-flex w-full items-center justify-center rounded-xl border border-red-400/70 bg-red-500 px-4 py-2 text-sm font-semibold text-[rgb(255,255,255)] hover:bg-red-600 disabled:cursor-not-allowed disabled:text-[rgb(255,255,255)] disabled:opacity-40"
           >
-            {deleting ? "Excluindo..." : "Excluir definitivamente"}
+            {deleting ? "Excluindo..." : "Excluir"}
           </button>
         </div>
       </AppModal>
