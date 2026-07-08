@@ -116,6 +116,7 @@ export function AtendimentoClient() {
   const [publicUrl, setPublicUrl] = useState("");
   const [query, setQuery] = useState("");
   const [leads, setLeads] = useState<AtendimentoLeadListItem[]>([]);
+  const [panelLeads, setPanelLeads] = useState<AtendimentoLeadListItem[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<AtendimentoConversation | null>(null);
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -244,6 +245,15 @@ export function AtendimentoClient() {
     },
     [],
   );
+
+  const loadPanelLeads = useCallback(async () => {
+    const res = await fetch("/api/atendimento/leads", { cache: "no-store" });
+    if (handleForbiddenResponse(res)) return;
+    const json = await res.json().catch(() => null);
+    if (json?.ok) {
+      setPanelLeads((json.leads ?? []) as AtendimentoLeadListItem[]);
+    }
+  }, []);
 
   const applyMessages = useCallback((incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
     const normalizedMessages = sortAndDedupeMessages(incomingMessages);
@@ -395,7 +405,8 @@ export function AtendimentoClient() {
     loadSummary();
     loadPublicLink();
     loadLeads(query);
-  }, [loadLeads, loadPublicLink, loadSummary, query]);
+    loadPanelLeads();
+  }, [loadLeads, loadPanelLeads, loadPublicLink, loadSummary, query]);
 
   useEffect(() => {
     if (!selectedLeadId) return;
@@ -451,8 +462,9 @@ export function AtendimentoClient() {
     listRefreshTimeoutRef.current = window.setTimeout(() => {
       void loadSummary({ silent: true });
       void loadLeads(queryRef.current, { silent: true });
+      void loadPanelLeads();
     }, 120);
-  }, [loadLeads, loadSummary]);
+  }, [loadLeads, loadPanelLeads, loadSummary]);
 
   const scheduleSelectedLeadRefresh = useCallback(() => {
     if (realtimeSuspendedRef.current || !selectedLeadIdRef.current) return;
@@ -474,12 +486,13 @@ export function AtendimentoClient() {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       void loadSummary();
       void loadLeads(queryRef.current, { silent: true });
+      void loadPanelLeads();
       if (selectedLeadIdRef.current) {
         if (messagesLoadingRef.current) return;
         void loadLeadDetail(selectedLeadIdRef.current, { suppressNotFound: true, skipMessages: true });
       }
     }, 1500);
-  }, [loadLeadDetail, loadLeads, loadSummary]);
+  }, [loadLeadDetail, loadLeads, loadPanelLeads, loadSummary]);
 
   const stopFallbackRefresh = useCallback(() => {
     if (fallbackRefreshIntervalRef.current != null) {
@@ -542,6 +555,7 @@ export function AtendimentoClient() {
           realtimeSubscribedRef.current = false;
           void loadSummary();
           void loadLeads(queryRef.current, { silent: true });
+          void loadPanelLeads();
         }
       });
 
@@ -561,6 +575,7 @@ export function AtendimentoClient() {
     applyMessages,
     loadConversationMessages,
     loadLeads,
+    loadPanelLeads,
     loadSummary,
     removeMessage,
     scheduleListRefresh,
@@ -630,6 +645,7 @@ export function AtendimentoClient() {
 
     await loadSummary();
     await loadLeads(query);
+    await loadPanelLeads();
     realtimeSuspendedRef.current = false;
   }
 
@@ -644,7 +660,7 @@ export function AtendimentoClient() {
     if (module === "public-link") {
       return <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />;
     }
-    return <AtendimentoSummaryCards summary={summary} leads={leads} />;
+    return <AtendimentoSummaryCards summary={summary} leads={panelLeads} />;
   }
 
   function renderRightPanelContent() {
