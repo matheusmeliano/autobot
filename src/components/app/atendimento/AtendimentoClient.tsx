@@ -67,17 +67,14 @@ type AtendimentoRightPanel = "conversation" | AtendimentoSidebarModule;
 const SIDEBAR_MODULES: Array<{
   id: AtendimentoSidebarModule;
   label: string;
-  description: string;
 }> = [
   {
     id: "public-link",
     label: "Link de Atendimento",
-    description: "Abre a pagina exclusiva do link publico para copia rapida.",
   },
   {
     id: "summary",
     label: "Indicadores",
-    description: "Abre a pagina exclusiva com os cards de acompanhamento do atendimento.",
   },
 ];
 
@@ -610,7 +607,6 @@ export function AtendimentoClient() {
                   ].join(" ")}
                 >
                   <div className="truncate text-sm font-semibold">{module.label}</div>
-                  <div className="mt-1 text-xs text-[var(--app-text-45)]">{module.description}</div>
                 </button>
               );
             })}
