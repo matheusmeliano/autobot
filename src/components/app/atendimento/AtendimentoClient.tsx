@@ -145,16 +145,37 @@ export function AtendimentoClient() {
     return true;
   }
 
-  const loadSummary = useCallback(async () => {
-    const res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
-    if (handleForbiddenResponse(res)) return;
-    const json = await res.json().catch(() => null);
-    if (json?.ok) {
-      setSummary(json.summary as AtendimentoSummary);
-      setLoadError(null);
-      return;
+  const loadSummary = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    const delays = [0, 350, 900];
+    let lastErrorMessage: string | null = null;
+
+    for (let attempt = 0; attempt < delays.length; attempt += 1) {
+      if (delays[attempt]) {
+        await new Promise((resolve) => window.setTimeout(resolve, delays[attempt]));
+      }
+
+      let res: Response;
+      try {
+        res = await fetch("/api/atendimento/resumo", { cache: "no-store" });
+      } catch (error) {
+        lastErrorMessage = "Falha ao carregar resumo.";
+        continue;
+      }
+
+      if (handleForbiddenResponse(res)) return;
+
+      const json = await res.json().catch(() => null);
+      if (json?.ok) {
+        setSummary(json.summary as AtendimentoSummary);
+        if (!silent) setLoadError(null);
+        return;
+      }
+      lastErrorMessage = String(json?.error ?? "Falha ao carregar resumo.");
     }
-    const message = String(json?.error ?? "Falha ao carregar resumo.");
+
+    if (silent) return;
+    const message = String(lastErrorMessage ?? "Falha ao carregar resumo.");
     setLoadError(message);
     modalToast.error(message);
   }, []);
@@ -242,7 +263,16 @@ export function AtendimentoClient() {
       if (!conversationId) return;
       const requestId = ++messagesRequestIdRef.current;
       if (options?.showLoading) setMessagesLoading(true);
-      const messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
+      let messagesRes: Response;
+      try {
+        messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
+      } catch (error) {
+        const message = "Falha ao carregar mensagens.";
+        setLoadError(message);
+        modalToast.error(message);
+        if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
+        return;
+      }
       if (handleForbiddenResponse(messagesRes)) {
         if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
         return;
@@ -319,7 +349,7 @@ export function AtendimentoClient() {
       }
 
       if (!options?.skipMessages) {
-        await loadConversationMessages(conversationId, "replace", { showLoading: true });
+        void loadConversationMessages(conversationId, "replace", { showLoading: true });
       } else {
         setMessagesLoading(false);
       }
@@ -335,7 +365,10 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     if (!selectedLeadId) return;
-    loadLeadDetail(selectedLeadId);
+    setMessages([]);
+    setMessagesLoading(true);
+    setSelectedConversation(null);
+    void loadLeadDetail(selectedLeadId);
   }, [loadLeadDetail, selectedLeadId]);
 
   useEffect(() => {
@@ -372,7 +405,7 @@ export function AtendimentoClient() {
       window.clearTimeout(listRefreshTimeoutRef.current);
     }
     listRefreshTimeoutRef.current = window.setTimeout(() => {
-      void loadSummary();
+      void loadSummary({ silent: true });
       void loadLeads(queryRef.current, { silent: true });
     }, 120);
   }, [loadLeads, loadSummary]);

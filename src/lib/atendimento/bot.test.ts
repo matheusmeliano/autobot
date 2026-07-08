@@ -2,23 +2,22 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { extractLeadDataFromMessage, filterCapturedDataForLead, getNextMissingField, initialBotMessages } from "./bot.ts";
 
-test("extractLeadDataFromMessage captura email e telefone", () => {
+test("extractLeadDataFromMessage captura nome e telefone", () => {
   const data = extractLeadDataFromMessage(
     "Olá, meu nome é Ana Maria, meu CPF é 123.456.789-10, meu e-mail é ana@email.com e meu telefone é +1 321 555 9988.",
   );
 
-  assert.equal(data.email, "ana@email.com");
+  assert.equal(data.full_name, "Ana Maria");
   assert.equal(data.phone, "+1 321 555 9988");
 });
 
-test("getNextMissingField respeita a ordem do pré-cadastro", () => {
+test("getNextMissingField retorna null quando o pre-cadastro estiver completo", () => {
   const nextField = getNextMissingField({
     full_name: "Ana Maria",
     phone: "+1 321 555 9988",
-    email: "",
   });
 
-  assert.equal(nextField, "email");
+  assert.equal(nextField, null);
 });
 
 test("initialBotMessages inicia o fluxo com convite e pré-cadastro", () => {
@@ -59,24 +58,23 @@ test("extractLeadDataFromMessage nao trata horario como nome", () => {
 test("extractLeadDataFromMessage nao trata timezone como nome", () => {
   const data = extractLeadDataFromMessage("America/New_York ou GMT-4");
 
-  assert.equal(data.timezone, "America/New_York");
   assert.equal(data.full_name, undefined);
 });
 
-test("filterCapturedDataForLead nao sobrescreve nome existente com outro campo", () => {
+test("filterCapturedDataForLead nao sobrescreve nome existente quando o campo esperado nao for nome", () => {
   const captured = filterCapturedDataForLead({
     lead: {
       full_name: "Ana Divina Pereira",
-      best_contact_time: "",
-    } as any,
-    captured: {
-      full_name: "Às :h",
-      best_contact_time: "Às 19:h",
+      phone: "",
     },
-    expectedField: "best_contact_time",
+    captured: {
+      full_name: "Nome errado",
+      phone: "+1 321 555 9988",
+    },
+    expectedField: "phone",
   });
 
   assert.deepEqual(captured, {
-    best_contact_time: "Às 19:h",
+    phone: "+1 321 555 9988",
   });
 });
