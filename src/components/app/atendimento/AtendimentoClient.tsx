@@ -126,6 +126,7 @@ export function AtendimentoClient() {
   const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [activeView, setActiveView] = useState<AtendimentoSidebarModule>("public-link");
   const [rightPanel, setRightPanel] = useState<AtendimentoRightPanel>("conversation");
+  const [mobileModuleOpen, setMobileModuleOpen] = useState<AtendimentoSidebarModule | null>(null);
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
@@ -555,17 +556,20 @@ export function AtendimentoClient() {
   function openMobileConversation(leadId: string) {
     setSelectedLeadId(leadId);
     setRightPanel("conversation");
+    setMobileModuleOpen(null);
     setMobileConversationOpen(true);
   }
 
-  function renderRightPanelContent() {
-    if (rightPanel === "public-link") {
+  function renderModuleContent(module: AtendimentoSidebarModule) {
+    if (module === "public-link") {
       return <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />;
     }
+    return <AtendimentoSummaryCards summary={summary} />;
+  }
 
-    if (rightPanel === "summary") {
-      return <AtendimentoSummaryCards summary={summary} />;
-    }
+  function renderRightPanelContent() {
+    if (rightPanel === "public-link") return renderModuleContent("public-link");
+    if (rightPanel === "summary") return renderModuleContent("summary");
 
     return (
       <AtendimentoConversationPanel
@@ -590,14 +594,23 @@ export function AtendimentoClient() {
 
           <div className="space-y-2">
             {SIDEBAR_MODULES.map((module) => {
-              const active = module.id === activeView && rightPanel === module.id;
+              const active =
+                module.id === activeView && (rightPanel === module.id || mobileModuleOpen === module.id);
               return (
                 <button
                   key={module.id}
                   type="button"
                   onClick={() => {
                     setActiveView(module.id);
-                    setRightPanel(module.id);
+                    const shouldUseSidePanel =
+                      typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+                    if (shouldUseSidePanel) {
+                      setMobileModuleOpen(null);
+                      setRightPanel(module.id);
+                      return;
+                    }
+                    setMobileConversationOpen(false);
+                    setMobileModuleOpen(module.id);
                   }}
                   className={[
                     "w-full rounded-2xl border px-4 py-3 text-left transition",
@@ -622,6 +635,7 @@ export function AtendimentoClient() {
             onQueryChange={setQuery}
             onSelectLead={(leadId) => {
               setSelectedLeadId(leadId);
+              setMobileModuleOpen(null);
               setRightPanel("conversation");
             }}
             onOpenConversation={openMobileConversation}
@@ -660,6 +674,33 @@ export function AtendimentoClient() {
       </div>
 
       <div className="lg:hidden">
+        <AppModal
+          open={mobileModuleOpen != null}
+          onClose={() => setMobileModuleOpen(null)}
+          position="bottom"
+          size="xl"
+          zIndexClass="z-[340]"
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex items-start justify-between gap-4">
+              <div className="text-sm font-semibold text-[var(--app-text-85)]">
+                {SIDEBAR_MODULES.find((item) => item.id === mobileModuleOpen)?.label ?? ""}
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileModuleOpen(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+              {mobileModuleOpen ? renderModuleContent(mobileModuleOpen) : null}
+            </div>
+          </div>
+        </AppModal>
+
         <AppModal
           open={mobileConversationOpen}
           onClose={() => setMobileConversationOpen(false)}
