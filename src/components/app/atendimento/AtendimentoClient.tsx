@@ -119,6 +119,7 @@ export function AtendimentoClient() {
   const [selectedConversation, setSelectedConversation] = useState<AtendimentoConversation | null>(null);
   const [messages, setMessages] = useState<AtendimentoMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesLoadError, setMessagesLoadError] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -262,14 +263,16 @@ export function AtendimentoClient() {
     async (conversationId: string, mode: "replace" | "merge" = "replace", options?: { showLoading?: boolean }) => {
       if (!conversationId) return;
       const requestId = ++messagesRequestIdRef.current;
-      if (options?.showLoading) setMessagesLoading(true);
+      if (options?.showLoading) {
+        setMessagesLoadError(null);
+        setMessagesLoading(true);
+      }
       let messagesRes: Response;
       try {
         messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages?limit=200`, { cache: "no-store" });
       } catch (error) {
-        const message = "Falha ao carregar mensagens.";
-        setLoadError(message);
-        modalToast.error(message);
+        const message = "Falha ao carregar as mensagens.";
+        setMessagesLoadError(message);
         if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
         return;
       }
@@ -280,12 +283,12 @@ export function AtendimentoClient() {
       const messagesJson = await messagesRes.json().catch(() => null);
       if (messagesJson?.ok && requestId === messagesRequestIdRef.current) {
         applyMessages((messagesJson.messages ?? []) as AtendimentoMessage[], mode);
+        setMessagesLoadError(null);
         if (options?.showLoading) setMessagesLoading(false);
         return;
       }
-      const message = String(messagesJson?.error ?? "Falha ao carregar mensagens.");
-      setLoadError(message);
-      modalToast.error(message);
+      const message = "Falha ao carregar as mensagens.";
+      setMessagesLoadError(message);
       if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
     },
     [applyMessages],
@@ -350,8 +353,6 @@ export function AtendimentoClient() {
 
       if (!options?.skipMessages) {
         void loadConversationMessages(conversationId, "replace", { showLoading: true });
-      } else {
-        setMessagesLoading(false);
       }
     },
     [leads, loadConversationMessages],
@@ -366,6 +367,7 @@ export function AtendimentoClient() {
   useEffect(() => {
     if (!selectedLeadId) return;
     setMessages([]);
+    setMessagesLoadError(null);
     setMessagesLoading(true);
     setSelectedConversation(null);
     void loadLeadDetail(selectedLeadId);
@@ -769,6 +771,51 @@ export function AtendimentoClient() {
           </div>
         </AppModal>
       </div>
+
+      <AppModal
+        open={messagesLoadError != null}
+        onClose={() => setMessagesLoadError(null)}
+        size="md"
+        zIndexClass="z-[520]"
+        fullScreenOnMobile
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[var(--app-text-85)]">Falha ao carregar as mensagens.</div>
+            <div className="mt-1 text-xs text-[var(--app-text-55)]">Tente novamente.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMessagesLoadError(null)}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-0 text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setMessagesLoadError(null)}
+            className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+          >
+            Fechar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMessagesLoadError(null);
+              const conversationId = String(selectedConversationIdRef.current ?? "").trim();
+              if (!conversationId) return;
+              void loadConversationMessages(conversationId, "replace", { showLoading: true });
+            }}
+            className="inline-flex items-center justify-center rounded-xl border border-emerald-500/70 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </AppModal>
     </div>
   );
 }

@@ -345,7 +345,14 @@ export function AtendimentoConversationPanel({
         }}
         className={desktopExpanded ? "flex-1 space-y-3 overflow-y-auto bg-[var(--app-bg)] px-4 py-4" : "flex-1 space-y-3 overflow-y-auto px-4 py-4"}
       >
-        {orderedMessages.length ? (
+        {messagesLoading ? (
+          <div className="flex h-full min-h-56 items-center justify-center text-sm text-[var(--app-text-45)]">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500/70" />
+              Carregando...
+            </div>
+          </div>
+        ) : orderedMessages.length ? (
           orderedMessages.map((message) => {
             const isLead = message.sender_role === "lead";
             const isBot = message.sender_role === "bot";
@@ -437,13 +444,6 @@ export function AtendimentoConversationPanel({
               </div>
             );
           })
-        ) : messagesLoading ? (
-          <div className="flex h-full min-h-56 items-center justify-center text-sm text-[var(--app-text-45)]">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500/70" />
-              Carregando...
-            </div>
-          </div>
         ) : (
           <div className="flex h-full min-h-56 items-center justify-center text-sm text-[var(--app-text-45)]">
             Nenhuma mensagem nesta conversa.
