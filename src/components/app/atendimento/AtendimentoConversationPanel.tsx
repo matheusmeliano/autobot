@@ -323,7 +323,7 @@ export function AtendimentoConversationPanel({
       {!compact ? (
         <div
           className={[
-            "flex items-start justify-start gap-3 border-b border-[var(--app-border)] px-4 py-4",
+            "flex items-center justify-start gap-3 border-b border-[var(--app-border)] px-4 py-4",
             desktopExpanded ? "bg-[var(--app-bg)]" : "",
           ].join(" ")}
         >

@@ -10,7 +10,7 @@ export function AtendimentoPresenceBadge({
   return (
     <span
       className={[
-        "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+        "inline-flex h-9 items-center gap-2 rounded-full border px-2.5 text-[11px] font-semibold leading-none",
         online
           ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
           : "border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-55)]",
