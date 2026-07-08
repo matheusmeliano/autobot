@@ -158,6 +158,7 @@ export function AtendimentoClient() {
   const [rightPanel, setRightPanel] = useState<AtendimentoRightPanel>("conversation");
   const [mobileModuleOpen, setMobileModuleOpen] = useState<AtendimentoSidebarModule | null>(null);
   const leadsRef = useRef<AtendimentoLeadListItem[]>([]);
+  const messagesLoadingRef = useRef(false);
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
@@ -292,6 +293,7 @@ export function AtendimentoClient() {
   const loadConversationMessages = useCallback(
     async (conversationId: string, mode: "replace" | "merge" = "replace", options?: { showLoading?: boolean }) => {
       if (!conversationId) return;
+      if (!options?.showLoading && messagesLoadingRef.current) return;
       const requestId = ++messagesRequestIdRef.current;
       // #region debug-point B:messages-begin
       reportDebugEvent({
@@ -496,6 +498,10 @@ export function AtendimentoClient() {
   }, [leads]);
 
   useEffect(() => {
+    messagesLoadingRef.current = messagesLoading;
+  }, [messagesLoading]);
+
+  useEffect(() => {
     selectedConversationIdRef.current = String(selectedConversation?.id ?? "") || null;
   }, [selectedConversation]);
 
@@ -560,14 +566,11 @@ export function AtendimentoClient() {
       // #endregion
       void loadSummary();
       void loadLeads(queryRef.current, { silent: true });
-      if (selectedConversationIdRef.current) {
-        void loadConversationMessages(selectedConversationIdRef.current, "replace");
-      }
       if (selectedLeadIdRef.current) {
         void loadLeadDetail(selectedLeadIdRef.current, { suppressNotFound: true, skipMessages: true });
       }
     }, 1500);
-  }, [loadConversationMessages, loadLeadDetail, loadLeads, loadSummary]);
+  }, [loadLeadDetail, loadLeads, loadSummary]);
 
   const stopFallbackRefresh = useCallback(() => {
     if (fallbackRefreshIntervalRef.current != null) {
