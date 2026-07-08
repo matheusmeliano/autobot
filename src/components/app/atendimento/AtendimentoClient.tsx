@@ -159,6 +159,7 @@ export function AtendimentoClient() {
   const [mobileModuleOpen, setMobileModuleOpen] = useState<AtendimentoSidebarModule | null>(null);
   const leadsRef = useRef<AtendimentoLeadListItem[]>([]);
   const messagesLoadingRef = useRef(false);
+  const messagesLoadingTokenRef = useRef(0);
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const queryRef = useRef("");
@@ -258,6 +259,7 @@ export function AtendimentoClient() {
           setSelectedConversation(null);
           setMessages([]);
           setMessagesLoading(false);
+          messagesLoadingRef.current = false;
         }
         setLoadError(null);
       } else if (json?.error) {
@@ -293,7 +295,8 @@ export function AtendimentoClient() {
   const loadConversationMessages = useCallback(
     async (conversationId: string, mode: "replace" | "merge" = "replace", options?: { showLoading?: boolean }) => {
       if (!conversationId) return;
-      if (!options?.showLoading && messagesLoadingRef.current) return;
+      const wantsLoading = Boolean(options?.showLoading);
+      if (!wantsLoading && messagesLoadingRef.current) return;
       const requestId = ++messagesRequestIdRef.current;
       // #region debug-point B:messages-begin
       reportDebugEvent({
@@ -311,7 +314,9 @@ export function AtendimentoClient() {
         },
       });
       // #endregion
-      if (options?.showLoading) {
+      if (wantsLoading) {
+        messagesLoadingRef.current = true;
+        messagesLoadingTokenRef.current = requestId;
         setMessagesLoadError(null);
         setMessagesLoading(true);
         // #region debug-point B:messages-set-loading
@@ -329,7 +334,10 @@ export function AtendimentoClient() {
       } catch (error) {
         const message = "Falha ao carregar as mensagens.";
         setMessagesLoadError(message);
-        if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
+        if (wantsLoading && requestId === messagesLoadingTokenRef.current) {
+          setMessagesLoading(false);
+          messagesLoadingRef.current = false;
+        }
         // #region debug-point B:messages-network-error
         reportDebugEvent({
           hypothesisId: "B",
@@ -341,7 +349,10 @@ export function AtendimentoClient() {
         return;
       }
       if (handleForbiddenResponse(messagesRes)) {
-        if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
+        if (wantsLoading && requestId === messagesLoadingTokenRef.current) {
+          setMessagesLoading(false);
+          messagesLoadingRef.current = false;
+        }
         // #region debug-point B:messages-forbidden
         reportDebugEvent({
           hypothesisId: "B",
@@ -353,10 +364,16 @@ export function AtendimentoClient() {
         return;
       }
       const messagesJson = await messagesRes.json().catch(() => null);
-      if (messagesJson?.ok && requestId === messagesRequestIdRef.current) {
+      const acceptResponse = wantsLoading
+        ? requestId === messagesLoadingTokenRef.current
+        : requestId === messagesRequestIdRef.current;
+      if (messagesJson?.ok && acceptResponse) {
         applyMessages((messagesJson.messages ?? []) as AtendimentoMessage[], mode);
         setMessagesLoadError(null);
-        if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
+        if (wantsLoading && requestId === messagesLoadingTokenRef.current) {
+          setMessagesLoading(false);
+          messagesLoadingRef.current = false;
+        }
         // #region debug-point B:messages-success
         reportDebugEvent({
           hypothesisId: "B",
@@ -375,7 +392,10 @@ export function AtendimentoClient() {
       }
       const message = "Falha ao carregar as mensagens.";
       setMessagesLoadError(message);
-      if (options?.showLoading && requestId === messagesRequestIdRef.current) setMessagesLoading(false);
+      if (wantsLoading && requestId === messagesLoadingTokenRef.current) {
+        setMessagesLoading(false);
+        messagesLoadingRef.current = false;
+      }
       // #region debug-point B:messages-nok
       reportDebugEvent({
         hypothesisId: "B",
@@ -411,6 +431,10 @@ export function AtendimentoClient() {
       } catch (error) {
         setLoadError("Falha ao carregar detalhes do lead.");
         modalToast.error("Falha ao carregar detalhes do lead.");
+        if (requestId === detailRequestIdRef.current) {
+          setMessagesLoading(false);
+          messagesLoadingRef.current = false;
+        }
         return;
       }
       if (handleForbiddenResponse(res)) return;
@@ -428,6 +452,7 @@ export function AtendimentoClient() {
             setSelectedConversation(null);
             setMessages([]);
             setMessagesLoading(false);
+            messagesLoadingRef.current = false;
           }
           setLoadError(null);
           if (options?.suppressNotFound) {
@@ -440,6 +465,10 @@ export function AtendimentoClient() {
         }
         setLoadError(errorMessage);
         modalToast.error(errorMessage);
+        if (requestId === detailRequestIdRef.current) {
+          setMessagesLoading(false);
+          messagesLoadingRef.current = false;
+        }
         return;
       }
 
@@ -456,6 +485,7 @@ export function AtendimentoClient() {
       if (!conversationId) {
         setMessages([]);
         setMessagesLoading(false);
+        messagesLoadingRef.current = false;
         return;
       }
 
@@ -485,6 +515,7 @@ export function AtendimentoClient() {
     setMessages([]);
     setMessagesLoadError(null);
     setMessagesLoading(true);
+    messagesLoadingRef.current = true;
     setSelectedConversation(null);
     void loadLeadDetail(selectedLeadId);
   }, [loadLeadDetail, selectedLeadId]);
