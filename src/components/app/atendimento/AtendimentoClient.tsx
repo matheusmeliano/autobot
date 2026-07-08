@@ -790,9 +790,6 @@ export function AtendimentoClient() {
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-xs text-[var(--app-text-55)]">Envie mensagens para o lead por aqui.</div>
-            </div>
             <button
               type="button"
               onClick={() => setMobileConversationOpen(false)}
