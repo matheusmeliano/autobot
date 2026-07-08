@@ -1,6 +1,23 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 
+function getLeadSortTime(row: any) {
+  const candidates = [
+    row?.last_interaction_at,
+    row?.conversation?.last_message_at,
+    row?.conversation?.updated_at,
+    row?.updated_at,
+    row?.created_at,
+  ];
+
+  for (const candidate of candidates) {
+    const time = new Date(String(candidate ?? "")).getTime();
+    if (Number.isFinite(time) && time > 0) return time;
+  }
+
+  return 0;
+}
+
 export async function GET(req: Request) {
   const auth = await requireAtendimentoUser();
   if (!auth.ok) {
@@ -59,6 +76,11 @@ export async function GET(req: Request) {
     if (status && String(row.status ?? "").toLowerCase() !== status) return false;
     if (stage && String(row.funnel_stage ?? "").toLowerCase() !== stage) return false;
     return true;
+    })
+    .sort((left, right) => {
+      const timeDiff = getLeadSortTime(right) - getLeadSortTime(left);
+      if (timeDiff !== 0) return timeDiff;
+      return new Date(String(right.created_at ?? "")).getTime() - new Date(String(left.created_at ?? "")).getTime();
     });
 
   return Response.json({ ok: true, leads: rows });
