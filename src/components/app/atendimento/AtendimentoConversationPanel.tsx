@@ -330,7 +330,7 @@ export function AtendimentoConversationPanel({
           <button
             type="button"
             onClick={() => setDesktopExpanded((current) => !current)}
-            className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] lg:inline-flex"
+            className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] min-[1201px]:inline-flex"
             aria-label={desktopExpanded ? "Sair da tela cheia" : "Expandir conversa"}
           >
             {desktopExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
