@@ -80,8 +80,6 @@ const SIDEBAR_MODULES: Array<{
 ];
 
 const LEAD_PRESENCE_CHANNEL = "atendimento-lead-presence";
-const __presenceDbgUrl = "http://127.0.0.1:7777/event";
-const __presenceDbgSession = "lead-presence-status";
 
 function getOnlineLeadIdsFromPresence(channel: RealtimeChannel) {
   const state = channel.presenceState<Record<string, unknown>>();
@@ -615,27 +613,15 @@ export function AtendimentoClient() {
     const channel = supabase
       .channel(LEAD_PRESENCE_CHANNEL)
       .on("presence", { event: "sync" }, () => {
-        // #region debug-point C:presence-sync
-        fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"C",location:"src/components/app/atendimento/AtendimentoClient.tsx:presenceSync",msg:"[DEBUG] attendant_presence_sync",data:{onlineLeadIds:getOnlineLeadIdsFromPresence(channel),rawState:channel.presenceState()},ts:Date.now()})}).catch(()=>{});
-        // #endregion
         setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
       })
       .on("presence", { event: "join" }, () => {
-        // #region debug-point C:presence-join
-        fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"C",location:"src/components/app/atendimento/AtendimentoClient.tsx:presenceJoin",msg:"[DEBUG] attendant_presence_join",data:{onlineLeadIds:getOnlineLeadIdsFromPresence(channel),rawState:channel.presenceState()},ts:Date.now()})}).catch(()=>{});
-        // #endregion
         setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
       })
       .on("presence", { event: "leave" }, () => {
-        // #region debug-point C:presence-leave
-        fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"C",location:"src/components/app/atendimento/AtendimentoClient.tsx:presenceLeave",msg:"[DEBUG] attendant_presence_leave",data:{onlineLeadIds:getOnlineLeadIdsFromPresence(channel),rawState:channel.presenceState()},ts:Date.now()})}).catch(()=>{});
-        // #endregion
         setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
       })
       .subscribe((status) => {
-        // #region debug-point C:presence-subscribe
-        fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"C",location:"src/components/app/atendimento/AtendimentoClient.tsx:presenceSubscribe",msg:"[DEBUG] attendant_presence_subscribe_status",data:{status,selectedLeadId:String(selectedLeadIdRef.current??""),selectedConversationId:String(selectedConversationIdRef.current??""),rawState:channel.presenceState()},ts:Date.now()})}).catch(()=>{});
-        // #endregion
         if (status === "SUBSCRIBED") {
           setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
           return;

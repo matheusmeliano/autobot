@@ -30,8 +30,6 @@ const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 2_500;
 const PHONE_PROMPT_MESSAGE = CAPTURED_FIELD_PROMPTS.phone;
 const LEAD_PRESENCE_CHANNEL = "atendimento-lead-presence";
-const __presenceDbgUrl = "http://127.0.0.1:7777/event";
-const __presenceDbgSession = "lead-presence-status";
 // #region debug-point A:bootstrap
 const __dbgUrl = "http://127.0.0.1:7777/event";
 const __dbgSession = "chat-timing-flicker";
@@ -1181,9 +1179,6 @@ export function PublicAtendimentoClient({
   ]);
 
   useEffect(() => {
-    // #region debug-point D:presence-effect-guard
-    fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"D",location:"src/components/atendimento/PublicAtendimentoClient.tsx:presence-effect",msg:"[DEBUG] lead_presence_effect_evaluated",data:{isProfilePage,authError:Boolean(authError),publicSlug:Boolean(publicSlug),conversationId:Boolean(conversationId),leadId:Boolean(leadId),pageVisible,shouldTrackLeadPresence,pathname:typeof window!=="undefined"?window.location.pathname:""},ts:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!shouldTrackLeadPresence) return;
 
     const presenceKey = `lead:${conversationId}:${leadId}`;
@@ -1194,9 +1189,6 @@ export function PublicAtendimentoClient({
     });
 
     const trackPresence = async () => {
-      // #region debug-point A:track-presence
-      fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"A",location:"src/components/atendimento/PublicAtendimentoClient.tsx:trackPresence",msg:"[DEBUG] lead_presence_track_requested",data:{presenceKey,leadId,conversationId,publicSlug,pageVisible},ts:Date.now()})}).catch(()=>{});
-      // #endregion
       await channel.track({
         role: "lead",
         page: "bot",
@@ -1208,26 +1200,17 @@ export function PublicAtendimentoClient({
     };
 
     const handlePageHide = () => {
-      // #region debug-point E:pagehide-untrack
-      fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"E",location:"src/components/atendimento/PublicAtendimentoClient.tsx:pagehide",msg:"[DEBUG] lead_presence_pagehide_untrack",data:{presenceKey,leadId,conversationId,publicSlug},ts:Date.now()})}).catch(()=>{});
-      // #endregion
       void channel.untrack();
     };
 
     window.addEventListener("pagehide", handlePageHide);
     channel.subscribe((status) => {
-      // #region debug-point A:subscribe-status
-      fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"A",location:"src/components/atendimento/PublicAtendimentoClient.tsx:presenceSubscribe",msg:"[DEBUG] lead_presence_subscribe_status",data:{status,presenceKey,leadId,conversationId,publicSlug,pageVisible},ts:Date.now()})}).catch(()=>{});
-      // #endregion
       if (status === "SUBSCRIBED") {
         void trackPresence();
       }
     });
 
     return () => {
-      // #region debug-point E:cleanup-untrack
-      fetch(__presenceDbgUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:__presenceDbgSession,runId:"pre-fix",hypothesisId:"E",location:"src/components/atendimento/PublicAtendimentoClient.tsx:presenceCleanup",msg:"[DEBUG] lead_presence_cleanup",data:{presenceKey,leadId,conversationId,publicSlug,pageVisible},ts:Date.now()})}).catch(()=>{});
-      // #endregion
       window.removeEventListener("pagehide", handlePageHide);
       void channel.untrack();
       supabase.removeChannel(channel);
