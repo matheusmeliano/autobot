@@ -1,18 +1,50 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Copy, Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { modalToast } from "@/lib/modalToast";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
+const PANEL_PAGE_SIZE = 4;
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({
+  label,
+  value,
+  copyable,
+}: {
+  label: string;
+  value: string | null | undefined;
+  copyable?: boolean;
+}) {
   const displayValue = value || "-";
+  const canCopy = Boolean(copyable && value && String(value).trim());
+
+  async function handleCopy() {
+    if (!canCopy) return;
+    await navigator.clipboard.writeText(String(value).trim());
+    modalToast.success(`${label} copiado.`);
+  }
+
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">{label}</div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">{label}</div>
+        {copyable ? (
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            disabled={!canCopy}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={`Copiar ${label.toLowerCase()}`}
+            title={canCopy ? `Copiar ${label.toLowerCase()}` : `${label} indisponivel`}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
       <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]" title={displayValue}>
         {displayValue}
       </div>
@@ -33,9 +65,9 @@ function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-        <Field label="Telefone" value={lead.phone} />
-        <Field label="Email" value={lead.email} />
-        <Field label="CPF" value={lead.cpf} />
+        <Field label="Telefone" value={lead.phone} copyable />
+        <Field label="Email" value={lead.email} copyable />
+        <Field label="CPF" value={lead.cpf} copyable />
         <Field label="Origem" value={lead.origin} />
         <Field label="Status" value={atendimentoStatusLabel(lead.status)} />
         <Field label="Etapa" value={atendimentoStageLabel(lead.funnel_stage)} />
@@ -97,6 +129,7 @@ export function AtendimentoSummaryCards({
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [mobileLead, setMobileLead] = useState<AtendimentoLeadListItem | null>(null);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   const activeSectionData = sections.find((section) => section.id === activeSection) ?? sections[0];
   const activeItems = activeSectionData?.items ?? [];
@@ -104,18 +137,32 @@ export function AtendimentoSummaryCards({
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return activeItems;
     return activeItems.filter((lead) =>
-      [lead.full_name, lead.phone, lead.email, lead.cpf, lead.origin].some((value) =>
+      [lead.full_name, lead.phone, lead.cpf].some((value) =>
         String(value ?? "")
           .toLowerCase()
           .includes(normalizedQuery),
       ),
     );
   }, [activeItems, query]);
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredItems.length / PANEL_PAGE_SIZE)), [filteredItems.length]);
+  const pagedItems = useMemo(() => {
+    const start = (page - 1) * PANEL_PAGE_SIZE;
+    return filteredItems.slice(start, start + PANEL_PAGE_SIZE);
+  }, [filteredItems, page]);
   const selectedLead = filteredItems.find((lead) => lead.id === selectedLeadId) ?? filteredItems[0] ?? null;
 
   useEffect(() => {
     setQuery("");
+    setPage(1);
   }, [activeSection]);
+
+  useEffect(() => {
+    setPage((current) => {
+      if (current < 1) return 1;
+      if (current > totalPages) return totalPages;
+      return current;
+    });
+  }, [totalPages]);
 
   useEffect(() => {
     setSelectedLeadId((currentSelectedLeadId) => {
@@ -166,16 +213,19 @@ export function AtendimentoSummaryCards({
               <Search className="h-4 w-4 text-[var(--app-text-45)]" />
               <input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar interessado"
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Pesquisar por nome, telefone ou CPF"
                 className="w-full bg-transparent text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
               />
             </label>
           </div>
           <div className="max-h-[26rem] overflow-y-auto p-3">
-            {filteredItems.length ? (
+            {pagedItems.length ? (
               <div className="space-y-3">
-                {filteredItems.map((lead) => {
+                {pagedItems.map((lead) => {
                   const active = lead.id === selectedLead?.id;
                   return (
                     <button
@@ -203,6 +253,31 @@ export function AtendimentoSummaryCards({
               </div>
             )}
           </div>
+          {filteredItems.length > PANEL_PAGE_SIZE ? (
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--app-border)] px-4 py-3">
+              <div className="text-xs font-semibold text-[var(--app-text-55)]">
+                Página {page} de {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page <= 1}
+                  className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page >= totalPages}
+                  className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Próximo
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="hidden min-h-0 min-w-0 flex-1 lg:block">
