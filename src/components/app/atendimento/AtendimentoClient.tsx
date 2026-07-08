@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Copy, X } from "lucide-react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   AtendimentoConversation,
@@ -78,6 +79,25 @@ const SIDEBAR_MODULES: Array<{
   },
 ];
 
+const LEAD_PRESENCE_CHANNEL = "atendimento-lead-presence";
+
+function getOnlineLeadIdsFromPresence(channel: RealtimeChannel) {
+  const state = channel.presenceState<Record<string, unknown>>();
+  const onlineLeadIds = new Set<string>();
+
+  for (const entries of Object.values(state)) {
+    for (const entry of entries ?? []) {
+      const leadId = String(entry?.leadId ?? "").trim();
+      const role = String(entry?.role ?? "").trim();
+      const page = String(entry?.page ?? "").trim();
+      if (!leadId || role !== "lead" || page !== "bot") continue;
+      onlineLeadIds.add(leadId);
+    }
+  }
+
+  return Array.from(onlineLeadIds);
+}
+
 function AtendimentoLinkCard({
   publicUrl,
   onCopy,
@@ -129,6 +149,7 @@ export function AtendimentoClient() {
   const [activeView, setActiveView] = useState<AtendimentoSidebarModule>("public-link");
   const [rightPanel, setRightPanel] = useState<AtendimentoRightPanel>("conversation");
   const [mobileModuleOpen, setMobileModuleOpen] = useState<AtendimentoSidebarModule | null>(null);
+  const [onlineLeadIds, setOnlineLeadIds] = useState<string[]>([]);
   const leadsRef = useRef<AtendimentoLeadListItem[]>([]);
   const messagesLoadingRef = useRef(false);
   const messagesLoadingTokenRef = useRef(0);
@@ -143,6 +164,10 @@ export function AtendimentoClient() {
   const leadsRequestIdRef = useRef(0);
   const detailRequestIdRef = useRef(0);
   const messagesRequestIdRef = useRef(0);
+  const selectedLead = useMemo(
+    () => leads.find((lead) => String(lead.id ?? "") === String(selectedLeadId ?? "")) ?? null,
+    [leads, selectedLeadId],
+  );
 
   function handleForbiddenResponse(res: Response) {
     if (res.status !== 401 && res.status !== 403) return false;
@@ -585,6 +610,34 @@ export function AtendimentoClient() {
     supabase,
   ]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel(LEAD_PRESENCE_CHANNEL)
+      .on("presence", { event: "sync" }, () => {
+        setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
+      })
+      .on("presence", { event: "join" }, () => {
+        setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
+      })
+      .on("presence", { event: "leave" }, () => {
+        setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          setOnlineLeadIds(getOnlineLeadIdsFromPresence(channel));
+          return;
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setOnlineLeadIds([]);
+        }
+      });
+
+    return () => {
+      setOnlineLeadIds([]);
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
+
   async function handleCopyLink() {
     if (!publicUrl) return;
     await navigator.clipboard.writeText(publicUrl);
@@ -673,6 +726,7 @@ export function AtendimentoClient() {
         messages={messages}
         messagesLoading={messagesLoading}
         disabled={sending}
+        leadOnline={selectedLead ? onlineLeadIds.includes(String(selectedLead.id ?? "")) : false}
         onSendMessage={handleSendMessage}
       />
     );
@@ -727,6 +781,7 @@ export function AtendimentoClient() {
             leads={leads}
             query={query}
             loading={loading}
+            onlineLeadIds={onlineLeadIds}
             selectedLeadId={selectedLeadId}
             onQueryChange={setQuery}
             onSelectLead={(leadId) => {
@@ -830,6 +885,7 @@ export function AtendimentoClient() {
                 messages={messages}
                 messagesLoading={messagesLoading}
                 disabled={sending}
+                leadOnline={selectedLead ? onlineLeadIds.includes(String(selectedLead.id ?? "")) : false}
                 onSendMessage={handleSendMessage}
               />
             </div>

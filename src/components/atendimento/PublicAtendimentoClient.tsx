@@ -29,6 +29,7 @@ type PortalPage = "bot" | "conta" | "arquivos";
 const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 2_500;
 const PHONE_PROMPT_MESSAGE = CAPTURED_FIELD_PROMPTS.phone;
+const LEAD_PRESENCE_CHANNEL = "atendimento-lead-presence";
 // #region debug-point A:bootstrap
 const __dbgUrl = "http://127.0.0.1:7777/event";
 const __dbgSession = "chat-timing-flicker";
@@ -146,6 +147,9 @@ export function PublicAtendimentoClient({
   const [authError, setAuthError] = useState("");
   const [composerError, setComposerError] = useState("");
   const [conversationBlocked, setConversationBlocked] = useState(false);
+  const [pageVisible, setPageVisible] = useState(() =>
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
   const [initialTotal, setInitialTotal] = useState(4);
   const [awaitingBotSince, setAwaitingBotSince] = useState<number | null>(null);
   const [botResponsePendingSince, setBotResponsePendingSince] = useState<number | null>(null);
@@ -221,6 +225,8 @@ export function PublicAtendimentoClient({
         contentText: previewMessage.content_text,
       })
     : "";
+  const shouldTrackLeadPresence =
+    !isProfilePage && !authError && Boolean(publicSlug) && Boolean(conversationId) && Boolean(leadId) && pageVisible;
 
   async function redirectToLoginAfterSessionLoss() {
     try {
@@ -304,6 +310,23 @@ export function PublicAtendimentoClient({
   useEffect(() => {
     awaitingBotSinceRef.current = awaitingBotSince;
   }, [awaitingBotSince]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const syncVisibility = () => {
+      setPageVisible(document.visibilityState === "visible");
+    };
+
+    syncVisibility();
+    document.addEventListener("visibilitychange", syncVisibility);
+    window.addEventListener("pageshow", syncVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", syncVisibility);
+      window.removeEventListener("pageshow", syncVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -1154,6 +1177,45 @@ export function PublicAtendimentoClient({
     scheduleSessionRefresh,
     supabase,
   ]);
+
+  useEffect(() => {
+    if (!shouldTrackLeadPresence) return;
+
+    const presenceKey = `lead:${conversationId}:${leadId}`;
+    const channel = supabase.channel(LEAD_PRESENCE_CHANNEL, {
+      config: {
+        presence: { key: presenceKey },
+      },
+    });
+
+    const trackPresence = async () => {
+      await channel.track({
+        role: "lead",
+        page: "bot",
+        leadId,
+        conversationId,
+        publicSlug,
+        onlineAt: new Date().toISOString(),
+      });
+    };
+
+    const handlePageHide = () => {
+      void channel.untrack();
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        void trackPresence();
+      }
+    });
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      void channel.untrack();
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, leadId, publicSlug, shouldTrackLeadPresence, supabase]);
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

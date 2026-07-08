@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFileGallery";
+import { AtendimentoPresenceBadge } from "@/components/app/atendimento/AtendimentoPresenceBadge";
 import type { AtendimentoFileRecord, AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
@@ -22,6 +23,7 @@ export function AtendimentoLeadList({
   leads,
   query,
   loading,
+  onlineLeadIds,
   selectedLeadId,
   onQueryChange,
   onListHeightChange,
@@ -32,6 +34,7 @@ export function AtendimentoLeadList({
   leads: AtendimentoLeadListItem[];
   query: string;
   loading: boolean;
+  onlineLeadIds: string[];
   selectedLeadId: string | null;
   onQueryChange: (value: string) => void;
   onListHeightChange?: (height: number) => void;
@@ -51,6 +54,7 @@ export function AtendimentoLeadList({
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(leads.length / PAGE_SIZE)), [leads.length]);
+  const onlineLeadIdsSet = useMemo(() => new Set(onlineLeadIds), [onlineLeadIds]);
 
   useEffect(() => {
     setPage((current) => {
@@ -153,6 +157,7 @@ export function AtendimentoLeadList({
               const active = selectedLeadId === lead.id;
               const unread = Number(lead.unread_count ?? 0);
               const isNewLead = Boolean(lead.is_new_for_attendant);
+              const isOnline = onlineLeadIdsSet.has(String(lead.id ?? ""));
               return (
                 <div
                   key={lead.id}
@@ -182,6 +187,9 @@ export function AtendimentoLeadList({
                       </div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
+                      </div>
+                      <div className="mt-2">
+                        <AtendimentoPresenceBadge online={isOnline} />
                       </div>
                     </div>
                     {unread > 0 ? (

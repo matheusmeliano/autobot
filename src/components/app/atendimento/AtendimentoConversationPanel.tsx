@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, FileText, ImageIcon, Maximize2, Minimize2, Paperclip, Play, Send, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
+import { AtendimentoPresenceBadge } from "@/components/app/atendimento/AtendimentoPresenceBadge";
 import {
   ATENDIMENTO_DOCUMENT_MIME_ACCEPT,
   ATENDIMENTO_IMAGE_MIME_ACCEPT,
@@ -45,6 +46,7 @@ export function AtendimentoConversationPanel({
   messages,
   messagesLoading,
   disabled,
+  leadOnline = false,
   onSendMessage,
   compact,
 }: {
@@ -52,6 +54,7 @@ export function AtendimentoConversationPanel({
   messages: AtendimentoMessage[];
   messagesLoading?: boolean;
   disabled?: boolean;
+  leadOnline?: boolean;
   onSendMessage: (payload: {
     content_text?: string;
     media_type?: AtendimentoMessage["media_type"];
@@ -332,6 +335,7 @@ export function AtendimentoConversationPanel({
           >
             {desktopExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
+          {conversation?.id ? <AtendimentoPresenceBadge online={leadOnline} /> : null}
         </div>
       ) : null}
 
