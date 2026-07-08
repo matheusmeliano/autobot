@@ -152,6 +152,9 @@ export function AtendimentoLeadList({
             {pagedLeads.map((lead) => {
               const active = selectedLeadId === lead.id;
               const unread = Number(lead.unread_count ?? 0);
+              const isNewLead =
+                String(lead.status ?? "").trim() === "novo_lead" ||
+                String(lead.funnel_stage ?? "").trim() === "novo_lead";
               return (
                 <div
                   key={lead.id}
@@ -173,8 +176,11 @@ export function AtendimentoLeadList({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
-                        {lead.full_name || "Novo Lead"}
+                      <div className="flex items-center gap-2">
+                        {isNewLead ? <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" /> : null}
+                        <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                          {lead.full_name || "Novo Lead"}
+                        </div>
                       </div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}

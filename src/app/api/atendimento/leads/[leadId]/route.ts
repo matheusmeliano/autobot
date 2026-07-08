@@ -60,10 +60,20 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
 
     const conversationId = String((conversation as any)?.id ?? "");
     const now = new Date().toISOString();
+    const shouldMarkLeadAsOpened = lead.status === "novo_lead" || lead.funnel_stage === "novo_lead";
     void Promise.allSettled([
       admin
         .from("atendimento_leads")
-        .update({ unread_count: 0, updated_at: now })
+        .update({
+          unread_count: 0,
+          updated_at: now,
+          ...(shouldMarkLeadAsOpened
+            ? {
+                status: "em_atendimento",
+                funnel_stage: "em_atendimento",
+              }
+            : {}),
+        })
         .eq("id", leadId),
       conversationId
         ? admin
@@ -79,6 +89,8 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       ok: true,
       lead: {
         ...(lead as any),
+        status: shouldMarkLeadAsOpened ? "em_atendimento" : (lead as any).status,
+        funnel_stage: shouldMarkLeadAsOpened ? "em_atendimento" : (lead as any).funnel_stage,
         conversation: conversation ?? null,
       },
       events: (events ?? []) as any[],
