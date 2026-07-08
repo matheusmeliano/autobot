@@ -582,7 +582,7 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 gap-6 overflow-hidden bg-[var(--app-bg)] p-5">
+    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 gap-6 overflow-hidden bg-[var(--app-bg)]">
       <aside className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 lg:max-w-[340px] lg:min-w-[340px]">
         <div className="shrink-0 space-y-4 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
           {loadError ? (
