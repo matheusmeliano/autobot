@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
@@ -96,17 +96,33 @@ export function AtendimentoSummaryCards({
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [mobileLead, setMobileLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [query, setQuery] = useState("");
 
   const activeSectionData = sections.find((section) => section.id === activeSection) ?? sections[0];
   const activeItems = activeSectionData?.items ?? [];
-  const selectedLead = activeItems.find((lead) => lead.id === selectedLeadId) ?? activeItems[0] ?? null;
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return activeItems;
+    return activeItems.filter((lead) =>
+      [lead.full_name, lead.phone, lead.email, lead.cpf, lead.origin].some((value) =>
+        String(value ?? "")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      ),
+    );
+  }, [activeItems, query]);
+  const selectedLead = filteredItems.find((lead) => lead.id === selectedLeadId) ?? filteredItems[0] ?? null;
+
+  useEffect(() => {
+    setQuery("");
+  }, [activeSection]);
 
   useEffect(() => {
     setSelectedLeadId((currentSelectedLeadId) => {
-      if (!activeItems.length) return null;
-      return activeItems.some((lead) => lead.id === currentSelectedLeadId) ? currentSelectedLeadId : activeItems[0]?.id ?? null;
+      if (!filteredItems.length) return null;
+      return filteredItems.some((lead) => lead.id === currentSelectedLeadId) ? currentSelectedLeadId : filteredItems[0]?.id ?? null;
     });
-  }, [activeItems]);
+  }, [filteredItems]);
 
   function handleSelectLead(lead: AtendimentoLeadListItem) {
     if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
@@ -146,12 +162,20 @@ export function AtendimentoSummaryCards({
         <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:w-[320px] lg:min-w-[320px]">
           <div className="border-b border-[var(--app-border)] px-4 py-4">
             <div className="text-sm font-semibold text-[var(--app-text-85)]">{activeSectionData.label}</div>
-            <div className="mt-1 text-xs text-[var(--app-text-55)]">Selecione um item para visualizar os detalhes.</div>
+            <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+              <Search className="h-4 w-4 text-[var(--app-text-45)]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar interessado"
+                className="w-full bg-transparent text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
+              />
+            </label>
           </div>
           <div className="max-h-[26rem] overflow-y-auto p-3">
-            {activeItems.length ? (
+            {filteredItems.length ? (
               <div className="space-y-3">
-                {activeItems.map((lead) => {
+                {filteredItems.map((lead) => {
                   const active = lead.id === selectedLead?.id;
                   return (
                     <button
@@ -175,7 +199,7 @@ export function AtendimentoSummaryCards({
               </div>
             ) : (
               <div className="flex min-h-40 items-center justify-center px-4 text-center text-sm text-[var(--app-text-45)]">
-                {activeSectionData.emptyMessage}
+                {query.trim() ? "Nenhum resultado encontrado para a busca." : activeSectionData.emptyMessage}
               </div>
             )}
           </div>
