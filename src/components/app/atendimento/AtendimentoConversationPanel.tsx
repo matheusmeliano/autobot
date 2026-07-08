@@ -320,13 +320,13 @@ export function AtendimentoConversationPanel({
             : "flex min-h-[520px] flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:h-full lg:min-h-0"
       }
     >
-      <div
-        className={[
-          "flex items-start justify-start gap-3 border-b border-[var(--app-border)] px-4 py-4",
-          desktopExpanded ? "bg-[var(--app-bg)]" : "",
-        ].join(" ")}
-      >
-        {!compact ? (
+      {!compact ? (
+        <div
+          className={[
+            "flex items-start justify-start gap-3 border-b border-[var(--app-border)] px-4 py-4",
+            desktopExpanded ? "bg-[var(--app-bg)]" : "",
+          ].join(" ")}
+        >
           <button
             type="button"
             onClick={() => setDesktopExpanded((current) => !current)}
@@ -335,8 +335,8 @@ export function AtendimentoConversationPanel({
           >
             {desktopExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div
         ref={messagesViewportRef}
