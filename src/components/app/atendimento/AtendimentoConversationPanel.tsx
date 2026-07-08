@@ -322,11 +322,10 @@ export function AtendimentoConversationPanel({
     >
       <div
         className={[
-          "flex items-start justify-between gap-3 border-b border-[var(--app-border)] px-4 py-4",
+          "flex items-start justify-start gap-3 border-b border-[var(--app-border)] px-4 py-4",
           desktopExpanded ? "bg-[var(--app-bg)]" : "",
         ].join(" ")}
       >
-        <div className="text-sm font-semibold text-[var(--app-text-85)]">Conversa</div>
         {!compact ? (
           <button
             type="button"
