@@ -44,35 +44,6 @@ function isViewportNearBottom(element: HTMLDivElement, threshold = 40) {
   return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold;
 }
 
-// #region debug-point D:reporter
-const DEBUG_SESSION_ID = "atendimento-flicker-loading";
-const DEBUG_SERVER_URL = "http://127.0.0.1:7777/event";
-const DEBUG_RUN_ID = "post-fix";
-
-function reportDebugEvent(payload: {
-  hypothesisId: string;
-  location: string;
-  msg: string;
-  data?: Record<string, unknown>;
-}) {
-  if (typeof window === "undefined") return;
-  const host = window.location.hostname;
-  if (host !== "localhost" && host !== "127.0.0.1") return;
-  void fetch(DEBUG_SERVER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      runId: DEBUG_RUN_ID,
-      ts: Date.now(),
-      ...payload,
-      msg: `[DEBUG] ${payload.msg}`,
-      data: payload.data ?? {},
-    }),
-  }).catch(() => {});
-}
-// #endregion
-
 export function AtendimentoConversationPanel({
   conversation,
   messages,
@@ -118,30 +89,6 @@ export function AtendimentoConversationPanel({
         contentText: previewMessage.content_text,
       })
     : "";
-
-  const renderBranch = messagesLoading
-    ? "loading"
-    : orderedMessages.length
-      ? "messages"
-      : "empty";
-
-  useEffect(() => {
-    // #region debug-point D:panel-branch
-    reportDebugEvent({
-      hypothesisId: "D",
-      location: "AtendimentoConversationPanel:renderBranch",
-      msg: "panel branch change",
-      data: {
-        conversationId: String(conversation?.id ?? ""),
-        messagesLoading: Boolean(messagesLoading),
-        messagesCount: orderedMessages.length,
-        branch: renderBranch,
-        compact: Boolean(compact),
-        desktopExpanded,
-      },
-    });
-    // #endregion
-  }, [compact, conversation?.id, desktopExpanded, messagesLoading, orderedMessages.length, renderBranch]);
 
   useEffect(() => {
     if (!desktopExpanded) return;

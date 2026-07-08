@@ -25,35 +25,6 @@ const EMPTY_SUMMARY: AtendimentoSummary = {
   conversasNaoLidas: 0,
 };
 
-// #region debug-point A:reporter
-const DEBUG_SESSION_ID = "atendimento-flicker-loading";
-const DEBUG_SERVER_URL = "http://127.0.0.1:7777/event";
-const DEBUG_RUN_ID = "post-fix";
-
-function reportDebugEvent(payload: {
-  hypothesisId: string;
-  location: string;
-  msg: string;
-  data?: Record<string, unknown>;
-}) {
-  if (typeof window === "undefined") return;
-  const host = window.location.hostname;
-  if (host !== "localhost" && host !== "127.0.0.1") return;
-  void fetch(DEBUG_SERVER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      runId: DEBUG_RUN_ID,
-      ts: Date.now(),
-      ...payload,
-      msg: `[DEBUG] ${payload.msg}`,
-      data: payload.data ?? {},
-    }),
-  }).catch(() => {});
-}
-// #endregion
-
 function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
   const unique = new Map<string, AtendimentoMessage>();
   for (const message of messageList) {
@@ -298,35 +269,11 @@ export function AtendimentoClient() {
       const wantsLoading = Boolean(options?.showLoading);
       if (!wantsLoading && messagesLoadingRef.current) return;
       const requestId = ++messagesRequestIdRef.current;
-      // #region debug-point B:messages-begin
-      reportDebugEvent({
-        hypothesisId: "B",
-        location: "AtendimentoClient:loadConversationMessages:begin",
-        msg: "loadConversationMessages begin",
-        data: {
-          conversationId,
-          requestId,
-          currentRequestId: messagesRequestIdRef.current,
-          showLoading: Boolean(options?.showLoading),
-          mode,
-          messagesLoading,
-          messagesCount: messages.length,
-        },
-      });
-      // #endregion
       if (wantsLoading) {
         messagesLoadingRef.current = true;
         messagesLoadingTokenRef.current = requestId;
         setMessagesLoadError(null);
         setMessagesLoading(true);
-        // #region debug-point B:messages-set-loading
-        reportDebugEvent({
-          hypothesisId: "B",
-          location: "AtendimentoClient:loadConversationMessages:setMessagesLoading(true)",
-          msg: "setMessagesLoading(true)",
-          data: { conversationId, requestId, currentRequestId: messagesRequestIdRef.current },
-        });
-        // #endregion
       }
       let messagesRes: Response;
       try {
@@ -338,14 +285,6 @@ export function AtendimentoClient() {
           setMessagesLoading(false);
           messagesLoadingRef.current = false;
         }
-        // #region debug-point B:messages-network-error
-        reportDebugEvent({
-          hypothesisId: "B",
-          location: "AtendimentoClient:loadConversationMessages:catch",
-          msg: "network error",
-          data: { conversationId, requestId, currentRequestId: messagesRequestIdRef.current },
-        });
-        // #endregion
         return;
       }
       if (handleForbiddenResponse(messagesRes)) {
@@ -353,14 +292,6 @@ export function AtendimentoClient() {
           setMessagesLoading(false);
           messagesLoadingRef.current = false;
         }
-        // #region debug-point B:messages-forbidden
-        reportDebugEvent({
-          hypothesisId: "B",
-          location: "AtendimentoClient:loadConversationMessages:forbidden",
-          msg: "forbidden response",
-          data: { conversationId, requestId, currentRequestId: messagesRequestIdRef.current },
-        });
-        // #endregion
         return;
       }
       const messagesJson = await messagesRes.json().catch(() => null);
@@ -374,20 +305,6 @@ export function AtendimentoClient() {
           setMessagesLoading(false);
           messagesLoadingRef.current = false;
         }
-        // #region debug-point B:messages-success
-        reportDebugEvent({
-          hypothesisId: "B",
-          location: "AtendimentoClient:loadConversationMessages:success",
-          msg: "success",
-          data: {
-            conversationId,
-            requestId,
-            currentRequestId: messagesRequestIdRef.current,
-            receivedCount: Array.isArray(messagesJson?.messages) ? (messagesJson.messages as unknown[]).length : null,
-            showLoading: Boolean(options?.showLoading),
-          },
-        });
-        // #endregion
         return;
       }
       const message = "Falha ao carregar as mensagens.";
@@ -396,20 +313,6 @@ export function AtendimentoClient() {
         setMessagesLoading(false);
         messagesLoadingRef.current = false;
       }
-      // #region debug-point B:messages-nok
-      reportDebugEvent({
-        hypothesisId: "B",
-        location: "AtendimentoClient:loadConversationMessages:bad-json",
-        msg: "json not ok or stale request",
-        data: {
-          conversationId,
-          requestId,
-          currentRequestId: messagesRequestIdRef.current,
-          ok: Boolean(messagesJson?.ok),
-          status: messagesRes.status,
-        },
-      });
-      // #endregion
     },
     [applyMessages],
   );
@@ -417,14 +320,6 @@ export function AtendimentoClient() {
   const loadLeadDetail = useCallback(
     async (leadId: string, options?: { skipMessages?: boolean; suppressNotFound?: boolean }) => {
       const requestId = ++detailRequestIdRef.current;
-      // #region debug-point A:lead-detail-begin
-      reportDebugEvent({
-        hypothesisId: "A",
-        location: "AtendimentoClient:loadLeadDetail:begin",
-        msg: "loadLeadDetail begin",
-        data: { leadId, requestId, options: options ?? null },
-      });
-      // #endregion
       let res: Response;
       try {
         res = await fetch(`/api/atendimento/leads/${leadId}?skipEvents=1`, { cache: "no-store" });
@@ -490,14 +385,6 @@ export function AtendimentoClient() {
       }
 
       if (!options?.skipMessages) {
-        // #region debug-point A:lead-detail-load-messages
-        reportDebugEvent({
-          hypothesisId: "A",
-          location: "AtendimentoClient:loadLeadDetail:triggerMessages",
-          msg: "trigger loadConversationMessages(showLoading: true)",
-          data: { leadId, conversationId, requestId, options: options ?? null },
-        });
-        // #endregion
         void loadConversationMessages(conversationId, "replace", { showLoading: true });
       }
     },
@@ -585,18 +472,6 @@ export function AtendimentoClient() {
     fallbackRefreshIntervalRef.current = window.setInterval(() => {
       if (realtimeSuspendedRef.current) return;
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      // #region debug-point A:fallback-tick
-      reportDebugEvent({
-        hypothesisId: "A",
-        location: "AtendimentoClient:startFallbackRefresh:tick",
-        msg: "fallback refresh tick",
-        data: {
-          selectedLeadId: selectedLeadIdRef.current,
-          selectedConversationId: selectedConversationIdRef.current,
-          realtimeSubscribed: realtimeSubscribedRef.current,
-        },
-      });
-      // #endregion
       void loadSummary();
       void loadLeads(queryRef.current, { silent: true });
       if (selectedLeadIdRef.current) {
