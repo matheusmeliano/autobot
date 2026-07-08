@@ -74,7 +74,7 @@ const SIDEBAR_MODULES: Array<{
   },
   {
     id: "summary",
-    label: "Indicadores",
+    label: "Painel de Dados",
   },
 ];
 
@@ -739,7 +739,7 @@ export function AtendimentoClient() {
             <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
               <div className="border-b border-[var(--app-border)] px-6 py-5">
                 <div className="text-sm font-semibold text-[var(--app-text-85)]">
-                  {rightPanel === "public-link" ? "Link de Atendimento" : "Indicadores"}
+                  {rightPanel === "public-link" ? "Link de Atendimento" : "Painel de Dados"}
                 </div>
                 <div className="mt-1 text-xs text-[var(--app-text-55)]">
                   {rightPanel === "public-link"
