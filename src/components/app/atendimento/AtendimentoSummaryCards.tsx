@@ -54,7 +54,7 @@ function Field({
 
 function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
       <div className="min-w-0 flex flex-col gap-2 border-b border-[var(--app-border)] pb-4">
         <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Lead"}>
           {lead.full_name || "Novo Lead"}
@@ -206,8 +206,8 @@ export function AtendimentoSummaryCards({
       </div>
 
       <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
-        <div className="flex flex-col gap-4 lg:min-h-[26rem] lg:flex-row">
-        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:w-[320px] lg:min-w-[320px]">
+        <div className="flex flex-col gap-4 lg:h-[26rem] lg:flex-row">
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:flex lg:h-full lg:w-[320px] lg:min-w-[320px] lg:flex-col">
           <div className="border-b border-[var(--app-border)] px-4 py-4">
             <div className="text-sm font-semibold text-[var(--app-text-85)]">{activeSectionData.label}</div>
             <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
@@ -223,7 +223,7 @@ export function AtendimentoSummaryCards({
               />
             </label>
           </div>
-          <div className="max-h-[26rem] overflow-y-auto p-3">
+          <div className="max-h-[26rem] overflow-y-auto p-3 lg:min-h-0 lg:max-h-none lg:flex-1">
             {pagedItems.length ? (
               <div className="space-y-3">
                 {pagedItems.map((lead) => {
@@ -236,7 +236,7 @@ export function AtendimentoSummaryCards({
                       className={[
                         "w-full rounded-2xl border px-4 py-3 text-left transition",
                         active
-                          ? "border-yellow-500/30 bg-yellow-500/10"
+                          ? "border-[var(--app-border)] bg-[var(--app-card)] lg:border-yellow-500/30 lg:bg-yellow-500/10"
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
@@ -281,16 +281,16 @@ export function AtendimentoSummaryCards({
           ) : null}
         </div>
 
-        <div className="hidden min-h-0 min-w-0 flex-1 lg:block">
-          {selectedLead ? (
-            <LeadDetails lead={selectedLead} />
-          ) : (
-            <div className="flex h-full min-h-[26rem] items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-6 text-center text-sm text-[var(--app-text-45)]">
-              {activeSectionData.emptyMessage}
-            </div>
-          )}
+          <div className="hidden min-h-0 min-w-0 flex-1 lg:block lg:h-full">
+            {selectedLead ? (
+              <LeadDetails lead={selectedLead} />
+            ) : (
+              <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-6 text-center text-sm text-[var(--app-text-45)]">
+                {activeSectionData.emptyMessage}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       </div>
 
       <AppModal open={Boolean(mobileLead)} onClose={() => setMobileLead(null)} size="lg" zIndexClass="z-[340]" fullScreenOnMobile>
