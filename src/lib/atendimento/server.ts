@@ -428,6 +428,7 @@ export async function createPublicLeadSession(params: { origin?: string | null; 
       funnel_stage: "novo_lead",
       assigned_user_email: ATENDIMENTO_EMAIL,
       unread_count: 0,
+      is_new_for_attendant: true,
     })
     .select("*")
     .maybeSingle();
@@ -533,6 +534,7 @@ export async function ensureAtendimentoLeadForAuthenticatedUser(params: {
         funnel_stage: "novo_lead",
         assigned_user_email: ATENDIMENTO_EMAIL,
         unread_count: 0,
+        is_new_for_attendant: true,
       })
       .select("*")
       .maybeSingle();

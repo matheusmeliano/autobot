@@ -152,9 +152,7 @@ export function AtendimentoLeadList({
             {pagedLeads.map((lead) => {
               const active = selectedLeadId === lead.id;
               const unread = Number(lead.unread_count ?? 0);
-              const isNewLead =
-                String(lead.status ?? "").trim() === "novo_lead" ||
-                String(lead.funnel_stage ?? "").trim() === "novo_lead";
+              const isNewLead = Boolean(lead.is_new_for_attendant);
               return (
                 <div
                   key={lead.id}

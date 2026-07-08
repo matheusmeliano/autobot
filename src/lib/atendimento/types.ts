@@ -23,6 +23,7 @@ export type AtendimentoLead = {
   updated_at: string;
   last_interaction_at: string | null;
   unread_count: number;
+  is_new_for_attendant: boolean;
 };
 
 export type AtendimentoConversation = {
