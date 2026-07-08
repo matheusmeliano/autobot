@@ -538,11 +538,13 @@ export function AtendimentoClient() {
 
   const scheduleSelectedLeadRefresh = useCallback(() => {
     if (realtimeSuspendedRef.current || !selectedLeadIdRef.current) return;
+    if (messagesLoadingRef.current) return;
     if (detailRefreshTimeoutRef.current != null) {
       window.clearTimeout(detailRefreshTimeoutRef.current);
     }
     detailRefreshTimeoutRef.current = window.setTimeout(() => {
       if (!selectedLeadIdRef.current) return;
+      if (messagesLoadingRef.current) return;
       void loadLeadDetail(selectedLeadIdRef.current, { skipMessages: true, suppressNotFound: true });
     }, 120);
   }, [loadLeadDetail]);
@@ -567,6 +569,7 @@ export function AtendimentoClient() {
       void loadSummary();
       void loadLeads(queryRef.current, { silent: true });
       if (selectedLeadIdRef.current) {
+        if (messagesLoadingRef.current) return;
         void loadLeadDetail(selectedLeadIdRef.current, { suppressNotFound: true, skipMessages: true });
       }
     }, 1500);
