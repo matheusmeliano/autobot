@@ -644,7 +644,7 @@ export function AtendimentoClient() {
     if (module === "public-link") {
       return <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />;
     }
-    return <AtendimentoSummaryCards summary={summary} />;
+    return <AtendimentoSummaryCards summary={summary} leads={leads} />;
   }
 
   function renderRightPanelContent() {
