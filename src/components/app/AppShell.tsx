@@ -449,16 +449,12 @@ export function AppShell({
 
   return (
     <AppThemeProvider value={themeProviderValue}>
-      <div
-        className={
-          drawerOnlyNav ? "min-h-screen min-[1400px]:h-[100dvh] min-[1400px]:overflow-hidden" : "min-h-screen"
-        }
-      >
+      <div className={drawerOnlyNav ? "min-h-screen lg:h-[100dvh] lg:overflow-hidden" : "min-h-screen"}>
         <div
           className={[
             "relative flex w-full",
             drawerOnlyNav
-              ? "min-h-screen flex-col gap-4 overflow-visible px-4 py-6 min-[1201px]:px-6 lg:gap-6 min-[1400px]:h-full min-[1400px]:overflow-hidden"
+              ? "min-h-screen flex-col gap-4 overflow-visible px-4 py-6 min-[1201px]:px-6 lg:h-full lg:min-h-0 lg:gap-6 lg:overflow-hidden"
               : "gap-6 px-4 py-6 min-[1201px]:px-6",
           ].join(" ")}
         >
@@ -505,7 +501,7 @@ export function AppShell({
           className={[
             "flex w-full flex-col",
             drawerOnlyNav
-              ? "min-h-screen overflow-visible pb-0 min-[1400px]:h-full min-[1400px]:min-h-0 min-[1400px]:overflow-hidden"
+              ? "min-h-screen overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
               : "min-h-[calc(100vh-3rem)] pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
