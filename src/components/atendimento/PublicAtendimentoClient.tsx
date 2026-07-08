@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Clapperboard, FileText, ImageIcon, Paperclip, Play, Send, X } from "lucide-react";
 import { logoutAction } from "@/app/app/actions";
 import { AppModal } from "@/components/app/AppModal";
@@ -153,7 +153,7 @@ export function PublicAtendimentoClient({
   const [uploadItems, setUploadItems] = useState<AtendimentoUploadItem[]>([]);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<AtendimentoMessage | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -229,21 +229,6 @@ export function PublicAtendimentoClient({
     } catch {}
     window.location.replace("/login");
   }
-
-  useLayoutEffect(() => {
-    if (isProfilePage) return;
-    const element = textareaRef.current;
-    if (!element) return;
-
-    element.style.height = "56px";
-    element.style.overflowY = "hidden";
-
-    const nextHeight = Math.min(element.scrollHeight, 144);
-    element.style.height = `${Math.max(56, nextHeight)}px`;
-    if (element.scrollHeight > 144) {
-      element.style.overflowY = "auto";
-    }
-  }, [draft, isProfilePage]);
 
   useEffect(() => {
     if (isProfilePage) return;
@@ -383,7 +368,7 @@ export function PublicAtendimentoClient({
     if (isProfilePage) return;
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        const element = textareaRef.current;
+        const element = inputRef.current;
         if (!element || element.disabled) return;
         element.focus();
         const cursorPosition = element.value.length;
@@ -1175,8 +1160,8 @@ export function PublicAtendimentoClient({
     await submitDraft();
   }
 
-  async function handleTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey) return;
+  async function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
     event.preventDefault();
     await submitDraft();
   }
@@ -1492,15 +1477,16 @@ export function PublicAtendimentoClient({
                 >
                   <Paperclip className="h-4 w-4" />
                 </button>
-                <textarea
-                  ref={textareaRef}
+                <input
+                  ref={inputRef}
+                  type="text"
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={handleTextareaKeyDown}
-                  placeholder={conversationBlocked ? "Atendimento encerrado." : "Mensagem..."}
-                  rows={1}
+                  onKeyDown={handleInputKeyDown}
+                  placeholder="Mensagem..."
                   disabled={composerDisabled}
-                  className="h-14 w-full flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-emerald-500/40 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+                  autoComplete="off"
+                  className="h-14 w-full min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-emerald-500/40 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <button
                   type="submit"

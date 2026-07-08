@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, FileText, ImageIcon, Maximize2, Minimize2, Paperclip, Play, Send, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import {
@@ -69,7 +69,7 @@ export function AtendimentoConversationPanel({
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<AtendimentoMessage | null>(null);
   const orderedMessages = useMemo(() => messages.slice(), [messages]);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -122,20 +122,6 @@ export function AtendimentoConversationPanel({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [desktopExpanded]);
-
-  useLayoutEffect(() => {
-    const element = textareaRef.current;
-    if (!element) return;
-
-    element.style.height = "56px";
-    element.style.overflowY = "hidden";
-
-    const nextHeight = Math.min(element.scrollHeight, 144);
-    element.style.height = `${Math.max(56, nextHeight)}px`;
-    if (element.scrollHeight > 144) {
-      element.style.overflowY = "auto";
-    }
-  }, [draft]);
 
   useEffect(() => {
     const viewport = messagesViewportRef.current;
@@ -198,7 +184,7 @@ export function AtendimentoConversationPanel({
   function restoreTextareaFocus() {
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        const element = textareaRef.current;
+        const element = inputRef.current;
         if (!element || element.disabled) return;
         element.focus();
         const cursorPosition = element.value.length;
@@ -315,8 +301,8 @@ export function AtendimentoConversationPanel({
     await submitDraft();
   }
 
-  async function handleTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey) return;
+  async function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
     event.preventDefault();
     await submitDraft();
   }
@@ -532,15 +518,16 @@ export function AtendimentoConversationPanel({
           >
             <Paperclip className="h-4 w-4" />
           </button>
-          <textarea
-            ref={textareaRef}
+          <input
+            ref={inputRef}
+            type="text"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleTextareaKeyDown}
-            placeholder={conversation?.id ? "Mensagem..." : "Selecione um atendimento"}
+            onKeyDown={handleInputKeyDown}
+            placeholder="Mensagem..."
             disabled={!conversation?.id || disabled}
-            rows={1}
-            className="h-14 w-full flex-1 resize-none rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm leading-6 text-[var(--app-text-85)] outline-none transition placeholder:text-[var(--app-text-35)] focus:border-emerald-500/40 focus:bg-[var(--app-hover)]"
+            autoComplete="off"
+            className="h-14 w-full min-w-0 flex-1 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm text-[var(--app-text-85)] outline-none transition placeholder:text-[var(--app-text-35)] focus:border-emerald-500/40 focus:bg-[var(--app-hover)]"
           />
           <button
             type="submit"
