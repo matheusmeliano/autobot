@@ -7,7 +7,7 @@ import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFile
 import type { AtendimentoFileRecord, AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
-const PAGE_SIZE = 2;
+const PAGE_SIZE = 3;
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -192,17 +192,6 @@ export function AtendimentoLeadList({
                   </div>
 
                   <div className="mt-3 flex flex-col items-stretch gap-2">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setProfileLead(lead);
-                        setProfileOpen(true);
-                      }}
-                      className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                    >
-                      Perfil do aluno
-                    </button>
                     <button
                       type="button"
                       onClick={(event) => {
