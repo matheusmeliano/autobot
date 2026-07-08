@@ -178,7 +178,7 @@ export function AtendimentoLeadList({
                   ].join(" ")}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         {isNewLead ? <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" /> : null}
                         <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
@@ -188,15 +188,15 @@ export function AtendimentoLeadList({
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
                       </div>
-                      <div className="mt-2">
-                        <AtendimentoPresenceBadge online={isOnline} />
-                      </div>
                     </div>
-                    {unread > 0 ? (
-                      <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
-                        {unread}
-                      </span>
-                    ) : null}
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <AtendimentoPresenceBadge online={isOnline} />
+                      {unread > 0 ? (
+                        <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
+                          {unread}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="mt-3 flex flex-col items-stretch gap-2">
