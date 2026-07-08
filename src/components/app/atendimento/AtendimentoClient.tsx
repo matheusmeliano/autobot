@@ -265,7 +265,7 @@ export function AtendimentoClient() {
       if (options?.showLoading) setMessagesLoading(true);
       let messagesRes: Response;
       try {
-        messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages`, { cache: "no-store" });
+        messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages?limit=200`, { cache: "no-store" });
       } catch (error) {
         const message = "Falha ao carregar mensagens.";
         setLoadError(message);
@@ -296,7 +296,7 @@ export function AtendimentoClient() {
       const requestId = ++detailRequestIdRef.current;
       let res: Response;
       try {
-        res = await fetch(`/api/atendimento/leads/${leadId}`, { cache: "no-store" });
+        res = await fetch(`/api/atendimento/leads/${leadId}?skipEvents=1`, { cache: "no-store" });
       } catch (error) {
         setLoadError("Falha ao carregar detalhes do lead.");
         modalToast.error("Falha ao carregar detalhes do lead.");

@@ -5,7 +5,7 @@ import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/a
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function GET(_: Request, context: { params: Promise<{ leadId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ leadId: string }> }) {
   try {
     const auth = await requireAtendimentoUser();
     if (!auth.ok) {
@@ -13,21 +13,27 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
     }
 
     const { leadId } = await context.params;
+    const url = new URL(request.url);
+    const skipEvents = url.searchParams.get("skipEvents") !== "0";
     const admin = createSupabaseAdminClient();
 
+    const leadPromise = admin
+      .from("atendimento_leads")
+      .select("*")
+      .eq("id", leadId)
+      .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+      .maybeSingle();
+    const eventsPromise = skipEvents
+      ? Promise.resolve({ data: [] as any[], error: null as any })
+      : admin
+          .from("atendimento_history_events")
+          .select("*")
+          .eq("lead_id", leadId)
+          .order("created_at", { ascending: false })
+          .limit(100);
     const [{ data: lead, error: leadError }, { data: events, error: eventsError }] = await Promise.all([
-      admin
-        .from("atendimento_leads")
-        .select("*")
-        .eq("id", leadId)
-        .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-        .maybeSingle(),
-      admin
-        .from("atendimento_history_events")
-        .select("*")
-        .eq("lead_id", leadId)
-        .order("created_at", { ascending: false })
-        .limit(100),
+      leadPromise,
+      eventsPromise,
     ]);
 
     if (leadError) {
@@ -42,7 +48,7 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
 
     const { data: conversation, error: conversationError } = await admin
       .from("atendimento_conversations")
-      .select("*")
+      .select("id")
       .eq("lead_id", leadId)
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -52,20 +58,22 @@ export async function GET(_: Request, context: { params: Promise<{ leadId: strin
       return Response.json({ ok: false, error: conversationError.message }, { status: 500 });
     }
 
-    await admin
-      .from("atendimento_leads")
-      .update({ unread_count: 0, updated_at: new Date().toISOString() })
-      .eq("id", leadId);
-
     const conversationId = String((conversation as any)?.id ?? "");
-    if (conversationId) {
-      await admin
-        .from("atendimento_messages")
-        .update({ status: "lida", read_at: new Date().toISOString() })
-        .eq("conversation_id", conversationId)
-        .eq("sender_role", "lead")
-        .is("read_at", null);
-    }
+    const now = new Date().toISOString();
+    void Promise.allSettled([
+      admin
+        .from("atendimento_leads")
+        .update({ unread_count: 0, updated_at: now })
+        .eq("id", leadId),
+      conversationId
+        ? admin
+            .from("atendimento_messages")
+            .update({ status: "lida", read_at: now })
+            .eq("conversation_id", conversationId)
+            .eq("sender_role", "lead")
+            .is("read_at", null)
+        : Promise.resolve({ error: null }),
+    ]);
 
     return Response.json({
       ok: true,
