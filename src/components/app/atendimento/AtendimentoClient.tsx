@@ -582,8 +582,8 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] min-w-0 gap-6 overflow-hidden bg-[var(--app-bg)]">
-      <aside className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 lg:max-w-[340px] lg:min-w-[340px]">
+    <div className="flex min-h-screen min-w-0 flex-col gap-4 bg-[var(--app-bg)] lg:gap-6 min-[1400px]:h-[100dvh] min-[1400px]:min-h-[100dvh] min-[1400px]:overflow-hidden lg:flex-row">
+      <aside className="flex min-h-0 w-full min-w-0 flex-col gap-4 lg:max-w-[340px] lg:min-w-[340px] min-[1400px]:h-full">
         <div className="shrink-0 space-y-4 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
           {loadError ? (
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
@@ -617,7 +617,7 @@ export function AtendimentoClient() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 min-[1400px]:overflow-hidden">
           <AtendimentoLeadList
             leads={leads}
             query={query}
@@ -642,7 +642,7 @@ export function AtendimentoClient() {
       </aside>
 
       <div className="hidden min-w-0 flex-1 lg:block">
-        <div className="h-full min-h-0">
+        <div className="min-h-[520px] min-[1400px]:h-full min-[1400px]:min-h-0">
           {rightPanel === "conversation" ? (
             renderRightPanelContent()
           ) : (
