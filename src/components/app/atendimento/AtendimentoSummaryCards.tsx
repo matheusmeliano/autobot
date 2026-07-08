@@ -9,25 +9,30 @@ import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTim
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
+  const displayValue = value || "-";
   return (
-    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">{label}</div>
-      <div className="mt-2 text-sm font-semibold text-[var(--app-text-85)]">{value || "-"}</div>
+      <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]" title={displayValue}>
+        {displayValue}
+      </div>
     </div>
   );
 }
 
 function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
   return (
-    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
-      <div className="flex flex-col gap-2 border-b border-[var(--app-border)] pb-4">
-        <div className="truncate text-lg font-semibold text-[var(--app-text-85)]">{lead.full_name || "Novo Lead"}</div>
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
+      <div className="min-w-0 flex flex-col gap-2 border-b border-[var(--app-border)] pb-4">
+        <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Lead"}>
+          {lead.full_name || "Novo Lead"}
+        </div>
         <div className="text-sm text-[var(--app-text-55)]">
           Ultima interacao: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
         <Field label="Telefone" value={lead.phone} />
         <Field label="Email" value={lead.email} />
         <Field label="CPF" value={lead.cpf} />
@@ -176,7 +181,7 @@ export function AtendimentoSummaryCards({
           </div>
         </div>
 
-        <div className="hidden min-h-0 flex-1 lg:block">
+        <div className="hidden min-h-0 min-w-0 flex-1 lg:block">
           {selectedLead ? (
             <LeadDetails lead={selectedLead} />
           ) : (
