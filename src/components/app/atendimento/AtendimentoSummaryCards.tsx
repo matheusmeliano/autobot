@@ -180,8 +180,8 @@ export function AtendimentoSummaryCards({
   }
 
   return (
-    <>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="flex flex-col gap-6 lg:h-full lg:min-h-0">
+      <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {sections.map((section) => {
           const active = section.id === activeSection;
           return (
@@ -205,7 +205,8 @@ export function AtendimentoSummaryCards({
         })}
       </div>
 
-      <div className="mt-6 flex flex-col gap-4 lg:min-h-[26rem] lg:flex-row">
+      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+        <div className="flex flex-col gap-4 lg:min-h-[26rem] lg:flex-row">
         <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:w-[320px] lg:min-w-[320px]">
           <div className="border-b border-[var(--app-border)] px-4 py-4">
             <div className="text-sm font-semibold text-[var(--app-text-85)]">{activeSectionData.label}</div>
@@ -290,6 +291,7 @@ export function AtendimentoSummaryCards({
           )}
         </div>
       </div>
+      </div>
 
       <AppModal open={Boolean(mobileLead)} onClose={() => setMobileLead(null)} size="lg" zIndexClass="z-[340]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
@@ -309,6 +311,6 @@ export function AtendimentoSummaryCards({
 
         {mobileLead ? <div className="mt-4"><LeadDetails lead={mobileLead} /></div> : null}
       </AppModal>
-    </>
+    </div>
   );
 }

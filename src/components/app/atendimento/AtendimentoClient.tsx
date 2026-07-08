@@ -763,7 +763,14 @@ export function AtendimentoClient() {
                     : "Resumo consolidado dos indicadores do atendimento."}
                 </div>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-6">{renderRightPanelContent()}</div>
+              <div
+                className={[
+                  "min-h-0 flex-1 p-6",
+                  rightPanel === "summary" ? "overflow-hidden" : "overflow-y-auto",
+                ].join(" ")}
+              >
+                {renderRightPanelContent()}
+              </div>
             </div>
           )}
         </div>
