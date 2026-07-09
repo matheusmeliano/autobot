@@ -113,14 +113,9 @@ export function AtendimentoSummaryCards({
       {
         id: "contratos" as const,
         label: "Contratos",
-        value: summary.matriculasPendentes,
+        value: 0,
         emptyMessage: "Nenhum contrato disponivel no momento.",
-        items: leads.filter(
-          (lead) =>
-            lead.status === "matricula_pendente" ||
-            lead.funnel_stage === "matricula_pendente" ||
-            lead.funnel_stage === "pre_cadastro_concluido",
-        ),
+        items: [],
       },
     ],
     [leads, summary],
