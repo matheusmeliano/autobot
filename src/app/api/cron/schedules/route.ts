@@ -12,6 +12,9 @@ import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { localDateInTimeZone } from "@/lib/recurrence";
 
+const MAX_ZAPI_SENDS_PER_RUN = 5;
+const ZAPI_SEND_INTERVAL_MS = 10_000;
+
 // #region debug-point extra-send-cron-bootstrap
 const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
@@ -90,6 +93,10 @@ function weekdayFromLocalDate(localDate: string) {
   const base = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
   const weekday = base.getUTCDay();
   return weekday === 0 ? 7 : weekday;
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function countExecutedRunsOnLocalDate(params: {
@@ -295,11 +302,13 @@ export async function GET(req: Request) {
   // #endregion
 
   const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+  let zapiSendAttempts = 0;
 
   for (const s of schedules ?? []) {
     const scheduleId = String((s as any).id);
     const userId = String((s as any).user_id);
     const scheduledFor = String((s as any).data_envio ?? nowIso);
+    let attemptedZapiSend = false;
 
     try {
       const debtor = (s as any).debtors ?? null;
@@ -452,6 +461,11 @@ export async function GET(req: Request) {
         continue;
       }
 
+      if (zapiSendAttempts >= MAX_ZAPI_SENDS_PER_RUN) {
+        results.push({ id: scheduleId, ok: true, error: "rate_limited_to_next_run" });
+        continue;
+      }
+
       const message = applyTemplate(templateText, {
         nome: String(debtor?.nome ?? ""),
         pix: String(debtor?.pix_key ?? ""),
@@ -477,6 +491,8 @@ export async function GET(req: Request) {
         templateSource: sourceStatus,
       });
       // #endregion
+      attemptedZapiSend = true;
+      zapiSendAttempts += 1;
       await sendZapiText({
         instance_id: wa.instance_id,
         token: wa.token,
@@ -596,6 +612,10 @@ export async function GET(req: Request) {
       });
       // #endregion
       results.push({ id: scheduleId, ok: false, error: msg });
+    } finally {
+      if (attemptedZapiSend) {
+        await sleep(ZAPI_SEND_INTERVAL_MS);
+      }
     }
   }
 
@@ -603,6 +623,7 @@ export async function GET(req: Request) {
     ok: true,
     now: nowIso,
     found: schedules?.length ?? 0,
+    throttled_attempts: zapiSendAttempts,
     results,
     deployment,
   });
