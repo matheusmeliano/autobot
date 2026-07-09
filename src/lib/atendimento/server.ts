@@ -56,6 +56,40 @@ const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<
 };
 // #endregion
 
+// #region debug-point A2:bootstrap-bot-duplicate
+const __dbgBotEnvPath = ".dbg/bot-duplicate-message.env";
+const __dbgBotEnvRaw = fs.existsSync(__dbgBotEnvPath) ? fs.readFileSync(__dbgBotEnvPath, "utf8") : "";
+const __dbgBotMap = Object.fromEntries(
+  __dbgBotEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgBotUrl = __dbgBotMap.DEBUG_SERVER_URL;
+const __dbgBotSession = __dbgBotMap.DEBUG_SESSION_ID;
+const __dbgBot = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  if (!__dbgBotUrl || !__dbgBotSession) return;
+  fetch(__dbgBotUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgBotSession,
+      runId: "post-fix",
+      hypothesisId,
+      traceId,
+      location: "src/lib/atendimento/server.ts",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
+
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
   const digits = raw.replace(/\D/g, "");
@@ -661,8 +695,15 @@ export async function ensureInitialBotConversationFlow(params: {
   leadId: string;
   conversationId: string;
 }) {
+  const traceId = `ensure-initial-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const INITIAL_BOT_TYPING_DELAY_MS = 1500;
   const admin = createSupabaseAdminClient();
+  // #region debug-point A2:ensure-initial-start
+  __dbgBot(traceId, "A", "[DEBUG] ensure_initial_start", {
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+  });
+  // #endregion
   const { data: lead } = await admin
     .from("atendimento_leads")
     .select("full_name")
@@ -675,9 +716,17 @@ export async function ensureInitialBotConversationFlow(params: {
     .eq("sender_role", "lead");
 
   if (leadCountError) {
+    // #region debug-point A2:ensure-initial-leadcount-error
+    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_leadcount_error", { error: leadCountError.message });
+    // #endregion
     throw new Error(leadCountError.message || "Falha ao verificar mensagens do lead.");
   }
   if (Number(leadCount ?? 0) > 0) {
+    // #region debug-point A2:ensure-initial-skip-has-lead
+    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_skip_has_lead_messages", {
+      leadCount: Number(leadCount ?? 0),
+    });
+    // #endregion
     return false;
   }
 
@@ -688,6 +737,9 @@ export async function ensureInitialBotConversationFlow(params: {
     .eq("sender_role", "bot");
 
   if (botCountError) {
+    // #region debug-point A2:ensure-initial-botcount-error
+    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_botcount_error", { error: botCountError.message });
+    // #endregion
     throw new Error(botCountError.message || "Falha ao verificar mensagens iniciais.");
   }
 
@@ -695,14 +747,86 @@ export async function ensureInitialBotConversationFlow(params: {
     userName: String((lead as any)?.full_name ?? "").trim() || null,
   });
   const botCountNum = Number(botCount ?? 0);
-  if (botCountNum >= initialMessages.length) {
+  const normalizedInitialMessages = initialMessages.map((m) => String(m ?? "").trim()).filter(Boolean);
+  const { data: existingInitialBotMessages, error: existingInitialBotMessagesError } = await admin
+    .from("atendimento_messages")
+    .select("id, content_text, created_at")
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot")
+    .in("content_text", normalizedInitialMessages);
+
+  if (existingInitialBotMessagesError) {
+    throw new Error(existingInitialBotMessagesError.message || "Falha ao verificar mensagens iniciais.");
+  }
+
+  const sentInitialSet = new Set(
+    (existingInitialBotMessages ?? [])
+      .map((row: any) => String(row?.content_text ?? "").trim())
+      .filter(Boolean),
+  );
+
+  const duplicateInitialIdsToDelete: string[] = [];
+  const byContent = new Map<string, Array<{ id: string; createdAt: string }>>();
+  for (const row of existingInitialBotMessages ?? []) {
+    const content = String((row as any)?.content_text ?? "").trim();
+    const id = String((row as any)?.id ?? "").trim();
+    const createdAt = String((row as any)?.created_at ?? "").trim();
+    if (!content || !id) continue;
+    const next = byContent.get(content) ?? [];
+    next.push({ id, createdAt });
+    byContent.set(content, next);
+  }
+  for (const items of byContent.values()) {
+    items.sort((a, b) => {
+      if (a.createdAt !== b.createdAt) return a.createdAt.localeCompare(b.createdAt);
+      return a.id.localeCompare(b.id);
+    });
+    for (const extra of items.slice(1)) {
+      duplicateInitialIdsToDelete.push(extra.id);
+    }
+  }
+
+  if (duplicateInitialIdsToDelete.length > 0) {
+    await admin.from("atendimento_messages").delete().in("id", duplicateInitialIdsToDelete);
+    // #region debug-point A2:ensure-initial-dedupe-cleanup
+    __dbgBot(traceId, "D", "[DEBUG] ensure_initial_dedupe_cleanup", {
+      conversationId: params.conversationId,
+      deletedCount: duplicateInitialIdsToDelete.length,
+    });
+    // #endregion
+  }
+  const nextIndex = normalizedInitialMessages.findIndex((message) => !sentInitialSet.has(message));
+  const nextContentRaw = nextIndex >= 0 ? normalizedInitialMessages[nextIndex] : "";
+  // #region debug-point A2:ensure-initial-counts
+  __dbgBot(traceId, "A", "[DEBUG] ensure_initial_counts", {
+    leadCount: Number(leadCount ?? 0),
+    botCount: botCountNum,
+    initialLen: normalizedInitialMessages.length,
+    initialSentCount: sentInitialSet.size,
+    initialNextIndex: nextIndex,
+  });
+  // #endregion
+  if (nextIndex < 0) {
+    // #region debug-point A2:ensure-initial-skip-complete
+    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_skip_complete", {
+      botCount: botCountNum,
+      initialSentCount: sentInitialSet.size,
+    });
+    // #endregion
     return false;
   }
 
   await new Promise((resolve) => setTimeout(resolve, INITIAL_BOT_TYPING_DELAY_MS));
   const nowIso = new Date().toISOString();
-  const nextContent = String(initialMessages[botCountNum] ?? "").trim();
+  const nextContent = String(nextContentRaw ?? "").trim();
   if (!nextContent) return false;
+  // #region debug-point A2:ensure-initial-next-content
+  __dbgBot(traceId, "A", "[DEBUG] ensure_initial_next_content", {
+    botCount: botCountNum,
+    initialNextIndex: nextIndex,
+    nextContentPreview: nextContent.slice(0, 120),
+  });
+  // #endregion
 
   const { data: existingBotMessage } = await admin
     .from("atendimento_messages")
@@ -714,6 +838,12 @@ export async function ensureInitialBotConversationFlow(params: {
     .maybeSingle();
 
   if (existingBotMessage?.id) {
+    // #region debug-point A2:ensure-initial-dedupe-hit
+    __dbgBot(traceId, "D", "[DEBUG] ensure_initial_dedupe_hit", {
+      existingId: String(existingBotMessage.id),
+      nextContentPreview: nextContent.slice(0, 120),
+    });
+    // #endregion
     await syncConversationPreview({
       conversationId: params.conversationId,
       contentText: nextContent,
@@ -739,12 +869,31 @@ export async function ensureInitialBotConversationFlow(params: {
 
   if (insertError) {
     const code = String((insertError as any)?.code ?? "").trim();
+    // #region debug-point A2:ensure-initial-insert-error
+    __dbgBot(traceId, "C", "[DEBUG] ensure_initial_insert_error", {
+      code,
+      error: insertError.message,
+      nextContentPreview: nextContent.slice(0, 120),
+    });
+    // #endregion
     if (code !== "23505") {
       throw new Error(insertError.message || "Falha ao iniciar fluxo do bot.");
     }
   }
+  // #region debug-point A2:ensure-initial-insert-ok
+  __dbgBot(traceId, "C", "[DEBUG] ensure_initial_insert_ok", {
+    nextContentPreview: String(inserted?.content_text ?? nextContent).slice(0, 120),
+  });
+  // #endregion
 
-  if (botCountNum + 1 >= initialMessages.length) {
+  if (nextIndex + 1 >= normalizedInitialMessages.length) {
+    // #region debug-point A2:ensure-initial-stage-update
+    __dbgBot(traceId, "E", "[DEBUG] ensure_initial_stage_update", {
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      nowIso,
+    });
+    // #endregion
     await admin
       .from("atendimento_leads")
       .update({
@@ -770,6 +919,13 @@ export async function ensureInitialBotConversationFlow(params: {
     contentText: String(inserted?.content_text ?? nextContent),
     createdAt: nowIso,
   });
+
+  // #region debug-point A2:ensure-initial-done
+  __dbgBot(traceId, "E", "[DEBUG] ensure_initial_done", {
+    conversationId: params.conversationId,
+    leadId: params.leadId,
+  });
+  // #endregion
 
   return true;
 }
