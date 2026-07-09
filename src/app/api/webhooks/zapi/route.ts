@@ -277,7 +277,7 @@ async function findPendingPhoneValidationEvent(params: {
 }) {
   for (const messageId of params.messageIds) {
     if (!messageId) continue;
-    const { data } = await params.admin
+    const { data: byMessageId } = await params.admin
       .from("atendimento_history_events")
       .select("id, lead_id, conversation_id, details")
       .eq("event_type", "phone_validation_pending")
@@ -285,16 +285,36 @@ async function findPendingPhoneValidationEvent(params: {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data?.id) {
+    if (byMessageId?.id) {
       // #region debug-point C:pending-match-hit
       __dbg(`pending-match-${messageId}`, "C", "[DEBUG] zapi_webhook_pending_match_hit", {
         messageId,
-        pendingEventId: String((data as any)?.id ?? ""),
-        leadId: String((data as any)?.lead_id ?? ""),
-        conversationId: String((data as any)?.conversation_id ?? ""),
+        pendingEventId: String((byMessageId as any)?.id ?? ""),
+        leadId: String((byMessageId as any)?.lead_id ?? ""),
+        conversationId: String((byMessageId as any)?.conversation_id ?? ""),
       });
       // #endregion
-      return data as any;
+      return byMessageId as any;
+    }
+
+    const { data: byZaapId } = await params.admin
+      .from("atendimento_history_events")
+      .select("id, lead_id, conversation_id, details")
+      .eq("event_type", "phone_validation_pending")
+      .contains("details", { external_zaap_id: messageId })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byZaapId?.id) {
+      // #region debug-point C:pending-match-hit
+      __dbg(`pending-match-zaap-${messageId}`, "C", "[DEBUG] zapi_webhook_pending_match_hit_zaap", {
+        messageId,
+        pendingEventId: String((byZaapId as any)?.id ?? ""),
+        leadId: String((byZaapId as any)?.lead_id ?? ""),
+        conversationId: String((byZaapId as any)?.conversation_id ?? ""),
+      });
+      // #endregion
+      return byZaapId as any;
     }
   }
   // #region debug-point C:pending-match-miss

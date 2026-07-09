@@ -62,21 +62,6 @@ Conclua as etapas do AutoBot para agendar sua aula experimental. No dia e horÃ�
 Nos vemos em breve ${firstName}. 🤝`;
 }
 
-function wasWhatsAppSendAccepted(payload: unknown) {
-  if (!payload || typeof payload !== "object") return false;
-  const data = payload as Record<string, unknown>;
-  if (data.error) return false;
-  if (data.success === false) return false;
-  return Boolean(
-    data.messageId ||
-      data.zaapId ||
-      data.id ||
-      data.zapId ||
-      data.text?.toString().trim() ||
-      data.message?.toString().trim(),
-  );
-}
-
 function extractWhatsAppMessageIds(payload: unknown) {
   if (!payload || typeof payload !== "object") {
     return { messageId: null, zaapId: null };
@@ -780,25 +765,27 @@ export async function POST(req: Request) {
             baseUrl,
           });
 
-          const accepted = wasWhatsAppSendAccepted(sendResult);
           const ids = extractWhatsAppMessageIds(sendResult);
+          const externalMessageId = ids.messageId ?? ids.zaapId;
+
+          if (!externalMessageId) {
+            throw new Error("Z-API não retornou identificador da mensagem para validar a entrega.");
+          }
 
           await appendHistoryEvent({
             leadId: String(lead.id),
             conversationId: String(conversation.id),
-            eventType: accepted ? "phone_confirmation_whatsapp_sent" : "phone_confirmation_whatsapp_send_uncertain",
-            title: accepted
-              ? "Mensagem de boas-vindas enviada para o WhatsApp confirmado"
-              : "Envio da mensagem de boas-vindas sem confirmação clara",
+            eventType: "phone_validation_pending",
+            title: "Aguardando confirmação da entrega da mensagem no WhatsApp",
             details: {
               phone: pendingPhone,
-              message_id: ids.messageId,
-              zaap_id: ids.zaapId,
+              external_message_id: externalMessageId,
+              external_zaap_id: ids.zaapId,
               payload: sendResult,
             },
             actorType: "system",
           });
-          positiveFollowUpMessage = PHONE_CONFIRMATION_SUCCESS_MESSAGE;
+          positiveFollowUpMessage = WHATSAPP_PENDING_MESSAGE;
         } catch (error) {
           await appendHistoryEvent({
             leadId: String(lead.id),
