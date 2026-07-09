@@ -37,7 +37,7 @@ const NUMERIC_ONLY_TEXT_MESSAGE =
 const NUMERIC_ONLY_MIXED_MESSAGE =
   "Por favor, responda somente com números.";
 const PHONE_CONFIRMATION_PROMPT_MESSAGE =
-  'Antes de continuar, preciso verificar uma informação. Você confirma que esse é o número correto? Posso realizar a validação? Responda com "sim" para continuar.';
+  'Para continuarmos, confirme se o número informado acima está correto respondendo "sim". Caso contrário, envie apenas o número correto para prosseguirmos.';
 const PHONE_CONFIRMATION_SUCCESS_MESSAGE =
   "Perfeito! Enviei uma mensagem de boas-vindas para o WhatsApp informado.";
 const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
@@ -183,6 +183,17 @@ function hasSupportedWhatsAppCountryCode(value: string) {
   if (raw.startsWith("+55") || raw.startsWith("55")) return true;
   if (raw.startsWith("+1") || raw.startsWith("1")) return true;
   return false;
+}
+
+function extractReplacementPhoneFromConfirmationResponse(value: string) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (/[A-Za-zÀ-ÿ]/.test(raw)) return null;
+  if (!/^[+\d()\s-]+$/.test(raw)) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  if (!hasSupportedWhatsAppCountryCode(raw)) return null;
+  return raw;
 }
 
 async function getPhoneFormatFailureCount(params: {
@@ -613,6 +624,7 @@ export async function POST(req: Request) {
     });
     const decision = interpretPhoneConfirmationDecision(contentText);
     const pendingPhone = String((pendingPhoneConfirmation?.details ?? {}).phone ?? "").trim();
+    const replacementPhone = extractReplacementPhoneFromConfirmationResponse(contentText);
 
     await admin
       .from("atendimento_leads")
@@ -644,6 +656,77 @@ export async function POST(req: Request) {
       },
       actorType: "lead",
     });
+
+    if (replacementPhone) {
+      if (pendingPhoneConfirmation?.id) {
+        await admin
+          .from("atendimento_history_events")
+          .update({
+            event_type: "phone_confirmation_rejected",
+            title: "Lead informou um novo número de WhatsApp para confirmação",
+            details: {
+              ...((pendingPhoneConfirmation.details ?? {}) as Record<string, unknown>),
+              decision: "replacement_phone",
+              replaced_at: nowIso,
+              replacement_phone: replacementPhone,
+            },
+          })
+          .eq("id", String(pendingPhoneConfirmation.id))
+          .eq("event_type", "phone_confirmation_pending");
+      }
+
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: "phone_confirmation_pending",
+        title: "Aguardando confirmação do novo número de WhatsApp",
+        details: {
+          phone: replacementPhone,
+          replaced_previous_phone: pendingPhone || null,
+        },
+        actorType: "system",
+      });
+
+      await sleep(POST_LEAD_REPLY_DELAY_MS);
+      const botNowIso = new Date().toISOString();
+      const { data: outbound, error: outboundError } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String(conversation.id),
+          sender_role: "bot",
+          content_text: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+          media_type: "text",
+          status: "entregue",
+          sent_at: botNowIso,
+          delivered_at: botNowIso,
+        })
+        .select("*")
+        .maybeSingle();
+
+      if (outboundError) {
+        const code = String((outboundError as any)?.code ?? "").trim();
+        if (code !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+      }
+
+      await syncConversationPreview({
+        conversationId: String(conversation.id),
+        contentText: PHONE_CONFIRMATION_PROMPT_MESSAGE,
+        createdAt: botNowIso,
+      });
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: outboundError ? null : outbound,
+        blocked: false,
+        conversation: {
+          id: String(conversation.id),
+          bot_enabled: true,
+        },
+      });
+    }
 
     if (decision === "negative") {
       if (pendingPhoneConfirmation?.id) {
