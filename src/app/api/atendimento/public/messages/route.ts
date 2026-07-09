@@ -41,7 +41,7 @@ const PHONE_CONFIRMATION_PROMPT_MESSAGE =
 const PHONE_CONFIRMATION_SUCCESS_MESSAGE =
   "Perfeito! Enviei uma mensagem de boas-vindas para o WhatsApp informado.";
 const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
-  "Recebi sua confirmação, mas não consegui enviar a mensagem para o WhatsApp informado agora. Tente novamente em instantes.";
+  "Ops! Parece que ocorreu uma falha em nosso sistema.\n\nEntre em contato conosco pelo link abaixo para que nossa equipe possa ajuda-lo:\n\nhttps://wa.me/5565996933336";
 
 function firstNameFromLead(lead: { full_name?: string | null }) {
   const clean = String(lead.full_name ?? "").trim().replace(/\s+/g, " ");
