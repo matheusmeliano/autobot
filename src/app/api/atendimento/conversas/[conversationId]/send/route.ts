@@ -85,6 +85,32 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
     .eq("id", String(conversation.lead_id))
     .maybeSingle();
 
+  let leadPhone = String((lead as { phone?: string | null } | null)?.phone ?? "").trim();
+  if (!leadPhone) {
+    const { data: capturedPhone } = await admin
+      .from("atendimento_captured_fields")
+      .select("field_value")
+      .eq("lead_id", String(conversation.lead_id))
+      .eq("field_name", "phone")
+      .not("field_value", "is", null)
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    leadPhone = String((capturedPhone as { field_value?: string | null } | null)?.field_value ?? "").trim();
+
+    if (leadPhone) {
+      await admin
+        .from("atendimento_leads")
+        .update({
+          phone: leadPhone,
+          updated_at: nowIso,
+        })
+        .eq("id", String(conversation.lead_id));
+    }
+  }
+
   const activePresenceCount = await getAtendimentoActivePresenceCount(conversationId);
   if (activePresenceCount === 0) {
     const { data: notificationLease } = await admin
@@ -99,7 +125,6 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
       .maybeSingle();
 
     if (notificationLease?.id) {
-      const leadPhone = String((lead as { phone?: string | null } | null)?.phone ?? "").trim();
       const leadName = String((lead as { full_name?: string | null } | null)?.full_name ?? "").trim() || "Aluno";
 
       if (leadPhone) {

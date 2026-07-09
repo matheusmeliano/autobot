@@ -19,7 +19,7 @@ Um novo interessado acabou de entrar na fila de atendimento.
 Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 
 https://www.autobot.business/app/atendimento`;
-export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 75_000;
+export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 45_000;
 
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
@@ -786,6 +786,11 @@ export async function removeAtendimentoPresenceSession(sessionId: string) {
 export async function getAtendimentoActivePresenceCount(conversationId: string) {
   const admin = createSupabaseAdminClient();
   const activeSinceIso = new Date(Date.now() - ATENDIMENTO_PRESENCE_SESSION_TTL_MS).toISOString();
+  await admin
+    .from("atendimento_presence_sessions")
+    .delete()
+    .eq("conversation_id", conversationId)
+    .lt("updated_at", activeSinceIso);
   const { count } = await admin
     .from("atendimento_presence_sessions")
     .select("id", { count: "exact", head: true })
