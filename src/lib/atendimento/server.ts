@@ -214,17 +214,6 @@ export async function sendAtendimentoWhatsAppText(params: {
     throw new Error("WhatsApp do atendimento não configurado.");
   }
 
-  const runtimeInfo = await getZapiInstanceMeta({
-    instance_id: config.instance_id,
-    token: config.token,
-    client_token: config.client_token,
-  });
-  const runtimeConnected = Boolean((runtimeInfo as Record<string, unknown> | null)?.connected);
-
-  if (!runtimeConnected) {
-    throw new Error("Instancia do WhatsApp desconectada na Z-API.");
-  }
-
   const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
   if (baseUrl) {
     const webhookUrl = buildAuthorizedZapiWebhookUrl(baseUrl);
