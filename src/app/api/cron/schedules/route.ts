@@ -12,8 +12,16 @@ import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { localDateInTimeZone } from "@/lib/recurrence";
 
-const MAX_ZAPI_SENDS_PER_RUN = 5;
-const ZAPI_SEND_INTERVAL_MS = 10_000;
+const OFFPEAK_MAX_ZAPI_SENDS_PER_RUN = 5;
+const PEAK_MAX_ZAPI_SENDS_PER_RUN = 2;
+const OFFPEAK_ZAPI_SEND_INTERVAL_MS = 10_000;
+const PEAK_ZAPI_SEND_INTERVAL_MS = 20_000;
+const OFFPEAK_BATCH_DEFER_MINUTES = 8;
+const PEAK_BATCH_DEFER_MINUTES = 20;
+const OFFPEAK_FAILED_RETRY_MINUTES = 10;
+const PEAK_FAILED_RETRY_MINUTES = 30;
+const PEAK_HOURS_START_MINUTES = 8 * 60;
+const PEAK_HOURS_END_MINUTES = 20 * 60;
 
 // #region debug-point extra-send-cron-bootstrap
 const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
@@ -93,6 +101,30 @@ function weekdayFromLocalDate(localDate: string) {
   const base = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
   const weekday = base.getUTCDay();
   return weekday === 0 ? 7 : weekday;
+}
+
+function localMinutesInTimeZone(value: string, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const map = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  const hours = Number(map.hour ?? 0);
+  const minutes = Number(map.minute ?? 0);
+  return hours * 60 + minutes;
+}
+
+function isPeakHourInTimeZone(value: string, timeZone: string) {
+  const minutes = localMinutesInTimeZone(value, timeZone);
+  return minutes >= PEAK_HOURS_START_MINUTES && minutes < PEAK_HOURS_END_MINUTES;
+}
+
+function buildDeferredBatchUtcIso(nowIso: string, index: number, isPeakHour: boolean) {
+  const stepMinutes = isPeakHour ? PEAK_BATCH_DEFER_MINUTES : OFFPEAK_BATCH_DEFER_MINUTES;
+  return new Date(Date.parse(nowIso) + Math.max(1, index + 1) * stepMinutes * 60_000).toISOString();
 }
 
 async function sleep(ms: number) {
@@ -303,12 +335,14 @@ export async function GET(req: Request) {
 
   const results: Array<{ id: string; ok: boolean; error?: string }> = [];
   let zapiSendAttempts = 0;
+  let deferredBatchCount = 0;
 
   for (const s of schedules ?? []) {
     const scheduleId = String((s as any).id);
     const userId = String((s as any).user_id);
     const scheduledFor = String((s as any).data_envio ?? nowIso);
     let attemptedZapiSend = false;
+    let sendIntervalMs = OFFPEAK_ZAPI_SEND_INTERVAL_MS;
 
     try {
       const debtor = (s as any).debtors ?? null;
@@ -316,6 +350,8 @@ export async function GET(req: Request) {
       const overdueTemplate = (s as any).overdue_template ?? null;
       const sourceStatus = String((s as any).status ?? "") === "atrasado" ? "atrasado" : "pendente";
       const timeZone = String((s as any).schedule_timezone ?? "") || "America/Sao_Paulo";
+      const isPeakHour = isPeakHourInTimeZone(nowIso, timeZone);
+      const maxSendsThisRun = isPeakHour ? PEAK_MAX_ZAPI_SENDS_PER_RUN : OFFPEAK_MAX_ZAPI_SENDS_PER_RUN;
       const retryConfig = normalizeRetryConfig(debtor ?? {});
       const effectiveRetryWeekdays = Boolean(debtor?.skip_weekends_on_first_charge)
         ? retryConfig.weekdays.filter((weekday) => weekday >= 1 && weekday <= 5)
@@ -461,8 +497,14 @@ export async function GET(req: Request) {
         continue;
       }
 
-      if (zapiSendAttempts >= MAX_ZAPI_SENDS_PER_RUN) {
-        results.push({ id: scheduleId, ok: true, error: "rate_limited_to_next_run" });
+      if (zapiSendAttempts >= maxSendsThisRun) {
+        const deferredTo = buildDeferredBatchUtcIso(nowIso, deferredBatchCount, isPeakHour);
+        deferredBatchCount += 1;
+        await supabase
+          .from("schedules")
+          .update({ data_envio: deferredTo })
+          .eq("id", scheduleId);
+        results.push({ id: scheduleId, ok: true, error: "deferred_to_next_batch" });
         continue;
       }
 
@@ -492,6 +534,7 @@ export async function GET(req: Request) {
       });
       // #endregion
       attemptedZapiSend = true;
+      sendIntervalMs = isPeakHour ? PEAK_ZAPI_SEND_INTERVAL_MS : OFFPEAK_ZAPI_SEND_INTERVAL_MS;
       zapiSendAttempts += 1;
       await sendZapiText({
         instance_id: wa.instance_id,
@@ -528,7 +571,7 @@ export async function GET(req: Request) {
               localDate: nowLocalDate,
               timeZone,
               time: retryConfig.time,
-              dailySendLimit: retryConfig.maxAttempts,
+              dailySendLimit: isPeakHour ? Math.min(retryConfig.maxAttempts, 1) : retryConfig.maxAttempts,
               sentToday,
             })
           : null;
@@ -588,7 +631,10 @@ export async function GET(req: Request) {
         descricao: `Falha ao executar agendamento ${scheduleId}: ${msg}`,
       });
       if (!wasExecuted.data?.id) {
-        const retryAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+        const retryDelayMinutes = isPeakHourInTimeZone(nowIso, String((s as any)?.schedule_timezone ?? "") || "America/Sao_Paulo")
+          ? PEAK_FAILED_RETRY_MINUTES
+          : OFFPEAK_FAILED_RETRY_MINUTES;
+        const retryAt = new Date(Date.now() + retryDelayMinutes * 60_000).toISOString();
         await supabase
           .from("schedules")
           .update({ status: String((s as any)?.status ?? "") === "atrasado" ? "atrasado" : "agendado", data_envio: retryAt })
@@ -614,7 +660,7 @@ export async function GET(req: Request) {
       results.push({ id: scheduleId, ok: false, error: msg });
     } finally {
       if (attemptedZapiSend) {
-        await sleep(ZAPI_SEND_INTERVAL_MS);
+        await sleep(sendIntervalMs);
       }
     }
   }
