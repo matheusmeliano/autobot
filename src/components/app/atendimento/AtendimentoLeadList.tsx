@@ -180,7 +180,11 @@ export function AtendimentoLeadList({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        {isNewLead ? <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" /> : null}
+                        {isNewLead ? (
+                          <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
+                            {unread > 0 ? unread : 1}
+                          </span>
+                        ) : null}
                         <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
                           {lead.full_name || "Novo Lead"}
                         </div>
@@ -191,7 +195,7 @@ export function AtendimentoLeadList({
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-2">
                       <AtendimentoPresenceBadge online={isOnline} />
-                      {unread > 0 ? (
+                      {unread > 0 && !isNewLead ? (
                         <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
                           {unread}
                         </span>

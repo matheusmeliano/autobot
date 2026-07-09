@@ -57,7 +57,7 @@ Seja muito bem-vindo(a) ao Lucas Brum Online Music USA!
 
 Estamos felizes em ter você conosco.
 
-Conclua as etapas do AutoBot para agendar sua aula experimental. No dia e horÃ¡rio escolhidos, entraremos em contato.
+Conclua as etapas do AutoBot para agendar sua aula experimental. No dia e horário escolhidos, entraremos em contato.
 
 Nos vemos em breve ${firstName}. 🤝`;
 }
