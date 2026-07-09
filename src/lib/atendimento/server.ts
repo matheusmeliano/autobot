@@ -85,7 +85,7 @@ export function buildOfflineAttendantNotificationMessage(params: {
   publicSlug: string;
 }) {
   const firstName = getLeadFirstName(params.leadName);
-  const conversationUrl = buildAtendimentoConversationPublicUrl(params.publicSlug);
+  const conversationUrl = buildAtendimentoConversationPublicUrl(ATENDIMENTO_PUBLIC_LINK_SLUG);
   return `Olá, ${firstName}! 👋
 
 Você recebeu uma nova mensagem no AutoBot.
