@@ -928,7 +928,7 @@ export function PublicAtendimentoClient({
         optimisticLeadMessageRef.current = null;
       }
 
-      if (json.outbound?.id) {
+      if (json.outbound?.id || json.should_reload) {
         window.setTimeout(() => {
           void loadMessages(publicSlug, "replace");
         }, 180);

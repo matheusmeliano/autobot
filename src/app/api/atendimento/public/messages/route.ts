@@ -17,7 +17,6 @@ import {
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
-import fs from "node:fs";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
@@ -43,74 +42,6 @@ const PHONE_CONFIRMATION_SUCCESS_MESSAGE =
   "Perfeito! Enviei uma mensagem de boas-vindas para o WhatsApp informado.";
 const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
   "Recebi sua confirmação, mas não consegui enviar a mensagem para o WhatsApp informado agora. Tente novamente em instantes.";
-
-// #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
-const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
-const __dbgMap = Object.fromEntries(
-  __dbgEnvRaw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
-const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
-const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  if (!__dbgUrl || !__dbgSession) return;
-  fetch(__dbgUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSession,
-      runId: "pre-fix",
-      hypothesisId,
-      traceId,
-      location: "src/app/api/atendimento/public/messages/route.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
-
-// #region debug-point A2:bootstrap-bot-duplicate
-const __dbgBotEnvPath = ".dbg/bot-duplicate-message.env";
-const __dbgBotEnvRaw = fs.existsSync(__dbgBotEnvPath) ? fs.readFileSync(__dbgBotEnvPath, "utf8") : "";
-const __dbgBotMap = Object.fromEntries(
-  __dbgBotEnvRaw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgBotUrl = __dbgBotMap.DEBUG_SERVER_URL;
-const __dbgBotSession = __dbgBotMap.DEBUG_SESSION_ID;
-const __dbgBot = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  if (!__dbgBotUrl || !__dbgBotSession) return;
-  fetch(__dbgBotUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgBotSession,
-      runId: "post-fix",
-      hypothesisId,
-      traceId,
-      location: "src/app/api/atendimento/public/messages/route.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
 
 function firstNameFromLead(lead: { full_name?: string | null }) {
   const clean = String(lead.full_name ?? "").trim().replace(/\s+/g, " ");
@@ -331,16 +262,6 @@ async function expirePendingPhoneValidationIfNeeded(params: {
   if (!pendingEvent?.id) return false;
 
   const createdAtMs = new Date(String((pendingEvent as any).created_at ?? "")).getTime();
-  // #region debug-point F:pending-timeout-check
-  __dbg(`pending-timeout-${params.conversationId}`, "F", "[DEBUG] atendimento_pending_timeout_check", {
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-    pendingEventId: String((pendingEvent as any).id ?? ""),
-    pendingCreatedAt: String((pendingEvent as any).created_at ?? ""),
-    pendingAgeMs: Number.isNaN(createdAtMs) ? null : Date.now() - createdAtMs,
-    timeoutMs: PHONE_VALIDATION_TIMEOUT_MS,
-  });
-  // #endregion
   if (Number.isNaN(createdAtMs) || Date.now() - createdAtMs < PHONE_VALIDATION_TIMEOUT_MS) {
     return false;
   }
@@ -365,13 +286,6 @@ async function expirePendingPhoneValidationIfNeeded(params: {
     .maybeSingle();
 
   if (!updatedPendingEvent?.id) {
-    // #region debug-point F:pending-timeout-race
-    __dbg(`pending-timeout-${params.conversationId}`, "F", "[DEBUG] atendimento_pending_timeout_update_skipped", {
-      leadId: params.leadId,
-      conversationId: params.conversationId,
-      pendingEventId: String((pendingEvent as any).id ?? ""),
-    });
-    // #endregion
     return false;
   }
 
@@ -407,15 +321,6 @@ async function expirePendingPhoneValidationIfNeeded(params: {
     contentText: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
     createdAt: nowIso,
   });
-
-  // #region debug-point F:pending-timeout-expired
-  __dbg(`pending-timeout-${params.conversationId}`, "F", "[DEBUG] atendimento_pending_timeout_expired", {
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-    pendingEventId: String((pendingEvent as any).id ?? ""),
-    timeoutMs: PHONE_VALIDATION_TIMEOUT_MS,
-  });
-  // #endregion
 
   return true;
 }
@@ -468,16 +373,11 @@ async function upsertCapturedFields(params: {
 }
 
 export async function GET(req: Request) {
-  const traceId = `public-messages-get-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const { searchParams } = new URL(req.url);
   const publicSlug = String(searchParams.get("public_slug") ?? "").trim();
   if (!publicSlug) {
     return Response.json({ ok: false, error: "missing_public_slug" }, { status: 400 });
   }
-
-  // #region debug-point A2:get-start
-  __dbgBot(traceId, "A", "[DEBUG] public_messages_get_start", { publicSlug });
-  // #endregion
 
   const access = await getAuthenticatedAtendimentoConversationAccess(publicSlug);
   if (!access.ok) {
@@ -485,21 +385,10 @@ export async function GET(req: Request) {
   }
   const { admin, conversation } = access;
 
-  // #region debug-point A2:get-ensure-initial
-  __dbgBot(traceId, "A", "[DEBUG] public_messages_get_ensure_initial_start", {
-    conversationId: String(conversation.id),
-    leadId: String(conversation.lead_id),
-  });
-  // #endregion
   await ensureInitialBotConversationFlow({
     leadId: String(conversation.lead_id),
     conversationId: String(conversation.id),
   });
-  // #region debug-point A2:get-ensure-initial-done
-  __dbgBot(traceId, "A", "[DEBUG] public_messages_get_ensure_initial_done", {
-    conversationId: String(conversation.id),
-  });
-  // #endregion
 
   const { data, error } = await admin
     .from("atendimento_messages")
@@ -508,28 +397,8 @@ export async function GET(req: Request) {
     .order("created_at", { ascending: true });
 
   if (error) {
-    // #region debug-point A2:get-messages-error
-    __dbgBot(traceId, "A", "[DEBUG] public_messages_get_messages_error", {
-      conversationId: String(conversation.id),
-      error: error.message,
-    });
-    // #endregion
     return Response.json({ ok: false, error: error.message }, { status: 500 });
   }
-
-  const allMessages = (data ?? []) as any[];
-  const botTexts = allMessages
-    .filter((m) => m?.sender_role === "bot" && String(m?.content_text ?? "").trim())
-    .map((m) => String(m?.content_text ?? "").trim());
-  const botUniqueCount = new Set(botTexts).size;
-  // #region debug-point A2:get-messages-result
-  __dbgBot(traceId, "A", "[DEBUG] public_messages_get_messages_result", {
-    conversationId: String(conversation.id),
-    totalCount: allMessages.length,
-    botCount: botTexts.length,
-    botUniqueCount,
-  });
-  // #endregion
 
   await admin
     .from("atendimento_messages")
@@ -538,11 +407,10 @@ export async function GET(req: Request) {
     .in("sender_role", ["bot", "attendant"])
     .neq("status", "lida");
 
-  return Response.json({ ok: true, messages: allMessages });
+  return Response.json({ ok: true, messages: (data ?? []) as any[] });
 }
 
 export async function POST(req: Request) {
-  const traceId = `public-wa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const body = await req.json().catch(() => null);
   const publicSlug = String(body?.public_slug ?? "").trim();
   const contentText = String(body?.content_text ?? "").trim();
@@ -560,27 +428,11 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "empty_message" }, { status: 400 });
   }
 
-  // #region debug-point A2:post-start
-  __dbgBot(traceId, "B", "[DEBUG] public_messages_post_start", {
-    publicSlug,
-    contentTextLen: contentText.length,
-    hasMedia: Boolean(mediaUrl),
-    mediaType,
-  });
-  // #endregion
-
   const access = await getAuthenticatedAtendimentoConversationAccess(publicSlug);
   if (!access.ok) {
     return Response.json({ ok: false, error: access.error }, { status: access.status });
   }
   const { admin, conversation, lead } = access;
-  // #region debug-point A2:post-access
-  __dbgBot(traceId, "B", "[DEBUG] public_messages_post_access_ok", {
-    conversationId: String(conversation.id),
-    leadId: String(lead.id),
-    botEnabled: Boolean(conversation.bot_enabled),
-  });
-  // #endregion
   if (!conversation.bot_enabled) {
     return Response.json(
       {
@@ -603,22 +455,41 @@ export async function POST(req: Request) {
     .limit(1)
     .maybeSingle();
 
-  // #region debug-point A2:post-last-bot
-  __dbgBot(traceId, "B", "[DEBUG] public_messages_post_last_bot", {
-    conversationId: String(conversation.id),
-    lastBotContent: String((lastBotMessage as any)?.content_text ?? ""),
-    lastBotCreatedAt: String((lastBotMessage as any)?.created_at ?? ""),
-  });
-  // #endregion
-
   const nowIso = new Date().toISOString();
-  // #region debug-point A2:post-inbound-insert
-  __dbgBot(traceId, "B", "[DEBUG] public_messages_post_inbound_insert_start", {
-    conversationId: String(conversation.id),
-    nowIso,
-    contentTextPreview: contentText.slice(0, 80),
-  });
-  // #endregion
+
+  const { data: lastLeadMessage } = await admin
+    .from("atendimento_messages")
+    .select("*")
+    .eq("conversation_id", String(conversation.id))
+    .eq("sender_role", "lead")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const lastLeadCreatedAtMs = new Date(String((lastLeadMessage as any)?.created_at ?? "")).getTime();
+  const isLikelyDuplicateSubmission = Boolean(
+    lastLeadMessage?.id &&
+      String((lastLeadMessage as any)?.content_text ?? "").trim() === contentText &&
+      String((lastLeadMessage as any)?.media_type ?? "text").trim() === mediaType &&
+      String((lastLeadMessage as any)?.media_url ?? "").trim() === String(mediaUrl ?? "").trim() &&
+      !Number.isNaN(lastLeadCreatedAtMs) &&
+      Date.now() - lastLeadCreatedAtMs < 2500,
+  );
+
+  if (isLikelyDuplicateSubmission) {
+    return Response.json({
+      ok: true,
+      inbound: lastLeadMessage,
+      outbound: null,
+      blocked: false,
+      should_reload: true,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: true,
+      },
+    });
+  }
+
   const { data: inbound, error: inboundError } = await admin
     .from("atendimento_messages")
     .insert({
@@ -638,31 +509,10 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (inboundError || !inbound?.id) {
-    // #region debug-point A2:post-inbound-error
-    __dbgBot(traceId, "B", "[DEBUG] public_messages_post_inbound_insert_error", {
-      conversationId: String(conversation.id),
-      error: inboundError?.message ?? "unknown",
-      code: String((inboundError as any)?.code ?? ""),
-    });
-    // #endregion
     return Response.json({ ok: false, error: inboundError?.message ?? "message_error" }, { status: 500 });
   }
-  // #region debug-point A2:post-inbound-ok
-  __dbgBot(traceId, "B", "[DEBUG] public_messages_post_inbound_insert_ok", {
-    conversationId: String(conversation.id),
-    inboundId: String(inbound.id),
-  });
-  // #endregion
 
   const extracted = extractLeadDataFromMessage(contentText) as Record<string, string>;
-  // #region debug-point B:phone-extraction
-  __dbg(traceId, "B", "[DEBUG] atendimento_phone_extraction", {
-    contentText,
-    expectedField: null,
-    extractedPhone: extracted.phone ?? null,
-    extractedKeys: Object.keys(extracted),
-  });
-  // #endregion
   const isAwaitingPhoneConfirmation =
     String(lastBotMessage?.content_text ?? "").trim() === PHONE_CONFIRMATION_PROMPT_MESSAGE;
   const expectedField = inferExpectedFieldFromBotMessage(lastBotMessage?.content_text ?? "") ?? getNextMissingField(lead as any);
@@ -1185,16 +1035,6 @@ export async function POST(req: Request) {
   };
   const nextMissingField = getNextMissingField(nextLead as any);
   const botResponse = botReplyForLead({ lead: nextLead as any, messageText: contentText });
-  // #region debug-point B:save-decision
-  __dbg(traceId, "B", "[DEBUG] atendimento_phone_save_decision", {
-    expectedField,
-    leadPhone: String((lead as any)?.phone ?? ""),
-    leadCpf: String((lead as any)?.cpf ?? ""),
-    capturedPhone: captured.phone ?? null,
-    nextMissingField,
-    botMessage: botResponse.message,
-  });
-  // #endregion
   const nextStage = nextMissingField ? botResponse.stage : "pre_cadastro_concluido";
   const nextStatus = nextMissingField ? botResponse.status : "matricula_pendente";
 
@@ -1251,13 +1091,39 @@ export async function POST(req: Request) {
 
   await sleep(POST_LEAD_REPLY_DELAY_MS);
   const botNowIso = new Date().toISOString();
-  // #region debug-point A2:post-outbound-insert
-  __dbgBot(traceId, "C", "[DEBUG] public_messages_post_outbound_insert_start", {
-    conversationId: String(conversation.id),
-    botNowIso,
-    botMessagePreview: botResponse.message.slice(0, 120),
-  });
-  // #endregion
+
+  const { data: lastBotBeforeInsert } = await admin
+    .from("atendimento_messages")
+    .select("*")
+    .eq("conversation_id", String(conversation.id))
+    .eq("sender_role", "bot")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const lastBotBeforeInsertCreatedAtMs = new Date(String((lastBotBeforeInsert as any)?.created_at ?? "")).getTime();
+  const botResponseText = String(botResponse.message ?? "").trim();
+  const shouldReuseLastBotMessage = Boolean(
+    lastBotBeforeInsert?.id &&
+      botResponseText &&
+      String((lastBotBeforeInsert as any)?.content_text ?? "").trim() === botResponseText &&
+      !Number.isNaN(lastBotBeforeInsertCreatedAtMs) &&
+      Date.now() - lastBotBeforeInsertCreatedAtMs < POST_LEAD_REPLY_DELAY_MS + 4000,
+  );
+
+  if (shouldReuseLastBotMessage) {
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: lastBotBeforeInsert,
+      blocked: false,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: true,
+      },
+    });
+  }
+
   const { data: outbound, error: outboundError } = await admin
     .from("atendimento_messages")
     .insert({
@@ -1274,32 +1140,10 @@ export async function POST(req: Request) {
 
   if (outboundError) {
     const code = String((outboundError as any)?.code ?? "").trim();
-    // #region debug-point A2:post-outbound-error
-    __dbgBot(traceId, "C", "[DEBUG] public_messages_post_outbound_insert_error", {
-      conversationId: String(conversation.id),
-      code,
-      error: outboundError.message,
-    });
-    // #endregion
     if (code !== "23505") {
       return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
     }
   }
-  // #region debug-point A2:post-outbound-ok
-  __dbgBot(traceId, "C", "[DEBUG] public_messages_post_outbound_insert_ok", {
-    conversationId: String(conversation.id),
-    outboundId: String((outbound as any)?.id ?? ""),
-  });
-  // #endregion
-
-  // #region debug-point E:post-response-shape
-  __dbg(traceId, "E", "[DEBUG] atendimento_public_post_response_shape", {
-    inboundId: String((inbound as any)?.id ?? ""),
-    outboundId: String((outbound as any)?.id ?? ""),
-    outboundMessage: String((outbound as any)?.content_text ?? ""),
-    blocked: false,
-  });
-  // #endregion
 
   await syncConversationPreview({
     conversationId: String(conversation.id),

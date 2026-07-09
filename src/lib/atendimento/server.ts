@@ -10,7 +10,6 @@ import {
 import { initialBotMessages } from "@/lib/atendimento/bot";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
-import fs from "node:fs";
 
 const ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE = "+1 321 297 3565";
 const ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE = `🔔 Novo interessado recebido no Bot!
@@ -21,74 +20,6 @@ Acesse o painel para visualizar os detalhes e iniciar o atendimento:
 
 https://www.autobot.business/app/atendimento`;
 export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 75_000;
-
-// #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
-const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
-const __dbgMap = Object.fromEntries(
-  __dbgEnvRaw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
-const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
-const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  if (!__dbgUrl || !__dbgSession) return;
-  fetch(__dbgUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSession,
-      runId: "pre-fix",
-      hypothesisId,
-      traceId,
-      location: "src/lib/atendimento/server.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
-
-// #region debug-point A2:bootstrap-bot-duplicate
-const __dbgBotEnvPath = ".dbg/bot-duplicate-message.env";
-const __dbgBotEnvRaw = fs.existsSync(__dbgBotEnvPath) ? fs.readFileSync(__dbgBotEnvPath, "utf8") : "";
-const __dbgBotMap = Object.fromEntries(
-  __dbgBotEnvRaw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgBotUrl = __dbgBotMap.DEBUG_SERVER_URL;
-const __dbgBotSession = __dbgBotMap.DEBUG_SESSION_ID;
-const __dbgBot = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  if (!__dbgBotUrl || !__dbgBotSession) return;
-  fetch(__dbgBotUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgBotSession,
-      runId: "post-fix",
-      hypothesisId,
-      traceId,
-      location: "src/lib/atendimento/server.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
 
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
@@ -258,35 +189,11 @@ async function getAtendimentoWhatsAppConfig() {
     .select("instance_id, token, client_token, status")
     .eq("user_id", userId)
     .maybeSingle();
-
-  const waStatus = String((wa as any)?.status ?? "").trim().toLowerCase();
-  // #region debug-point G:wa-config-loaded
-  __dbg(`wa-config-${userId}`, "G", "[DEBUG] atendimento_whatsapp_config_loaded", {
-    userId,
-    instanceId: String((wa as any)?.instance_id ?? ""),
-    hasToken: Boolean((wa as any)?.token),
-    hasClientToken: Boolean((wa as any)?.client_token),
-    waStatus,
-  });
-  // #endregion
   const canSend =
     Boolean((wa as any)?.instance_id) &&
     Boolean((wa as any)?.token);
 
   if (!canSend) {
-    // #region debug-point G:wa-config-rejected
-    __dbg(`wa-config-${userId}`, "G", "[DEBUG] atendimento_whatsapp_config_rejected", {
-      userId,
-      instanceId: String((wa as any)?.instance_id ?? ""),
-      hasToken: Boolean((wa as any)?.token),
-      waStatus,
-      rejectionReason: !((wa as any)?.instance_id)
-        ? "missing_instance_id"
-        : !((wa as any)?.token)
-          ? "missing_token"
-          : "unknown",
-    });
-    // #endregion
     return null;
   }
 
@@ -302,14 +209,8 @@ export async function sendAtendimentoWhatsAppText(params: {
   message: string;
   baseUrl?: string | null;
 }) {
-  const traceId = `wa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const config = await getAtendimentoWhatsAppConfig();
   if (!config) {
-    // #region debug-point C:missing-config
-    __dbg(traceId, "C", "[DEBUG] atendimento_whatsapp_missing_config", {
-      phone: params.phone,
-    });
-    // #endregion
     throw new Error("WhatsApp do atendimento não configurado.");
   }
 
@@ -327,15 +228,6 @@ export async function sendAtendimentoWhatsAppText(params: {
   const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
   if (baseUrl) {
     const webhookUrl = buildAuthorizedZapiWebhookUrl(baseUrl);
-    // #region debug-point B:webhook-config
-    __dbg(traceId, "B", "[DEBUG] atendimento_whatsapp_webhook_config", {
-      baseUrl,
-      webhookUrl,
-      hasClientToken: Boolean(config.client_token),
-      hasWebhookSecret: Boolean(process.env.ZAPI_WEBHOOK_SECRET),
-      instanceId: config.instance_id,
-    });
-    // #endregion
     await updateZapiWebhook({
       instance_id: config.instance_id,
       token: config.token,
@@ -346,18 +238,6 @@ export async function sendAtendimentoWhatsAppText(params: {
     });
   }
 
-  // #region debug-point B:before-send
-  __dbg(traceId, "B", "[DEBUG] atendimento_whatsapp_before_send", {
-    phoneOriginal: params.phone,
-    phoneNormalized: normalizePhone(params.phone),
-    originalDigitsLength: params.phone.replace(/\D/g, "").length,
-    normalizedDigitsLength: normalizePhone(params.phone).length,
-    messagePreview: params.message.slice(0, 160),
-    instanceId: config.instance_id,
-    hasClientToken: Boolean(config.client_token),
-  });
-  // #endregion
-
   const result = await sendZapiText({
     instance_id: config.instance_id,
     token: config.token,
@@ -365,27 +245,6 @@ export async function sendAtendimentoWhatsAppText(params: {
     phone: params.phone,
     message: params.message,
   });
-
-  // #region debug-point A:send-result
-  __dbg(traceId, "A", "[DEBUG] atendimento_whatsapp_send_result", {
-    phoneOriginal: params.phone,
-    phoneNormalized: normalizePhone(params.phone),
-    originalDigitsLength: params.phone.replace(/\D/g, "").length,
-    normalizedDigitsLength: normalizePhone(params.phone).length,
-    result,
-  });
-  // #endregion
-
-  // #region debug-point A:send-result-shape
-  __dbg(traceId, "A", "[DEBUG] atendimento_whatsapp_send_result_shape", {
-    topLevelKeys: result && typeof result === "object" ? Object.keys(result as Record<string, unknown>) : [],
-    messageId: String((result as Record<string, unknown> | null)?.messageId ?? ""),
-    id: String((result as Record<string, unknown> | null)?.id ?? ""),
-    zaapId: String((result as Record<string, unknown> | null)?.zaapId ?? ""),
-    success: (result as Record<string, unknown> | null)?.success ?? null,
-    error: (result as Record<string, unknown> | null)?.error ?? null,
-  });
-  // #endregion
 
   return result;
 }
@@ -695,15 +554,8 @@ export async function ensureInitialBotConversationFlow(params: {
   leadId: string;
   conversationId: string;
 }) {
-  const traceId = `ensure-initial-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const INITIAL_BOT_TYPING_DELAY_MS = 1500;
   const admin = createSupabaseAdminClient();
-  // #region debug-point A2:ensure-initial-start
-  __dbgBot(traceId, "A", "[DEBUG] ensure_initial_start", {
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-  });
-  // #endregion
   const { data: lead } = await admin
     .from("atendimento_leads")
     .select("full_name")
@@ -716,17 +568,9 @@ export async function ensureInitialBotConversationFlow(params: {
     .eq("sender_role", "lead");
 
   if (leadCountError) {
-    // #region debug-point A2:ensure-initial-leadcount-error
-    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_leadcount_error", { error: leadCountError.message });
-    // #endregion
     throw new Error(leadCountError.message || "Falha ao verificar mensagens do lead.");
   }
   if (Number(leadCount ?? 0) > 0) {
-    // #region debug-point A2:ensure-initial-skip-has-lead
-    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_skip_has_lead_messages", {
-      leadCount: Number(leadCount ?? 0),
-    });
-    // #endregion
     return false;
   }
 
@@ -737,9 +581,6 @@ export async function ensureInitialBotConversationFlow(params: {
     .eq("sender_role", "bot");
 
   if (botCountError) {
-    // #region debug-point A2:ensure-initial-botcount-error
-    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_botcount_error", { error: botCountError.message });
-    // #endregion
     throw new Error(botCountError.message || "Falha ao verificar mensagens iniciais.");
   }
 
@@ -788,31 +629,10 @@ export async function ensureInitialBotConversationFlow(params: {
 
   if (duplicateInitialIdsToDelete.length > 0) {
     await admin.from("atendimento_messages").delete().in("id", duplicateInitialIdsToDelete);
-    // #region debug-point A2:ensure-initial-dedupe-cleanup
-    __dbgBot(traceId, "D", "[DEBUG] ensure_initial_dedupe_cleanup", {
-      conversationId: params.conversationId,
-      deletedCount: duplicateInitialIdsToDelete.length,
-    });
-    // #endregion
   }
   const nextIndex = normalizedInitialMessages.findIndex((message) => !sentInitialSet.has(message));
   const nextContentRaw = nextIndex >= 0 ? normalizedInitialMessages[nextIndex] : "";
-  // #region debug-point A2:ensure-initial-counts
-  __dbgBot(traceId, "A", "[DEBUG] ensure_initial_counts", {
-    leadCount: Number(leadCount ?? 0),
-    botCount: botCountNum,
-    initialLen: normalizedInitialMessages.length,
-    initialSentCount: sentInitialSet.size,
-    initialNextIndex: nextIndex,
-  });
-  // #endregion
   if (nextIndex < 0) {
-    // #region debug-point A2:ensure-initial-skip-complete
-    __dbgBot(traceId, "A", "[DEBUG] ensure_initial_skip_complete", {
-      botCount: botCountNum,
-      initialSentCount: sentInitialSet.size,
-    });
-    // #endregion
     return false;
   }
 
@@ -820,13 +640,6 @@ export async function ensureInitialBotConversationFlow(params: {
   const nowIso = new Date().toISOString();
   const nextContent = String(nextContentRaw ?? "").trim();
   if (!nextContent) return false;
-  // #region debug-point A2:ensure-initial-next-content
-  __dbgBot(traceId, "A", "[DEBUG] ensure_initial_next_content", {
-    botCount: botCountNum,
-    initialNextIndex: nextIndex,
-    nextContentPreview: nextContent.slice(0, 120),
-  });
-  // #endregion
 
   const { data: existingBotMessage } = await admin
     .from("atendimento_messages")
@@ -838,12 +651,6 @@ export async function ensureInitialBotConversationFlow(params: {
     .maybeSingle();
 
   if (existingBotMessage?.id) {
-    // #region debug-point A2:ensure-initial-dedupe-hit
-    __dbgBot(traceId, "D", "[DEBUG] ensure_initial_dedupe_hit", {
-      existingId: String(existingBotMessage.id),
-      nextContentPreview: nextContent.slice(0, 120),
-    });
-    // #endregion
     await syncConversationPreview({
       conversationId: params.conversationId,
       contentText: nextContent,
@@ -869,31 +676,12 @@ export async function ensureInitialBotConversationFlow(params: {
 
   if (insertError) {
     const code = String((insertError as any)?.code ?? "").trim();
-    // #region debug-point A2:ensure-initial-insert-error
-    __dbgBot(traceId, "C", "[DEBUG] ensure_initial_insert_error", {
-      code,
-      error: insertError.message,
-      nextContentPreview: nextContent.slice(0, 120),
-    });
-    // #endregion
     if (code !== "23505") {
       throw new Error(insertError.message || "Falha ao iniciar fluxo do bot.");
     }
   }
-  // #region debug-point A2:ensure-initial-insert-ok
-  __dbgBot(traceId, "C", "[DEBUG] ensure_initial_insert_ok", {
-    nextContentPreview: String(inserted?.content_text ?? nextContent).slice(0, 120),
-  });
-  // #endregion
 
   if (nextIndex + 1 >= normalizedInitialMessages.length) {
-    // #region debug-point A2:ensure-initial-stage-update
-    __dbgBot(traceId, "E", "[DEBUG] ensure_initial_stage_update", {
-      leadId: params.leadId,
-      conversationId: params.conversationId,
-      nowIso,
-    });
-    // #endregion
     await admin
       .from("atendimento_leads")
       .update({
@@ -919,13 +707,6 @@ export async function ensureInitialBotConversationFlow(params: {
     contentText: String(inserted?.content_text ?? nextContent),
     createdAt: nowIso,
   });
-
-  // #region debug-point A2:ensure-initial-done
-  __dbgBot(traceId, "E", "[DEBUG] ensure_initial_done", {
-    conversationId: params.conversationId,
-    leadId: params.leadId,
-  });
-  // #endregion
 
   return true;
 }
