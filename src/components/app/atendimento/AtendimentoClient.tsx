@@ -926,13 +926,11 @@ export function AtendimentoClient() {
             type="button"
             onClick={() => {
               setMessagesLoadError(null);
-              const conversationId = String(selectedConversationIdRef.current ?? "").trim();
-              if (!conversationId) return;
-              void loadConversationMessages(conversationId, "replace", { showLoading: true });
+              window.location.reload();
             }}
             className="inline-flex items-center justify-center rounded-xl border border-emerald-500/70 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
           >
-            Tentar novamente
+            Ok
           </button>
         </div>
       </AppModal>
