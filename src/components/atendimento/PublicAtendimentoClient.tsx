@@ -161,6 +161,7 @@ export function PublicAtendimentoClient({
   const [loading, setLoading] = useState(!isProfilePage);
   const [sending, setSending] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [messagesLoadError, setMessagesLoadError] = useState<string | null>(null);
   const [composerError, setComposerError] = useState("");
   const [conversationBlocked, setConversationBlocked] = useState(false);
   const [pageVisible, setPageVisible] = useState(() =>
@@ -732,6 +733,7 @@ export function PublicAtendimentoClient({
     async (nextPublicSlug: string, mode: "replace" | "merge" = "replace") => {
       if (!nextPublicSlug) return [] as AtendimentoMessage[];
       const requestId = ++messagesRequestIdRef.current;
+      try {
       const res = await fetch(`/api/atendimento/public/messages?public_slug=${encodeURIComponent(nextPublicSlug)}`, {
         cache: "no-store",
       });
@@ -743,11 +745,20 @@ export function PublicAtendimentoClient({
       }
 
       const json = await res.json().catch(() => null);
-      const nextMessages = json?.ok ? ((json.messages ?? []) as AtendimentoMessage[]) : [];
-      if (json?.ok && requestId === messagesRequestIdRef.current) {
+      if (!json?.ok) {
+        setMessagesLoadError(String(json?.error ?? "Falha ao carregar as mensagens."));
+        return [] as AtendimentoMessage[];
+      }
+      const nextMessages = (json.messages ?? []) as AtendimentoMessage[];
+      if (requestId === messagesRequestIdRef.current) {
+        setMessagesLoadError(null);
         applyMessagesWithBotTiming(nextMessages, mode);
       }
       return nextMessages;
+      } catch {
+        setMessagesLoadError("Falha ao carregar as mensagens.");
+        return [] as AtendimentoMessage[];
+      }
     },
     [applyMessagesWithBotTiming],
   );
@@ -1626,6 +1637,50 @@ export function PublicAtendimentoClient({
           </>
         )}
       </div>
+
+      <AppModal
+        open={messagesLoadError != null}
+        onClose={() => setMessagesLoadError(null)}
+        size="md"
+        zIndexClass="z-[530]"
+        fullScreenOnMobile
+        panelClassName="border-white/10 bg-[#0E1723]"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-white">Falha ao carregar as mensagens.</div>
+            <div className="mt-1 text-xs text-white/55">Tente novamente.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMessagesLoadError(null)}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.08]"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setMessagesLoadError(null)}
+            className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+          >
+            Fechar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMessagesLoadError(null);
+              window.location.reload();
+            }}
+            className="inline-flex items-center justify-center rounded-2xl border border-emerald-500/70 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+          >
+            Ok
+          </button>
+        </div>
+      </AppModal>
 
       <AppModal
         open={attachmentMenuOpen}

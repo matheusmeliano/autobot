@@ -894,7 +894,10 @@ export function AtendimentoClient() {
 
       <AppModal
         open={messagesLoadError != null}
-        onClose={() => setMessagesLoadError(null)}
+        onClose={() => {
+          setMessagesLoadError(null);
+          window.location.replace(window.location.href);
+        }}
         size="md"
         zIndexClass="z-[520]"
         fullScreenOnMobile
@@ -906,7 +909,10 @@ export function AtendimentoClient() {
           </div>
           <button
             type="button"
-            onClick={() => setMessagesLoadError(null)}
+            onClick={() => {
+              setMessagesLoadError(null);
+              window.location.replace(window.location.href);
+            }}
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] p-0 text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
             aria-label="Fechar"
           >
@@ -917,7 +923,10 @@ export function AtendimentoClient() {
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => setMessagesLoadError(null)}
+            onClick={() => {
+              setMessagesLoadError(null);
+              window.location.replace(window.location.href);
+            }}
             className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
           >
             Fechar
@@ -926,7 +935,7 @@ export function AtendimentoClient() {
             type="button"
             onClick={() => {
               setMessagesLoadError(null);
-              window.location.reload();
+              window.location.replace(window.location.href);
             }}
             className="inline-flex items-center justify-center rounded-xl border border-emerald-500/70 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
           >
