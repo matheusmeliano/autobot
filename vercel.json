@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/schedules",
       "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/atendimento-daily-summary",
+      "schedule": "0 0 * * *"
     }
   ],
   "functions": {

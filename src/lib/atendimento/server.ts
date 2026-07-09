@@ -10,15 +10,11 @@ import {
 import { initialBotMessages } from "@/lib/atendimento/bot";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
+import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
-const ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE = "+1 321 297 3565";
-const ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE = `🔔 Novo interessado recebido no AutoBot!
-
-Um novo interessado acabou de entrar na fila de atendimento.
-
-Acesse o painel para visualizar os detalhes e iniciar o atendimento:
-
-https://www.autobot.business/app/atendimento`;
+const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+1 321 297 3565";
+const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
+const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
 export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 45_000;
 
 function normalizePhone(phone: string) {
@@ -38,6 +34,37 @@ function getLeadFirstName(name: string | null | undefined) {
     .split(/\s+/)
     .filter(Boolean);
   return parts[0] ?? "Aluno";
+}
+
+function localDateInTimeZone(value: Date | string | number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const map = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function addDaysToLocalDate(localDate: string, days: number) {
+  const [year, month, day] = localDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  date.setUTCDate(date.getUTCDate() + days);
+  const nextYear = date.getUTCFullYear();
+  const nextMonth = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const nextDay = String(date.getUTCDate()).padStart(2, "0");
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
+function buildAtendimentoDailySummaryMessage(leadsCount: number) {
+  return `📊 Resumo diário de interessados – AutoBot
+
+Hoje entraram ${leadsCount} novos interessados na fila de atendimento.
+
+Acesse o painel para visualizar todos os leads e iniciar os atendimentos:
+
+${ATENDIMENTO_DAILY_SUMMARY_LINK}`;
 }
 
 export function buildAtendimentoConversationPublicUrl(publicSlug: string) {
@@ -238,13 +265,66 @@ export async function sendAtendimentoWhatsAppText(params: {
   return result;
 }
 
-async function notifyNewAtendimentoLead() {
-  await sendAtendimentoWhatsAppText({
-    phone: ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE,
-    message: ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE,
+export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
+  const admin = createSupabaseAdminClient();
+  const summaryDate = localDateInTimeZone(now, ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE);
+  const nextSummaryDate = addDaysToLocalDate(summaryDate, 1);
+  const rangeStartIso = zonedDateTimeToUtcIso({
+    date: summaryDate,
+    time: "00:00",
+    timeZone: ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE,
+  });
+  const rangeEndIso = zonedDateTimeToUtcIso({
+    date: nextSummaryDate,
+    time: "00:00",
+    timeZone: ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE,
   });
 
-  return true;
+  const { error: leaseError } = await admin.from("atendimento_daily_summary_runs").insert({
+    summary_date: summaryDate,
+    timezone: ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE,
+  });
+
+  if (leaseError) {
+    const code = String((leaseError as any)?.code ?? "").trim();
+    if (code === "23505") {
+      return { ok: true as const, skipped: true as const, summaryDate, leadsCount: null };
+    }
+    throw new Error(leaseError.message || "Falha ao reservar o resumo diario do atendimento.");
+  }
+
+  const { count, error: countError } = await admin
+    .from("atendimento_leads")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", rangeStartIso)
+    .lt("created_at", rangeEndIso);
+
+  if (countError) {
+    await admin.from("atendimento_daily_summary_runs").delete().eq("summary_date", summaryDate);
+    throw new Error(countError.message || "Falha ao contar leads do resumo diario do atendimento.");
+  }
+
+  const leadsCount = Number(count ?? 0);
+
+  try {
+    await sendAtendimentoWhatsAppText({
+      phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
+      message: buildAtendimentoDailySummaryMessage(leadsCount),
+    });
+
+    await admin
+      .from("atendimento_daily_summary_runs")
+      .update({
+        leads_count: leadsCount,
+        sent_at: new Date().toISOString(),
+      })
+      .eq("summary_date", summaryDate);
+
+    return { ok: true as const, skipped: false as const, summaryDate, leadsCount };
+  } catch (error) {
+    await admin.from("atendimento_daily_summary_runs").delete().eq("summary_date", summaryDate);
+    throw error;
+  }
 }
 
 export async function requireAtendimentoUser() {
@@ -348,8 +428,6 @@ export async function createPublicLeadSession(params: { origin?: string | null; 
     throw new Error("Não foi possível criar o lead.");
   }
 
-  await notifyNewAtendimentoLead().catch(() => {});
-
   const { data: conversation } = await admin
     .from("atendimento_conversations")
     .insert({
@@ -451,9 +529,6 @@ export async function ensureAtendimentoLeadForAuthenticatedUser(params: {
       .maybeSingle();
 
     lead = createdLead;
-    if (createdLead?.id) {
-      await notifyNewAtendimentoLead().catch(() => {});
-    }
   } else {
     const nextLeadPatch: Record<string, unknown> = {
       auth_user_id: params.userId,
