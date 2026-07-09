@@ -99,16 +99,16 @@ export function AtendimentoSummaryCards({
       {
         id: "alunos" as const,
         label: "Alunos",
-        value: summary.matriculados,
+        value: 0,
         emptyMessage: "Nenhum aluno disponivel no momento.",
-        items: leads.filter((lead) => lead.status === "matriculado" || lead.funnel_stage === "matriculado"),
+        items: [],
       },
       {
         id: "agendamentos" as const,
         label: "Agendamentos",
-        value: summary.aulasExperimentaisAgendadas,
+        value: 0,
         emptyMessage: "Nenhum agendamento disponivel no momento.",
-        items: leads.filter((lead) => lead.funnel_stage === "aula_experimental_agendada"),
+        items: [],
       },
       {
         id: "contratos" as const,
