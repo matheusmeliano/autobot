@@ -814,7 +814,7 @@ export function AtendimentoClient() {
                 <div className="mt-1 text-xs text-[var(--app-text-55)]">
                   {rightPanel === "public-link"
                     ? "Acesso rapido ao link publico do atendimento."
-                    : "Resumo consolidado dos indicadores do atendimento."}
+                    : "Painel completo com os dados dos alunos."}
                 </div>
               </div>
               <div
