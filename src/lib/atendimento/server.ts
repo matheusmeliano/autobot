@@ -12,7 +12,7 @@ import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionS
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 
 const ATENDIMENTO_NEW_LEAD_NOTIFY_PHONE = "+1 321 297 3565";
-const ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE = `🔔 Novo interessado recebido no Bot!
+const ATENDIMENTO_NEW_LEAD_NOTIFY_MESSAGE = `🔔 Novo interessado recebido no AutoBot!
 
 Um novo interessado acabou de entrar na fila de atendimento.
 
@@ -55,7 +55,7 @@ export function buildOfflineAttendantNotificationMessage(params: {
 
 Você recebeu uma nova mensagem no AutoBot.
 
-Entre agora na plataforma para visualizar a mensagem e continuar a conversa com o atendente. Estamos aguardando sua resposta.
+Acesse a plataforma e responda ao atendente.
 
 ${conversationUrl}`;
 }
