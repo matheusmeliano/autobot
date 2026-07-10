@@ -85,6 +85,14 @@ function yearMonthFromIso(value: string | null | undefined, timeZone: string) {
   return localDate ? localDate.slice(0, 7) : "";
 }
 
+function executedLocalDate(row: DebtorScheduleStatusRow, timeZone: string) {
+  return (
+    scheduleLocalDate(row.last_executed_scheduled_for ?? null, timeZone) ??
+    scheduleLocalDate(row.last_sent_at ?? null, timeZone) ??
+    scheduleLocalDate(row.first_sent_at ?? null, timeZone)
+  );
+}
+
 function rolledForwardReferenceYearMonth(row: DebtorScheduleStatusRow, timeZone: string) {
   const status = String(row.status ?? "").trim().toLowerCase();
   if (status !== "agendado") return null;
@@ -243,6 +251,13 @@ function hasOpenOverdueSchedule(params: {
     const timeZone = String(row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
     if (isPaidSchedule(row, timeZone)) return false;
     if (String(row.closed_at ?? "").trim()) return false;
+
+    if (status === "executado") {
+      const executedDate = executedLocalDate(row, timeZone);
+      if (executedDate && diffDaysLocalDate(executedDate, params.currentLocalDate) >= 1) {
+        return true;
+      }
+    }
 
     const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
     return Boolean(referenceLocalDate && referenceLocalDate < params.currentLocalDate);
