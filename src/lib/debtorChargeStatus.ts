@@ -80,6 +80,11 @@ function scheduleReferenceLocalDate(row: DebtorScheduleStatusRow, timeZone: stri
   );
 }
 
+function yearMonthFromIso(value: string | null | undefined, timeZone: string) {
+  const localDate = scheduleLocalDate(value, timeZone);
+  return localDate ? localDate.slice(0, 7) : "";
+}
+
 function rolledForwardReferenceYearMonth(row: DebtorScheduleStatusRow, timeZone: string) {
   const status = String(row.status ?? "").trim().toLowerCase();
   if (status !== "agendado") return null;
@@ -102,6 +107,30 @@ function isPaidSchedule(row: DebtorScheduleStatusRow, timeZone: string) {
     status === "pago" ||
     Boolean(scheduleLocalDate(row.payment_received_at ?? null, timeZone)) ||
     (status === "pago" && Boolean(scheduleLocalDate(row.closed_at ?? null, timeZone)))
+  );
+}
+
+function isAgendarExecutedPaidForReferenceMonth(params: {
+  row: DebtorScheduleStatusRow;
+  referenceYearMonth: string;
+  scheduleTimeZone: string;
+}) {
+  const timeZone = String(params.row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
+  const normalizedStatus = String(params.row.status ?? "").trim().toLowerCase();
+  const lastExecutedYearMonth = yearMonthFromIso(params.row.last_executed_scheduled_for ?? null, timeZone);
+  const paymentYearMonth = yearMonthFromIso(params.row.payment_received_at ?? null, timeZone);
+  const scheduledCycleYearMonth = yearMonthFromIso(
+    params.row.charge_due_at ?? params.row.data_envio ?? null,
+    timeZone,
+  );
+
+  return (
+    paymentYearMonth === params.referenceYearMonth ||
+    normalizedStatus === "pago" ||
+    ((normalizedStatus === "agendado" || normalizedStatus === "executado") &&
+      lastExecutedYearMonth === params.referenceYearMonth &&
+      Boolean(scheduledCycleYearMonth) &&
+      scheduledCycleYearMonth !== params.referenceYearMonth)
   );
 }
 
@@ -229,10 +258,11 @@ function deriveReferenceMonthDebtorStatus(
   const currentLocalDate = scheduleLocalDate(nowUtcIso, scheduleTimeZone);
   if (!currentLocalDate) return "agendado";
   const referenceYearMonth = currentLocalDate.slice(0, 7);
+  const openSchedules = schedules.filter((row) => !String(row.closed_at ?? "").trim());
 
   if (
     hasOpenOverdueSchedule({
-      schedules,
+      schedules: openSchedules,
       currentLocalDate,
       scheduleTimeZone,
     })
@@ -254,12 +284,12 @@ function deriveReferenceMonthDebtorStatus(
     const paidCharges = referenceCharges.filter((charge) => {
       const matchingSchedules = getMatchingSchedulesForCharge({
         charge,
-        schedules,
+        schedules: openSchedules,
         scheduleTimeZone,
         usedScheduleIndexes,
       });
       return matchingSchedules.some((row) =>
-        isSchedulePaidForReferenceMonth({
+        isAgendarExecutedPaidForReferenceMonth({
           row,
           referenceYearMonth,
           scheduleTimeZone,
@@ -274,12 +304,12 @@ function deriveReferenceMonthDebtorStatus(
       if (!chargeLocalDate || chargeLocalDate >= currentLocalDate) return false;
       const matchingSchedules = getMatchingSchedulesForCharge({
         charge,
-        schedules,
+        schedules: openSchedules,
         scheduleTimeZone,
       });
       if (!matchingSchedules.length) return true;
       return !matchingSchedules.some((row) =>
-        isSchedulePaidForReferenceMonth({
+        isAgendarExecutedPaidForReferenceMonth({
           row,
           referenceYearMonth,
           scheduleTimeZone,
@@ -292,14 +322,14 @@ function deriveReferenceMonthDebtorStatus(
   }
 
   const referenceSchedules = getReferenceMonthOperationalSchedules({
-    schedules,
+    schedules: openSchedules,
     referenceYearMonth,
     scheduleTimeZone,
   });
   if (!referenceSchedules.length) return "agendado";
 
   const paidSchedulesInReferenceMonth = referenceSchedules.filter((row) =>
-    isSchedulePaidForReferenceMonth({
+    isAgendarExecutedPaidForReferenceMonth({
       row,
       referenceYearMonth,
       scheduleTimeZone,
@@ -309,16 +339,9 @@ function deriveReferenceMonthDebtorStatus(
 
   const hasReferenceMonthOverdue = referenceSchedules.some((row) => {
     const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
-    if (
-      isSchedulePaidForReferenceMonth({
-        row,
-        referenceYearMonth,
-        scheduleTimeZone,
-      })
-    ) {
+    if (isAgendarExecutedPaidForReferenceMonth({ row, referenceYearMonth, scheduleTimeZone })) {
       return false;
     }
-    if (String(row.closed_at ?? "").trim()) return false;
     const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
     return Boolean(
       referenceLocalDate &&
