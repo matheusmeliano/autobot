@@ -502,7 +502,10 @@ export async function GET(req: Request) {
         deferredBatchCount += 1;
         await supabase
           .from("schedules")
-          .update({ data_envio: deferredTo })
+          .update({
+            status: String((s as any).status ?? "") === "atrasado" ? "atrasado" : "agendado",
+            data_envio: deferredTo,
+          })
           .eq("id", scheduleId);
         results.push({ id: scheduleId, ok: true, error: "deferred_to_next_batch" });
         continue;
