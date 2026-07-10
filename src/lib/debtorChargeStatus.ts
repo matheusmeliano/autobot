@@ -116,6 +116,9 @@ function isSchedulePaidForReferenceMonth(params: {
       scheduleLocalDate(params.row.payment_received_at ?? null, timeZone) ??
       scheduleLocalDate(params.row.closed_at ?? null, timeZone);
     if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
+
+    const scheduleReferenceDate = scheduleReferenceLocalDate(params.row, timeZone);
+    if (scheduleReferenceDate?.slice(0, 7) === params.referenceYearMonth) return true;
   }
 
   return rolledForwardReferenceYearMonth(params.row, timeZone) === params.referenceYearMonth;
@@ -166,7 +169,10 @@ function countReferenceMonthPaidSchedules(params: {
     const paymentLocalDate =
       scheduleLocalDate(row.payment_received_at ?? null, timeZone) ??
       scheduleLocalDate(row.closed_at ?? null, timeZone);
-    return Boolean(paymentLocalDate && paymentLocalDate.slice(0, 7) === params.referenceYearMonth);
+    if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
+
+    const scheduleReferenceDate = scheduleReferenceLocalDate(row, timeZone);
+    return Boolean(scheduleReferenceDate && scheduleReferenceDate.slice(0, 7) === params.referenceYearMonth);
   }).length;
 }
 
