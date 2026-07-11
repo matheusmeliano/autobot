@@ -42,7 +42,7 @@ function isExplicitInvalidWhatsAppError(error: unknown) {
 }
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/valid-whatsapp-false-failure.env";
+const __dbgEnvPath = ".dbg/whatsapp-validation-delay.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -769,18 +769,11 @@ export async function POST(req: Request) {
       return Response.json({ ok: true, validated: false, reason: "delivery_error" });
     }
 
-    // #region debug-point G:callback-awaiting-status
-    __dbg(traceId, "G", "[DEBUG] zapi_webhook_callback_awaiting_final_status", {
-      eventType,
-      callbackMessageIds,
-      pendingEventId: String((pendingEvent as any)?.id ?? ""),
-      pendingPhone,
-      deliveryError,
-      statusChange,
-    });
-    // #endregion
+    const shouldConfirmPhoneValidation =
+      (eventType === "DeliveryCallback" && !deliveryError) ||
+      (eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ"));
 
-    if (eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ")) {
+    if (shouldConfirmPhoneValidation) {
       const { data: leadRecord } = await admin
         .from("atendimento_leads")
         .select("*")
@@ -872,6 +865,17 @@ export async function POST(req: Request) {
 
       return Response.json({ ok: true, validated: true, reason: "message_received" });
     }
+
+    // #region debug-point G:callback-awaiting-status
+    __dbg(traceId, "G", "[DEBUG] zapi_webhook_callback_awaiting_final_status", {
+      eventType,
+      callbackMessageIds,
+      pendingEventId: String((pendingEvent as any)?.id ?? ""),
+      pendingPhone,
+      deliveryError,
+      statusChange,
+    });
+    // #endregion
 
     return Response.json({ ok: true, ignored: true, reason: "awaiting_final_phone_status" });
   }
