@@ -1,11 +1,54 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
-import { syncConversationPreview } from "@/lib/atendimento/server";
+import { botReplyForLead } from "@/lib/atendimento/bot";
+import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
 
 export const runtime = "nodejs";
+const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
+const WHATSAPP_INVALID_MESSAGE =
+  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
+const WHATSAPP_INVALID_FINAL_MESSAGE =
+  "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
+const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
+  "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
+
+// #region debug-point C:bootstrap
+const __dbgEnvPath = ".dbg/whatsapp-validation-send.env";
+const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
+const __dbgMap = Object.fromEntries(
+  __dbgEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
+const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
+const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  if (!__dbgUrl || !__dbgSession) return;
+  fetch(__dbgUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgSession,
+      runId: "pre-fix",
+      hypothesisId,
+      traceId,
+      location: "src/app/api/webhooks/zapi/route.ts",
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
 
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
@@ -48,6 +91,115 @@ function normalizeText(text: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
+}
+
+function buildPhoneValidationRetryMessage(attempts: number) {
+  return `${WHATSAPP_INVALID_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_VALIDATION_ATTEMPTS}.`;
+}
+
+function normalizeValidationErrorText(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function isExplicitInvalidWhatsAppError(error: unknown) {
+  const message = normalizeValidationErrorText(error);
+  if (!message) return false;
+  return (
+    message.includes("phone number does not exist") ||
+    message.includes("numero nao existe") ||
+    message.includes("number does not exist") ||
+    message.includes("nao possui whatsapp") ||
+    message.includes("not on whatsapp") ||
+    message.includes("whatsapp number does not exist")
+  );
+}
+
+async function upsertCapturedPhoneField(params: {
+  leadId: string;
+  sourceMessageId: string;
+  phone: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data: existing } = await admin
+    .from("atendimento_captured_fields")
+    .select("id")
+    .eq("lead_id", params.leadId)
+    .eq("field_name", "phone")
+    .maybeSingle();
+
+  if (existing?.id) {
+    await admin
+      .from("atendimento_captured_fields")
+      .update({
+        field_value: params.phone,
+        source_message_id: params.sourceMessageId,
+        confidence: 0.92,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", String(existing.id));
+    return;
+  }
+
+  await admin.from("atendimento_captured_fields").insert({
+    lead_id: params.leadId,
+    field_name: "phone",
+    field_value: params.phone,
+    source_message_id: params.sourceMessageId,
+    confidence: 0.92,
+  });
+}
+
+async function findPendingPhoneValidationEvent(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  messageIds: string[];
+}) {
+  for (const messageId of params.messageIds) {
+    if (!messageId) continue;
+    const { data: byMessageId } = await params.admin
+      .from("atendimento_history_events")
+      .select("id, lead_id, conversation_id, details")
+      .eq("event_type", "phone_validation_pending")
+      .contains("details", { external_message_id: messageId })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byMessageId?.id) {
+      return byMessageId as any;
+    }
+
+    const { data: byZaapId } = await params.admin
+      .from("atendimento_history_events")
+      .select("id, lead_id, conversation_id, details")
+      .eq("event_type", "phone_validation_pending")
+      .contains("details", { external_zaap_id: messageId })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byZaapId?.id) {
+      return byZaapId as any;
+    }
+  }
+
+  return null;
+}
+
+async function getPhoneValidationFailureCount(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+}) {
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .in("event_type", ["phone_validation_format_failed", "phone_validation_failed"]);
+
+  return Number(count ?? 0);
 }
 
 const POSITIVE_TEXT_SNIPPETS = [
@@ -261,6 +413,7 @@ Regras:
 }
 
 export async function POST(req: Request) {
+  const traceId = `zapi-webhook-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   if (!isAuthorized(req)) {
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
@@ -395,7 +548,262 @@ export async function POST(req: Request) {
     ),
   );
   if ((eventType === "DeliveryCallback" || eventType === "MessageStatusCallback") && callbackMessageIds.length > 0) {
-    return Response.json({ ok: true, ignored: true, reason: "callback_not_used_for_phone_validation" });
+    // #region debug-point C:callback
+    __dbg(traceId, "C", "[DEBUG] zapi_webhook_phone_validation_callback_seen", {
+      eventType,
+      rawEventId,
+      callbackMessageIds,
+      body,
+    });
+    // #endregion
+
+    const pendingEvent = await findPendingPhoneValidationEvent({
+      admin,
+      messageIds: callbackMessageIds,
+    });
+
+    // #region debug-point C:callback-match
+    __dbg(traceId, "C", "[DEBUG] zapi_webhook_phone_validation_callback_match", {
+      eventType,
+      callbackMessageIds,
+      pendingEventId: pendingEvent?.id ?? null,
+      leadId: pendingEvent?.lead_id ?? null,
+      conversationId: pendingEvent?.conversation_id ?? null,
+    });
+    // #endregion
+
+    if (!pendingEvent?.id) {
+      return Response.json({ ok: true, ignored: true, reason: "no_pending_phone_validation" });
+    }
+
+    const pendingDetails = ((pendingEvent as any).details ?? {}) as Record<string, unknown>;
+    const pendingPhone = String(pendingDetails.phone ?? "").trim();
+    const deliveryError = getFirstNonEmpty((body as any).error, (body as any).data?.error);
+    const statusChange = normalizeText(
+      getFirstNonEmpty((body as any).status, (body as any).data?.status),
+    ).toUpperCase();
+    const nowIso = new Date().toISOString();
+
+    if (eventType === "DeliveryCallback" && deliveryError) {
+      const isRealInvalidWhatsApp = isExplicitInvalidWhatsAppError(deliveryError);
+      await admin
+        .from("atendimento_history_events")
+        .update({
+          event_type: isRealInvalidWhatsApp ? "phone_validation_failed" : "phone_validation_timeout",
+          title: isRealInvalidWhatsApp
+            ? "WhatsApp informado não passou no teste"
+            : "Validacao do WhatsApp falhou por indisponibilidade tecnica",
+          details: {
+            ...pendingDetails,
+            final_status: isRealInvalidWhatsApp ? "DELIVERY_ERROR" : "DELIVERY_TECHNICAL_ERROR",
+            error: deliveryError,
+            failed_at: nowIso,
+          },
+        })
+        .eq("id", String((pendingEvent as any).id));
+
+      const { data: leadRow } = await admin
+        .from("atendimento_leads")
+        .select("id, unread_count, status, funnel_stage")
+        .eq("id", String((pendingEvent as any).lead_id ?? ""))
+        .maybeSingle();
+
+      if (!isRealInvalidWhatsApp) {
+        const { data: technicalMessage } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+            sender_role: "bot",
+            content_text: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
+            media_type: "text",
+            status: "entregue",
+            sent_at: nowIso,
+            delivered_at: nowIso,
+          })
+          .select("id, content_text")
+          .maybeSingle();
+
+        await admin
+          .from("atendimento_leads")
+          .update({
+            status: (leadRow as any)?.status ?? null,
+            funnel_stage: (leadRow as any)?.funnel_stage ?? null,
+            unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
+            last_interaction_at: nowIso,
+            updated_at: nowIso,
+          })
+          .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+        await syncConversationPreview({
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          contentText: String((technicalMessage as any)?.content_text ?? WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE),
+          createdAt: nowIso,
+        });
+
+        return Response.json({ ok: true, validated: false, reason: "delivery_error_technical" });
+      }
+
+      const failureAttempts = await getPhoneValidationFailureCount({
+        admin,
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+      });
+      const shouldBlockConversation = failureAttempts >= MAX_PHONE_VALIDATION_ATTEMPTS;
+
+      const { data: failureMessage } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          sender_role: "bot",
+          content_text: shouldBlockConversation
+            ? WHATSAPP_INVALID_FINAL_MESSAGE
+            : buildPhoneValidationRetryMessage(failureAttempts),
+          media_type: "text",
+          status: "entregue",
+          sent_at: nowIso,
+          delivered_at: nowIso,
+        })
+        .select("id, content_text")
+        .maybeSingle();
+
+      await admin
+        .from("atendimento_leads")
+        .update({
+          status: shouldBlockConversation ? "encerrado" : (leadRow as any)?.status ?? null,
+          funnel_stage: shouldBlockConversation ? "encerrado" : (leadRow as any)?.funnel_stage ?? null,
+          unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+      if (shouldBlockConversation) {
+        await admin
+          .from("atendimento_conversations")
+          .update({
+            bot_enabled: false,
+            updated_at: nowIso,
+          })
+          .eq("id", String((pendingEvent as any).conversation_id ?? ""));
+
+        await admin.from("atendimento_history_events").insert({
+          lead_id: String((pendingEvent as any).lead_id ?? ""),
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          event_type: "conversation_closed",
+          title: "Atendimento encerrado após 3 tentativas inválidas de WhatsApp",
+          details: {
+            invalid_attempts: failureAttempts,
+            source: "delivery_callback",
+          },
+          actor_type: "system",
+          actor_email: null,
+        });
+      }
+
+      await syncConversationPreview({
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        contentText: String((failureMessage as any)?.content_text ?? ""),
+        createdAt: nowIso,
+      });
+
+      return Response.json({ ok: true, validated: false, reason: "delivery_error" });
+    }
+
+    const shouldConfirmPhoneValidation =
+      (eventType === "DeliveryCallback" && !deliveryError) ||
+      (eventType === "MessageStatusCallback" &&
+        (statusChange === "SENT" || statusChange === "RECEIVED" || statusChange === "READ"));
+
+    if (!shouldConfirmPhoneValidation) {
+      return Response.json({ ok: true, ignored: true, reason: "awaiting_final_phone_status" });
+    }
+
+    const { data: leadRecord } = await admin
+      .from("atendimento_leads")
+      .select("*")
+      .eq("id", String((pendingEvent as any).lead_id ?? ""))
+      .maybeSingle();
+
+    if (!leadRecord?.id || !pendingPhone) {
+      return Response.json({ ok: true, ignored: true, reason: "missing_pending_lead_or_phone" });
+    }
+
+    const nextLead = {
+      ...(leadRecord as any),
+      phone: pendingPhone,
+    };
+    const botResponse = botReplyForLead({
+      lead: nextLead,
+      messageText: "",
+    });
+    const successMessage =
+      botResponse.message === "WhatsApp registrado com sucesso."
+        ? "WhatsApp registrado com sucesso."
+        : `WhatsApp registrado com sucesso. ${botResponse.message}`;
+    const nextStatus = botResponse.message ? botResponse.status : "matricula_pendente";
+    const nextStage = botResponse.message ? botResponse.stage : "pre_cadastro_concluido";
+
+    await admin
+      .from("atendimento_leads")
+      .update({
+        phone: pendingPhone,
+        status: nextStatus,
+        funnel_stage: nextStage,
+        unread_count: Number((leadRecord as any)?.unread_count ?? 0) + 1,
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+    await upsertCapturedPhoneField({
+      leadId: String((pendingEvent as any).lead_id ?? ""),
+      sourceMessageId: callbackMessageIds[0] ?? String((pendingEvent as any).id ?? ""),
+      phone: pendingPhone,
+    });
+
+    await admin
+      .from("atendimento_history_events")
+      .update({
+        event_type: "phone_validated",
+        title: "WhatsApp validado e salvo",
+        details: {
+          ...pendingDetails,
+          final_status: statusChange || eventType,
+          confirmed_at: nowIso,
+        },
+      })
+      .eq("id", String((pendingEvent as any).id));
+
+    const { data: outbound } = await admin
+      .from("atendimento_messages")
+      .insert({
+        conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+        sender_role: "bot",
+        content_text: successMessage,
+        media_type: "text",
+        status: "entregue",
+        sent_at: nowIso,
+        delivered_at: nowIso,
+      })
+      .select("content_text")
+      .maybeSingle();
+
+    await syncConversationPreview({
+      conversationId: String((pendingEvent as any).conversation_id ?? ""),
+      contentText: String((outbound as any)?.content_text ?? successMessage),
+      createdAt: nowIso,
+    });
+
+    await appendHistoryEvent({
+      leadId: String((pendingEvent as any).lead_id ?? ""),
+      conversationId: String((pendingEvent as any).conversation_id ?? ""),
+      eventType: "stage_changed",
+      title: "Etapa do funil atualizada automaticamente",
+      details: { status: nextStatus, funnel_stage: nextStage },
+      actorType: "bot",
+    });
+
+    return Response.json({ ok: true, validated: true, reason: "message_received" });
   }
 
   const hasContent = Boolean((messageText || "").trim() || mediaInfo.hasPaymentMedia);
