@@ -67,6 +67,48 @@ Acesse o painel para visualizar todos os leads e iniciar os atendimentos:
 ${ATENDIMENTO_DAILY_SUMMARY_LINK}`;
 }
 
+async function countAtendimentoDailyInterestedLeads(params: {
+  rangeStartIso: string;
+  rangeEndIso: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const [{ data: createdLeads, error: leadsError }, { data: createdConversations, error: conversationsError }] =
+    await Promise.all([
+      admin
+        .from("atendimento_leads")
+        .select("id")
+        .gte("created_at", params.rangeStartIso)
+        .lt("created_at", params.rangeEndIso),
+      admin
+        .from("atendimento_conversations")
+        .select("lead_id")
+        .gte("created_at", params.rangeStartIso)
+        .lt("created_at", params.rangeEndIso),
+    ]);
+
+  if (leadsError) {
+    throw new Error(leadsError.message || "Falha ao listar leads do resumo diario do atendimento.");
+  }
+
+  if (conversationsError) {
+    throw new Error(conversationsError.message || "Falha ao listar conversas do resumo diario do atendimento.");
+  }
+
+  const leadIds = new Set<string>();
+
+  for (const row of createdLeads ?? []) {
+    const leadId = String((row as any)?.id ?? "").trim();
+    if (leadId) leadIds.add(leadId);
+  }
+
+  for (const row of createdConversations ?? []) {
+    const leadId = String((row as any)?.lead_id ?? "").trim();
+    if (leadId) leadIds.add(leadId);
+  }
+
+  return leadIds.size;
+}
+
 export function buildAtendimentoConversationPublicUrl(publicSlug: string) {
   const safeSlug = String(publicSlug ?? "").trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
   return `https://www.autobot.business/atendimento?slug=${encodeURIComponent(safeSlug)}`;
@@ -293,18 +335,16 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
     throw new Error(leaseError.message || "Falha ao reservar o resumo diario do atendimento.");
   }
 
-  const { count, error: countError } = await admin
-    .from("atendimento_leads")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at", rangeStartIso)
-    .lt("created_at", rangeEndIso);
-
-  if (countError) {
+  let leadsCount = 0;
+  try {
+    leadsCount = await countAtendimentoDailyInterestedLeads({
+      rangeStartIso,
+      rangeEndIso,
+    });
+  } catch (error) {
     await admin.from("atendimento_daily_summary_runs").delete().eq("summary_date", summaryDate);
-    throw new Error(countError.message || "Falha ao contar leads do resumo diario do atendimento.");
+    throw error;
   }
-
-  const leadsCount = Number(count ?? 0);
 
   try {
     await sendAtendimentoWhatsAppText({
