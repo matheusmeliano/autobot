@@ -116,6 +116,54 @@ function shouldRedirectAfterLeadSessionLoss(status: number, error?: unknown) {
   );
 }
 
+const MESSAGE_URL_PATTERN = /`?(https?:\/\/[^\s`]+)`?/g;
+
+function renderMessageText(content: string) {
+  const raw = String(content ?? "");
+  const lines = raw.split(/\r?\n/);
+
+  return lines.map((line, lineIndex) => {
+    const nodes: Array<React.ReactNode> = [];
+    let lastIndex = 0;
+
+    for (const match of line.matchAll(MESSAGE_URL_PATTERN)) {
+      const fullMatch = match[0] ?? "";
+      const href = match[1] ?? "";
+      const start = match.index ?? 0;
+
+      if (start > lastIndex) {
+        nodes.push(line.slice(lastIndex, start));
+      }
+
+      nodes.push(
+        <a
+          key={`link-${lineIndex}-${start}-${href}`}
+          href={href}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="font-medium text-emerald-200 underline underline-offset-2 break-all"
+          title={href}
+        >
+          {href}
+        </a>,
+      );
+
+      lastIndex = start + fullMatch.length;
+    }
+
+    if (lastIndex < line.length) {
+      nodes.push(line.slice(lastIndex));
+    }
+
+    return (
+      <span key={`line-${lineIndex}`}>
+        {nodes}
+        {lineIndex < lines.length - 1 ? <br /> : null}
+      </span>
+    );
+  });
+}
+
 function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
   const unique = new Map<string, AtendimentoMessage>();
   for (const message of messageList) {
@@ -1520,7 +1568,9 @@ export function PublicAtendimentoClient({
                             </button>
                           ) : null}
                           {message.content_text ? (
-                            <div className="whitespace-pre-wrap text-sm text-white/90">{message.content_text}</div>
+                            <div className="whitespace-pre-wrap text-sm text-white/90">
+                              {renderMessageText(message.content_text)}
+                            </div>
                           ) : null}
                           {message.media_url ? (
                             <>
