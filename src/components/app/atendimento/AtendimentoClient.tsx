@@ -122,6 +122,26 @@ function bumpLeadRecencyByConversation(
   return changed ? sortLeadsByRecentActivity(nextItems) : items;
 }
 
+function markLeadConversationAsOpened(items: AtendimentoLeadListItem[], leadId: string | null) {
+  const normalizedLeadId = String(leadId ?? "").trim();
+  if (!normalizedLeadId) return items;
+
+  let changed = false;
+  const nextItems = items.map((lead) => {
+    if (String(lead.id ?? "").trim() !== normalizedLeadId) return lead;
+    if (Number(lead.unread_count ?? 0) === 0 && !lead.is_new_for_attendant) return lead;
+
+    changed = true;
+    return {
+      ...lead,
+      unread_count: 0,
+      is_new_for_attendant: false,
+    };
+  });
+
+  return changed ? nextItems : items;
+}
+
 type AtendimentoSidebarModule = "public-link" | "summary";
 type AtendimentoRightPanel = "conversation" | AtendimentoSidebarModule;
 
@@ -227,6 +247,11 @@ export function AtendimentoClient() {
     () => leads.find((lead) => String(lead.id ?? "") === String(selectedLeadId ?? "")) ?? null,
     [leads, selectedLeadId],
   );
+
+  const clearLeadUnreadLocally = useCallback((leadId: string | null) => {
+    setLeads((currentLeads) => markLeadConversationAsOpened(currentLeads, leadId));
+    setPanelLeads((currentLeads) => markLeadConversationAsOpened(currentLeads, leadId));
+  }, []);
 
   function handleForbiddenResponse(res: Response) {
     if (res.status !== 401 && res.status !== 403) return false;
@@ -494,13 +519,14 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     if (!selectedLeadId) return;
+    clearLeadUnreadLocally(selectedLeadId);
     setMessages([]);
     setMessagesLoadError(null);
     setMessagesLoading(true);
     messagesLoadingRef.current = true;
     setSelectedConversation(null);
     void loadLeadDetail(selectedLeadId);
-  }, [loadLeadDetail, selectedLeadId]);
+  }, [clearLeadUnreadLocally, loadLeadDetail, selectedLeadId]);
 
   useEffect(() => {
     selectedLeadIdRef.current = selectedLeadId;
