@@ -197,7 +197,6 @@ export function AtendimentoLeadList({
             {pagedLeads.map((lead) => {
               const active = selectedLeadId === lead.id;
               const unread = Number(lead.unread_count ?? 0);
-              const isNewLead = Boolean(lead.is_new_for_attendant);
               const isOnline = onlineLeadIdsSet.has(String(lead.id ?? ""));
               const unreadBadge = unread > 0 ? unread : 1;
               return (
@@ -222,7 +221,7 @@ export function AtendimentoLeadList({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        {(isNewLead || unread > 0) ? (
+                        {unread > 0 ? (
                           <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
                             {unreadBadge}
                           </span>

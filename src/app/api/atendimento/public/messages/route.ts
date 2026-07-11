@@ -570,6 +570,7 @@ export async function POST(req: Request) {
       .from("atendimento_leads")
       .update({
         unread_count: Number(lead.unread_count ?? 0) + 1,
+        is_new_for_attendant: true,
         last_interaction_at: nowIso,
         updated_at: nowIso,
       })
@@ -665,6 +666,7 @@ export async function POST(req: Request) {
       .from("atendimento_leads")
       .update({
         unread_count: Number(lead.unread_count ?? 0) + 1,
+        is_new_for_attendant: true,
         last_interaction_at: nowIso,
         updated_at: nowIso,
       })
@@ -1048,6 +1050,7 @@ export async function POST(req: Request) {
       .from("atendimento_leads")
       .update({
         unread_count: Number(lead.unread_count ?? 0) + 1,
+        is_new_for_attendant: true,
         last_interaction_at: nowIso,
         updated_at: nowIso,
       })
@@ -1132,6 +1135,7 @@ export async function POST(req: Request) {
       .from("atendimento_leads")
       .update({
         unread_count: Number(lead.unread_count ?? 0) + 1,
+        is_new_for_attendant: true,
         last_interaction_at: nowIso,
         updated_at: nowIso,
       })
@@ -1187,6 +1191,7 @@ export async function POST(req: Request) {
       status: nextStatus,
       funnel_stage: nextStage,
       unread_count: Number(lead.unread_count ?? 0) + 1,
+      is_new_for_attendant: true,
       last_interaction_at: nowIso,
       updated_at: nowIso,
     })

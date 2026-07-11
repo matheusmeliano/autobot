@@ -92,10 +92,12 @@ function bumpLeadRecencyByConversation(
   items: AtendimentoLeadListItem[],
   conversationId: string,
   message: AtendimentoMessage | null,
+  options?: { markAsUnread?: boolean },
 ) {
   if (!conversationId) return items;
 
   let changed = false;
+  const shouldMarkAsUnread = Boolean(options?.markAsUnread);
   const nextItems = items.map((lead) => {
     if (String(lead.conversation?.id ?? "") !== conversationId) return lead;
 
@@ -104,6 +106,8 @@ function bumpLeadRecencyByConversation(
 
     return {
       ...lead,
+      unread_count: shouldMarkAsUnread ? Number(lead.unread_count ?? 0) + 1 : Number(lead.unread_count ?? 0),
+      is_new_for_attendant: shouldMarkAsUnread ? true : Boolean(lead.is_new_for_attendant),
       last_interaction_at: messageTime,
       conversation: lead.conversation
         ? {
@@ -612,10 +616,18 @@ export function AtendimentoClient() {
       .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, (payload: any) => {
         const affectedConversationId = String(payload.new?.conversation_id ?? payload.old?.conversation_id ?? "");
         const nextMessage = (payload.new ?? null) as AtendimentoMessage | null;
+        const shouldMarkAsUnread =
+          payload.eventType !== "DELETE" &&
+          affectedConversationId !== selectedConversationIdRef.current &&
+          String(nextMessage?.sender_role ?? "") === "lead";
 
         if (payload.eventType !== "DELETE" && affectedConversationId) {
-          setLeads((currentLeads) => bumpLeadRecencyByConversation(currentLeads, affectedConversationId, nextMessage));
-          setPanelLeads((currentLeads) => bumpLeadRecencyByConversation(currentLeads, affectedConversationId, nextMessage));
+          setLeads((currentLeads) =>
+            bumpLeadRecencyByConversation(currentLeads, affectedConversationId, nextMessage, { markAsUnread: shouldMarkAsUnread }),
+          );
+          setPanelLeads((currentLeads) =>
+            bumpLeadRecencyByConversation(currentLeads, affectedConversationId, nextMessage, { markAsUnread: shouldMarkAsUnread }),
+          );
         }
 
         if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
