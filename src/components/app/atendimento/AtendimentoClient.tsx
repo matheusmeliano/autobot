@@ -234,6 +234,7 @@ export function AtendimentoClient() {
   const [mobileModuleOpen, setMobileModuleOpen] = useState<AtendimentoSidebarModule | null>(null);
   const [onlineLeadIds, setOnlineLeadIds] = useState<string[]>([]);
   const leadsRef = useRef<AtendimentoLeadListItem[]>([]);
+  const messagesRef = useRef<AtendimentoMessage[]>([]);
   const messagesLoadingRef = useRef(false);
   const messagesLoadingTokenRef = useRef(0);
   const selectedLeadIdRef = useRef<string | null>(null);
@@ -418,7 +419,9 @@ export function AtendimentoClient() {
         messagesRes = await fetch(`/api/atendimento/conversas/${conversationId}/messages?limit=200`, { cache: "no-store" });
       } catch (error) {
         const message = "Falha ao carregar as mensagens.";
-        setMessagesLoadError(message);
+        if (wantsLoading || messagesRef.current.length === 0) {
+          setMessagesLoadError(message);
+        }
         if (wantsLoading && requestId === messagesLoadingTokenRef.current) {
           setMessagesLoading(false);
           messagesLoadingRef.current = false;
@@ -446,7 +449,9 @@ export function AtendimentoClient() {
         return;
       }
       const message = "Falha ao carregar as mensagens.";
-      setMessagesLoadError(message);
+      if (wantsLoading || messagesRef.current.length === 0) {
+        setMessagesLoadError(message);
+      }
       if (wantsLoading && requestId === messagesLoadingTokenRef.current) {
         setMessagesLoading(false);
         messagesLoadingRef.current = false;
@@ -562,6 +567,10 @@ export function AtendimentoClient() {
   useEffect(() => {
     leadsRef.current = leads;
   }, [leads]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     messagesLoadingRef.current = messagesLoading;
