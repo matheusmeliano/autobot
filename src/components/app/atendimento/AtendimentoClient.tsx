@@ -62,6 +62,62 @@ function sameMessages(left: AtendimentoMessage[], right: AtendimentoMessage[]) {
   });
 }
 
+function getLeadSortTime(lead: AtendimentoLeadListItem) {
+  const candidates = [
+    lead.last_interaction_at,
+    lead.conversation?.last_message_at,
+    lead.conversation?.updated_at,
+    lead.updated_at,
+    lead.created_at,
+  ];
+
+  for (const candidate of candidates) {
+    const time = new Date(String(candidate ?? "")).getTime();
+    if (Number.isFinite(time) && time > 0) return time;
+  }
+
+  return 0;
+}
+
+function sortLeadsByRecentActivity(items: AtendimentoLeadListItem[]) {
+  return items.slice().sort((left, right) => {
+    const timeDiff = getLeadSortTime(right) - getLeadSortTime(left);
+    if (timeDiff !== 0) return timeDiff;
+
+    return new Date(String(right.created_at ?? "")).getTime() - new Date(String(left.created_at ?? "")).getTime();
+  });
+}
+
+function bumpLeadRecencyByConversation(
+  items: AtendimentoLeadListItem[],
+  conversationId: string,
+  message: AtendimentoMessage | null,
+) {
+  if (!conversationId) return items;
+
+  let changed = false;
+  const nextItems = items.map((lead) => {
+    if (String(lead.conversation?.id ?? "") !== conversationId) return lead;
+
+    changed = true;
+    const messageTime = String(message?.created_at ?? "").trim() || new Date().toISOString();
+
+    return {
+      ...lead,
+      last_interaction_at: messageTime,
+      conversation: lead.conversation
+        ? {
+            ...lead.conversation,
+            last_message_at: messageTime,
+            last_message_preview: String(message?.content_text ?? "").trim() || lead.conversation.last_message_preview,
+          }
+        : lead.conversation,
+    };
+  });
+
+  return changed ? sortLeadsByRecentActivity(nextItems) : items;
+}
+
 type AtendimentoSidebarModule = "public-link" | "summary";
 type AtendimentoRightPanel = "conversation" | AtendimentoSidebarModule;
 
@@ -238,7 +294,7 @@ export function AtendimentoClient() {
     }
       const json = await res.json().catch(() => null);
       if (json?.ok && requestId === leadsRequestIdRef.current) {
-        const nextLeads = (json.leads ?? []) as AtendimentoLeadListItem[];
+        const nextLeads = sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]);
         const currentSelectedLeadId = String(selectedLeadIdRef.current ?? "").trim();
         const preservedSelectedLeadId =
           nextLeads.find((lead) => String(lead.id ?? "").trim() === currentSelectedLeadId)?.id ?? null;
@@ -275,7 +331,7 @@ export function AtendimentoClient() {
     if (handleForbiddenResponse(res)) return;
     const json = await res.json().catch(() => null);
     if (json?.ok) {
-      setPanelLeads((json.leads ?? []) as AtendimentoLeadListItem[]);
+      setPanelLeads(sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]));
     }
   }, []);
 
@@ -555,11 +611,17 @@ export function AtendimentoClient() {
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, (payload: any) => {
         const affectedConversationId = String(payload.new?.conversation_id ?? payload.old?.conversation_id ?? "");
+        const nextMessage = (payload.new ?? null) as AtendimentoMessage | null;
+
+        if (payload.eventType !== "DELETE" && affectedConversationId) {
+          setLeads((currentLeads) => bumpLeadRecencyByConversation(currentLeads, affectedConversationId, nextMessage));
+          setPanelLeads((currentLeads) => bumpLeadRecencyByConversation(currentLeads, affectedConversationId, nextMessage));
+        }
+
         if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
           if (payload.eventType === "DELETE") {
             removeMessage(String(payload.old?.id ?? ""));
           } else {
-            const nextMessage = (payload.new ?? null) as AtendimentoMessage | null;
             if (nextMessage?.id) {
               applyMessages([nextMessage], "merge");
             } else {

@@ -10,6 +10,32 @@ import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTim
 
 const PAGE_SIZE = 3;
 
+function getLeadSortTime(lead: AtendimentoLeadListItem) {
+  const candidates = [
+    lead.last_interaction_at,
+    lead.conversation?.last_message_at,
+    lead.conversation?.updated_at,
+    lead.updated_at,
+    lead.created_at,
+  ];
+
+  for (const candidate of candidates) {
+    const time = new Date(String(candidate ?? "")).getTime();
+    if (Number.isFinite(time) && time > 0) return time;
+  }
+
+  return 0;
+}
+
+function sortLeadsByRecentActivity(items: AtendimentoLeadListItem[]) {
+  return items.slice().sort((left, right) => {
+    const timeDiff = getLeadSortTime(right) - getLeadSortTime(left);
+    if (timeDiff !== 0) return timeDiff;
+
+    return new Date(String(right.created_at ?? "")).getTime() - new Date(String(left.created_at ?? "")).getTime();
+  });
+}
+
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-3">
@@ -52,9 +78,24 @@ export function AtendimentoLeadList({
   const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(1);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const previousTopLeadIdRef = useRef<string | null>(null);
+  const userChangedPageRef = useRef(false);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(leads.length / PAGE_SIZE)), [leads.length]);
+  const orderedLeads = useMemo(() => sortLeadsByRecentActivity(leads), [leads]);
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(orderedLeads.length / PAGE_SIZE)), [orderedLeads.length]);
   const onlineLeadIdsSet = useMemo(() => new Set(onlineLeadIds), [onlineLeadIds]);
+
+  useEffect(() => {
+    const nextTopLeadId = String(orderedLeads[0]?.id ?? "").trim() || null;
+    const previousTopLeadId = previousTopLeadIdRef.current;
+
+    if (userChangedPageRef.current && previousTopLeadId && nextTopLeadId && previousTopLeadId !== nextTopLeadId) {
+      setPage(1);
+      userChangedPageRef.current = false;
+    }
+
+    previousTopLeadIdRef.current = nextTopLeadId;
+  }, [orderedLeads]);
 
   useEffect(() => {
     setPage((current) => {
@@ -66,8 +107,8 @@ export function AtendimentoLeadList({
 
   const pagedLeads = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return leads.slice(start, start + PAGE_SIZE);
-  }, [leads, page]);
+    return orderedLeads.slice(start, start + PAGE_SIZE);
+  }, [orderedLeads, page]);
 
   useLayoutEffect(() => {
     if (!onListHeightChange) return;
@@ -158,6 +199,7 @@ export function AtendimentoLeadList({
               const unread = Number(lead.unread_count ?? 0);
               const isNewLead = Boolean(lead.is_new_for_attendant);
               const isOnline = onlineLeadIdsSet.has(String(lead.id ?? ""));
+              const unreadBadge = unread > 0 ? unread : 1;
               return (
                 <div
                   key={lead.id}
@@ -179,27 +221,25 @@ export function AtendimentoLeadList({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        {isNewLead ? (
-                          <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
-                            {unread > 0 ? unread : 1}
-                          </span>
-                        ) : null}
-                        <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div
+                          className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--app-text-85)]"
+                          title={lead.full_name || "Novo Lead"}
+                        >
                           {lead.full_name || "Novo Lead"}
                         </div>
+                        {(isNewLead || unread > 0) ? (
+                          <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
+                            {unreadBadge}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
                       </div>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="flex shrink-0 items-start">
                       <AtendimentoPresenceBadge online={isOnline} />
-                      {unread > 0 && !isNewLead ? (
-                        <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
-                          {unread}
-                        </span>
-                      ) : null}
                     </div>
                   </div>
 
@@ -254,7 +294,10 @@ export function AtendimentoLeadList({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              onClick={() => {
+                userChangedPageRef.current = true;
+                setPage((current) => Math.max(1, current - 1));
+              }}
               disabled={page <= 1}
               className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -262,7 +305,10 @@ export function AtendimentoLeadList({
             </button>
             <button
               type="button"
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              onClick={() => {
+                userChangedPageRef.current = true;
+                setPage((current) => Math.min(totalPages, current + 1));
+              }}
               disabled={page >= totalPages}
               className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
             >
