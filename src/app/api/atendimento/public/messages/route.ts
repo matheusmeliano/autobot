@@ -416,12 +416,6 @@ export async function GET(req: Request) {
   }
   const { admin, conversation } = access;
 
-  await expirePendingPhoneValidationIfNeeded({
-    admin,
-    leadId: String(conversation.lead_id),
-    conversationId: String(conversation.id),
-  });
-
   await ensureInitialBotConversationFlow({
     leadId: String(conversation.lead_id),
     conversationId: String(conversation.id),

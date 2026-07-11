@@ -770,7 +770,8 @@ export async function POST(req: Request) {
     }
 
     const shouldConfirmPhoneValidation =
-      eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ");
+      (eventType === "DeliveryCallback" && !deliveryError) ||
+      (eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ"));
 
     if (shouldConfirmPhoneValidation) {
       // #region debug-point B:confirm-phone-validation
