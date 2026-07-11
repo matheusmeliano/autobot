@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import {
   botReplyForLead,
   extractLeadDataFromMessage,
@@ -21,16 +20,11 @@ import type { CapturedFieldName } from "@/lib/atendimento/types";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
-const PHONE_VALIDATION_TIMEOUT_MS = 60_000;
 const WHATSAPP_REGISTERED_SUCCESS = "WhatsApp registrado com sucesso.";
-const WHATSAPP_PENDING_MESSAGE =
-  "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
 const WHATSAPP_INVALID_MESSAGE =
   "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FORMAT_MESSAGE =
   "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
-const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
-  "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE =
   "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
 const NUMERIC_ONLY_TEXT_MESSAGE =
@@ -39,44 +33,8 @@ const NUMERIC_ONLY_MIXED_MESSAGE =
   "Por favor, responda somente com números.";
 const PHONE_CONFIRMATION_PROMPT_MESSAGE =
   'Para continuarmos, confirme se o número informado acima está correto respondendo "sim". Caso contrário, envie apenas o número correto para prosseguirmos.';
-const PHONE_CONFIRMATION_SUCCESS_MESSAGE =
-  "Perfeito! Enviei uma mensagem de boas-vindas para o WhatsApp informado.";
 const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
   "Ops! Parece que ocorreu uma falha em nosso sistema.\n\nEntre em contato conosco pelo link abaixo para que nossa equipe possa ajuda-lo:\n\nhttps://wa.me/5565996933336";
-
-// #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/whatsapp-false-success.env";
-const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
-const __dbgMap = Object.fromEntries(
-  __dbgEnvRaw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
-const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
-const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  if (!__dbgUrl || !__dbgSession) return;
-  fetch(__dbgUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSession,
-      runId: "pre-fix",
-      hypothesisId,
-      traceId,
-      location: "src/app/api/atendimento/public/messages/route.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
 
 function firstNameFromLead(lead: { full_name?: string | null }) {
   const clean = String(lead.full_name ?? "").trim().replace(/\s+/g, " ");
@@ -97,15 +55,19 @@ Conclua as etapas do AutoBot para agendar sua aula experimental. No dia e horár
 Nos vemos em breve ${firstName}. 🤝`;
 }
 
-function extractWhatsAppMessageIds(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return { messageId: null, zaapId: null };
-  }
+function wasWhatsAppSendAccepted(payload: unknown) {
+  if (!payload || typeof payload !== "object") return false;
   const data = payload as Record<string, unknown>;
-  return {
-    messageId: String(data.messageId ?? data.id ?? "").trim() || null,
-    zaapId: String(data.zaapId ?? "").trim() || null,
-  };
+  if (data.error) return false;
+  if (data.success === false) return false;
+  return Boolean(
+    data.messageId ||
+      data.zaapId ||
+      data.id ||
+      data.zapId ||
+      data.text?.toString().trim() ||
+      data.message?.toString().trim(),
+  );
 }
 
 async function sleep(ms: number) {
@@ -202,9 +164,7 @@ function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldNam
     raw.startsWith(WHATSAPP_INVALID_MESSAGE) ||
     raw.startsWith(WHATSAPP_INVALID_FORMAT_MESSAGE) ||
     raw === NUMERIC_ONLY_TEXT_MESSAGE ||
-    raw === NUMERIC_ONLY_MIXED_MESSAGE ||
-    raw.startsWith(WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE) ||
-    raw === WHATSAPP_PENDING_MESSAGE
+    raw === NUMERIC_ONLY_MIXED_MESSAGE
   ) {
     return "phone";
   }
@@ -252,108 +212,6 @@ function buildPhoneValidationRetryMessage(attempts: number) {
 
 function buildPhoneFormatRetryMessage(attempts: number) {
   return `${WHATSAPP_INVALID_FORMAT_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`;
-}
-
-function normalizeValidationErrorText(value: unknown) {
-  return String(value ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-function isExplicitInvalidWhatsAppError(error: unknown) {
-  const message = normalizeValidationErrorText(error instanceof Error ? error.message : error);
-  if (!message) return false;
-  return (
-    message.includes("phone number does not exist") ||
-    message.includes("numero nao existe") ||
-    message.includes("number does not exist") ||
-    message.includes("nao possui whatsapp") ||
-    message.includes("not on whatsapp") ||
-    message.includes("whatsapp number does not exist")
-  );
-}
-
-async function expirePendingPhoneValidationIfNeeded(params: {
-  admin: ReturnType<typeof createSupabaseAdminClient>;
-  leadId: string;
-  conversationId: string;
-}) {
-  const { data: pendingEvent } = await params.admin
-    .from("atendimento_history_events")
-    .select("id, details, created_at")
-    .eq("lead_id", params.leadId)
-    .eq("conversation_id", params.conversationId)
-    .eq("event_type", "phone_validation_pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!pendingEvent?.id) return false;
-
-  const createdAtMs = new Date(String((pendingEvent as any).created_at ?? "")).getTime();
-  if (Number.isNaN(createdAtMs) || Date.now() - createdAtMs < PHONE_VALIDATION_TIMEOUT_MS) {
-    return false;
-  }
-
-  const nowIso = new Date().toISOString();
-  const pendingDetails = ((pendingEvent as any).details ?? {}) as Record<string, unknown>;
-  const { data: updatedPendingEvent } = await params.admin
-    .from("atendimento_history_events")
-    .update({
-      event_type: "phone_validation_timeout",
-      title: "Validacao do WhatsApp expirou sem confirmacao",
-      details: {
-        ...pendingDetails,
-        final_status: "TIMEOUT",
-        error: "validation_timeout",
-        failed_at: nowIso,
-      },
-    })
-    .eq("id", String((pendingEvent as any).id))
-    .eq("event_type", "phone_validation_pending")
-    .select("id")
-    .maybeSingle();
-
-  if (!updatedPendingEvent?.id) {
-    return false;
-  }
-
-  await params.admin.from("atendimento_messages").insert({
-    conversation_id: params.conversationId,
-    sender_role: "bot",
-    content_text: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
-    media_type: "text",
-    status: "entregue",
-    sent_at: nowIso,
-    delivered_at: nowIso,
-  });
-
-  const { data: leadRow } = await params.admin
-    .from("atendimento_leads")
-    .select("unread_count, status, funnel_stage")
-    .eq("id", params.leadId)
-    .maybeSingle();
-
-  await params.admin
-    .from("atendimento_leads")
-    .update({
-      status: (leadRow as any)?.status ?? null,
-      funnel_stage: (leadRow as any)?.funnel_stage ?? null,
-      unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
-      last_interaction_at: nowIso,
-      updated_at: nowIso,
-    })
-    .eq("id", params.leadId);
-
-  await syncConversationPreview({
-    conversationId: params.conversationId,
-    contentText: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
-    createdAt: nowIso,
-  });
-
-  return true;
 }
 
 function looksLikeFieldValue(field: CapturedFieldName, text: string) {
@@ -836,7 +694,6 @@ export async function POST(req: Request) {
     }
 
     if (decision === "positive") {
-      const traceId = `public-phone-validation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const baseUrl = resolveBaseUrlFromHeaders(req.headers);
       let positiveFollowUpMessage: string | null = null;
       if (pendingPhoneConfirmation?.id) {
@@ -856,6 +713,21 @@ export async function POST(req: Request) {
       }
 
       if (pendingPhone) {
+        const confirmedLead = {
+          ...(lead as Record<string, unknown>),
+          phone: pendingPhone,
+        };
+        const botResponse = botReplyForLead({
+          lead: confirmedLead as any,
+          messageText: "",
+        });
+        const successMessage =
+          botResponse.message === WHATSAPP_REGISTERED_SUCCESS
+            ? WHATSAPP_REGISTERED_SUCCESS
+            : `${WHATSAPP_REGISTERED_SUCCESS} ${botResponse.message}`;
+        const nextStatus = botResponse.message ? botResponse.status : "matricula_pendente";
+        const nextStage = botResponse.message ? botResponse.stage : "pre_cadastro_concluido";
+
         await admin
           .from("atendimento_leads")
           .update({
@@ -880,70 +752,44 @@ export async function POST(req: Request) {
         });
 
         try {
-          // #region debug-point A:send-start
-          __dbg(traceId, "A", "[DEBUG] public_phone_validation_send_start", {
-            leadId: String(lead.id),
-            conversationId: String(conversation.id),
-            pendingPhone,
-            hasBaseUrl: Boolean(baseUrl),
-          });
-          // #endregion
           const sendResult = await sendAtendimentoWhatsAppText({
             phone: pendingPhone,
             message: buildWhatsAppWelcomeMessage(lead as { full_name?: string | null }),
             baseUrl,
           });
-
-          const ids = extractWhatsAppMessageIds(sendResult);
-          const externalMessageId = ids.messageId ?? ids.zaapId;
-          // #region debug-point B:send-result
-          __dbg(traceId, "B", "[DEBUG] public_phone_validation_send_result", {
-            leadId: String(lead.id),
-            conversationId: String(conversation.id),
-            pendingPhone,
-            sendResult,
-            extractedMessageId: ids.messageId,
-            extractedZaapId: ids.zaapId,
-            externalMessageId,
-          });
-          // #endregion
-
-          if (!externalMessageId) {
-            throw new Error("Z-API não retornou identificador da mensagem para validar a entrega.");
-          }
+          const accepted = wasWhatsAppSendAccepted(sendResult);
 
           await appendHistoryEvent({
             leadId: String(lead.id),
             conversationId: String(conversation.id),
-            eventType: "phone_validation_pending",
-            title: "Aguardando confirmação da entrega da mensagem no WhatsApp",
+            eventType: accepted
+              ? "phone_confirmation_whatsapp_sent"
+              : "phone_confirmation_whatsapp_send_uncertain",
+            title: accepted
+              ? "Mensagem de boas-vindas enviada para o WhatsApp confirmado"
+              : "Envio da mensagem de boas-vindas sem confirmação clara",
             details: {
               phone: pendingPhone,
-              external_message_id: externalMessageId,
-              external_zaap_id: ids.zaapId,
               payload: sendResult,
             },
             actorType: "system",
           });
-          // #region debug-point C:pending-saved
-          __dbg(traceId, "C", "[DEBUG] public_phone_validation_pending_saved", {
-            leadId: String(lead.id),
-            conversationId: String(conversation.id),
-            pendingPhone,
-            externalMessageId,
-            externalZaapId: ids.zaapId,
-          });
-          // #endregion
-          positiveFollowUpMessage = WHATSAPP_PENDING_MESSAGE;
+
+          if (!accepted) {
+            throw new Error("Envio do WhatsApp sem confirmação clara da Z-API.");
+          }
+
+          await admin
+            .from("atendimento_leads")
+            .update({
+              status: nextStatus,
+              funnel_stage: nextStage,
+              updated_at: nowIso,
+            })
+            .eq("id", String(lead.id));
+
+          positiveFollowUpMessage = successMessage;
         } catch (error) {
-          // #region debug-point D:send-error
-          __dbg(traceId, "D", "[DEBUG] public_phone_validation_send_error", {
-            leadId: String(lead.id),
-            conversationId: String(conversation.id),
-            pendingPhone,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // #endregion
           await appendHistoryEvent({
             leadId: String(lead.id),
             conversationId: String(conversation.id),
