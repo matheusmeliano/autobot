@@ -5,7 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { botReplyForLead } from "@/lib/atendimento/bot";
-import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
+import { appendHistoryEvent, sendAtendimentoWhatsAppText, syncConversationPreview } from "@/lib/atendimento/server";
 
 export const runtime = "nodejs";
 const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
@@ -833,6 +833,40 @@ export async function POST(req: Request) {
           },
         })
         .eq("id", String((pendingEvent as any).id));
+
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: pendingPhone,
+          message: successMessage,
+        });
+
+        await appendHistoryEvent({
+          leadId: String((pendingEvent as any).lead_id ?? ""),
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          eventType: "message_sent",
+          title: "Mensagem enviada ao WhatsApp validado",
+          details: {
+            channel: "whatsapp",
+            phone: pendingPhone,
+            content_text: successMessage,
+          },
+          actorType: "bot",
+        });
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId: String((pendingEvent as any).lead_id ?? ""),
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          eventType: "message_send_failed",
+          title: "Falha ao enviar mensagem ao WhatsApp validado",
+          details: {
+            channel: "whatsapp",
+            phone: pendingPhone,
+            content_text: successMessage,
+            error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
+          },
+          actorType: "system",
+        });
+      }
 
       const { data: outbound } = await admin
         .from("atendimento_messages")
