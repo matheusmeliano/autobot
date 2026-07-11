@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
@@ -16,6 +17,19 @@ const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+1 321 297 3565";
 const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
 export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 45_000;
+
+function buildDeterministicInitialBotMessageId(conversationId: string, contentText: string) {
+  const hash = crypto
+    .createHash("sha256")
+    .update(`initial-bot:${String(conversationId).trim()}:${String(contentText).trim()}`)
+    .digest("hex")
+    .slice(0, 32)
+    .split("");
+
+  hash[12] = "5";
+  hash[16] = ["8", "9", "a", "b"][parseInt(hash[16] ?? "0", 16) % 4] ?? "8";
+  return `${hash.slice(0, 8).join("")}-${hash.slice(8, 12).join("")}-${hash.slice(12, 16).join("")}-${hash.slice(16, 20).join("")}-${hash.slice(20, 32).join("")}`;
+}
 
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
@@ -766,6 +780,7 @@ export async function ensureInitialBotConversationFlow(params: {
   const { data: inserted, error: insertError } = await admin
     .from("atendimento_messages")
     .insert({
+      id: buildDeterministicInitialBotMessageId(params.conversationId, nextContent),
       conversation_id: params.conversationId,
       sender_role: "bot",
       content_text: nextContent,
@@ -783,6 +798,30 @@ export async function ensureInitialBotConversationFlow(params: {
     if (code !== "23505") {
       throw new Error(insertError.message || "Falha ao iniciar fluxo do bot.");
     }
+  }
+
+  const { data: duplicatedCurrentMessageRows } = await admin
+    .from("atendimento_messages")
+    .select("id, created_at")
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot")
+    .eq("content_text", nextContent);
+
+  const duplicateCurrentMessageIdsToDelete = (duplicatedCurrentMessageRows ?? [])
+    .map((row: any) => ({
+      id: String(row?.id ?? "").trim(),
+      createdAt: String(row?.created_at ?? "").trim(),
+    }))
+    .filter((row) => row.id)
+    .sort((a, b) => {
+      if (a.createdAt !== b.createdAt) return a.createdAt.localeCompare(b.createdAt);
+      return a.id.localeCompare(b.id);
+    })
+    .slice(1)
+    .map((row) => row.id);
+
+  if (duplicateCurrentMessageIdsToDelete.length > 0) {
+    await admin.from("atendimento_messages").delete().in("id", duplicateCurrentMessageIdsToDelete);
   }
 
   if (nextIndex + 1 >= normalizedInitialMessages.length) {
