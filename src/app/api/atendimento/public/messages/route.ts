@@ -45,7 +45,7 @@ const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
   "Ops! Parece que ocorreu uma falha em nosso sistema.\n\nEntre em contato conosco pelo link abaixo para que nossa equipe possa ajuda-lo:\n\nhttps://wa.me/5565996933336";
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/whatsapp-validation-delay.env";
+const __dbgEnvPath = ".dbg/whatsapp-false-success.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -415,6 +415,12 @@ export async function GET(req: Request) {
     return Response.json({ ok: false, error: access.error }, { status: access.status });
   }
   const { admin, conversation } = access;
+
+  await expirePendingPhoneValidationIfNeeded({
+    admin,
+    leadId: String(conversation.lead_id),
+    conversationId: String(conversation.id),
+  });
 
   await ensureInitialBotConversationFlow({
     leadId: String(conversation.lead_id),

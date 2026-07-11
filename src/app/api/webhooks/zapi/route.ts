@@ -42,7 +42,7 @@ function isExplicitInvalidWhatsAppError(error: unknown) {
 }
 
 // #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/whatsapp-validation-delay.env";
+const __dbgEnvPath = ".dbg/whatsapp-false-success.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
 const __dbgMap = Object.fromEntries(
   __dbgEnvRaw
@@ -770,10 +770,19 @@ export async function POST(req: Request) {
     }
 
     const shouldConfirmPhoneValidation =
-      (eventType === "DeliveryCallback" && !deliveryError) ||
-      (eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ"));
+      eventType === "MessageStatusCallback" && (statusChange === "RECEIVED" || statusChange === "READ");
 
     if (shouldConfirmPhoneValidation) {
+      // #region debug-point B:confirm-phone-validation
+      __dbg(traceId, "B", "[DEBUG] zapi_webhook_confirm_phone_validation", {
+        eventType,
+        callbackMessageIds,
+        statusChange,
+        deliveryError,
+        pendingEventId: String((pendingEvent as any)?.id ?? ""),
+        pendingPhone,
+      });
+      // #endregion
       const { data: leadRecord } = await admin
         .from("atendimento_leads")
         .select("*")
@@ -835,10 +844,24 @@ export async function POST(req: Request) {
         .eq("id", String((pendingEvent as any).id));
 
       try {
+        // #region debug-point A:send-success-message
+        __dbg(traceId, "A", "[DEBUG] zapi_webhook_success_whatsapp_send_start", {
+          pendingPhone,
+          successMessage,
+          pendingEventId: String((pendingEvent as any)?.id ?? ""),
+        });
+        // #endregion
         await sendAtendimentoWhatsAppText({
           phone: pendingPhone,
           message: successMessage,
         });
+        // #region debug-point A:send-success-message
+        __dbg(traceId, "A", "[DEBUG] zapi_webhook_success_whatsapp_send_ok", {
+          pendingPhone,
+          successMessage,
+          pendingEventId: String((pendingEvent as any)?.id ?? ""),
+        });
+        // #endregion
 
         await appendHistoryEvent({
           leadId: String((pendingEvent as any).lead_id ?? ""),
@@ -853,6 +876,14 @@ export async function POST(req: Request) {
           actorType: "bot",
         });
       } catch (error) {
+        // #region debug-point A:send-success-message
+        __dbg(traceId, "A", "[DEBUG] zapi_webhook_success_whatsapp_send_fail", {
+          pendingPhone,
+          successMessage,
+          pendingEventId: String((pendingEvent as any)?.id ?? ""),
+          error: error instanceof Error ? error.message : String(error ?? "unknown_error"),
+        });
+        // #endregion
         await appendHistoryEvent({
           leadId: String((pendingEvent as any).lead_id ?? ""),
           conversationId: String((pendingEvent as any).conversation_id ?? ""),
