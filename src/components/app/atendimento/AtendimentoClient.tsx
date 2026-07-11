@@ -600,9 +600,12 @@ export function AtendimentoClient() {
       if (selectedLeadIdRef.current) {
         if (messagesLoadingRef.current) return;
         void loadLeadDetail(selectedLeadIdRef.current, { suppressNotFound: true, skipMessages: true });
+        if (selectedConversationIdRef.current) {
+          void loadConversationMessages(selectedConversationIdRef.current, "replace");
+        }
       }
     }, 1500);
-  }, [loadLeadDetail, loadLeads, loadPanelLeads, loadSummary]);
+  }, [loadConversationMessages, loadLeadDetail, loadLeads, loadPanelLeads, loadSummary]);
 
   const stopFallbackRefresh = useCallback(() => {
     if (fallbackRefreshIntervalRef.current != null) {

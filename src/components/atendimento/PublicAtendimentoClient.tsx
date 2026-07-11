@@ -1222,6 +1222,48 @@ export function PublicAtendimentoClient({
   ]);
 
   useEffect(() => {
+    if (
+      isProfilePage ||
+      !publicSlug ||
+      authError ||
+      loading ||
+      !pageVisible ||
+      isInitialFlow ||
+      awaitingBotSince != null ||
+      botResponsePendingSince != null
+    ) {
+      return;
+    }
+
+    let active = true;
+    let intervalId: number | null = null;
+
+    const refreshMessages = async () => {
+      if (!active) return;
+      await loadMessages(publicSlug, "replace");
+    };
+
+    intervalId = window.setInterval(() => {
+      void refreshMessages();
+    }, 3000);
+
+    return () => {
+      active = false;
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+  }, [
+    authError,
+    awaitingBotSince,
+    botResponsePendingSince,
+    isInitialFlow,
+    isProfilePage,
+    loadMessages,
+    loading,
+    pageVisible,
+    publicSlug,
+  ]);
+
+  useEffect(() => {
     if (isProfilePage || !publicSlug || !conversationId || !leadId || authError) return;
 
     const channel = supabase
