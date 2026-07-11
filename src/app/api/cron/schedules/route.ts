@@ -10,6 +10,7 @@ import {
 } from "@/lib/chargeRetry";
 import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
+import { buildPixCopyLink } from "@/lib/pix-links";
 import { localDateInTimeZone } from "@/lib/recurrence";
 
 const OFFPEAK_MAX_ZAPI_SENDS_PER_RUN = 5;
@@ -514,6 +515,11 @@ export async function GET(req: Request) {
       const message = applyTemplate(templateText, {
         nome: String(debtor?.nome ?? ""),
         pix: String(debtor?.pix_key ?? ""),
+        pix_link: buildPixCopyLink({
+          pixKey: String(debtor?.pix_key ?? ""),
+          debtorName: String(debtor?.nome ?? ""),
+          amount: formatBRL(chargeAmount ?? (s as any).charge?.amount ?? debtor?.valor),
+        }),
         valor: formatBRL(chargeAmount ?? (s as any).charge?.amount ?? debtor?.valor),
         vencimento: formatDateBR(
           localDateInTimeZone(

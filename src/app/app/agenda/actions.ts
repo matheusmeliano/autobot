@@ -26,6 +26,7 @@ import {
 import { getScheduleChargeAmount, nextRecurringIsoAfterSettlement } from "@/lib/chargeAccumulation";
 import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
+import { buildPixCopyLink } from "@/lib/pix-links";
 
 // #region debug-point extra-send-manual-bootstrap
 const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
@@ -1155,6 +1156,11 @@ export async function triggerScheduleNowAction(id: string) {
     const message = applyTemplate(templateText, {
       nome: String(debtor?.nome ?? ""),
       pix: String(debtor?.pix_key ?? ""),
+      pix_link: buildPixCopyLink({
+        pixKey: String(debtor?.pix_key ?? ""),
+        debtorName: String(debtor?.nome ?? ""),
+        amount: formatBRL(chargeAmount ?? (schedule as any).charge?.amount ?? debtor?.valor),
+      }),
       valor: formatBRL(chargeAmount ?? (schedule as any).charge?.amount ?? debtor?.valor),
       vencimento: formatDateBR(
         localDateInTimeZone(

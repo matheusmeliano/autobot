@@ -127,7 +127,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
             Templates
           </h1>
           <div className="mt-2 text-sm text-[var(--app-text-60)]">
-            Use variáveis: {"{nome}"} {"{valor}"} {"{vencimento}"} {"{pix}"}
+            Use variÃ¡veis: {"{nome}"} {"{valor}"} {"{vencimento}"} {"{pix}"} {"{pix_link}"}
           </div>
         </div>
 
@@ -285,7 +285,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
               {editing ? "Editar template" : "Novo template"}
             </div>
             <div className="mt-1 text-xs text-[var(--app-text-55)]">
-              Monte sua mensagem com variáveis e PIX.
+              Monte sua mensagem com variaveis, PIX e link para copiar o PIX.
             </div>
           </div>
           <button
@@ -321,7 +321,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                   rows={7}
                   className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
                   placeholder={
-                    "Olá {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPIX: {pix}\n\nObrigado!"
+                    "Ola {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPara copiar a chave PIX, acesse: {pix_link}\n\nObrigado!"
                   }
                   {...register("conteudo", {
                     validate: (value) =>
