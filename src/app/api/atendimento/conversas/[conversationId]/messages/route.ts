@@ -24,6 +24,34 @@ export async function GET(request: Request, context: { params: Promise<{ convers
       return Response.json({ ok: false, error: error.message }, { status: 500 });
     }
 
+    const now = new Date().toISOString();
+    void Promise.allSettled([
+      admin
+        .from("atendimento_conversations")
+        .select("lead_id")
+        .eq("id", conversationId)
+        .maybeSingle()
+        .then(async ({ data: conversation }) => {
+          const leadId = String((conversation as any)?.lead_id ?? "").trim();
+          if (!leadId) return;
+
+          await admin
+            .from("atendimento_leads")
+            .update({
+              unread_count: 0,
+              updated_at: now,
+              is_new_for_attendant: false,
+            })
+            .eq("id", leadId);
+        }),
+      admin
+        .from("atendimento_messages")
+        .update({ status: "lida", read_at: now })
+        .eq("conversation_id", conversationId)
+        .eq("sender_role", "lead")
+        .is("read_at", null),
+    ]);
+
     return Response.json({ ok: true, messages: (data ?? []) as any[] });
   } catch (error) {
     return Response.json({ ok: false, error: "internal_error" }, { status: 500 });

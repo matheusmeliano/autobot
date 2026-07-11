@@ -222,17 +222,17 @@ export function AtendimentoLeadList({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
+                        {(isNewLead || unread > 0) ? (
+                          <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
+                            {unreadBadge}
+                          </span>
+                        ) : null}
                         <div
                           className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--app-text-85)]"
                           title={lead.full_name || "Novo Lead"}
                         >
                           {lead.full_name || "Novo Lead"}
                         </div>
-                        {(isNewLead || unread > 0) ? (
-                          <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-semibold text-white">
-                            {unreadBadge}
-                          </span>
-                        ) : null}
                       </div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}

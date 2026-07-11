@@ -58,32 +58,11 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       return Response.json({ ok: false, error: conversationError.message }, { status: 500 });
     }
 
-    const conversationId = String((conversation as any)?.id ?? "");
-    const now = new Date().toISOString();
-    void Promise.allSettled([
-      admin
-        .from("atendimento_leads")
-        .update({
-          unread_count: 0,
-          updated_at: now,
-          is_new_for_attendant: false,
-        })
-        .eq("id", leadId),
-      conversationId
-        ? admin
-            .from("atendimento_messages")
-            .update({ status: "lida", read_at: now })
-            .eq("conversation_id", conversationId)
-            .eq("sender_role", "lead")
-            .is("read_at", null)
-        : Promise.resolve({ error: null }),
-    ]);
-
     return Response.json({
       ok: true,
       lead: {
         ...(lead as any),
-        is_new_for_attendant: false,
+        is_new_for_attendant: (lead as any)?.is_new_for_attendant ?? false,
         conversation: conversation ?? null,
       },
       events: (events ?? []) as any[],
