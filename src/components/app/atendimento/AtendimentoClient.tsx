@@ -238,6 +238,8 @@ export function AtendimentoClient() {
   const messagesLoadingTokenRef = useRef(0);
   const selectedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
+  const rightPanelRef = useRef<AtendimentoRightPanel>("conversation");
+  const mobileConversationOpenRef = useRef(false);
   const queryRef = useRef("");
   const listRefreshTimeoutRef = useRef<number | null>(null);
   const detailRefreshTimeoutRef = useRef<number | null>(null);
@@ -255,6 +257,11 @@ export function AtendimentoClient() {
   const clearLeadUnreadLocally = useCallback((leadId: string | null) => {
     setLeads((currentLeads) => markLeadConversationAsOpened(currentLeads, leadId));
     setPanelLeads((currentLeads) => markLeadConversationAsOpened(currentLeads, leadId));
+  }, []);
+
+  const getOpenedLeadIdForUnreadClear = useCallback(() => {
+    const conversationVisible = rightPanelRef.current === "conversation" || mobileConversationOpenRef.current;
+    return conversationVisible ? selectedLeadIdRef.current : null;
   }, []);
 
   function handleForbiddenResponse(res: Response) {
@@ -329,7 +336,7 @@ export function AtendimentoClient() {
       if (json?.ok && requestId === leadsRequestIdRef.current) {
         const nextLeads = clearUnreadForSelectedLead(
           sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]),
-          selectedLeadIdRef.current,
+          getOpenedLeadIdForUnreadClear(),
         );
         const currentSelectedLeadId = String(selectedLeadIdRef.current ?? "").trim();
         const preservedSelectedLeadId =
@@ -370,11 +377,11 @@ export function AtendimentoClient() {
       setPanelLeads(
         clearUnreadForSelectedLead(
           sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]),
-          selectedLeadIdRef.current,
+          getOpenedLeadIdForUnreadClear(),
         ),
       );
     }
-  }, []);
+  }, [getOpenedLeadIdForUnreadClear]);
 
   const applyMessages = useCallback((incomingMessages: AtendimentoMessage[], mode: "replace" | "merge" = "replace") => {
     const normalizedMessages = sortAndDedupeMessages(incomingMessages);
@@ -543,6 +550,14 @@ export function AtendimentoClient() {
   useEffect(() => {
     selectedLeadIdRef.current = selectedLeadId;
   }, [selectedLeadId]);
+
+  useEffect(() => {
+    rightPanelRef.current = rightPanel;
+  }, [rightPanel]);
+
+  useEffect(() => {
+    mobileConversationOpenRef.current = mobileConversationOpen;
+  }, [mobileConversationOpen]);
 
   useEffect(() => {
     leadsRef.current = leads;
