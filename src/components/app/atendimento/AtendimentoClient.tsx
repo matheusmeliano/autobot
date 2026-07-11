@@ -142,6 +142,10 @@ function markLeadConversationAsOpened(items: AtendimentoLeadListItem[], leadId: 
   return changed ? nextItems : items;
 }
 
+function clearUnreadForSelectedLead(items: AtendimentoLeadListItem[], leadId: string | null) {
+  return markLeadConversationAsOpened(items, leadId);
+}
+
 type AtendimentoSidebarModule = "public-link" | "summary";
 type AtendimentoRightPanel = "conversation" | AtendimentoSidebarModule;
 
@@ -323,7 +327,10 @@ export function AtendimentoClient() {
     }
       const json = await res.json().catch(() => null);
       if (json?.ok && requestId === leadsRequestIdRef.current) {
-        const nextLeads = sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]);
+        const nextLeads = clearUnreadForSelectedLead(
+          sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]),
+          selectedLeadIdRef.current,
+        );
         const currentSelectedLeadId = String(selectedLeadIdRef.current ?? "").trim();
         const preservedSelectedLeadId =
           nextLeads.find((lead) => String(lead.id ?? "").trim() === currentSelectedLeadId)?.id ?? null;
@@ -360,7 +367,12 @@ export function AtendimentoClient() {
     if (handleForbiddenResponse(res)) return;
     const json = await res.json().catch(() => null);
     if (json?.ok) {
-      setPanelLeads(sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]));
+      setPanelLeads(
+        clearUnreadForSelectedLead(
+          sortLeadsByRecentActivity((json.leads ?? []) as AtendimentoLeadListItem[]),
+          selectedLeadIdRef.current,
+        ),
+      );
     }
   }, []);
 
