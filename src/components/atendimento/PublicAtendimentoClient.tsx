@@ -30,6 +30,8 @@ const BOT_TYPING_LEAD_IN_MS = 5_000;
 const BOT_COMPOSER_COOLDOWN_MS = 2_500;
 const PHONE_PROMPT_MESSAGE = CAPTURED_FIELD_PROMPTS.phone;
 const LEAD_PRESENCE_CHANNEL = "atendimento-lead-presence";
+const ATENDIMENTO_PUBLIC_SESSION_LOSS_REDIRECT_URL =
+  "https://www.autobot.business/atendimento?slug=lucas-brum-online-music-usa";
 // #region debug-point A:bootstrap
 const __dbgUrl = "http://127.0.0.1:7777/event";
 const __dbgSession = "chat-timing-flicker";
@@ -97,6 +99,21 @@ function getAtendimentoDownloadHref(url: string | null | undefined, fileName: st
   const separator = url.includes("?") ? "&" : "?";
   const downloadValue = fileName ? encodeURIComponent(fileName) : "";
   return `${url}${separator}download=${downloadValue}`;
+}
+
+function shouldRedirectAfterLeadSessionLoss(status: number, error?: unknown) {
+  const normalizedError = String(error ?? "")
+    .trim()
+    .toLowerCase();
+  return (
+    status === 401 ||
+    status === 403 ||
+    status === 404 ||
+    normalizedError === "unauthorized" ||
+    normalizedError === "forbidden" ||
+    normalizedError === "not_found" ||
+    normalizedError === "lead_not_found"
+  );
 }
 
 function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
@@ -251,7 +268,7 @@ export function PublicAtendimentoClient({
       const supabase = createSupabaseBrowserClient();
       await supabase.auth.signOut();
     } catch {}
-    window.location.replace("/login");
+    window.location.replace(ATENDIMENTO_PUBLIC_SESSION_LOSS_REDIRECT_URL);
   }
 
   useEffect(() => {
@@ -510,13 +527,13 @@ export function PublicAtendimentoClient({
     const res = await fetch(`/api/atendimento/public/files?slug=${encodeURIComponent(linkSlug)}`, {
       cache: "no-store",
     });
-    if (res.status === 401 || res.status === 403) {
-      setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+    const json = await res.json().catch(() => null);
+    if (shouldRedirectAfterLeadSessionLoss(res.status, json?.error)) {
+      setAuthError("Sua conexão com este atendimento foi encerrada. Redirecionando...");
       setFilesLoading(false);
       void redirectToLoginAfterSessionLoss();
       return;
     }
-    const json = await res.json().catch(() => null);
     if (json?.ok) {
       setFiles((json.files ?? []) as AtendimentoFileRecord[]);
     }
@@ -737,14 +754,13 @@ export function PublicAtendimentoClient({
       const res = await fetch(`/api/atendimento/public/messages?public_slug=${encodeURIComponent(nextPublicSlug)}`, {
         cache: "no-store",
       });
-      if (res.status === 401 || res.status === 403) {
-        setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+      const json = await res.json().catch(() => null);
+      if (shouldRedirectAfterLeadSessionLoss(res.status, json?.error)) {
+        setAuthError("Sua conexão com este atendimento foi encerrada. Redirecionando...");
         setMessages([]);
         void redirectToLoginAfterSessionLoss();
         return [] as AtendimentoMessage[];
       }
-
-      const json = await res.json().catch(() => null);
       if (!json?.ok) {
         setMessagesLoadError(String(json?.error ?? "Falha ao carregar as mensagens."));
         return [] as AtendimentoMessage[];
@@ -778,15 +794,15 @@ export function PublicAtendimentoClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ slug: linkSlug }),
         });
-
-        if (res.status === 401) {
-          setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+        const json = await res.json().catch(() => null);
+        if (shouldRedirectAfterLeadSessionLoss(res.status, json?.error)) {
+          setAuthError("Sua conexão com este atendimento foi encerrada. Redirecionando...");
+          setConversationId("");
+          setLeadId("");
           setMessages([]);
           void redirectToLoginAfterSessionLoss();
           return;
         }
-
-        const json = await res.json().catch(() => null);
         if (!json?.ok) {
           if (!silent) {
             setAuthError(String(json?.error ?? "Não foi possível carregar o seu atendimento."));
@@ -897,19 +913,22 @@ export function PublicAtendimentoClient({
           file_size_bytes: params.file_size_bytes ?? null,
         }),
       });
-      if (res.status === 401 || res.status === 403) {
+      const json = await res.json().catch(() => null);
+      if (shouldRedirectAfterLeadSessionLoss(res.status, json?.error)) {
         if (optimisticMessage) {
           removeMessage(optimisticMessage.id);
           optimisticLeadMessageIdRef.current = null;
           optimisticLeadMessageRef.current = null;
         }
         resetAwaitingBotSequence();
-        setAuthError("Sua sessão de atendimento expirou. Entre novamente para continuar.");
+        setAuthError("Sua conexão com este atendimento foi encerrada. Redirecionando...");
         void redirectToLoginAfterSessionLoss();
-        return { ok: false as const, error: "Sua sessão expirou. Entre novamente para continuar.", blocked: false as const };
+        return {
+          ok: false as const,
+          error: "Sua conexão com este atendimento foi encerrada.",
+          blocked: false as const,
+        };
       }
-
-      const json = await res.json().catch(() => null);
       if (!json?.ok) {
         if (optimisticMessage) {
           removeMessage(optimisticMessage.id);
