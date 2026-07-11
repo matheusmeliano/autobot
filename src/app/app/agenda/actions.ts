@@ -1153,14 +1153,19 @@ export async function triggerScheduleNowAction(id: string) {
       return { ok: true };
     }
 
+    const pixLink = await buildPixCopyLink({
+      pixKey: String(debtor?.pix_key ?? ""),
+      debtorName: String(debtor?.nome ?? ""),
+      amount: formatBRL(chargeAmount ?? (schedule as any).charge?.amount ?? debtor?.valor),
+      userId,
+      debtorId: String((schedule as any).debtor_id ?? ""),
+      scheduleId,
+    });
+
     const message = applyTemplate(templateText, {
       nome: String(debtor?.nome ?? ""),
       pix: String(debtor?.pix_key ?? ""),
-      pix_link: buildPixCopyLink({
-        pixKey: String(debtor?.pix_key ?? ""),
-        debtorName: String(debtor?.nome ?? ""),
-        amount: formatBRL(chargeAmount ?? (schedule as any).charge?.amount ?? debtor?.valor),
-      }),
+      pix_link: pixLink,
       valor: formatBRL(chargeAmount ?? (schedule as any).charge?.amount ?? debtor?.valor),
       vencimento: formatDateBR(
         localDateInTimeZone(

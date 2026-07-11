@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { PixCopyClient } from "@/components/pix/PixCopyClient";
-import { parsePixLinkToken } from "@/lib/pix-links";
+import { resolvePixCopyLink } from "@/lib/pix-links";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ type PixPageProps = {
 
 export default async function PixPage({ params }: PixPageProps) {
   const resolvedParams = await params;
-  const payload = parsePixLinkToken(resolvedParams.token);
+  const payload = await resolvePixCopyLink(resolvedParams.token);
 
   if (!payload) {
     notFound();

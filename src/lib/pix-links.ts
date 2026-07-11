@@ -1,13 +1,7 @@
 import crypto from "node:crypto";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const AUTOBOT_FALLBACK_BASE_URL = "https://www.autobot.business";
-
-type PixLinkPayload = {
-  pixKey: string;
-  debtorName?: string | null;
-  amount?: string | null;
-  createdAt: string;
-};
 
 function normalizeBaseUrl(value: string | null | undefined) {
   const raw = String(value ?? "").trim();
@@ -25,70 +19,64 @@ function getPixLinkBaseUrl() {
   );
 }
 
-function getPixLinkSecret() {
-  const secret =
-    String(process.env.PIX_LINK_SECRET ?? "").trim() ||
-    String(process.env.CRON_SECRET ?? "").trim() ||
-    String(process.env.ZAPI_WEBHOOK_SECRET ?? "").trim();
-
-  if (secret) return secret;
-  if (process.env.NODE_ENV !== "production") return "autobot-dev-pix-link-secret";
-  throw new Error("PIX link secret not configured.");
+function buildShortPixToken() {
+  return crypto.randomBytes(6).toString("base64url");
 }
 
-function signEncodedPayload(encodedPayload: string) {
-  return crypto.createHmac("sha256", getPixLinkSecret()).update(encodedPayload).digest("base64url");
-}
-
-export function buildPixCopyLink(params: {
+export async function buildPixCopyLink(params: {
   pixKey?: string | null;
   debtorName?: string | null;
   amount?: string | null;
+  userId?: string | null;
+  debtorId?: string | null;
+  scheduleId?: string | null;
 }) {
   const pixKey = String(params.pixKey ?? "").trim();
   if (!pixKey) return "";
 
-  const payload: PixLinkPayload = {
-    pixKey,
-    debtorName: String(params.debtorName ?? "").trim() || null,
-    amount: String(params.amount ?? "").trim() || null,
-    createdAt: new Date().toISOString(),
-  };
+  const admin = createSupabaseAdminClient();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const token = buildShortPixToken();
+    const { error } = await admin.from("pix_copy_links").insert({
+      token,
+      pix_key: pixKey,
+      debtor_name: String(params.debtorName ?? "").trim() || null,
+      amount: String(params.amount ?? "").trim() || null,
+      user_id: String(params.userId ?? "").trim() || null,
+      debtor_id: String(params.debtorId ?? "").trim() || null,
+      schedule_id: String(params.scheduleId ?? "").trim() || null,
+    });
 
-  const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  const signature = signEncodedPayload(encodedPayload);
-  return `${getPixLinkBaseUrl()}/pix/${encodedPayload}.${signature}`;
+    if (!error) {
+      return `${getPixLinkBaseUrl()}/pix/${token}`;
+    }
+
+    const code = String((error as any)?.code ?? "").trim();
+    if (code !== "23505") {
+      throw new Error(error.message || "Falha ao gerar link curto do PIX.");
+    }
+  }
+
+  throw new Error("Falha ao gerar link curto do PIX.");
 }
 
-export function parsePixLinkToken(token: string) {
-  const raw = String(token ?? "").trim();
-  if (!raw) return null;
+export async function resolvePixCopyLink(token: string) {
+  const admin = createSupabaseAdminClient();
+  const rawToken = String(token ?? "").trim();
+  if (!rawToken) return null;
 
-  const [encodedPayload, signature] = raw.split(".");
-  if (!encodedPayload || !signature) return null;
+  const { data, error } = await admin
+    .from("pix_copy_links")
+    .select("pix_key, debtor_name, amount, created_at")
+    .eq("token", rawToken)
+    .maybeSingle();
 
-  const expectedSignature = signEncodedPayload(encodedPayload);
-  const signatureBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expectedSignature);
-  if (
-    signatureBuffer.length !== expectedBuffer.length ||
-    !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
-  ) {
-    return null;
-  }
+  if (error || !data?.pix_key) return null;
 
-  try {
-    const parsed = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as PixLinkPayload;
-    const pixKey = String(parsed?.pixKey ?? "").trim();
-    if (!pixKey) return null;
-
-    return {
-      pixKey,
-      debtorName: String(parsed?.debtorName ?? "").trim() || null,
-      amount: String(parsed?.amount ?? "").trim() || null,
-      createdAt: String(parsed?.createdAt ?? "").trim() || null,
-    };
-  } catch {
-    return null;
-  }
+  return {
+    pixKey: String(data.pix_key ?? "").trim(),
+    debtorName: String(data.debtor_name ?? "").trim() || null,
+    amount: String(data.amount ?? "").trim() || null,
+    createdAt: String(data.created_at ?? "").trim() || null,
+  };
 }
