@@ -8,12 +8,24 @@ import {
 import {
   ATENDIMENTO_BLOCKED_FINAL_MESSAGE,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   LOCATION_CITY_BLOCKED_FINAL_MESSAGE,
   LOCATION_CITY_INVALID_MESSAGE,
   LOCATION_STATE_BLOCKED_FINAL_MESSAGE,
   LOCATION_STATE_INVALID_MESSAGE,
   NUMERIC_ONLY_FIELDS,
 } from "@/lib/atendimento/constants";
+import {
+  buildExperimentalClassDatesMessage,
+  buildExperimentalClassFinalChatMessage,
+  buildExperimentalClassStudentWhatsAppMessage,
+  buildExperimentalClassTimesMessage,
+  EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE,
+  EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE,
+  findExperimentalClassDateOption,
+  findExperimentalClassTimeOption,
+  listExperimentalClassAvailability,
+} from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   appendHistoryEvent,
@@ -369,6 +381,209 @@ async function upsertCapturedFields(params: {
       });
     }
   }
+}
+
+async function insertBotTextMessage(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+  contentText: string;
+  sentAt?: string;
+}) {
+  const sentAt = params.sentAt ?? new Date().toISOString();
+  const { data, error } = await params.admin
+    .from("atendimento_messages")
+    .insert({
+      conversation_id: params.conversationId,
+      sender_role: "bot",
+      content_text: params.contentText,
+      media_type: "text",
+      status: "entregue",
+      sent_at: sentAt,
+      delivered_at: sentAt,
+    })
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    const code = String((error as any)?.code ?? "").trim();
+    if (code !== "23505") {
+      throw new Error(error.message || "Falha ao enviar mensagem automática do bot.");
+    }
+  }
+
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
+async function listScheduledExperimentalClassProfessorStarts(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  nowIso: string;
+}) {
+  const { data, error } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", params.nowIso)
+    .order("professor_start_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || "Falha ao consultar horários ocupados da aula experimental.");
+  }
+
+  return (data ?? [])
+    .map((row) => String((row as any)?.professor_start_at ?? "").trim())
+    .filter(Boolean);
+}
+
+async function getScheduledExperimentalClassBooking(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+}) {
+  const { data, error } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("*")
+    .eq("lead_id", params.leadId)
+    .eq("status", "scheduled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || "Falha ao consultar o agendamento da aula experimental.");
+  }
+
+  return data as Record<string, unknown> | null;
+}
+
+async function getLatestHistoryEventByType(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  eventType: string;
+}) {
+  const { data, error } = await params.admin
+    .from("atendimento_history_events")
+    .select("id, details, created_at")
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", params.eventType)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || "Falha ao consultar o histórico do agendamento.");
+  }
+
+  return data as { id: string; details: Record<string, unknown> | null; created_at: string } | null;
+}
+
+async function presentExperimentalClassDateOptions(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  leadTimeZone?: string | null;
+  now?: Date;
+}) {
+  const now = params.now ?? new Date();
+  const bookedStarts = await listScheduledExperimentalClassProfessorStarts({
+    admin: params.admin,
+    nowIso: now.toISOString(),
+  });
+  const availability = listExperimentalClassAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedStarts,
+  });
+  const message = buildExperimentalClassDatesMessage(availability.dates);
+  const outbound = await insertBotTextMessage({
+    admin: params.admin,
+    conversationId: params.conversationId,
+    contentText: message,
+  });
+
+  await appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "experimental_class_date_options_presented",
+    title: "Datas disponíveis da aula experimental apresentadas",
+    details: {
+      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      options: availability.dates,
+    },
+    actorType: "system",
+  });
+
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: message,
+    createdAt: String(outbound?.created_at ?? new Date().toISOString()),
+  });
+
+  return {
+    outbound,
+    availability,
+    message,
+  };
+}
+
+async function presentExperimentalClassTimeOptions(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  leadTimeZone?: string | null;
+  professorDate: string;
+  now?: Date;
+}) {
+  const now = params.now ?? new Date();
+  const bookedStarts = await listScheduledExperimentalClassProfessorStarts({
+    admin: params.admin,
+    nowIso: now.toISOString(),
+  });
+  const availability = listExperimentalClassAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedStarts,
+  });
+  const dateOption = availability.dates.find((option) => option.professorDate === params.professorDate) ?? null;
+  const timeOptions = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
+  const message = buildExperimentalClassTimesMessage({
+    dateLabel: dateOption?.displayLabel ?? params.professorDate,
+    options: timeOptions,
+  });
+  const outbound = await insertBotTextMessage({
+    admin: params.admin,
+    conversationId: params.conversationId,
+    contentText: message,
+  });
+
+  await appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "experimental_class_time_options_presented",
+    title: "Horários disponíveis da aula experimental apresentados",
+    details: {
+      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      professor_date: params.professorDate,
+      date_label: dateOption?.displayLabel ?? params.professorDate,
+      options: timeOptions,
+    },
+    actorType: "system",
+  });
+
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: message,
+    createdAt: String(outbound?.created_at ?? new Date().toISOString()),
+  });
+
+  return {
+    outbound,
+    dateOption,
+    timeOptions,
+    message,
+  };
 }
 
 export async function GET(req: Request) {
@@ -1230,6 +1445,11 @@ export async function POST(req: Request) {
   }
 
   if (!expectedField && String((lead as any)?.phone ?? "").trim()) {
+    const leadId = String(lead.id);
+    const conversationId = String(conversation.id);
+    const leadTimeZone = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+    const lastBotText = String(lastBotMessage?.content_text ?? "").trim();
+
     await admin
       .from("atendimento_leads")
       .update({
@@ -1262,13 +1482,273 @@ export async function POST(req: Request) {
       actorType: "lead",
     });
 
+    const scheduledBooking = await getScheduledExperimentalClassBooking({
+      admin,
+      leadId,
+    });
+
+    if (scheduledBooking?.id) {
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: null,
+        blocked: false,
+        conversation: {
+          id: conversationId,
+          bot_enabled: true,
+        },
+      });
+    }
+
+    if (lastBotText.startsWith("Horários disponíveis para ")) {
+      const latestTimeOptionsEvent = await getLatestHistoryEventByType({
+        admin,
+        leadId,
+        conversationId,
+        eventType: "experimental_class_time_options_presented",
+      });
+      const latestTimeDetails = (latestTimeOptionsEvent?.details ?? {}) as Record<string, unknown>;
+      const professorDate = String(latestTimeDetails.professor_date ?? "").trim();
+
+      if (!professorDate) {
+        const dateOptionsPresentation = await presentExperimentalClassDateOptions({
+          admin,
+          leadId,
+          conversationId,
+          leadTimeZone,
+        });
+
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: dateOptionsPresentation.outbound,
+          blocked: false,
+          conversation: {
+            id: conversationId,
+            bot_enabled: true,
+          },
+        });
+      }
+
+      const bookedProfessorStarts = await listScheduledExperimentalClassProfessorStarts({
+        admin,
+        nowIso: nowIso,
+      });
+      const currentAvailability = listExperimentalClassAvailability({
+        leadTimeZone,
+        bookedProfessorStartAts: bookedProfessorStarts,
+      });
+      const timeOptions = currentAvailability.slotsByProfessorDate.get(professorDate) ?? [];
+      const selectedTimeOption = findExperimentalClassTimeOption(contentText, timeOptions);
+
+      if (!selectedTimeOption) {
+        const timeOptionsPresentation = await presentExperimentalClassTimeOptions({
+          admin,
+          leadId,
+          conversationId,
+          leadTimeZone,
+          professorDate,
+        });
+
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: timeOptionsPresentation.outbound,
+          blocked: false,
+          conversation: {
+            id: conversationId,
+            bot_enabled: true,
+          },
+        });
+      }
+
+      const { data: booking, error: bookingError } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .insert({
+          lead_id: leadId,
+          conversation_id: conversationId,
+          professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          lead_timezone: leadTimeZone,
+          professor_date: selectedTimeOption.professorDate,
+          professor_time: selectedTimeOption.professorTime,
+          professor_start_at: selectedTimeOption.professorStartAt,
+          lead_date: selectedTimeOption.leadDate,
+          lead_time: selectedTimeOption.leadTime.replace("h", ":"),
+          lead_start_at: selectedTimeOption.professorStartAt,
+          status: "scheduled",
+        })
+        .select("*")
+        .maybeSingle();
+
+      if (bookingError) {
+        const code = String((bookingError as any)?.code ?? "").trim();
+        if (code === "23505") {
+          const refreshedTimeOptionsPresentation = await presentExperimentalClassTimeOptions({
+            admin,
+            leadId,
+            conversationId,
+            leadTimeZone,
+            professorDate,
+          });
+
+          return Response.json({
+            ok: true,
+            inbound,
+            outbound: refreshedTimeOptionsPresentation.outbound,
+            blocked: false,
+            conversation: {
+              id: conversationId,
+              bot_enabled: true,
+            },
+          });
+        }
+
+        return Response.json({ ok: false, error: bookingError.message }, { status: 500 });
+      }
+
+      await admin
+        .from("atendimento_leads")
+        .update({
+          funnel_stage: "aula_experimental_agendada",
+          status: "em_atendimento",
+          best_contact_time: selectedTimeOption.leadTime.replace("h", ":"),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", leadId);
+
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_scheduled",
+        title: "Aula experimental agendada automaticamente",
+        details: {
+          booking_id: String((booking as any)?.id ?? ""),
+          teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          lead_timezone: leadTimeZone,
+          professor_date: selectedTimeOption.professorDate,
+          professor_time: selectedTimeOption.professorTime,
+          professor_start_at: selectedTimeOption.professorStartAt,
+          lead_date: selectedTimeOption.leadDate,
+          lead_time: selectedTimeOption.leadTime,
+        },
+        actorType: "system",
+      });
+
+      const firstName = firstNameFromLead(lead as { full_name?: string | null }) || "Aluno";
+      const botMessages = [
+        EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE,
+        EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE,
+        buildExperimentalClassFinalChatMessage(firstName),
+      ];
+      let lastOutbound: Record<string, unknown> | null = null;
+      for (let index = 0; index < botMessages.length; index += 1) {
+        lastOutbound = await insertBotTextMessage({
+          admin,
+          conversationId,
+          contentText: botMessages[index],
+          sentAt: new Date(Date.now() + index).toISOString(),
+        });
+      }
+
+      try {
+        const phone = String((lead as any)?.phone ?? "").trim();
+        if (phone) {
+          await sendAtendimentoWhatsAppText({
+            phone,
+            message: buildExperimentalClassStudentWhatsAppMessage(firstName),
+          });
+        }
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_whatsapp_confirmation_failed",
+          title: "Falha ao enviar a confirmação da aula experimental no WhatsApp",
+          details: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+
+      await syncConversationPreview({
+        conversationId,
+        contentText: botMessages[botMessages.length - 1],
+        createdAt: String(lastOutbound?.created_at ?? new Date().toISOString()),
+      });
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: lastOutbound,
+        blocked: false,
+        conversation: {
+          id: conversationId,
+          bot_enabled: true,
+        },
+      });
+    }
+
+    const bookedProfessorStarts = await listScheduledExperimentalClassProfessorStarts({
+      admin,
+      nowIso,
+    });
+    const availability = listExperimentalClassAvailability({
+      leadTimeZone,
+      bookedProfessorStartAts: bookedProfessorStarts,
+    });
+    const selectedDateOption = findExperimentalClassDateOption(contentText, availability.dates);
+
+    if (!selectedDateOption) {
+      const dateOptionsPresentation = await presentExperimentalClassDateOptions({
+        admin,
+        leadId,
+        conversationId,
+        leadTimeZone,
+      });
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: dateOptionsPresentation.outbound,
+        blocked: false,
+        conversation: {
+          id: conversationId,
+          bot_enabled: true,
+        },
+      });
+    }
+
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "experimental_class_date_selected",
+      title: "Data da aula experimental selecionada",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: leadTimeZone,
+        professor_date: selectedDateOption.professorDate,
+        lead_date: selectedDateOption.leadDate,
+        date_label: selectedDateOption.displayLabel,
+      },
+      actorType: "system",
+    });
+
+    const timeOptionsPresentation = await presentExperimentalClassTimeOptions({
+      admin,
+      leadId,
+      conversationId,
+      leadTimeZone,
+      professorDate: selectedDateOption.professorDate,
+    });
+
     return Response.json({
       ok: true,
       inbound,
-      outbound: null,
+      outbound: timeOptionsPresentation.outbound,
       blocked: false,
       conversation: {
-        id: String(conversation.id),
+        id: conversationId,
         bot_enabled: true,
       },
     });
@@ -1376,6 +1856,26 @@ export async function POST(req: Request) {
   );
 
   if (shouldReuseLastBotMessage) {
+    if (botResponseText === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
+      const dateOptionsPresentation = await presentExperimentalClassDateOptions({
+        admin,
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        leadTimeZone: String((persistedLeadValues.timezone as string | undefined) ?? (lead as any)?.timezone ?? "").trim(),
+      });
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: dateOptionsPresentation.outbound,
+        blocked: false,
+        conversation: {
+          id: String(conversation.id),
+          bot_enabled: true,
+        },
+      });
+    }
+
     return Response.json({
       ok: true,
       inbound,
@@ -1414,6 +1914,18 @@ export async function POST(req: Request) {
     contentText: botResponse.message,
     createdAt: botNowIso,
   });
+
+  let finalOutbound = outboundError ? null : ((outbound as Record<string, unknown> | null) ?? null);
+  if (botResponseText === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
+    const dateOptionsPresentation = await presentExperimentalClassDateOptions({
+      admin,
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      leadTimeZone: String((persistedLeadValues.timezone as string | undefined) ?? (lead as any)?.timezone ?? "").trim(),
+    });
+    finalOutbound = dateOptionsPresentation.outbound;
+  }
+
   await appendHistoryEvent({
     leadId: String(lead.id),
     conversationId: String(conversation.id),
@@ -1426,7 +1938,7 @@ export async function POST(req: Request) {
   return Response.json({
     ok: true,
     inbound,
-    outbound: outboundError ? null : outbound,
+    outbound: finalOutbound,
     blocked: false,
     conversation: {
       id: String(conversation.id),

@@ -7,8 +7,13 @@ import { botReplyForLead } from "@/lib/atendimento/bot";
 import {
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   CAPTURED_FIELD_PROMPTS,
+  EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
 } from "@/lib/atendimento/constants";
+import {
+  buildExperimentalClassDatesMessage,
+  listExperimentalClassAvailability,
+} from "@/lib/atendimento/experimentalClass";
 import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
 import { resolveTimeZoneFromCityInput } from "@/lib/timezone";
 
@@ -122,6 +127,26 @@ async function upsertCapturedPhoneField(params: {
     source_message_id: params.sourceMessageId,
     confidence: 0.92,
   });
+}
+
+async function listScheduledExperimentalClassProfessorStarts(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  nowIso: string;
+}) {
+  const { data, error } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", params.nowIso)
+    .order("professor_start_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || "Falha ao consultar horários ocupados da aula experimental.");
+  }
+
+  return (data ?? [])
+    .map((row) => String((row as any)?.professor_start_at ?? "").trim())
+    .filter(Boolean);
 }
 
 async function findPendingPhoneValidationEvent(params: {
@@ -797,6 +822,47 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       previewText = String((outbound as any)?.content_text ?? message);
+    }
+
+    if (followUpMessage === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
+      const bookedProfessorStarts = await listScheduledExperimentalClassProfessorStarts({
+        admin,
+        nowIso,
+      });
+      const availability = listExperimentalClassAvailability({
+        leadTimeZone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        bookedProfessorStartAts: bookedProfessorStarts,
+      });
+      const availabilityMessage = buildExperimentalClassDatesMessage(availability.dates);
+
+      const { data: availabilityOutbound } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          sender_role: "bot",
+          content_text: availabilityMessage,
+          media_type: "text",
+          status: "entregue",
+          sent_at: nowIso,
+          delivered_at: nowIso,
+        })
+        .select("content_text")
+        .maybeSingle();
+
+      previewText = String((availabilityOutbound as any)?.content_text ?? availabilityMessage);
+
+      await appendHistoryEvent({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        eventType: "experimental_class_date_options_presented",
+        title: "Datas disponíveis da aula experimental apresentadas",
+        details: {
+          teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          lead_timezone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          options: availability.dates,
+        },
+        actorType: "system",
+      });
     }
 
     if (
