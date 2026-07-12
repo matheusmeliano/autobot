@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Copy, Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
@@ -82,6 +83,7 @@ function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
 
 function BookingDetails({ lead }: { lead: AtendimentoLeadListItem }) {
   const booking = lead.experimental_class_booking;
+  const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
@@ -102,7 +104,7 @@ function BookingDetails({ lead }: { lead: AtendimentoLeadListItem }) {
         <Field label="Fuso do aluno" value={booking?.lead_timezone} />
         <Field label="Data do professor" value={formatAtendimentoDate(booking?.professor_date)} />
         <Field label="Horario do professor" value={booking?.professor_time} />
-        <Field label="Fuso do professor" value={booking?.professor_timezone} />
+        <Field label="Fuso do professor" value={professorTimeZone} />
       </div>
     </div>
   );

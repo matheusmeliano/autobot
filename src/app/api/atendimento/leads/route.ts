@@ -1,3 +1,4 @@
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 
@@ -92,6 +93,7 @@ export async function GET(req: Request) {
       if (!leadId || bookingsByLeadId.has(leadId)) continue;
       bookingsByLeadId.set(leadId, {
         ...(booking as any),
+        professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
       });
     }
@@ -114,7 +116,7 @@ export async function GET(req: Request) {
       bookingsByLeadId.set(leadId, {
         id: String((event as any)?.id ?? ""),
         status: "scheduled",
-        professor_timezone: String(details.professor_timezone ?? ""),
+        professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         lead_timezone: String(details.lead_timezone ?? ""),
         professor_date: String(details.professor_date ?? ""),
         professor_time: String(details.professor_time ?? ""),
