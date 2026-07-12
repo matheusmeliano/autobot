@@ -83,6 +83,63 @@ export default async function AtendimentoAccountPage({
     redirect("/app");
   }
 
+  const { data: lead } = await supabase
+    .from("atendimento_leads")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  let bookingSummary: {
+    status: string;
+    date_time: string;
+  } | null = null;
+
+  if (lead?.id) {
+    const { data: booking } = await supabase
+      .from("atendimento_experimental_class_bookings")
+      .select("status, lead_date, lead_time, professor_date, professor_time, created_at, updated_at")
+      .eq("lead_id", String(lead.id))
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (booking) {
+      const leadDate = String((booking as any)?.lead_date ?? "").trim();
+      const leadTime = String((booking as any)?.lead_time ?? "").trim();
+      const professorDate = String((booking as any)?.professor_date ?? "").trim();
+      const professorTime = String((booking as any)?.professor_time ?? "").trim();
+      bookingSummary = {
+        status: String((booking as any)?.status ?? "").trim() || "scheduled",
+        date_time: [leadDate || professorDate, leadTime || professorTime].filter(Boolean).join(", "),
+      };
+    } else {
+      const { data: historyEvent } = await supabase
+        .from("atendimento_history_events")
+        .select("event_type, details, created_at")
+        .eq("lead_id", String(lead.id))
+        .in("event_type", ["experimental_class_scheduled", "experimental_class_cancelled"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (historyEvent) {
+        const details = ((historyEvent as any)?.details ?? {}) as Record<string, unknown>;
+        const leadDate = String(details.lead_date ?? "").trim();
+        const leadTime = String(details.lead_time ?? "").trim();
+        const professorDate = String(details.professor_date ?? "").trim();
+        const professorTime = String(details.professor_time ?? "").trim();
+        const eventType = String((historyEvent as any)?.event_type ?? "").trim().toLowerCase();
+        bookingSummary = {
+          status:
+            String(details.status ?? "").trim() ||
+            (eventType === "experimental_class_cancelled" ? "cancelled" : "scheduled"),
+          date_time: [leadDate || professorDate, leadTime || professorTime].filter(Boolean).join(", "),
+        };
+      }
+    }
+  }
+
   return (
     <>
       {rootStyle}
@@ -97,6 +154,7 @@ export default async function AtendimentoAccountPage({
           nome: String((profile as any)?.nome ?? "").trim() || "",
           email: String((profile as any)?.email ?? user.email ?? "").trim(),
           created_at: String((profile as any)?.created_at ?? "").trim() || "",
+          booking: bookingSummary,
         }}
       />
     </>

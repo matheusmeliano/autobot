@@ -72,6 +72,14 @@ function getFirstName(value: string) {
   return normalized.split(/\s+/)[0] || "Usuario";
 }
 
+function bookingStatusLabel(status?: string | null) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "scheduled") return "Agendado";
+  if (normalized === "cancelled") return "Cancelado";
+  if (normalized === "completed") return "Concluido";
+  return normalized ? status ?? "-" : "-";
+}
+
 function getAtendimentoPresenceSessionId() {
   if (typeof window === "undefined") {
     return `presence-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -209,7 +217,15 @@ export function PublicAtendimentoClient({
   initialSlug: string;
   page: PortalPage;
   currentUser: { id: string; email: string };
-  profile: { nome: string; email: string; created_at: string };
+  profile: {
+    nome: string;
+    email: string;
+    created_at: string;
+    booking?: {
+      status: string;
+      date_time: string;
+    } | null;
+  };
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const linkSlug = String(initialSlug ?? "").trim();
@@ -1491,6 +1507,18 @@ export function PublicAtendimentoClient({
 
         {isAccountPage ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-6">
+            {profile.booking ? (
+              <div className="mb-4 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-amber-200/30 bg-amber-200/10 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Status do agendamento</div>
+                  <div className="mt-3 text-lg font-semibold text-amber-50">{bookingStatusLabel(profile.booking.status)}</div>
+                </div>
+                <div className="rounded-2xl border border-amber-200/30 bg-amber-200/10 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Data do agendamento</div>
+                  <div className="mt-3 text-lg font-semibold text-amber-50">{profile.booking.date_time || "-"}</div>
+                </div>
+              </div>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">Nome</div>
