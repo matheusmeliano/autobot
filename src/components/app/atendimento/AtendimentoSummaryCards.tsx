@@ -11,6 +11,15 @@ import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, f
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
 const PANEL_PAGE_SIZE = 4;
 
+function experimentalClassBookingStatusLabel(status: string | null | undefined) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "scheduled") return "Agendado";
+  if (normalized === "cancelled") return "Cancelado";
+  if (normalized === "completed") return "Concluido";
+  if (!normalized) return "-";
+  return status ?? "-";
+}
+
 function Field({
   label,
   value,
@@ -98,7 +107,7 @@ function BookingDetails({ lead }: { lead: AtendimentoLeadListItem }) {
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
         <Field label="Aluno" value={lead.full_name} />
-        <Field label="Status" value={booking?.status || "scheduled"} />
+        <Field label="Status" value={experimentalClassBookingStatusLabel(booking?.status || "scheduled")} />
         <Field label="Data do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
         <Field label="Horario do aluno" value={booking?.lead_time} />
         <Field label="Fuso do aluno" value={booking?.lead_timezone} />
