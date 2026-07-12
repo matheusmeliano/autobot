@@ -5,7 +5,7 @@ import { Copy, Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
-import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
+import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
 const PANEL_PAGE_SIZE = 4;
@@ -75,6 +75,34 @@ function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
         <Field label="Estado" value={lead.state} />
         <Field label="Pais" value={lead.country} />
         <Field label="Fuso" value={lead.timezone} />
+      </div>
+    </div>
+  );
+}
+
+function BookingDetails({ lead }: { lead: AtendimentoLeadListItem }) {
+  const booking = lead.experimental_class_booking;
+
+  return (
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
+      <div className="min-w-0 flex flex-col gap-2 border-b border-[var(--app-border)] pb-4">
+        <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Agendamento"}>
+          {lead.full_name || "Agendamento"}
+        </div>
+        <div className="text-sm text-[var(--app-text-55)]">
+          Agendamento: {formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}
+        </div>
+      </div>
+
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+        <Field label="Aluno" value={lead.full_name} />
+        <Field label="Status" value={booking?.status || "scheduled"} />
+        <Field label="Data do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
+        <Field label="Horario do aluno" value={booking?.lead_time} />
+        <Field label="Fuso do aluno" value={booking?.lead_timezone} />
+        <Field label="Data do professor" value={formatAtendimentoDate(booking?.professor_date)} />
+        <Field label="Horario do professor" value={booking?.professor_time} />
+        <Field label="Fuso do professor" value={booking?.professor_timezone} />
       </div>
     </div>
   );
@@ -174,6 +202,17 @@ export function AtendimentoSummaryCards({
     setMobileLead(lead);
   }
 
+  function buildItemMeta(lead: AtendimentoLeadListItem) {
+    if (activeSection === "agendamentos") {
+      const booking = lead.experimental_class_booking;
+      const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
+      const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
+      return [dateLabel, timeLabel].filter((value) => value && value !== "-").join(", ") || "Agendamento sem horario";
+    }
+
+    return formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
+  }
+
   return (
     <div className="flex flex-col gap-6 lg:h-full lg:min-h-0">
       <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -237,7 +276,7 @@ export function AtendimentoSummaryCards({
                     >
                       <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">{lead.full_name || "Novo Lead"}</div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
-                        {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
+                        {buildItemMeta(lead)}
                       </div>
                     </button>
                   );
@@ -278,7 +317,7 @@ export function AtendimentoSummaryCards({
 
           <div className="hidden min-h-0 min-w-0 flex-1 lg:block lg:h-full">
             {selectedLead ? (
-              <LeadDetails lead={selectedLead} />
+              activeSection === "agendamentos" ? <BookingDetails lead={selectedLead} /> : <LeadDetails lead={selectedLead} />
             ) : (
               <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-6 text-center text-sm text-[var(--app-text-45)]">
                 {activeSectionData.emptyMessage}
@@ -304,7 +343,7 @@ export function AtendimentoSummaryCards({
           </button>
         </div>
 
-        {mobileLead ? <div className="mt-4"><LeadDetails lead={mobileLead} /></div> : null}
+        {mobileLead ? <div className="mt-4">{activeSection === "agendamentos" ? <BookingDetails lead={mobileLead} /> : <LeadDetails lead={mobileLead} />}</div> : null}
       </AppModal>
     </div>
   );

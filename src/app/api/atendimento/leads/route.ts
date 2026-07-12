@@ -1,6 +1,17 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 
+function isExperimentalClassBookingsTableUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(message)
+  );
+}
+
 function getLeadSortTime(row: any) {
   const candidates = [
     row?.last_interaction_at,
@@ -44,6 +55,7 @@ export async function GET(req: Request) {
   const leadRows = (leads ?? []) as any[];
   const leadIds = leadRows.map((row) => String(row.id ?? "")).filter(Boolean);
   const conversationsByLeadId = new Map<string, any>();
+  const bookingsByLeadId = new Map<string, any>();
 
   if (leadIds.length > 0) {
     const { data: conversations, error: conversationsError } = await admin
@@ -61,12 +73,66 @@ export async function GET(req: Request) {
       if (!leadId || conversationsByLeadId.has(leadId)) continue;
       conversationsByLeadId.set(leadId, conversation);
     }
+
+    const { data: bookings, error: bookingsError } = await admin
+      .from("atendimento_experimental_class_bookings")
+      .select(
+        "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at",
+      )
+      .in("lead_id", leadIds)
+      .eq("status", "scheduled")
+      .order("created_at", { ascending: false });
+
+    if (bookingsError && !isExperimentalClassBookingsTableUnavailable(bookingsError)) {
+      return Response.json({ ok: false, error: bookingsError.message }, { status: 500 });
+    }
+
+    for (const booking of bookings ?? []) {
+      const leadId = String((booking as any)?.lead_id ?? "");
+      if (!leadId || bookingsByLeadId.has(leadId)) continue;
+      bookingsByLeadId.set(leadId, {
+        ...(booking as any),
+        source: "table",
+      });
+    }
+
+    const { data: historyEvents, error: historyError } = await admin
+      .from("atendimento_history_events")
+      .select("id, lead_id, created_at, details")
+      .in("lead_id", leadIds)
+      .eq("event_type", "experimental_class_scheduled")
+      .order("created_at", { ascending: false });
+
+    if (historyError) {
+      return Response.json({ ok: false, error: historyError.message }, { status: 500 });
+    }
+
+    for (const event of historyEvents ?? []) {
+      const leadId = String((event as any)?.lead_id ?? "");
+      if (!leadId || bookingsByLeadId.has(leadId)) continue;
+      const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+      bookingsByLeadId.set(leadId, {
+        id: String((event as any)?.id ?? ""),
+        status: "scheduled",
+        professor_timezone: String(details.professor_timezone ?? ""),
+        lead_timezone: String(details.lead_timezone ?? ""),
+        professor_date: String(details.professor_date ?? ""),
+        professor_time: String(details.professor_time ?? ""),
+        professor_start_at: String(details.professor_start_at ?? ""),
+        lead_date: String(details.lead_date ?? ""),
+        lead_time: String(details.lead_time ?? ""),
+        lead_start_at: String(details.lead_start_at ?? ""),
+        created_at: String((event as any)?.created_at ?? ""),
+        source: "history",
+      });
+    }
   }
 
   const rows = leadRows
     .map((row) => ({
       ...row,
       conversation: conversationsByLeadId.get(String(row.id ?? "")) ?? null,
+      experimental_class_booking: bookingsByLeadId.get(String(row.id ?? "")) ?? null,
     }))
     .filter((row) => {
     const name = String(row.full_name ?? "").toLowerCase();

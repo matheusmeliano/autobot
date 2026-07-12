@@ -83,9 +83,25 @@ export type AtendimentoHistoryEvent = {
   created_at: string;
 };
 
+export type AtendimentoExperimentalClassBookingSummary = {
+  id: string;
+  status: string | null;
+  professor_timezone: string | null;
+  lead_timezone: string | null;
+  professor_date: string | null;
+  professor_time: string | null;
+  professor_start_at: string | null;
+  lead_date: string | null;
+  lead_time: string | null;
+  lead_start_at: string | null;
+  source: "table" | "history";
+  created_at: string | null;
+};
+
 export type AtendimentoLeadListItem = AtendimentoLead & {
   conversation: AtendimentoConversation | null;
   last_message: AtendimentoMessage | null;
+  experimental_class_booking: AtendimentoExperimentalClassBookingSummary | null;
 };
 
 export type AtendimentoSummary = {
