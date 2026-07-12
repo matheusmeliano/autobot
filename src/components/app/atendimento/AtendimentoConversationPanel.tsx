@@ -444,7 +444,7 @@ export function AtendimentoConversationPanel({
           })
         ) : (
           <div className="flex h-full min-h-56 items-center justify-center text-sm text-[var(--app-text-45)]">
-            Nenhuma mensagem nesta conversa.
+            {conversation?.id ? "Nenhuma mensagem nesta conversa." : "Nenhuma conversa selecionada."}
           </div>
         )}
         <div ref={messagesEndRef} aria-hidden="true" />
