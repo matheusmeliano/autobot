@@ -106,9 +106,9 @@ export function AtendimentoSummaryCards({
       {
         id: "agendamentos" as const,
         label: "Agendamentos",
-        value: 0,
+        value: summary.aulasExperimentaisAgendadas,
         emptyMessage: "Nenhum agendamento disponivel no momento.",
-        items: [],
+        items: leads.filter((lead) => lead.funnel_stage === "aula_experimental_agendada"),
       },
       {
         id: "contratos" as const,
