@@ -271,6 +271,16 @@ export function AtendimentoClient() {
     return openedLeadId;
   }, []);
 
+  const getOpenedConversationId = useCallback(() => {
+    const openedLeadId = getOpenedLeadIdForUnreadClear();
+    const selectedLeadId = String(selectedLeadIdRef.current ?? "").trim();
+    const selectedConversationId = String(selectedConversationIdRef.current ?? "").trim();
+    if (!openedLeadId || openedLeadId !== selectedLeadId || !selectedConversationId) {
+      return null;
+    }
+    return selectedConversationId;
+  }, [getOpenedLeadIdForUnreadClear]);
+
   function handleForbiddenResponse(res: Response) {
     if (res.status !== 401 && res.status !== 403) return false;
     window.location.replace("/login");
@@ -644,17 +654,19 @@ export function AtendimentoClient() {
   }, [loadLeads, loadPanelLeads, loadSummary]);
 
   const scheduleSelectedLeadRefresh = useCallback(() => {
-    if (realtimeSuspendedRef.current || !selectedLeadIdRef.current) return;
+    const openedLeadId = getOpenedLeadIdForUnreadClear();
+    if (realtimeSuspendedRef.current || !openedLeadId) return;
     if (messagesLoadingRef.current) return;
     if (detailRefreshTimeoutRef.current != null) {
       window.clearTimeout(detailRefreshTimeoutRef.current);
     }
     detailRefreshTimeoutRef.current = window.setTimeout(() => {
-      if (!selectedLeadIdRef.current) return;
+      const currentOpenedLeadId = getOpenedLeadIdForUnreadClear();
+      if (!currentOpenedLeadId) return;
       if (messagesLoadingRef.current) return;
-      void loadLeadDetail(selectedLeadIdRef.current, { skipMessages: true, suppressNotFound: true });
+      void loadLeadDetail(currentOpenedLeadId, { skipMessages: true, suppressNotFound: true });
     }, 120);
-  }, [loadLeadDetail]);
+  }, [getOpenedLeadIdForUnreadClear, loadLeadDetail]);
 
   const startFallbackRefresh = useCallback(() => {
     if (fallbackRefreshIntervalRef.current != null) return;
@@ -664,15 +676,17 @@ export function AtendimentoClient() {
       void loadSummary();
       void loadLeads(queryRef.current, { silent: true });
       void loadPanelLeads();
-      if (selectedLeadIdRef.current) {
+      const openedLeadId = getOpenedLeadIdForUnreadClear();
+      const openedConversationId = getOpenedConversationId();
+      if (openedLeadId) {
         if (messagesLoadingRef.current) return;
-        void loadLeadDetail(selectedLeadIdRef.current, { suppressNotFound: true, skipMessages: true });
-        if (selectedConversationIdRef.current) {
-          void loadConversationMessages(selectedConversationIdRef.current, "replace");
+        void loadLeadDetail(openedLeadId, { suppressNotFound: true, skipMessages: true });
+        if (openedConversationId) {
+          void loadConversationMessages(openedConversationId, "replace");
         }
       }
     }, 1500);
-  }, [loadConversationMessages, loadLeadDetail, loadLeads, loadPanelLeads, loadSummary]);
+  }, [getOpenedConversationId, getOpenedLeadIdForUnreadClear, loadConversationMessages, loadLeadDetail, loadLeads, loadPanelLeads, loadSummary]);
 
   const stopFallbackRefresh = useCallback(() => {
     if (fallbackRefreshIntervalRef.current != null) {
@@ -694,7 +708,7 @@ export function AtendimentoClient() {
       .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_leads" }, (payload: any) => {
         scheduleListRefresh();
         const affectedLeadId = String(payload.new?.id ?? payload.old?.id ?? "");
-        if (affectedLeadId && affectedLeadId === selectedLeadIdRef.current) {
+        if (affectedLeadId && affectedLeadId === getOpenedLeadIdForUnreadClear()) {
           scheduleSelectedLeadRefresh();
         }
       })
@@ -704,7 +718,7 @@ export function AtendimentoClient() {
         (payload: any) => {
         scheduleListRefresh();
         const affectedConversationId = String(payload.new?.id ?? payload.old?.id ?? "");
-        if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
+        if (affectedConversationId && affectedConversationId === getOpenedConversationId()) {
           scheduleSelectedLeadRefresh();
         }
       },
@@ -712,9 +726,10 @@ export function AtendimentoClient() {
       .on("postgres_changes", { event: "*", schema: "public", table: "atendimento_messages" }, (payload: any) => {
         const affectedConversationId = String(payload.new?.conversation_id ?? payload.old?.conversation_id ?? "");
         const nextMessage = (payload.new ?? null) as AtendimentoMessage | null;
+        const openedConversationId = getOpenedConversationId();
         const shouldMarkAsUnread =
           payload.eventType !== "DELETE" &&
-          affectedConversationId !== selectedConversationIdRef.current &&
+          affectedConversationId !== openedConversationId &&
           String(nextMessage?.sender_role ?? "") === "lead";
 
         if (payload.eventType !== "DELETE" && affectedConversationId) {
@@ -726,7 +741,7 @@ export function AtendimentoClient() {
           );
         }
 
-        if (affectedConversationId && affectedConversationId === selectedConversationIdRef.current) {
+        if (affectedConversationId && affectedConversationId === openedConversationId) {
           if (payload.eventType === "DELETE") {
             removeMessage(String(payload.old?.id ?? ""));
           } else {
@@ -768,6 +783,8 @@ export function AtendimentoClient() {
   }, [
     applyMessages,
     loadConversationMessages,
+    getOpenedConversationId,
+    getOpenedLeadIdForUnreadClear,
     loadLeads,
     loadPanelLeads,
     loadSummary,
