@@ -107,7 +107,7 @@ function BookingDetails({
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
-      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 md:flex-row md:items-start md:justify-between">
+      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
           <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Agendamento"}>
             {lead.full_name || "Agendamento"}
@@ -122,7 +122,7 @@ function BookingDetails({
             type="button"
             onClick={() => void onCancelBooking(lead)}
             disabled={cancellingBookingId === bookingId}
-            className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] md:ml-auto md:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancellingBookingId === bookingId ? "Cancelando..." : "Cancelar agendamento"}
           </button>
