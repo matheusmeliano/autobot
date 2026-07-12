@@ -8,6 +8,7 @@ import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/s
 
 export const runtime = "nodejs";
 const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
+const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com sucesso.";
 const WHATSAPP_INVALID_MESSAGE =
   "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FINAL_MESSAGE =
@@ -531,7 +532,7 @@ export async function POST(req: Request) {
 
     if (eventType === "DeliveryCallback" && deliveryError) {
       const isRealInvalidWhatsApp = isExplicitInvalidWhatsAppError(deliveryError);
-      await admin
+      const { data: claimedFailureEvent } = await admin
         .from("atendimento_history_events")
         .update({
           event_type: isRealInvalidWhatsApp ? "phone_validation_failed" : "phone_validation_timeout",
@@ -545,7 +546,14 @@ export async function POST(req: Request) {
             failed_at: nowIso,
           },
         })
-        .eq("id", String((pendingEvent as any).id));
+        .eq("id", String((pendingEvent as any).id))
+        .eq("event_type", "phone_validation_pending")
+        .select("id")
+        .maybeSingle();
+
+      if (!claimedFailureEvent?.id) {
+        return Response.json({ ok: true, ignored: true, reason: "phone_validation_already_processed" });
+      }
 
       const { data: leadRow } = await admin
         .from("atendimento_leads")
@@ -663,6 +671,26 @@ export async function POST(req: Request) {
       return Response.json({ ok: true, ignored: true, reason: "awaiting_final_phone_status" });
     }
 
+    const { data: claimedSuccessEvent } = await admin
+      .from("atendimento_history_events")
+      .update({
+        event_type: "phone_validated",
+        title: "WhatsApp validado e salvo",
+        details: {
+          ...pendingDetails,
+          final_status: statusChange || eventType,
+          confirmed_at: nowIso,
+        },
+      })
+      .eq("id", String((pendingEvent as any).id))
+      .eq("event_type", "phone_validation_pending")
+      .select("id")
+      .maybeSingle();
+
+    if (!claimedSuccessEvent?.id) {
+      return Response.json({ ok: true, ignored: true, reason: "phone_validation_already_processed" });
+    }
+
     const { data: leadRecord } = await admin
       .from("atendimento_leads")
       .select("*")
@@ -681,10 +709,7 @@ export async function POST(req: Request) {
       lead: nextLead,
       messageText: "",
     });
-    const successMessage =
-      botResponse.message === "WhatsApp registrado com sucesso."
-        ? "WhatsApp registrado com sucesso."
-        : `WhatsApp registrado com sucesso. ${botResponse.message}`;
+    const successMessage = WHATSAPP_REGISTERED_SUCCESS_MESSAGE;
     const nextStatus = botResponse.message ? botResponse.status : "matricula_pendente";
     const nextStage = botResponse.message ? botResponse.stage : "pre_cadastro_concluido";
 
@@ -705,19 +730,6 @@ export async function POST(req: Request) {
       sourceMessageId: callbackMessageIds[0] ?? String((pendingEvent as any).id ?? ""),
       phone: pendingPhone,
     });
-
-    await admin
-      .from("atendimento_history_events")
-      .update({
-        event_type: "phone_validated",
-        title: "WhatsApp validado e salvo",
-        details: {
-          ...pendingDetails,
-          final_status: statusChange || eventType,
-          confirmed_at: nowIso,
-        },
-      })
-      .eq("id", String((pendingEvent as any).id));
 
     const { data: outbound } = await admin
       .from("atendimento_messages")

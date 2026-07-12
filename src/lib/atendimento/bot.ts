@@ -151,8 +151,7 @@ export function botReplyForLead(params: {
     return {
       stage: "pre_cadastro_concluido" as AtendimentoStage,
       status: "matricula_pendente" as AtendimentoStatus,
-      message:
-        "Perfeito. Seu pré-cadastro foi concluído e seu atendimento segue para matrícula pendente. Em breve continuaremos por aqui.",
+      message: "WhatsApp registrado com sucesso.",
     };
   }
 
