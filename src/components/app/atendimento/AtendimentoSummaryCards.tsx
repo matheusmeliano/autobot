@@ -103,7 +103,7 @@ function BookingDetails({
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const bookingId = String(booking?.id ?? "").trim();
   const normalizedStatus = String(booking?.status ?? "").trim().toLowerCase();
-  const canCancel = booking?.source === "table" && normalizedStatus === "scheduled" && Boolean(bookingId);
+  const canCancel = normalizedStatus === "scheduled" && Boolean(bookingId);
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
@@ -253,7 +253,7 @@ export function AtendimentoSummaryCards({
     const bookingId = String(booking?.id ?? "").trim();
     const normalizedStatus = String(booking?.status ?? "").trim().toLowerCase();
 
-    if (!bookingId || booking?.source !== "table" || normalizedStatus !== "scheduled") {
+    if (!bookingId || normalizedStatus !== "scheduled") {
       return;
     }
 
@@ -266,6 +266,20 @@ export function AtendimentoSummaryCards({
 
       const response = await fetch(`/api/atendimento/bookings/${bookingId}/cancel`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leadId: lead.id,
+          conversationId: lead.conversation?.id ?? null,
+          professorDate: booking?.professor_date ?? null,
+          professorTime: booking?.professor_time ?? null,
+          professorStartAt: booking?.professor_start_at ?? null,
+          leadDate: booking?.lead_date ?? null,
+          leadTime: booking?.lead_time ?? null,
+          leadTimeZone: booking?.lead_timezone ?? null,
+          professorTimeZone: booking?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        }),
       });
       const payload = (await response.json().catch(() => null)) as
         | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
@@ -294,7 +308,7 @@ export function AtendimentoSummaryCards({
             status: "cancelled",
           }),
           ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
-          source: "table",
+          source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
           status: "cancelled",
         },
       };

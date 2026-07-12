@@ -100,9 +100,9 @@ export async function GET(req: Request) {
 
     const { data: historyEvents, error: historyError } = await admin
       .from("atendimento_history_events")
-      .select("id, lead_id, created_at, details")
+      .select("id, lead_id, event_type, conversation_id, created_at, details")
       .in("lead_id", leadIds)
-      .eq("event_type", "experimental_class_scheduled")
+      .in("event_type", ["experimental_class_scheduled", "experimental_class_cancelled"])
       .order("created_at", { ascending: false });
 
     if (historyError) {
@@ -113,9 +113,13 @@ export async function GET(req: Request) {
       const leadId = String((event as any)?.lead_id ?? "");
       if (!leadId || bookingsByLeadId.has(leadId)) continue;
       const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+      const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+      const bookingStatus =
+        String(details.status ?? "").trim().toLowerCase() ||
+        (eventType === "experimental_class_cancelled" ? "cancelled" : "scheduled");
       bookingsByLeadId.set(leadId, {
         id: String((event as any)?.id ?? ""),
-        status: "scheduled",
+        status: bookingStatus,
         professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         lead_timezone: String(details.lead_timezone ?? ""),
         professor_date: String(details.professor_date ?? ""),
@@ -124,6 +128,7 @@ export async function GET(req: Request) {
         lead_date: String(details.lead_date ?? ""),
         lead_time: String(details.lead_time ?? ""),
         lead_start_at: String(details.lead_start_at ?? ""),
+        conversation_id: String((event as any)?.conversation_id ?? ""),
         created_at: String((event as any)?.created_at ?? ""),
         source: "history",
       });
