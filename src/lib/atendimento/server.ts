@@ -16,6 +16,7 @@ import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+1 321 297 3565";
 const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
+const ATENDIMENTO_DAILY_SUMMARY_TRIGGER_HOUR = 20;
 export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 45_000;
 
 function buildDeterministicInitialBotMessageId(conversationId: string, contentText: string) {
@@ -69,6 +70,20 @@ function addDaysToLocalDate(localDate: string, days: number) {
   const nextMonth = String(date.getUTCMonth() + 1).padStart(2, "0");
   const nextDay = String(date.getUTCDate()).padStart(2, "0");
   return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
+function localTimePartsInTimeZone(value: Date | string | number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(value));
+  const map = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return {
+    hour: Number(map.hour ?? 0),
+    minute: Number(map.minute ?? 0),
+  };
 }
 
 function buildAtendimentoDailySummaryMessage(leadsCount: number) {
@@ -324,7 +339,19 @@ export async function sendAtendimentoWhatsAppText(params: {
 
 export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
   const admin = createSupabaseAdminClient();
+  const nowIso = now.toISOString();
   const summaryDate = localDateInTimeZone(now, ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE);
+  const localTime = localTimePartsInTimeZone(now, ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE);
+  if (localTime.hour < ATENDIMENTO_DAILY_SUMMARY_TRIGGER_HOUR) {
+    return {
+      ok: true as const,
+      skipped: true as const,
+      reason: "before_trigger_time",
+      summaryDate,
+      leadsCount: null,
+    };
+  }
+
   const nextSummaryDate = addDaysToLocalDate(summaryDate, 1);
   const rangeStartIso = zonedDateTimeToUtcIso({
     date: summaryDate,
@@ -337,17 +364,61 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
     timeZone: ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE,
   });
 
-  const { error: leaseError } = await admin.from("atendimento_daily_summary_runs").insert({
+  const { data: existingRun, error: existingRunError } = await admin
+    .from("atendimento_daily_summary_runs")
+    .select("summary_date, sent_at, attempt_count")
+    .eq("summary_date", summaryDate)
+    .maybeSingle();
+
+  if (existingRunError) {
+    throw new Error(existingRunError.message || "Falha ao consultar o resumo diario do atendimento.");
+  }
+
+  if (existingRun?.sent_at) {
+    return {
+      ok: true as const,
+      skipped: true as const,
+      reason: "already_sent",
+      summaryDate,
+      leadsCount: Number((existingRun as any)?.leads_count ?? 0) || null,
+    };
+  }
+
+  const nextAttemptCount = Number((existingRun as any)?.attempt_count ?? 0) + 1;
+  const leasePayload = {
     summary_date: summaryDate,
     timezone: ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE,
-  });
+    sent_at: null,
+    last_attempt_at: nowIso,
+    attempt_count: nextAttemptCount,
+    last_error: null,
+  };
 
-  if (leaseError) {
-    const code = String((leaseError as any)?.code ?? "").trim();
-    if (code === "23505") {
-      return { ok: true as const, skipped: true as const, summaryDate, leadsCount: null };
+  if (existingRun?.summary_date) {
+    const { error: updateLeaseError } = await admin
+      .from("atendimento_daily_summary_runs")
+      .update(leasePayload)
+      .eq("summary_date", summaryDate)
+      .is("sent_at", null);
+
+    if (updateLeaseError) {
+      throw new Error(updateLeaseError.message || "Falha ao atualizar a tentativa do resumo diario do atendimento.");
     }
-    throw new Error(leaseError.message || "Falha ao reservar o resumo diario do atendimento.");
+  } else {
+    const { error: insertLeaseError } = await admin.from("atendimento_daily_summary_runs").insert(leasePayload);
+    if (insertLeaseError) {
+      const code = String((insertLeaseError as any)?.code ?? "").trim();
+      if (code === "23505") {
+        return {
+          ok: true as const,
+          skipped: true as const,
+          reason: "already_reserved",
+          summaryDate,
+          leadsCount: null,
+        };
+      }
+      throw new Error(insertLeaseError.message || "Falha ao reservar o resumo diario do atendimento.");
+    }
   }
 
   let leadsCount = 0;
@@ -357,7 +428,13 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
       rangeEndIso,
     });
   } catch (error) {
-    await admin.from("atendimento_daily_summary_runs").delete().eq("summary_date", summaryDate);
+    await admin
+      .from("atendimento_daily_summary_runs")
+      .update({
+        last_attempt_at: nowIso,
+        last_error: error instanceof Error ? error.message : String(error),
+      })
+      .eq("summary_date", summaryDate);
     throw error;
   }
 
@@ -372,12 +449,20 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
       .update({
         leads_count: leadsCount,
         sent_at: new Date().toISOString(),
+        last_attempt_at: nowIso,
+        last_error: null,
       })
       .eq("summary_date", summaryDate);
 
     return { ok: true as const, skipped: false as const, summaryDate, leadsCount };
   } catch (error) {
-    await admin.from("atendimento_daily_summary_runs").delete().eq("summary_date", summaryDate);
+    await admin
+      .from("atendimento_daily_summary_runs")
+      .update({
+        last_attempt_at: nowIso,
+        last_error: error instanceof Error ? error.message : String(error),
+      })
+      .eq("summary_date", summaryDate);
     throw error;
   }
 }
