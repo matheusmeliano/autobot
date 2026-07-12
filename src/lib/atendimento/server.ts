@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
@@ -18,40 +17,6 @@ const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+1 321 297 3565";
 const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
 export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 45_000;
-
-// #region debug-point A:bootstrap
-const __dbgEnvPath = ".dbg/whatsapp-validation-send.env";
-const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
-const __dbgMap = Object.fromEntries(
-  __dbgEnvRaw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
-const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
-const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  if (!__dbgUrl || !__dbgSession) return;
-  fetch(__dbgUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSession,
-      runId: "pre-fix",
-      hypothesisId,
-      traceId,
-      location: "src/lib/atendimento/server.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
 
 function buildDeterministicInitialBotMessageId(conversationId: string, contentText: string) {
   const hash = crypto
@@ -195,21 +160,10 @@ async function sendZapiText(params: {
   message: string;
 }) {
   const normalizedPhone = normalizePhone(params.phone);
-  const traceId = `atendimento-zapi-send-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const body = JSON.stringify({ phone: normalizedPhone, message: params.message });
   const baseUrl = `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}`;
   const urlWithTokenInPath = `${baseUrl}/token/${encodeURIComponent(params.token)}/send-text`;
   const urlWithHeader = `${baseUrl}/send-text`;
-
-  // #region debug-point A:send-zapi-start
-  __dbg(traceId, "A", "[DEBUG] atendimento_send_zapi_text_start", {
-    phone: params.phone,
-    normalizedPhone,
-    instanceId: params.instance_id,
-    hasClientToken: Boolean(params.client_token),
-    messageLength: String(params.message ?? "").length,
-  });
-  // #endregion
 
   const trySend = async (url: string, includeHeaderToken: boolean) => {
     const response = await fetch(url, {
@@ -221,15 +175,6 @@ async function sendZapiText(params: {
       body,
     });
     const data = await response.json().catch(() => null);
-    // #region debug-point A:send-zapi-response
-    __dbg(traceId, "A", "[DEBUG] atendimento_send_zapi_text_response", {
-      url,
-      includeHeaderToken,
-      status: response.status,
-      ok: response.ok,
-      data,
-    });
-    // #endregion
     return { response, data };
   };
 
@@ -356,13 +301,6 @@ export async function sendAtendimentoWhatsAppText(params: {
   const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
   if (baseUrl) {
     const webhookUrl = buildAuthorizedZapiWebhookUrl(baseUrl);
-    // #region debug-point B:update-webhook
-    __dbg(`atendimento-whatsapp-webhook-${Date.now()}`, "B", "[DEBUG] atendimento_send_whatsapp_update_webhook", {
-      baseUrl,
-      webhookUrl,
-      instanceId: config.instance_id,
-    });
-    // #endregion
     await updateZapiWebhook({
       instance_id: config.instance_id,
       token: config.token,

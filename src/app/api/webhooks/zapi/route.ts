@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
 import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
@@ -15,40 +14,6 @@ const WHATSAPP_INVALID_FINAL_MESSAGE =
   "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
 const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
   "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
-
-// #region debug-point C:bootstrap
-const __dbgEnvPath = ".dbg/whatsapp-validation-send.env";
-const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
-const __dbgMap = Object.fromEntries(
-  __dbgEnvRaw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf("=");
-      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
-    }),
-);
-const __dbgUrl = __dbgMap.DEBUG_SERVER_URL;
-const __dbgSession = __dbgMap.DEBUG_SESSION_ID;
-const __dbg = (traceId: string, hypothesisId: string, msg: string, data: Record<string, unknown>) => {
-  if (!__dbgUrl || !__dbgSession) return;
-  fetch(__dbgUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: __dbgSession,
-      runId: "pre-fix",
-      hypothesisId,
-      traceId,
-      location: "src/app/api/webhooks/zapi/route.ts",
-      msg,
-      data,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-};
-// #endregion
 
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
@@ -413,7 +378,6 @@ Regras:
 }
 
 export async function POST(req: Request) {
-  const traceId = `zapi-webhook-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   if (!isAuthorized(req)) {
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
@@ -548,29 +512,10 @@ export async function POST(req: Request) {
     ),
   );
   if ((eventType === "DeliveryCallback" || eventType === "MessageStatusCallback") && callbackMessageIds.length > 0) {
-    // #region debug-point C:callback
-    __dbg(traceId, "C", "[DEBUG] zapi_webhook_phone_validation_callback_seen", {
-      eventType,
-      rawEventId,
-      callbackMessageIds,
-      body,
-    });
-    // #endregion
-
     const pendingEvent = await findPendingPhoneValidationEvent({
       admin,
       messageIds: callbackMessageIds,
     });
-
-    // #region debug-point C:callback-match
-    __dbg(traceId, "C", "[DEBUG] zapi_webhook_phone_validation_callback_match", {
-      eventType,
-      callbackMessageIds,
-      pendingEventId: pendingEvent?.id ?? null,
-      leadId: pendingEvent?.lead_id ?? null,
-      conversationId: pendingEvent?.conversation_id ?? null,
-    });
-    // #endregion
 
     if (!pendingEvent?.id) {
       return Response.json({ ok: true, ignored: true, reason: "no_pending_phone_validation" });

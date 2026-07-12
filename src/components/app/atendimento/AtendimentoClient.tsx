@@ -238,6 +238,7 @@ export function AtendimentoClient() {
   const messagesLoadingRef = useRef(false);
   const messagesLoadingTokenRef = useRef(0);
   const selectedLeadIdRef = useRef<string | null>(null);
+  const openedLeadIdRef = useRef<string | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const rightPanelRef = useRef<AtendimentoRightPanel>("conversation");
   const mobileConversationOpenRef = useRef(false);
@@ -262,7 +263,12 @@ export function AtendimentoClient() {
 
   const getOpenedLeadIdForUnreadClear = useCallback(() => {
     const conversationVisible = rightPanelRef.current === "conversation" || mobileConversationOpenRef.current;
-    return conversationVisible ? selectedLeadIdRef.current : null;
+    const openedLeadId = String(openedLeadIdRef.current ?? "").trim();
+    const selectedLeadId = String(selectedLeadIdRef.current ?? "").trim();
+    if (!conversationVisible || !openedLeadId || openedLeadId !== selectedLeadId) {
+      return null;
+    }
+    return openedLeadId;
   }, []);
 
   function handleForbiddenResponse(res: Response) {
@@ -534,6 +540,30 @@ export function AtendimentoClient() {
     [loadConversationMessages],
   );
 
+  const openLeadConversation = useCallback(
+    (leadId: string) => {
+      const normalizedLeadId = String(leadId ?? "").trim();
+      if (!normalizedLeadId) return;
+
+      openedLeadIdRef.current = normalizedLeadId;
+      const isSameSelectedLead = String(selectedLeadIdRef.current ?? "").trim() === normalizedLeadId;
+      setSelectedLeadId(normalizedLeadId);
+
+      if (!isSameSelectedLead) {
+        return;
+      }
+
+      clearLeadUnreadLocally(normalizedLeadId);
+      setMessages([]);
+      setMessagesLoadError(null);
+      setMessagesLoading(true);
+      messagesLoadingRef.current = true;
+      setSelectedConversation(null);
+      void loadLeadDetail(normalizedLeadId);
+    },
+    [clearLeadUnreadLocally, loadLeadDetail],
+  );
+
   useEffect(() => {
     loadSummary();
     loadPublicLink();
@@ -543,6 +573,7 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     if (!selectedLeadId) return;
+    if (String(openedLeadIdRef.current ?? "").trim() !== String(selectedLeadId).trim()) return;
     clearLeadUnreadLocally(selectedLeadId);
     setMessages([]);
     setMessagesLoadError(null);
@@ -827,6 +858,7 @@ export function AtendimentoClient() {
 
     if (selectedLeadId === lead.id) {
       const fallbackLeadId = leads.find((item) => item.id !== lead.id)?.id ?? null;
+      openedLeadIdRef.current = null;
       selectedLeadIdRef.current = fallbackLeadId;
       setSelectedLeadId(fallbackLeadId);
       setSelectedConversation(null);
@@ -923,11 +955,14 @@ export function AtendimentoClient() {
             selectedLeadId={selectedLeadId}
             onQueryChange={setQuery}
             onSelectLead={(leadId) => {
-              setSelectedLeadId(leadId);
+              openLeadConversation(leadId);
               setMobileModuleOpen(null);
               setRightPanel("conversation");
             }}
-            onOpenConversation={openMobileConversation}
+            onOpenConversation={(leadId) => {
+              openLeadConversation(leadId);
+              openMobileConversation(leadId);
+            }}
             onDeleteLead={async (lead) => {
               try {
                 await handleDeleteLead(lead);
