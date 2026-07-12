@@ -17,6 +17,7 @@ test("getNextMissingField retorna null quando o pre-cadastro estiver completo", 
   const nextField = getNextMissingField({
     full_name: "Ana Maria",
     phone: "+1 321 555 9988",
+    state: "Florida",
     city: "Orlando",
   });
 
@@ -47,16 +48,29 @@ test("getNextMissingField pede whatsapp depois do nome ja preenchido", () => {
     phone: "",
     cpf: "",
     email: "",
+    state: "",
     city: "",
   });
 
   assert.equal(nextField, "phone");
 });
 
-test("getNextMissingField pede cidade depois do whatsapp validado", () => {
+test("getNextMissingField pede estado depois do whatsapp validado", () => {
   const nextField = getNextMissingField({
     full_name: "Ana Maria",
     phone: "+1 321 555 9988",
+    state: "",
+    city: "",
+  });
+
+  assert.equal(nextField, "state");
+});
+
+test("getNextMissingField pede cidade depois do estado informado", () => {
+  const nextField = getNextMissingField({
+    full_name: "Ana Maria",
+    phone: "+1 321 555 9988",
+    state: "Florida",
     city: "",
   });
 
@@ -98,6 +112,7 @@ test("botReplyForLead encerra o pre-cadastro pedindo a data da aula experimental
     lead: {
       full_name: "Ana Maria",
       phone: "+1 321 555 9988",
+      state: "Florida",
       city: "Orlando",
     } as any,
     messageText: "Orlando",
@@ -110,6 +125,7 @@ test("botReplyForLead encerra o pre-cadastro pedindo a data da aula experimental
 
 test("resolveTimeZoneFromCityInput identifica Orlando automaticamente", () => {
   const resolution = resolveTimeZoneFromCityInput({
+    state: "Florida",
     city: "Orlando, FL",
     phone: "+1 321 555 9988",
   });

@@ -223,19 +223,29 @@ function looksLikeFieldValue(field: CapturedFieldName, text: string) {
 
 function buildLeadLocationContext(params: {
   captured: Record<string, string>;
+  leadState?: string | null;
   phone?: string | null;
 }) {
+  const state = String(params.captured.state ?? params.leadState ?? "").trim();
   const city = String(params.captured.city ?? "").trim();
   if (!city) {
+    const normalizedState = state.replace(/\s+/g, " ").trim();
     return {
-      leadPatch: params.captured,
-      capturedFieldValues: params.captured,
+      leadPatch: {
+        ...params.captured,
+        ...(normalizedState ? { state: normalizedState } : {}),
+      },
+      capturedFieldValues: {
+        ...params.captured,
+        ...(normalizedState ? { state: normalizedState } : {}),
+      },
       historyDetails: null as Record<string, unknown> | null,
     };
   }
 
   const resolved = resolveTimeZoneFromCityInput({
     city,
+    state,
     phone: params.phone,
   });
 
@@ -248,9 +258,11 @@ function buildLeadLocationContext(params: {
   }
 
   const normalizedCity = resolved.city;
+  const normalizedState = resolved.state ?? (state.replace(/\s+/g, " ").trim() || null);
   const country = resolved.country === "BR" ? "Brasil" : resolved.country === "US" ? "Estados Unidos" : null;
   const leadPatch = {
     ...params.captured,
+    ...(normalizedState ? { state: normalizedState } : {}),
     city: normalizedCity,
     timezone: resolved.timeZone,
     ...(country ? { country } : {}),
@@ -260,11 +272,13 @@ function buildLeadLocationContext(params: {
     leadPatch,
     capturedFieldValues: {
       ...params.captured,
+      ...(normalizedState ? { state: normalizedState } : {}),
       city: normalizedCity,
       timezone: resolved.timeZone,
       ...(country ? { country } : {}),
     },
     historyDetails: {
+      state: normalizedState,
       city: normalizedCity,
       timezone: resolved.timeZone,
       teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
@@ -1050,6 +1064,7 @@ export async function POST(req: Request) {
 
   const locationContext = buildLeadLocationContext({
     captured,
+    leadState: String((lead as any)?.state ?? "").trim() || null,
     phone: String(captured.phone ?? (lead as any)?.phone ?? "").trim() || null,
   });
   const persistedLeadValues = locationContext.leadPatch;

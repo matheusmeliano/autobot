@@ -24,6 +24,7 @@ export const ATENDIMENTO_STATUS_ORDER = [
 export const CAPTURED_FIELD_ORDER = [
   "full_name",
   "phone",
+  "state",
   "city",
 ] as const;
 
@@ -35,7 +36,8 @@ export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number
   full_name: "Perfeito. Para começarmos, me diga seu nome completo.",
   phone:
     "Perfeito! Para começarmos, informe o número do seu WhatsApp.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\n\nImportante: inclua o código do país no início do número (+55 para Brasil ou +1 para Estados Unidos).",
-  city: "Perfeito. Agora me diga a cidade onde você mora.",
+  state: "Perfeito! Agora, informe o estado onde você mora.",
+  city: "E a cidade?",
 };
 
 export const ATENDIMENTO_PROFESSOR_TIME_ZONE = "America/Cuiaba";

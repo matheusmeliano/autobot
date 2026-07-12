@@ -8,11 +8,14 @@ type CityTimeZoneRule = {
   timeZone: string;
   country: "BR" | "US";
   keywords: string[];
+  stateKeywords?: string[];
 };
 
 export type CityTimeZoneResolution = {
   city: string;
+  state: string | null;
   normalizedCity: string;
+  normalizedState: string | null;
   timeZone: string;
   teacherTimeZone: string;
   country: "BR" | "US" | null;
@@ -101,6 +104,7 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "caceres",
       "mato grosso",
     ],
+    stateKeywords: ["mato grosso", "mt"],
   },
   {
     timeZone: "America/Campo_Grande",
@@ -112,6 +116,7 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "ponta pora",
       "mato grosso do sul",
     ],
+    stateKeywords: ["mato grosso do sul", "ms"],
   },
   {
     timeZone: "America/Sao_Paulo",
@@ -143,6 +148,26 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "vitoria",
       "vila velha",
     ],
+    stateKeywords: [
+      "sao paulo",
+      "sp",
+      "rio de janeiro",
+      "rj",
+      "minas gerais",
+      "mg",
+      "distrito federal",
+      "df",
+      "goias",
+      "go",
+      "parana",
+      "pr",
+      "rio grande do sul",
+      "rs",
+      "santa catarina",
+      "sc",
+      "espirito santo",
+      "es",
+    ],
   },
   {
     timeZone: "America/Fortaleza",
@@ -158,6 +183,26 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "sao luis",
       "aracaju",
     ],
+    stateKeywords: [
+      "ceara",
+      "ce",
+      "pernambuco",
+      "pe",
+      "bahia",
+      "ba",
+      "alagoas",
+      "al",
+      "paraiba",
+      "pb",
+      "rio grande do norte",
+      "rn",
+      "piaui",
+      "pi",
+      "maranhao",
+      "ma",
+      "sergipe",
+      "se",
+    ],
   },
   {
     timeZone: "America/Belem",
@@ -168,6 +213,7 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "palmas",
       "santarem",
     ],
+    stateKeywords: ["para", "pa", "amapa", "ap", "tocantins", "to"],
   },
   {
     timeZone: "America/Manaus",
@@ -176,16 +222,19 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "manaus",
       "boa vista",
     ],
+    stateKeywords: ["amazonas", "am", "roraima", "rr"],
   },
   {
     timeZone: "America/Porto_Velho",
     country: "BR",
     keywords: ["porto velho"],
+    stateKeywords: ["rondonia", "ro"],
   },
   {
     timeZone: "America/Rio_Branco",
     country: "BR",
     keywords: ["rio branco", "cruzeiro do sul"],
+    stateKeywords: ["acre", "ac"],
   },
   {
     timeZone: "America/New_York",
@@ -204,6 +253,22 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "charlotte",
       "raleigh",
     ],
+    stateKeywords: [
+      "florida",
+      "fl",
+      "new york",
+      "ny",
+      "massachusetts",
+      "ma",
+      "pennsylvania",
+      "pa",
+      "district of columbia",
+      "dc",
+      "georgia",
+      "ga",
+      "north carolina",
+      "nc",
+    ],
   },
   {
     timeZone: "America/Chicago",
@@ -218,16 +283,19 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "new orleans",
       "minneapolis",
     ],
+    stateKeywords: ["texas", "tx", "tennessee", "tn", "louisiana", "la", "minnesota", "mn", "illinois", "il"],
   },
   {
     timeZone: "America/Denver",
     country: "US",
     keywords: ["denver", "salt lake city", "albuquerque"],
+    stateKeywords: ["colorado", "co", "utah", "ut", "new mexico", "nm"],
   },
   {
     timeZone: "America/Phoenix",
     country: "US",
     keywords: ["phoenix", "scottsdale", "mesa"],
+    stateKeywords: ["arizona", "az"],
   },
   {
     timeZone: "America/Los_Angeles",
@@ -241,16 +309,19 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "sacramento",
       "portland",
     ],
+    stateKeywords: ["california", "ca", "washington", "wa", "nevada", "nv", "oregon", "or"],
   },
   {
     timeZone: "America/Anchorage",
     country: "US",
     keywords: ["anchorage"],
+    stateKeywords: ["alaska", "ak"],
   },
   {
     timeZone: "Pacific/Honolulu",
     country: "US",
     keywords: ["honolulu"],
+    stateKeywords: ["hawaii", "hi"],
   },
 ];
 
@@ -297,17 +368,28 @@ export function inferTimeZoneFromPhoneCountryCode(phone: string | null | undefin
 
 export function resolveTimeZoneFromCityInput(params: {
   city: string;
+  state?: string | null;
   phone?: string | null;
 }) {
   const rawCity = String(params.city ?? "").trim();
+  const rawState = String(params.state ?? "").trim();
   const normalizedCity = normalizeLocationText(rawCity);
+  const normalizedState = rawState ? normalizeLocationText(rawState) : "";
   if (!normalizedCity) return null;
 
   for (const rule of CITY_TIME_ZONE_RULES) {
-    if (rule.keywords.some((keyword) => locationMatchesKeyword(normalizedCity, keyword))) {
+    const matchesCity = rule.keywords.some((keyword) => locationMatchesKeyword(normalizedCity, keyword));
+    const matchesState =
+      !normalizedState || !rule.stateKeywords?.length
+        ? true
+        : rule.stateKeywords.some((keyword) => locationMatchesKeyword(normalizedState, keyword));
+
+    if (matchesCity && matchesState) {
       return {
         city: rawCity.replace(/\s+/g, " ").trim(),
+        state: rawState.replace(/\s+/g, " ").trim() || null,
         normalizedCity,
+        normalizedState: normalizedState || null,
         timeZone: rule.timeZone,
         teacherTimeZone: PROFESSOR_TIME_ZONE,
         country: rule.country,
@@ -321,7 +403,9 @@ export function resolveTimeZoneFromCityInput(params: {
 
   return {
     city: rawCity.replace(/\s+/g, " ").trim(),
+    state: rawState.replace(/\s+/g, " ").trim() || null,
     normalizedCity,
+    normalizedState: normalizedState || null,
     timeZone: phoneFallback.timeZone,
     teacherTimeZone: PROFESSOR_TIME_ZONE,
     country: phoneFallback.country,

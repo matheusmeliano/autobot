@@ -709,6 +709,7 @@ export async function POST(req: Request) {
     const resolvedLeadLocation = String((leadRecord as any)?.city ?? "").trim()
       ? resolveTimeZoneFromCityInput({
           city: String((leadRecord as any)?.city ?? ""),
+          state: String((leadRecord as any)?.state ?? ""),
           phone: pendingPhone,
         })
       : null;
@@ -738,6 +739,7 @@ export async function POST(req: Request) {
         phone: pendingPhone,
         ...(resolvedLeadLocation
           ? {
+              state: resolvedLeadLocation.state,
               city: resolvedLeadLocation.city,
               timezone: resolvedLeadLocation.timeZone,
               country: resolvedLeadLocation.country === "BR" ? "Brasil" : "Estados Unidos",
@@ -764,6 +766,7 @@ export async function POST(req: Request) {
         eventType: "lead_timezone_identified",
         title: "Cidade e fuso do lead identificados automaticamente",
         details: {
+          state: resolvedLeadLocation.state,
           city: resolvedLeadLocation.city,
           timezone: resolvedLeadLocation.timeZone,
           teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
@@ -799,12 +802,15 @@ export async function POST(req: Request) {
       previewText = String((outbound as any)?.content_text ?? message);
     }
 
-    if (followUpMessage === CAPTURED_FIELD_PROMPTS.city) {
+    if (
+      followUpMessage === CAPTURED_FIELD_PROMPTS.state ||
+      followUpMessage === CAPTURED_FIELD_PROMPTS.city
+    ) {
       await appendHistoryEvent({
         leadId: String((pendingEvent as any).lead_id ?? ""),
         conversationId: String((pendingEvent as any).conversation_id ?? ""),
         eventType: "lead_timezone_collection_started",
-        title: "Coleta da cidade do lead iniciada após validação do WhatsApp",
+        title: "Coleta de estado e cidade do lead iniciada após validação do WhatsApp",
         details: {
           teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
         },
