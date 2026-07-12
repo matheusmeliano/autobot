@@ -90,19 +90,43 @@ function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
   );
 }
 
-function BookingDetails({ lead }: { lead: AtendimentoLeadListItem }) {
+function BookingDetails({
+  lead,
+  cancellingBookingId,
+  onCancelBooking,
+}: {
+  lead: AtendimentoLeadListItem;
+  cancellingBookingId: string | null;
+  onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
+}) {
   const booking = lead.experimental_class_booking;
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const bookingId = String(booking?.id ?? "").trim();
+  const normalizedStatus = String(booking?.status ?? "").trim().toLowerCase();
+  const canCancel = booking?.source === "table" && normalizedStatus === "scheduled" && Boolean(bookingId);
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
-      <div className="min-w-0 flex flex-col gap-2 border-b border-[var(--app-border)] pb-4">
-        <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Agendamento"}>
-          {lead.full_name || "Agendamento"}
+      <div className="min-w-0 flex items-start justify-between gap-3 border-b border-[var(--app-border)] pb-4">
+        <div className="min-w-0 flex flex-1 flex-col gap-2">
+          <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Agendamento"}>
+            {lead.full_name || "Agendamento"}
+          </div>
+          <div className="text-sm text-[var(--app-text-55)]">
+            Agendamento: {formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}
+          </div>
         </div>
-        <div className="text-sm text-[var(--app-text-55)]">
-          Agendamento: {formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}
-        </div>
+
+        {canCancel ? (
+          <button
+            type="button"
+            onClick={() => void onCancelBooking(lead)}
+            disabled={cancellingBookingId === bookingId}
+            className="inline-flex shrink-0 items-center justify-center rounded-xl border border-rose-500/70 bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {cancellingBookingId === bookingId ? "Cancelando..." : "Cancelar agendamento"}
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
@@ -126,14 +150,16 @@ export function AtendimentoSummaryCards({
   summary: AtendimentoSummary;
   leads: AtendimentoLeadListItem[];
 }) {
+  const [localSummary, setLocalSummary] = useState(summary);
+  const [localLeads, setLocalLeads] = useState(leads);
   const sections = useMemo(
     () => [
       {
         id: "interessados" as const,
         label: "Interessados",
-        value: summary.totalLeads,
+        value: localSummary.totalLeads,
         emptyMessage: "Nenhum interessado disponivel no momento.",
-        items: leads.filter((lead) => lead.status !== "matriculado" && lead.funnel_stage !== "matriculado"),
+        items: localLeads.filter((lead) => lead.status !== "matriculado" && lead.funnel_stage !== "matriculado"),
       },
       {
         id: "alunos" as const,
@@ -145,9 +171,9 @@ export function AtendimentoSummaryCards({
       {
         id: "agendamentos" as const,
         label: "Agendamentos",
-        value: summary.aulasExperimentaisAgendadas,
+        value: localSummary.aulasExperimentaisAgendadas,
         emptyMessage: "Nenhum agendamento disponivel no momento.",
-        items: leads.filter((lead) => lead.funnel_stage === "aula_experimental_agendada"),
+        items: localLeads.filter((lead) => lead.funnel_stage === "aula_experimental_agendada"),
       },
       {
         id: "contratos" as const,
@@ -157,11 +183,12 @@ export function AtendimentoSummaryCards({
         items: [],
       },
     ],
-    [leads, summary],
+    [localLeads, localSummary],
   );
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [mobileLead, setMobileLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -184,6 +211,14 @@ export function AtendimentoSummaryCards({
     return filteredItems.slice(start, start + PANEL_PAGE_SIZE);
   }, [filteredItems, page]);
   const selectedLead = filteredItems.find((lead) => lead.id === selectedLeadId) ?? filteredItems[0] ?? null;
+
+  useEffect(() => {
+    setLocalSummary(summary);
+  }, [summary]);
+
+  useEffect(() => {
+    setLocalLeads(leads);
+  }, [leads]);
 
   useEffect(() => {
     setQuery("");
@@ -211,6 +246,71 @@ export function AtendimentoSummaryCards({
       return;
     }
     setMobileLead(lead);
+  }
+
+  async function handleCancelBooking(lead: AtendimentoLeadListItem) {
+    const booking = lead.experimental_class_booking;
+    const bookingId = String(booking?.id ?? "").trim();
+    const normalizedStatus = String(booking?.status ?? "").trim().toLowerCase();
+
+    if (!bookingId || booking?.source !== "table" || normalizedStatus !== "scheduled") {
+      return;
+    }
+
+    if (!window.confirm("Deseja realmente cancelar este agendamento?")) {
+      return;
+    }
+
+    try {
+      setCancellingBookingId(bookingId);
+
+      const response = await fetch(`/api/atendimento/bookings/${bookingId}/cancel`, {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
+        | null;
+
+      if (!response.ok || !payload?.ok || !payload.booking) {
+        modalToast.error(payload?.error ?? "Falha ao cancelar agendamento.");
+        return;
+      }
+
+      const updatedLead: AtendimentoLeadListItem = {
+        ...lead,
+        experimental_class_booking: {
+          ...(lead.experimental_class_booking ?? {
+            id: bookingId,
+            source: "table" as const,
+            created_at: lead.updated_at,
+            professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: null,
+            professor_date: null,
+            professor_time: null,
+            professor_start_at: null,
+            lead_date: null,
+            lead_time: null,
+            lead_start_at: null,
+            status: "cancelled",
+          }),
+          ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
+          source: "table",
+          status: "cancelled",
+        },
+      };
+
+      setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
+      setMobileLead((current) => (current?.id === lead.id ? updatedLead : current));
+      setLocalSummary((current) => ({
+        ...current,
+        aulasExperimentaisAgendadas: Math.max(0, current.aulasExperimentaisAgendadas - 1),
+      }));
+      modalToast.success("Agendamento cancelado.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao cancelar agendamento.");
+    } finally {
+      setCancellingBookingId(null);
+    }
   }
 
   function buildItemMeta(lead: AtendimentoLeadListItem) {
@@ -328,7 +428,15 @@ export function AtendimentoSummaryCards({
 
           <div className="hidden min-h-0 min-w-0 flex-1 lg:block lg:h-full">
             {selectedLead ? (
-              activeSection === "agendamentos" ? <BookingDetails lead={selectedLead} /> : <LeadDetails lead={selectedLead} />
+              activeSection === "agendamentos" ? (
+                <BookingDetails
+                  lead={selectedLead}
+                  cancellingBookingId={cancellingBookingId}
+                  onCancelBooking={handleCancelBooking}
+                />
+              ) : (
+                <LeadDetails lead={selectedLead} />
+              )
             ) : (
               <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-6 text-center text-sm text-[var(--app-text-45)]">
                 {activeSectionData.emptyMessage}
@@ -354,7 +462,19 @@ export function AtendimentoSummaryCards({
           </button>
         </div>
 
-        {mobileLead ? <div className="mt-4">{activeSection === "agendamentos" ? <BookingDetails lead={mobileLead} /> : <LeadDetails lead={mobileLead} />}</div> : null}
+        {mobileLead ? (
+          <div className="mt-4">
+            {activeSection === "agendamentos" ? (
+              <BookingDetails
+                lead={mobileLead}
+                cancellingBookingId={cancellingBookingId}
+                onCancelBooking={handleCancelBooking}
+              />
+            ) : (
+              <LeadDetails lead={mobileLead} />
+            )}
+          </div>
+        ) : null}
       </AppModal>
     </div>
   );

@@ -78,10 +78,10 @@ export async function GET(req: Request) {
     const { data: bookings, error: bookingsError } = await admin
       .from("atendimento_experimental_class_bookings")
       .select(
-        "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at",
+        "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at",
       )
       .in("lead_id", leadIds)
-      .eq("status", "scheduled")
+      .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (bookingsError && !isExperimentalClassBookingsTableUnavailable(bookingsError)) {
