@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { botReplyForLead, extractLeadDataFromMessage, filterCapturedDataForLead, getNextMissingField, initialBotMessages } from "./bot.ts";
 import { EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE } from "./constants.ts";
-import { resolveTimeZoneFromCityInput } from "../timezone.ts";
+import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "../timezone.ts";
 
 test("extractLeadDataFromMessage captura nome e telefone", () => {
   const data = extractLeadDataFromMessage(
@@ -132,4 +132,25 @@ test("resolveTimeZoneFromCityInput identifica Orlando automaticamente", () => {
 
   assert.equal(resolution?.timeZone, "America/New_York");
   assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromStateInput identifica Florida automaticamente", () => {
+  const resolution = resolveTimeZoneFromStateInput({
+    state: "Florida",
+    phone: "+1 321 555 9988",
+  });
+
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromCityInput falha sem fallback quando a cidade nao for reconhecida", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "Florida",
+    city: "Cidade Inexistente",
+    phone: "+1 321 555 9988",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.equal(resolution, null);
 });

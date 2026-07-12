@@ -5,7 +5,13 @@ import {
   filterCapturedDataForLead,
   getNextMissingField,
 } from "@/lib/atendimento/bot";
-import { ATENDIMENTO_PROFESSOR_TIME_ZONE, NUMERIC_ONLY_FIELDS } from "@/lib/atendimento/constants";
+import {
+  ATENDIMENTO_BLOCKED_FINAL_MESSAGE,
+  ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  LOCATION_CITY_INVALID_MESSAGE,
+  LOCATION_STATE_INVALID_MESSAGE,
+  NUMERIC_ONLY_FIELDS,
+} from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   appendHistoryEvent,
@@ -17,18 +23,18 @@ import {
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
-import { resolveTimeZoneFromCityInput } from "@/lib/timezone";
+import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/lib/timezone";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
+const MAX_LOCATION_VALIDATION_ATTEMPTS = 3;
 const WHATSAPP_PENDING_MESSAGE =
   "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
 const WHATSAPP_INVALID_MESSAGE =
   "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FORMAT_MESSAGE =
   "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
-const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE =
-  "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
+const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE = ATENDIMENTO_BLOCKED_FINAL_MESSAGE;
 const NUMERIC_ONLY_TEXT_MESSAGE =
   "Essa resposta não me parece válida. Responda somente com números.";
 const NUMERIC_ONLY_MIXED_MESSAGE =
@@ -158,6 +164,12 @@ function inferExpectedFieldFromBotMessage(promptText: unknown): CapturedFieldNam
   if (!raw) return null;
   const mapped = fieldFromBotPrompt(raw);
   if (mapped) return mapped;
+  if (raw.startsWith(LOCATION_STATE_INVALID_MESSAGE)) {
+    return "state";
+  }
+  if (raw.startsWith(LOCATION_CITY_INVALID_MESSAGE)) {
+    return "city";
+  }
   if (
     raw.startsWith(WHATSAPP_INVALID_MESSAGE) ||
     raw.startsWith(WHATSAPP_INVALID_FORMAT_MESSAGE) ||
@@ -213,6 +225,31 @@ function buildPhoneFormatRetryMessage(attempts: number) {
   return `${WHATSAPP_INVALID_FORMAT_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_FORMAT_ATTEMPTS}.`;
 }
 
+function buildLocationRetryMessage(field: "state" | "city", attempts: number) {
+  const baseMessage = field === "state" ? LOCATION_STATE_INVALID_MESSAGE : LOCATION_CITY_INVALID_MESSAGE;
+  return `${baseMessage}\n\nTentativa ${attempts} de ${MAX_LOCATION_VALIDATION_ATTEMPTS}.`;
+}
+
+function getLocationFailureEventType(field: "state" | "city") {
+  return field === "state" ? "state_validation_failed" : "city_validation_failed";
+}
+
+async function getLocationValidationFailureCount(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  field: "state" | "city";
+}) {
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", getLocationFailureEventType(params.field));
+
+  return Number(count ?? 0);
+}
+
 function looksLikeFieldValue(field: CapturedFieldName, text: string) {
   const clean = text.trim();
   if (!clean) return false;
@@ -247,6 +284,7 @@ function buildLeadLocationContext(params: {
     city,
     state,
     phone: params.phone,
+    allowPhoneCountryFallback: false,
   });
 
   if (!resolved) {
@@ -1015,6 +1053,174 @@ export async function POST(req: Request) {
         bot_enabled: true,
       },
     });
+  }
+
+  const locationValidationField = expectedField === "state" || expectedField === "city" ? expectedField : null;
+  if (locationValidationField) {
+    const phoneForLocationValidation = String(captured.phone ?? (lead as any)?.phone ?? "").trim() || null;
+    const currentState = String(captured.state ?? (lead as any)?.state ?? "").trim();
+    const currentCity = String(captured.city ?? "").trim();
+
+    const stateResolution = currentState
+      ? resolveTimeZoneFromStateInput({
+          state: currentState,
+          phone: phoneForLocationValidation,
+        })
+      : null;
+    const cityResolution =
+      locationValidationField === "city" && currentCity
+        ? resolveTimeZoneFromCityInput({
+            city: currentCity,
+            state: currentState,
+            phone: phoneForLocationValidation,
+            allowPhoneCountryFallback: false,
+          })
+        : null;
+
+    const locationValidationPassed =
+      locationValidationField === "state" ? Boolean(stateResolution) : Boolean(cityResolution);
+
+    if (!locationValidationPassed) {
+      const nextFailureAttempt =
+        (await getLocationValidationFailureCount({
+          admin,
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+          field: locationValidationField,
+        })) + 1;
+      const shouldBlockConversation = nextFailureAttempt >= MAX_LOCATION_VALIDATION_ATTEMPTS;
+      const replyMessage = shouldBlockConversation
+        ? WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE
+        : buildLocationRetryMessage(locationValidationField, nextFailureAttempt);
+
+      await admin
+        .from("atendimento_leads")
+        .update({
+          unread_count: Number(lead.unread_count ?? 0) + 1,
+          is_new_for_attendant: true,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+          ...(shouldBlockConversation
+            ? {
+                status: "encerrado",
+                funnel_stage: "encerrado",
+              }
+            : {}),
+        })
+        .eq("id", String(lead.id));
+
+      await syncConversationPreview({
+        conversationId: String(conversation.id),
+        contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+        createdAt: nowIso,
+      });
+
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: "message_received",
+        title: "Mensagem recebida do lead",
+        details: {
+          content_text: contentText || null,
+          media_type: mediaType,
+          media_url: mediaUrl,
+          mime_type: mimeType,
+          file_name: fileName,
+          file_size_bytes: fileSizeBytes,
+        },
+        actorType: "lead",
+      });
+
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: getLocationFailureEventType(locationValidationField),
+        title:
+          locationValidationField === "state"
+            ? "Falha ao identificar o estado informado"
+            : "Falha ao identificar a cidade informada",
+        details: {
+          field: locationValidationField,
+          attempt: nextFailureAttempt,
+          content_text: contentText || null,
+          state: currentState || null,
+          city: currentCity || null,
+        },
+        actorType: "system",
+      });
+
+      if (shouldBlockConversation) {
+        await admin
+          .from("atendimento_conversations")
+          .update({
+            bot_enabled: false,
+            updated_at: nowIso,
+          })
+          .eq("id", String(conversation.id));
+
+        await appendHistoryEvent({
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+          eventType: "conversation_closed",
+          title: "Atendimento encerrado após 3 falhas de identificação de localização",
+          details: {
+            field: locationValidationField,
+            invalid_attempts: nextFailureAttempt,
+            source: "location_validation",
+          },
+          actorType: "system",
+        });
+      }
+
+      await sleep(POST_LEAD_REPLY_DELAY_MS);
+      const botNowIso = new Date().toISOString();
+      const { data: outbound, error: outboundError } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String(conversation.id),
+          sender_role: "bot",
+          content_text: replyMessage,
+          media_type: "text",
+          status: "entregue",
+          sent_at: botNowIso,
+          delivered_at: botNowIso,
+        })
+        .select("*")
+        .maybeSingle();
+
+      if (outboundError) {
+        const code = String((outboundError as any)?.code ?? "").trim();
+        if (code !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+      }
+
+      await syncConversationPreview({
+        conversationId: String(conversation.id),
+        contentText: replyMessage,
+        createdAt: botNowIso,
+      });
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: outboundError ? null : outbound,
+        blocked: shouldBlockConversation,
+        conversation: {
+          id: String(conversation.id),
+          bot_enabled: !shouldBlockConversation,
+        },
+      });
+    }
+
+    if (stateResolution) {
+      captured.state = stateResolution.state;
+    }
+
+    if (cityResolution) {
+      captured.state = cityResolution.state ?? currentState;
+      captured.city = cityResolution.city;
+    }
   }
 
   if (!expectedField && String((lead as any)?.phone ?? "").trim()) {

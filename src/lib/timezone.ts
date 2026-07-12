@@ -22,6 +22,13 @@ export type CityTimeZoneResolution = {
   source: "city_match" | "phone_country_fallback";
 };
 
+export type StateTimeZoneResolution = {
+  state: string;
+  normalizedState: string;
+  timeZone: string;
+  country: "BR" | "US";
+};
+
 export const PROFESSOR_TIME_ZONE = "America/Cuiaba";
 
 function partsToMap(parts: Intl.DateTimeFormatPart[]) {
@@ -366,10 +373,40 @@ export function inferTimeZoneFromPhoneCountryCode(phone: string | null | undefin
   return null;
 }
 
+export function resolveTimeZoneFromStateInput(params: {
+  state: string;
+  phone?: string | null;
+}) {
+  const rawState = String(params.state ?? "").trim();
+  const normalizedState = normalizeLocationText(rawState);
+  if (!normalizedState) return null;
+
+  const phoneCountry = inferTimeZoneFromPhoneCountryCode(params.phone)?.country ?? null;
+  const matchingRules = CITY_TIME_ZONE_RULES.filter((rule) =>
+    rule.stateKeywords?.some((keyword) => locationMatchesKeyword(normalizedState, keyword)),
+  );
+
+  if (!matchingRules.length) return null;
+
+  const preferredRules = phoneCountry
+    ? matchingRules.filter((rule) => rule.country === phoneCountry)
+    : matchingRules;
+  const selectedRule = preferredRules[0] ?? matchingRules[0] ?? null;
+  if (!selectedRule) return null;
+
+  return {
+    state: rawState.replace(/\s+/g, " ").trim(),
+    normalizedState,
+    timeZone: selectedRule.timeZone,
+    country: selectedRule.country,
+  } satisfies StateTimeZoneResolution;
+}
+
 export function resolveTimeZoneFromCityInput(params: {
   city: string;
   state?: string | null;
   phone?: string | null;
+  allowPhoneCountryFallback?: boolean;
 }) {
   const rawCity = String(params.city ?? "").trim();
   const rawState = String(params.state ?? "").trim();
@@ -396,6 +433,10 @@ export function resolveTimeZoneFromCityInput(params: {
         source: "city_match" as const,
       };
     }
+  }
+
+  if (params.allowPhoneCountryFallback === false) {
+    return null;
   }
 
   const phoneFallback = inferTimeZoneFromPhoneCountryCode(params.phone);
