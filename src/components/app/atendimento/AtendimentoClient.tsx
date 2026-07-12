@@ -132,7 +132,7 @@ function bumpLeadRecencyByConversation(
 
     return {
       ...lead,
-      unread_count: shouldMarkAsUnread ? Number(lead.unread_count ?? 0) + 1 : Number(lead.unread_count ?? 0),
+      unread_count: Number(lead.unread_count ?? 0),
       is_new_for_attendant: shouldMarkAsUnread ? true : Boolean(lead.is_new_for_attendant),
       last_interaction_at: messageTime,
       conversation: lead.conversation
