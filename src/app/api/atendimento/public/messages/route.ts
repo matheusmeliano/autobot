@@ -21,6 +21,7 @@ import {
   buildExperimentalClassStudentWhatsAppMessage,
   buildExperimentalClassTimesMessage,
   EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE,
+  EXPERIMENTAL_CLASS_DURATION_MINUTES,
   EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
@@ -425,13 +426,31 @@ async function listScheduledExperimentalClassProfessorStarts(params: {
     .gte("professor_start_at", params.nowIso)
     .order("professor_start_at", { ascending: true });
 
-  if (error) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  const tableMissing =
+    Boolean(error) &&
+    (code === "42P01" || /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message));
+  if (error && !tableMissing) {
     throw new Error(error.message || "Falha ao consultar horários ocupados da aula experimental.");
   }
 
-  return (data ?? [])
-    .map((row) => String((row as any)?.professor_start_at ?? "").trim())
-    .filter(Boolean);
+  const { data: historyData, error: historyError } = await params.admin
+    .from("atendimento_history_events")
+    .select("details")
+    .eq("event_type", "experimental_class_scheduled")
+    .order("created_at", { ascending: true });
+
+  if (historyError) {
+    throw new Error(historyError.message || "Falha ao consultar horários ocupados da aula experimental.");
+  }
+
+  return Array.from(
+    new Set([
+      ...(!tableMissing ? (data ?? []).map((row) => String((row as any)?.professor_start_at ?? "").trim()) : []),
+      ...(historyData ?? []).map((row) => String(((row as any)?.details ?? {}).professor_start_at ?? "").trim()),
+    ]),
+  ).filter((value) => value && value >= params.nowIso);
 }
 
 async function getScheduledExperimentalClassBooking(params: {
@@ -447,11 +466,119 @@ async function getScheduledExperimentalClassBooking(params: {
     .limit(1)
     .maybeSingle();
 
-  if (error) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  const tableMissing =
+    Boolean(error) &&
+    (code === "42P01" || /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message));
+  if (error && !tableMissing) {
     throw new Error(error.message || "Falha ao consultar o agendamento da aula experimental.");
   }
 
-  return data as Record<string, unknown> | null;
+  if (data) {
+    return data as Record<string, unknown> | null;
+  }
+
+  const { data: fallbackData, error: fallbackError } = await params.admin
+    .from("atendimento_history_events")
+    .select("id, details, created_at")
+    .eq("lead_id", params.leadId)
+    .eq("event_type", "experimental_class_scheduled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError) {
+    throw new Error(fallbackError.message || "Falha ao consultar o agendamento da aula experimental.");
+  }
+
+  return fallbackData
+    ? {
+        id: String((fallbackData as any).id ?? ""),
+        professor_start_at: String((((fallbackData as any).details ?? {}) as Record<string, unknown>).professor_start_at ?? ""),
+      }
+    : null;
+}
+
+async function reserveExperimentalClassSlot(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  leadTimeZone: string;
+  selectedTimeOption: {
+    professorDate: string;
+    professorTime: string;
+    professorStartAt: string;
+    leadDate: string;
+    leadTime: string;
+  };
+}) {
+  const { data, error } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .insert({
+      lead_id: params.leadId,
+      conversation_id: params.conversationId,
+      professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      lead_timezone: params.leadTimeZone,
+      professor_date: params.selectedTimeOption.professorDate,
+      professor_time: params.selectedTimeOption.professorTime,
+      professor_start_at: params.selectedTimeOption.professorStartAt,
+      lead_date: params.selectedTimeOption.leadDate,
+      lead_time: params.selectedTimeOption.leadTime,
+      lead_start_at: params.selectedTimeOption.professorStartAt,
+      status: "scheduled",
+    })
+    .select("*")
+    .maybeSingle();
+
+  if (!error) {
+    return {
+      ok: true as const,
+      conflict: false as const,
+      booking: (data as Record<string, unknown> | null) ?? null,
+    };
+  }
+
+  const code = String((error as any)?.code ?? "").trim();
+  if (code === "23505") {
+    return {
+      ok: true as const,
+      conflict: true as const,
+      booking: null,
+    };
+  }
+
+  const message = String((error as any)?.message ?? "");
+  if (code !== "42P01" && !/relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message)) {
+    throw new Error(error.message || "Falha ao reservar a aula experimental.");
+  }
+
+  const bookedStarts = await listScheduledExperimentalClassProfessorStarts({
+    admin: params.admin,
+    nowIso: new Date(0).toISOString(),
+  });
+  const selectedStartMs = new Date(params.selectedTimeOption.professorStartAt).getTime();
+  const selectedEndMs = selectedStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+  const hasConflict = bookedStarts.some((bookedStart) => {
+    const bookedStartMs = new Date(bookedStart).getTime();
+    if (!Number.isFinite(bookedStartMs)) return false;
+    const bookedEndMs = bookedStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+    return selectedStartMs < bookedEndMs && bookedStartMs < selectedEndMs;
+  });
+
+  if (hasConflict) {
+    return {
+      ok: true as const,
+      conflict: true as const,
+      booking: null,
+    };
+  }
+
+  return {
+    ok: true as const,
+    conflict: false as const,
+    booking: null,
+  };
 }
 
 async function getLatestHistoryEventByType(params: {
@@ -548,7 +675,7 @@ async function presentExperimentalClassTimeOptions(params: {
   const dateOption = availability.dates.find((option) => option.professorDate === params.professorDate) ?? null;
   const timeOptions = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
   const message = buildExperimentalClassTimesMessage({
-    dateLabel: dateOption?.displayLabel ?? params.professorDate,
+    dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: timeOptions,
   });
   const outbound = await insertBotTextMessage({
@@ -567,6 +694,7 @@ async function presentExperimentalClassTimeOptions(params: {
       lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
       professor_date: params.professorDate,
       date_label: dateOption?.displayLabel ?? params.professorDate,
+      day_label: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
       options: timeOptions,
     },
     actorType: "system",
@@ -1500,7 +1628,7 @@ export async function POST(req: Request) {
       });
     }
 
-    if (lastBotText.startsWith("Horários disponíveis para ")) {
+    if (lastBotText.startsWith("Horários disponíveis")) {
       const latestTimeOptionsEvent = await getLatestHistoryEventByType({
         admin,
         leadId,
@@ -1562,48 +1690,33 @@ export async function POST(req: Request) {
         });
       }
 
-      const { data: booking, error: bookingError } = await admin
-        .from("atendimento_experimental_class_bookings")
-        .insert({
-          lead_id: leadId,
-          conversation_id: conversationId,
-          professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-          lead_timezone: leadTimeZone,
-          professor_date: selectedTimeOption.professorDate,
-          professor_time: selectedTimeOption.professorTime,
-          professor_start_at: selectedTimeOption.professorStartAt,
-          lead_date: selectedTimeOption.leadDate,
-          lead_time: selectedTimeOption.leadTime.replace("h", ":"),
-          lead_start_at: selectedTimeOption.professorStartAt,
-          status: "scheduled",
-        })
-        .select("*")
-        .maybeSingle();
+      const bookingReservation = await reserveExperimentalClassSlot({
+        admin,
+        leadId,
+        conversationId,
+        leadTimeZone,
+        selectedTimeOption,
+      });
 
-      if (bookingError) {
-        const code = String((bookingError as any)?.code ?? "").trim();
-        if (code === "23505") {
-          const refreshedTimeOptionsPresentation = await presentExperimentalClassTimeOptions({
-            admin,
-            leadId,
-            conversationId,
-            leadTimeZone,
-            professorDate,
-          });
+      if (bookingReservation.conflict) {
+        const refreshedTimeOptionsPresentation = await presentExperimentalClassTimeOptions({
+          admin,
+          leadId,
+          conversationId,
+          leadTimeZone,
+          professorDate,
+        });
 
-          return Response.json({
-            ok: true,
-            inbound,
-            outbound: refreshedTimeOptionsPresentation.outbound,
-            blocked: false,
-            conversation: {
-              id: conversationId,
-              bot_enabled: true,
-            },
-          });
-        }
-
-        return Response.json({ ok: false, error: bookingError.message }, { status: 500 });
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: refreshedTimeOptionsPresentation.outbound,
+          blocked: false,
+          conversation: {
+            id: conversationId,
+            bot_enabled: true,
+          },
+        });
       }
 
       await admin
@@ -1611,7 +1724,7 @@ export async function POST(req: Request) {
         .update({
           funnel_stage: "aula_experimental_agendada",
           status: "em_atendimento",
-          best_contact_time: selectedTimeOption.leadTime.replace("h", ":"),
+          best_contact_time: selectedTimeOption.leadTime,
           updated_at: new Date().toISOString(),
         })
         .eq("id", leadId);
@@ -1622,7 +1735,7 @@ export async function POST(req: Request) {
         eventType: "experimental_class_scheduled",
         title: "Aula experimental agendada automaticamente",
         details: {
-          booking_id: String((booking as any)?.id ?? ""),
+          booking_id: String((bookingReservation.booking as any)?.id ?? ""),
           teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
           lead_timezone: leadTimeZone,
           professor_date: selectedTimeOption.professorDate,

@@ -140,13 +140,31 @@ async function listScheduledExperimentalClassProfessorStarts(params: {
     .gte("professor_start_at", params.nowIso)
     .order("professor_start_at", { ascending: true });
 
-  if (error) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  const tableMissing =
+    Boolean(error) &&
+    (code === "42P01" || /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message));
+  if (error && !tableMissing) {
     throw new Error(error.message || "Falha ao consultar horários ocupados da aula experimental.");
   }
 
-  return (data ?? [])
-    .map((row) => String((row as any)?.professor_start_at ?? "").trim())
-    .filter(Boolean);
+  const { data: historyData, error: historyError } = await params.admin
+    .from("atendimento_history_events")
+    .select("details")
+    .eq("event_type", "experimental_class_scheduled")
+    .order("created_at", { ascending: true });
+
+  if (historyError) {
+    throw new Error(historyError.message || "Falha ao consultar horários ocupados da aula experimental.");
+  }
+
+  return Array.from(
+    new Set([
+      ...(!tableMissing ? (data ?? []).map((row) => String((row as any)?.professor_start_at ?? "").trim()) : []),
+      ...(historyData ?? []).map((row) => String(((row as any)?.details ?? {}).professor_start_at ?? "").trim()),
+    ]),
+  ).filter((value) => value && value >= params.nowIso);
 }
 
 async function findPendingPhoneValidationEvent(params: {

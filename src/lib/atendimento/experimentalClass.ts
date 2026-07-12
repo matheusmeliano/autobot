@@ -1,7 +1,8 @@
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "./constants";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
-export const EXPERIMENTAL_CLASS_SLOT_TIMES = ["13:00", "14:00", "15:00", "16:00", "17:00"] as const;
+export const EXPERIMENTAL_CLASS_SLOT_TIMES = ["13:00", "14:30", "16:00"] as const;
+export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
 export const EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE =
   "Sua aula experimental com o professor Lucas Brum foi agendada com sucesso.";
 export const EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE =
@@ -9,16 +10,15 @@ export const EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE =
 
 export type ExperimentalClassDateOption = {
   id: string;
-  index: number;
   professorDate: string;
   leadDate: string;
+  dayLabel: string;
   displayLabel: string;
   slotCount: number;
 };
 
 export type ExperimentalClassTimeOption = {
   id: string;
-  index: number;
   professorDate: string;
   professorTime: string;
   professorStartAt: string;
@@ -76,20 +76,17 @@ function weekdayInTimeZone(value: Date | string | number, timeZone: string) {
 function formatDateInTimeZone(iso: string, timeZone: string) {
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone,
-    weekday: "long",
     day: "2-digit",
-    month: "2-digit",
   }).format(new Date(iso));
 }
 
 function formatTimeInTimeZone(iso: string, timeZone: string) {
-  const raw = new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat("pt-BR", {
     timeZone,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
-  return raw.replace(":", "h");
 }
 
 function normalizeSelectionText(value: string) {
@@ -103,8 +100,7 @@ function normalizeSelectionText(value: string) {
 }
 
 function buildDisplayDateLabel(iso: string, timeZone: string) {
-  const formatted = formatDateInTimeZone(iso, timeZone);
-  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  return formatDateInTimeZone(iso, timeZone);
 }
 
 export function buildExperimentalClassDatesMessage(options: ExperimentalClassDateOption[]) {
@@ -112,24 +108,18 @@ export function buildExperimentalClassDatesMessage(options: ExperimentalClassDat
     return "No momento, não há datas disponíveis para aula experimental até o fim deste mês.";
   }
 
-  return [
-    "Datas disponíveis para agendamento:",
-    ...options.map((option) => `${option.index}. ${option.displayLabel}`),
-  ].join("\n");
+  return `Disponível: ${options.map((option) => option.dayLabel).join(", ")}`;
 }
 
 export function buildExperimentalClassTimesMessage(params: {
-  dateLabel: string;
+  dayLabel: string;
   options: ExperimentalClassTimeOption[];
 }) {
   if (!params.options.length) {
-    return `No momento, não há horários livres para ${params.dateLabel}. Escolha outra data disponível.`;
+    return `Não há horários livres para o dia ${params.dayLabel}. Escolha outra data disponível.`;
   }
 
-  return [
-    `Horários disponíveis para ${params.dateLabel}:`,
-    ...params.options.map((option) => `${option.index}. ${option.displayLabel}`),
-  ].join("\n");
+  return `Horários disponíveis: ${params.options.map((option) => option.displayLabel).join(", ")}`;
 }
 
 export function buildExperimentalClassStudentWhatsAppMessage(name: string) {
@@ -159,6 +149,9 @@ export function listExperimentalClassAvailability(params: {
       .map((value) => new Date(String(value ?? "")).toISOString())
       .filter(Boolean),
   );
+  const bookedProfessorStartMs = Array.from(bookedProfessorStarts)
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
 
   const professorToday = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
   const professorMonthEnd = endOfMonthLocalDate(professorToday);
@@ -184,12 +177,16 @@ export function listExperimentalClassAvailability(params: {
       });
       const professorStartMs = new Date(professorStartAt).getTime();
       if (!Number.isFinite(professorStartMs) || professorStartMs <= nowMs) continue;
-      if (bookedProfessorStarts.has(new Date(professorStartAt).toISOString())) continue;
+      const professorEndMs = professorStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+      const overlapsExistingBooking = bookedProfessorStartMs.some((bookedStartMs) => {
+        const bookedEndMs = bookedStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+        return professorStartMs < bookedEndMs && bookedStartMs < professorEndMs;
+      });
+      if (overlapsExistingBooking) continue;
 
       const leadDate = localDateInTimeZone(professorStartAt, leadTimeZone);
       daySlots.push({
         id: `${currentDate}|${professorTime}`,
-        index: daySlots.length + 1,
         professorDate: currentDate,
         professorTime,
         professorStartAt,
@@ -203,11 +200,12 @@ export function listExperimentalClassAvailability(params: {
 
     slotsByProfessorDate.set(currentDate, daySlots);
     const leadDate = daySlots[0]?.leadDate ?? currentDate;
+    const dayLabel = leadDate.slice(8, 10);
     dates.push({
       id: currentDate,
-      index: dates.length + 1,
       professorDate: currentDate,
       leadDate,
+      dayLabel,
       displayLabel: buildDisplayDateLabel(daySlots[0]?.professorStartAt ?? middayIso, leadTimeZone),
       slotCount: daySlots.length,
     });
@@ -227,15 +225,10 @@ export function findExperimentalClassDateOption(
   if (!normalizedInput) return null;
 
   for (const option of options) {
-    if (normalizedInput === String(option.index)) return option;
-    if (normalizedInput.includes(option.professorDate)) return option;
-    if (normalizedInput.includes(option.leadDate)) return option;
-
-    const displayDate = normalizeSelectionText(option.displayLabel);
-    if (displayDate && normalizedInput.includes(displayDate)) return option;
-
-    const shortLeadDate = option.leadDate.slice(8, 10) + "/" + option.leadDate.slice(5, 7);
-    if (normalizedInput.includes(shortLeadDate)) return option;
+    const normalizedDayLabel = normalizeSelectionText(option.dayLabel);
+    if (normalizedInput === normalizedDayLabel) return option;
+    if (normalizedInput === normalizeSelectionText(option.displayLabel)) return option;
+    if (normalizedInput === normalizeSelectionText(option.leadDate)) return option;
   }
 
   return null;
@@ -249,10 +242,8 @@ export function findExperimentalClassTimeOption(
   if (!normalizedInput) return null;
 
   for (const option of options) {
-    if (normalizedInput === String(option.index)) return option;
-    if (normalizedInput.includes(option.professorTime)) return option;
-    if (normalizedInput.includes(option.displayLabel.replace("h", ":"))) return option;
-    if (normalizedInput.includes(normalizeSelectionText(option.displayLabel))) return option;
+    if (normalizedInput === normalizeSelectionText(option.professorTime)) return option;
+    if (normalizedInput === normalizeSelectionText(option.displayLabel)) return option;
   }
 
   return null;
