@@ -728,7 +728,7 @@ export function AtendimentoClient() {
         const nextMessage = (payload.new ?? null) as AtendimentoMessage | null;
         const openedConversationId = getOpenedConversationId();
         const shouldMarkAsUnread =
-          payload.eventType !== "DELETE" &&
+          payload.eventType === "INSERT" &&
           affectedConversationId !== openedConversationId &&
           String(nextMessage?.sender_role ?? "") === "lead";
 
