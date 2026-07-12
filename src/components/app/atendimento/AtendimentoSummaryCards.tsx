@@ -107,7 +107,7 @@ function BookingDetails({
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
-      <div className="min-w-0 flex items-start justify-between gap-3 border-b border-[var(--app-border)] pb-4">
+      <div className="min-w-0 flex flex-wrap items-start gap-3 border-b border-[var(--app-border)] pb-4">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
           <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Agendamento"}>
             {lead.full_name || "Agendamento"}
@@ -122,7 +122,7 @@ function BookingDetails({
             type="button"
             onClick={() => void onCancelBooking(lead)}
             disabled={cancellingBookingId === bookingId}
-            className="inline-flex shrink-0 items-center justify-center rounded-xl border border-rose-500/70 bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] sm:ml-auto sm:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancellingBookingId === bookingId ? "Cancelando..." : "Cancelar agendamento"}
           </button>
