@@ -4,11 +4,16 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { botReplyForLead } from "@/lib/atendimento/bot";
+import {
+  ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  CAPTURED_FIELD_PROMPTS,
+  WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
+} from "@/lib/atendimento/constants";
 import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
+import { resolveTimeZoneFromCityInput } from "@/lib/timezone";
 
 export const runtime = "nodejs";
 const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
-const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com sucesso.";
 const WHATSAPP_INVALID_MESSAGE =
   "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FINAL_MESSAGE =
@@ -701,22 +706,43 @@ export async function POST(req: Request) {
       return Response.json({ ok: true, ignored: true, reason: "missing_pending_lead_or_phone" });
     }
 
+    const resolvedLeadLocation = String((leadRecord as any)?.city ?? "").trim()
+      ? resolveTimeZoneFromCityInput({
+          city: String((leadRecord as any)?.city ?? ""),
+          phone: pendingPhone,
+        })
+      : null;
+
     const nextLead = {
       ...(leadRecord as any),
       phone: pendingPhone,
+      timezone: resolvedLeadLocation?.timeZone ?? (String((leadRecord as any)?.timezone ?? "").trim() || null),
+      country:
+        resolvedLeadLocation?.country === "BR"
+          ? "Brasil"
+          : resolvedLeadLocation?.country === "US"
+            ? "Estados Unidos"
+            : String((leadRecord as any)?.country ?? "").trim() || null,
     };
     const botResponse = botReplyForLead({
       lead: nextLead,
       messageText: "",
     });
     const successMessage = WHATSAPP_REGISTERED_SUCCESS_MESSAGE;
-    const nextStatus = botResponse.message ? botResponse.status : "matricula_pendente";
-    const nextStage = botResponse.message ? botResponse.stage : "pre_cadastro_concluido";
+    const nextStatus = botResponse.status;
+    const nextStage = botResponse.stage;
 
     await admin
       .from("atendimento_leads")
       .update({
         phone: pendingPhone,
+        ...(resolvedLeadLocation
+          ? {
+              city: resolvedLeadLocation.city,
+              timezone: resolvedLeadLocation.timeZone,
+              country: resolvedLeadLocation.country === "BR" ? "Brasil" : "Estados Unidos",
+            }
+          : {}),
         status: nextStatus,
         funnel_stage: nextStage,
         unread_count: Number((leadRecord as any)?.unread_count ?? 0) + 1,
@@ -731,23 +757,64 @@ export async function POST(req: Request) {
       phone: pendingPhone,
     });
 
-    const { data: outbound } = await admin
-      .from("atendimento_messages")
-      .insert({
-        conversation_id: String((pendingEvent as any).conversation_id ?? ""),
-        sender_role: "bot",
-        content_text: successMessage,
-        media_type: "text",
-        status: "entregue",
-        sent_at: nowIso,
-        delivered_at: nowIso,
-      })
-      .select("content_text")
-      .maybeSingle();
+    if (resolvedLeadLocation) {
+      await appendHistoryEvent({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        eventType: "lead_timezone_identified",
+        title: "Cidade e fuso do lead identificados automaticamente",
+        details: {
+          city: resolvedLeadLocation.city,
+          timezone: resolvedLeadLocation.timeZone,
+          teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          country: resolvedLeadLocation.country === "BR" ? "Brasil" : "Estados Unidos",
+          source: resolvedLeadLocation.source,
+        },
+        actorType: "system",
+      });
+    }
+
+    const outgoingMessages = [successMessage];
+    const followUpMessage = String(botResponse.message ?? "").trim();
+    if (followUpMessage && followUpMessage !== successMessage) {
+      outgoingMessages.push(followUpMessage);
+    }
+
+    let previewText = successMessage;
+    for (const message of outgoingMessages) {
+      const { data: outbound } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          sender_role: "bot",
+          content_text: message,
+          media_type: "text",
+          status: "entregue",
+          sent_at: nowIso,
+          delivered_at: nowIso,
+        })
+        .select("content_text")
+        .maybeSingle();
+
+      previewText = String((outbound as any)?.content_text ?? message);
+    }
+
+    if (followUpMessage === CAPTURED_FIELD_PROMPTS.city) {
+      await appendHistoryEvent({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        eventType: "lead_timezone_collection_started",
+        title: "Coleta da cidade do lead iniciada após validação do WhatsApp",
+        details: {
+          teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        },
+        actorType: "system",
+      });
+    }
 
     await syncConversationPreview({
       conversationId: String((pendingEvent as any).conversation_id ?? ""),
-      contentText: String((outbound as any)?.content_text ?? successMessage),
+      contentText: previewText,
       createdAt: nowIso,
     });
 

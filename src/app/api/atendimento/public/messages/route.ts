@@ -5,7 +5,7 @@ import {
   filterCapturedDataForLead,
   getNextMissingField,
 } from "@/lib/atendimento/bot";
-import { NUMERIC_ONLY_FIELDS } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE, NUMERIC_ONLY_FIELDS } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   appendHistoryEvent,
@@ -17,6 +17,7 @@ import {
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
+import { resolveTimeZoneFromCityInput } from "@/lib/timezone";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
@@ -218,6 +219,59 @@ function looksLikeFieldValue(field: CapturedFieldName, text: string) {
   if (field === "phone") return clean.replace(/\D/g, "").length >= 8;
   if (field === "full_name") return clean.split(/\s+/).length >= 2;
   return true;
+}
+
+function buildLeadLocationContext(params: {
+  captured: Record<string, string>;
+  phone?: string | null;
+}) {
+  const city = String(params.captured.city ?? "").trim();
+  if (!city) {
+    return {
+      leadPatch: params.captured,
+      capturedFieldValues: params.captured,
+      historyDetails: null as Record<string, unknown> | null,
+    };
+  }
+
+  const resolved = resolveTimeZoneFromCityInput({
+    city,
+    phone: params.phone,
+  });
+
+  if (!resolved) {
+    return {
+      leadPatch: params.captured,
+      capturedFieldValues: params.captured,
+      historyDetails: null as Record<string, unknown> | null,
+    };
+  }
+
+  const normalizedCity = resolved.city;
+  const country = resolved.country === "BR" ? "Brasil" : resolved.country === "US" ? "Estados Unidos" : null;
+  const leadPatch = {
+    ...params.captured,
+    city: normalizedCity,
+    timezone: resolved.timeZone,
+    ...(country ? { country } : {}),
+  };
+
+  return {
+    leadPatch,
+    capturedFieldValues: {
+      ...params.captured,
+      city: normalizedCity,
+      timezone: resolved.timeZone,
+      ...(country ? { country } : {}),
+    },
+    historyDetails: {
+      city: normalizedCity,
+      timezone: resolved.timeZone,
+      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      country,
+      source: resolved.source,
+    } satisfies Record<string, unknown>,
+  };
 }
 
 async function upsertCapturedFields(params: {
@@ -994,9 +1048,15 @@ export async function POST(req: Request) {
     });
   }
 
+  const locationContext = buildLeadLocationContext({
+    captured,
+    phone: String(captured.phone ?? (lead as any)?.phone ?? "").trim() || null,
+  });
+  const persistedLeadValues = locationContext.leadPatch;
+  const persistedCapturedValues = locationContext.capturedFieldValues;
   const nextLead = {
     ...lead,
-    ...captured,
+    ...persistedLeadValues,
   };
   const nextMissingField = getNextMissingField(nextLead as any);
   const botResponse = botReplyForLead({ lead: nextLead as any, messageText: contentText });
@@ -1006,7 +1066,7 @@ export async function POST(req: Request) {
   await admin
     .from("atendimento_leads")
     .update({
-      ...captured,
+      ...persistedLeadValues,
       status: nextStatus,
       funnel_stage: nextStage,
       unread_count: Number(lead.unread_count ?? 0) + 1,
@@ -1019,7 +1079,7 @@ export async function POST(req: Request) {
   await upsertCapturedFields({
     leadId: String(lead.id),
     sourceMessageId: String(inbound.id),
-    values: captured as Record<string, string>,
+    values: persistedCapturedValues,
   });
 
   await syncConversationPreview({
@@ -1044,13 +1104,24 @@ export async function POST(req: Request) {
     actorType: "lead",
   });
 
-  if (Object.keys(captured).length > 0) {
+  if (Object.keys(persistedCapturedValues).length > 0) {
     await appendHistoryEvent({
       leadId: String(lead.id),
       conversationId: String(conversation.id),
       eventType: "data_captured",
       title: "Dados capturados automaticamente",
-      details: captured,
+      details: persistedCapturedValues,
+      actorType: "system",
+    });
+  }
+
+  if (locationContext.historyDetails) {
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "lead_timezone_identified",
+      title: "Cidade e fuso do lead identificados automaticamente",
+      details: locationContext.historyDetails,
       actorType: "system",
     });
   }

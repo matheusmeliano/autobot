@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractLeadDataFromMessage, filterCapturedDataForLead, getNextMissingField, initialBotMessages } from "./bot.ts";
+import { botReplyForLead, extractLeadDataFromMessage, filterCapturedDataForLead, getNextMissingField, initialBotMessages } from "./bot.ts";
+import { EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE } from "./constants.ts";
+import { resolveTimeZoneFromCityInput } from "../timezone.ts";
 
 test("extractLeadDataFromMessage captura nome e telefone", () => {
   const data = extractLeadDataFromMessage(
@@ -15,6 +17,7 @@ test("getNextMissingField retorna null quando o pre-cadastro estiver completo", 
   const nextField = getNextMissingField({
     full_name: "Ana Maria",
     phone: "+1 321 555 9988",
+    city: "Orlando",
   });
 
   assert.equal(nextField, null);
@@ -44,9 +47,20 @@ test("getNextMissingField pede whatsapp depois do nome ja preenchido", () => {
     phone: "",
     cpf: "",
     email: "",
+    city: "",
   });
 
   assert.equal(nextField, "phone");
+});
+
+test("getNextMissingField pede cidade depois do whatsapp validado", () => {
+  const nextField = getNextMissingField({
+    full_name: "Ana Maria",
+    phone: "+1 321 555 9988",
+    city: "",
+  });
+
+  assert.equal(nextField, "city");
 });
 
 test("extractLeadDataFromMessage nao trata horario como nome", () => {
@@ -77,4 +91,29 @@ test("filterCapturedDataForLead nao sobrescreve nome existente quando o campo es
   assert.deepEqual(captured, {
     phone: "+1 321 555 9988",
   });
+});
+
+test("botReplyForLead encerra o pre-cadastro pedindo a data da aula experimental", () => {
+  const reply = botReplyForLead({
+    lead: {
+      full_name: "Ana Maria",
+      phone: "+1 321 555 9988",
+      city: "Orlando",
+    } as any,
+    messageText: "Orlando",
+  });
+
+  assert.equal(reply.message, EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE);
+  assert.equal(reply.stage, "pre_cadastro_concluido");
+  assert.equal(reply.status, "matricula_pendente");
+});
+
+test("resolveTimeZoneFromCityInput identifica Orlando automaticamente", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    city: "Orlando, FL",
+    phone: "+1 321 555 9988",
+  });
+
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
 });

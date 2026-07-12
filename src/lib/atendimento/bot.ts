@@ -1,6 +1,7 @@
 import {
   CAPTURED_FIELD_ORDER,
   CAPTURED_FIELD_PROMPTS,
+  EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
 } from "./constants.ts";
 import type { AtendimentoLead, AtendimentoStage, AtendimentoStatus, CapturedFieldName } from "./types.ts";
 
@@ -108,6 +109,9 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
 export function getNextMissingField(lead: Partial<AtendimentoLead>) {
   return (
     CAPTURED_FIELD_ORDER.find((field) => {
+      if (field === "full_name" && String(lead.phone ?? "").trim()) {
+        return false;
+      }
       const value = String((lead as any)?.[field] ?? "").trim();
       return !value;
     }) ?? null
@@ -151,7 +155,7 @@ export function botReplyForLead(params: {
     return {
       stage: "pre_cadastro_concluido" as AtendimentoStage,
       status: "matricula_pendente" as AtendimentoStatus,
-      message: "WhatsApp registrado com sucesso.",
+      message: EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
     };
   }
 
