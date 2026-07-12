@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PublicAtendimentoClient } from "@/components/atendimento/PublicAtendimentoClient";
 import { getAtendimentoAccountPath, isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -83,7 +84,9 @@ export default async function AtendimentoAccountPage({
     redirect("/app");
   }
 
-  const { data: lead } = await supabase
+  const admin = createSupabaseAdminClient();
+
+  const { data: lead } = await admin
     .from("atendimento_leads")
     .select("id")
     .eq("auth_user_id", user.id)
@@ -95,7 +98,7 @@ export default async function AtendimentoAccountPage({
   } | null = null;
 
   if (lead?.id) {
-    const { data: booking } = await supabase
+    const { data: booking } = await admin
       .from("atendimento_experimental_class_bookings")
       .select("status, lead_date, lead_time, professor_date, professor_time, created_at, updated_at")
       .eq("lead_id", String(lead.id))
@@ -114,7 +117,7 @@ export default async function AtendimentoAccountPage({
         date_time: [leadDate || professorDate, leadTime || professorTime].filter(Boolean).join(", "),
       };
     } else {
-      const { data: historyEvent } = await supabase
+      const { data: historyEvent } = await admin
         .from("atendimento_history_events")
         .select("event_type, details, created_at")
         .eq("lead_id", String(lead.id))
