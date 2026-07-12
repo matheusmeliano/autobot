@@ -8,7 +8,9 @@ import {
 import {
   ATENDIMENTO_BLOCKED_FINAL_MESSAGE,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  LOCATION_CITY_BLOCKED_FINAL_MESSAGE,
   LOCATION_CITY_INVALID_MESSAGE,
+  LOCATION_STATE_BLOCKED_FINAL_MESSAGE,
   LOCATION_STATE_INVALID_MESSAGE,
   NUMERIC_ONLY_FIELDS,
 } from "@/lib/atendimento/constants";
@@ -228,6 +230,10 @@ function buildPhoneFormatRetryMessage(attempts: number) {
 function buildLocationRetryMessage(field: "state" | "city", attempts: number) {
   const baseMessage = field === "state" ? LOCATION_STATE_INVALID_MESSAGE : LOCATION_CITY_INVALID_MESSAGE;
   return `${baseMessage}\n\nTentativa ${attempts} de ${MAX_LOCATION_VALIDATION_ATTEMPTS}.`;
+}
+
+function getLocationBlockedFinalMessage(field: "state" | "city") {
+  return field === "state" ? LOCATION_STATE_BLOCKED_FINAL_MESSAGE : LOCATION_CITY_BLOCKED_FINAL_MESSAGE;
 }
 
 function getLocationFailureEventType(field: "state" | "city") {
@@ -1090,7 +1096,7 @@ export async function POST(req: Request) {
         })) + 1;
       const shouldBlockConversation = nextFailureAttempt >= MAX_LOCATION_VALIDATION_ATTEMPTS;
       const replyMessage = shouldBlockConversation
-        ? WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE
+        ? getLocationBlockedFinalMessage(locationValidationField)
         : buildLocationRetryMessage(locationValidationField, nextFailureAttempt);
 
       await admin
