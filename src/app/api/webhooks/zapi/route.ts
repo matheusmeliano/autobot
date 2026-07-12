@@ -144,7 +144,10 @@ async function listScheduledExperimentalClassProfessorStarts(params: {
   const message = String((error as any)?.message ?? "");
   const tableMissing =
     Boolean(error) &&
-    (code === "42P01" || /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message));
+    (code === "42P01" ||
+      code === "PGRST205" ||
+      /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+      /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(message));
   if (error && !tableMissing) {
     throw new Error(error.message || "Falha ao consultar horários ocupados da aula experimental.");
   }

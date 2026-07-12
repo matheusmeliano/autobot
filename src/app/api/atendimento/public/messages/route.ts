@@ -415,6 +415,17 @@ async function insertBotTextMessage(params: {
   return (data as Record<string, unknown> | null) ?? null;
 }
 
+function isExperimentalClassBookingsTableUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(message)
+  );
+}
+
 async function listScheduledExperimentalClassProfessorStarts(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   nowIso: string;
@@ -426,11 +437,7 @@ async function listScheduledExperimentalClassProfessorStarts(params: {
     .gte("professor_start_at", params.nowIso)
     .order("professor_start_at", { ascending: true });
 
-  const code = String((error as any)?.code ?? "").trim();
-  const message = String((error as any)?.message ?? "");
-  const tableMissing =
-    Boolean(error) &&
-    (code === "42P01" || /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message));
+  const tableMissing = Boolean(error) && isExperimentalClassBookingsTableUnavailable(error);
   if (error && !tableMissing) {
     throw new Error(error.message || "Falha ao consultar horários ocupados da aula experimental.");
   }
@@ -466,11 +473,7 @@ async function getScheduledExperimentalClassBooking(params: {
     .limit(1)
     .maybeSingle();
 
-  const code = String((error as any)?.code ?? "").trim();
-  const message = String((error as any)?.message ?? "");
-  const tableMissing =
-    Boolean(error) &&
-    (code === "42P01" || /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message));
+  const tableMissing = Boolean(error) && isExperimentalClassBookingsTableUnavailable(error);
   if (error && !tableMissing) {
     throw new Error(error.message || "Falha ao consultar o agendamento da aula experimental.");
   }
@@ -548,8 +551,7 @@ async function reserveExperimentalClassSlot(params: {
     };
   }
 
-  const message = String((error as any)?.message ?? "");
-  if (code !== "42P01" && !/relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message)) {
+  if (!isExperimentalClassBookingsTableUnavailable(error)) {
     throw new Error(error.message || "Falha ao reservar a aula experimental.");
   }
 
