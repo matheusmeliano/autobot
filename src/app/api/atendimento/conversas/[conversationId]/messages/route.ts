@@ -15,9 +15,10 @@ export async function GET(request: Request, context: { params: Promise<{ convers
     const admin = createSupabaseAdminClient();
     const { data, error } = await admin
       .from("atendimento_messages")
-      .select("id, conversation_id, sender_role, content_text, media_type, media_url, mime_type, file_name, file_size_bytes, created_at, status, read_at")
+      .select("id, conversation_id, sender_role, content_text, media_type, media_url, mime_type, file_name, file_size_bytes, sent_at, delivered_at, created_at, status, read_at")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
+      .order("sent_at", { ascending: true, nullsFirst: false })
       .limit(limit);
 
     if (error) {

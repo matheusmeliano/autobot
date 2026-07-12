@@ -35,13 +35,39 @@ function sortAndDedupeMessages(messageList: AtendimentoMessage[]) {
     unique.set(key, message);
   }
 
-  return Array.from(unique.values()).sort((left, right) => {
-    const leftTime = new Date(left.created_at).getTime();
-    const rightTime = new Date(right.created_at).getTime();
+  const getMessageSortTime = (message: AtendimentoMessage) => {
+    const candidates = [message.sent_at, message.delivered_at, message.read_at, message.created_at];
+    for (const candidate of candidates) {
+      const time = new Date(String(candidate ?? "")).getTime();
+      if (Number.isFinite(time) && time > 0) return time;
+    }
+    return 0;
+  };
+
+  const values = Array.from(unique.values());
+  const originalIndexByKey = new Map(
+    values.map((message, index) => [
+      String(message.id ?? "").trim() ||
+        `${message.created_at}:${message.sender_role}:${message.content_text ?? ""}:${message.media_url ?? ""}`,
+      index,
+    ]),
+  );
+
+  return values.sort((left, right) => {
+    const leftTime = getMessageSortTime(left);
+    const rightTime = getMessageSortTime(right);
     if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
       return leftTime - rightTime;
     }
-    return String(left.id ?? "").localeCompare(String(right.id ?? ""));
+
+    const leftKey =
+      String(left.id ?? "").trim() ||
+      `${left.created_at}:${left.sender_role}:${left.content_text ?? ""}:${left.media_url ?? ""}`;
+    const rightKey =
+      String(right.id ?? "").trim() ||
+      `${right.created_at}:${right.sender_role}:${right.content_text ?? ""}:${right.media_url ?? ""}`;
+
+    return (originalIndexByKey.get(leftKey) ?? 0) - (originalIndexByKey.get(rightKey) ?? 0);
   });
 }
 
