@@ -586,7 +586,6 @@ export async function POST(req: Request) {
           .update({
             status: (leadRow as any)?.status ?? null,
             funnel_stage: (leadRow as any)?.funnel_stage ?? null,
-            unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
             last_interaction_at: nowIso,
             updated_at: nowIso,
           })
@@ -629,7 +628,6 @@ export async function POST(req: Request) {
         .update({
           status: shouldBlockConversation ? "encerrado" : (leadRow as any)?.status ?? null,
           funnel_stage: shouldBlockConversation ? "encerrado" : (leadRow as any)?.funnel_stage ?? null,
-          unread_count: Number((leadRow as any)?.unread_count ?? 0) + 1,
           last_interaction_at: nowIso,
           updated_at: nowIso,
         })
@@ -747,7 +745,6 @@ export async function POST(req: Request) {
           : {}),
         status: nextStatus,
         funnel_stage: nextStage,
-        unread_count: Number((leadRecord as any)?.unread_count ?? 0) + 1,
         last_interaction_at: nowIso,
         updated_at: nowIso,
       })
