@@ -12,7 +12,7 @@ import {
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
 } from "@/lib/atendimento/constants";
 import {
-  buildExperimentalClassDatesMessage,
+  buildExperimentalClassDatesMessages,
   listExperimentalClassAvailability,
 } from "@/lib/atendimento/experimentalClass";
 import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
@@ -861,23 +861,25 @@ export async function POST(req: Request) {
         leadTimeZone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         bookedProfessorStartAts: bookedProfessorStarts,
       });
-      const availabilityMessage = buildExperimentalClassDatesMessage(availability.dates);
+      const availabilityMessages = buildExperimentalClassDatesMessages(availability.dates);
 
-      const { data: availabilityOutbound } = await admin
-        .from("atendimento_messages")
-        .insert({
-          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
-          sender_role: "bot",
-          content_text: availabilityMessage,
-          media_type: "text",
-          status: "entregue",
-          sent_at: nowIso,
-          delivered_at: nowIso,
-        })
-        .select("content_text")
-        .maybeSingle();
+      for (const availabilityMessage of availabilityMessages) {
+        const { data: availabilityOutbound } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+            sender_role: "bot",
+            content_text: availabilityMessage,
+            media_type: "text",
+            status: "entregue",
+            sent_at: nowIso,
+            delivered_at: nowIso,
+          })
+          .select("content_text")
+          .maybeSingle();
 
-      previewText = String((availabilityOutbound as any)?.content_text ?? availabilityMessage);
+        previewText = String((availabilityOutbound as any)?.content_text ?? availabilityMessage);
+      }
 
       await appendHistoryEvent({
         leadId: String((pendingEvent as any).lead_id ?? ""),

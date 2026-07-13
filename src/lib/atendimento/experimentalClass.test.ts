@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildExperimentalClassDatesMessage,
+  buildExperimentalClassDatesMessages,
   buildExperimentalClassTimesMessage,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
@@ -39,8 +39,8 @@ test("listExperimentalClassAvailability remove slots que conflitam em 1h30", () 
   );
 });
 
-test("buildExperimentalClassDatesMessage mostra apenas os dias selecionaveis", () => {
-  const message = buildExperimentalClassDatesMessage([
+test("buildExperimentalClassDatesMessages mostra as duas mensagens com conjuncao final", () => {
+  const messages = buildExperimentalClassDatesMessages([
     {
       id: "2026-07-13",
       professorDate: "2026-07-13",
@@ -59,7 +59,10 @@ test("buildExperimentalClassDatesMessage mostra apenas os dias selecionaveis", (
     },
   ]);
 
-  assert.equal(message, "Disponível: 13, 14");
+  assert.deepEqual(messages, [
+    "As datas disponíveis são:\n\n13 e 14.",
+    "Responda apenas com a data desejada.",
+  ]);
 });
 
 test("buildExperimentalClassTimesMessage mostra apenas os horarios selecionaveis", () => {

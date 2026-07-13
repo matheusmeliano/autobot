@@ -17,7 +17,7 @@ import {
   NUMERIC_ONLY_FIELDS,
 } from "@/lib/atendimento/constants";
 import {
-  buildExperimentalClassDatesMessage,
+  buildExperimentalClassDatesMessages,
   buildExperimentalClassFinalChatMessage,
   buildExperimentalClassStudentWhatsAppMessage,
   buildExperimentalClassTimesMessage,
@@ -624,12 +624,15 @@ async function presentExperimentalClassDateOptions(params: {
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedStarts,
   });
-  const message = buildExperimentalClassDatesMessage(availability.dates);
-  const outbound = await insertBotTextMessage({
-    admin: params.admin,
-    conversationId: params.conversationId,
-    contentText: message,
-  });
+  const messages = buildExperimentalClassDatesMessages(availability.dates);
+  let outbound: Record<string, unknown> | null = null;
+  for (const message of messages) {
+    outbound = await insertBotTextMessage({
+      admin: params.admin,
+      conversationId: params.conversationId,
+      contentText: message,
+    });
+  }
 
   await appendHistoryEvent({
     leadId: params.leadId,
@@ -646,14 +649,14 @@ async function presentExperimentalClassDateOptions(params: {
 
   await syncConversationPreview({
     conversationId: params.conversationId,
-    contentText: message,
+    contentText: messages[messages.length - 1] ?? "",
     createdAt: String(outbound?.created_at ?? new Date().toISOString()),
   });
 
   return {
     outbound,
     availability,
-    message,
+    message: messages[messages.length - 1] ?? "",
   };
 }
 

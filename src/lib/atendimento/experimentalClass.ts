@@ -103,12 +103,23 @@ function buildDisplayDateLabel(iso: string, timeZone: string) {
   return formatDateInTimeZone(iso, timeZone);
 }
 
-export function buildExperimentalClassDatesMessage(options: ExperimentalClassDateOption[]) {
+function joinWithFinalConjunction(values: string[]) {
+  if (!values.length) return "";
+  if (values.length === 1) return values[0] ?? "";
+  if (values.length === 2) return `${values[0]} e ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`;
+}
+
+export function buildExperimentalClassDatesMessages(options: ExperimentalClassDateOption[]) {
   if (!options.length) {
-    return "No momento, não há datas disponíveis para aula experimental até o fim deste mês.";
+    return ["No momento, não há datas disponíveis para aula experimental até o fim deste mês."];
   }
 
-  return `Disponível: ${options.map((option) => option.dayLabel).join(", ")}`;
+  const labels = options.map((option) => option.dayLabel);
+  return [
+    `As datas disponíveis são:\n\n${joinWithFinalConjunction(labels)}.`,
+    "Responda apenas com a data desejada.",
+  ];
 }
 
 export function buildExperimentalClassTimesMessage(params: {
