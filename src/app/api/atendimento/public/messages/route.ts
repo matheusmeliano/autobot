@@ -74,9 +74,7 @@ Seja muito bem-vindo(a) ao Lucas Brum Online Music USA!
 
 Estamos felizes em ter você conosco.
 
-Conclua as etapas do AutoBot para agendar sua aula experimental. No dia e horário escolhidos, entraremos em contato.
-
-Nos vemos em breve ${firstName}. 🤝`;
+Agora é só concluir as etapas do AutoBot para agendar sua aula experimental.`;
 }
 
 function extractWhatsAppMessageIds(payload: unknown) {
@@ -1637,7 +1635,13 @@ export async function POST(req: Request) {
       });
     }
 
-    if (lastBotText.startsWith("Horários disponíveis")) {
+    const isAwaitingTimeSelection =
+      lastBotText.startsWith("Horários disponíveis") ||
+      lastBotText.startsWith("Os horários disponíveis são:") ||
+      lastBotText.startsWith("Perfeito! E os horários disponíveis são:") ||
+      lastBotText === "Responda apenas com o horário desejado.";
+
+    if (isAwaitingTimeSelection) {
       const latestTimeOptionsEvent = await getLatestHistoryEventByType({
         admin,
         leadId,
