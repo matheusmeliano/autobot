@@ -91,7 +91,7 @@ test("buildExperimentalClassTimesMessages mostra as duas mensagens de horario", 
   });
 
   assert.deepEqual(messages, [
-    "Os horários disponíveis são:\n\n13:00, 14:30",
+    "Perfeito! E os horários disponíveis são:\n\n13:00, 14:30",
     "Responda apenas com o horário desejado.",
   ]);
 });

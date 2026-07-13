@@ -131,7 +131,7 @@ export function buildExperimentalClassTimesMessages(params: {
   }
 
   return [
-    `Os horários disponíveis são:\n\n${params.options.map((option) => option.displayLabel).join(", ")}`,
+    `Perfeito! E os horários disponíveis são:\n\n${params.options.map((option) => option.displayLabel).join(", ")}`,
     "Responda apenas com o horário desejado.",
   ];
 }
