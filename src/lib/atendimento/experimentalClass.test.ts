@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
   buildExperimentalClassTimesMessages,
   findExperimentalClassDateOption,
@@ -93,6 +94,15 @@ test("buildExperimentalClassTimesMessages mostra as duas mensagens de horario", 
   assert.deepEqual(messages, [
     "Perfeito! E os horários disponíveis são:\n\n13:00, 14:30",
     "Responda apenas com o horário desejado.",
+  ]);
+});
+
+test("buildExperimentalClassBookingChatMessages monta o novo fechamento com primeiro nome", () => {
+  const messages = buildExperimentalClassBookingChatMessages("Ana");
+
+  assert.deepEqual(messages, [
+    "Sua aula experimental foi agendada com sucesso, Ana! Agora você receberá a confirmação da sua inscrição pelo WhatsApp.",
+    "Tudo certo! Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais Ana!",
   ]);
 });
 

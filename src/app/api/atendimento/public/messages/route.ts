@@ -17,13 +17,11 @@ import {
   NUMERIC_ONLY_FIELDS,
 } from "@/lib/atendimento/constants";
 import {
+  buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
-  buildExperimentalClassFinalChatMessage,
   buildExperimentalClassStudentWhatsAppMessage,
   buildExperimentalClassTimesMessages,
-  EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
-  EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
@@ -1761,11 +1759,7 @@ export async function POST(req: Request) {
       });
 
       const firstName = firstNameFromLead(lead as { full_name?: string | null }) || "Aluno";
-      const botMessages = [
-        EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE,
-        EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE,
-        buildExperimentalClassFinalChatMessage(firstName),
-      ];
+      const botMessages = buildExperimentalClassBookingChatMessages(firstName);
       let lastOutbound: Record<string, unknown> | null = null;
       for (let index = 0; index < botMessages.length; index += 1) {
         lastOutbound = await insertBotTextMessage({

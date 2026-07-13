@@ -3,10 +3,6 @@ import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 export const EXPERIMENTAL_CLASS_SLOT_TIMES = ["13:00", "14:30", "16:00"] as const;
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
-export const EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE =
-  "Sua aula experimental com o professor Lucas Brum foi agendada com sucesso.";
-export const EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE =
-  "Agora você receberá uma mensagem no WhatsApp confirmando sua inscrição.";
 
 export type ExperimentalClassDateOption = {
   id: string;
@@ -147,7 +143,15 @@ Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua au
 
 export function buildExperimentalClassFinalChatMessage(name: string) {
   const safeName = String(name ?? "").trim() || "Aluno";
-  return `${safeName}, tudo certo! Agora é só aguardar. Em breve enviaremos o link da sua aula. Até mais!`;
+  return `Tudo certo! Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais ${safeName}!`;
+}
+
+export function buildExperimentalClassBookingChatMessages(name: string) {
+  const safeName = String(name ?? "").trim() || "Aluno";
+  return [
+    `Sua aula experimental foi agendada com sucesso, ${safeName}! Agora você receberá a confirmação da sua inscrição pelo WhatsApp.`,
+    buildExperimentalClassFinalChatMessage(safeName),
+  ];
 }
 
 export function listExperimentalClassAvailability(params: {
