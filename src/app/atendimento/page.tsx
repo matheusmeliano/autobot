@@ -1,9 +1,17 @@
+import type { Viewport } from "next";
 import Link from "next/link";
 import { PublicAtendimentoClient } from "@/components/atendimento/PublicAtendimentoClient";
 import { getAtendimentoPortalPath, isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default async function AtendimentoPublicPage({
   searchParams,
@@ -25,6 +33,16 @@ export default async function AtendimentoPublicPage({
       body {
         background: #09111A;
         overscroll-behavior-y: none;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      @supports (-webkit-touch-callout: none) {
+        input,
+        textarea,
+        select {
+          font-size: 16px !important;
+        }
       }
     `}</style>
   );
