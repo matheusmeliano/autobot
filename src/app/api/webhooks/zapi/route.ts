@@ -6,6 +6,7 @@ import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { botReplyForLead } from "@/lib/atendimento/bot";
 import {
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  buildExperimentalClassDatePromptMessages,
   CAPTURED_FIELD_PROMPTS,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
@@ -823,7 +824,13 @@ export async function POST(req: Request) {
     const outgoingMessages = [successMessage];
     const followUpMessage = String(botResponse.message ?? "").trim();
     if (followUpMessage && followUpMessage !== successMessage) {
-      outgoingMessages.push(followUpMessage);
+      if (followUpMessage === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
+        outgoingMessages.push(
+          ...buildExperimentalClassDatePromptMessages(String((nextLead as any)?.full_name ?? "").trim()),
+        );
+      } else {
+        outgoingMessages.push(followUpMessage);
+      }
     }
 
     let previewText = successMessage;

@@ -8,6 +8,7 @@ import {
 import {
   ATENDIMENTO_BLOCKED_FINAL_MESSAGE,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  buildExperimentalClassDatePromptMessages,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   LOCATION_CITY_BLOCKED_FINAL_MESSAGE,
   LOCATION_CITY_INVALID_MESSAGE,
@@ -1962,6 +1963,12 @@ export async function POST(req: Request) {
 
   const lastBotBeforeInsertCreatedAtMs = new Date(String((lastBotBeforeInsert as any)?.created_at ?? "")).getTime();
   const botResponseText = String(botResponse.message ?? "").trim();
+  const botResponseMessages =
+    botResponseText === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE
+      ? buildExperimentalClassDatePromptMessages(
+          String((persistedLeadValues as Record<string, unknown>)?.full_name ?? (lead as any)?.full_name ?? "").trim(),
+        )
+      : [botResponseText];
   const shouldReuseLastBotMessage = Boolean(
     lastBotBeforeInsert?.id &&
       botResponseText &&
@@ -2003,34 +2010,33 @@ export async function POST(req: Request) {
     });
   }
 
-  const { data: outbound, error: outboundError } = await admin
-    .from("atendimento_messages")
-    .insert({
-      conversation_id: String(conversation.id),
-      sender_role: "bot",
-      content_text: botResponse.message,
-      media_type: "text",
-      status: "entregue",
-      sent_at: botNowIso,
-      delivered_at: botNowIso,
-    })
-    .select("*")
-    .maybeSingle();
+  let outbound: Record<string, unknown> | null = null;
+  let outboundError: { message?: string; code?: string } | null = null;
+  for (const message of botResponseMessages) {
+    try {
+      outbound = await insertBotTextMessage({
+        admin,
+        conversationId: String(conversation.id),
+        contentText: message,
+        sentAt: botNowIso,
+      });
+    } catch (error) {
+      outboundError = error instanceof Error ? { message: error.message } : { message: String(error) };
+      break;
+    }
+  }
 
   if (outboundError) {
-    const code = String((outboundError as any)?.code ?? "").trim();
-    if (code !== "23505") {
-      return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
-    }
+    return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
   }
 
   await syncConversationPreview({
     conversationId: String(conversation.id),
-    contentText: botResponse.message,
+    contentText: botResponseMessages[botResponseMessages.length - 1] ?? botResponse.message,
     createdAt: botNowIso,
   });
 
-  let finalOutbound = outboundError ? null : ((outbound as Record<string, unknown> | null) ?? null);
+  let finalOutbound = outbound;
   if (botResponseText === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
     const dateOptionsPresentation = await presentExperimentalClassDateOptions({
       admin,

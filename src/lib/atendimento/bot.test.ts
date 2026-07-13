@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { botReplyForLead, extractLeadDataFromMessage, filterCapturedDataForLead, getNextMissingField, initialBotMessages } from "./bot.ts";
-import { EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE } from "./constants.ts";
+import { buildExperimentalClassDatePromptMessages, EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE } from "./constants.ts";
 import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "../timezone.ts";
 
 test("extractLeadDataFromMessage captura nome e telefone", () => {
@@ -121,6 +121,14 @@ test("botReplyForLead encerra o pre-cadastro pedindo a data da aula experimental
   assert.equal(reply.message, EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE);
   assert.equal(reply.stage, "pre_cadastro_concluido");
   assert.equal(reply.status, "matricula_pendente");
+});
+
+test("buildExperimentalClassDatePromptMessages monta a nova sequencia com o nome do lead", () => {
+  assert.deepEqual(buildExperimentalClassDatePromptMessages("Ana Maria"), [
+    "Maravilha, Ana Maria!",
+    "Agora é só escolher o melhor dia e horário para sua aula experimental.",
+    "Para começarmos, qual data você prefere?",
+  ]);
 });
 
 test("resolveTimeZoneFromCityInput identifica Orlando automaticamente", () => {
