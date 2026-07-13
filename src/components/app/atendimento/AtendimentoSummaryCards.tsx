@@ -27,6 +27,12 @@ function atendimentoOriginLabel(origin: string | null | undefined) {
   return origin ?? "-";
 }
 
+function atendimentoTimeLabel(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "-";
+  return normalized.endsWith("h") ? normalized : `${normalized}h`;
+}
+
 function Field({
   label,
   value,
@@ -140,10 +146,10 @@ function BookingDetails({
         <Field label="Aluno" value={lead.full_name} />
         <Field label="Status" value={experimentalClassBookingStatusLabel(booking?.status || "scheduled")} />
         <Field label="Data do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
-        <Field label="Horario do aluno" value={booking?.lead_time} />
+        <Field label="Horario do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
         <Field label="Fuso do aluno" value={booking?.lead_timezone} />
         <Field label="Data do professor" value={formatAtendimentoDate(booking?.professor_date)} />
-        <Field label="Horario do professor" value={booking?.professor_time} />
+        <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
         <Field label="Fuso do professor" value={professorTimeZone} />
       </div>
     </div>
