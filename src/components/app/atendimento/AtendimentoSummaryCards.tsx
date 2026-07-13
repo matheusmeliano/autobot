@@ -22,7 +22,7 @@ function experimentalClassBookingStatusLabel(status: string | null | undefined) 
 
 function atendimentoOriginLabel(origin: string | null | undefined) {
   const normalized = String(origin ?? "").trim().toLowerCase();
-  if (normalized === "link_publico_atendimento") return "link público de atendimento";
+  if (normalized === "link_publico_atendimento") return "Link de Atendimento";
   if (!normalized) return "-";
   return origin ?? "-";
 }
