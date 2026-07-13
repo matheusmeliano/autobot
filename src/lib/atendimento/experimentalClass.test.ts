@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildExperimentalClassDatesMessages,
-  buildExperimentalClassTimesMessage,
+  buildExperimentalClassTimesMessages,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
@@ -65,8 +65,8 @@ test("buildExperimentalClassDatesMessages mostra as duas mensagens com conjuncao
   ]);
 });
 
-test("buildExperimentalClassTimesMessage mostra apenas os horarios selecionaveis", () => {
-  const message = buildExperimentalClassTimesMessage({
+test("buildExperimentalClassTimesMessages mostra as duas mensagens de horario", () => {
+  const messages = buildExperimentalClassTimesMessages({
     dayLabel: "13",
     options: [
       {
@@ -90,7 +90,10 @@ test("buildExperimentalClassTimesMessage mostra apenas os horarios selecionaveis
     ],
   });
 
-  assert.equal(message, "Horários disponíveis: 13:00, 14:30");
+  assert.deepEqual(messages, [
+    "Os horários disponíveis são:\n\n13:00, 14:30",
+    "Responda apenas com o horário desejado.",
+  ]);
 });
 
 test("findExperimentalClassDateOption aceita apenas dia exibido", () => {

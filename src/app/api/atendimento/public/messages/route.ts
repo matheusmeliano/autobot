@@ -20,7 +20,7 @@ import {
   buildExperimentalClassDatesMessages,
   buildExperimentalClassFinalChatMessage,
   buildExperimentalClassStudentWhatsAppMessage,
-  buildExperimentalClassTimesMessage,
+  buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_BOOKING_SUCCESS_MESSAGE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
   EXPERIMENTAL_CLASS_WHATSAPP_NOTICE_MESSAGE,
@@ -680,15 +680,18 @@ async function presentExperimentalClassTimeOptions(params: {
   });
   const dateOption = availability.dates.find((option) => option.professorDate === params.professorDate) ?? null;
   const timeOptions = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
-  const message = buildExperimentalClassTimesMessage({
+  const messages = buildExperimentalClassTimesMessages({
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: timeOptions,
   });
-  const outbound = await insertBotTextMessage({
-    admin: params.admin,
-    conversationId: params.conversationId,
-    contentText: message,
-  });
+  let outbound: Record<string, unknown> | null = null;
+  for (const message of messages) {
+    outbound = await insertBotTextMessage({
+      admin: params.admin,
+      conversationId: params.conversationId,
+      contentText: message,
+    });
+  }
 
   await appendHistoryEvent({
     leadId: params.leadId,
@@ -708,7 +711,7 @@ async function presentExperimentalClassTimeOptions(params: {
 
   await syncConversationPreview({
     conversationId: params.conversationId,
-    contentText: message,
+    contentText: messages[messages.length - 1] ?? "",
     createdAt: String(outbound?.created_at ?? new Date().toISOString()),
   });
 
@@ -716,7 +719,7 @@ async function presentExperimentalClassTimeOptions(params: {
     outbound,
     dateOption,
     timeOptions,
-    message,
+    message: messages[messages.length - 1] ?? "",
   };
 }
 

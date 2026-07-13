@@ -122,15 +122,18 @@ export function buildExperimentalClassDatesMessages(options: ExperimentalClassDa
   ];
 }
 
-export function buildExperimentalClassTimesMessage(params: {
+export function buildExperimentalClassTimesMessages(params: {
   dayLabel: string;
   options: ExperimentalClassTimeOption[];
 }) {
   if (!params.options.length) {
-    return `Não há horários livres para o dia ${params.dayLabel}. Escolha outra data disponível.`;
+    return [`Não há horários livres para o dia ${params.dayLabel}. Escolha outra data disponível.`];
   }
 
-  return `Horários disponíveis: ${params.options.map((option) => option.displayLabel).join(", ")}`;
+  return [
+    `Os horários disponíveis são:\n\n${params.options.map((option) => option.displayLabel).join(", ")}`,
+    "Responda apenas com o horário desejado.",
+  ];
 }
 
 export function buildExperimentalClassStudentWhatsAppMessage(name: string) {
