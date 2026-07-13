@@ -60,6 +60,19 @@ function dateTimeBR(value?: string | null) {
   return date.toLocaleString("pt-BR");
 }
 
+function bookingDateBR(value?: string | null) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "-";
+
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})(?:,\s*(\d{2}:\d{2}))?$/);
+  if (match) {
+    const [, year, month, day, time] = match;
+    return time ? `${day}/${month}/${year}, ${time}` : `${day}/${month}/${year}`;
+  }
+
+  return normalized;
+}
+
 function getInitialLetter(value: string) {
   const normalized = String(value ?? "").trim();
   if (!normalized) return "U";
@@ -1501,8 +1514,8 @@ export function PublicAtendimentoClient({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-6">
             <div className="mb-4">
               <div className="rounded-2xl border border-amber-200/30 bg-amber-200/10 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Data do agendamento</div>
-                <div className="mt-3 text-lg font-semibold text-amber-50">{profile.booking?.date_time || "-"}</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Sua proxima aula sera:</div>
+                <div className="mt-3 text-lg font-semibold text-amber-50">{bookingDateBR(profile.booking?.date_time)}</div>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
