@@ -1522,7 +1522,7 @@ export function PublicAtendimentoClient({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-6">
             <div className="mb-4">
               <div className="rounded-2xl border border-amber-200/30 bg-amber-200/10 p-4">
-                <div className="flex flex-col-reverse gap-2 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between">
+                <div className="flex flex-col-reverse gap-4 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between min-[640px]:gap-2">
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Sua próxima aula será:</div>
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80 min-[640px]:text-right">
                     Status: {bookingStatusLabel(profile.booking?.status)}
