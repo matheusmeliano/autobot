@@ -13,7 +13,7 @@ import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionS
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
-const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+1 321 297 3565";
+const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+55 65 9985-1142";
 const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
 const ATENDIMENTO_DAILY_SUMMARY_TRIGGER_HOUR = 20;
@@ -123,19 +123,20 @@ async function countAtendimentoDailyInterestedLeads(params: {
     throw new Error(conversationsError.message || "Falha ao listar conversas do resumo diario do atendimento.");
   }
 
-  const leadIds = new Set<string>();
-
-  for (const row of createdLeads ?? []) {
-    const leadId = String((row as any)?.id ?? "").trim();
-    if (leadId) leadIds.add(leadId);
-  }
-
+  const conversationLeadIds = new Set<string>();
   for (const row of createdConversations ?? []) {
     const leadId = String((row as any)?.lead_id ?? "").trim();
-    if (leadId) leadIds.add(leadId);
+    if (leadId) conversationLeadIds.add(leadId);
   }
 
-  return leadIds.size;
+  let leadsWithoutConversationCount = 0;
+  for (const row of createdLeads ?? []) {
+    const leadId = String((row as any)?.id ?? "").trim();
+    if (!leadId) continue;
+    if (!conversationLeadIds.has(leadId)) leadsWithoutConversationCount += 1;
+  }
+
+  return (createdConversations ?? []).length + leadsWithoutConversationCount;
 }
 
 export function buildAtendimentoConversationPublicUrl(publicSlug: string) {
