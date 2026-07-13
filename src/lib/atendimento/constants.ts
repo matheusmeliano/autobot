@@ -46,7 +46,10 @@ export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
   "Agora é só escolher o melhor dia e horário para sua aula experimental.";
 export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual data você prefere?";
 export function buildExperimentalClassDatePromptMessages(name?: string | null) {
-  const normalizedName = String(name ?? "").trim() || "Aluno";
+  const normalizedName = String(name ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")[0] || "Aluno";
   return [
     `Maravilha, ${normalizedName}!`,
     EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE,
