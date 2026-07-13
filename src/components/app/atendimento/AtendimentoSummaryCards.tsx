@@ -20,6 +20,13 @@ function experimentalClassBookingStatusLabel(status: string | null | undefined) 
   return status ?? "-";
 }
 
+function atendimentoOriginLabel(origin: string | null | undefined) {
+  const normalized = String(origin ?? "").trim().toLowerCase();
+  if (normalized === "link_publico_atendimento") return "link público de atendimento";
+  if (!normalized) return "-";
+  return origin ?? "-";
+}
+
 function Field({
   label,
   value,
@@ -78,7 +85,7 @@ function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
         <Field label="Telefone" value={lead.phone} copyable />
         <Field label="Email" value={lead.email} copyable />
         <Field label="CPF" value={lead.cpf} copyable />
-        <Field label="Origem" value={lead.origin} />
+        <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
         <Field label="Status" value={atendimentoStatusLabel(lead.status)} />
         <Field label="Etapa" value={atendimentoStageLabel(lead.funnel_stage)} />
         <Field label="Cidade" value={lead.city} />
