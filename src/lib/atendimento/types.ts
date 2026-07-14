@@ -86,6 +86,7 @@ export type AtendimentoHistoryEvent = {
 export type AtendimentoExperimentalClassBookingSummary = {
   id: string;
   status: string | null;
+  lesson_link: string | null;
   professor_timezone: string | null;
   lead_timezone: string | null;
   professor_date: string | null;

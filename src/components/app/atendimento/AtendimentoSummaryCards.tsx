@@ -106,17 +106,30 @@ function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
 function BookingDetails({
   lead,
   cancellingBookingId,
+  savingLessonLinkBookingId,
   onCancelBooking,
+  onSaveLessonLink,
 }: {
   lead: AtendimentoLeadListItem;
   cancellingBookingId: string | null;
+  savingLessonLinkBookingId: string | null;
   onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
+  onSaveLessonLink: (lead: AtendimentoLeadListItem, lessonLink: string) => Promise<void>;
 }) {
   const booking = lead.experimental_class_booking;
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const bookingId = String(booking?.id ?? "").trim();
   const normalizedStatus = String(booking?.status ?? "").trim().toLowerCase();
   const canCancel = normalizedStatus === "scheduled" && Boolean(bookingId);
+  const [lessonLinkDraft, setLessonLinkDraft] = useState(String(booking?.lesson_link ?? "").trim());
+  const savedLessonLink = String(booking?.lesson_link ?? "").trim();
+  const isSavingLessonLink = savingLessonLinkBookingId === bookingId;
+  const lessonLinkChanged = lessonLinkDraft.trim() !== savedLessonLink;
+  const canOpenSavedLessonLink = /^https?:\/\//i.test(savedLessonLink);
+
+  useEffect(() => {
+    setLessonLinkDraft(savedLessonLink);
+  }, [savedLessonLink, bookingId]);
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
@@ -153,8 +166,46 @@ function BookingDetails({
         <Field label="Fuso do professor" value={professorTimeZone} />
       </div>
 
-      <div className="mt-3">
-        <Field label="Link da Aula" value="Será enviado ao aluno na data e horário agendados." />
+      <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+        <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">Link da Aula</div>
+            <div className="mt-2 text-xs text-[var(--app-text-55)]">
+              Adicione manualmente o link que será enviado ao aluno na data e horário agendados.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void onSaveLessonLink(lead, lessonLinkDraft)}
+            disabled={isSavingLessonLink || !lessonLinkChanged}
+            className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isSavingLessonLink ? "Salvando..." : "Salvar link"}
+          </button>
+        </div>
+
+        <input
+          type="text"
+          value={lessonLinkDraft}
+          onChange={(event) => setLessonLinkDraft(event.target.value)}
+          placeholder="https://meet.google.com/..."
+          className="mt-4 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-medium text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
+        />
+
+        {savedLessonLink ? (
+          <a
+            href={canOpenSavedLessonLink ? savedLessonLink : "#"}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="mt-3 inline-flex text-sm font-semibold text-emerald-300 underline underline-offset-2 break-all"
+            onClick={(event) => {
+              if (!canOpenSavedLessonLink) event.preventDefault();
+            }}
+          >
+            {savedLessonLink}
+          </a>
+        ) : null}
       </div>
     </div>
   );
@@ -206,6 +257,7 @@ export function AtendimentoSummaryCards({
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [mobileLead, setMobileLead] = useState<AtendimentoLeadListItem | null>(null);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
+  const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -314,6 +366,7 @@ export function AtendimentoSummaryCards({
             id: bookingId,
             source: "table" as const,
             created_at: lead.updated_at,
+            lesson_link: null,
             professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
             lead_timezone: null,
             professor_date: null,
@@ -326,6 +379,8 @@ export function AtendimentoSummaryCards({
           }),
           ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
           source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
+          lesson_link:
+            String((payload.booking as any)?.lesson_link ?? lead.experimental_class_booking?.lesson_link ?? "").trim() || null,
           status: "cancelled",
         },
       };
@@ -341,6 +396,80 @@ export function AtendimentoSummaryCards({
       modalToast.error(error instanceof Error ? error.message : "Falha ao cancelar agendamento.");
     } finally {
       setCancellingBookingId(null);
+    }
+  }
+
+  async function handleSaveLessonLink(lead: AtendimentoLeadListItem, lessonLink: string) {
+    const booking = lead.experimental_class_booking;
+    const bookingId = String(booking?.id ?? "").trim();
+
+    if (!bookingId) {
+      modalToast.error("Agendamento indisponível para salvar o link.");
+      return;
+    }
+
+    try {
+      setSavingLessonLinkBookingId(bookingId);
+
+      const response = await fetch(`/api/atendimento/bookings/${bookingId}/lesson-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          lessonLink,
+          leadId: lead.id,
+          conversationId: lead.conversation?.id ?? null,
+          professorDate: booking?.professor_date ?? null,
+          professorTime: booking?.professor_time ?? null,
+          professorStartAt: booking?.professor_start_at ?? null,
+          leadDate: booking?.lead_date ?? null,
+          leadTime: booking?.lead_time ?? null,
+          leadTimeZone: booking?.lead_timezone ?? null,
+          professorTimeZone: booking?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          status: booking?.status ?? "scheduled",
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
+        | null;
+
+      if (!response.ok || !payload?.ok || !payload.booking) {
+        modalToast.error(payload?.error ?? "Falha ao salvar o link da aula.");
+        return;
+      }
+
+      const updatedLead: AtendimentoLeadListItem = {
+        ...lead,
+        experimental_class_booking: {
+          ...(lead.experimental_class_booking ?? {
+            id: bookingId,
+            source: "table" as const,
+            created_at: lead.updated_at,
+            lesson_link: null,
+            professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: null,
+            professor_date: null,
+            professor_time: null,
+            professor_start_at: null,
+            lead_date: null,
+            lead_time: null,
+            lead_start_at: null,
+            status: "scheduled",
+          }),
+          ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
+          source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
+          lesson_link: String((payload.booking as any)?.lesson_link ?? "").trim() || null,
+        },
+      };
+
+      setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
+      setMobileLead((current) => (current?.id === lead.id ? updatedLead : current));
+      modalToast.success(lessonLink.trim() ? "Link da aula salvo." : "Link da aula removido.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao salvar o link da aula.");
+    } finally {
+      setSavingLessonLinkBookingId(null);
     }
   }
 
@@ -463,7 +592,9 @@ export function AtendimentoSummaryCards({
                 <BookingDetails
                   lead={selectedLead}
                   cancellingBookingId={cancellingBookingId}
+                  savingLessonLinkBookingId={savingLessonLinkBookingId}
                   onCancelBooking={handleCancelBooking}
+                  onSaveLessonLink={handleSaveLessonLink}
                 />
               ) : (
                 <LeadDetails lead={selectedLead} />
@@ -499,7 +630,9 @@ export function AtendimentoSummaryCards({
               <BookingDetails
                 lead={mobileLead}
                 cancellingBookingId={cancellingBookingId}
+                savingLessonLinkBookingId={savingLessonLinkBookingId}
                 onCancelBooking={handleCancelBooking}
+                onSaveLessonLink={handleSaveLessonLink}
               />
             ) : (
               <LeadDetails lead={mobileLead} />

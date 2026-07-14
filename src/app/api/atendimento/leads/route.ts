@@ -13,6 +13,19 @@ function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   );
 }
 
+function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .*lesson_link.* does not exist/i.test(message) ||
+    /could not find the 'lesson_link' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
 function getLeadSortTime(row: any) {
   const candidates = [
     row?.last_interaction_at,
@@ -75,14 +88,35 @@ export async function GET(req: Request) {
       conversationsByLeadId.set(leadId, conversation);
     }
 
-    const { data: bookings, error: bookingsError } = await admin
+    let bookings: any[] | null = null;
+    let bookingsError: any = null;
+
+    const bookingsSelectWithLessonLink =
+      "id, lead_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+    const bookingsSelectWithoutLessonLink =
+      "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+
+    const bookingsWithLessonLinkResult = await admin
       .from("atendimento_experimental_class_bookings")
-      .select(
-        "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at",
-      )
+      .select(bookingsSelectWithLessonLink)
       .in("lead_id", leadIds)
       .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false });
+
+    if (bookingsWithLessonLinkResult.error && isExperimentalClassBookingsLessonLinkColumnUnavailable(bookingsWithLessonLinkResult.error)) {
+      const bookingsWithoutLessonLinkResult = await admin
+        .from("atendimento_experimental_class_bookings")
+        .select(bookingsSelectWithoutLessonLink)
+        .in("lead_id", leadIds)
+        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      bookings = bookingsWithoutLessonLinkResult.data as any[] | null;
+      bookingsError = bookingsWithoutLessonLinkResult.error;
+    } else {
+      bookings = bookingsWithLessonLinkResult.data as any[] | null;
+      bookingsError = bookingsWithLessonLinkResult.error;
+    }
 
     if (bookingsError && !isExperimentalClassBookingsTableUnavailable(bookingsError)) {
       return Response.json({ ok: false, error: bookingsError.message }, { status: 500 });
@@ -93,6 +127,7 @@ export async function GET(req: Request) {
       if (!leadId || bookingsByLeadId.has(leadId)) continue;
       bookingsByLeadId.set(leadId, {
         ...(booking as any),
+        lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
         professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
       });
@@ -102,24 +137,37 @@ export async function GET(req: Request) {
       .from("atendimento_history_events")
       .select("id, lead_id, event_type, conversation_id, created_at, details")
       .in("lead_id", leadIds)
-      .in("event_type", ["experimental_class_scheduled", "experimental_class_cancelled"])
+      .in("event_type", ["experimental_class_scheduled", "experimental_class_cancelled", "experimental_class_link_updated"])
       .order("created_at", { ascending: false });
 
     if (historyError) {
       return Response.json({ ok: false, error: historyError.message }, { status: 500 });
     }
 
+    const lessonLinkByLeadId = new Map<string, string | null>();
     for (const event of historyEvents ?? []) {
       const leadId = String((event as any)?.lead_id ?? "");
-      if (!leadId || bookingsByLeadId.has(leadId)) continue;
+      if (!leadId) continue;
       const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
       const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+      const lessonLink = String(details.lesson_link ?? "").trim() || null;
+
+      if (eventType === "experimental_class_link_updated") {
+        if (!lessonLinkByLeadId.has(leadId)) {
+          lessonLinkByLeadId.set(leadId, lessonLink);
+        }
+        continue;
+      }
+
+      if (bookingsByLeadId.has(leadId)) continue;
+
       const bookingStatus =
         String(details.status ?? "").trim().toLowerCase() ||
         (eventType === "experimental_class_cancelled" ? "cancelled" : "scheduled");
       bookingsByLeadId.set(leadId, {
         id: String((event as any)?.id ?? ""),
         status: bookingStatus,
+        lesson_link: lessonLink,
         professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         lead_timezone: String(details.lead_timezone ?? ""),
         professor_date: String(details.professor_date ?? ""),
@@ -131,6 +179,15 @@ export async function GET(req: Request) {
         conversation_id: String((event as any)?.conversation_id ?? ""),
         created_at: String((event as any)?.created_at ?? ""),
         source: "history",
+      });
+    }
+
+    for (const [leadId, lessonLink] of lessonLinkByLeadId.entries()) {
+      const currentBooking = bookingsByLeadId.get(leadId);
+      if (!currentBooking) continue;
+      bookingsByLeadId.set(leadId, {
+        ...currentBooking,
+        lesson_link: lessonLink,
       });
     }
   }
