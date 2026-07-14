@@ -143,13 +143,14 @@ Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua au
 
 export function buildExperimentalClassFinalChatMessage(name: string) {
   const safeName = String(name ?? "").trim() || "Aluno";
-  return `Tudo certo! Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais ${safeName}!`;
+  return `Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais ${safeName}!`;
 }
 
 export function buildExperimentalClassBookingChatMessages(name: string) {
   const safeName = String(name ?? "").trim() || "Aluno";
   return [
-    `Sua aula experimental foi agendada com sucesso, ${safeName}! Agora você receberá a confirmação da sua inscrição pelo WhatsApp.`,
+    "Agora você receberá a confirmação da sua inscrição pelo WhatsApp.",
+    `Sua aula experimental foi agendada com sucesso, ${safeName}!`,
     buildExperimentalClassFinalChatMessage(safeName),
   ];
 }

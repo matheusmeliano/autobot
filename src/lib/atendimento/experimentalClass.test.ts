@@ -101,8 +101,9 @@ test("buildExperimentalClassBookingChatMessages monta o novo fechamento com prim
   const messages = buildExperimentalClassBookingChatMessages("Ana");
 
   assert.deepEqual(messages, [
-    "Sua aula experimental foi agendada com sucesso, Ana! Agora você receberá a confirmação da sua inscrição pelo WhatsApp.",
-    "Tudo certo! Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais Ana!",
+    "Agora você receberá a confirmação da sua inscrição pelo WhatsApp.",
+    "Sua aula experimental foi agendada com sucesso, Ana!",
+    "Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais Ana!",
   ]);
 });
 
