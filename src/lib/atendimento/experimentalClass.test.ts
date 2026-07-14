@@ -9,7 +9,7 @@ import {
   listExperimentalClassAvailability,
 } from "./experimentalClass.ts";
 
-test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 16:00", () => {
+test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 16:00 a partir do dia 20", () => {
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-12T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
@@ -19,6 +19,7 @@ test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 
   const firstDate = availability.dates[0];
   const slots = availability.slotsByProfessorDate.get(firstDate.professorDate) ?? [];
 
+  assert.equal(firstDate.professorDate, "2026-07-20");
   assert.deepEqual(
     slots.map((slot) => slot.professorTime),
     ["13:00", "14:30", "16:00"],
@@ -29,10 +30,10 @@ test("listExperimentalClassAvailability remove slots que conflitam em 1h30", () 
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-12T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
-    bookedProfessorStartAts: ["2026-07-13T17:30:00.000Z"],
+    bookedProfessorStartAts: ["2026-07-20T17:30:00.000Z"],
   });
 
-  const slots = availability.slotsByProfessorDate.get("2026-07-13") ?? [];
+  const slots = availability.slotsByProfessorDate.get("2026-07-20") ?? [];
 
   assert.deepEqual(
     slots.map((slot) => slot.professorTime),
@@ -187,7 +188,10 @@ test("findExperimentalClassTimeOption aceita formatos equivalentes de horario", 
 
   assert.equal(findExperimentalClassTimeOption("10h", options)?.professorTime, "10:00");
   assert.equal(findExperimentalClassTimeOption("10 horas", options)?.professorTime, "10:00");
+  assert.equal(findExperimentalClassTimeOption("10:00h", options)?.professorTime, "10:00");
   assert.equal(findExperimentalClassTimeOption("13h30", options)?.professorTime, "13:30");
   assert.equal(findExperimentalClassTimeOption("13h30min", options)?.professorTime, "13:30");
   assert.equal(findExperimentalClassTimeOption("13 horas 30 min", options)?.professorTime, "13:30");
+  assert.equal(findExperimentalClassTimeOption("13:30h", options)?.professorTime, "13:30");
+  assert.equal(findExperimentalClassTimeOption("13:30 h", options)?.professorTime, "13:30");
 });

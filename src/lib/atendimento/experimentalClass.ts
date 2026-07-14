@@ -62,6 +62,10 @@ function endOfMonthLocalDate(localDate: string) {
   return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
+function maxLocalDate(left: string, right: string) {
+  return left >= right ? left : right;
+}
+
 function weekdayInTimeZone(value: Date | string | number, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -104,7 +108,8 @@ function normalizeFlexibleTimeSelection(value: string) {
     .replace(/horas?/g, "h")
     .replace(/hrs?/g, "h")
     .replace(/minutos?/g, "min")
-    .replace(/mins?/g, "min");
+    .replace(/mins?/g, "min")
+    .replace(/^(\d{1,2}:\d{1,2})h$/, "$1");
 
   const colonMatch = compact.match(/^(\d{1,2}):(\d{1,2})$/);
   if (colonMatch) {
@@ -210,11 +215,17 @@ export function listExperimentalClassAvailability(params: {
     .filter((value) => Number.isFinite(value));
 
   const professorToday = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
+  const professorMonthStartAtDay20 = `${professorToday.slice(0, 8)}20`;
+  const professorWindowStart = maxLocalDate(professorToday, professorMonthStartAtDay20);
   const professorMonthEnd = endOfMonthLocalDate(professorToday);
   const dates: ExperimentalClassDateOption[] = [];
   const slotsByProfessorDate = new Map<string, ExperimentalClassTimeOption[]>();
 
-  for (let currentDate = professorToday; currentDate <= professorMonthEnd; currentDate = addDaysToLocalDate(currentDate, 1)) {
+  for (
+    let currentDate = professorWindowStart;
+    currentDate <= professorMonthEnd;
+    currentDate = addDaysToLocalDate(currentDate, 1)
+  ) {
     const middayIso = zonedDateTimeToUtcIso({
       date: currentDate,
       time: "12:00",
