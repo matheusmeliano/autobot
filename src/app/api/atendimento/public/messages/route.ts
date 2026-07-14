@@ -21,10 +21,12 @@ import {
   NUMERIC_ONLY_FIELDS,
 } from "@/lib/atendimento/constants";
 import {
+  buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
   buildExperimentalClassStudentWhatsAppMessage,
   buildExperimentalClassTimesMessages,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
@@ -1903,6 +1905,36 @@ export async function POST(req: Request) {
           eventType: "experimental_class_whatsapp_confirmation_failed",
           title: "Falha ao enviar a confirmação da aula experimental no WhatsApp",
           details: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          message: buildExperimentalClassAttendantWhatsAppMessage(),
+        });
+
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_attendant_notification_sent",
+          title: "Atendente notificado sobre novo agendamento de aula experimental",
+          details: {
+            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          },
+          actorType: "system",
+        });
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_attendant_notification_failed",
+          title: "Falha ao notificar o atendente sobre novo agendamento de aula experimental",
+          details: {
+            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
             error: error instanceof Error ? error.message : String(error),
           },
           actorType: "system",

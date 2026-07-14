@@ -3,6 +3,8 @@ import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 export const EXPERIMENTAL_CLASS_SLOT_TIMES = ["13:00", "14:30", "16:00"] as const;
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
+export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+1 321 297 3565";
+export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
 
 export type ExperimentalClassDateOption = {
   id: string;
@@ -181,6 +183,14 @@ export function buildExperimentalClassStudentWhatsAppMessage(name: string) {
 É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.
 
 Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
+}
+
+export function buildExperimentalClassAttendantWhatsAppMessage() {
+  return `Você recebeu um novo agendamento de aula experimental.
+
+Acesse o link abaixo e adicione o link da aula ao interessado.
+
+${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 
 export function buildExperimentalClassFinalChatMessage(name: string) {
