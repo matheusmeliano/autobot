@@ -101,7 +101,10 @@ async function countAtendimentoDailyInterestedLeads(params: {
   rangeEndIso: string;
 }) {
   const admin = createSupabaseAdminClient();
-  const [{ data: createdLeads, error: leadsError }, { data: createdConversations, error: conversationsError }] =
+  const [
+    { data: createdLeads, error: leadsError },
+    { data: leadMessages, error: leadMessagesError },
+  ] =
     await Promise.all([
       admin
         .from("atendimento_leads")
@@ -109,8 +112,9 @@ async function countAtendimentoDailyInterestedLeads(params: {
         .gte("created_at", params.rangeStartIso)
         .lt("created_at", params.rangeEndIso),
       admin
-        .from("atendimento_conversations")
-        .select("lead_id")
+        .from("atendimento_messages")
+        .select("conversation_id")
+        .eq("sender_role", "lead")
         .gte("created_at", params.rangeStartIso)
         .lt("created_at", params.rangeEndIso),
     ]);
@@ -119,14 +123,34 @@ async function countAtendimentoDailyInterestedLeads(params: {
     throw new Error(leadsError.message || "Falha ao listar leads do resumo diario do atendimento.");
   }
 
-  if (conversationsError) {
-    throw new Error(conversationsError.message || "Falha ao listar conversas do resumo diario do atendimento.");
+  if (leadMessagesError) {
+    throw new Error(leadMessagesError.message || "Falha ao listar mensagens do lead no resumo diario do atendimento.");
   }
 
-  const conversationLeadIds = new Set<string>();
-  for (const row of createdConversations ?? []) {
-    const leadId = String((row as any)?.lead_id ?? "").trim();
-    if (leadId) conversationLeadIds.add(leadId);
+  const leadConversationIds = Array.from(
+    new Set(
+      (leadMessages ?? [])
+        .map((row: any) => String(row?.conversation_id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  let conversationLeadIds = new Set<string>();
+  if (leadConversationIds.length > 0) {
+    const { data: conversations, error: conversationsError } = await admin
+      .from("atendimento_conversations")
+      .select("id, lead_id")
+      .in("id", leadConversationIds);
+
+    if (conversationsError) {
+      throw new Error(conversationsError.message || "Falha ao listar conversas do resumo diario do atendimento.");
+    }
+
+    conversationLeadIds = new Set(
+      (conversations ?? [])
+        .map((row: any) => String(row?.lead_id ?? "").trim())
+        .filter(Boolean),
+    );
   }
 
   let leadsWithoutConversationCount = 0;
@@ -136,7 +160,7 @@ async function countAtendimentoDailyInterestedLeads(params: {
     if (!conversationLeadIds.has(leadId)) leadsWithoutConversationCount += 1;
   }
 
-  return (createdConversations ?? []).length + leadsWithoutConversationCount;
+  return leadConversationIds.length + leadsWithoutConversationCount;
 }
 
 export function buildAtendimentoConversationPublicUrl(publicSlug: string) {
