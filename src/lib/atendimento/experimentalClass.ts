@@ -136,7 +136,7 @@ export function buildExperimentalClassStudentWhatsAppMessage(name: string) {
   const safeName = String(name ?? "").trim() || "Aluno";
   return `Parabéns, ${safeName}!
 
-Ficamos muito felizes em receber você na sua primeira aula da Escola de Música Lucas Brum.
+É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.
 
 Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
 }
