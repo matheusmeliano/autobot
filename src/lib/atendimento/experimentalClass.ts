@@ -5,6 +5,7 @@ export const EXPERIMENTAL_CLASS_SLOT_TIMES = ["13:00", "14:30", "16:00"] as cons
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
+export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 
 export type ExperimentalClassDateOption = {
   id: string;
@@ -191,6 +192,30 @@ export function buildExperimentalClassAttendantWhatsAppMessage() {
 Acesse o link abaixo e adicione o link da aula ao interessado.
 
 ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
+}
+
+export function buildExperimentalClassStudentLessonReadyWhatsAppMessage(name: string, lessonLink: string) {
+  const safeName = String(name ?? "").trim() || "Aluno";
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  return `Olá, ${safeName}! 👋
+
+Sua aula experimental já está disponível.
+
+Link da aula: ${safeLessonLink}
+
+O professor Lucas Brum já está te aguardando.
+
+Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
+}
+
+export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name: string, lessonLink: string) {
+  const safeName = String(name ?? "").trim() || "Aluno";
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  return `A aula experimental do(a) aluno(a) ${safeName} está perto de começar!
+
+Link da aula: ${safeLessonLink}
+
+Aguarde o(a) aluno(a) acessar a sala.`;
 }
 
 export function buildExperimentalClassFinalChatMessage(name: string) {

@@ -9,6 +9,12 @@ import {
   getAtendimentoMediaTypeFromMimeType,
 } from "@/lib/atendimento/files";
 import { initialBotMessages } from "@/lib/atendimento/bot";
+import {
+  buildExperimentalClassAttendantStartReminderWhatsAppMessage,
+  buildExperimentalClassStudentLessonReadyWhatsAppMessage,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
+} from "@/lib/atendimento/experimentalClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -49,6 +55,11 @@ function getLeadFirstName(name: string | null | undefined) {
     .split(/\s+/)
     .filter(Boolean);
   return parts[0] ?? "Aluno";
+}
+
+function getLeadFullName(name: string | null | undefined) {
+  const clean = String(name ?? "").trim().replace(/\s+/g, " ");
+  return clean || getLeadFirstName(name);
 }
 
 function localDateInTimeZone(value: Date | string | number, timeZone: string) {
@@ -94,6 +105,30 @@ Hoje entraram ${leadsCount} novos interessados na fila de atendimento.
 Acesse o painel para visualizar todos os leads e iniciar os atendimentos:
 
 ${ATENDIMENTO_DAILY_SUMMARY_LINK}`;
+}
+
+function isExperimentalClassBookingsTableUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(message)
+  );
+}
+
+function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .*lesson_link.* does not exist/i.test(message) ||
+    /could not find the 'lesson_link' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
+      message,
+    )
+  );
 }
 
 async function countAtendimentoDailyInterestedLeads(params: {
@@ -490,6 +525,277 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
       .eq("summary_date", summaryDate);
     throw error;
   }
+}
+
+export async function sendExperimentalClassStartNotifications(now = new Date()) {
+  const admin = createSupabaseAdminClient();
+  const nowIso = now.toISOString();
+  const nowMs = now.getTime();
+  const lookbackMinutes = 15;
+  const candidateWindowStartIso = new Date(nowMs - lookbackMinutes * 60_000).toISOString();
+  const attendantReminderUpperIso = new Date(
+    nowMs + EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000,
+  ).toISOString();
+
+  let bookings: any[] | null = null;
+  let bookingsError: any = null;
+
+  const bookingsSelectWithLessonLink =
+    "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+  const bookingsSelectWithoutLessonLink =
+    "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+
+  const bookingsWithLessonLinkResult = await admin
+    .from("atendimento_experimental_class_bookings")
+    .select(bookingsSelectWithLessonLink)
+    .eq("status", "scheduled")
+    .gte("professor_start_at", candidateWindowStartIso)
+    .lte("professor_start_at", attendantReminderUpperIso)
+    .order("professor_start_at", { ascending: true });
+
+  if (
+    bookingsWithLessonLinkResult.error &&
+    isExperimentalClassBookingsLessonLinkColumnUnavailable(bookingsWithLessonLinkResult.error)
+  ) {
+    const bookingsWithoutLessonLinkResult = await admin
+      .from("atendimento_experimental_class_bookings")
+      .select(bookingsSelectWithoutLessonLink)
+      .eq("status", "scheduled")
+      .gte("professor_start_at", candidateWindowStartIso)
+      .lte("professor_start_at", attendantReminderUpperIso)
+      .order("professor_start_at", { ascending: true });
+
+    bookings = bookingsWithoutLessonLinkResult.data as any[] | null;
+    bookingsError = bookingsWithoutLessonLinkResult.error;
+  } else {
+    bookings = bookingsWithLessonLinkResult.data as any[] | null;
+    bookingsError = bookingsWithLessonLinkResult.error;
+  }
+
+  if (bookingsError) {
+    if (isExperimentalClassBookingsTableUnavailable(bookingsError)) {
+      return {
+        ok: true as const,
+        skipped: true as const,
+        reason: "bookings_table_unavailable",
+        checkedBookings: 0,
+        studentSent: 0,
+        attendantSent: 0,
+        missingLessonLink: 0,
+        missingStudentPhone: 0,
+      };
+    }
+
+    throw new Error(bookingsError.message || "Falha ao consultar agendamentos da aula experimental.");
+  }
+
+  const bookingRows = (bookings ?? []).filter((booking) => String((booking as any)?.id ?? "").trim());
+  if (!bookingRows.length) {
+    return {
+      ok: true as const,
+      skipped: true as const,
+      reason: "no_due_bookings",
+      checkedBookings: 0,
+      studentSent: 0,
+      attendantSent: 0,
+      missingLessonLink: 0,
+      missingStudentPhone: 0,
+    };
+  }
+
+  const leadIds = Array.from(
+    new Set(bookingRows.map((booking) => String((booking as any)?.lead_id ?? "").trim()).filter(Boolean)),
+  );
+
+  const { data: leads, error: leadsError } = await admin
+    .from("atendimento_leads")
+    .select("id, full_name, phone")
+    .in("id", leadIds);
+
+  if (leadsError) {
+    throw new Error(leadsError.message || "Falha ao consultar os leads da aula experimental.");
+  }
+
+  const { data: historyEvents, error: historyError } = await admin
+    .from("atendimento_history_events")
+    .select("lead_id, conversation_id, event_type, details, created_at")
+    .in("lead_id", leadIds)
+    .in("event_type", [
+      "experimental_class_link_updated",
+      "experimental_class_student_start_notification_sent",
+      "experimental_class_attendant_start_notification_sent",
+    ])
+    .order("created_at", { ascending: false });
+
+  if (historyError) {
+    throw new Error(historyError.message || "Falha ao consultar o histórico da aula experimental.");
+  }
+
+  const leadsById = new Map(
+    (leads ?? []).map((lead) => [String((lead as any)?.id ?? "").trim(), lead]),
+  );
+  const latestLessonLinkByLeadId = new Map<string, string | null>();
+  const sentStudentBookingIds = new Set<string>();
+  const sentAttendantBookingIds = new Set<string>();
+
+  for (const event of historyEvents ?? []) {
+    const leadId = String((event as any)?.lead_id ?? "").trim();
+    const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+    const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+    const bookingId = String(details.booking_id ?? "").trim();
+    const lessonLink = String(details.lesson_link ?? "").trim() || null;
+
+    if (eventType === "experimental_class_link_updated") {
+      if (leadId && !latestLessonLinkByLeadId.has(leadId)) {
+        latestLessonLinkByLeadId.set(leadId, lessonLink);
+      }
+      continue;
+    }
+
+    if (!bookingId) continue;
+    if (eventType === "experimental_class_student_start_notification_sent") {
+      sentStudentBookingIds.add(bookingId);
+      continue;
+    }
+    if (eventType === "experimental_class_attendant_start_notification_sent") {
+      sentAttendantBookingIds.add(bookingId);
+    }
+  }
+
+  let studentSent = 0;
+  let attendantSent = 0;
+  let missingLessonLink = 0;
+  let missingStudentPhone = 0;
+
+  for (const booking of bookingRows) {
+    const bookingId = String((booking as any)?.id ?? "").trim();
+    const leadId = String((booking as any)?.lead_id ?? "").trim();
+    const conversationId = String((booking as any)?.conversation_id ?? "").trim() || null;
+    const lessonLink =
+      String((booking as any)?.lesson_link ?? "").trim() ||
+      latestLessonLinkByLeadId.get(leadId) ||
+      "";
+    const professorStartAtRaw = String((booking as any)?.professor_start_at ?? "").trim();
+    const leadStartAtRaw = String((booking as any)?.lead_start_at ?? professorStartAtRaw).trim();
+    const professorStartAtMs = new Date(professorStartAtRaw).getTime();
+    const leadStartAtMs = new Date(leadStartAtRaw).getTime();
+
+    if (
+      !bookingId ||
+      !leadId ||
+      !Number.isFinite(professorStartAtMs) ||
+      !Number.isFinite(leadStartAtMs)
+    ) continue;
+
+    const lead = leadsById.get(leadId) as any;
+    const leadPhone = String(lead?.phone ?? "").trim();
+    const leadFirstName = getLeadFirstName(lead?.full_name);
+    const leadFullName = getLeadFullName(lead?.full_name);
+
+    if (!lessonLink) {
+      missingLessonLink += 1;
+      continue;
+    }
+
+    const studentDue = leadStartAtMs <= nowMs;
+    const attendantDue =
+      professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
+
+    if (attendantDue && !sentAttendantBookingIds.has(bookingId)) {
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
+        });
+
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_attendant_start_notification_sent",
+          title: "Lembrete de inicio da aula experimental enviado ao atendente",
+          details: {
+            booking_id: bookingId,
+            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: professorStartAtRaw,
+          },
+          actorType: "system",
+        });
+        sentAttendantBookingIds.add(bookingId);
+        attendantSent += 1;
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_attendant_start_notification_failed",
+          title: "Falha ao enviar lembrete de inicio da aula experimental ao atendente",
+          details: {
+            booking_id: bookingId,
+            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: professorStartAtRaw,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+    }
+
+    if (studentDue && !sentStudentBookingIds.has(bookingId)) {
+      if (!leadPhone) {
+        missingStudentPhone += 1;
+        continue;
+      }
+
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: leadPhone,
+          message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+        });
+
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_student_start_notification_sent",
+          title: "Link da aula experimental enviado ao aluno no inicio da aula",
+          details: {
+            booking_id: bookingId,
+            phone: leadPhone,
+            lesson_link: lessonLink,
+            start_at: leadStartAtRaw,
+          },
+          actorType: "system",
+        });
+        sentStudentBookingIds.add(bookingId);
+        studentSent += 1;
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_student_start_notification_failed",
+          title: "Falha ao enviar o link da aula experimental ao aluno no inicio da aula",
+          details: {
+            booking_id: bookingId,
+            phone: leadPhone,
+            lesson_link: lessonLink,
+            start_at: leadStartAtRaw,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+    }
+  }
+
+  return {
+    ok: true as const,
+    skipped: false as const,
+    checkedBookings: bookingRows.length,
+    studentSent,
+    attendantSent,
+    missingLessonLink,
+    missingStudentPhone,
+  };
 }
 
 export async function requireAtendimentoUser() {

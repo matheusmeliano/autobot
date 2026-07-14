@@ -6,6 +6,10 @@
       "schedule": "*/1 * * * *"
     },
     {
+      "path": "/api/cron/atendimento-experimental-class-reminders",
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/cron/atendimento-daily-summary",
       "schedule": "*/5 * * * *"
     }

@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildExperimentalClassAttendantWhatsAppMessage,
+  buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
+  buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildExperimentalClassTimesMessages,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
@@ -113,6 +115,20 @@ test("buildExperimentalClassAttendantWhatsAppMessage monta a notificacao do aten
   assert.equal(
     buildExperimentalClassAttendantWhatsAppMessage(),
     "Você recebeu um novo agendamento de aula experimental.\n\nAcesse o link abaixo e adicione o link da aula ao interessado.\n\nhttps://www.autobot.business/app/atendimento",
+  );
+});
+
+test("buildExperimentalClassStudentLessonReadyWhatsAppMessage monta a mensagem de inicio da aula para o aluno", () => {
+  assert.equal(
+    buildExperimentalClassStudentLessonReadyWhatsAppMessage("Pedro", "https://meet.google.com/abc-defg-hij"),
+    "Olá, Pedro! 👋\n\nSua aula experimental já está disponível.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nO professor Lucas Brum já está te aguardando.\n\nLembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.",
+  );
+});
+
+test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso do atendente antes da aula", () => {
+  assert.equal(
+    buildExperimentalClassAttendantStartReminderWhatsAppMessage("Pedro Silva", "https://meet.google.com/abc-defg-hij"),
+    "A aula experimental do(a) aluno(a) Pedro Silva está perto de começar!\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nAguarde o(a) aluno(a) acessar a sala.",
   );
 });
 
