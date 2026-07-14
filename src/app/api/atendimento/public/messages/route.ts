@@ -1674,6 +1674,7 @@ export async function POST(req: Request) {
       lastBotText.startsWith("Horários disponíveis") ||
       lastBotText.startsWith("Os horários disponíveis são:") ||
       lastBotText.startsWith("Perfeito! E os horários disponíveis são:") ||
+      lastBotText.startsWith(EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE) ||
       lastBotText === "Responda apenas com o horário desejado.";
 
     if (isAwaitingTimeSelection) {
