@@ -162,3 +162,32 @@ test("findExperimentalClassTimeOption aceita apenas horario exibido", () => {
   assert.equal(option?.professorTime, "14:30");
   assert.equal(invalid, null);
 });
+
+test("findExperimentalClassTimeOption aceita formatos equivalentes de horario", () => {
+  const options = [
+    {
+      id: "2026-07-13|10:00",
+      professorDate: "2026-07-13",
+      professorTime: "10:00",
+      professorStartAt: "2026-07-13T14:00:00.000Z",
+      leadDate: "2026-07-13",
+      leadTime: "10:00",
+      displayLabel: "10:00",
+    },
+    {
+      id: "2026-07-13|13:30",
+      professorDate: "2026-07-13",
+      professorTime: "13:30",
+      professorStartAt: "2026-07-13T17:30:00.000Z",
+      leadDate: "2026-07-13",
+      leadTime: "13:30",
+      displayLabel: "13:30",
+    },
+  ];
+
+  assert.equal(findExperimentalClassTimeOption("10h", options)?.professorTime, "10:00");
+  assert.equal(findExperimentalClassTimeOption("10 horas", options)?.professorTime, "10:00");
+  assert.equal(findExperimentalClassTimeOption("13h30", options)?.professorTime, "13:30");
+  assert.equal(findExperimentalClassTimeOption("13h30min", options)?.professorTime, "13:30");
+  assert.equal(findExperimentalClassTimeOption("13 horas 30 min", options)?.professorTime, "13:30");
+});

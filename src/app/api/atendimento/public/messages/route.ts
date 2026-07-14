@@ -9,7 +9,11 @@ import {
   ATENDIMENTO_BLOCKED_FINAL_MESSAGE,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   buildExperimentalClassDatePromptMessages,
+  EXPERIMENTAL_CLASS_DATE_BLOCKED_FINAL_MESSAGE,
+  EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
+  EXPERIMENTAL_CLASS_TIME_BLOCKED_FINAL_MESSAGE,
+  EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE,
   LOCATION_CITY_BLOCKED_FINAL_MESSAGE,
   LOCATION_CITY_INVALID_MESSAGE,
   LOCATION_STATE_BLOCKED_FINAL_MESSAGE,
@@ -42,6 +46,7 @@ import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/l
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
 const MAX_LOCATION_VALIDATION_ATTEMPTS = 3;
+const MAX_SCHEDULE_SELECTION_ATTEMPTS = 3;
 const WHATSAPP_PENDING_MESSAGE =
   "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
 const WHATSAPP_INVALID_MESSAGE =
@@ -248,6 +253,38 @@ function getLocationBlockedFinalMessage(field: "state" | "city") {
 
 function getLocationFailureEventType(field: "state" | "city") {
   return field === "state" ? "state_validation_failed" : "city_validation_failed";
+}
+
+function buildScheduleSelectionRetryMessage(field: "date" | "time", attempts: number) {
+  const baseMessage =
+    field === "date" ? EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE : EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE;
+  return `${baseMessage}\n\nTentativa ${attempts} de ${MAX_SCHEDULE_SELECTION_ATTEMPTS}.`;
+}
+
+function getScheduleSelectionBlockedFinalMessage(field: "date" | "time") {
+  return field === "date"
+    ? EXPERIMENTAL_CLASS_DATE_BLOCKED_FINAL_MESSAGE
+    : EXPERIMENTAL_CLASS_TIME_BLOCKED_FINAL_MESSAGE;
+}
+
+function getScheduleSelectionFailureEventType(field: "date" | "time") {
+  return field === "date" ? "experimental_class_date_validation_failed" : "experimental_class_time_validation_failed";
+}
+
+async function getScheduleSelectionFailureCount(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  field: "date" | "time";
+}) {
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", getScheduleSelectionFailureEventType(params.field));
+
+  return Number(count ?? 0);
 }
 
 async function getLocationValidationFailureCount(params: {
@@ -1681,22 +1718,102 @@ export async function POST(req: Request) {
       const selectedTimeOption = findExperimentalClassTimeOption(contentText, timeOptions);
 
       if (!selectedTimeOption) {
-        const timeOptionsPresentation = await presentExperimentalClassTimeOptions({
-          admin,
+        const nextFailureAttempt =
+          (await getScheduleSelectionFailureCount({
+            admin,
+            leadId,
+            conversationId,
+            field: "time",
+          })) + 1;
+        const shouldBlockConversation = nextFailureAttempt >= MAX_SCHEDULE_SELECTION_ATTEMPTS;
+        const replyMessage = shouldBlockConversation
+          ? getScheduleSelectionBlockedFinalMessage("time")
+          : buildScheduleSelectionRetryMessage("time", nextFailureAttempt);
+
+        await appendHistoryEvent({
           leadId,
           conversationId,
-          leadTimeZone,
-          professorDate,
+          eventType: getScheduleSelectionFailureEventType("time"),
+          title: "Falha ao validar o horário da aula experimental",
+          details: {
+            field: "time",
+            attempt: nextFailureAttempt,
+            content_text: contentText || null,
+            professor_date: professorDate,
+            available_times: timeOptions.map((option) => option.displayLabel),
+          },
+          actorType: "system",
+        });
+
+        if (shouldBlockConversation) {
+          await admin
+            .from("atendimento_leads")
+            .update({
+              status: "encerrado",
+              funnel_stage: "encerrado",
+              updated_at: nowIso,
+            })
+            .eq("id", leadId);
+
+          await admin
+            .from("atendimento_conversations")
+            .update({
+              bot_enabled: false,
+              updated_at: nowIso,
+            })
+            .eq("id", conversationId);
+
+          await appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "conversation_closed",
+            title: "Atendimento encerrado após 3 falhas de validação do horário",
+            details: {
+              field: "time",
+              invalid_attempts: nextFailureAttempt,
+              source: "experimental_class_schedule_validation",
+            },
+            actorType: "system",
+          });
+        }
+
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const { data: outbound, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: conversationId,
+            sender_role: "bot",
+            content_text: replyMessage,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+
+        if (outboundError) {
+          const code = String((outboundError as any)?.code ?? "").trim();
+          if (code !== "23505") {
+            return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+          }
+        }
+
+        await syncConversationPreview({
+          conversationId,
+          contentText: replyMessage,
+          createdAt: botNowIso,
         });
 
         return Response.json({
           ok: true,
           inbound,
-          outbound: timeOptionsPresentation.outbound,
-          blocked: false,
+          outbound: outboundError ? null : outbound,
+          blocked: shouldBlockConversation,
           conversation: {
             id: conversationId,
-            bot_enabled: true,
+            bot_enabled: !shouldBlockConversation,
           },
         });
       }
@@ -1820,21 +1937,101 @@ export async function POST(req: Request) {
     const selectedDateOption = findExperimentalClassDateOption(contentText, availability.dates);
 
     if (!selectedDateOption) {
-      const dateOptionsPresentation = await presentExperimentalClassDateOptions({
-        admin,
+      const nextFailureAttempt =
+        (await getScheduleSelectionFailureCount({
+          admin,
+          leadId,
+          conversationId,
+          field: "date",
+        })) + 1;
+      const shouldBlockConversation = nextFailureAttempt >= MAX_SCHEDULE_SELECTION_ATTEMPTS;
+      const replyMessage = shouldBlockConversation
+        ? getScheduleSelectionBlockedFinalMessage("date")
+        : buildScheduleSelectionRetryMessage("date", nextFailureAttempt);
+
+      await appendHistoryEvent({
         leadId,
         conversationId,
-        leadTimeZone,
+        eventType: getScheduleSelectionFailureEventType("date"),
+        title: "Falha ao validar a data da aula experimental",
+        details: {
+          field: "date",
+          attempt: nextFailureAttempt,
+          content_text: contentText || null,
+          available_dates: availability.dates.map((option) => option.dayLabel),
+        },
+        actorType: "system",
+      });
+
+      if (shouldBlockConversation) {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            status: "encerrado",
+            funnel_stage: "encerrado",
+            updated_at: nowIso,
+          })
+          .eq("id", leadId);
+
+        await admin
+          .from("atendimento_conversations")
+          .update({
+            bot_enabled: false,
+            updated_at: nowIso,
+          })
+          .eq("id", conversationId);
+
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "conversation_closed",
+          title: "Atendimento encerrado após 3 falhas de validação da data",
+          details: {
+            field: "date",
+            invalid_attempts: nextFailureAttempt,
+            source: "experimental_class_schedule_validation",
+          },
+          actorType: "system",
+        });
+      }
+
+      await sleep(POST_LEAD_REPLY_DELAY_MS);
+      const botNowIso = new Date().toISOString();
+      const { data: outbound, error: outboundError } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_role: "bot",
+          content_text: replyMessage,
+          media_type: "text",
+          status: "entregue",
+          sent_at: botNowIso,
+          delivered_at: botNowIso,
+        })
+        .select("*")
+        .maybeSingle();
+
+      if (outboundError) {
+        const code = String((outboundError as any)?.code ?? "").trim();
+        if (code !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+      }
+
+      await syncConversationPreview({
+        conversationId,
+        contentText: replyMessage,
+        createdAt: botNowIso,
       });
 
       return Response.json({
         ok: true,
         inbound,
-        outbound: dateOptionsPresentation.outbound,
-        blocked: false,
+        outbound: outboundError ? null : outbound,
+        blocked: shouldBlockConversation,
         conversation: {
           id: conversationId,
-          bot_enabled: true,
+          bot_enabled: !shouldBlockConversation,
         },
       });
     }

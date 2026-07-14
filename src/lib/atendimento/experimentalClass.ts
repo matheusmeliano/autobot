@@ -95,6 +95,43 @@ function normalizeSelectionText(value: string) {
     .trim();
 }
 
+function normalizeFlexibleTimeSelection(value: string) {
+  const normalized = normalizeSelectionText(value);
+  if (!normalized) return null;
+
+  const compact = normalized
+    .replace(/\s+/g, "")
+    .replace(/horas?/g, "h")
+    .replace(/hrs?/g, "h")
+    .replace(/minutos?/g, "min")
+    .replace(/mins?/g, "min");
+
+  const colonMatch = compact.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (colonMatch) {
+    const hour = Number(colonMatch[1]);
+    const minute = Number(colonMatch[2]);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  const hourMinuteMatch = compact.match(/^(\d{1,2})h(\d{1,2})(?:min)?$/);
+  if (hourMinuteMatch) {
+    const hour = Number(hourMinuteMatch[1]);
+    const minute = Number(hourMinuteMatch[2]);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  const hourOnlyMatch = compact.match(/^(\d{1,2})h$/);
+  if (hourOnlyMatch) {
+    const hour = Number(hourOnlyMatch[1]);
+    if (hour < 0 || hour > 23) return null;
+    return `${String(hour).padStart(2, "0")}:00`;
+  }
+
+  return null;
+}
+
 function buildDisplayDateLabel(iso: string, timeZone: string) {
   return formatDateInTimeZone(iso, timeZone);
 }
@@ -259,10 +296,18 @@ export function findExperimentalClassTimeOption(
 ) {
   const normalizedInput = normalizeSelectionText(input);
   if (!normalizedInput) return null;
+  const normalizedFlexibleInput = normalizeFlexibleTimeSelection(input);
 
   for (const option of options) {
     if (normalizedInput === normalizeSelectionText(option.professorTime)) return option;
     if (normalizedInput === normalizeSelectionText(option.displayLabel)) return option;
+    if (
+      normalizedFlexibleInput &&
+      (normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.professorTime) ||
+        normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.displayLabel))
+    ) {
+      return option;
+    }
   }
 
   return null;

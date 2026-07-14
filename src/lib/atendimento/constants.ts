@@ -60,12 +60,20 @@ export const LOCATION_STATE_INVALID_MESSAGE =
   "Não foi possível identificar o estado informado. Informe novamente apenas o estado onde você mora.";
 export const LOCATION_CITY_INVALID_MESSAGE =
   "Não foi possível identificar a cidade informada com base no estado enviado. Informe novamente apenas a cidade onde você mora.";
+export const EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE =
+  "Não foi possível validar a data informada. Responda novamente apenas com a data desejada.";
+export const EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE =
+  "Não foi possível validar o horário informado. Responda novamente apenas com o horário desejado.";
 export const ATENDIMENTO_BLOCKED_FINAL_MESSAGE =
   "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
 export const LOCATION_STATE_BLOCKED_FINAL_MESSAGE =
   "Não foi possível validar seu estado após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
 export const LOCATION_CITY_BLOCKED_FINAL_MESSAGE =
   "Não foi possível validar sua cidade após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
+export const EXPERIMENTAL_CLASS_DATE_BLOCKED_FINAL_MESSAGE =
+  "Não foi possível validar a data informada após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
+export const EXPERIMENTAL_CLASS_TIME_BLOCKED_FINAL_MESSAGE =
+  "Não foi possível validar o horário informado após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
 
 export const STAGE_LABELS: Record<string, string> = {
   novo_lead: "Novo Lead",
