@@ -152,6 +152,10 @@ function BookingDetails({
         <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
         <Field label="Fuso do professor" value={professorTimeZone} />
       </div>
+
+      <div className="mt-3">
+        <Field label="Link da Aula" value="Será enviado ao aluno na data e horário agendados." />
+      </div>
     </div>
   );
 }
