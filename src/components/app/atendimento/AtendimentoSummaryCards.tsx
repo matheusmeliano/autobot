@@ -549,6 +549,11 @@ export function AtendimentoSummaryCards({
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {buildItemMeta(lead)}
                       </div>
+                      {activeSection === "agendamentos" &&
+                      !String(lead.experimental_class_booking?.lesson_link ?? "")
+                        .trim() ? (
+                        <div className="mt-2 text-[11px] font-semibold text-amber-300">Adicione o link da aula</div>
+                      ) : null}
                     </button>
                   );
                 })}
