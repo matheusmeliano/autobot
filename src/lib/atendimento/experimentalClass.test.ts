@@ -5,6 +5,7 @@ import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
+  buildExperimentalClassPostAttendanceWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildExperimentalClassTimesMessages,
   findExperimentalClassDateOption,
@@ -129,6 +130,13 @@ test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso 
   assert.equal(
     buildExperimentalClassAttendantStartReminderWhatsAppMessage("Pedro Silva", "https://meet.google.com/abc-defg-hij"),
     "A aula experimental do(a) aluno(a) Pedro Silva está perto de começar!\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nAguarde o(a) aluno(a) acessar a sala.",
+  );
+});
+
+test("buildExperimentalClassPostAttendanceWhatsAppMessage monta a mensagem apos comparecimento", () => {
+  assert.equal(
+    buildExperimentalClassPostAttendanceWhatsAppMessage("Pedro"),
+    "Show, Pedro! 😄\n\nFicamos felizes por você ter participado da aula experimental com o professor Lucas Brum.\n\nAgora é hora de dar o próximo passo!\n\nVamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?",
   );
 });
 

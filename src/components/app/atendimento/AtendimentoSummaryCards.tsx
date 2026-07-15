@@ -33,6 +33,12 @@ function atendimentoTimeLabel(value: string | null | undefined) {
   return normalized.endsWith("h") ? normalized : `${normalized}h`;
 }
 
+function experimentalClassAttendanceLabel(status: "pending" | "attended" | "no_show" | null | undefined) {
+  if (status === "attended") return "Compareceu";
+  if (status === "no_show") return "Repescagem manual";
+  return "Pendente";
+}
+
 function Field({
   label,
   value,
@@ -107,14 +113,18 @@ function BookingDetails({
   lead,
   cancellingBookingId,
   savingLessonLinkBookingId,
+  markingAttendanceBookingId,
   onCancelBooking,
   onSaveLessonLink,
+  onMarkAttendance,
 }: {
   lead: AtendimentoLeadListItem;
   cancellingBookingId: string | null;
   savingLessonLinkBookingId: string | null;
+  markingAttendanceBookingId: string | null;
   onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveLessonLink: (lead: AtendimentoLeadListItem, lessonLink: string) => Promise<void>;
+  onMarkAttendance: (lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") => Promise<void>;
 }) {
   const booking = lead.experimental_class_booking;
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
@@ -124,8 +134,13 @@ function BookingDetails({
   const [lessonLinkDraft, setLessonLinkDraft] = useState(String(booking?.lesson_link ?? "").trim());
   const savedLessonLink = String(booking?.lesson_link ?? "").trim();
   const isSavingLessonLink = savingLessonLinkBookingId === bookingId;
+  const isMarkingAttendance = markingAttendanceBookingId === bookingId;
   const lessonLinkChanged = lessonLinkDraft.trim() !== savedLessonLink;
   const canOpenSavedLessonLink = /^https?:\/\//i.test(savedLessonLink);
+  const notificationsSent =
+    Boolean(String(booking?.student_start_notification_sent_at ?? "").trim()) &&
+    Boolean(String(booking?.attendant_start_notification_sent_at ?? "").trim());
+  const attendanceStatus = booking?.attendance_status ?? null;
 
   useEffect(() => {
     setLessonLinkDraft(savedLessonLink);
@@ -165,6 +180,55 @@ function BookingDetails({
         <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
         <Field label="Fuso do professor" value={professorTimeZone} />
       </div>
+
+      {notificationsSent ? (
+        <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+            Comparecimento
+          </div>
+          {attendanceStatus ? (
+            <>
+              <div
+                className={[
+                  "mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                  attendanceStatus === "attended"
+                    ? "bg-emerald-500/15 text-emerald-200"
+                    : "bg-amber-400/15 text-amber-200",
+                ].join(" ")}
+              >
+                {experimentalClassAttendanceLabel(attendanceStatus)}
+              </div>
+              <div className="mt-3 text-sm text-[var(--app-text-70)]">
+                {attendanceStatus === "attended"
+                  ? "A confirmação de comparecimento foi registrada e a mensagem de continuidade já foi enviada ao aluno."
+                  : "O aluno foi marcado para repescagem, permitindo que a equipe faça um contato manual e humanizado para reagendar."}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mt-3 text-sm font-semibold text-[var(--app-text-85)]">O aluno compareceu a aula?</div>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => void onMarkAttendance(lead, "attended")}
+                  disabled={isMarkingAttendance}
+                  className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/12 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isMarkingAttendance ? "Salvando..." : "Sim"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onMarkAttendance(lead, "no_show")}
+                  disabled={isMarkingAttendance}
+                  className="inline-flex items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/12 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/18 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isMarkingAttendance ? "Salvando..." : "Não"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
 
       <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
         <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
@@ -258,6 +322,7 @@ export function AtendimentoSummaryCards({
   const [mobileLead, setMobileLead] = useState<AtendimentoLeadListItem | null>(null);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
+  const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -367,6 +432,10 @@ export function AtendimentoSummaryCards({
             source: "table" as const,
             created_at: lead.updated_at,
             lesson_link: null,
+            student_start_notification_sent_at: null,
+            attendant_start_notification_sent_at: null,
+            attendance_status: null,
+            attendance_checked_at: null,
             professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
             lead_timezone: null,
             professor_date: null,
@@ -447,6 +516,10 @@ export function AtendimentoSummaryCards({
             source: "table" as const,
             created_at: lead.updated_at,
             lesson_link: null,
+            student_start_notification_sent_at: null,
+            attendant_start_notification_sent_at: null,
+            attendance_status: null,
+            attendance_checked_at: null,
             professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
             lead_timezone: null,
             professor_date: null,
@@ -460,6 +533,26 @@ export function AtendimentoSummaryCards({
           ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
           source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
           lesson_link: String((payload.booking as any)?.lesson_link ?? "").trim() || null,
+          student_start_notification_sent_at:
+            String(
+              (payload.booking as any)?.student_start_notification_sent_at ??
+                lead.experimental_class_booking?.student_start_notification_sent_at ??
+                "",
+            ).trim() || null,
+          attendant_start_notification_sent_at:
+            String(
+              (payload.booking as any)?.attendant_start_notification_sent_at ??
+                lead.experimental_class_booking?.attendant_start_notification_sent_at ??
+                "",
+            ).trim() || null,
+          attendance_status:
+            ((payload.booking as any)?.attendance_status ??
+              lead.experimental_class_booking?.attendance_status ??
+              null) as "pending" | "attended" | "no_show" | null,
+          attendance_checked_at:
+            String(
+              (payload.booking as any)?.attendance_checked_at ?? lead.experimental_class_booking?.attendance_checked_at ?? "",
+            ).trim() || null,
         },
       };
 
@@ -470,6 +563,97 @@ export function AtendimentoSummaryCards({
       modalToast.error(error instanceof Error ? error.message : "Falha ao salvar o link da aula.");
     } finally {
       setSavingLessonLinkBookingId(null);
+    }
+  }
+
+  async function handleMarkAttendance(lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") {
+    const booking = lead.experimental_class_booking;
+    const bookingId = String(booking?.id ?? "").trim();
+
+    if (!bookingId) {
+      modalToast.error("Agendamento indisponível para registrar o comparecimento.");
+      return;
+    }
+
+    try {
+      setMarkingAttendanceBookingId(bookingId);
+
+      const response = await fetch(`/api/atendimento/bookings/${bookingId}/attendance`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          attendance,
+          leadId: lead.id,
+          conversationId: lead.conversation?.id ?? null,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
+        | null;
+
+      if (!response.ok || !payload?.ok || !payload.booking) {
+        modalToast.error(payload?.error ?? "Falha ao registrar o comparecimento da aula.");
+        return;
+      }
+
+      const updatedLead: AtendimentoLeadListItem = {
+        ...lead,
+        experimental_class_booking: {
+          ...(lead.experimental_class_booking ?? {
+            id: bookingId,
+            source: "table" as const,
+            created_at: lead.updated_at,
+            lesson_link: null,
+            student_start_notification_sent_at: null,
+            attendant_start_notification_sent_at: null,
+            attendance_status: null,
+            attendance_checked_at: null,
+            professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: null,
+            professor_date: null,
+            professor_time: null,
+            professor_start_at: null,
+            lead_date: null,
+            lead_time: null,
+            lead_start_at: null,
+            status: "scheduled",
+          }),
+          ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
+          source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
+          lesson_link:
+            String((payload.booking as any)?.lesson_link ?? lead.experimental_class_booking?.lesson_link ?? "").trim() || null,
+          student_start_notification_sent_at:
+            String(
+              (payload.booking as any)?.student_start_notification_sent_at ??
+                lead.experimental_class_booking?.student_start_notification_sent_at ??
+                "",
+            ).trim() || null,
+          attendant_start_notification_sent_at:
+            String(
+              (payload.booking as any)?.attendant_start_notification_sent_at ??
+                lead.experimental_class_booking?.attendant_start_notification_sent_at ??
+                "",
+            ).trim() || null,
+          attendance_status: ((payload.booking as any)?.attendance_status ?? attendance) as "pending" | "attended" | "no_show",
+          attendance_checked_at:
+            String((payload.booking as any)?.attendance_checked_at ?? new Date().toISOString()).trim() || new Date().toISOString(),
+        },
+      };
+
+      setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
+      setMobileLead((current) => (current?.id === lead.id ? updatedLead : current));
+      modalToast.success(
+        attendance === "attended"
+          ? "Comparecimento confirmado e mensagem enviada ao aluno."
+          : "Aluno marcado para repescagem manual.",
+      );
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao registrar o comparecimento da aula.");
+    } finally {
+      setMarkingAttendanceBookingId(null);
     }
   }
 
@@ -554,6 +738,9 @@ export function AtendimentoSummaryCards({
                         .trim() ? (
                         <div className="mt-2 text-[11px] font-semibold text-amber-300">Adicione o link da aula</div>
                       ) : null}
+                      {activeSection === "agendamentos" && lead.experimental_class_booking?.attendance_status === "no_show" ? (
+                        <div className="mt-2 text-[11px] font-semibold text-amber-200">Repescagem manual pendente</div>
+                      ) : null}
                     </button>
                   );
                 })}
@@ -598,8 +785,10 @@ export function AtendimentoSummaryCards({
                   lead={selectedLead}
                   cancellingBookingId={cancellingBookingId}
                   savingLessonLinkBookingId={savingLessonLinkBookingId}
+                  markingAttendanceBookingId={markingAttendanceBookingId}
                   onCancelBooking={handleCancelBooking}
                   onSaveLessonLink={handleSaveLessonLink}
+                  onMarkAttendance={handleMarkAttendance}
                 />
               ) : (
                 <LeadDetails lead={selectedLead} />
@@ -636,8 +825,10 @@ export function AtendimentoSummaryCards({
                 lead={mobileLead}
                 cancellingBookingId={cancellingBookingId}
                 savingLessonLinkBookingId={savingLessonLinkBookingId}
+                  markingAttendanceBookingId={markingAttendanceBookingId}
                 onCancelBooking={handleCancelBooking}
                 onSaveLessonLink={handleSaveLessonLink}
+                  onMarkAttendance={handleMarkAttendance}
               />
             ) : (
               <LeadDetails lead={mobileLead} />

@@ -128,6 +128,10 @@ export async function GET(req: Request) {
       bookingsByLeadId.set(leadId, {
         ...(booking as any),
         lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
+        student_start_notification_sent_at: null,
+        attendant_start_notification_sent_at: null,
+        attendance_status: null,
+        attendance_checked_at: null,
         professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
       });
@@ -137,7 +141,15 @@ export async function GET(req: Request) {
       .from("atendimento_history_events")
       .select("id, lead_id, event_type, conversation_id, created_at, details")
       .in("lead_id", leadIds)
-      .in("event_type", ["experimental_class_scheduled", "experimental_class_cancelled", "experimental_class_link_updated"])
+      .in("event_type", [
+        "experimental_class_scheduled",
+        "experimental_class_cancelled",
+        "experimental_class_link_updated",
+        "experimental_class_student_start_notification_sent",
+        "experimental_class_attendant_start_notification_sent",
+        "experimental_class_attendance_confirmed",
+        "experimental_class_attendance_follow_up_required",
+      ])
       .order("created_at", { ascending: false });
 
     if (historyError) {
@@ -168,6 +180,10 @@ export async function GET(req: Request) {
         id: String((event as any)?.id ?? ""),
         status: bookingStatus,
         lesson_link: lessonLink,
+        student_start_notification_sent_at: null,
+        attendant_start_notification_sent_at: null,
+        attendance_status: null,
+        attendance_checked_at: null,
         professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         lead_timezone: String(details.lead_timezone ?? ""),
         professor_date: String(details.professor_date ?? ""),
@@ -189,6 +205,61 @@ export async function GET(req: Request) {
         ...currentBooking,
         lesson_link: lessonLink,
       });
+    }
+
+    for (const event of historyEvents ?? []) {
+      const leadId = String((event as any)?.lead_id ?? "");
+      if (!leadId) continue;
+      const currentBooking = bookingsByLeadId.get(leadId);
+      if (!currentBooking) continue;
+
+      const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+      const eventCreatedAt = String((event as any)?.created_at ?? "").trim() || null;
+
+      if (
+        eventType === "experimental_class_student_start_notification_sent" &&
+        !String(currentBooking.student_start_notification_sent_at ?? "").trim()
+      ) {
+        bookingsByLeadId.set(leadId, {
+          ...currentBooking,
+          student_start_notification_sent_at: eventCreatedAt,
+        });
+        continue;
+      }
+
+      if (
+        eventType === "experimental_class_attendant_start_notification_sent" &&
+        !String(currentBooking.attendant_start_notification_sent_at ?? "").trim()
+      ) {
+        bookingsByLeadId.set(leadId, {
+          ...currentBooking,
+          attendant_start_notification_sent_at: eventCreatedAt,
+        });
+        continue;
+      }
+
+      if (
+        eventType === "experimental_class_attendance_confirmed" &&
+        !String(currentBooking.attendance_status ?? "").trim()
+      ) {
+        bookingsByLeadId.set(leadId, {
+          ...currentBooking,
+          attendance_status: "attended",
+          attendance_checked_at: eventCreatedAt,
+        });
+        continue;
+      }
+
+      if (
+        eventType === "experimental_class_attendance_follow_up_required" &&
+        !String(currentBooking.attendance_status ?? "").trim()
+      ) {
+        bookingsByLeadId.set(leadId, {
+          ...currentBooking,
+          attendance_status: "no_show",
+          attendance_checked_at: eventCreatedAt,
+        });
+      }
     }
   }
 

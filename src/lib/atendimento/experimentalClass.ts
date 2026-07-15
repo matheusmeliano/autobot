@@ -218,6 +218,17 @@ Link da aula: ${safeLessonLink}
 Aguarde o(a) aluno(a) acessar a sala.`;
 }
 
+export function buildExperimentalClassPostAttendanceWhatsAppMessage(name: string) {
+  const safeName = String(name ?? "").trim() || "Aluno";
+  return `Show, ${safeName}! 😄
+
+Ficamos felizes por você ter participado da aula experimental com o professor Lucas Brum.
+
+Agora é hora de dar o próximo passo!
+
+Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?`;
+}
+
 export function buildExperimentalClassFinalChatMessage(name: string) {
   const safeName = String(name ?? "").trim() || "Aluno";
   return `Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais ${safeName}!`;

@@ -87,6 +87,10 @@ export type AtendimentoExperimentalClassBookingSummary = {
   id: string;
   status: string | null;
   lesson_link: string | null;
+  student_start_notification_sent_at: string | null;
+  attendant_start_notification_sent_at: string | null;
+  attendance_status: "pending" | "attended" | "no_show" | null;
+  attendance_checked_at: string | null;
   professor_timezone: string | null;
   lead_timezone: string | null;
   professor_date: string | null;
