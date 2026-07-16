@@ -8,6 +8,8 @@ import {
   buildExperimentalClassPostAttendanceWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildExperimentalClassTimesMessages,
+  deriveExperimentalClassBookingDisplayStatus,
+  experimentalClassBookingDisplayStatusLabel,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
@@ -138,6 +140,47 @@ test("buildExperimentalClassPostAttendanceWhatsAppMessage monta a mensagem apos 
     buildExperimentalClassPostAttendanceWhatsAppMessage("Pedro"),
     "Show, Pedro! 😄\n\nFicamos felizes por você ter participado da aula experimental com o professor Lucas Brum.\n\nAgora é hora de dar o próximo passo!\n\nVamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?",
   );
+});
+
+test("deriveExperimentalClassBookingDisplayStatus resolve os status padronizados do agendamento", () => {
+  assert.equal(
+    deriveExperimentalClassBookingDisplayStatus({
+      hasLead: true,
+    }),
+    "incomplete",
+  );
+  assert.equal(
+    deriveExperimentalClassBookingDisplayStatus({
+      bookingStatus: "scheduled",
+    }),
+    "scheduled",
+  );
+  assert.equal(
+    deriveExperimentalClassBookingDisplayStatus({
+      bookingStatus: "scheduled",
+      studentStartNotificationSentAt: "2026-07-16T15:00:00.000Z",
+      attendantStartNotificationSentAt: "2026-07-16T14:55:00.000Z",
+    }),
+    "in_progress",
+  );
+  assert.equal(
+    deriveExperimentalClassBookingDisplayStatus({
+      attendanceStatus: "no_show",
+    }),
+    "no_show",
+  );
+  assert.equal(
+    deriveExperimentalClassBookingDisplayStatus({
+      attendanceStatus: "attended",
+    }),
+    "completed",
+  );
+  assert.equal(experimentalClassBookingDisplayStatusLabel("incomplete"), "Incompleto");
+  assert.equal(experimentalClassBookingDisplayStatusLabel("scheduled"), "Agendado");
+  assert.equal(experimentalClassBookingDisplayStatusLabel("cancelled"), "Cancelado");
+  assert.equal(experimentalClassBookingDisplayStatusLabel("in_progress"), "Em andamento");
+  assert.equal(experimentalClassBookingDisplayStatusLabel("no_show"), "Não compareceu");
+  assert.equal(experimentalClassBookingDisplayStatusLabel("completed"), "Concluído");
 });
 
 test("findExperimentalClassDateOption aceita apenas dia exibido", () => {

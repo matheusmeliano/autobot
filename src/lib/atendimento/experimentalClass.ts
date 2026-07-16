@@ -26,6 +26,14 @@ export type ExperimentalClassTimeOption = {
   displayLabel: string;
 };
 
+export type ExperimentalClassBookingDisplayStatus =
+  | "incomplete"
+  | "scheduled"
+  | "cancelled"
+  | "in_progress"
+  | "no_show"
+  | "completed";
+
 function partsToMap(parts: Intl.DateTimeFormatPart[]) {
   const map: Record<string, string> = {};
   for (const part of parts) {
@@ -149,6 +157,39 @@ function joinWithFinalConjunction(values: string[]) {
   if (values.length === 1) return values[0] ?? "";
   if (values.length === 2) return `${values[0]} e ${values[1]}`;
   return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`;
+}
+
+export function deriveExperimentalClassBookingDisplayStatus(params: {
+  bookingStatus?: string | null;
+  studentStartNotificationSentAt?: string | null;
+  attendantStartNotificationSentAt?: string | null;
+  attendanceStatus?: string | null;
+  hasSchedulingProgress?: boolean;
+  hasLead?: boolean;
+}) {
+  const bookingStatus = String(params.bookingStatus ?? "").trim().toLowerCase();
+  const attendanceStatus = String(params.attendanceStatus ?? "").trim().toLowerCase();
+  const studentStartNotificationSentAt = String(params.studentStartNotificationSentAt ?? "").trim();
+  const attendantStartNotificationSentAt = String(params.attendantStartNotificationSentAt ?? "").trim();
+
+  if (attendanceStatus === "no_show") return "no_show" as const;
+  if (attendanceStatus === "attended") return "completed" as const;
+  if (bookingStatus === "cancelled") return "cancelled" as const;
+  if (bookingStatus === "completed") return "completed" as const;
+  if (studentStartNotificationSentAt && attendantStartNotificationSentAt) return "in_progress" as const;
+  if (bookingStatus === "scheduled") return "scheduled" as const;
+  if (params.hasSchedulingProgress || params.hasLead) return "incomplete" as const;
+  return null;
+}
+
+export function experimentalClassBookingDisplayStatusLabel(status: ExperimentalClassBookingDisplayStatus | null | undefined) {
+  if (status === "incomplete") return "Incompleto";
+  if (status === "scheduled") return "Agendado";
+  if (status === "cancelled") return "Cancelado";
+  if (status === "in_progress") return "Em andamento";
+  if (status === "no_show") return "Não compareceu";
+  if (status === "completed") return "Concluído";
+  return "-";
 }
 
 export function buildExperimentalClassDatesMessages(options: ExperimentalClassDateOption[]) {

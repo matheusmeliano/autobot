@@ -19,6 +19,7 @@ import {
   validateAtendimentoFiles,
 } from "@/lib/atendimento/files";
 import { CAPTURED_FIELD_PROMPTS } from "@/lib/atendimento/constants";
+import { experimentalClassBookingDisplayStatusLabel } from "@/lib/atendimento/experimentalClass";
 import { uploadAtendimentoFileWithProgress } from "@/lib/atendimento/upload-client";
 import type { AtendimentoFileRecord, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
@@ -74,11 +75,7 @@ function bookingDateBR(value?: string | null) {
 }
 
 function bookingStatusLabel(status?: string | null) {
-  const normalized = String(status ?? "").trim().toLowerCase();
-  if (normalized === "scheduled") return "Agendado";
-  if (normalized === "cancelled") return "Cancelado";
-  if (normalized === "completed") return "Concluído";
-  return normalized ? status ?? "-" : "-";
+  return experimentalClassBookingDisplayStatusLabel(String(status ?? "").trim().toLowerCase() as any);
 }
 
 function getInitialLetter(value: string) {
@@ -1523,12 +1520,14 @@ export function PublicAtendimentoClient({
             <div className="mb-4">
               <div className="rounded-2xl border border-amber-200/30 bg-amber-200/10 p-4">
                 <div className="flex flex-col-reverse gap-4 min-[640px]:flex-row min-[640px]:items-start min-[640px]:justify-between min-[640px]:gap-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Sua próxima aula será:</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Status do agendamento</div>
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80 min-[640px]:text-right">
                     Status: {bookingStatusLabel(profile.booking?.status)}
                   </div>
                 </div>
-                <div className="mt-3 text-lg font-semibold text-amber-50">{bookingDateBR(profile.booking?.date_time)}</div>
+                <div className="mt-3 text-lg font-semibold text-amber-50">
+                  {String(profile.booking?.date_time ?? "").trim() ? bookingDateBR(profile.booking?.date_time) : "-"}
+                </div>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">

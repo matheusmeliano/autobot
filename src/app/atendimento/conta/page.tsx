@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PublicAtendimentoClient } from "@/components/atendimento/PublicAtendimentoClient";
 import { getAtendimentoAccountPath, isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
+import { deriveExperimentalClassBookingDisplayStatus } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -88,7 +89,7 @@ export default async function AtendimentoAccountPage({
 
   const { data: lead } = await admin
     .from("atendimento_leads")
-    .select("id")
+    .select("id, funnel_stage")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -98,6 +99,48 @@ export default async function AtendimentoAccountPage({
   } | null = null;
 
   if (lead?.id) {
+    const { data: historyEvents } = await admin
+      .from("atendimento_history_events")
+      .select("event_type, details, created_at")
+      .eq("lead_id", String(lead.id))
+      .in("event_type", [
+        "experimental_class_scheduled",
+        "experimental_class_cancelled",
+        "experimental_class_student_start_notification_sent",
+        "experimental_class_attendant_start_notification_sent",
+        "experimental_class_attendance_confirmed",
+        "experimental_class_attendance_follow_up_required",
+      ])
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const latestScheduledOrCancelledEvent =
+      (historyEvents ?? []).find((event) =>
+        ["experimental_class_scheduled", "experimental_class_cancelled"].includes(
+          String((event as any)?.event_type ?? "").trim().toLowerCase(),
+        ),
+      ) ?? null;
+    const studentStartNotificationEvent =
+      (historyEvents ?? []).find(
+        (event) =>
+          String((event as any)?.event_type ?? "").trim().toLowerCase() === "experimental_class_student_start_notification_sent",
+      ) ?? null;
+    const attendantStartNotificationEvent =
+      (historyEvents ?? []).find(
+        (event) =>
+          String((event as any)?.event_type ?? "").trim().toLowerCase() === "experimental_class_attendant_start_notification_sent",
+      ) ?? null;
+    const attendanceConfirmedEvent =
+      (historyEvents ?? []).find(
+        (event) =>
+          String((event as any)?.event_type ?? "").trim().toLowerCase() === "experimental_class_attendance_confirmed",
+      ) ?? null;
+    const attendanceNoShowEvent =
+      (historyEvents ?? []).find(
+        (event) =>
+          String((event as any)?.event_type ?? "").trim().toLowerCase() === "experimental_class_attendance_follow_up_required",
+      ) ?? null;
+
     const { data: booking } = await admin
       .from("atendimento_experimental_class_bookings")
       .select("status, lead_date, lead_time, professor_date, professor_time, created_at, updated_at")
@@ -112,34 +155,49 @@ export default async function AtendimentoAccountPage({
       const leadTime = String((booking as any)?.lead_time ?? "").trim();
       const professorDate = String((booking as any)?.professor_date ?? "").trim();
       const professorTime = String((booking as any)?.professor_time ?? "").trim();
+      const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
+        bookingStatus: String((booking as any)?.status ?? "").trim() || "scheduled",
+        studentStartNotificationSentAt: String((studentStartNotificationEvent as any)?.created_at ?? "").trim() || null,
+        attendantStartNotificationSentAt: String((attendantStartNotificationEvent as any)?.created_at ?? "").trim() || null,
+        attendanceStatus: attendanceNoShowEvent ? "no_show" : attendanceConfirmedEvent ? "attended" : null,
+        hasSchedulingProgress: true,
+        hasLead: true,
+      });
       bookingSummary = {
-        status: String((booking as any)?.status ?? "").trim() || "scheduled",
+        status: derivedStatus ?? (String((booking as any)?.status ?? "").trim() || "scheduled"),
         date_time: [leadDate || professorDate, leadTime || professorTime].filter(Boolean).join(", "),
       };
-    } else {
-      const { data: historyEvent } = await admin
-        .from("atendimento_history_events")
-        .select("event_type, details, created_at")
-        .eq("lead_id", String(lead.id))
-        .in("event_type", ["experimental_class_scheduled", "experimental_class_cancelled"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (historyEvent) {
-        const details = ((historyEvent as any)?.details ?? {}) as Record<string, unknown>;
+    } else if (latestScheduledOrCancelledEvent) {
+      const details = ((latestScheduledOrCancelledEvent as any)?.details ?? {}) as Record<string, unknown>;
         const leadDate = String(details.lead_date ?? "").trim();
         const leadTime = String(details.lead_time ?? "").trim();
         const professorDate = String(details.professor_date ?? "").trim();
         const professorTime = String(details.professor_time ?? "").trim();
-        const eventType = String((historyEvent as any)?.event_type ?? "").trim().toLowerCase();
+        const eventType = String((latestScheduledOrCancelledEvent as any)?.event_type ?? "").trim().toLowerCase();
+        const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
+          bookingStatus:
+            String(details.status ?? "").trim() || (eventType === "experimental_class_cancelled" ? "cancelled" : "scheduled"),
+          studentStartNotificationSentAt: String((studentStartNotificationEvent as any)?.created_at ?? "").trim() || null,
+          attendantStartNotificationSentAt: String((attendantStartNotificationEvent as any)?.created_at ?? "").trim() || null,
+          attendanceStatus: attendanceNoShowEvent ? "no_show" : attendanceConfirmedEvent ? "attended" : null,
+          hasSchedulingProgress: true,
+          hasLead: true,
+        });
         bookingSummary = {
-          status:
-            String(details.status ?? "").trim() ||
-            (eventType === "experimental_class_cancelled" ? "cancelled" : "scheduled"),
+          status: derivedStatus || String(details.status ?? "").trim() || (eventType === "experimental_class_cancelled" ? "cancelled" : "scheduled"),
           date_time: [leadDate || professorDate, leadTime || professorTime].filter(Boolean).join(", "),
         };
-      }
+    } else {
+      bookingSummary = {
+        status:
+          deriveExperimentalClassBookingDisplayStatus({
+            hasSchedulingProgress: ["aula_experimental_convidada", "pre_cadastro_concluido", "aula_experimental_agendada"].includes(
+              String((lead as any)?.funnel_stage ?? "").trim().toLowerCase(),
+            ),
+            hasLead: true,
+          }) ?? "incomplete",
+        date_time: "",
+      };
     }
   }
 

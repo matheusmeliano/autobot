@@ -5,20 +5,15 @@ import { Copy, Search, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
+import {
+  deriveExperimentalClassBookingDisplayStatus,
+  experimentalClassBookingDisplayStatusLabel,
+} from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
 const PANEL_PAGE_SIZE = 4;
-
-function experimentalClassBookingStatusLabel(status: string | null | undefined) {
-  const normalized = String(status ?? "").trim().toLowerCase();
-  if (normalized === "scheduled") return "Agendado";
-  if (normalized === "cancelled") return "Cancelado";
-  if (normalized === "completed") return "Concluido";
-  if (!normalized) return "-";
-  return status ?? "-";
-}
 
 function atendimentoOriginLabel(origin: string | null | undefined) {
   const normalized = String(origin ?? "").trim().toLowerCase();
@@ -34,9 +29,16 @@ function atendimentoTimeLabel(value: string | null | undefined) {
 }
 
 function experimentalClassAttendanceLabel(status: "pending" | "attended" | "no_show" | null | undefined) {
-  if (status === "attended") return "Compareceu";
-  if (status === "no_show") return "Repescagem manual";
+  if (status === "attended") return "Concluído";
+  if (status === "no_show") return "Não compareceu";
   return "Pendente";
+}
+
+function leadHasExperimentalClassPanelStatus(lead: AtendimentoLeadListItem) {
+  if (lead.experimental_class_booking) return true;
+  return ["aula_experimental_convidada", "pre_cadastro_concluido", "aula_experimental_agendada"].includes(
+    String(lead.funnel_stage ?? "").trim().toLowerCase(),
+  );
 }
 
 function Field({
@@ -129,18 +131,25 @@ function BookingDetails({
   const booking = lead.experimental_class_booking;
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const bookingId = String(booking?.id ?? "").trim();
-  const normalizedStatus = String(booking?.status ?? "").trim().toLowerCase();
-  const canCancel = normalizedStatus === "scheduled" && Boolean(bookingId);
   const [lessonLinkDraft, setLessonLinkDraft] = useState(String(booking?.lesson_link ?? "").trim());
   const savedLessonLink = String(booking?.lesson_link ?? "").trim();
   const isSavingLessonLink = savingLessonLinkBookingId === bookingId;
   const isMarkingAttendance = markingAttendanceBookingId === bookingId;
   const lessonLinkChanged = lessonLinkDraft.trim() !== savedLessonLink;
   const canOpenSavedLessonLink = /^https?:\/\//i.test(savedLessonLink);
-  const notificationsSent =
-    Boolean(String(booking?.student_start_notification_sent_at ?? "").trim()) &&
+  const notificationsSent = Boolean(String(booking?.student_start_notification_sent_at ?? "").trim()) &&
     Boolean(String(booking?.attendant_start_notification_sent_at ?? "").trim());
   const attendanceStatus = booking?.attendance_status ?? null;
+  const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
+    bookingStatus: booking?.status,
+    studentStartNotificationSentAt: booking?.student_start_notification_sent_at,
+    attendantStartNotificationSentAt: booking?.attendant_start_notification_sent_at,
+    attendanceStatus,
+    hasSchedulingProgress: leadHasExperimentalClassPanelStatus(lead),
+    hasLead: true,
+  });
+  const canCancel = derivedStatus === "scheduled" && Boolean(bookingId);
+  const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
 
   useEffect(() => {
     setLessonLinkDraft(savedLessonLink);
@@ -172,7 +181,7 @@ function BookingDetails({
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
         <Field label="Aluno" value={lead.full_name} />
-        <Field label="Status" value={experimentalClassBookingStatusLabel(booking?.status || "scheduled")} />
+        <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
         <Field label="Data do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
         <Field label="Horario do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
         <Field label="Fuso do aluno" value={booking?.lead_timezone} />
@@ -180,6 +189,15 @@ function BookingDetails({
         <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
         <Field label="Fuso do professor" value={professorTimeZone} />
       </div>
+
+      {showIncompleteState ? (
+        <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">Agendamento</div>
+          <div className="mt-3 text-sm text-amber-50">
+            O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com data e horário confirmados.
+          </div>
+        </div>
+      ) : null}
 
       {notificationsSent ? (
         <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
@@ -200,7 +218,7 @@ function BookingDetails({
               </div>
               <div className="mt-3 text-sm text-[var(--app-text-70)]">
                 {attendanceStatus === "attended"
-                  ? "A confirmação de comparecimento foi registrada e a mensagem de continuidade já foi enviada ao aluno."
+                  ? "A aula foi concluída e a mensagem de continuidade já foi enviada ao aluno."
                   : "O aluno foi marcado para repescagem, permitindo que a equipe faça um contato manual e humanizado para reagendar."}
               </div>
             </>
@@ -230,6 +248,7 @@ function BookingDetails({
         </div>
       ) : null}
 
+      {!showIncompleteState ? (
       <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
         <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
           <div className="min-w-0">
@@ -271,6 +290,7 @@ function BookingDetails({
           </a>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }
@@ -284,6 +304,10 @@ export function AtendimentoSummaryCards({
 }) {
   const [localSummary, setLocalSummary] = useState(summary);
   const [localLeads, setLocalLeads] = useState(leads);
+  const agendamentoItems = useMemo(
+    () => localLeads.filter((lead) => leadHasExperimentalClassPanelStatus(lead)),
+    [localLeads],
+  );
   const sections = useMemo(
     () => [
       {
@@ -303,9 +327,9 @@ export function AtendimentoSummaryCards({
       {
         id: "agendamentos" as const,
         label: "Agendamentos",
-        value: localSummary.aulasExperimentaisAgendadas,
+        value: agendamentoItems.length,
         emptyMessage: "Nenhum agendamento disponivel no momento.",
-        items: localLeads.filter((lead) => lead.funnel_stage === "aula_experimental_agendada"),
+        items: agendamentoItems,
       },
       {
         id: "contratos" as const,
@@ -315,7 +339,7 @@ export function AtendimentoSummaryCards({
         items: [],
       },
     ],
-    [localLeads, localSummary],
+    [agendamentoItems, localLeads, localSummary],
   );
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -662,7 +686,7 @@ export function AtendimentoSummaryCards({
       const booking = lead.experimental_class_booking;
       const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
       const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
-      return [dateLabel, timeLabel].filter((value) => value && value !== "-").join(", ") || "Agendamento sem horario";
+      return [dateLabel, timeLabel].filter((value) => value && value !== "-").join(", ") || "Agendamento incompleto";
     }
 
     return formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
