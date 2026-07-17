@@ -47,23 +47,15 @@ export function getAgendarDisplayReferenceMoment(
   const operationalMoment = String(row.operational_due_at ?? "").trim();
   const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
   const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
-  const operationalYearMonth = operationalMoment ? agendarYearMonthKey(operationalMoment, timeZone) : "";
   const dueYearMonth = dueMoment ? agendarYearMonthKey(dueMoment, timeZone) : "";
   const executedYearMonth = lastExecutedMoment ? agendarYearMonthKey(lastExecutedMoment, timeZone) : "";
+  let selectedMoment = operationalMoment || dueMoment || lastExecutedMoment;
 
-  if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
-    return operationalMoment;
+  if (!operationalMoment && executedYearMonth && executedYearMonth === operationalMonthKey && dueYearMonth !== operationalMonthKey) {
+    selectedMoment = lastExecutedMoment;
   }
 
-  if (
-    executedYearMonth &&
-    executedYearMonth === operationalMonthKey &&
-    dueYearMonth !== operationalMonthKey
-  ) {
-    return lastExecutedMoment;
-  }
-
-  return dueMoment || lastExecutedMoment;
+  return selectedMoment;
 }
 
 export function deriveAgendarVisualStatus(
