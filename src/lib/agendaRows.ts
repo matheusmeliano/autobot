@@ -8,6 +8,16 @@ type TemplateChoice = {
 type DebtorRow = {
   id: string;
   nome?: string | null;
+  vencimento?: string | null;
+  debtor_charges?:
+    | Array<{
+        id?: string | null;
+        due_day?: number | null;
+        recurrence_month?: number | null;
+        recurrence_year?: number | null;
+        created_at?: string | null;
+      }>
+    | null;
 };
 
 type ScheduleSourceRow = {
@@ -105,6 +115,98 @@ function extractLocalTimeFromIso(value: string | null | undefined, timeZone: str
   return map.hour && map.minute ? `${map.hour}:${map.minute}` : null;
 }
 
+function extractLocalDateFromIso(value: string | null | undefined, timeZone: string) {
+  const iso = String(value ?? "").trim();
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return map.year && map.month && map.day ? `${map.year}-${map.month}-${map.day}` : null;
+}
+
+function compareChargeCandidateOrder(
+  a: { recurrence_year?: number | null; recurrence_month?: number | null; due_day?: number | null; created_at?: string | null },
+  b: { recurrence_year?: number | null; recurrence_month?: number | null; due_day?: number | null; created_at?: string | null },
+) {
+  const yearA = Number(a.recurrence_year ?? 0);
+  const yearB = Number(b.recurrence_year ?? 0);
+  if (yearA !== yearB) return yearA - yearB;
+  const monthA = Number(a.recurrence_month ?? 0);
+  const monthB = Number(b.recurrence_month ?? 0);
+  if (monthA !== monthB) return monthA - monthB;
+  const dayA = Number(a.due_day ?? 0);
+  const dayB = Number(b.due_day ?? 0);
+  if (dayA !== dayB) return dayA - dayB;
+  return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+}
+
+function resolveOperationalLocalDate(params: {
+  debtor: DebtorRow | undefined;
+  schedule: ScheduleSourceRow;
+  timeZone: string;
+  fallbackLocalDate: string | null;
+}) {
+  const charges = Array.isArray(params.debtor?.debtor_charges) ? params.debtor.debtor_charges : [];
+  const scheduleChargeId = String(params.schedule.charge_id ?? "").trim();
+  const recurrenceDay = Number(params.schedule.recurrence_day ?? 0);
+  const referenceLocalDate = extractLocalDateFromIso(
+    params.schedule.charge_due_at ?? params.schedule.data_envio ?? null,
+    params.timeZone,
+  );
+  const referenceMonthKey = referenceLocalDate ? referenceLocalDate.slice(0, 7) : "";
+  const referenceDay = referenceLocalDate ? Number(referenceLocalDate.slice(-2)) : 0;
+
+  const scoredCharges = charges
+    .map((charge) => {
+      const localDate = buildChargeLocalDate({
+        year: charge?.recurrence_year,
+        month: charge?.recurrence_month,
+        day: charge?.due_day,
+      });
+      if (!localDate) return null;
+      let score = 0;
+      const chargeId = String(charge?.id ?? "").trim();
+      const chargeDay = Number(charge?.due_day ?? 0);
+      const chargeMonthKey = localDate.slice(0, 7);
+      if (referenceMonthKey && chargeMonthKey === referenceMonthKey) score += 100;
+      if (recurrenceDay >= 1 && chargeDay === recurrenceDay) score += 60;
+      if (referenceDay >= 1 && chargeDay === referenceDay) score += 40;
+      if (params.fallbackLocalDate && localDate === params.fallbackLocalDate) score += 20;
+      if (scheduleChargeId && chargeId === scheduleChargeId) score += 10;
+      return {
+        charge,
+        localDate,
+        score,
+      };
+    })
+    .filter(Boolean) as Array<{
+    charge: NonNullable<NonNullable<DebtorRow["debtor_charges"]>[number]>;
+    localDate: string;
+    score: number;
+  }>;
+
+  scoredCharges.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    return compareChargeCandidateOrder(left.charge, right.charge);
+  });
+
+  if (scoredCharges[0]?.score > 0) {
+    return scoredCharges[0].localDate;
+  }
+
+  return params.fallbackLocalDate;
+}
+
 export function buildAgendaRows(params: {
   debtors: DebtorRow[];
   schedules: ScheduleSourceRow[];
@@ -145,10 +247,16 @@ export function buildAgendaRows(params: {
       String(templatesById.get(overdueTemplateId)?.nome ?? "").trim() ||
       null;
     const scheduleTimeZone = schedule.schedule_timezone ? String(schedule.schedule_timezone) : params.defaultTimeZone || null;
-    const operationalLocalDate = buildChargeLocalDate({
+    const fallbackOperationalLocalDate = buildChargeLocalDate({
       year: schedule.charge?.recurrence_year,
       month: schedule.charge?.recurrence_month,
       day: schedule.charge?.due_day ?? schedule.recurrence_day,
+    });
+    const operationalLocalDate = resolveOperationalLocalDate({
+      debtor,
+      schedule,
+      timeZone: scheduleTimeZone || "America/Sao_Paulo",
+      fallbackLocalDate: fallbackOperationalLocalDate,
     });
     const operationalTime =
       (String(schedule.recurrence_time ?? "").trim() || extractLocalTimeFromIso(schedule.charge_due_at ?? schedule.data_envio ?? null, scheduleTimeZone || "America/Sao_Paulo")) ??
