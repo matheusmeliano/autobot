@@ -58,6 +58,33 @@ export function getAgendarDisplayReferenceMoment(
   return selectedMoment;
 }
 
+function getAgendarStatusReferenceMoment(
+  row: AgendarStatusRow,
+  timeZone: BrazilTimeZone,
+  operationalMonthKey: string,
+) {
+  const operationalMoment = String(row.operational_due_at ?? "").trim();
+  const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
+  const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+  const operationalYearMonth = operationalMoment ? agendarYearMonthKey(operationalMoment, timeZone) : "";
+  const dueYearMonth = dueMoment ? agendarYearMonthKey(dueMoment, timeZone) : "";
+  const executedYearMonth = lastExecutedMoment ? agendarYearMonthKey(lastExecutedMoment, timeZone) : "";
+
+  if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
+    return operationalMoment;
+  }
+
+  if (
+    executedYearMonth &&
+    executedYearMonth === operationalMonthKey &&
+    dueYearMonth !== operationalMonthKey
+  ) {
+    return lastExecutedMoment;
+  }
+
+  return dueMoment || lastExecutedMoment;
+}
+
 export function deriveAgendarVisualStatus(
   row: AgendarStatusRow,
   timeZone: BrazilTimeZone,
@@ -69,7 +96,7 @@ export function deriveAgendarVisualStatus(
     Boolean(row.schedule_missing) ||
     String(row.id ?? "").startsWith("charge:");
   const referenceMoment = String(
-    getAgendarDisplayReferenceMoment(row, timeZone, operationalMonthKey) ?? "",
+    getAgendarStatusReferenceMoment(row, timeZone, operationalMonthKey) ?? "",
   ).trim();
 
   if (scheduleUnavailable || !referenceMoment) {
