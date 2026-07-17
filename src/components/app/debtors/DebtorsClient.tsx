@@ -21,7 +21,6 @@ import {
   DEFAULT_RETRY_WEEKDAYS,
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
-import { localDateInTimeZone } from "@/lib/recurrence";
 
 export type DebtorRow = {
   id: string;
@@ -102,8 +101,6 @@ const weekdayOptions = [
   { value: 7, label: "Dom" },
 ];
 
-const DEBTOR_OPERATIONAL_TIME_ZONE = "America/Sao_Paulo";
-
 function money(v: number | null) {
   if (typeof v !== "number") return "-";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -117,22 +114,17 @@ function dueDayLabel(v: string | null) {
   return String(d.getDate());
 }
 
-function chargesTotal(row: DebtorRow, reference?: { month: number; year: number; day?: number }) {
+function chargesTotal(row: DebtorRow, reference?: { month: number; year: number }) {
+  if (typeof row.valor === "number" && Number.isFinite(row.valor)) {
+    return row.valor;
+  }
+
   if (row.charges && row.charges.length) {
     const scoped = reference
       ? row.charges.filter(
-          (c) => {
-            const recurrenceMonth = Number(c.recurrence_month ?? 0);
-            const recurrenceYear = Number(c.recurrence_year ?? 0);
-            const dueDay = Number(c.due_day ?? 0);
-            const isSameReferenceMonth = recurrenceMonth === reference.month && recurrenceYear === reference.year;
-
-            if (!isSameReferenceMonth) return false;
-
-            if (!Number.isInteger(reference.day) || !Number.isInteger(dueDay)) return true;
-
-            return dueDay >= Number(reference.day);
-          },
+          (c) =>
+            Number(c.recurrence_month ?? 0) === reference.month &&
+            Number(c.recurrence_year ?? 0) === reference.year,
         )
       : row.charges;
 
@@ -144,11 +136,7 @@ function chargesTotal(row: DebtorRow, reference?: { month: number; year: number;
     if (Number.isFinite(sum) && sum > 0) return sum;
   }
 
-  if (typeof row.valor === "number" && Number.isFinite(row.valor)) {
-    return row.valor;
-  }
-
-  return null;
+  return row.valor;
 }
 
 function compareChargeOrder(
@@ -208,17 +196,6 @@ function currentMonthYear(baseDate: Date) {
   return {
     month: String(baseDate.getMonth() + 1),
     year: String(baseDate.getFullYear()),
-  };
-}
-
-function operationalCurrentRecurrence() {
-  const localDate = localDateInTimeZone(new Date().toISOString(), DEBTOR_OPERATIONAL_TIME_ZONE);
-  const [year, month, day] = localDate.split("-").map(Number);
-  return {
-    year,
-    month,
-    day,
-    date: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
   };
 }
 
@@ -395,8 +372,7 @@ function normalizePixKeyForSave(raw: string) {
 export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
   const { theme } = useAppTheme();
   const pageSize = 5;
-  const operationalRecurrence = useMemo(() => operationalCurrentRecurrence(), []);
-  const currentDate = operationalRecurrence.date;
+  const currentDate = useMemo(() => new Date(), []);
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<DebtorRow[]>(initial);
@@ -442,7 +418,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     defaultValues: {
       nome: "",
       telefone: "",
-      charges: [defaultChargeFormValue(String(operationalRecurrence.day), currentDate)],
+      charges: [defaultChargeFormValue(String(currentDate.getDate()), currentDate)],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -463,11 +439,10 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   const watchedCharges = watch("charges");
   const currentRecurrence = useMemo(
     () => ({
-      month: operationalRecurrence.month,
-      year: operationalRecurrence.year,
-      day: operationalRecurrence.day,
+      month: currentDate.getMonth() + 1,
+      year: currentDate.getFullYear(),
     }),
-    [operationalRecurrence.day, operationalRecurrence.month, operationalRecurrence.year],
+    [currentDate],
   );
 
   useEffect(() => {
@@ -496,7 +471,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     reset({
       nome: "",
       telefone: "",
-      charges: [defaultChargeFormValue(String(operationalRecurrence.day), currentDate)],
+      charges: [defaultChargeFormValue(String(currentDate.getDate()), currentDate)],
       pix_key: "",
       observacoes: "",
       status: "ativo",
