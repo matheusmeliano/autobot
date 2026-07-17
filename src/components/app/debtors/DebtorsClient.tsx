@@ -118,10 +118,6 @@ function dueDayLabel(v: string | null) {
 }
 
 function chargesTotal(row: DebtorRow, reference?: { month: number; year: number; day?: number }) {
-  if (typeof row.valor === "number" && Number.isFinite(row.valor)) {
-    return row.valor;
-  }
-
   if (row.charges && row.charges.length) {
     const scoped = reference
       ? row.charges.filter(
@@ -148,7 +144,11 @@ function chargesTotal(row: DebtorRow, reference?: { month: number; year: number;
     if (Number.isFinite(sum) && sum > 0) return sum;
   }
 
-  return row.valor;
+  if (typeof row.valor === "number" && Number.isFinite(row.valor)) {
+    return row.valor;
+  }
+
+  return null;
 }
 
 function compareChargeOrder(
