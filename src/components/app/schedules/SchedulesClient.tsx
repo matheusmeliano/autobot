@@ -687,13 +687,14 @@ export function SchedulesClient({
 
   const displayMoments = (row: ScheduleRow) => {
     const dueMoment = displayReferenceMoment(row);
+    const scheduledMoment = String(row.data_envio ?? dueMoment ?? "").trim();
     const dueInput = splitDateTimeForInput(dueMoment, effectiveTimeZone);
     const dueDay = dueInput.date ? dueInput.date.slice(-2) : "--";
-    const scheduledDate = dateBR(dueMoment, effectiveTimeZone);
+    const scheduledDate = dateBR(scheduledMoment || dueMoment, effectiveTimeZone);
 
     return {
       primaryDate: dueDay,
-      primaryTime: timeBR(dueMoment, effectiveTimeZone),
+      primaryTime: timeBR(scheduledMoment || dueMoment, effectiveTimeZone),
       scheduledDate,
     };
   };
