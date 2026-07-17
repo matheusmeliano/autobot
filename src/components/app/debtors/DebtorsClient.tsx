@@ -21,6 +21,7 @@ import {
   DEFAULT_RETRY_WEEKDAYS,
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
+import { localDateInTimeZone } from "@/lib/recurrence";
 
 export type DebtorRow = {
   id: string;
@@ -100,6 +101,8 @@ const weekdayOptions = [
   { value: 6, label: "Sab" },
   { value: 7, label: "Dom" },
 ];
+
+const DEBTOR_OPERATIONAL_TIME_ZONE = "America/Sao_Paulo";
 
 function money(v: number | null) {
   if (typeof v !== "number") return "-";
@@ -206,6 +209,12 @@ function currentMonthYear(baseDate: Date) {
     month: String(baseDate.getMonth() + 1),
     year: String(baseDate.getFullYear()),
   };
+}
+
+function operationalCurrentDate() {
+  const localDate = localDateInTimeZone(new Date().toISOString(), DEBTOR_OPERATIONAL_TIME_ZONE);
+  const [year, month, day] = localDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 }
 
 function resolveChargeRecurrenceFromDueDay(dueDay: number, baseDate: Date) {
@@ -381,7 +390,7 @@ function normalizePixKeyForSave(raw: string) {
 export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
   const { theme } = useAppTheme();
   const pageSize = 5;
-  const currentDate = useMemo(() => new Date(), []);
+  const currentDate = useMemo(() => operationalCurrentDate(), []);
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<DebtorRow[]>(initial);
