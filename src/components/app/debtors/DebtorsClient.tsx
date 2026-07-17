@@ -211,10 +211,15 @@ function currentMonthYear(baseDate: Date) {
   };
 }
 
-function operationalCurrentDate() {
+function operationalCurrentRecurrence() {
   const localDate = localDateInTimeZone(new Date().toISOString(), DEBTOR_OPERATIONAL_TIME_ZONE);
   const [year, month, day] = localDate.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return {
+    year,
+    month,
+    day,
+    date: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+  };
 }
 
 function resolveChargeRecurrenceFromDueDay(dueDay: number, baseDate: Date) {
@@ -390,7 +395,8 @@ function normalizePixKeyForSave(raw: string) {
 export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
   const { theme } = useAppTheme();
   const pageSize = 5;
-  const currentDate = useMemo(() => operationalCurrentDate(), []);
+  const operationalRecurrence = useMemo(() => operationalCurrentRecurrence(), []);
+  const currentDate = operationalRecurrence.date;
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<DebtorRow[]>(initial);
@@ -436,7 +442,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     defaultValues: {
       nome: "",
       telefone: "",
-      charges: [defaultChargeFormValue(String(currentDate.getDate()), currentDate)],
+      charges: [defaultChargeFormValue(String(operationalRecurrence.day), currentDate)],
       pix_key: "",
       observacoes: "",
       status: "ativo",
@@ -457,11 +463,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   const watchedCharges = watch("charges");
   const currentRecurrence = useMemo(
     () => ({
-      month: currentDate.getMonth() + 1,
-      year: currentDate.getFullYear(),
-      day: currentDate.getDate(),
+      month: operationalRecurrence.month,
+      year: operationalRecurrence.year,
+      day: operationalRecurrence.day,
     }),
-    [currentDate],
+    [operationalRecurrence.day, operationalRecurrence.month, operationalRecurrence.year],
   );
 
   useEffect(() => {
@@ -490,7 +496,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     reset({
       nome: "",
       telefone: "",
-      charges: [defaultChargeFormValue(String(currentDate.getDate()), currentDate)],
+      charges: [defaultChargeFormValue(String(operationalRecurrence.day), currentDate)],
       pix_key: "",
       observacoes: "",
       status: "ativo",
