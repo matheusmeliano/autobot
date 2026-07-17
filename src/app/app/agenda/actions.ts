@@ -271,7 +271,7 @@ async function applySchedulePaymentSettlement(params: {
           last_sent_at: null,
           retry_attempts: 0,
           closed_at: null,
-          payment_received_at: null,
+          payment_received_at: nowIso,
         }
       : {
           status: "executado",

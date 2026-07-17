@@ -443,7 +443,6 @@ export async function GET(req: Request) {
         .eq("data_envio", scheduledFor)
         .in("status", ["agendado", "atrasado", "pausado"])
         .is("closed_at", null)
-        .is("payment_received_at", null)
         .select("id")
         .maybeSingle();
 

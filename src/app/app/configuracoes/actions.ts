@@ -60,7 +60,6 @@ export async function updateTimezoneAction(input: unknown) {
       .is("closed_at", null)
       .not("charge_id", "is", null)
       .eq("status", "agendado")
-      .is("payment_received_at", null)
       .order("created_at", { ascending: true })
       .range(offset, offset + pageSize - 1);
     if (schedulesError) return { ok: false, error: schedulesError.message };
