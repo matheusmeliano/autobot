@@ -28,6 +28,40 @@ import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { buildPixCopyLink } from "@/lib/pix-links";
 
+// #region debug-point A:manual-payment-bootstrap
+const __dbgManualEnvPath = ".dbg/agendar-manual-payment.env";
+const __dbgManualEnvRaw = fs.existsSync(__dbgManualEnvPath)
+  ? fs.readFileSync(__dbgManualEnvPath, "utf8")
+  : "";
+const __dbgManualMap = Object.fromEntries(
+  __dbgManualEnvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf("=");
+      return idx >= 0 ? [line.slice(0, idx), line.slice(idx + 1)] : [line, ""];
+    }),
+);
+const __dbgManualUrl = __dbgManualMap.DEBUG_SERVER_URL || "http://127.0.0.1:7777/event";
+const __dbgManualSession = __dbgManualMap.DEBUG_SESSION_ID || "agendar-manual-payment";
+const __dbgManual = (hypothesisId: string, msg: string, data: Record<string, unknown>) => {
+  fetch(__dbgManualUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: __dbgManualSession,
+      runId: "pre-fix",
+      hypothesisId,
+      location: "src/app/app/agenda/actions.ts",
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+};
+// #endregion
+
 // #region debug-point extra-send-manual-bootstrap
 const __dbgEnvPath = ".dbg/extra-scheduled-send.env";
 const __dbgEnvRaw = fs.existsSync(__dbgEnvPath) ? fs.readFileSync(__dbgEnvPath, "utf8") : "";
@@ -208,6 +242,26 @@ async function loadScheduleWithVisualStatus(params: {
     timeZone as any,
   );
 
+  // #region debug-point A:loaded-visual-status
+  __dbgManual("A", "loaded visual status", {
+    scheduleId: params.scheduleId,
+    scheduleStatus: String((schedule as any)?.status ?? ""),
+    recurrence: String((schedule as any)?.recurrence ?? ""),
+    dataEnvio: String((schedule as any)?.data_envio ?? ""),
+    chargeDueAt: String((schedule as any)?.charge_due_at ?? ""),
+    paymentReceivedAt: String((schedule as any)?.payment_received_at ?? ""),
+    closedAt: String((schedule as any)?.closed_at ?? ""),
+    lastExecutedScheduledFor,
+    visualLabel: visualStatus.label,
+    visualSubtitle: visualStatus.subtitle,
+    isExecuted: visualStatus.isExecuted,
+    isPaid: visualStatus.isPaid,
+    referenceMoment: visualStatus.referenceMoment,
+    referenceMonthKey: visualStatus.referenceMonthKey,
+    isCurrentMonth: visualStatus.isCurrentMonth,
+  });
+  // #endregion
+
   return {
     ok: true as const,
     schedule,
@@ -286,11 +340,43 @@ async function applySchedulePaymentSettlement(params: {
     };
   }
 
+  // #region debug-point B:settlement-payload
+  __dbgManual("B", "manual payment settlement payload", {
+    scheduleId: String((params.schedule as any).id ?? ""),
+    recurrence,
+    scheduledFor,
+    nowIso,
+    currentStatus: String((params.schedule as any)?.status ?? ""),
+    currentPaymentReceivedAt: String((params.schedule as any)?.payment_received_at ?? ""),
+    currentChargeDueAt: String((params.schedule as any)?.charge_due_at ?? ""),
+    currentDataEnvio: String((params.schedule as any)?.data_envio ?? ""),
+    updatePayload,
+  });
+  // #endregion
+
   const { error: updateError } = await params.admin
     .from("schedules")
     .update(updatePayload)
     .eq("id", String((params.schedule as any).id));
   if (updateError) return { ok: false as const, error: updateError.message };
+
+  const { data: updatedSchedule, error: updatedScheduleError } = await params.admin
+    .from("schedules")
+    .select("id, status, data_envio, charge_due_at, payment_received_at, closed_at")
+    .eq("id", String((params.schedule as any).id))
+    .maybeSingle();
+
+  // #region debug-point C:settlement-updated-row
+  __dbgManual("C", "manual payment updated schedule", {
+    scheduleId: String((params.schedule as any).id ?? ""),
+    updatedScheduleError: updatedScheduleError?.message ?? null,
+    updatedStatus: String((updatedSchedule as any)?.status ?? ""),
+    updatedDataEnvio: String((updatedSchedule as any)?.data_envio ?? ""),
+    updatedChargeDueAt: String((updatedSchedule as any)?.charge_due_at ?? ""),
+    updatedPaymentReceivedAt: String((updatedSchedule as any)?.payment_received_at ?? ""),
+    updatedClosedAt: String((updatedSchedule as any)?.closed_at ?? ""),
+  });
+  // #endregion
 
   await syncDebtorChargeStatus(
     params.admin,
@@ -314,10 +400,36 @@ export async function confirmExecutedSchedulePaymentForUser(params: {
   if (String((loaded.schedule as any).user_id) !== params.userId) {
     return { ok: false as const, error: "Sem permissão." };
   }
+
+  // #region debug-point D:confirm-payment-loaded
+  __dbgManual("D", "confirm payment loaded schedule", {
+    scheduleId: params.scheduleId,
+    visualLabel: loaded.visualStatus.label,
+    visualSubtitle: loaded.visualStatus.subtitle,
+    isExecuted: loaded.visualStatus.isExecuted,
+    isPaid: loaded.visualStatus.isPaid,
+    scheduleStatus: String((loaded.schedule as any)?.status ?? ""),
+    paymentReceivedAt: String((loaded.schedule as any)?.payment_received_at ?? ""),
+    lastExecutedScheduledFor: loaded.lastExecutedScheduledFor,
+  });
+  // #endregion
+
   if (loaded.visualStatus.isPaid) {
     return { ok: true as const, alreadyProcessed: true };
   }
   if (loaded.visualStatus.label !== "Executado") {
+    // #region debug-point D:confirm-payment-blocked
+    __dbgManual("D", "confirm payment blocked by visual status", {
+      scheduleId: params.scheduleId,
+      visualLabel: loaded.visualStatus.label,
+      visualSubtitle: loaded.visualStatus.subtitle,
+      isExecuted: loaded.visualStatus.isExecuted,
+      isPaid: loaded.visualStatus.isPaid,
+      scheduleStatus: String((loaded.schedule as any)?.status ?? ""),
+      paymentReceivedAt: String((loaded.schedule as any)?.payment_received_at ?? ""),
+      lastExecutedScheduledFor: loaded.lastExecutedScheduledFor,
+    });
+    // #endregion
     return {
       ok: false as const,
       error: "Esse agendamento ainda não possui uma cobrança executada para confirmar pagamento.",
@@ -1305,6 +1417,21 @@ export async function markSchedulePaidAction(id: string) {
   const loaded = await loadScheduleWithVisualStatus({ admin, scheduleId: id });
   if (!loaded.ok) return loaded;
   const schedule = loaded.schedule;
+
+  // #region debug-point E:mark-paid-entry
+  __dbgManual("E", "mark schedule paid action entry", {
+    scheduleId: id,
+    scheduleStatus: String((schedule as any)?.status ?? ""),
+    recurrence: String((schedule as any)?.recurrence ?? ""),
+    paymentReceivedAt: String((schedule as any)?.payment_received_at ?? ""),
+    visualLabel: loaded.visualStatus.label,
+    visualSubtitle: loaded.visualStatus.subtitle,
+    isExecuted: loaded.visualStatus.isExecuted,
+    isPaid: loaded.visualStatus.isPaid,
+    lastExecutedScheduledFor: loaded.lastExecutedScheduledFor,
+  });
+  // #endregion
+
   if (String((schedule as any).user_id) !== userId) return { ok: false, error: "Sem permissão." };
   const currentStatus = String((schedule as any).status ?? "");
   if (currentStatus === "executando") {
