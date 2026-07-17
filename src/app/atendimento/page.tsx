@@ -58,9 +58,6 @@ export default async function AtendimentoPublicPage({
               <p className="mt-3 text-sm text-white/70">
                 <strong>Para participar desta conversa com nosso bot, você precisa se cadastrar.</strong>
               </p>
-              <p className="mt-3 text-sm text-white/60">
-                Use o seu cadastro existente ou crie sua conta para acessar o portal exclusivo de atendimento.
-              </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <Link
                   href={`/login?next=${encodeURIComponent(nextPath)}`}
