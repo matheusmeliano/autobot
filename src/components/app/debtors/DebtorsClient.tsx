@@ -114,7 +114,7 @@ function dueDayLabel(v: string | null) {
   return String(d.getDate());
 }
 
-function chargesTotal(row: DebtorRow, reference?: { month: number; year: number }) {
+function chargesTotal(row: DebtorRow, reference?: { month: number; year: number; day?: number }) {
   if (typeof row.valor === "number" && Number.isFinite(row.valor)) {
     return row.valor;
   }
@@ -122,9 +122,18 @@ function chargesTotal(row: DebtorRow, reference?: { month: number; year: number 
   if (row.charges && row.charges.length) {
     const scoped = reference
       ? row.charges.filter(
-          (c) =>
-            Number(c.recurrence_month ?? 0) === reference.month &&
-            Number(c.recurrence_year ?? 0) === reference.year,
+          (c) => {
+            const recurrenceMonth = Number(c.recurrence_month ?? 0);
+            const recurrenceYear = Number(c.recurrence_year ?? 0);
+            const dueDay = Number(c.due_day ?? 0);
+            const isSameReferenceMonth = recurrenceMonth === reference.month && recurrenceYear === reference.year;
+
+            if (!isSameReferenceMonth) return false;
+
+            if (!Number.isInteger(reference.day) || !Number.isInteger(dueDay)) return true;
+
+            return dueDay >= Number(reference.day);
+          },
         )
       : row.charges;
 
@@ -441,6 +450,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     () => ({
       month: currentDate.getMonth() + 1,
       year: currentDate.getFullYear(),
+      day: currentDate.getDate(),
     }),
     [currentDate],
   );
