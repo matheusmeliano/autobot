@@ -162,15 +162,24 @@ function compareChargeOrder(
   return Number(a.due_day ?? 0) - Number(b.due_day ?? 0);
 }
 
-function chargesFirstDueDay(row: DebtorRow) {
+function joinDueDays(values: string[]) {
+  if (!values.length) return "-";
+  if (values.length === 1) return values[0] ?? "-";
+  if (values.length === 2) return `${values[0]} e ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`;
+}
+
+function chargesDueDaysLabel(row: DebtorRow) {
   if (row.charges && row.charges.length) {
-    const firstCharge = [...row.charges]
+    const dueDays = [...row.charges]
       .sort(compareChargeOrder)
-      .find((c) => {
+      .map((c) => {
         const dueDay = Number(c.due_day);
-        return Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31;
-      });
-    return firstCharge ? String(Number(firstCharge.due_day)) : dueDayLabel(row.vencimento);
+        return Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31 ? String(dueDay) : null;
+      })
+      .filter((value): value is string => Boolean(value));
+    const uniqueDueDays = Array.from(new Set(dueDays));
+    return uniqueDueDays.length ? joinDueDays(uniqueDueDays) : dueDayLabel(row.vencimento);
   }
   return dueDayLabel(row.vencimento);
 }
@@ -766,7 +775,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             Vencimento
                           </div>
                           <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                            {chargesFirstDueDay(r)}
+                            {chargesDueDaysLabel(r)}
                           </div>
                         </div>
                       </div>
@@ -834,7 +843,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     </div>
                     <div className="col-span-2 text-center">{money(chargesTotal(r, currentRecurrence))}</div>
                     <div className="col-span-2 text-center text-[var(--app-text-70)]">
-                      {chargesFirstDueDay(r)}
+                      {chargesDueDaysLabel(r)}
                     </div>
                     <div className="col-span-1 flex justify-center">
                       <span
