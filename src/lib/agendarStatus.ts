@@ -13,7 +13,7 @@ export type AgendarStatusRow = {
 };
 
 export type AgendarVisualStatus = {
-  label: "-" | "Agendado" | "Executado";
+  label: "Agendado" | "Executado";
   subtitle: "Não pago" | "Pago" | null;
   isExecuted: boolean;
   isPaid: boolean;
@@ -180,9 +180,9 @@ export function deriveAgendarVisualStatus(
     ? agendarYearMonthKey(currentCycleMoment, timeZone)
     : "";
 
-  if (scheduleUnavailable || !currentCycleMoment || currentCycleMonthKey !== operationalMonthKey) {
+  if (scheduleUnavailable || !currentCycleMoment) {
     return {
-      label: "-",
+      label: "Agendado",
       subtitle: null,
       isExecuted: false,
       isPaid: false,
@@ -199,7 +199,7 @@ export function deriveAgendarVisualStatus(
 
   if (!referenceMoment) {
     return {
-      label: "-",
+      label: "Agendado",
       subtitle: null,
       isExecuted: false,
       isPaid: false,
@@ -232,13 +232,7 @@ export function deriveAgendarVisualStatus(
   const isPaid =
     Boolean(referenceMonthKey) &&
     ((Boolean(paymentMoment) && paymentMonthKey === referenceMonthKey) ||
-      (normalizedStatus === "pago" && isCurrentMonth) ||
-      (isCurrentMonth &&
-        normalizedStatus === "agendado" &&
-        Boolean(lastExecutedMoment) &&
-        lastExecutedMonthKey === operationalMonthKey &&
-        ((Boolean(scheduledCycleMonthKey) && scheduledCycleMonthKey !== operationalMonthKey) ||
-          (Boolean(currentCycleMonthKey) && currentCycleMonthKey !== operationalMonthKey))));
+      (normalizedStatus === "pago" && isCurrentMonth));
 
   if (!isCurrentMonth || !isExecuted) {
     return {

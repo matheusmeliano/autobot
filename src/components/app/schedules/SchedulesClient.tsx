@@ -647,19 +647,6 @@ export function SchedulesClient({
   const displayStatus = (row: ScheduleRow) => {
     const derived = deriveAgendarVisualStatus(row, effectiveTimeZone, operationalMonthKey);
 
-    if (derived.label === "-") {
-      return {
-        label: "-",
-        subtitle: null as "Não pago" | "Pago" | null,
-        className: theme === "dark" ? "bg-white/10 text-white/75" : "bg-black/10 text-black/70",
-        isExecuted: false,
-        isPaid: false,
-        referenceMoment: null as string | null,
-        referenceMonthKey: "",
-        isCurrentMonth: false,
-      };
-    }
-
     if (derived.label === "Agendado") {
       return {
         label: "Agendado",

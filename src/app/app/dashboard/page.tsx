@@ -165,7 +165,7 @@ export default async function DashboardPage() {
     visualStatus: deriveAgendarVisualStatus(row, effectiveTimeZone, currentMonthKey),
   }));
   const currentMonthAgendaRows = agendaRowsWithVisualStatus.filter(
-    ({ visualStatus }) => visualStatus.isCurrentMonth && visualStatus.label !== "-",
+    ({ visualStatus }) => visualStatus.isCurrentMonth,
   );
   const hasCurrentMonthSchedules = currentMonthAgendaRows.length > 0;
 
