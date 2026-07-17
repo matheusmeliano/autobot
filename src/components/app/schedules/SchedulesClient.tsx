@@ -261,7 +261,7 @@ function debtorReferenceOptionKey(option: { value: string; chargeId: string | nu
 }
 
 function scheduleReferenceLocalDate(row: ScheduleRow, fallbackTimeZone: BrazilTimeZone) {
-  const referenceMoment = String(row.charge_due_at ?? row.data_envio ?? row.operational_due_at ?? "").trim();
+  const referenceMoment = String(row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "").trim();
   if (!referenceMoment) return "";
   const rowTimeZone = (String(row.schedule_timezone ?? "").trim() || fallbackTimeZone) as BrazilTimeZone;
   try {
@@ -352,7 +352,7 @@ function getNextRecurringMoment(row: ScheduleRow, timeZone: BrazilTimeZone) {
   const recurrence = String(row.recurrence ?? "none").toLowerCase();
   if (recurrence !== "monthly" && recurrence !== "yearly") return null;
 
-  const baseIso = row.charge_due_at ?? row.data_envio;
+  const baseIso = row.operational_due_at ?? row.charge_due_at ?? row.data_envio;
   if (!baseIso) return null;
 
   const dueInput = splitDateTimeForInput(baseIso, timeZone);
@@ -511,7 +511,9 @@ export function SchedulesClient({
           sensitivity: "base",
         });
         if (debtorCompare !== 0) return debtorCompare;
-        return String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio));
+        return String(a.operational_due_at ?? a.charge_due_at ?? a.data_envio).localeCompare(
+          String(b.operational_due_at ?? b.charge_due_at ?? b.data_envio),
+        );
       });
   }, [query, rows]);
   const operationalMonthKey = useMemo(
@@ -564,7 +566,7 @@ export function SchedulesClient({
           continue;
         }
 
-        const dueMoment = referenceRow.charge_due_at ?? referenceRow.data_envio;
+        const dueMoment = referenceRow.operational_due_at ?? referenceRow.charge_due_at ?? referenceRow.data_envio;
         const dueLocalDate = localDateInTimeZone(dueMoment, effectiveTimeZone);
         const executedByCurrentInstance = scheduleHasExecutedCurrentInstance(referenceRow);
         const isExecuted =
@@ -697,7 +699,10 @@ export function SchedulesClient({
   };
 
   const getEditDateTime = (row: ScheduleRow) => {
-    const dueInput = splitDateTimeForInput(row.charge_due_at ?? row.data_envio, effectiveTimeZone);
+    const dueInput = splitDateTimeForInput(
+      row.operational_due_at ?? row.charge_due_at ?? row.data_envio,
+      effectiveTimeZone,
+    );
     const sendInput = splitDateTimeForInput(row.data_envio, effectiveTimeZone);
     return {
       date: dueInput.date,

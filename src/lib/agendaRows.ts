@@ -197,6 +197,8 @@ export function buildAgendaRows(params: {
       sensitivity: "base",
     });
     if (debtorCompare !== 0) return debtorCompare;
-    return String(a.charge_due_at ?? a.data_envio).localeCompare(String(b.charge_due_at ?? b.data_envio));
+    return String(a.operational_due_at ?? a.charge_due_at ?? a.data_envio).localeCompare(
+      String(b.operational_due_at ?? b.charge_due_at ?? b.data_envio),
+    );
   });
 }
