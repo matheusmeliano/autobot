@@ -175,13 +175,6 @@ function chargesFirstDueDay(row: DebtorRow) {
   return dueDayLabel(row.vencimento);
 }
 
-function progressText(row: DebtorRow) {
-  const total = Number(row.progress_total ?? 0);
-  if (!Number.isFinite(total) || total <= 0) return null;
-  const paid = Math.max(0, Math.min(total, Number(row.progress_paid ?? 0) || 0));
-  return `${paid}/${total} Pagas`;
-}
-
 function nextMonthYear(baseDate: Date) {
   const year = baseDate.getFullYear();
   const month = baseDate.getMonth() + 1;
@@ -740,12 +733,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             {r.observacoes}
                           </div>
                         ) : null}
-                        {(() => {
-                          const p = progressText(r);
-                          return p ? (
-                            <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{p}</div>
-                          ) : null;
-                        })()}
                       </div>
                       <span
                         className={[
@@ -841,10 +828,6 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           {r.observacoes}
                         </div>
                       ) : null}
-                      {(() => {
-                        const p = progressText(r);
-                        return p ? <div className="truncate text-[11px] text-[var(--app-text-55)]">{p}</div> : null;
-                      })()}
                     </div>
                     <div className="col-span-2 truncate text-center text-[var(--app-text-70)]">
                       {r.telefone ?? "-"}
