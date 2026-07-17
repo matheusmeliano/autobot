@@ -275,11 +275,15 @@ async function applySchedulePaymentSettlement(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   userId: string;
   schedule: any;
+  referenceMoment?: string | null;
 }) {
   const recurrence = String((params.schedule as any).recurrence ?? "none");
   const nowIso = new Date().toISOString();
   const scheduledFor = String(
-    (params.schedule as any).data_envio ?? (params.schedule as any).charge_due_at ?? nowIso,
+    params.referenceMoment ??
+      (params.schedule as any).data_envio ??
+      (params.schedule as any).charge_due_at ??
+      nowIso,
   );
 
   await ensureExecutedScheduleRun({
@@ -345,6 +349,7 @@ async function applySchedulePaymentSettlement(params: {
     scheduleId: String((params.schedule as any).id ?? ""),
     recurrence,
     scheduledFor,
+    referenceMoment: String(params.referenceMoment ?? ""),
     nowIso,
     currentStatus: String((params.schedule as any)?.status ?? ""),
     currentPaymentReceivedAt: String((params.schedule as any)?.payment_received_at ?? ""),
@@ -440,6 +445,7 @@ export async function confirmExecutedSchedulePaymentForUser(params: {
     admin,
     userId: params.userId,
     schedule: loaded.schedule,
+    referenceMoment: null,
   });
 }
 
@@ -1407,7 +1413,7 @@ export async function triggerScheduleNowAction(id: string) {
   }
 }
 
-export async function markSchedulePaidAction(id: string) {
+export async function markSchedulePaidAction(id: string, referenceMoment?: string | null) {
   const supabase = await createSupabaseServerClient();
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
@@ -1451,6 +1457,7 @@ export async function markSchedulePaidAction(id: string) {
     admin,
     userId,
     schedule,
+    referenceMoment: referenceMoment ?? null,
   });
   if (!settlement.ok) return settlement;
 

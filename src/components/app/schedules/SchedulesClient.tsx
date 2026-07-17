@@ -1318,12 +1318,11 @@ export function SchedulesClient({
   const markAsPaid = async (row: ScheduleRow) => {
     const visualStatus = displayStatus(row);
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
-    const referenceMoment =
-      visualStatus.isCurrentMonth && visualStatus.referenceMoment
-        ? visualStatus.referenceMoment
-        : new Date().toISOString();
+    const referenceMoment = displayReferenceMoment(row) || new Date().toISOString();
     const referenceMonthLabel = referenceMoment ? monthYearBR(referenceMoment, effectiveTimeZone) : null;
-    const referenceMonthCompactLabel = referenceMoment ? monthYearCompactBR(referenceMoment, effectiveTimeZone) : null;
+    const referenceMonthCompactLabel = referenceMoment
+      ? monthYearCompactBR(referenceMoment, effectiveTimeZone)
+      : null;
     const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
     const nextReferenceLabel = nextRecurringMoment ? monthYearBR(nextRecurringMoment, effectiveTimeZone) : null;
     if (visualStatus.isPaid) {
@@ -1348,7 +1347,7 @@ export function SchedulesClient({
 
     setMarkingPaidId(row.id);
     startTransition(async () => {
-      const res = await markSchedulePaidAction(row.id);
+      const res = await markSchedulePaidAction(row.id, referenceMoment);
       if (!res.ok) {
         modalToast.error(res.error ?? "Falha ao marcar pagamento.");
         setMarkingPaidId(null);
