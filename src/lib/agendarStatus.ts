@@ -1,4 +1,4 @@
-import { type BrazilTimeZone } from "@/lib/timezone";
+import { type BrazilTimeZone, zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 export type AgendarStatusRow = {
   id?: string | null;
@@ -39,6 +39,74 @@ export function agendarYearMonthKey(value: string, timeZone: BrazilTimeZone) {
   return `${map.year}-${map.month}`;
 }
 
+function agendarLocalDateParts(value: string, timeZone: BrazilTimeZone) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  if (!map.year || !map.month || !map.day) return null;
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+  };
+}
+
+function agendarLocalTime(value: string, timeZone: BrazilTimeZone) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return map.hour && map.minute ? `${map.hour}:${map.minute}` : null;
+}
+
+function agendarLastDayOfMonth(year: number, month1: number) {
+  return new Date(Date.UTC(year, month1, 0)).getUTCDate();
+}
+
+function buildAgendarOperationalMonthMoment(
+  row: AgendarStatusRow,
+  timeZone: BrazilTimeZone,
+  operationalMonthKey: string,
+) {
+  const sourceMoment = String(row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "").trim();
+  if (!sourceMoment || !/^\d{4}-\d{2}$/.test(operationalMonthKey)) return "";
+
+  const localDate = agendarLocalDateParts(sourceMoment, timeZone);
+  const localTime = agendarLocalTime(sourceMoment, timeZone);
+  if (!localDate || !localTime) return sourceMoment;
+
+  const [yearRaw, monthRaw] = operationalMonthKey.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!year || !month) return sourceMoment;
+
+  const safeDay = Math.max(1, Math.min(localDate.day, agendarLastDayOfMonth(year, month)));
+  return zonedDateTimeToUtcIso({
+    date: `${yearRaw}-${monthRaw}-${String(safeDay).padStart(2, "0")}`,
+    time: localTime,
+    timeZone,
+  });
+}
+
 export function getAgendarDisplayReferenceMoment(
   row: AgendarStatusRow,
   timeZone: BrazilTimeZone,
@@ -47,15 +115,32 @@ export function getAgendarDisplayReferenceMoment(
   const operationalMoment = String(row.operational_due_at ?? "").trim();
   const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
   const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+  const operationalYearMonth = operationalMoment ? agendarYearMonthKey(operationalMoment, timeZone) : "";
   const dueYearMonth = dueMoment ? agendarYearMonthKey(dueMoment, timeZone) : "";
   const executedYearMonth = lastExecutedMoment ? agendarYearMonthKey(lastExecutedMoment, timeZone) : "";
-  let selectedMoment = operationalMoment || dueMoment || lastExecutedMoment;
+  const projectedCurrentMonthMoment = buildAgendarOperationalMonthMoment(
+    row,
+    timeZone,
+    operationalMonthKey,
+  );
 
-  if (!operationalMoment && executedYearMonth && executedYearMonth === operationalMonthKey && dueYearMonth !== operationalMonthKey) {
-    selectedMoment = lastExecutedMoment;
+  if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
+    return operationalMoment;
   }
 
-  return selectedMoment;
+  if (
+    executedYearMonth &&
+    executedYearMonth === operationalMonthKey &&
+    dueYearMonth !== operationalMonthKey
+  ) {
+    return lastExecutedMoment;
+  }
+
+  if (projectedCurrentMonthMoment) {
+    return projectedCurrentMonthMoment;
+  }
+
+  return operationalMoment || dueMoment || lastExecutedMoment;
 }
 
 function getAgendarStatusReferenceMoment(
