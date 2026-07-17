@@ -95,11 +95,31 @@ export function deriveAgendarVisualStatus(
     sourceKind === "charge" ||
     Boolean(row.schedule_missing) ||
     String(row.id ?? "").startsWith("charge:");
+  const currentCycleMoment = String(
+    row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "",
+  ).trim();
+  const currentCycleMonthKey = currentCycleMoment
+    ? agendarYearMonthKey(currentCycleMoment, timeZone)
+    : "";
+
+  if (scheduleUnavailable || !currentCycleMoment || currentCycleMonthKey !== operationalMonthKey) {
+    return {
+      label: "-",
+      subtitle: null,
+      isExecuted: false,
+      isPaid: false,
+      referenceMoment: null,
+      referenceMonthKey: currentCycleMonthKey,
+      isCurrentMonth: false,
+      scheduleUnavailable,
+    };
+  }
+
   const referenceMoment = String(
     getAgendarStatusReferenceMoment(row, timeZone, operationalMonthKey) ?? "",
   ).trim();
 
-  if (scheduleUnavailable || !referenceMoment) {
+  if (!referenceMoment) {
     return {
       label: "-",
       subtitle: null,
@@ -113,12 +133,6 @@ export function deriveAgendarVisualStatus(
   }
 
   const referenceMonthKey = agendarYearMonthKey(referenceMoment, timeZone);
-  const currentCycleMoment = String(
-    row.operational_due_at ?? row.charge_due_at ?? row.data_envio ?? "",
-  ).trim();
-  const currentCycleMonthKey = currentCycleMoment
-    ? agendarYearMonthKey(currentCycleMoment, timeZone)
-    : "";
   const scheduledCycleMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
   const scheduledCycleMonthKey = scheduledCycleMoment
     ? agendarYearMonthKey(scheduledCycleMoment, timeZone)
