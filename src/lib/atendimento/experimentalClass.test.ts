@@ -15,7 +15,7 @@ import {
   listExperimentalClassAvailability,
 } from "./experimentalClass.ts";
 
-test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 16:00 a partir do dia 20", () => {
+test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 16:00 a partir do dia 24", () => {
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-12T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
@@ -25,7 +25,7 @@ test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 
   const firstDate = availability.dates[0];
   const slots = availability.slotsByProfessorDate.get(firstDate.professorDate) ?? [];
 
-  assert.equal(firstDate.professorDate, "2026-07-20");
+  assert.equal(firstDate.professorDate, "2026-07-24");
   assert.deepEqual(
     slots.map((slot) => slot.professorTime),
     ["13:00", "14:30", "16:00"],
@@ -36,15 +36,39 @@ test("listExperimentalClassAvailability remove slots que conflitam em 1h30", () 
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-12T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
-    bookedProfessorStartAts: ["2026-07-20T17:30:00.000Z"],
+    bookedProfessorStartAts: ["2026-07-24T17:30:00.000Z"],
   });
 
-  const slots = availability.slotsByProfessorDate.get("2026-07-20") ?? [];
+  const slots = availability.slotsByProfessorDate.get("2026-07-24") ?? [];
 
   assert.deepEqual(
     slots.map((slot) => slot.professorTime),
     ["14:30", "16:00"],
   );
+});
+
+test("listExperimentalClassAvailability nao exibe domingos entre as datas restantes do mes", () => {
+  const availability = listExperimentalClassAvailability({
+    now: new Date("2026-07-24T10:00:00.000Z"),
+    leadTimeZone: "America/Cuiaba",
+    bookedProfessorStartAts: [],
+  });
+
+  assert.deepEqual(
+    availability.dates.map((option) => option.professorDate),
+    ["2026-07-24", "2026-07-25", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"],
+  );
+});
+
+test("listExperimentalClassAvailability vira automaticamente para o proximo mes no ultimo dia do mes", () => {
+  const availability = listExperimentalClassAvailability({
+    now: new Date("2026-07-31T10:00:00.000Z"),
+    leadTimeZone: "America/Cuiaba",
+    bookedProfessorStartAts: [],
+  });
+
+  assert.equal(availability.dates[0]?.professorDate, "2026-08-01");
+  assert.equal(availability.dates.some((option) => option.professorDate === "2026-08-02"), false);
 });
 
 test("buildExperimentalClassDatesMessages mostra as duas mensagens com conjuncao final", () => {

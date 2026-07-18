@@ -73,6 +73,14 @@ function endOfMonthLocalDate(localDate: string) {
   return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
+function startOfNextMonthLocalDate(localDate: string) {
+  const [year, month] = localDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month, 1, 12, 0, 0));
+  const nextYear = date.getUTCFullYear();
+  const nextMonth = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${nextYear}-${nextMonth}-01`;
+}
+
 function maxLocalDate(left: string, right: string) {
   return left >= right ? left : right;
 }
@@ -302,67 +310,75 @@ export function listExperimentalClassAvailability(params: {
     .filter((value) => Number.isFinite(value));
 
   const professorToday = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
-  const professorMonthStartAtDay20 = `${professorToday.slice(0, 8)}20`;
-  const professorWindowStart = maxLocalDate(professorToday, professorMonthStartAtDay20);
   const professorMonthEnd = endOfMonthLocalDate(professorToday);
   const dates: ExperimentalClassDateOption[] = [];
   const slotsByProfessorDate = new Map<string, ExperimentalClassTimeOption[]>();
-
-  for (
-    let currentDate = professorWindowStart;
-    currentDate <= professorMonthEnd;
-    currentDate = addDaysToLocalDate(currentDate, 1)
-  ) {
-    const middayIso = zonedDateTimeToUtcIso({
-      date: currentDate,
-      time: "12:00",
-      timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-    });
-    const weekday = weekdayInTimeZone(middayIso, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
-    if (weekday === "sun") continue;
-
-    const daySlots: ExperimentalClassTimeOption[] = [];
-
-    for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
-      const professorStartAt = zonedDateTimeToUtcIso({
+  const collectDates = (startDate: string, endDate: string) => {
+    for (let currentDate = startDate; currentDate <= endDate; currentDate = addDaysToLocalDate(currentDate, 1)) {
+      const middayIso = zonedDateTimeToUtcIso({
         date: currentDate,
-        time: professorTime,
+        time: "12:00",
         timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       });
-      const professorStartMs = new Date(professorStartAt).getTime();
-      if (!Number.isFinite(professorStartMs) || professorStartMs <= nowMs) continue;
-      const professorEndMs = professorStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
-      const overlapsExistingBooking = bookedProfessorStartMs.some((bookedStartMs) => {
-        const bookedEndMs = bookedStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
-        return professorStartMs < bookedEndMs && bookedStartMs < professorEndMs;
-      });
-      if (overlapsExistingBooking) continue;
+      const weekday = weekdayInTimeZone(middayIso, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
+      if (weekday === "sun") continue;
 
-      const leadDate = localDateInTimeZone(professorStartAt, leadTimeZone);
-      daySlots.push({
-        id: `${currentDate}|${professorTime}`,
+      const daySlots: ExperimentalClassTimeOption[] = [];
+
+      for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
+        const professorStartAt = zonedDateTimeToUtcIso({
+          date: currentDate,
+          time: professorTime,
+          timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        });
+        const professorStartMs = new Date(professorStartAt).getTime();
+        if (!Number.isFinite(professorStartMs) || professorStartMs <= nowMs) continue;
+        const professorEndMs = professorStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+        const overlapsExistingBooking = bookedProfessorStartMs.some((bookedStartMs) => {
+          const bookedEndMs = bookedStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+          return professorStartMs < bookedEndMs && bookedStartMs < professorEndMs;
+        });
+        if (overlapsExistingBooking) continue;
+
+        const leadDate = localDateInTimeZone(professorStartAt, leadTimeZone);
+        daySlots.push({
+          id: `${currentDate}|${professorTime}`,
+          professorDate: currentDate,
+          professorTime,
+          professorStartAt,
+          leadDate,
+          leadTime: formatTimeInTimeZone(professorStartAt, leadTimeZone),
+          displayLabel: formatTimeInTimeZone(professorStartAt, leadTimeZone),
+        });
+      }
+
+      if (!daySlots.length) continue;
+
+      slotsByProfessorDate.set(currentDate, daySlots);
+      const leadDate = daySlots[0]?.leadDate ?? currentDate;
+      const dayLabel = leadDate.slice(8, 10);
+      dates.push({
+        id: currentDate,
         professorDate: currentDate,
-        professorTime,
-        professorStartAt,
         leadDate,
-        leadTime: formatTimeInTimeZone(professorStartAt, leadTimeZone),
-        displayLabel: formatTimeInTimeZone(professorStartAt, leadTimeZone),
+        dayLabel,
+        displayLabel: buildDisplayDateLabel(daySlots[0]?.professorStartAt ?? middayIso, leadTimeZone),
+        slotCount: daySlots.length,
       });
     }
+  };
 
-    if (!daySlots.length) continue;
+  const professorMonthStartAtDay24 = `${professorToday.slice(0, 8)}24`;
+  const shouldUseNextMonth = professorToday >= professorMonthEnd;
+  if (!shouldUseNextMonth) {
+    const professorWindowStart = maxLocalDate(professorToday, professorMonthStartAtDay24);
+    collectDates(professorWindowStart, professorMonthEnd);
+  }
 
-    slotsByProfessorDate.set(currentDate, daySlots);
-    const leadDate = daySlots[0]?.leadDate ?? currentDate;
-    const dayLabel = leadDate.slice(8, 10);
-    dates.push({
-      id: currentDate,
-      professorDate: currentDate,
-      leadDate,
-      dayLabel,
-      displayLabel: buildDisplayDateLabel(daySlots[0]?.professorStartAt ?? middayIso, leadTimeZone),
-      slotCount: daySlots.length,
-    });
+  if (!dates.length) {
+    const nextMonthStart = startOfNextMonthLocalDate(professorToday);
+    const nextMonthEnd = endOfMonthLocalDate(nextMonthStart);
+    collectDates(nextMonthStart, nextMonthEnd);
   }
 
   return {
