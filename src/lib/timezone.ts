@@ -19,7 +19,7 @@ export type CityTimeZoneResolution = {
   timeZone: string;
   teacherTimeZone: string;
   country: "BR" | "US" | null;
-  source: "city_match" | "phone_country_fallback";
+  source: "city_match" | "state_match" | "phone_country_fallback";
 };
 
 export type StateTimeZoneResolution = {
@@ -433,6 +433,25 @@ export function resolveTimeZoneFromCityInput(params: {
         source: "city_match" as const,
       };
     }
+  }
+
+  const stateResolution = rawState
+    ? resolveTimeZoneFromStateInput({
+        state: rawState,
+        phone: params.phone,
+      })
+    : null;
+  if (stateResolution?.country === "BR") {
+    return {
+      city: rawCity.replace(/\s+/g, " ").trim(),
+      state: stateResolution.state,
+      normalizedCity,
+      normalizedState: stateResolution.normalizedState,
+      timeZone: stateResolution.timeZone,
+      teacherTimeZone: PROFESSOR_TIME_ZONE,
+      country: stateResolution.country,
+      source: "state_match" as const,
+    };
   }
 
   if (params.allowPhoneCountryFallback === false) {

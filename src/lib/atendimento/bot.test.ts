@@ -152,6 +152,29 @@ test("resolveTimeZoneFromStateInput identifica Florida automaticamente", () => {
   assert.equal(resolution?.country, "US");
 });
 
+test("resolveTimeZoneFromStateInput identifica Mato Grosso automaticamente", () => {
+  const resolution = resolveTimeZoneFromStateInput({
+    state: "Mato Grosso",
+    phone: "+55 65 99999-9999",
+  });
+
+  assert.equal(resolution?.timeZone, "America/Cuiaba");
+  assert.equal(resolution?.country, "BR");
+});
+
+test("resolveTimeZoneFromCityInput aceita cidade brasileira com fallback pelo estado validado", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "Mato Grosso",
+    city: "Primavera do Leste",
+    phone: "+55 65 99999-9999",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.equal(resolution?.timeZone, "America/Cuiaba");
+  assert.equal(resolution?.country, "BR");
+  assert.equal(resolution?.source, "state_match");
+});
+
 test("resolveTimeZoneFromCityInput falha sem fallback quando a cidade nao for reconhecida", () => {
   const resolution = resolveTimeZoneFromCityInput({
     state: "Florida",
