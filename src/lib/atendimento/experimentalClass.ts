@@ -3,7 +3,7 @@ import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 export const EXPERIMENTAL_CLASS_SLOT_TIMES = ["13:00", "14:30", "16:00"] as const;
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
-export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
+export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 99807-9407";
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
 export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 
