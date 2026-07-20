@@ -230,6 +230,7 @@ function debtorStatusLabel(status: string | null | undefined) {
   const s = String(status ?? "").trim().toLowerCase();
   if (!s || s === "-") return "-";
   if (s === "agendado") return "Agendado";
+  if (s === "nao_pago") return "Não pago";
   if (s === "pago") return "Pago";
   if (s === "atrasado") return "Atrasado";
   if (s === "pendente") return "Atrasado";
@@ -247,6 +248,9 @@ function debtorStatusClass(status: string | null | undefined, theme: "light" | "
   }
   if (s === "agendado") {
     return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
+  }
+  if (s === "nao_pago") {
+    return `${theme === "dark" ? "bg-orange-600" : "bg-orange-500"} text-[rgb(255,255,255)]`;
   }
   if (s === "atrasado") {
     return "bg-rose-600 text-[rgb(255,255,255)]";
