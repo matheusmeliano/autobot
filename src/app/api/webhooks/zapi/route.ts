@@ -1470,7 +1470,7 @@ export async function POST(req: Request) {
             .from("atendimento_leads")
             .update({
               city: resolved.city,
-              state: resolved.state ?? String((lead as any)?.state ?? "").trim() || null,
+              state: resolved.state ?? (String((lead as any)?.state ?? "").trim() || null),
               timezone: resolved.timeZone,
               country: resolved.country === "BR" ? "Brasil" : "Estados Unidos",
               funnel_stage: "pre_cadastro_concluido",
@@ -1700,7 +1700,7 @@ export async function POST(req: Request) {
                 professor_start_at: chosen.professorStartAt,
                 lead_date: chosen.leadDate,
                 lead_time: chosen.leadTime,
-                lead_start_at: chosen.leadStartAt,
+                lead_start_at: chosen.professorStartAt,
                 status: "scheduled",
               })
               .select("*")
