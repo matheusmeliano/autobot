@@ -115,7 +115,7 @@ function LeadDetails({
             type="button"
             onClick={() => void onDelete()}
             disabled={deleting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/5 px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 className="h-4 w-4" />
             {deleting ? "Excluindo..." : "Excluir interessado"}
