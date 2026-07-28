@@ -98,8 +98,8 @@ function LeadDetails({
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
-          <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Lead"}>
-            {lead.full_name || "Novo Lead"}
+          <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Interessado"}>
+            {lead.full_name || "Novo Interessado"}
           </div>
           <div className="text-sm text-[var(--app-text-55)]">
             Ultima interacao: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
@@ -114,7 +114,7 @@ function LeadDetails({
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 className="h-4 w-4" />
-            {deleting ? "Excluindo..." : "Excluir lead"}
+            {deleting ? "Excluindo..." : "Excluir interessado"}
           </button>
         ) : null}
       </div>
@@ -411,9 +411,9 @@ export function AtendimentoSummaryCards({
     const leadId = String(lead.id ?? "").trim();
     if (!leadId) return;
 
-    const name = String(lead.full_name ?? "").trim() || "Lead sem nome";
+    const name = String(lead.full_name ?? "").trim() || "Interessado sem nome";
     const phone = String(lead.phone ?? "").trim() || "-";
-    if (!window.confirm(`Excluir lead?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
+    if (!window.confirm(`Excluir interessado?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
       return;
     }
 
@@ -422,7 +422,7 @@ export function AtendimentoSummaryCards({
       const response = await fetch(`/api/atendimento/leads/${leadId}`, { method: "DELETE" });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!response.ok || !payload?.ok) {
-        modalToast.error(payload?.error ?? "Falha ao excluir lead.");
+        modalToast.error(payload?.error ?? "Falha ao excluir interessado.");
         return;
       }
 
@@ -430,9 +430,9 @@ export function AtendimentoSummaryCards({
       setLocalSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
       setSelectedLeadId((current) => (current === leadId ? null : current));
       setMobileLead((current) => (current?.id === leadId ? null : current));
-      modalToast.success("Lead excluído com sucesso.");
+      modalToast.success("Interessado excluído com sucesso.");
     } catch (error) {
-      modalToast.error(error instanceof Error ? error.message : "Falha ao excluir lead.");
+      modalToast.error(error instanceof Error ? error.message : "Falha ao excluir interessado.");
     } finally {
       setDeletingLeadId(null);
     }
@@ -813,7 +813,7 @@ export function AtendimentoSummaryCards({
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">{lead.full_name || "Novo Lead"}</div>
+                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">{lead.full_name || "Novo Interessado"}</div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {buildItemMeta(lead)}
                       </div>
@@ -894,7 +894,7 @@ export function AtendimentoSummaryCards({
       <AppModal open={Boolean(mobileLead)} onClose={() => setMobileLead(null)} size="lg" zIndexClass="z-[340]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">{mobileLead?.full_name || "Novo Lead"}</div>
+            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">{mobileLead?.full_name || "Novo Interessado"}</div>
             <div className="mt-1 text-xs text-[var(--app-text-55)]">{activeSectionData.label}</div>
           </div>
           <button
