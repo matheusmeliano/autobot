@@ -532,7 +532,6 @@ export function AtendimentoSummaryCards({
       };
 
       setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
-      setMobileLead((current) => (current?.id === lead.id ? updatedLead : current));
       setLocalSummary((current) => ({
         ...current,
         aulasExperimentaisAgendadas: Math.max(0, current.aulasExperimentaisAgendadas - 1),
@@ -634,7 +633,6 @@ export function AtendimentoSummaryCards({
       };
 
       setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
-      setMobileLead((current) => (current?.id === lead.id ? updatedLead : current));
       modalToast.success(lessonLink.trim() ? "Link da aula salvo." : "Link da aula removido.");
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao salvar o link da aula.");
@@ -721,7 +719,6 @@ export function AtendimentoSummaryCards({
       };
 
       setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
-      setMobileLead((current) => (current?.id === lead.id ? updatedLead : current));
       modalToast.success(
         attendance === "attended"
           ? "Comparecimento confirmado e mensagem enviada ao aluno."
