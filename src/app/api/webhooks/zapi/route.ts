@@ -485,6 +485,74 @@ async function countWhatsAppScheduleFailures(params: {
   return Number(count ?? 0);
 }
 
+async function detectExpectedWhatsAppFieldFromHistory(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+}): Promise<"state" | "city" | "date" | "time" | null> {
+  const eventTypes = [
+    "lead_timezone_collection_started",
+    "lead_timezone_identified",
+    "state_validation_failed",
+    "city_validation_failed",
+    "experimental_class_date_options_presented",
+    "experimental_class_date_selected",
+    "experimental_class_date_validation_failed",
+    "experimental_class_time_options_presented",
+    "experimental_class_time_validation_failed",
+    "experimental_class_scheduled",
+  ];
+  const { data: events } = await params.admin
+    .from("atendimento_history_events")
+    .select("event_type, created_at")
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .in("event_type", eventTypes)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (!events || !events.length) return null;
+  let blocked: "state" | "city" | "date" | "time" | null = null;
+  for (const evt of events as Array<{ event_type: string; created_at: string }>) {
+    const t = String(evt.event_type ?? "");
+    switch (t) {
+      case "experimental_class_scheduled":
+        return null;
+      case "experimental_class_time_validation_failed":
+        blocked = "time";
+        break;
+      case "experimental_class_time_options_presented":
+        return "time";
+      case "experimental_class_date_validation_failed":
+        blocked = "date";
+        break;
+      case "experimental_class_date_selected":
+      case "experimental_class_date_options_presented":
+        return "date";
+      case "city_validation_failed":
+        blocked = "city";
+        break;
+      case "lead_timezone_identified":
+        return null;
+      case "state_validation_failed":
+        blocked = "state";
+        break;
+      case "lead_timezone_collection_started":
+        return "state";
+    }
+  }
+  return blocked;
+}
+
+function getWhatsAppNextMissingField(lead: any): "state" | "city" | null {
+  const origin = String(lead?.origin ?? "").trim().toLowerCase();
+  const isWhatsAppDirect = origin === "whatsapp_trafego_pago";
+  const hasState = Boolean(String(lead?.state ?? "").trim());
+  const hasCity = Boolean(String(lead?.city ?? "").trim());
+  if (isWhatsAppDirect && !hasState) return "state";
+  if (!hasCity) return "city";
+  return null;
+}
+
 async function presentExperimentalClassDateOptionsWhatsApp(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -789,17 +857,25 @@ export async function POST(req: Request) {
       .eq("instance_id", instanceId);
   }
 
-  await admin.from("whatsapp_events").upsert(
-    {
-      user_id: userId,
-      provider: "zapi",
-      event_id: eventId,
-      instance_id: instanceId,
-      event_type: eventType || null,
-      payload: body,
-    },
-    { onConflict: "provider,event_id" },
-  );
+  {
+    const { error: insertErr } = await admin
+      .from("whatsapp_events")
+      .insert({
+        user_id: userId,
+        provider: "zapi",
+        event_id: eventId,
+        instance_id: instanceId,
+        event_type: eventType || null,
+        payload: body,
+      });
+    if (insertErr) {
+      const code = String((insertErr as any)?.code ?? "").trim();
+      if (code === "23505") {
+        return Response.json({ ok: true, ignored: true, reason: "duplicate_event_already_processed" });
+      }
+      return Response.json({ ok: false, error: insertErr.message }, { status: 500 });
+    }
+  }
 
   const callbackMessageIds = Array.from(
     new Set(
@@ -1272,8 +1348,14 @@ export async function POST(req: Request) {
         const isFirstBotInteraction = !(await hasAnyBotMessage({ conversationId }));
         const lastBot = await getLastBotMessage({ admin, conversationId });
         const lastBotText = String(lastBot?.content_text ?? "").trim();
-        const expectedField = inferExpectedWhatsAppFieldFromLastBot(lastBotText);
-        const nextMissingField = getNextMissingField(lead as any);
+        const expectedFieldByText = inferExpectedWhatsAppFieldFromLastBot(lastBotText);
+        const expectedFieldByHistory = await detectExpectedWhatsAppFieldFromHistory({
+          admin,
+          leadId,
+          conversationId,
+        });
+        const expectedField = expectedFieldByHistory ?? expectedFieldByText;
+        const nextMissingField = getWhatsAppNextMissingField(lead);
 
         if (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) {
           const dddHint = inferBrazilianLocationFromDdd(normalizedPhoneOnly);

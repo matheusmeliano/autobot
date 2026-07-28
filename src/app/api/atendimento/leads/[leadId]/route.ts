@@ -130,10 +130,11 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
           .delete()
           .in("conversation_id", conversationIds)
       : Promise.resolve({ error: null });
-  const [messagesResult, eventsResult, capturedFieldsResult] = await Promise.all([
+  const [messagesResult, eventsResult, capturedFieldsResult, bookingsResult] = await Promise.all([
     deleteMessagesPromise,
     admin.from("atendimento_history_events").delete().eq("lead_id", leadId),
     admin.from("atendimento_captured_fields").delete().eq("lead_id", leadId),
+    admin.from("atendimento_experimental_class_bookings").delete().eq("lead_id", leadId),
   ]);
 
   if (messagesResult.error) {
@@ -148,6 +149,11 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
   const { error: capturedFieldsError } = capturedFieldsResult;
   if (capturedFieldsError) {
     return Response.json({ ok: false, error: capturedFieldsError.message }, { status: 500 });
+  }
+
+  const { error: bookingsError } = bookingsResult;
+  if (bookingsError) {
+    return Response.json({ ok: false, error: bookingsError.message }, { status: 500 });
   }
 
   const { error: conversationsDeleteError } = await admin
