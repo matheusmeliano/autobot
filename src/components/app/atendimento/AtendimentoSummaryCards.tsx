@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Search, Trash2, X } from "lucide-react";
-import { AppModal } from "@/components/app/AppModal";
+import { Copy, Search, Trash2 } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import {
@@ -372,7 +371,6 @@ export function AtendimentoSummaryCards({
   );
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [mobileLead, setMobileLead] = useState<AtendimentoLeadListItem | null>(null);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
   const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
@@ -429,7 +427,6 @@ export function AtendimentoSummaryCards({
       setLocalLeads((current) => current.filter((item) => item.id !== leadId));
       setLocalSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
       setSelectedLeadId((current) => (current === leadId ? null : current));
-      setMobileLead((current) => (current?.id === leadId ? null : current));
       modalToast.success("Interessado excluído com sucesso.");
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao excluir interessado.");
@@ -459,11 +456,7 @@ export function AtendimentoSummaryCards({
   }, [filteredItems]);
 
   function handleSelectLead(lead: AtendimentoLeadListItem) {
-    if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
-      setSelectedLeadId(lead.id);
-      return;
-    }
-    setMobileLead(lead);
+    setSelectedLeadId(lead.id);
   }
 
   async function handleCancelBooking(lead: AtendimentoLeadListItem) {
@@ -891,49 +884,30 @@ export function AtendimentoSummaryCards({
             )}
           </div>
         </div>
-      </div>
 
-      <AppModal open={Boolean(mobileLead)} onClose={() => setMobileLead(null)} size="lg" zIndexClass="z-[340]" fullScreenOnMobile>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">
-              {mobileLead?.phone || mobileLead?.full_name || "Interessado sem telefone"}
-            </div>
-            <div className="mt-1 text-xs text-[var(--app-text-55)]">{activeSectionData.label}</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMobileLead(null)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
-            aria-label="Fechar"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {mobileLead ? (
-          <div className="mt-4">
-            {activeSection === "agendamentos" ? (
+        <div className="lg:hidden">
+          {selectedLead ? (
+            activeSection === "agendamentos" ? (
               <BookingDetails
-                lead={mobileLead}
+                lead={selectedLead}
                 cancellingBookingId={cancellingBookingId}
                 savingLessonLinkBookingId={savingLessonLinkBookingId}
-                  markingAttendanceBookingId={markingAttendanceBookingId}
+                markingAttendanceBookingId={markingAttendanceBookingId}
                 onCancelBooking={handleCancelBooking}
                 onSaveLessonLink={handleSaveLessonLink}
-                  onMarkAttendance={handleMarkAttendance}
+                onMarkAttendance={handleMarkAttendance}
               />
             ) : (
               <LeadDetails
-                lead={mobileLead}
+                lead={selectedLead}
                 showDelete={activeSection === "interessados"}
-                deleting={deletingLeadId === mobileLead.id}
-                onDelete={() => handleDeleteLead(mobileLead)}
+                deleting={deletingLeadId === selectedLead.id}
+                onDelete={() => handleDeleteLead(selectedLead)}
               />
-            )}
-          </div>
-        ) : null}
-      </AppModal>
+            )
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
