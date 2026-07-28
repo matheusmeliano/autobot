@@ -3,20 +3,42 @@ import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
-import { botReplyForLead } from "@/lib/atendimento/bot";
+import { botReplyForLead, getNextMissingField } from "@/lib/atendimento/bot";
 import {
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   buildExperimentalClassDatePromptMessages,
   CAPTURED_FIELD_PROMPTS,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
+  EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE,
+  EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE,
+  LOCATION_STATE_INVALID_MESSAGE,
+  LOCATION_CITY_INVALID_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
 } from "@/lib/atendimento/constants";
 import {
+  buildExperimentalClassAttendantWhatsAppMessage,
+  buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
+  buildExperimentalClassStudentWhatsAppMessage,
+  buildExperimentalClassTimesMessages,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_DURATION_MINUTES,
+  findExperimentalClassDateOption,
+  findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
 } from "@/lib/atendimento/experimentalClass";
-import { appendHistoryEvent, syncConversationPreview } from "@/lib/atendimento/server";
-import { resolveTimeZoneFromCityInput } from "@/lib/timezone";
+import {
+  appendHistoryEvent,
+  ensureWhatsAppLeadAndConversation,
+  hasAnyBotMessage,
+  sendAtendimentoWhatsAppText,
+  syncConversationPreview,
+} from "@/lib/atendimento/server";
+import {
+  inferBrazilianLocationFromDdd,
+  resolveTimeZoneFromCityInput,
+  resolveTimeZoneFromStateInput,
+} from "@/lib/timezone";
 
 export const runtime = "nodejs";
 const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
@@ -357,6 +379,231 @@ function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | n
       raw: { source: "heuristic", positive, negative, hasMedia },
     },
   };
+}
+
+const MAX_LOCATION_WHATSAPP_ATTEMPTS = 3;
+const MAX_SCHEDULE_WHATSAPP_ATTEMPTS = 3;
+
+function looksLikeWhatsAppDirectLeadFirstMessage(value: string) {
+  const clean = String(value ?? "").trim().toLowerCase();
+  if (!clean) return false;
+  if (/^\d+$/.test(clean) && clean.length >= 8) return false;
+  return true;
+}
+
+async function insertWhatsAppBotTextMessage(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+  contentText: string;
+  sentAt?: string;
+}) {
+  const sentAt = params.sentAt ?? new Date().toISOString();
+  const { data, error } = await params.admin
+    .from("atendimento_messages")
+    .insert({
+      conversation_id: params.conversationId,
+      sender_role: "bot",
+      content_text: params.contentText,
+      media_type: "text",
+      status: "entregue",
+      sent_at: sentAt,
+      delivered_at: sentAt,
+    })
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    const code = String((error as any)?.code ?? "").trim();
+    if (code !== "23505") {
+      throw new Error(error.message || "Falha ao inserir mensagem automática do bot.");
+    }
+  }
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
+async function getLastBotMessage(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+}) {
+  const { data } = await params.admin
+    .from("atendimento_messages")
+    .select("content_text, created_at")
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { content_text: string | null; created_at: string | null } | null) ?? null;
+}
+
+function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | undefined) {
+  const raw = String(lastBotText ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith(LOCATION_STATE_INVALID_MESSAGE)) return "state" as const;
+  if (raw.startsWith(LOCATION_CITY_INVALID_MESSAGE)) return "city" as const;
+  if (raw === CAPTURED_FIELD_PROMPTS.state) return "state" as const;
+  if (raw === CAPTURED_FIELD_PROMPTS.city) return "city" as const;
+  if (raw.startsWith("Datas disponíveis") || raw.startsWith("As datas disponíveis são:")) return "date" as const;
+  if (raw.startsWith(EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE)) return "date" as const;
+  if (raw.startsWith("Horários disponíveis") || raw.startsWith("Os horários disponíveis são:")) return "time" as const;
+  if (raw.startsWith(EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE)) return "time" as const;
+  return null;
+}
+
+async function countWhatsAppLocationFailures(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  field: "state" | "city";
+}) {
+  const eventType = params.field === "state" ? "state_validation_failed" : "city_validation_failed";
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", eventType);
+  return Number(count ?? 0);
+}
+
+async function countWhatsAppScheduleFailures(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  field: "date" | "time";
+}) {
+  const eventType =
+    params.field === "date"
+      ? "experimental_class_date_validation_failed"
+      : "experimental_class_time_validation_failed";
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", eventType);
+  return Number(count ?? 0);
+}
+
+async function presentExperimentalClassDateOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  leadTimeZone?: string | null;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listExperimentalClassAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const messages = buildExperimentalClassDatesMessages(availability.dates);
+  let lastOutbound: Record<string, unknown> | null = null;
+  for (const message of messages) {
+    lastOutbound = await insertWhatsAppBotTextMessage({
+      admin: params.admin,
+      conversationId: params.conversationId,
+      contentText: message,
+    });
+  }
+  await appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "experimental_class_date_options_presented",
+    title: "Datas disponíveis da aula experimental apresentadas",
+    details: {
+      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      options: availability.dates,
+    },
+    actorType: "system",
+  });
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: messages[messages.length - 1] ?? "",
+    createdAt: new Date().toISOString(),
+  });
+  return { lastOutbound, availability };
+}
+
+async function presentExperimentalClassTimeOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  leadTimeZone?: string | null;
+  professorDate: string;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listExperimentalClassAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
+  const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
+  const messages = buildExperimentalClassTimesMessages({
+    dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
+    options: slots,
+  });
+  let lastOutbound: Record<string, unknown> | null = null;
+  for (const message of messages) {
+    lastOutbound = await insertWhatsAppBotTextMessage({
+      admin: params.admin,
+      conversationId: params.conversationId,
+      contentText: message,
+    });
+  }
+  await appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "experimental_class_time_options_presented",
+    title: "Horários disponíveis da aula experimental apresentados",
+    details: {
+      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      professor_date: params.professorDate,
+    },
+    actorType: "system",
+  });
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: messages[messages.length - 1] ?? "",
+    createdAt: new Date().toISOString(),
+  });
+  return { lastOutbound, dateOption, slots };
+}
+
+async function getScheduledExperimentalClassBookingWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+}) {
+  const { data } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at, id")
+    .eq("lead_id", params.leadId)
+    .eq("status", "scheduled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as any) ?? null;
 }
 
 async function analyzePayment(params: { text: string; mediaUrl?: string | null }) {
@@ -946,11 +1193,590 @@ export async function POST(req: Request) {
   });
 
   const normalizedFrom = normalizePhone(fromPhone);
+
+  if (normalizedFrom) {
+    try {
+      const normalizedPhoneOnly = String(normalizedFrom ?? "").replace(/\D/g, "");
+      const leadContext = await ensureWhatsAppLeadAndConversation({
+        phone: normalizedPhoneOnly,
+        userId,
+        firstNameFromMessage: null,
+        initialState: null,
+        initialTimezone: null,
+        initialCountry: null,
+      });
+      if (leadContext?.lead?.id && leadContext?.conversation?.id) {
+        const nowIso = new Date().toISOString();
+        const leadId = String(leadContext.lead.id);
+        const conversationId = String(leadContext.conversation.id);
+        const lead = leadContext.lead as any;
+        const conversation = leadContext.conversation as any;
+
+        if (!conversation.bot_enabled) {
+          return Response.json({ ok: true, ignored: true, reason: "conversation_blocked" });
+        }
+
+        const inboundContent = String(messageText ?? "").trim();
+        const inboundMediaType = mediaInfo.hasPaymentMedia
+          ? (mediaInfo.mediaUrl ? "document" : "text")
+          : "text";
+        const inboundMediaUrl = mediaInfo.mediaUrl || null;
+
+        const { data: inboundMsg, error: inboundErr } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: conversationId,
+            sender_role: "lead",
+            content_text: inboundContent || null,
+            media_type: inboundMediaType,
+            media_url: inboundMediaUrl,
+            status: "recebida",
+            sent_at: nowIso,
+            delivered_at: nowIso,
+          })
+          .select("*")
+          .maybeSingle();
+
+        if (!inboundErr && inboundMsg?.id) {
+          void admin
+            .from("atendimento_leads")
+            .update({
+              unread_count: Number(lead.unread_count ?? 0) + 1,
+              is_new_for_attendant: true,
+              last_interaction_at: nowIso,
+              updated_at: nowIso,
+            })
+            .eq("id", leadId);
+
+          void syncConversationPreview({
+            conversationId,
+            contentText: inboundContent || "(mensagem recebida)",
+            createdAt: nowIso,
+          });
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "message_received",
+            title: "Mensagem recebida do lead via WhatsApp",
+            details: {
+              content_text: inboundContent || null,
+              media_type: inboundMediaType,
+              media_url: inboundMediaUrl,
+              source: "whatsapp_zapi",
+            },
+            actorType: "lead",
+          });
+        }
+
+        const isFirstBotInteraction = !(await hasAnyBotMessage({ conversationId }));
+        const lastBot = await getLastBotMessage({ admin, conversationId });
+        const lastBotText = String(lastBot?.content_text ?? "").trim();
+        const expectedField = inferExpectedWhatsAppFieldFromLastBot(lastBotText);
+        const nextMissingField = getNextMissingField(lead as any);
+
+        if (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) {
+          const dddHint = inferBrazilianLocationFromDdd(normalizedPhoneOnly);
+          let initialState: string | null = null;
+          let initialStateNorm: string | null = null;
+          let initialTz: string | null = null;
+          let initialCountry: "BR" | "US" | null = null;
+          if (dddHint) {
+            initialState = dddHint.state;
+            initialStateNorm = dddHint.normalizedState;
+            initialTz = dddHint.timeZone;
+            initialCountry = "BR";
+            void admin
+              .from("atendimento_leads")
+              .update({
+                state: initialState,
+                timezone: initialTz,
+                country: "Brasil",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", leadId);
+          }
+
+          const nextMessage = dddHint ? CAPTURED_FIELD_PROMPTS.city : CAPTURED_FIELD_PROMPTS.state;
+
+          await insertWhatsAppBotTextMessage({
+            admin,
+            conversationId,
+            contentText: nextMessage,
+          });
+
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: nextMessage,
+            });
+          } catch (_sendErr) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: dddHint ? "lead_timezone_identified" : "lead_timezone_collection_started",
+            title: dddHint
+              ? "Estado do lead identificado via DDD do WhatsApp (início direto)"
+              : "Coleta de estado e cidade iniciada diretamente via WhatsApp",
+            details: {
+              phone: normalizedPhoneOnly,
+              state: initialState,
+              normalized_state: initialStateNorm,
+              timezone: initialTz,
+              country: initialCountry,
+              source: dddHint ? "ddd_mapping_automatic" : "manual_collection_whatsapp",
+              first_message: inboundContent || null,
+            },
+            actorType: "system",
+          });
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_direct_lead_first",
+          });
+        }
+
+        if (expectedField === "state" || (!expectedField && nextMissingField === "state")) {
+          const stateResolution = resolveTimeZoneFromStateInput({
+            state: inboundContent,
+            phone: normalizedPhoneOnly,
+          });
+          if (!stateResolution) {
+            const nextFail =
+              (await countWhatsAppLocationFailures({ admin, leadId, conversationId, field: "state" })) + 1;
+            const blocked = nextFail >= MAX_LOCATION_WHATSAPP_ATTEMPTS;
+            const msg = blocked
+              ? "Não foi possível validar seu estado após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte.\n\nhttps://wa.me/5565996933336"
+              : `${LOCATION_STATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "state_validation_failed",
+              title: "Falha ao identificar estado informado via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+              },
+              actorType: "system",
+            });
+
+            if (blocked) {
+              void admin
+                .from("atendimento_leads")
+                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
+                .eq("id", leadId);
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            }
+
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_state_retry",
+              blocked,
+            });
+          }
+
+          void admin
+            .from("atendimento_leads")
+            .update({
+              state: stateResolution.state,
+              timezone: stateResolution.timeZone,
+              country: stateResolution.country === "BR" ? "Brasil" : "Estados Unidos",
+              updated_at: nowIso,
+            })
+            .eq("id", leadId);
+
+          const nextMsg = CAPTURED_FIELD_PROMPTS.city;
+          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
+          } catch (_e) {}
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_state_collected",
+          });
+        }
+
+        if (expectedField === "city" || (!expectedField && nextMissingField === "city")) {
+          const stateSoFar = String((lead as any)?.state ?? "").trim();
+          const resolved = resolveTimeZoneFromCityInput({
+            city: inboundContent,
+            state: stateSoFar || null,
+            phone: normalizedPhoneOnly,
+            allowPhoneCountryFallback: true,
+          });
+
+          if (!resolved) {
+            const nextFail =
+              (await countWhatsAppLocationFailures({ admin, leadId, conversationId, field: "city" })) + 1;
+            const blocked = nextFail >= MAX_LOCATION_WHATSAPP_ATTEMPTS;
+            const msg = blocked
+              ? "Não foi possível validar sua cidade após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte.\n\nhttps://wa.me/5565996933336"
+              : `${LOCATION_CITY_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "city_validation_failed",
+              title: "Falha ao identificar cidade informada via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+                state: stateSoFar || null,
+              },
+              actorType: "system",
+            });
+
+            if (blocked) {
+              void admin
+                .from("atendimento_leads")
+                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
+                .eq("id", leadId);
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            }
+
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_city_retry",
+              blocked,
+            });
+          }
+
+          void admin
+            .from("atendimento_leads")
+            .update({
+              city: resolved.city,
+              state: resolved.state ?? String((lead as any)?.state ?? "").trim() || null,
+              timezone: resolved.timeZone,
+              country: resolved.country === "BR" ? "Brasil" : "Estados Unidos",
+              funnel_stage: "pre_cadastro_concluido",
+              status: "matricula_pendente",
+              updated_at: nowIso,
+            })
+            .eq("id", leadId);
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "lead_timezone_identified",
+            title: "Cidade e fuso do lead identificados via WhatsApp",
+            details: {
+              state: resolved.state,
+              city: resolved.city,
+              timezone: resolved.timeZone,
+              teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              country: resolved.country === "BR" ? "Brasil" : "Estados Unidos",
+              source: resolved.source,
+            },
+            actorType: "system",
+          });
+
+          const introMsgs = buildExperimentalClassDatePromptMessages(
+            String((lead as any)?.full_name ?? "").trim() || null,
+          );
+          for (const introMsg of introMsgs) {
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: introMsg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: introMsg });
+            } catch (_e) {}
+          }
+
+          const { lastOutbound } = await presentExperimentalClassDateOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            leadTimeZone: resolved.timeZone,
+          });
+          if (lastOutbound) {
+            try {
+              const lastMsg = String((lastOutbound as any)?.content_text ?? "").trim();
+              if (lastMsg) {
+                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
+              }
+            } catch (_e) {}
+          }
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_city_collected_date_presented",
+          });
+        }
+
+        if (!expectedField && nextMissingField === null) {
+          const alreadyBooked = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+          if (alreadyBooked?.id) {
+            return Response.json({ ok: true, handled: true, flow: "whatsapp_already_booked" });
+          }
+          const leadTz =
+            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const { availability } = await presentExperimentalClassDateOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            leadTimeZone: leadTz,
+          });
+          const lastMsg = buildExperimentalClassDatesMessages(availability.dates).slice(-1)[0] || "";
+          if (lastMsg) {
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
+            } catch (_e) {}
+          }
+          return Response.json({ ok: true, handled: true, flow: "whatsapp_date_presented_fallback" });
+        }
+
+        if (expectedField === "date") {
+          const leadTz =
+            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const { availability } = await presentExperimentalClassDateOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            leadTimeZone: leadTz,
+          });
+          const chosen = findExperimentalClassDateOption(inboundContent, availability.dates);
+          if (!chosen) {
+            const nextFail =
+              (await countWhatsAppScheduleFailures({ admin, leadId, conversationId, field: "date" })) +
+              1;
+            const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
+            const msg = blocked
+              ? "Não foi possível validar a data informada após 3 tentativas. Este cadastro foi bloqueado.\n\nFale com nossa equipe: https://wa.me/5565996933336"
+              : `${EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            if (blocked) {
+              void admin
+                .from("atendimento_leads")
+                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
+                .eq("id", leadId);
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            }
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_date_retry",
+              blocked,
+            });
+          }
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_date_selected",
+            title: "Data da aula experimental selecionada via WhatsApp",
+            details: {
+              professor_date: chosen.professorDate,
+              lead_date: chosen.leadDate,
+              label: chosen.displayLabel,
+            },
+            actorType: "system",
+          });
+
+          const pres = await presentExperimentalClassTimeOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            leadTimeZone: leadTz,
+            professorDate: chosen.professorDate,
+          });
+          const lastMsg = String((pres.lastOutbound as any)?.content_text ?? "").trim();
+          if (lastMsg) {
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
+            } catch (_e) {}
+          }
+          return Response.json({ ok: true, handled: true, flow: "whatsapp_time_presented" });
+        }
+
+        if (expectedField === "time") {
+          const leadTz =
+            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const { data: latestTimeEvt } = await admin
+            .from("atendimento_history_events")
+            .select("details")
+            .eq("lead_id", leadId)
+            .eq("conversation_id", conversationId)
+            .eq("event_type", "experimental_class_time_options_presented")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const professorDate = String(
+            (((latestTimeEvt as any)?.details ?? {}) as Record<string, unknown>).professor_date ?? "",
+          ).trim();
+          if (!professorDate) {
+            const fallback = await presentExperimentalClassDateOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              leadTimeZone: leadTz,
+            });
+            const lastMsg = String((fallback.lastOutbound as any)?.content_text ?? "").trim();
+            if (lastMsg) {
+              try {
+                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
+              } catch (_e) {}
+            }
+            return Response.json({ ok: true, handled: true, flow: "whatsapp_date_represented" });
+          }
+          const pres = await presentExperimentalClassTimeOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            leadTimeZone: leadTz,
+            professorDate,
+          });
+          const chosen = findExperimentalClassTimeOption(inboundContent, pres.slots);
+          if (!chosen) {
+            const nextFail =
+              (await countWhatsAppScheduleFailures({ admin, leadId, conversationId, field: "time" })) +
+              1;
+            const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
+            const msg = blocked
+              ? "Não foi possível validar o horário informado após 3 tentativas. Este cadastro foi bloqueado.\n\nFale com nossa equipe: https://wa.me/5565996933336"
+              : `${EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            if (blocked) {
+              void admin
+                .from("atendimento_leads")
+                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
+                .eq("id", leadId);
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            }
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_time_retry",
+              blocked,
+            });
+          }
+
+          const already = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+          if (!already?.id) {
+            const { data: booking } = await admin
+              .from("atendimento_experimental_class_bookings")
+              .insert({
+                lead_id: leadId,
+                conversation_id: conversationId,
+                professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                lead_timezone: leadTz,
+                professor_date: chosen.professorDate,
+                professor_time: chosen.professorTime,
+                professor_start_at: chosen.professorStartAt,
+                lead_date: chosen.leadDate,
+                lead_time: chosen.leadTime,
+                lead_start_at: chosen.leadStartAt,
+                status: "scheduled",
+              })
+              .select("*")
+              .maybeSingle();
+
+            void admin
+              .from("atendimento_leads")
+              .update({
+                funnel_stage: "aula_experimental_agendada",
+                status: "em_atendimento",
+                best_contact_time: chosen.leadTime,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_class_scheduled",
+              title: "Aula experimental agendada via WhatsApp",
+              details: {
+                booking_id: String((booking as any)?.id ?? ""),
+                teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                lead_timezone: leadTz,
+                professor_date: chosen.professorDate,
+                professor_time: chosen.professorTime,
+                professor_start_at: chosen.professorStartAt,
+                lead_date: chosen.leadDate,
+                lead_time: chosen.leadTime,
+              },
+              actorType: "system",
+            });
+
+            const firstName =
+              String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] || "Aluno";
+            const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
+            let lastSent: string | null = null;
+            for (const m of chatMsgs) {
+              await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
+              lastSent = m;
+            }
+            if (lastSent) {
+              try {
+                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastSent });
+              } catch (_e) {}
+            }
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: buildExperimentalClassStudentWhatsAppMessage(firstName),
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+                message: buildExperimentalClassAttendantWhatsAppMessage(),
+              });
+            } catch (_e) {}
+          }
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_booked",
+          });
+        }
+      }
+    } catch (_whatsappLeadErr) {
+    }
+  }
+
   if (!normalizedFrom) {
     await admin.from("logs").insert({
       user_id: userId,
       tipo: "zapi_webhook_ignorado",
-      descricao: "Webhook financeiro ignorado: remetente sem telefone identificável.",
+      descricao: "Webhook ignorado: remetente sem telefone identificável.",
     });
     return Response.json({ ok: true, ignored: true, reason: "missing_sender_phone" });
   }
@@ -967,9 +1793,9 @@ export async function POST(req: Request) {
     await admin.from("logs").insert({
       user_id: userId,
       tipo: "zapi_webhook_ignorado",
-      descricao: `Webhook financeiro ignorado: telefone ${normalizedFrom} sem cliente cadastrado.`,
+      descricao: `Webhook ignorado: telefone ${normalizedFrom} sem lead de atendimento e sem cliente cadastrado no financeiro.`,
     });
-    return Response.json({ ok: true, ignored: true, reason: "unknown_debtor" });
+    return Response.json({ ok: true, ignored: true, reason: "unknown_debtor_or_lead" });
   }
 
   const { data: activeSchedule } = await admin

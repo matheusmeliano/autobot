@@ -1509,3 +1509,171 @@ export async function uploadAtendimentoFileToStorage(params: {
     storage_path: storagePath,
   };
 }
+
+function normalizePhoneDigitsOnly(value: string | null | undefined): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function phoneMatches(stored: string | null | undefined, search: string): boolean {
+  const s = normalizePhoneDigitsOnly(stored);
+  if (!s) return false;
+  return s === search;
+}
+
+export async function findLeadByPhone(params: { phone: string; userId?: string | null }) {
+  const admin = createSupabaseAdminClient();
+  const normalizedSearch = normalizePhoneDigitsOnly(params.phone);
+  if (!normalizedSearch) return null;
+
+  const { data: byAssigned } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("assigned_user_email", ATENDIMENTO_EMAIL)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  const rows = (byAssigned ?? []) as any[];
+  for (const row of rows) {
+    if (phoneMatches(row?.phone, normalizedSearch)) {
+      return row as any;
+    }
+  }
+
+  return null;
+}
+
+export async function findLeadConversationByChannel(params: {
+  leadId: string;
+  channel: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .from("atendimento_conversations")
+    .select("*")
+    .eq("lead_id", String(params.leadId))
+    .eq("channel", String(params.channel))
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return (data as any) ?? null;
+}
+
+export async function ensureWhatsAppLeadAndConversation(params: {
+  phone: string;
+  userId: string;
+  firstNameFromMessage?: string | null;
+  initialState?: string | null;
+  initialStateNormalized?: string | null;
+  initialTimezone?: string | null;
+  initialCountry?: string | null;
+}) {
+  const admin = createSupabaseAdminClient();
+  const normalizedPhone = normalizePhoneDigitsOnly(params.phone);
+  const publicLink = await ensureAtendimentoPublicLink();
+
+  let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });
+
+  if (!lead?.id) {
+    const nameRaw = String(params.firstNameFromMessage ?? "").trim() || null;
+    const initialState = params.initialState ? String(params.initialState).trim() : null;
+    const initialCountry = params.initialCountry ? String(params.initialCountry).trim() : null;
+    const initialTimezone = params.initialTimezone ? String(params.initialTimezone).trim() : null;
+
+    const leadPatch: Record<string, unknown> = {
+      phone: normalizedPhone,
+      origin: "whatsapp_trafego_pago",
+      status: "novo_lead",
+      funnel_stage: "novo_lead",
+      assigned_user_email: ATENDIMENTO_EMAIL,
+      unread_count: 0,
+      is_new_for_attendant: true,
+      ...(nameRaw ? { full_name: nameRaw } : {}),
+      ...(initialState ? { state: initialState } : {}),
+      ...(initialCountry ? { country: initialCountry } : {}),
+      ...(initialTimezone ? { timezone: initialTimezone } : {}),
+    };
+
+    const { data: createdLead } = await admin
+      .from("atendimento_leads")
+      .insert(leadPatch as any)
+      .select("*")
+      .maybeSingle();
+
+    lead = createdLead;
+  } else {
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (!String((lead as any)?.phone ?? "").trim()) {
+      updates.phone = normalizedPhone;
+    }
+    if (params.initialState && !String((lead as any)?.state ?? "").trim()) {
+      updates.state = String(params.initialState).trim();
+    }
+    if (params.initialTimezone && !String((lead as any)?.timezone ?? "").trim()) {
+      updates.timezone = String(params.initialTimezone).trim();
+    }
+    if (params.initialCountry && !String((lead as any)?.country ?? "").trim()) {
+      updates.country = String(params.initialCountry).trim();
+    }
+    if (Object.keys(updates).length > 1) {
+      const { data: refreshed } = await admin
+        .from("atendimento_leads")
+        .update(updates as any)
+        .eq("id", String((lead as any).id))
+        .select("*")
+        .maybeSingle();
+      if (refreshed) lead = refreshed;
+    }
+  }
+
+  if (!(lead as any)?.id) {
+    throw new Error("Não foi possível preparar o lead para atendimento via WhatsApp.");
+  }
+
+  let conversation = await findLeadConversationByChannel({
+    leadId: String((lead as any).id),
+    channel: "whatsapp",
+  });
+
+  if (!conversation?.id) {
+    const { data: createdConversation } = await admin
+      .from("atendimento_conversations")
+      .insert({
+        lead_id: String((lead as any).id),
+        public_link_id: String(publicLink.id ?? ""),
+        channel: "whatsapp",
+        public_slug: makeConversationSessionSlug(),
+        bot_enabled: true,
+      })
+      .select("*")
+      .maybeSingle();
+    conversation = createdConversation;
+  }
+
+  if (!conversation?.id) {
+    throw new Error("Não foi possível preparar a conversa para atendimento via WhatsApp.");
+  }
+
+  return {
+    lead: lead as any,
+    conversation: conversation as any,
+    publicLink: {
+      slug: String(publicLink.slug ?? ATENDIMENTO_PUBLIC_LINK_SLUG),
+      public_url: publicLink.public_url,
+    },
+  };
+}
+
+export async function hasAnyBotMessage(params: { conversationId: string }) {
+  const admin = createSupabaseAdminClient();
+  const { count, error } = await admin
+    .from("atendimento_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("conversation_id", String(params.conversationId))
+    .eq("sender_role", "bot");
+
+  if (error) {
+    throw new Error(error.message || "Falha ao verificar mensagens do bot.");
+  }
+  return Number(count ?? 0) > 0;
+}

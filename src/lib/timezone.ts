@@ -356,9 +356,107 @@ function normalizePhoneDigits(phone: string | null | undefined) {
   return String(phone ?? "").replace(/\D/g, "");
 }
 
+const BRAZIL_DDD_TO_STATE_AND_TIMEZONE: Record<string, { state: string; normalizedState: string; uf: string; timeZone: BrazilTimeZone }> = {
+  "11": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "12": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "13": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "14": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "15": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "16": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "17": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "18": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "19": { state: "São Paulo", normalizedState: "sao paulo", uf: "SP", timeZone: "America/Sao_Paulo" },
+  "21": { state: "Rio de Janeiro", normalizedState: "rio de janeiro", uf: "RJ", timeZone: "America/Sao_Paulo" },
+  "22": { state: "Rio de Janeiro", normalizedState: "rio de janeiro", uf: "RJ", timeZone: "America/Sao_Paulo" },
+  "24": { state: "Rio de Janeiro", normalizedState: "rio de janeiro", uf: "RJ", timeZone: "America/Sao_Paulo" },
+  "27": { state: "Espírito Santo", normalizedState: "espirito santo", uf: "ES", timeZone: "America/Sao_Paulo" },
+  "28": { state: "Espírito Santo", normalizedState: "espirito santo", uf: "ES", timeZone: "America/Sao_Paulo" },
+  "31": { state: "Minas Gerais", normalizedState: "minas gerais", uf: "MG", timeZone: "America/Sao_Paulo" },
+  "32": { state: "Minas Gerais", normalizedState: "minas gerais", uf: "MG", timeZone: "America/Sao_Paulo" },
+  "33": { state: "Minas Gerais", normalizedState: "minas gerais", uf: "MG", timeZone: "America/Sao_Paulo" },
+  "34": { state: "Minas Gerais", normalizedState: "minas gerais", uf: "MG", timeZone: "America/Sao_Paulo" },
+  "35": { state: "Minas Gerais", normalizedState: "minas gerais", uf: "MG", timeZone: "America/Sao_Paulo" },
+  "37": { state: "Minas Gerais", normalizedState: "minas gerais", uf: "MG", timeZone: "America/Sao_Paulo" },
+  "38": { state: "Minas Gerais", normalizedState: "minas gerais", uf: "MG", timeZone: "America/Sao_Paulo" },
+  "41": { state: "Paraná", normalizedState: "parana", uf: "PR", timeZone: "America/Sao_Paulo" },
+  "42": { state: "Paraná", normalizedState: "parana", uf: "PR", timeZone: "America/Sao_Paulo" },
+  "43": { state: "Paraná", normalizedState: "parana", uf: "PR", timeZone: "America/Sao_Paulo" },
+  "44": { state: "Paraná", normalizedState: "parana", uf: "PR", timeZone: "America/Sao_Paulo" },
+  "45": { state: "Paraná", normalizedState: "parana", uf: "PR", timeZone: "America/Sao_Paulo" },
+  "46": { state: "Paraná", normalizedState: "parana", uf: "PR", timeZone: "America/Sao_Paulo" },
+  "47": { state: "Santa Catarina", normalizedState: "santa catarina", uf: "SC", timeZone: "America/Sao_Paulo" },
+  "48": { state: "Santa Catarina", normalizedState: "santa catarina", uf: "SC", timeZone: "America/Sao_Paulo" },
+  "49": { state: "Santa Catarina", normalizedState: "santa catarina", uf: "SC", timeZone: "America/Sao_Paulo" },
+  "51": { state: "Rio Grande do Sul", normalizedState: "rio grande do sul", uf: "RS", timeZone: "America/Sao_Paulo" },
+  "53": { state: "Rio Grande do Sul", normalizedState: "rio grande do sul", uf: "RS", timeZone: "America/Sao_Paulo" },
+  "54": { state: "Rio Grande do Sul", normalizedState: "rio grande do sul", uf: "RS", timeZone: "America/Sao_Paulo" },
+  "55": { state: "Rio Grande do Sul", normalizedState: "rio grande do sul", uf: "RS", timeZone: "America/Sao_Paulo" },
+  "61": { state: "Distrito Federal", normalizedState: "distrito federal", uf: "DF", timeZone: "America/Sao_Paulo" },
+  "62": { state: "Goiás", normalizedState: "goias", uf: "GO", timeZone: "America/Sao_Paulo" },
+  "63": { state: "Tocantins", normalizedState: "tocantins", uf: "TO", timeZone: "America/Belem" },
+  "64": { state: "Goiás", normalizedState: "goias", uf: "GO", timeZone: "America/Sao_Paulo" },
+  "65": { state: "Mato Grosso", normalizedState: "mato grosso", uf: "MT", timeZone: "America/Cuiaba" },
+  "66": { state: "Mato Grosso", normalizedState: "mato grosso", uf: "MT", timeZone: "America/Cuiaba" },
+  "67": { state: "Mato Grosso do Sul", normalizedState: "mato grosso do sul", uf: "MS", timeZone: "America/Campo_Grande" },
+  "68": { state: "Acre", normalizedState: "acre", uf: "AC", timeZone: "America/Rio_Branco" },
+  "69": { state: "Rondônia", normalizedState: "rondonia", uf: "RO", timeZone: "America/Porto_Velho" },
+  "71": { state: "Bahia", normalizedState: "bahia", uf: "BA", timeZone: "America/Bahia" },
+  "73": { state: "Bahia", normalizedState: "bahia", uf: "BA", timeZone: "America/Bahia" },
+  "74": { state: "Bahia", normalizedState: "bahia", uf: "BA", timeZone: "America/Bahia" },
+  "75": { state: "Bahia", normalizedState: "bahia", uf: "BA", timeZone: "America/Bahia" },
+  "77": { state: "Bahia", normalizedState: "bahia", uf: "BA", timeZone: "America/Bahia" },
+  "79": { state: "Sergipe", normalizedState: "sergipe", uf: "SE", timeZone: "America/Recife" },
+  "81": { state: "Pernambuco", normalizedState: "pernambuco", uf: "PE", timeZone: "America/Recife" },
+  "82": { state: "Alagoas", normalizedState: "alagoas", uf: "AL", timeZone: "America/Maceio" },
+  "83": { state: "Paraíba", normalizedState: "paraiba", uf: "PB", timeZone: "America/Recife" },
+  "84": { state: "Rio Grande do Norte", normalizedState: "rio grande do norte", uf: "RN", timeZone: "America/Recife" },
+  "85": { state: "Ceará", normalizedState: "ceara", uf: "CE", timeZone: "America/Fortaleza" },
+  "86": { state: "Piauí", normalizedState: "piaui", uf: "PI", timeZone: "America/Fortaleza" },
+  "87": { state: "Pernambuco", normalizedState: "pernambuco", uf: "PE", timeZone: "America/Recife" },
+  "88": { state: "Ceará", normalizedState: "ceara", uf: "CE", timeZone: "America/Fortaleza" },
+  "89": { state: "Piauí", normalizedState: "piaui", uf: "PI", timeZone: "America/Fortaleza" },
+  "91": { state: "Pará", normalizedState: "para", uf: "PA", timeZone: "America/Belem" },
+  "92": { state: "Amazonas", normalizedState: "amazonas", uf: "AM", timeZone: "America/Manaus" },
+  "93": { state: "Pará", normalizedState: "para", uf: "PA", timeZone: "America/Belem" },
+  "94": { state: "Pará", normalizedState: "para", uf: "PA", timeZone: "America/Belem" },
+  "95": { state: "Roraima", normalizedState: "roraima", uf: "RR", timeZone: "America/Manaus" },
+  "96": { state: "Amapá", normalizedState: "amapa", uf: "AP", timeZone: "America/Belem" },
+  "97": { state: "Amazonas", normalizedState: "amazonas", uf: "AM", timeZone: "America/Manaus" },
+  "98": { state: "Maranhão", normalizedState: "maranhao", uf: "MA", timeZone: "America/Fortaleza" },
+  "99": { state: "Maranhão", normalizedState: "maranhao", uf: "MA", timeZone: "America/Fortaleza" },
+};
+
+export function extractBrazilianDdd(phone: string | null | undefined): string | null {
+  const digits = normalizePhoneDigits(phone);
+  if (!digits.startsWith("55")) return null;
+  const afterCountryCode = digits.slice(2);
+  if (afterCountryCode.length < 10) return null;
+  const ddd = afterCountryCode.slice(0, 2);
+  return ddd || null;
+}
+
+export function inferBrazilianLocationFromDdd(phone: string | null | undefined) {
+  const ddd = extractBrazilianDdd(phone);
+  if (!ddd) return null;
+  const mapping = BRAZIL_DDD_TO_STATE_AND_TIMEZONE[ddd];
+  if (!mapping) return null;
+  return {
+    ...mapping,
+    country: "BR" as const,
+    source: "ddd_mapping" as const,
+  };
+}
+
 export function inferTimeZoneFromPhoneCountryCode(phone: string | null | undefined) {
   const digits = normalizePhoneDigits(phone);
   if (digits.startsWith("55")) {
+    const fromDdd = inferBrazilianLocationFromDdd(phone);
+    if (fromDdd) {
+      return {
+        timeZone: fromDdd.timeZone,
+        country: "BR" as const,
+      };
+    }
     return {
       timeZone: "America/Sao_Paulo",
       country: "BR" as const,
