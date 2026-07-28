@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Search, Trash2 } from "lucide-react";
+import { Copy, Search, Trash2, X } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import {
@@ -376,6 +376,7 @@ export function AtendimentoSummaryCards({
   const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
 
   const activeSectionData = sections.find((section) => section.id === activeSection) ?? sections[0];
   const activeItems = activeSectionData?.items ?? [];
@@ -427,6 +428,7 @@ export function AtendimentoSummaryCards({
       setLocalLeads((current) => current.filter((item) => item.id !== leadId));
       setLocalSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
       setSelectedLeadId((current) => (current === leadId ? null : current));
+      setMobileDetailsOpen((current) => (selectedLeadId === leadId ? false : current));
       modalToast.success("Interessado excluído com sucesso.");
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao excluir interessado.");
@@ -455,8 +457,15 @@ export function AtendimentoSummaryCards({
     });
   }, [filteredItems]);
 
+  useEffect(() => {
+    if (!selectedLead) {
+      setMobileDetailsOpen(false);
+    }
+  }, [selectedLead]);
+
   function handleSelectLead(lead: AtendimentoLeadListItem) {
     setSelectedLeadId(lead.id);
+    setMobileDetailsOpen(true);
   }
 
   async function handleCancelBooking(lead: AtendimentoLeadListItem) {
@@ -882,28 +891,59 @@ export function AtendimentoSummaryCards({
           </div>
         </div>
 
-        <div className="lg:hidden">
-          {selectedLead ? (
-            activeSection === "agendamentos" ? (
-              <BookingDetails
-                lead={selectedLead}
-                cancellingBookingId={cancellingBookingId}
-                savingLessonLinkBookingId={savingLessonLinkBookingId}
-                markingAttendanceBookingId={markingAttendanceBookingId}
-                onCancelBooking={handleCancelBooking}
-                onSaveLessonLink={handleSaveLessonLink}
-                onMarkAttendance={handleMarkAttendance}
-              />
-            ) : (
-              <LeadDetails
-                lead={selectedLead}
-                showDelete={activeSection === "interessados"}
-                deleting={deletingLeadId === selectedLead.id}
-                onDelete={() => handleDeleteLead(selectedLead)}
-              />
-            )
-          ) : null}
-        </div>
+        {selectedLead && mobileDetailsOpen ? (
+          <div className="fixed inset-0 z-[460] lg:hidden">
+            <button
+              type="button"
+              aria-label="Fechar detalhes"
+              className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
+              onClick={() => setMobileDetailsOpen(false)}
+            />
+            <div className="absolute inset-x-0 bottom-0 top-0 flex min-h-0 flex-col p-3">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-[var(--app-border)] bg-[var(--app-bg)] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+                <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 shrink-0">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                      {activeSectionData.label}
+                    </div>
+                    <div className="mt-1 truncate text-sm font-semibold text-[var(--app-text-85)]">
+                      {selectedLead.phone || selectedLead.full_name || "Interessado sem telefone"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMobileDetailsOpen(false)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-75)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]"
+                    aria-label="Fechar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                  {activeSection === "agendamentos" ? (
+                    <BookingDetails
+                      lead={selectedLead}
+                      cancellingBookingId={cancellingBookingId}
+                      savingLessonLinkBookingId={savingLessonLinkBookingId}
+                      markingAttendanceBookingId={markingAttendanceBookingId}
+                      onCancelBooking={handleCancelBooking}
+                      onSaveLessonLink={handleSaveLessonLink}
+                      onMarkAttendance={handleMarkAttendance}
+                    />
+                  ) : (
+                    <LeadDetails
+                      lead={selectedLead}
+                      showDelete={activeSection === "interessados"}
+                      deleting={deletingLeadId === selectedLead.id}
+                      onDelete={() => handleDeleteLead(selectedLead)}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
