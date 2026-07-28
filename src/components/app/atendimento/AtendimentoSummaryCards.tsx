@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Search, X } from "lucide-react";
+import { Copy, Search, Trash2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -83,16 +83,40 @@ function Field({
   );
 }
 
-function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
+function LeadDetails({
+  lead,
+  showDelete,
+  deleting,
+  onDelete,
+}: {
+  lead: AtendimentoLeadListItem;
+  showDelete: boolean;
+  deleting: boolean;
+  onDelete: () => void;
+}) {
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
-      <div className="min-w-0 flex flex-col gap-2 border-b border-[var(--app-border)] pb-4 shrink-0">
-        <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Lead"}>
-          {lead.full_name || "Novo Lead"}
+      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
+        <div className="min-w-0 flex flex-1 flex-col gap-2">
+          <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Lead"}>
+            {lead.full_name || "Novo Lead"}
+          </div>
+          <div className="text-sm text-[var(--app-text-55)]">
+            Ultima interacao: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
+          </div>
         </div>
-        <div className="text-sm text-[var(--app-text-55)]">
-          Ultima interacao: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
-        </div>
+
+        {showDelete ? (
+          <button
+            type="button"
+            onClick={() => void onDelete()}
+            disabled={deleting}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Trash2 className="h-4 w-4" />
+            {deleting ? "Excluindo..." : "Excluir lead"}
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
@@ -308,8 +332,6 @@ export function AtendimentoSummaryCards({
 }) {
   const [localSummary, setLocalSummary] = useState(summary);
   const [localLeads, setLocalLeads] = useState(leads);
-  const [manageLeadsOpen, setManageLeadsOpen] = useState(false);
-  const [manageQuery, setManageQuery] = useState("");
   const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
   const agendamentoItems = useMemo(
     () => localLeads.filter((lead) => leadHasExperimentalClassPanelStatus(lead)),
@@ -384,28 +406,6 @@ export function AtendimentoSummaryCards({
   useEffect(() => {
     setLocalLeads(leads);
   }, [leads]);
-
-  const manageLeadsItems = useMemo(() => {
-    const q = manageQuery.trim().toLowerCase();
-    if (!q) return localLeads.slice(0, 120);
-    const digits = q.replace(/\D/g, "");
-    return localLeads
-      .filter((lead) => {
-        const name = String(lead.full_name ?? "").toLowerCase();
-        const phone = String(lead.phone ?? "").toLowerCase();
-        const email = String(lead.email ?? "").toLowerCase();
-        const cpf = String(lead.cpf ?? "").toLowerCase();
-        const phoneDigits = phone.replace(/\D/g, "");
-        return (
-          name.includes(q) ||
-          email.includes(q) ||
-          cpf.includes(q) ||
-          phone.includes(q) ||
-          (digits && phoneDigits.includes(digits))
-        );
-      })
-      .slice(0, 120);
-  }, [localLeads, manageQuery]);
 
   async function handleDeleteLead(lead: AtendimentoLeadListItem) {
     const leadId = String(lead.id ?? "").trim();
@@ -754,17 +754,7 @@ export function AtendimentoSummaryCards({
 
   return (
     <div className="flex flex-col gap-6 lg:h-full lg:min-h-0">
-      <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <button
-          type="button"
-          onClick={() => setManageLeadsOpen(true)}
-          className="rounded-2xl border p-4 text-left transition border-yellow-500/30 bg-yellow-500/10 hover:bg-yellow-500/12"
-        >
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-            Gerenciar Leads
-          </div>
-          <div className="mt-3 text-2xl font-semibold tracking-tight text-[var(--app-text-85)]">{localSummary.totalLeads}</div>
-        </button>
+      <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {sections.map((section) => {
           const active = section.id === activeSection;
           return (
@@ -885,7 +875,12 @@ export function AtendimentoSummaryCards({
                   onMarkAttendance={handleMarkAttendance}
                 />
               ) : (
-                <LeadDetails lead={selectedLead} />
+                <LeadDetails
+                  lead={selectedLead}
+                  showDelete={activeSection === "interessados"}
+                  deleting={deletingLeadId === selectedLead.id}
+                  onDelete={() => handleDeleteLead(selectedLead)}
+                />
               )
             ) : (
               <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-6 text-center text-sm text-[var(--app-text-45)]">
@@ -925,80 +920,15 @@ export function AtendimentoSummaryCards({
                   onMarkAttendance={handleMarkAttendance}
               />
             ) : (
-              <LeadDetails lead={mobileLead} />
+              <LeadDetails
+                lead={mobileLead}
+                showDelete={activeSection === "interessados"}
+                deleting={deletingLeadId === mobileLead.id}
+                onDelete={() => handleDeleteLead(mobileLead)}
+              />
             )}
           </div>
         ) : null}
-      </AppModal>
-
-      <AppModal open={manageLeadsOpen} onClose={() => setManageLeadsOpen(false)} size="lg" zIndexClass="z-[350]" fullScreenOnMobile>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">Gerenciar Leads</div>
-            <div className="mt-1 text-xs text-[var(--app-text-55)]">
-              Exclua um lead para reiniciar o atendimento do zero no WhatsApp.
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setManageLeadsOpen(false)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
-            aria-label="Fechar"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
-          <Search className="h-4 w-4 text-[var(--app-text-45)]" />
-          <input
-            value={manageQuery}
-            onChange={(event) => setManageQuery(event.target.value)}
-            placeholder="Buscar por nome, telefone, email ou CPF"
-            className="w-full bg-transparent text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
-          />
-        </label>
-
-        <div className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
-          {manageLeadsItems.length ? (
-            <div className="space-y-3">
-              {manageLeadsItems.map((lead) => {
-                const leadId = String(lead.id ?? "").trim();
-                const deleting = deletingLeadId === leadId;
-                return (
-                  <div
-                    key={leadId}
-                    className="flex flex-col gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
-                        {lead.full_name || "Lead sem nome"}
-                      </div>
-                      <div className="mt-1 text-xs text-[var(--app-text-55)]">
-                        {String(lead.phone ?? "").trim() || "-"}
-                      </div>
-                      <div className="mt-2 text-[11px] text-[var(--app-text-45)]">
-                        Última interação: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteLead(lead)}
-                      disabled={deleting}
-                      className="inline-flex items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {deleting ? "Excluindo..." : "Excluir lead"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-card-2)] p-6 text-center text-sm text-[var(--app-text-45)]">
-              {manageQuery.trim() ? "Nenhum lead corresponde à busca." : "Nenhum lead disponível no momento."}
-            </div>
-          )}
-        </div>
       </AppModal>
     </div>
   );
