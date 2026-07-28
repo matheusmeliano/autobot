@@ -387,7 +387,7 @@ export function AtendimentoLeadList({
         </div>
       </AppModal>
 
-      <AppModal open={Boolean(deleteLead)} onClose={closeDeleteModal} size="md" zIndexClass="z-[130]">
+      <AppModal open={Boolean(deleteLead)} onClose={closeDeleteModal} size="md" zIndexClass="z-[130]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[var(--app-text-85)]">Excluir aluno</div>

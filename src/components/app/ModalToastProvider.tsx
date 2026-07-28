@@ -82,7 +82,7 @@ export function ModalToastProvider() {
   };
 
   return (
-    <AppModal open={Boolean(active)} onClose={() => close(false)} size="md" zIndexClass="z-[500]">
+    <AppModal open={Boolean(active)} onClose={() => close(false)} size="md" zIndexClass="z-[500]" fullScreenOnMobile>
       {active && meta ? (
         <div>
           <div className="flex items-start gap-3">

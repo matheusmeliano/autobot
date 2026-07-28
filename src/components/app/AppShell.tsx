@@ -642,8 +642,8 @@ export function AppShell({
         </div>
 
         {pendingPayment ? (
-          <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/60 px-4 py-10">
-            <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-modal-bg)] p-6">
+          <div className="fixed inset-0 z-[320] flex items-stretch justify-stretch bg-black/60 px-0 py-0 lg:items-center lg:justify-center lg:px-4 lg:py-10">
+            <div className="h-full w-full overflow-y-auto rounded-none border-0 bg-[var(--app-modal-bg)] p-4 lg:h-auto lg:max-w-md lg:rounded-2xl lg:border lg:border-[var(--app-border)] lg:p-6">
               <div className="text-sm font-semibold tracking-tight text-[var(--app-text-85)]">
                 Possível pagamento identificado
               </div>
@@ -718,8 +718,8 @@ export function AppShell({
         ) : null}
 
         {showThemeGate ? (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 px-4 py-10">
-            <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-modal-bg)] p-6 backdrop-blur-xl">
+          <div className="fixed inset-0 z-[300] flex items-stretch justify-stretch bg-black/60 px-0 py-0 lg:items-center lg:justify-center lg:px-4 lg:py-10">
+            <div className="h-full w-full overflow-y-auto rounded-none border-0 bg-[var(--app-modal-bg)] p-4 backdrop-blur-xl lg:h-auto lg:max-w-md lg:rounded-2xl lg:border lg:border-[var(--app-border)] lg:p-6">
               <div className="text-sm font-semibold tracking-tight text-[var(--app-text-85)]">
                 Escolha seu tema
               </div>
