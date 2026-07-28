@@ -191,7 +191,7 @@ export function AtendimentoClient() {
         ) : null}
       </div>
 
-      <div className="shrink-0">
+      <div className="min-h-0 min-w-0 flex-1">
         <AtendimentoSummaryCards summary={summary} leads={panelLeads} />
       </div>
     </div>
