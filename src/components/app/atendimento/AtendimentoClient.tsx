@@ -172,7 +172,7 @@ export function AtendimentoClient() {
               type="button"
               onClick={() => void handleRefresh()}
               disabled={refreshing || loading}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               {refreshing ? "Atualizando..." : "Atualizar"}
