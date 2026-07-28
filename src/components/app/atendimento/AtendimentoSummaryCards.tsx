@@ -899,8 +899,8 @@ export function AtendimentoSummaryCards({
               className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
               onClick={() => setMobileDetailsOpen(false)}
             />
-            <div className="absolute inset-x-0 bottom-0 top-0 flex min-h-0 flex-col p-3">
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-[var(--app-border)] bg-[var(--app-bg)] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+            <div className="absolute inset-0 flex min-h-0 flex-col">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--app-bg)]">
                 <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 shrink-0">
                   <div className="min-w-0">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
