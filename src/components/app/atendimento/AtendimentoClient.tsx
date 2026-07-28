@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { AtendimentoSummaryCards } from "@/components/app/atendimento/AtendimentoSummaryCards";
@@ -17,42 +17,9 @@ const EMPTY_SUMMARY: AtendimentoSummary = {
   conversasNaoLidas: 0,
 };
 
-function AtendimentoLinkCard({
-  publicUrl,
-  onCopy,
-}: {
-  publicUrl: string;
-  onCopy: () => Promise<void>;
-}) {
-  return (
-    <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75 sm:shrink-0">
-          Link de Atendimento
-        </div>
-        <div
-          className="min-w-0 flex-1 truncate text-sm font-semibold text-white"
-          title={publicUrl || undefined}
-        >
-          {publicUrl || "Carregando link..."}
-        </div>
-        <button
-          type="button"
-          onClick={onCopy}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] sm:shrink-0"
-        >
-          <Copy className="h-4 w-4" />
-          Copiar Link
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function AtendimentoClient() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [summary, setSummary] = useState<AtendimentoSummary>(EMPTY_SUMMARY);
-  const [publicUrl, setPublicUrl] = useState("");
   const [panelLeads, setPanelLeads] = useState<AtendimentoLeadListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,19 +68,6 @@ export function AtendimentoClient() {
     modalToast.error(message);
   }, []);
 
-  const loadPublicLink = useCallback(async () => {
-    const res = await fetch("/api/atendimento/link-publico", { cache: "no-store" });
-    if (handleForbiddenResponse(res)) return;
-    const json = await res.json().catch(() => null);
-    if (json?.ok) {
-      setPublicUrl(String(json.link?.public_url ?? ""));
-      return;
-    }
-    const message = String(json?.error ?? "Falha ao carregar link público.");
-    setLoadError(message);
-    modalToast.error(message);
-  }, []);
-
   const loadPanelLeads = useCallback(async () => {
     const res = await fetch("/api/atendimento/leads", { cache: "no-store" });
     if (handleForbiddenResponse(res)) return;
@@ -123,17 +77,11 @@ export function AtendimentoClient() {
     }
   }, []);
 
-  async function handleCopyLink() {
-    if (!publicUrl) return;
-    await navigator.clipboard.writeText(publicUrl);
-    modalToast.success("Link copiado.");
-  }
-
   async function handleRefresh() {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      await Promise.all([loadSummary({ silent: true }), loadPanelLeads(), loadPublicLink()]);
+      await Promise.all([loadSummary({ silent: true }), loadPanelLeads()]);
       modalToast.success("Painel atualizado.");
     } finally {
       setRefreshing(false);
@@ -142,14 +90,14 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadSummary(), loadPublicLink(), loadPanelLeads()])
+    Promise.all([loadSummary(), loadPanelLeads()])
       .then(() => {
         setLoadError(null);
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [loadPanelLeads, loadPublicLink, loadSummary]);
+  }, [loadPanelLeads, loadSummary]);
 
   useEffect(() => {
     if (fallbackRefreshIntervalRef.current != null) return;
@@ -241,10 +189,6 @@ export function AtendimentoClient() {
             {loadError}
           </div>
         ) : null}
-      </div>
-
-      <div className="shrink-0">
-        <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />
       </div>
 
       <div className="shrink-0">
