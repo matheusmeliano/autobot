@@ -789,7 +789,7 @@ export function AtendimentoSummaryCards({
               />
             </label>
           </div>
-          <div className="min-h-0 max-h-[26rem] overflow-y-auto p-3 pr-1.5 lg:max-h-none lg:flex-1 lg:min-h-0">
+          <div className="overflow-y-auto p-3 pr-1.5 lg:flex-1 lg:min-h-0">
             {pagedItems.length ? (
               <div className="space-y-3">
                 {pagedItems.map((lead) => {
