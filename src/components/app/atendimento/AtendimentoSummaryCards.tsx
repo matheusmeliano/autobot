@@ -13,7 +13,7 @@ import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendime
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
-const PANEL_PAGE_SIZE = 4;
+const PANEL_PAGE_SIZE = 10;
 
 function atendimentoOriginLabel(origin: string | null | undefined) {
   const normalized = String(origin ?? "").trim().toLowerCase();
