@@ -126,8 +126,6 @@ function LeadDetails({
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
           <Field label="CPF" value={lead.cpf} copyable />
           <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
-          <Field label="Status" value={atendimentoStatusLabel(lead.status)} />
-          <Field label="Etapa" value={atendimentoStageLabel(lead.funnel_stage)} />
           <Field label="Cidade" value={lead.city} />
           <Field label="Estado" value={lead.state} />
           <Field label="Pais" value={lead.country} />
