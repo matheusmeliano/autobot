@@ -85,8 +85,8 @@ function Field({
 
 function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
-      <div className="min-w-0 flex flex-col gap-2 border-b border-[var(--app-border)] pb-4">
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
+      <div className="min-w-0 flex flex-col gap-2 border-b border-[var(--app-border)] pb-4 shrink-0">
         <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Lead"}>
           {lead.full_name || "Novo Lead"}
         </div>
@@ -95,17 +95,19 @@ function LeadDetails({ lead }: { lead: AtendimentoLeadListItem }) {
         </div>
       </div>
 
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-        <Field label="Telefone" value={lead.phone} copyable />
-        <Field label="Email" value={lead.email} copyable />
-        <Field label="CPF" value={lead.cpf} copyable />
-        <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
-        <Field label="Status" value={atendimentoStatusLabel(lead.status)} />
-        <Field label="Etapa" value={atendimentoStageLabel(lead.funnel_stage)} />
-        <Field label="Cidade" value={lead.city} />
-        <Field label="Estado" value={lead.state} />
-        <Field label="Pais" value={lead.country} />
-        <Field label="Fuso" value={lead.timezone} />
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+          <Field label="Telefone" value={lead.phone} copyable />
+          <Field label="Email" value={lead.email} copyable />
+          <Field label="CPF" value={lead.cpf} copyable />
+          <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
+          <Field label="Status" value={atendimentoStatusLabel(lead.status)} />
+          <Field label="Etapa" value={atendimentoStageLabel(lead.funnel_stage)} />
+          <Field label="Cidade" value={lead.city} />
+          <Field label="Estado" value={lead.state} />
+          <Field label="Pais" value={lead.country} />
+          <Field label="Fuso" value={lead.timezone} />
+        </div>
       </div>
     </div>
   );
@@ -156,8 +158,8 @@ function BookingDetails({
   }, [savedLessonLink, bookingId]);
 
   return (
-    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-y-auto">
-      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between">
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
+      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
           <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Agendamento"}>
             {lead.full_name || "Agendamento"}
@@ -179,118 +181,120 @@ function BookingDetails({
         ) : null}
       </div>
 
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-        <Field label="Aluno" value={lead.full_name} />
-        <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
-        <Field label="Data do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
-        <Field label="Horario do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
-        <Field label="Fuso do aluno" value={booking?.lead_timezone} />
-        <Field label="Data do professor" value={formatAtendimentoDate(booking?.professor_date)} />
-        <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
-        <Field label="Fuso do professor" value={professorTimeZone} />
-      </div>
-
-      {showIncompleteState ? (
-        <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">Agendamento</div>
-          <div className="mt-3 text-sm text-amber-50">
-            O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com data e horário confirmados.
-          </div>
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+          <Field label="Aluno" value={lead.full_name} />
+          <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
+          <Field label="Data do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
+          <Field label="Horario do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
+          <Field label="Fuso do aluno" value={booking?.lead_timezone} />
+          <Field label="Data do professor" value={formatAtendimentoDate(booking?.professor_date)} />
+          <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
+          <Field label="Fuso do professor" value={professorTimeZone} />
         </div>
-      ) : null}
 
-      {notificationsSent ? (
-        <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-            Comparecimento
-          </div>
-          {attendanceStatus ? (
-            <>
-              <div
-                className={[
-                  "mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold",
-                  attendanceStatus === "attended"
-                    ? "bg-emerald-500/15 text-emerald-200"
-                    : "bg-amber-400/15 text-amber-200",
-                ].join(" ")}
-              >
-                {experimentalClassAttendanceLabel(attendanceStatus)}
-              </div>
-              <div className="mt-3 text-sm text-[var(--app-text-70)]">
-                {attendanceStatus === "attended"
-                  ? "A aula foi concluída e a mensagem de continuidade já foi enviada ao aluno."
-                  : "O aluno foi marcado para repescagem, permitindo que a equipe faça um contato manual e humanizado para reagendar."}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="mt-3 text-sm font-semibold text-[var(--app-text-85)]">O aluno compareceu a aula?</div>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => void onMarkAttendance(lead, "attended")}
-                  disabled={isMarkingAttendance}
-                  className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/12 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isMarkingAttendance ? "Salvando..." : "Sim"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void onMarkAttendance(lead, "no_show")}
-                  disabled={isMarkingAttendance}
-                  className="inline-flex items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/12 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/18 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isMarkingAttendance ? "Salvando..." : "Não"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      ) : null}
-
-      {!showIncompleteState ? (
-      <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-        <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">Link da Aula</div>
-            <div className="mt-2 text-xs text-[var(--app-text-55)]">
-              Adicione manualmente o link que será enviado ao aluno na data e horário agendados.
+        {showIncompleteState ? (
+          <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">Agendamento</div>
+            <div className="mt-3 text-sm text-amber-50">
+              O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com data e horário confirmados.
             </div>
           </div>
+        ) : null}
 
-          <button
-            type="button"
-            onClick={() => void onSaveLessonLink(lead, lessonLinkDraft)}
-            disabled={isSavingLessonLink || !lessonLinkChanged}
-            className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isSavingLessonLink ? "Salvando..." : "Salvar link"}
-          </button>
+        {notificationsSent ? (
+          <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+              Comparecimento
+            </div>
+            {attendanceStatus ? (
+              <>
+                <div
+                  className={[
+                    "mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                    attendanceStatus === "attended"
+                      ? "bg-emerald-500/15 text-emerald-200"
+                      : "bg-amber-400/15 text-amber-200",
+                  ].join(" ")}
+                >
+                  {experimentalClassAttendanceLabel(attendanceStatus)}
+                </div>
+                <div className="mt-3 text-sm text-[var(--app-text-70)]">
+                  {attendanceStatus === "attended"
+                    ? "A aula foi concluída e a mensagem de continuidade já foi enviada ao aluno."
+                    : "O aluno foi marcado para repescagem, permitindo que a equipe faça um contato manual e humanizado para reagendar."}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mt-3 text-sm font-semibold text-[var(--app-text-85)]">O aluno compareceu a aula?</div>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => void onMarkAttendance(lead, "attended")}
+                    disabled={isMarkingAttendance}
+                    className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/12 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isMarkingAttendance ? "Salvando..." : "Sim"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onMarkAttendance(lead, "no_show")}
+                    disabled={isMarkingAttendance}
+                    className="inline-flex items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/12 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/18 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isMarkingAttendance ? "Salvando..." : "Não"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        {!showIncompleteState ? (
+        <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+          <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">Link da Aula</div>
+              <div className="mt-2 text-xs text-[var(--app-text-55)]">
+                Adicione manualmente o link que será enviado ao aluno na data e horário agendados.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void onSaveLessonLink(lead, lessonLinkDraft)}
+              disabled={isSavingLessonLink || !lessonLinkChanged}
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isSavingLessonLink ? "Salvando..." : "Salvar link"}
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={lessonLinkDraft}
+            onChange={(event) => setLessonLinkDraft(event.target.value)}
+            placeholder="https://meet.google.com/..."
+            className="mt-4 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-medium text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
+          />
+
+          {savedLessonLink ? (
+            <a
+              href={canOpenSavedLessonLink ? savedLessonLink : "#"}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-3 inline-flex text-sm font-semibold text-emerald-300 underline underline-offset-2 break-all"
+              onClick={(event) => {
+                if (!canOpenSavedLessonLink) event.preventDefault();
+              }}
+            >
+              {savedLessonLink}
+            </a>
+          ) : null}
         </div>
-
-        <input
-          type="text"
-          value={lessonLinkDraft}
-          onChange={(event) => setLessonLinkDraft(event.target.value)}
-          placeholder="https://meet.google.com/..."
-          className="mt-4 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-medium text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
-        />
-
-        {savedLessonLink ? (
-          <a
-            href={canOpenSavedLessonLink ? savedLessonLink : "#"}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="mt-3 inline-flex text-sm font-semibold text-emerald-300 underline underline-offset-2 break-all"
-            onClick={(event) => {
-              if (!canOpenSavedLessonLink) event.preventDefault();
-            }}
-          >
-            {savedLessonLink}
-          </a>
         ) : null}
       </div>
-      ) : null}
     </div>
   );
 }
@@ -304,6 +308,9 @@ export function AtendimentoSummaryCards({
 }) {
   const [localSummary, setLocalSummary] = useState(summary);
   const [localLeads, setLocalLeads] = useState(leads);
+  const [manageLeadsOpen, setManageLeadsOpen] = useState(false);
+  const [manageQuery, setManageQuery] = useState("");
+  const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
   const agendamentoItems = useMemo(
     () => localLeads.filter((lead) => leadHasExperimentalClassPanelStatus(lead)),
     [localLeads],
@@ -377,6 +384,59 @@ export function AtendimentoSummaryCards({
   useEffect(() => {
     setLocalLeads(leads);
   }, [leads]);
+
+  const manageLeadsItems = useMemo(() => {
+    const q = manageQuery.trim().toLowerCase();
+    if (!q) return localLeads.slice(0, 120);
+    const digits = q.replace(/\D/g, "");
+    return localLeads
+      .filter((lead) => {
+        const name = String(lead.full_name ?? "").toLowerCase();
+        const phone = String(lead.phone ?? "").toLowerCase();
+        const email = String(lead.email ?? "").toLowerCase();
+        const cpf = String(lead.cpf ?? "").toLowerCase();
+        const phoneDigits = phone.replace(/\D/g, "");
+        return (
+          name.includes(q) ||
+          email.includes(q) ||
+          cpf.includes(q) ||
+          phone.includes(q) ||
+          (digits && phoneDigits.includes(digits))
+        );
+      })
+      .slice(0, 120);
+  }, [localLeads, manageQuery]);
+
+  async function handleDeleteLead(lead: AtendimentoLeadListItem) {
+    const leadId = String(lead.id ?? "").trim();
+    if (!leadId) return;
+
+    const name = String(lead.full_name ?? "").trim() || "Lead sem nome";
+    const phone = String(lead.phone ?? "").trim() || "-";
+    if (!window.confirm(`Excluir lead?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
+      return;
+    }
+
+    try {
+      setDeletingLeadId(leadId);
+      const response = await fetch(`/api/atendimento/leads/${leadId}`, { method: "DELETE" });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao excluir lead.");
+        return;
+      }
+
+      setLocalLeads((current) => current.filter((item) => item.id !== leadId));
+      setLocalSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
+      setSelectedLeadId((current) => (current === leadId ? null : current));
+      setMobileLead((current) => (current?.id === leadId ? null : current));
+      modalToast.success("Lead excluído com sucesso.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao excluir lead.");
+    } finally {
+      setDeletingLeadId(null);
+    }
+  }
 
   useEffect(() => {
     setQuery("");
@@ -694,7 +754,17 @@ export function AtendimentoSummaryCards({
 
   return (
     <div className="flex flex-col gap-6 lg:h-full lg:min-h-0">
-      <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <button
+          type="button"
+          onClick={() => setManageLeadsOpen(true)}
+          className="rounded-2xl border p-4 text-left transition border-yellow-500/30 bg-yellow-500/10 hover:bg-yellow-500/12"
+        >
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+            Gerenciar Leads
+          </div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-[var(--app-text-85)]">{localSummary.totalLeads}</div>
+        </button>
         {sections.map((section) => {
           const active = section.id === activeSection;
           return (
@@ -859,6 +929,76 @@ export function AtendimentoSummaryCards({
             )}
           </div>
         ) : null}
+      </AppModal>
+
+      <AppModal open={manageLeadsOpen} onClose={() => setManageLeadsOpen(false)} size="lg" zIndexClass="z-[350]" fullScreenOnMobile>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">Gerenciar Leads</div>
+            <div className="mt-1 text-xs text-[var(--app-text-55)]">
+              Exclua um lead para reiniciar o atendimento do zero no WhatsApp.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setManageLeadsOpen(false)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+          <Search className="h-4 w-4 text-[var(--app-text-45)]" />
+          <input
+            value={manageQuery}
+            onChange={(event) => setManageQuery(event.target.value)}
+            placeholder="Buscar por nome, telefone, email ou CPF"
+            className="w-full bg-transparent text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
+          />
+        </label>
+
+        <div className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
+          {manageLeadsItems.length ? (
+            <div className="space-y-3">
+              {manageLeadsItems.map((lead) => {
+                const leadId = String(lead.id ?? "").trim();
+                const deleting = deletingLeadId === leadId;
+                return (
+                  <div
+                    key={leadId}
+                    className="flex flex-col gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                        {lead.full_name || "Lead sem nome"}
+                      </div>
+                      <div className="mt-1 text-xs text-[var(--app-text-55)]">
+                        {String(lead.phone ?? "").trim() || "-"}
+                      </div>
+                      <div className="mt-2 text-[11px] text-[var(--app-text-45)]">
+                        Última interação: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteLead(lead)}
+                      disabled={deleting}
+                      className="inline-flex items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {deleting ? "Excluindo..." : "Excluir lead"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-card-2)] p-6 text-center text-sm text-[var(--app-text-45)]">
+              {manageQuery.trim() ? "Nenhum lead corresponde à busca." : "Nenhum lead disponível no momento."}
+            </div>
+          )}
+        </div>
       </AppModal>
     </div>
   );
