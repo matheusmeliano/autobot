@@ -18,6 +18,7 @@ const PANEL_PAGE_SIZE = 4;
 function atendimentoOriginLabel(origin: string | null | undefined) {
   const normalized = String(origin ?? "").trim().toLowerCase();
   if (normalized === "link_publico_atendimento") return "Link de Atendimento";
+  if (normalized === "whatsapp_trafego_pago") return "Tráfego pago";
   if (!normalized) return "-";
   return origin ?? "-";
 }
