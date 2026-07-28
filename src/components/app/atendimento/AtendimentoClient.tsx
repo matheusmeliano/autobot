@@ -58,45 +58,75 @@ function LeadRow({
   onDelete: (leadId: string) => void;
   deleting: boolean;
 }) {
-  const funnelStage = String((lead as any)?.funnel_stage ?? "").trim() || "-";
-  const status = String((lead as any)?.status ?? "").trim() || "-";
-  const phone = String((lead as any)?.phone ?? "").trim() || "-";
+  const funnelStage = String((lead as any)?.funnel_stage ?? "").trim() || "novo_lead";
+  const status = String((lead as any)?.status ?? "").trim() || "novo_lead";
+  const phone = String((lead as any)?.phone ?? "").trim();
   const city = String((lead as any)?.city ?? "").trim();
   const state = String((lead as any)?.state ?? "").trim();
-  const location = city && state ? `${city}/${state}` : state || city || "-";
   const createdAtRaw = String((lead as any)?.created_at ?? "").trim();
-  const createdAt = createdAtRaw ? new Date(createdAtRaw).toLocaleString("pt-BR") : "-";
+  const createdAt = createdAtRaw ? new Date(createdAtRaw).toLocaleString("pt-BR") : "";
+  const origin = String((lead as any)?.origin ?? "").trim();
 
   return (
-    <div className="grid grid-cols-12 items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 hover:bg-[var(--app-hover)]">
-      <div className="col-span-4 min-w-0">
-        <div className="truncate text-sm font-semibold text-[var(--app-text-90)]">
-          {String((lead as any)?.full_name ?? "").trim() || "Lead sem nome"}
+    <div className="group grid grid-cols-12 items-center gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-5 py-4 transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-hover)]">
+      <div className="col-span-12 min-[960px]:col-span-5 min-w-0">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--app-accent)]/30 to-[var(--app-accent)]/5 text-sm font-bold text-[var(--app-accent)] ring-1 ring-inset ring-[var(--app-accent)]/20">
+            {(String((lead as any)?.full_name ?? "L ").trim() || "L ")
+              .split(" ")
+              .slice(0, 2)
+              .map((w) => w[0]?.toUpperCase() ?? "")
+              .join("")
+              .slice(0, 2) || "L"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[15px] font-semibold leading-tight text-[var(--app-text-92)]">
+              {String((lead as any)?.full_name ?? "").trim() || "Lead sem nome"}
+            </div>
+            <div className="mt-0.5 truncate text-xs text-[var(--app-text-55)]">
+              {phone || "Telefone não identificado"}
+            </div>
+          </div>
         </div>
-        <div className="mt-0.5 truncate text-xs text-[var(--app-text-55)]">{phone}</div>
       </div>
-      <div className="col-span-3 min-w-0">
-        <div className="truncate text-xs text-[var(--app-text-70)]">
-          <span className="font-semibold">Stage:</span> {funnelStage}
+
+      <div className="col-span-12 min-[960px]:col-span-3 min-w-0">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center rounded-full border border-indigo-400/20 bg-indigo-400/10 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wide text-indigo-300">
+            Funnel · {funnelStage.replace(/_/g, " ")}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wide text-emerald-300">
+            {status.replace(/_/g, " ")}
+          </span>
+          {origin ? (
+            <span className="inline-flex items-center rounded-full border border-[var(--app-accent)]/20 bg-[var(--app-accent)]/10 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--app-accent)]">
+              {origin.replace(/_/g, " ")}
+            </span>
+          ) : null}
         </div>
-        <div className="mt-0.5 truncate text-xs text-[var(--app-text-55)]">
-          <span className="font-semibold">Status:</span> {status}
+      </div>
+
+      <div className="col-span-12 min-[960px]:col-span-2 min-w-0">
+        <div className="truncate text-sm font-medium text-[var(--app-text-78)]">
+          {city && state ? `${city}/${state}` : state || city || "Localização pendente"}
         </div>
+        {createdAt ? (
+          <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-52)]">
+            Criado em {createdAt}
+          </div>
+        ) : null}
       </div>
-      <div className="col-span-3 min-w-0">
-        <div className="truncate text-xs text-[var(--app-text-70)]">{location}</div>
-        <div className="mt-0.5 truncate text-xs text-[var(--app-text-55)]">{createdAt}</div>
-      </div>
-      <div className="col-span-2 flex justify-end">
+
+      <div className="col-span-12 min-[960px]:col-span-2 flex min-[960px]:justify-end">
         <button
           type="button"
           onClick={() => onDelete(String((lead as any)?.id ?? ""))}
           disabled={deleting}
-          title="Excluir lead (histórico e atendimento serão removidos completamente)"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500/50 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+          title="Excluir lead — zera todo histórico e atendimento para este número"
+          className="inline-flex w-full min-[960px]:w-auto items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-3.5 py-2 text-xs font-semibold text-red-400 transition hover:border-red-500/50 hover:bg-red-500/12 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Trash2 className="h-3.5 w-3.5" />
-          Excluir
+          Excluir lead
         </button>
       </div>
     </div>
@@ -371,66 +401,71 @@ export function AtendimentoClient() {
   }, [loadPanelLeads, loadSummary, supabase]);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-4 bg-[var(--app-bg)] lg:h-full lg:min-h-0">
-      <div className="shrink-0 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4 sm:px-6 sm:py-5">
-        <div className="flex flex-col gap-3 min-[720px]:flex-row min-[720px]:items-center min-[720px]:justify-between">
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-              Painel de Dados
+    <div className="flex min-h-0 min-w-0 flex-col gap-5 bg-[var(--app-bg)] lg:h-full lg:min-h-0">
+      <div className="mx-auto w-full max-w-[1480px] flex-1 px-0 sm:px-3 lg:px-6 xl:px-10 2xl:px-16">
+        <div className="shrink-0 rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+          <div className="flex flex-col gap-3 min-[880px]:flex-row min-[880px]:items-center min-[880px]:justify-between">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--app-text-45)]">
+                Painel de Dados
+              </div>
+              <div className="mt-1 truncate text-[20px] font-semibold tracking-tight text-[var(--app-text-90)]">
+                Atendimento Lucas Brum Online Music USA
+              </div>
+              <div className="mt-1 text-xs text-[var(--app-text-58)]">
+                Visão consolidada dos leads, agendamentos e conversas por WhatsApp.
+              </div>
             </div>
-            <div className="mt-1 truncate text-lg font-semibold tracking-tight text-[var(--app-text-85)]">
-              Atendimento Lucas Brum Online Music USA
-            </div>
-            <div className="mt-1 text-xs text-[var(--app-text-55)]">
-              Visão consolidada dos leads, agendamentos e conversas por WhatsApp.
+            <div className="min-[880px]:ml-auto">
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={refreshing || loading}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Atualizando..." : "Atualizar painel"}
+              </button>
             </div>
           </div>
-          <div className="min-[720px]:ml-auto">
-            <button
-              type="button"
-              onClick={() => void handleRefresh()}
-              disabled={refreshing || loading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              {refreshing ? "Atualizando..." : "Atualizar"}
-            </button>
-          </div>
+          {loading && !loadError ? (
+            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
+              Carregando painel...
+            </div>
+          ) : null}
+          {loadError ? (
+            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
+              {loadError}
+            </div>
+          ) : null}
         </div>
-        {loading && !loadError ? (
-          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
-            Carregando painel...
-          </div>
-        ) : null}
-        {loadError ? (
-          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-text-55)]">
-            {loadError}
-          </div>
-        ) : null}
-      </div>
 
-      <div className="min-h-0 flex-1">
-        <div className="flex flex-col gap-4">
+        <div className="mt-5 flex flex-col gap-5">
           <AtendimentoLinkCard publicUrl={publicUrl} onCopy={handleCopyLink} />
           <AtendimentoSummaryCards summary={summary} leads={panelLeads} />
-          <div className="rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 sm:p-5">
-            <div className="flex flex-col gap-3 min-[720px]:flex-row min-[720px]:items-center min-[720px]:justify-between">
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+          <div className="rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 sm:p-5 lg:p-7">
+            <div className="flex flex-col gap-4 min-[980px]:flex-row min-[980px]:items-start min-[980px]:justify-between">
+              <div className="min-w-0 flex-1 pr-0 min-[980px]:pr-12">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text-45)]">
                   Gerenciar Leads
                 </div>
-                <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                  Exclua um lead para zerar o histórico e permitir um novo início de atendimento
-                  por WhatsApp com o mesmo número.
+                <div className="mt-1.5 text-[17px] font-semibold leading-snug text-[var(--app-text-90)]">
+                  Exclua um lead para zerar todo o histórico e reiniciar o fluxo do WhatsApp
+                </div>
+                <div className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-[var(--app-text-58)]">
+                  Ao confirmar a exclusão, todas as mensagens, eventos do histórico, campos
+                  capturados e agendamentos são apagados permanentemente. O mesmo número poderá
+                  enviar uma nova mensagem que o bot iniciará do zero, como se fosse o primeiro
+                  contato.
                 </div>
               </div>
-              <label className="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 min-[720px]:w-[360px]">
-                <Search className="h-4 w-4 shrink-0 text-[var(--app-text-45)]" />
+              <label className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 min-[980px]:w-[440px] shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset]">
+                <Search className="h-4 w-4 shrink-0 text-[var(--app-text-48)]" />
                 <input
                   value={leadSearchQuery}
                   onChange={(e) => setLeadSearchQuery(e.target.value)}
-                  placeholder="Buscar por nome ou telefone..."
-                  className="min-w-0 flex-1 bg-transparent text-sm text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:outline-none"
+                  placeholder="Buscar por nome, telefone ou e-mail..."
+                  className="min-w-0 flex-1 bg-transparent text-sm text-[var(--app-text-88)] placeholder:text-[var(--app-text-45)] focus:outline-none"
                 />
               </label>
             </div>
@@ -485,16 +520,16 @@ function LeadsGrid({
 
   if (!panelLeads.length) {
     return (
-      <div className="mt-4 rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-card)] p-6 text-center text-xs text-[var(--app-text-55)]">
+      <div className="mt-6 rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-card)] p-8 text-center text-sm text-[var(--app-text-55)]">
         Nenhum lead encontrado no painel.
       </div>
     );
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
+    <div className="mt-6 flex flex-col gap-2.5 max-h-[640px] overflow-y-auto pr-1.5 scroll-smooth">
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-card)] p-6 text-center text-xs text-[var(--app-text-55)]">
+        <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-card)] p-8 text-center text-sm text-[var(--app-text-55)]">
           Nenhum lead corresponde à busca.
         </div>
       ) : (

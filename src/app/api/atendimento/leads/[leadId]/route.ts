@@ -2,6 +2,19 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 
+function isExperimentalClassBookingsTableUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -130,11 +143,10 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
           .delete()
           .in("conversation_id", conversationIds)
       : Promise.resolve({ error: null });
-  const [messagesResult, eventsResult, capturedFieldsResult, bookingsResult] = await Promise.all([
+  const [messagesResult, eventsResult, capturedFieldsResult] = await Promise.all([
     deleteMessagesPromise,
     admin.from("atendimento_history_events").delete().eq("lead_id", leadId),
     admin.from("atendimento_captured_fields").delete().eq("lead_id", leadId),
-    admin.from("atendimento_experimental_class_bookings").delete().eq("lead_id", leadId),
   ]);
 
   if (messagesResult.error) {
@@ -151,9 +163,14 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
     return Response.json({ ok: false, error: capturedFieldsError.message }, { status: 500 });
   }
 
-  const { error: bookingsError } = bookingsResult;
-  if (bookingsError) {
-    return Response.json({ ok: false, error: bookingsError.message }, { status: 500 });
+  {
+    const bookingsDelete = await admin
+      .from("atendimento_experimental_class_bookings")
+      .delete()
+      .eq("lead_id", leadId);
+    if (bookingsDelete.error && !isExperimentalClassBookingsTableUnavailable(bookingsDelete.error)) {
+      return Response.json({ ok: false, error: bookingsDelete.error.message }, { status: 500 });
+    }
   }
 
   const { error: conversationsDeleteError } = await admin
