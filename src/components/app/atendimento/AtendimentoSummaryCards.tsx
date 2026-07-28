@@ -98,8 +98,11 @@ function LeadDetails({
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
-          <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Novo Interessado"}>
-            {lead.full_name || "Novo Interessado"}
+          <div
+            className="truncate text-lg font-semibold text-[var(--app-text-85)]"
+            title={lead.phone || lead.full_name || "Interessado sem telefone"}
+          >
+            {lead.phone || lead.full_name || "Interessado sem telefone"}
           </div>
           <div className="text-sm text-[var(--app-text-55)]">
             Ultima interacao: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
@@ -121,8 +124,6 @@ function LeadDetails({
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
-          <Field label="Telefone" value={lead.phone} copyable />
-          <Field label="Email" value={lead.email} copyable />
           <Field label="CPF" value={lead.cpf} copyable />
           <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
           <Field label="Status" value={atendimentoStatusLabel(lead.status)} />
@@ -813,7 +814,9 @@ export function AtendimentoSummaryCards({
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">{lead.full_name || "Novo Interessado"}</div>
+                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                        {lead.phone || lead.full_name || "Interessado sem telefone"}
+                      </div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {buildItemMeta(lead)}
                       </div>
@@ -894,7 +897,9 @@ export function AtendimentoSummaryCards({
       <AppModal open={Boolean(mobileLead)} onClose={() => setMobileLead(null)} size="lg" zIndexClass="z-[340]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">{mobileLead?.full_name || "Novo Interessado"}</div>
+            <div className="truncate text-base font-semibold text-[var(--app-text-85)]">
+              {mobileLead?.phone || mobileLead?.full_name || "Interessado sem telefone"}
+            </div>
             <div className="mt-1 text-xs text-[var(--app-text-55)]">{activeSectionData.label}</div>
           </div>
           <button
