@@ -775,6 +775,20 @@ export async function POST(req: Request) {
     (body as any).data?.event,
   );
 
+  const rawFromMe =
+    (body as any).fromMe === true ||
+    (body as any).from_me === true ||
+    (body as any).is_from_me === true ||
+    (body as any).message?.fromMe === true ||
+    (body as any).message?.from_me === true ||
+    (body as any).message?.is_from_me === true ||
+    (body as any).data?.fromMe === true ||
+    (body as any).data?.from_me === true ||
+    (body as any).data?.is_from_me === true ||
+    (body as any).data?.message?.fromMe === true ||
+    (body as any).data?.message?.from_me === true ||
+    (body as any).data?.message?.is_from_me === true;
+
   const rawEventId = getFirstNonEmpty(
     (body as any).messageId,
     (body as any).message_id,
@@ -855,6 +869,20 @@ export async function POST(req: Request) {
       .from("whatsapp_instances")
       .update({ status: nextInstanceStatus })
       .eq("instance_id", instanceId);
+  }
+
+  const isMessageFromConnectedNumber =
+    rawFromMe === true &&
+    normalizedEventType !== "DeliveryCallback" &&
+    normalizedEventType !== "MessageStatusCallback" &&
+    normalizedEventType !== "DisconnectedCallback";
+
+  if (isMessageFromConnectedNumber) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "message_from_connected_number",
+    });
   }
 
   {

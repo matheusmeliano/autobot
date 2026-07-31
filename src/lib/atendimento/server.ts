@@ -49,6 +49,16 @@ function normalizePhone(phone: string) {
   return digits;
 }
 
+function normalizePhoneDigitsOnly(value: string | null | undefined): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function phoneMatches(stored: string | null | undefined, search: string): boolean {
+  const s = normalizePhoneDigitsOnly(stored);
+  if (!s) return false;
+  return s === search;
+}
+
 function getLeadFirstName(name: string | null | undefined) {
   const parts = String(name ?? "")
     .trim()
@@ -371,6 +381,57 @@ export async function sendAtendimentoWhatsAppText(params: {
   const config = await getAtendimentoWhatsAppConfig();
   if (!config) {
     throw new Error("WhatsApp do atendimento não configurado.");
+  }
+
+  const normalizedDest = normalizePhoneDigitsOnly(params.phone);
+  const internalNotificationPhones = new Set(
+    [ATENDIMENTO_DAILY_SUMMARY_PHONE, EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE].map((value) =>
+      normalizePhoneDigitsOnly(value),
+    ),
+  );
+
+  if (normalizedDest && !internalNotificationPhones.has(normalizedDest)) {
+    const admin = createSupabaseAdminClient();
+    const { data: leadRow } = await admin
+      .from("atendimento_leads")
+      .select("id")
+      .ilike("phone", `%${normalizedDest}%`)
+      .limit(1)
+      .maybeSingle();
+
+    if (leadRow?.id) {
+      const { count: inboundCount } = await admin
+        .from("atendimento_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", (
+          (
+            await admin
+              .from("atendimento_conversations")
+              .select("id")
+              .eq("lead_id", String((leadRow as any).id))
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          )?.id ?? ""
+        ))
+        .eq("sender_role", "lead");
+
+      if (Number(inboundCount ?? 0) <= 0) {
+        return {
+          ok: false,
+          skipped: true,
+          reason: "no_prior_inbound_message_from_lead",
+          phone: normalizedDest,
+        };
+      }
+    } else {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "unknown_lead_no_prior_inbound",
+        phone: normalizedDest,
+      };
+    }
   }
 
   const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
@@ -1508,16 +1569,6 @@ export async function uploadAtendimentoFileToStorage(params: {
     file_size_bytes: Number(params.file.size ?? 0) || 0,
     storage_path: storagePath,
   };
-}
-
-function normalizePhoneDigitsOnly(value: string | null | undefined): string {
-  return String(value ?? "").replace(/\D/g, "");
-}
-
-function phoneMatches(stored: string | null | undefined, search: string): boolean {
-  const s = normalizePhoneDigitsOnly(stored);
-  if (!s) return false;
-  return s === search;
 }
 
 export async function findLeadByPhone(params: { phone: string; userId?: string | null }) {
