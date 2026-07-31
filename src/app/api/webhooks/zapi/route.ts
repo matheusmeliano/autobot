@@ -441,11 +441,38 @@ function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | unde
   if (!raw) return null;
   if (raw.startsWith(LOCATION_STATE_INVALID_MESSAGE)) return "state" as const;
   if (raw.startsWith(LOCATION_CITY_INVALID_MESSAGE)) return "city" as const;
-  if (raw === CAPTURED_FIELD_PROMPTS.state) return "state" as const;
-  if (raw === CAPTURED_FIELD_PROMPTS.city) return "city" as const;
-  if (raw.startsWith("Datas disponíveis") || raw.startsWith("As datas disponíveis são:")) return "date" as const;
+  if (
+    raw === CAPTURED_FIELD_PROMPTS.state ||
+    raw.includes("Em qual estado você mora?") ||
+    raw.includes("informe o estado onde você mora") ||
+    raw.includes("qual estado você mora")
+  ) {
+    return "state" as const;
+  }
+  if (
+    raw === CAPTURED_FIELD_PROMPTS.city ||
+    raw.includes("E a cidade?") ||
+    raw.includes("qual a sua cidade") ||
+    raw.includes("informe a cidade onde você mora")
+  ) {
+    return "city" as const;
+  }
+  if (
+    raw.startsWith("Datas disponíveis") ||
+    raw.startsWith("As datas disponíveis são:") ||
+    raw.includes("qual data você prefere") ||
+    raw.includes("escolha a melhor data")
+  ) {
+    return "date" as const;
+  }
   if (raw.startsWith(EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE)) return "date" as const;
-  if (raw.startsWith("Horários disponíveis") || raw.startsWith("Os horários disponíveis são:")) return "time" as const;
+  if (
+    raw.startsWith("Horários disponíveis") ||
+    raw.startsWith("Os horários disponíveis são:") ||
+    raw.includes("qual horário você prefere")
+  ) {
+    return "time" as const;
+  }
   if (raw.startsWith(EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE)) return "time" as const;
   return null;
 }
@@ -492,6 +519,9 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
 }): Promise<"state" | "city" | "date" | "time" | null> {
   const eventTypes = [
     "lead_timezone_collection_started",
+    "state_collected",
+    "city_prompt_presented",
+    "city_collected",
     "lead_timezone_identified",
     "state_validation_failed",
     "city_validation_failed",
@@ -512,6 +542,8 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
     .limit(20);
   if (!events || !events.length) return null;
   let blocked: "state" | "city" | "date" | "time" | null = null;
+  let hasStateCollected = false;
+  let hasCityCollected = false;
   for (const evt of events as Array<{ event_type: string; created_at: string }>) {
     const t = String(evt.event_type ?? "");
     switch (t) {
@@ -528,15 +560,27 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
       case "experimental_class_date_selected":
       case "experimental_class_date_options_presented":
         return "date";
+      case "lead_timezone_identified":
+      case "city_collected":
+        hasCityCollected = true;
+        if (!blocked) return null;
+        break;
       case "city_validation_failed":
         blocked = "city";
         break;
-      case "lead_timezone_identified":
-        return null;
+      case "city_prompt_presented":
+        if (!blocked) return "city";
+        break;
+      case "state_collected":
+        hasStateCollected = true;
+        if (!blocked && !hasCityCollected) return "city";
+        break;
       case "state_validation_failed":
         blocked = "state";
         break;
       case "lead_timezone_collection_started":
+        if (hasStateCollected && !blocked && !hasCityCollected) return "city";
+        if (blocked) return blocked;
         return "state";
     }
   }
@@ -1382,7 +1426,7 @@ export async function POST(req: Request) {
           leadId,
           conversationId,
         });
-        const expectedField = expectedFieldByHistory ?? expectedFieldByText;
+        const expectedField = expectedFieldByText ?? expectedFieldByHistory;
         const nextMissingField = getWhatsAppNextMissingField(lead);
 
         if (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) {
@@ -1494,11 +1538,37 @@ export async function POST(req: Request) {
             })
             .eq("id", leadId);
 
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "state_collected",
+            title: "Estado do lead identificado e salvo via WhatsApp",
+            details: {
+              state: stateResolution.state,
+              normalized_state: stateResolution.normalizedState,
+              timezone: stateResolution.timeZone,
+              country: stateResolution.country === "BR" ? "Brasil" : "Estados Unidos",
+            },
+            actorType: "system",
+          });
+
           const nextMsg = CAPTURED_FIELD_PROMPTS.city;
           await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
           try {
             await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
           } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "city_prompt_presented",
+            title: "Solicitada cidade do lead após estado identificado",
+            details: {
+              prompt: nextMsg,
+              state: stateResolution.state,
+            },
+            actorType: "system",
+          });
 
           return Response.json({
             ok: true,
@@ -1574,6 +1644,21 @@ export async function POST(req: Request) {
               updated_at: nowIso,
             })
             .eq("id", leadId);
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "city_collected",
+            title: "Cidade do lead identificada e salva via WhatsApp",
+            details: {
+              state: resolved.state,
+              city: resolved.city,
+              timezone: resolved.timeZone,
+              country: resolved.country === "BR" ? "Brasil" : "Estados Unidos",
+              source: resolved.source,
+            },
+            actorType: "system",
+          });
 
           void appendHistoryEvent({
             leadId,
