@@ -384,6 +384,59 @@ function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | n
 const MAX_LOCATION_WHATSAPP_ATTEMPTS = 3;
 const MAX_SCHEDULE_WHATSAPP_ATTEMPTS = 3;
 
+const SUPPORT_FINAL_MESSAGE = `Não foi possível concluir este agendamento.
+
+Para continuar, entre em contato com nosso suporte pelo WhatsApp:
+
++55 (65) 9 9693-3336
+
+Nossa equipe dará continuidade ao seu atendimento o mais breve possível.`;
+
+async function sendSupportFinalAndMarkBlocked(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  normalizedPhoneOnly: string;
+  blockedStage: "state" | "city" | "date" | "time";
+  attempt: number;
+  contentText?: string | null;
+}) {
+  const nowIso = new Date().toISOString();
+  void params.admin
+    .from("atendimento_leads")
+    .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
+    .eq("id", params.leadId);
+  void params.admin
+    .from("atendimento_conversations")
+    .update({ bot_enabled: false, updated_at: nowIso })
+    .eq("id", params.conversationId);
+
+  void appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "whatsapp_flow_blocked_max_attempts",
+    title: "Fluxo WhatsApp encerrado por limite de tentativas",
+    details: {
+      stage: params.blockedStage,
+      attempt: params.attempt,
+      last_content: params.contentText || null,
+    },
+    actorType: "system",
+  });
+
+  await insertWhatsAppBotTextMessage({
+    admin: params.admin,
+    conversationId: params.conversationId,
+    contentText: SUPPORT_FINAL_MESSAGE,
+  });
+  try {
+    await sendAtendimentoWhatsAppText({
+      phone: params.normalizedPhoneOnly,
+      message: SUPPORT_FINAL_MESSAGE,
+    });
+  } catch (_e) {}
+}
+
 function looksLikeWhatsAppDirectLeadFirstMessage(value: string) {
   const clean = String(value ?? "").trim().toLowerCase();
   if (!clean) return false;
@@ -1361,6 +1414,16 @@ export async function POST(req: Request) {
         const conversation = leadContext.conversation as any;
 
         if (!conversation.bot_enabled) {
+          const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+          const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+          if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: SUPPORT_FINAL_MESSAGE,
+              });
+            } catch (_e) {}
+          }
           return Response.json({ ok: true, ignored: true, reason: "conversation_blocked" });
         }
 
@@ -1487,9 +1550,6 @@ export async function POST(req: Request) {
             const nextFail =
               (await countWhatsAppLocationFailures({ admin, leadId, conversationId, field: "state" })) + 1;
             const blocked = nextFail >= MAX_LOCATION_WHATSAPP_ATTEMPTS;
-            const msg = blocked
-              ? "Não foi possível validar seu estado após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte.\n\nhttps://wa.me/5565996933336"
-              : `${LOCATION_STATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
 
             void appendHistoryEvent({
               leadId,
@@ -1505,16 +1565,24 @@ export async function POST(req: Request) {
             });
 
             if (blocked) {
-              void admin
-                .from("atendimento_leads")
-                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
-                .eq("id", leadId);
-              void admin
-                .from("atendimento_conversations")
-                .update({ bot_enabled: false, updated_at: nowIso })
-                .eq("id", conversationId);
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "state",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_state_blocked_support",
+                blocked: true,
+              });
             }
 
+            const msg = `${LOCATION_STATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
             await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
@@ -1524,7 +1592,7 @@ export async function POST(req: Request) {
               ok: true,
               handled: true,
               flow: "whatsapp_state_retry",
-              blocked,
+              blocked: false,
             });
           }
 
@@ -1590,9 +1658,6 @@ export async function POST(req: Request) {
             const nextFail =
               (await countWhatsAppLocationFailures({ admin, leadId, conversationId, field: "city" })) + 1;
             const blocked = nextFail >= MAX_LOCATION_WHATSAPP_ATTEMPTS;
-            const msg = blocked
-              ? "Não foi possível validar sua cidade após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte.\n\nhttps://wa.me/5565996933336"
-              : `${LOCATION_CITY_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
 
             void appendHistoryEvent({
               leadId,
@@ -1609,16 +1674,24 @@ export async function POST(req: Request) {
             });
 
             if (blocked) {
-              void admin
-                .from("atendimento_leads")
-                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
-                .eq("id", leadId);
-              void admin
-                .from("atendimento_conversations")
-                .update({ bot_enabled: false, updated_at: nowIso })
-                .eq("id", conversationId);
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "city",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_city_blocked_support",
+                blocked: true,
+              });
             }
 
+            const msg = `${LOCATION_CITY_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
             await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
@@ -1628,7 +1701,7 @@ export async function POST(req: Request) {
               ok: true,
               handled: true,
               flow: "whatsapp_city_retry",
-              blocked,
+              blocked: false,
             });
           }
 
@@ -1745,28 +1818,35 @@ export async function POST(req: Request) {
               (await countWhatsAppScheduleFailures({ admin, leadId, conversationId, field: "date" })) +
               1;
             const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
-            const msg = blocked
-              ? "Não foi possível validar a data informada após 3 tentativas. Este cadastro foi bloqueado.\n\nFale com nossa equipe: https://wa.me/5565996933336"
-              : `${EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+
+            if (blocked) {
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "date",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_date_blocked_support",
+                blocked: true,
+              });
+            }
+
+            const msg = `${EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
             await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
-            if (blocked) {
-              void admin
-                .from("atendimento_leads")
-                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
-                .eq("id", leadId);
-              void admin
-                .from("atendimento_conversations")
-                .update({ bot_enabled: false, updated_at: nowIso })
-                .eq("id", conversationId);
-            }
             return Response.json({
               ok: true,
               handled: true,
               flow: "whatsapp_date_retry",
-              blocked,
+              blocked: false,
             });
           }
 
@@ -1842,28 +1922,35 @@ export async function POST(req: Request) {
               (await countWhatsAppScheduleFailures({ admin, leadId, conversationId, field: "time" })) +
               1;
             const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
-            const msg = blocked
-              ? "Não foi possível validar o horário informado após 3 tentativas. Este cadastro foi bloqueado.\n\nFale com nossa equipe: https://wa.me/5565996933336"
-              : `${EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+
+            if (blocked) {
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "time",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_time_blocked_support",
+                blocked: true,
+              });
+            }
+
+            const msg = `${EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
             await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
-            if (blocked) {
-              void admin
-                .from("atendimento_leads")
-                .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
-                .eq("id", leadId);
-              void admin
-                .from("atendimento_conversations")
-                .update({ bot_enabled: false, updated_at: nowIso })
-                .eq("id", conversationId);
-            }
             return Response.json({
               ok: true,
               handled: true,
               flow: "whatsapp_time_retry",
-              blocked,
+              blocked: false,
             });
           }
 
