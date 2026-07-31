@@ -1003,6 +1003,7 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, ignored: true, reason: "unknown_instance" });
   }
 
+  const pendingPhoneValidationRef: { id: string } = { id: "" };
   const normalizedEventType = String(eventType ?? "").trim();
   const nextInstanceStatus =
     normalizedEventType === "DisconnectedCallback"
@@ -1070,6 +1071,7 @@ export async function POST(req: Request) {
       messageIds: callbackMessageIds,
     });
 
+    pendingPhoneValidationRef.id = String((pendingEvent as any)?.id ?? "");
     if (!pendingEvent?.id) {
       return Response.json({ ok: true, ignored: true, reason: "no_pending_phone_validation" });
     }
@@ -1467,7 +1469,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingEvent?.id) {
+  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id) {
     return Response.json({
       ok: true,
       ignored: true,
