@@ -400,20 +400,28 @@ export async function sendAtendimentoWhatsAppText(params: {
       .maybeSingle();
 
     if (leadRow?.id) {
+      const { data: conversationRow } = await admin
+        .from("atendimento_conversations")
+        .select("id")
+        .eq("lead_id", String((leadRow as any).id))
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const conversationId = String((conversationRow as any)?.id ?? "").trim();
+
+      if (!conversationId) {
+        return {
+          ok: false,
+          skipped: true,
+          reason: "no_conversation_found_for_lead",
+          phone: normalizedDest,
+        };
+      }
+
       const { count: inboundCount } = await admin
         .from("atendimento_messages")
         .select("id", { count: "exact", head: true })
-        .eq("conversation_id", (
-          (
-            await admin
-              .from("atendimento_conversations")
-              .select("id")
-              .eq("lead_id", String((leadRow as any).id))
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          )?.id ?? ""
-        ))
+        .eq("conversation_id", conversationId)
         .eq("sender_role", "lead");
 
       if (Number(inboundCount ?? 0) <= 0) {
