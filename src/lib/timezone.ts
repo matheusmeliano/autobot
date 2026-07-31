@@ -352,6 +352,77 @@ function locationMatchesKeyword(normalizedLocation: string, keyword: string) {
   return new RegExp(`(?:^|\\s)${escapeRegExp(normalizedKeyword)}(?:\\s|$)`, "i").test(normalizedLocation);
 }
 
+const LOCATION_PREPROCESS_PATTERNS: Array<RegExp> = [
+  /\bmoro\s+em\b/gi,
+  /\bmoro\s+no\s+estado\s+de\b/gi,
+  /\bmoro\s+na\s+cidade\s+de\b/gi,
+  /\bmoro\s+na\b/gi,
+  /\bmoro\s+no\b/gi,
+  /\bsou\s+de\b/gi,
+  /\bsou\s+do\s+estado\s+de\b/gi,
+  /\bsou\s+da\s+cidade\s+de\b/gi,
+  /\bsou\s+do\b/gi,
+  /\bsou\s+da\b/gi,
+  /\bvenho\s+de\b/gi,
+  /\bvenho\s+do\s+estado\s+de\b/gi,
+  /\bvenho\s+do\b/gi,
+  /\bvenho\s+da\s+cidade\s+de\b/gi,
+  /\bvenho\s+da\b/gi,
+  /\bresido\s+em\b/gi,
+  /\bresido\s+no\s+estado\s+de\b/gi,
+  /\bresido\s+na\s+cidade\s+de\b/gi,
+  /\bresido\s+no\b/gi,
+  /\bresido\s+na\b/gi,
+  /\bvivo\s+em\b/gi,
+  /\bvivo\s+no\s+estado\s+de\b/gi,
+  /\bvivo\s+na\s+cidade\s+de\b/gi,
+  /\bvivo\s+no\b/gi,
+  /\bvivo\s+na\b/gi,
+  /\bno\s+estado\s+de\b/gi,
+  /\bna\s+cidade\s+de\b/gi,
+  /\bestado\s+de\b/gi,
+  /\bcidade\s+de\b/gi,
+  /\bo\s+estado\b/gi,
+  /\ba\s+cidade\b/gi,
+];
+
+function extractLocationCandidates(raw: string): string[] {
+  const normalized = normalizeLocationText(raw);
+  if (!normalized) return [];
+
+  const candidates = new Set<string>();
+  candidates.add(normalized);
+
+  let stripped = normalized;
+  for (const pattern of LOCATION_PREPROCESS_PATTERNS) {
+    stripped = stripped.replace(pattern, " ");
+  }
+  stripped = stripped.replace(/\s+/g, " ").trim();
+  if (stripped && stripped !== normalized) {
+    candidates.add(stripped);
+  }
+
+  for (const separator of [/\s*,\s*/g, /\s+e\s+/g, /\s+-\s+/g]) {
+    const parts = stripped.split(separator).map((part) => part.trim()).filter(Boolean);
+    for (const part of parts) {
+      if (part) candidates.add(part);
+    }
+  }
+
+  for (const separator of [/\s*,\s*/g, /\s+e\s+/g, /\s+-\s+/g]) {
+    const parts = normalized.split(separator).map((part) => part.trim()).filter(Boolean);
+    for (const part of parts) {
+      if (part) candidates.add(part);
+    }
+  }
+
+  return Array.from(candidates);
+}
+
+function candidateMatchesKeyword(candidates: string[], keyword: string): boolean {
+  return candidates.some((candidate) => locationMatchesKeyword(candidate, keyword));
+}
+
 function normalizePhoneDigits(phone: string | null | undefined) {
   return String(phone ?? "").replace(/\D/g, "");
 }
@@ -476,12 +547,12 @@ export function resolveTimeZoneFromStateInput(params: {
   phone?: string | null;
 }) {
   const rawState = String(params.state ?? "").trim();
-  const normalizedState = normalizeLocationText(rawState);
-  if (!normalizedState) return null;
+  const candidates = extractLocationCandidates(rawState);
+  if (!candidates.length) return null;
 
   const phoneCountry = inferTimeZoneFromPhoneCountryCode(params.phone)?.country ?? null;
   const matchingRules = CITY_TIME_ZONE_RULES.filter((rule) =>
-    rule.stateKeywords?.some((keyword) => locationMatchesKeyword(normalizedState, keyword)),
+    rule.stateKeywords?.some((keyword) => candidateMatchesKeyword(candidates, keyword)),
   );
 
   if (!matchingRules.length) return null;
@@ -492,9 +563,20 @@ export function resolveTimeZoneFromStateInput(params: {
   const selectedRule = preferredRules[0] ?? matchingRules[0] ?? null;
   if (!selectedRule) return null;
 
+  let matchedKeywordLabel = "";
+  for (const rule of matchingRules) {
+    for (const keyword of rule.stateKeywords ?? []) {
+      if (candidateMatchesKeyword(candidates, keyword)) {
+        matchedKeywordLabel = keyword;
+        break;
+      }
+    }
+    if (matchedKeywordLabel) break;
+  }
+
   return {
-    state: rawState.replace(/\s+/g, " ").trim(),
-    normalizedState,
+    state: (matchedKeywordLabel || rawState).replace(/\s+/g, " ").trim(),
+    normalizedState: matchedKeywordLabel ? normalizeLocationText(matchedKeywordLabel) : candidates[0] ?? "",
     timeZone: selectedRule.timeZone,
     country: selectedRule.country,
   } satisfies StateTimeZoneResolution;
@@ -508,23 +590,41 @@ export function resolveTimeZoneFromCityInput(params: {
 }) {
   const rawCity = String(params.city ?? "").trim();
   const rawState = String(params.state ?? "").trim();
-  const normalizedCity = normalizeLocationText(rawCity);
-  const normalizedState = rawState ? normalizeLocationText(rawState) : "";
-  if (!normalizedCity) return null;
+  const cityCandidates = extractLocationCandidates(rawCity);
+  const stateCandidates = rawState ? extractLocationCandidates(rawState) : [];
+  if (!cityCandidates.length) return null;
 
   for (const rule of CITY_TIME_ZONE_RULES) {
-    const matchesCity = rule.keywords.some((keyword) => locationMatchesKeyword(normalizedCity, keyword));
+    const matchesCity = rule.keywords.some((keyword) => candidateMatchesKeyword(cityCandidates, keyword));
     const matchesState =
-      !normalizedState || !rule.stateKeywords?.length
+      !stateCandidates.length || !rule.stateKeywords?.length
         ? true
-        : rule.stateKeywords.some((keyword) => locationMatchesKeyword(normalizedState, keyword));
+        : rule.stateKeywords.some((keyword) => candidateMatchesKeyword(stateCandidates, keyword));
 
     if (matchesCity && matchesState) {
+      let matchedCityLabel = "";
+      for (const keyword of rule.keywords) {
+        if (candidateMatchesKeyword(cityCandidates, keyword)) {
+          matchedCityLabel = keyword;
+          break;
+        }
+      }
+      let matchedStateLabel = "";
+      if (stateCandidates.length) {
+        for (const keyword of rule.stateKeywords ?? []) {
+          if (candidateMatchesKeyword(stateCandidates, keyword)) {
+            matchedStateLabel = keyword;
+            break;
+          }
+        }
+      }
       return {
-        city: rawCity.replace(/\s+/g, " ").trim(),
-        state: rawState.replace(/\s+/g, " ").trim() || null,
-        normalizedCity,
-        normalizedState: normalizedState || null,
+        city: (matchedCityLabel || rawCity).replace(/\s+/g, " ").trim(),
+        state: (matchedStateLabel || rawState).replace(/\s+/g, " ").trim() || null,
+        normalizedCity: matchedCityLabel ? normalizeLocationText(matchedCityLabel) : cityCandidates[0] ?? "",
+        normalizedState: matchedStateLabel
+          ? normalizeLocationText(matchedStateLabel)
+          : stateCandidates[0] ?? null,
         timeZone: rule.timeZone,
         teacherTimeZone: PROFESSOR_TIME_ZONE,
         country: rule.country,
@@ -533,9 +633,13 @@ export function resolveTimeZoneFromCityInput(params: {
     }
   }
 
-  const stateResolution = rawState
+  const combinedCandidates = stateCandidates.length ? stateCandidates : cityCandidates;
+  const stateResolutionInput = stateCandidates.length
+    ? rawState
+    : rawCity;
+  const stateResolution = combinedCandidates.length
     ? resolveTimeZoneFromStateInput({
-        state: rawState,
+        state: stateResolutionInput,
         phone: params.phone,
       })
     : null;
@@ -543,7 +647,7 @@ export function resolveTimeZoneFromCityInput(params: {
     return {
       city: rawCity.replace(/\s+/g, " ").trim(),
       state: stateResolution.state,
-      normalizedCity,
+      normalizedCity: cityCandidates[0] ?? "",
       normalizedState: stateResolution.normalizedState,
       timeZone: stateResolution.timeZone,
       teacherTimeZone: PROFESSOR_TIME_ZONE,
@@ -562,8 +666,8 @@ export function resolveTimeZoneFromCityInput(params: {
   return {
     city: rawCity.replace(/\s+/g, " ").trim(),
     state: rawState.replace(/\s+/g, " ").trim() || null,
-    normalizedCity,
-    normalizedState: normalizedState || null,
+    normalizedCity: cityCandidates[0] ?? "",
+    normalizedState: stateCandidates[0] ?? null,
     timeZone: phoneFallback.timeZone,
     teacherTimeZone: PROFESSOR_TIME_ZONE,
     country: phoneFallback.country,
