@@ -208,7 +208,7 @@ export function buildExperimentalClassDatesMessages(options: ExperimentalClassDa
   const labels = options.map((option) => option.dayLabel);
   return [
     `As datas disponíveis são:\n\n${joinWithFinalConjunction(labels)}.`,
-    "Responda apenas com a data desejada.",
+    "Responda apenas com o dia desejado.",
   ];
 }
 
@@ -399,6 +399,18 @@ export function findExperimentalClassDateOption(
     if (normalizedInput === normalizedDayLabel) return option;
     if (normalizedInput === normalizeSelectionText(option.displayLabel)) return option;
     if (normalizedInput === normalizeSelectionText(option.leadDate)) return option;
+  }
+
+  const digitsMatches = normalizedInput.match(/\d+/g);
+  if (digitsMatches && digitsMatches.length) {
+    const inputDay = Number(digitsMatches[0]);
+    if (Number.isFinite(inputDay) && inputDay >= 1 && inputDay <= 31) {
+      const candidates = options.filter((option) => {
+        const dayNum = Number(option.dayLabel);
+        return Number.isFinite(dayNum) && dayNum === inputDay;
+      });
+      if (candidates.length === 1) return candidates[0] as ExperimentalClassDateOption;
+    }
   }
 
   return null;

@@ -44,7 +44,7 @@ export const ATENDIMENTO_PROFESSOR_TIME_ZONE = "America/Cuiaba";
 export const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com sucesso.";
 export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
   "Agora é só escolher a melhor data e horário para sua aula experimental.";
-export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual data você prefere?";
+export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual dia você prefere?";
 export function buildExperimentalClassDatePromptMessages(_name?: string | null) {
   return [
     "Maravilha!",
@@ -57,7 +57,7 @@ export const LOCATION_STATE_INVALID_MESSAGE =
 export const LOCATION_CITY_INVALID_MESSAGE =
   "Não foi possível identificar a cidade informada com base no estado enviado. Informe novamente apenas a cidade onde você mora.";
 export const EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE =
-  "Não foi possível validar a data informada. Responda novamente apenas com a data desejada.";
+  "Não foi possível validar o dia informado. Responda novamente apenas com o dia desejado.";
 export const EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE =
   "Não foi possível validar o horário informado. Responda novamente apenas com o horário desejado.";
 export const ATENDIMENTO_BLOCKED_FINAL_MESSAGE =
