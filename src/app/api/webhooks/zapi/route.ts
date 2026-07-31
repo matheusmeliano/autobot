@@ -1386,56 +1386,42 @@ export async function POST(req: Request) {
         const nextMissingField = getWhatsAppNextMissingField(lead);
 
         if (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) {
-          const dddHint = inferBrazilianLocationFromDdd(normalizedPhoneOnly);
-          let initialState: string | null = null;
-          let initialStateNorm: string | null = null;
-          let initialTz: string | null = null;
-          let initialCountry: "BR" | "US" | null = null;
-          if (dddHint) {
-            initialState = dddHint.state;
-            initialStateNorm = dddHint.normalizedState;
-            initialTz = dddHint.timeZone;
-            initialCountry = "BR";
-            void admin
-              .from("atendimento_leads")
-              .update({
-                state: initialState,
-                timezone: initialTz,
-                country: "Brasil",
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", leadId);
-          }
-
-          const nextMessage = dddHint ? CAPTURED_FIELD_PROMPTS.city : CAPTURED_FIELD_PROMPTS.state;
+          const firstMessage =
+            "Para agendarmos sua aula experimental gratuita, preciso de algumas informações rápidas. Vamos começar?";
+          const secondMessage = "Em qual estado você mora?";
 
           await insertWhatsAppBotTextMessage({
             admin,
             conversationId,
-            contentText: nextMessage,
+            contentText: firstMessage,
+          });
+          await insertWhatsAppBotTextMessage({
+            admin,
+            conversationId,
+            contentText: secondMessage,
           });
 
           try {
             await sendAtendimentoWhatsAppText({
               phone: normalizedPhoneOnly,
-              message: nextMessage,
+              message: firstMessage,
+            });
+          } catch (_sendErr) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: secondMessage,
             });
           } catch (_sendErr) {}
 
           void appendHistoryEvent({
             leadId,
             conversationId,
-            eventType: dddHint ? "lead_timezone_identified" : "lead_timezone_collection_started",
-            title: dddHint
-              ? "Estado do lead identificado via DDD do WhatsApp (início direto)"
-              : "Coleta de estado e cidade iniciada diretamente via WhatsApp",
+            eventType: "lead_timezone_collection_started",
+            title: "Coleta de estado e cidade iniciada diretamente via WhatsApp",
             details: {
               phone: normalizedPhoneOnly,
-              state: initialState,
-              normalized_state: initialStateNorm,
-              timezone: initialTz,
-              country: initialCountry,
-              source: dddHint ? "ddd_mapping_automatic" : "manual_collection_whatsapp",
+              source: "manual_collection_whatsapp",
               first_message: inboundContent || null,
             },
             actorType: "system",
