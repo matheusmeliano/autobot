@@ -49,6 +49,32 @@ function normalizePhone(phone: string) {
   return digits;
 }
 
+function isValidWhatsAppUserPhone(digitsOnly: string): boolean {
+  const d = String(digitsOnly ?? "").replace(/\D/g, "");
+  if (!d) return false;
+  if (!/^\d+$/.test(d)) return false;
+  if (/^0+$/.test(d)) return false;
+  if (d.length < 10) return false;
+  if (d.length > 15) return false;
+  if (d.startsWith("0")) return false;
+  if (d.startsWith("550")) return false;
+  if (d.startsWith("55")) {
+    if (d.length !== 12 && d.length !== 13) return false;
+    const rest = d.slice(2);
+    if (/^0+/.test(rest)) return false;
+    return true;
+  }
+  if (d.startsWith("1")) {
+    if (d.length !== 11) return false;
+    const npa = d.slice(1, 4);
+    if (!/^[2-9]\d{2}$/.test(npa)) return false;
+    return true;
+  }
+  const firstDigit = Number(d[0]);
+  if (!Number.isFinite(firstDigit) || firstDigit < 2) return false;
+  return true;
+}
+
 function normalizePhoneDigitsOnly(value: string | null | undefined): string {
   return String(value ?? "").replace(/\D/g, "");
 }
@@ -1629,6 +1655,11 @@ export async function ensureWhatsAppLeadAndConversation(params: {
 }) {
   const admin = createSupabaseAdminClient();
   const normalizedPhone = normalizePhoneDigitsOnly(params.phone);
+  if (!normalizedPhone || !isValidWhatsAppUserPhone(normalizedPhone)) {
+    throw new Error(
+      `Telefone informado nao corresponde a um usuario WhatsApp valido: ${normalizedPhone ? "len=" + normalizedPhone.length : "empty"}`,
+    );
+  }
   const publicLink = await ensureAtendimentoPublicLink();
 
   let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });

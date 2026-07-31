@@ -60,6 +60,58 @@ function normalizePhone(phone: string) {
   return d;
 }
 
+function isValidWhatsAppUserPhone(digitsOnly: string): boolean {
+  const d = String(digitsOnly ?? "").replace(/\D/g, "");
+  if (!d) return false;
+  if (!/^\d+$/.test(d)) return false;
+  if (/^0+$/.test(d)) return false;
+  if (d.length < 10) return false;
+  if (d.length > 15) return false;
+  if (d.startsWith("0")) return false;
+  if (d.startsWith("550")) return false;
+  if (d.startsWith("55")) {
+    if (d.length !== 12 && d.length !== 13) return false;
+    const rest = d.slice(2);
+    if (/^0+/.test(rest)) return false;
+    return true;
+  }
+  if (d.startsWith("1")) {
+    if (d.length !== 11) return false;
+    const npa = d.slice(1, 4);
+    if (!/^[2-9]\d{2}$/.test(npa)) return false;
+    return true;
+  }
+  const firstDigit = Number(d[0]);
+  if (!Number.isFinite(firstDigit) || firstDigit < 2) return false;
+  return true;
+}
+
+function normalizeAndValidateFromPhone(phone: unknown): {
+  normalized: string;
+  digitsOnly: string;
+  valid: boolean;
+  invalidReason?: string;
+} {
+  const raw = String(phone ?? "").trim();
+  if (!raw) {
+    return { normalized: "", digitsOnly: "", valid: false, invalidReason: "empty_phone" };
+  }
+  const normalized = normalizePhone(raw);
+  const digitsOnly = normalized.replace(/\D/g, "");
+  if (!digitsOnly) {
+    return { normalized: "", digitsOnly: "", valid: false, invalidReason: "empty_digits" };
+  }
+  if (!isValidWhatsAppUserPhone(digitsOnly)) {
+    return {
+      normalized,
+      digitsOnly,
+      valid: false,
+      invalidReason: "invalid_user_phone_format",
+    };
+  }
+  return { normalized, digitsOnly, valid: true };
+}
+
 function isAuthorized(req: Request) {
   const secret = process.env.ZAPI_WEBHOOK_SECRET;
   if (!secret) return true;
@@ -1394,10 +1446,38 @@ export async function POST(req: Request) {
   });
 
   const normalizedFrom = normalizePhone(fromPhone);
+  const validatedFrom = normalizeAndValidateFromPhone(fromPhone);
+  const normalizedPhoneOnly = validatedFrom.digitsOnly;
+  const isRealInboundMessage =
+    normalizedEventType === "ReceivedCallback" ||
+    normalizedEventType === "MESSAGE_RECEIVED" ||
+    normalizedEventType === "message_received" ||
+    normalizedEventType === "message" ||
+    normalizedEventType === "inbound" ||
+    normalizedFrom !== "receivedcallback" && (Boolean(messageText?.trim()) || Boolean(mediaUrl?.trim())) && rawFromMe !== true;
+
+  if (normalizedFrom && !validatedFrom.valid) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "invalid_or_non_user_phone_not_processed",
+      invalidReason: validatedFrom.invalidReason,
+      phoneSample: validatedFrom.digitsOnly.slice(0, 8) || "-",
+      phoneLength: validatedFrom.digitsOnly.length,
+    });
+  }
+
+  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingEvent?.id) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "non_inbound_event_skipped",
+      eventType: normalizedEventType || "unknown",
+    });
+  }
 
   if (normalizedFrom) {
     try {
-      const normalizedPhoneOnly = String(normalizedFrom ?? "").replace(/\D/g, "");
       const leadContext = await ensureWhatsAppLeadAndConversation({
         phone: normalizedPhoneOnly,
         userId,
