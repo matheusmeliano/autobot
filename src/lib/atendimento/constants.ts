@@ -45,13 +45,9 @@ export const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com suce
 export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
   "Agora é só escolher a melhor data e horário para sua aula experimental.";
 export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual data você prefere?";
-export function buildExperimentalClassDatePromptMessages(name?: string | null) {
-  const normalizedName = String(name ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .split(" ")[0] || "Aluno";
+export function buildExperimentalClassDatePromptMessages(_name?: string | null) {
   return [
-    `Maravilha, ${normalizedName}!`,
+    "Maravilha!",
     EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE,
     EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   ];
