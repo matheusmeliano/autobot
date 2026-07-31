@@ -697,7 +697,7 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
     contentText: messages[messages.length - 1] ?? "",
     createdAt: new Date().toISOString(),
   });
-  return { lastOutbound, availability };
+  return { lastOutbound, availability, messages };
 }
 
 async function presentExperimentalClassTimeOptionsWhatsApp(params: {
@@ -753,7 +753,7 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
     contentText: messages[messages.length - 1] ?? "",
     createdAt: new Date().toISOString(),
   });
-  return { lastOutbound, dateOption, slots };
+  return { lastOutbound, dateOption, slots, messages };
 }
 
 async function getScheduledExperimentalClassBookingWhatsApp(params: {
@@ -1759,18 +1759,17 @@ export async function POST(req: Request) {
             } catch (_e) {}
           }
 
-          const { lastOutbound } = await presentExperimentalClassDateOptionsWhatsApp({
+          const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
             conversationId,
             leadTimeZone: resolved.timeZone,
           });
-          if (lastOutbound) {
+          for (const dateMsg of dateMessages) {
+            const cleanMsg = String(dateMsg ?? "").trim();
+            if (!cleanMsg) continue;
             try {
-              const lastMsg = String((lastOutbound as any)?.content_text ?? "").trim();
-              if (lastMsg) {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
-              }
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
             } catch (_e) {}
           }
 
@@ -1788,16 +1787,17 @@ export async function POST(req: Request) {
           }
           const leadTz =
             String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
-          const { availability } = await presentExperimentalClassDateOptionsWhatsApp({
+          const { messages: fallbackDateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
             conversationId,
             leadTimeZone: leadTz,
           });
-          const lastMsg = buildExperimentalClassDatesMessages(availability.dates).slice(-1)[0] || "";
-          if (lastMsg) {
+          for (const dateMsg of fallbackDateMessages) {
+            const cleanMsg = String(dateMsg ?? "").trim();
+            if (!cleanMsg) continue;
             try {
-              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
             } catch (_e) {}
           }
           return Response.json({ ok: true, handled: true, flow: "whatsapp_date_presented_fallback" });
@@ -1870,10 +1870,11 @@ export async function POST(req: Request) {
             leadTimeZone: leadTz,
             professorDate: chosen.professorDate,
           });
-          const lastMsg = String((pres.lastOutbound as any)?.content_text ?? "").trim();
-          if (lastMsg) {
+          for (const timeMsg of pres.messages) {
+            const cleanMsg = String(timeMsg ?? "").trim();
+            if (!cleanMsg) continue;
             try {
-              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
             } catch (_e) {}
           }
           return Response.json({ ok: true, handled: true, flow: "whatsapp_time_presented" });
@@ -1901,10 +1902,11 @@ export async function POST(req: Request) {
               conversationId,
               leadTimeZone: leadTz,
             });
-            const lastMsg = String((fallback.lastOutbound as any)?.content_text ?? "").trim();
-            if (lastMsg) {
+            for (const dateMsg of fallback.messages) {
+              const cleanMsg = String(dateMsg ?? "").trim();
+              if (!cleanMsg) continue;
               try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastMsg });
+                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
               } catch (_e) {}
             }
             return Response.json({ ok: true, handled: true, flow: "whatsapp_date_represented" });
