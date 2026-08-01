@@ -148,7 +148,7 @@ test("buildExperimentalClassAttendantWhatsAppMessage monta a notificacao do aten
 test("buildExperimentalClassStudentLessonReadyWhatsAppMessage monta a mensagem de inicio da aula para o aluno", () => {
   assert.equal(
     buildExperimentalClassStudentLessonReadyWhatsAppMessage("Pedro", "https://meet.google.com/abc-defg-hij"),
-    "Olá, Pedro! 👋\n\nSua aula experimental já está disponível.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nO professor Lucas Brum já está te aguardando.\n\nLembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.",
+    "Sua aula experimental já está disponível.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nO professor Lucas Brum já está te aguardando.\n\nLembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.",
   );
 });
 

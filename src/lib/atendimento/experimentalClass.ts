@@ -258,11 +258,8 @@ ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 
 export function buildExperimentalClassStudentLessonReadyWhatsAppMessage(name: string, lessonLink: string) {
-  const safeName = String(name ?? "").trim() || "Aluno";
   const safeLessonLink = String(lessonLink ?? "").trim();
-  return `Olá, ${safeName}! 👋
-
-Sua aula experimental já está disponível.
+  return `Sua aula experimental já está disponível.
 
 Link da aula: ${safeLessonLink}
 
