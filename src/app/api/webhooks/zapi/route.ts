@@ -19,10 +19,12 @@ import {
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
+  buildExperimentalClassFinalChatMessages,
   buildExperimentalClassStudentWhatsAppMessages,
   buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
+  EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
@@ -1496,17 +1498,72 @@ export async function POST(req: Request) {
         const conversation = leadContext.conversation as any;
 
         if (!conversation.bot_enabled) {
-          const lastBotMsg = await getLastBotMessage({ admin, conversationId });
-          const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
-          if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+          let finalReason = "conversation_blocked";
+          let responseMessage: string | null = null;
+          const hasBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+          if (hasBooking?.id) {
+            finalReason = "conversation_blocked_echo_booking_scheduled";
+            responseMessage = EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+          } else {
+            const histFinal = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .in("event_type", [
+                "experimental_class_scheduled",
+                "whatsapp_flow_concluded_bot_disabled",
+                "whatsapp_flow_blocked_max_attempts",
+              ])
+              .order("created_at", { ascending: false })
+              .limit(3);
+            const events = (histFinal.data ?? []) as Array<{ event_type: string }>;
+            const hasScheduled = events.some(
+              (e) =>
+                e.event_type === "experimental_class_scheduled" ||
+                e.event_type === "whatsapp_flow_concluded_bot_disabled",
+            );
+            const hasBlockedMaxAttempts = events.some(
+              (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
+            );
+            if (hasScheduled) {
+              finalReason = "conversation_blocked_echo_scheduled_by_history";
+              responseMessage = EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+            } else if (hasBlockedMaxAttempts) {
+              const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+              const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+              finalReason = "conversation_blocked_support_max_attempts";
+              if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+                responseMessage = SUPPORT_FINAL_MESSAGE;
+              }
+            } else {
+              const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+              const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+              if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+                responseMessage = SUPPORT_FINAL_MESSAGE;
+              }
+            }
+          }
+          if (responseMessage) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: responseMessage,
+              });
+            } catch (_e) {}
             try {
               await sendAtendimentoWhatsAppText({
                 phone: normalizedPhoneOnly,
-                message: SUPPORT_FINAL_MESSAGE,
+                message: responseMessage,
               });
             } catch (_e) {}
           }
-          return Response.json({ ok: true, ignored: true, reason: "conversation_blocked" });
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: finalReason,
+          });
         }
 
         const inboundContent = String(messageText ?? "").trim();
@@ -1588,10 +1645,23 @@ export async function POST(req: Request) {
           } catch (_e) {}
         }
         if (existingScheduledBookingId) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
+            });
+          } catch (_e) {}
           return Response.json({
             ok: true,
             ignored: true,
-            reason: "flow_concluded_aula_experimental_ja_agendada",
+            reason: "flow_concluded_aula_experimental_ja_agendada_echo",
             booking_id: existingScheduledBookingId,
           });
         }
@@ -1608,7 +1678,16 @@ export async function POST(req: Request) {
           ])
           .order("created_at", { ascending: false })
           .limit(3);
-        const recentFlowConclusion = (histFlowRecent.data ?? []).length > 0;
+        const eventsFlowRecent = (histFlowRecent.data ?? []) as Array<{ event_type: string }>;
+        const recentFlowConclusion = eventsFlowRecent.length > 0;
+        const recentIsScheduled = eventsFlowRecent.some(
+          (e) =>
+            e.event_type === "experimental_class_scheduled" ||
+            e.event_type === "whatsapp_flow_concluded_bot_disabled",
+        );
+        const recentIsMaxAttemptsBlocked = eventsFlowRecent.some(
+          (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
+        );
         if (recentFlowConclusion && conversation.bot_enabled !== false) {
           try {
             await admin
@@ -1621,11 +1700,39 @@ export async function POST(req: Request) {
           } catch (_e) {}
         }
         if (recentFlowConclusion) {
+          let finalMsg: string | null = null;
+          let finalReason = "flow_concluded_already_finalized_in_history_event";
+          if (recentIsScheduled) {
+            finalMsg = EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+            finalReason = "flow_concluded_echo_scheduled_by_history";
+          } else if (recentIsMaxAttemptsBlocked) {
+            const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+            const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+            if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+              finalMsg = SUPPORT_FINAL_MESSAGE;
+            }
+            finalReason = "flow_concluded_support_max_attempts_by_history";
+          }
+          if (finalMsg) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: finalMsg,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: finalMsg,
+              });
+            } catch (_e) {}
+          }
           return Response.json({
             ok: true,
             ignored: true,
-            reason: "flow_concluded_already_finalized_in_history_event",
-            event_types: (histFlowRecent.data ?? []).map((e: any) => e.event_type),
+            reason: finalReason,
+            event_types: eventsFlowRecent.map((e: any) => e.event_type),
           });
         }
 

@@ -240,7 +240,7 @@ export function buildExperimentalClassStudentWhatsAppMessages(_name: string) {
   return [
     `Parabéns!`,
     `É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
-    `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
+    EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
   ];
 }
 
@@ -292,11 +292,14 @@ Agora é hora de dar o próximo passo!
 Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?`;
 }
 
+export const EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE =
+  `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
+
 export function buildExperimentalClassFinalChatMessages() {
   return [
     `Parabéns!`,
     `É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
-    `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
+    EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
   ];
 }
 
