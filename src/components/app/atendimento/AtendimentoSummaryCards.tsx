@@ -18,7 +18,7 @@ const PANEL_PAGE_SIZE = 10;
 
 function atendimentoOriginLabel(origin: string | null | undefined) {
   const normalized = String(origin ?? "").trim().toLowerCase();
-  if (normalized === "link_publico_atendimento") return "Link de Atendimento";
+  if (normalized === "link_publico_atendimento") return "Link de atendimento";
   if (normalized === "whatsapp_trafego_pago") return "Tráfego pago";
   if (!normalized) return "-";
   return origin ?? "-";
@@ -72,7 +72,7 @@ function Field({
             disabled={!canCopy}
             className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)] disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={`Copiar ${label.toLowerCase()}`}
-            title={canCopy ? `Copiar ${label.toLowerCase()}` : `${label} indisponivel`}
+            title={canCopy ? `Copiar ${label.toLowerCase()}` : `${label} indisponível`}
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
@@ -113,9 +113,9 @@ function LeadDetails({
   const draftStageLabel = (() => {
     switch (experimentalStatus) {
       case "date_selected":
-        return "Data escolhida";
+        return "Dia escolhido";
       case "time_selected":
-        return "Data e horário escolhidos";
+        return "Dia e horário escolhidos";
       case "booked":
         return "";
       default:
@@ -134,7 +134,7 @@ function LeadDetails({
             {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
           </div>
           <div className="text-sm text-[var(--app-text-55)]">
-            Ultima interacao: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
+            Última interação: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
           </div>
         </div>
 
@@ -169,7 +169,7 @@ function LeadDetails({
           <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
           <Field label="Cidade" value={lead.city} />
           <Field label="Estado" value={lead.state} />
-          <Field label="Pais" value={lead.country} />
+          <Field label="País" value={lead.country} />
           <Field label="Fuso" value={lead.timezone} />
         </div>
 
@@ -187,13 +187,16 @@ function LeadDetails({
               <Field
                 label="Dia (aluno)"
                 value={
-                  String(booking?.lead_date ?? "").trim() ||
-                  draftDate ||
-                  null
+                  formatAtendimentoDate(
+                    String(booking?.lead_date ?? "").trim() ||
+                      String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+                        String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
+                        null,
+                  )
                 }
               />
               <Field
-                label="Horario (aluno)"
+                label="Horário (aluno)"
                 value={
                   atendimentoTimeLabel(
                     String(booking?.lead_time ?? "").trim() || draftTime || null,
@@ -211,7 +214,7 @@ function LeadDetails({
                 }
               />
               <Field
-                label="Horario (professor)"
+                label="Horário (professor)"
                 value={
                   atendimentoTimeLabel(
                     String(booking?.professor_time ?? "").trim() ||
@@ -304,10 +307,10 @@ function BookingDetails({
           <Field label="Aluno" value={lead.full_name} />
           <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
           <Field label="Dia do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
-          <Field label="Horario do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
+          <Field label="Horário do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
           <Field label="Fuso do aluno" value={booking?.lead_timezone} />
           <Field label="Dia do professor" value={formatAtendimentoDate(booking?.professor_date)} />
-          <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
+          <Field label="Horário do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
           <Field label="Fuso do professor" value={professorTimeZone} />
         </div>
 
@@ -315,7 +318,7 @@ function BookingDetails({
           <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">Agendamento</div>
             <div className="mt-3 text-sm text-amber-50">
-              O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com data e horário confirmados.
+              O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com dia e horário confirmados.
             </div>
           </div>
         ) : null}
@@ -345,7 +348,7 @@ function BookingDetails({
               </>
             ) : (
               <>
-                <div className="mt-3 text-sm font-semibold text-[var(--app-text-85)]">O aluno compareceu a aula?</div>
+                <div className="mt-3 text-sm font-semibold text-[var(--app-text-85)]">O aluno compareceu à aula?</div>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
@@ -375,7 +378,7 @@ function BookingDetails({
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">Link da Aula</div>
               <div className="mt-2 text-xs text-[var(--app-text-55)]">
-                Adicione manualmente o link que será enviado ao aluno na data e horário agendados.
+                Adicione manualmente o link que será enviado ao aluno no dia e horário agendados.
               </div>
             </div>
 
@@ -504,28 +507,28 @@ export function AtendimentoSummaryCards({
         id: "interessados" as const,
         label: "Interessados",
         value: localSummary.totalLeads,
-        emptyMessage: "Nenhum interessado disponivel no momento.",
+        emptyMessage: "Nenhum interessado disponível no momento.",
         items: localLeads.filter((lead) => lead.status !== "matriculado" && lead.funnel_stage !== "matriculado"),
       },
       {
         id: "alunos" as const,
         label: "Alunos",
         value: 0,
-        emptyMessage: "Nenhum aluno disponivel no momento.",
+        emptyMessage: "Nenhum aluno disponível no momento.",
         items: [],
       },
       {
         id: "agendamentos" as const,
         label: "Agendamentos",
         value: agendamentoItems.length,
-        emptyMessage: "Nenhum agendamento disponivel no momento.",
+        emptyMessage: "Nenhum agendamento disponível no momento.",
         items: agendamentoItems,
       },
       {
         id: "contratos" as const,
         label: "Contratos",
         value: 0,
-        emptyMessage: "Nenhum contrato disponivel no momento.",
+        emptyMessage: "Nenhum contrato disponível no momento.",
         items: [],
       },
     ],

@@ -51,7 +51,7 @@ export function AtendimentoLeadSidebar({
             label="Última interação"
             value={lead.last_interaction_at ? formatAtendimentoDateTime(lead.last_interaction_at) : "-"}
           />
-          <Field label="Data base" value={formatAtendimentoDate(lead.created_at)} />
+          <Field label="Dia base" value={formatAtendimentoDate(lead.created_at)} />
         </div>
       </div>
     </div>

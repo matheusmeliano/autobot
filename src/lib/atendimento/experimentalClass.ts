@@ -212,7 +212,7 @@ export function experimentalClassBookingDisplayStatusLabel(status: ExperimentalC
 
 export function buildExperimentalClassDatesMessages(options: ExperimentalClassDateOption[]) {
   if (!options.length) {
-    return ["No momento, não há datas disponíveis para aula experimental até o fim deste mês."];
+    return ["No momento, não há dias disponíveis para aula experimental até o fim deste mês."];
   }
 
   const labels = options.map((option) => option.dayLabel);
@@ -227,7 +227,7 @@ export function buildExperimentalClassTimesMessages(params: {
   options: ExperimentalClassTimeOption[];
 }) {
   if (!params.options.length) {
-    return [`Não há horários livres para o dia ${params.dayLabel}. Escolha outra data disponível.`];
+    return [`Não há horários livres para o dia ${params.dayLabel}. Escolha outro dia disponível.`];
   }
 
   return [
