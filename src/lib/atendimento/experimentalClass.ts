@@ -422,6 +422,35 @@ export function findExperimentalClassDateOption(
     if (normalizedInput === normalizeSelectionText(option.leadDate)) return option;
   }
 
+  const hasAnyLetter = /[a-zA-Záàâãéèêíìîóòôõúùûçüñ]/.test(String(input ?? "").normalize("NFD"));
+  const hasDateSeparatorsOnlyNoLetters = /^[0-9\s./\-]+$/.test(String(input ?? "").trim());
+  const seemsLikePureNumericDate = !hasAnyLetter && hasDateSeparatorsOnlyNoLetters;
+  const relevantDateKeywords = [
+    /(^|[\s.!,?:;\-])((segunda|terca|quarta|quinta|sexta|sabado|domingo)|(seg|ter|qua|qui|sex|sab|dom)|(feira|dia|hoje|amanha|depois de amanha|proximo|proxima|mes|agosto|janeiro|fevereiro|marco|abril|maio|junho|julho|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez))([\s.!,?:;\-]|$)/,
+    /\bd\s*\+\s*\d+\b/,
+  ];
+  const hasRelevantDateText = hasAnyLetter && relevantDateKeywords.some((rx) => rx.test(normalizedInput));
+  function cleanTextLooksReasonable(raw: string): boolean {
+    const t = String(raw ?? "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-záàâãéèêíìîóòôõúùûç]/g, "");
+    if (t.length < 3) return true;
+    const vowels = (t.match(/[aeiou]/g) || []).length;
+    const ratio = vowels / t.length;
+    if (ratio < 0.2) return false;
+    const unique = new Set(Array.from(t)).size;
+    if (unique / t.length < 0.55) return false;
+    return true;
+  }
+  const canFallbackToDigitsOnly =
+    seemsLikePureNumericDate ||
+    !hasAnyLetter ||
+    (hasRelevantDateText && cleanTextLooksReasonable(String(input ?? "")));
+
+  if (!canFallbackToDigitsOnly) return null;
+
   const digitsMatches = normalizedInput.match(/\d+/g);
   if (digitsMatches && digitsMatches.length) {
     const inputDay = Number(digitsMatches[0]);
@@ -454,6 +483,46 @@ export function findExperimentalClassTimeOption(
         normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.displayLabel))
     ) {
       return option;
+    }
+  }
+
+  const hasAnyLetter = /[a-zA-Záàâãéèêíìîóòôõúùûçüñ]/.test(String(input ?? "").normalize("NFD"));
+  const hasTimeSeparatorsOnlyNoLetters = /^[0-9\s.:\-hH]+$/.test(String(input ?? "").trim());
+  const relevantTimeKeywords = [
+    /(^|[\s.!,?:;\-])((horas|hora|hrs|hr|minutos|minuto|mins|min|meio dia|meio-dia|manha|tarde|noite|almoco|jantar|agora)|([0-9]{1,2}h([0-9]{1,2}min?)?))([\s.!,?:;\-]|$)/,
+  ];
+  const hasRelevantTimeText = hasAnyLetter && relevantTimeKeywords.some((rx) => rx.test(normalizedInput));
+  function cleanTextLooksReasonable(raw: string): boolean {
+    const t = String(raw ?? "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-záàâãéèêíìîóòôõúùûç]/g, "");
+    if (t.length < 3) return true;
+    const vowels = (t.match(/[aeiou]/g) || []).length;
+    const ratio = vowels / t.length;
+    if (ratio < 0.2) return false;
+    const unique = new Set(Array.from(t)).size;
+    if (unique / t.length < 0.55) return false;
+    return true;
+  }
+  const canUseNumericFallback =
+    !hasAnyLetter ||
+    hasTimeSeparatorsOnlyNoLetters ||
+    (hasRelevantTimeText && cleanTextLooksReasonable(String(input ?? "")));
+
+  if (!canUseNumericFallback) return null;
+
+  const digitsMatches = normalizedInput.match(/\d+/g);
+  if (digitsMatches && digitsMatches.length) {
+    const inputHour = Number(digitsMatches[0]);
+    const inputMinute = digitsMatches[1] ? Number(digitsMatches[1]) : 0;
+    if (Number.isFinite(inputHour) && inputHour >= 0 && inputHour <= 23 && Number.isFinite(inputMinute) && inputMinute >= 0 && inputMinute <= 59) {
+      const wanted = `${String(inputHour).padStart(2, "0")}:${String(inputMinute).padStart(2, "0")}`;
+      for (const option of options) {
+        if (normalizeSelectionText(option.professorTime) === wanted) return option;
+        if (normalizeSelectionText(option.displayLabel) === wanted) return option;
+      }
     }
   }
 
