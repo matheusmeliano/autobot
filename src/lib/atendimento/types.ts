@@ -24,6 +24,13 @@ export type AtendimentoLead = {
   last_interaction_at: string | null;
   unread_count: number;
   is_new_for_attendant: boolean;
+  experimental_class_professor_date?: string | null;
+  experimental_class_lead_date?: string | null;
+  experimental_class_professor_time?: string | null;
+  experimental_class_lead_time?: string | null;
+  experimental_class_professor_start_at?: string | null;
+  experimental_class_lead_start_at?: string | null;
+  experimental_class_status?: string | null;
 };
 
 export type AtendimentoConversation = {

@@ -137,6 +137,14 @@ export function AtendimentoClient() {
           void loadSummary({ silent: true });
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "atendimento_experimental_class_bookings" },
+        () => {
+          void loadSummary({ silent: true });
+          void loadPanelLeads();
+        },
+      )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           realtimeSubscribedRef.current = true;

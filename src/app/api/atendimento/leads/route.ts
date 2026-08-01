@@ -136,12 +136,19 @@ export async function GET(req: Request) {
         source: "table",
       });
     }
+  }
 
+  const draftDateByLeadId = new Map<string, { professor_date: string; lead_date: string; label?: string | null; at: string } | null>();
+  const draftTimeByLeadId = new Map<string, { professor_date: string; professor_time: string; lead_date: string; lead_time: string; professor_start_at: string; lead_start_at: string; at: string } | null>();
+
+  if (leadIds.length > 0) {
     const { data: historyEvents, error: historyError } = await admin
       .from("atendimento_history_events")
       .select("id, lead_id, event_type, conversation_id, created_at, details")
       .in("lead_id", leadIds)
       .in("event_type", [
+        "experimental_class_date_selected",
+        "experimental_class_time_selected",
         "experimental_class_scheduled",
         "experimental_class_cancelled",
         "experimental_class_link_updated",
@@ -162,6 +169,7 @@ export async function GET(req: Request) {
       if (!leadId) continue;
       const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
       const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+      const eventCreatedAt = String((event as any)?.created_at ?? "").trim() || null;
       const lessonLink = String(details.lesson_link ?? "").trim() || null;
 
       if (eventType === "experimental_class_link_updated") {
@@ -171,31 +179,51 @@ export async function GET(req: Request) {
         continue;
       }
 
-      if (bookingsByLeadId.has(leadId)) continue;
+      if (!bookingsByLeadId.has(leadId) && eventType === "experimental_class_scheduled") {
+        const bookingStatus = String(details.status ?? "").trim().toLowerCase() || "scheduled";
+        bookingsByLeadId.set(leadId, {
+          id: String((event as any)?.id ?? ""),
+          status: bookingStatus,
+          lesson_link: lessonLink,
+          student_start_notification_sent_at: null,
+          attendant_start_notification_sent_at: null,
+          attendance_status: null,
+          attendance_checked_at: null,
+          professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          lead_timezone: String(details.lead_timezone ?? ""),
+          professor_date: String(details.professor_date ?? ""),
+          professor_time: String(details.professor_time ?? ""),
+          professor_start_at: String(details.professor_start_at ?? ""),
+          lead_date: String(details.lead_date ?? ""),
+          lead_time: String(details.lead_time ?? ""),
+          lead_start_at: String(details.lead_start_at ?? ""),
+          conversation_id: String((event as any)?.conversation_id ?? ""),
+          created_at: String((event as any)?.created_at ?? ""),
+          source: "history",
+        });
+      }
 
-      const bookingStatus =
-        String(details.status ?? "").trim().toLowerCase() ||
-        (eventType === "experimental_class_cancelled" ? "cancelled" : "scheduled");
-      bookingsByLeadId.set(leadId, {
-        id: String((event as any)?.id ?? ""),
-        status: bookingStatus,
-        lesson_link: lessonLink,
-        student_start_notification_sent_at: null,
-        attendant_start_notification_sent_at: null,
-        attendance_status: null,
-        attendance_checked_at: null,
-        professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-        lead_timezone: String(details.lead_timezone ?? ""),
-        professor_date: String(details.professor_date ?? ""),
-        professor_time: String(details.professor_time ?? ""),
-        professor_start_at: String(details.professor_start_at ?? ""),
-        lead_date: String(details.lead_date ?? ""),
-        lead_time: String(details.lead_time ?? ""),
-        lead_start_at: String(details.lead_start_at ?? ""),
-        conversation_id: String((event as any)?.conversation_id ?? ""),
-        created_at: String((event as any)?.created_at ?? ""),
-        source: "history",
-      });
+      if (eventType === "experimental_class_date_selected" && !draftDateByLeadId.has(leadId)) {
+        draftDateByLeadId.set(leadId, {
+          professor_date: String(details.professor_date ?? "").trim(),
+          lead_date: String(details.lead_date ?? "").trim(),
+          label: String(details.label ?? "").trim() || null,
+          at: String(eventCreatedAt ?? ""),
+        });
+        continue;
+      }
+      if (eventType === "experimental_class_time_selected" && !draftTimeByLeadId.has(leadId)) {
+        draftTimeByLeadId.set(leadId, {
+          professor_date: String(details.professor_date ?? "").trim(),
+          professor_time: String(details.professor_time ?? "").trim(),
+          lead_date: String(details.lead_date ?? "").trim(),
+          lead_time: String(details.lead_time ?? "").trim(),
+          professor_start_at: String(details.professor_start_at ?? "").trim(),
+          lead_start_at: String(details.lead_start_at ?? "").trim(),
+          at: String(eventCreatedAt ?? ""),
+        });
+        continue;
+      }
     }
 
     for (const [leadId, lessonLink] of lessonLinkByLeadId.entries()) {
@@ -210,11 +238,11 @@ export async function GET(req: Request) {
     for (const event of historyEvents ?? []) {
       const leadId = String((event as any)?.lead_id ?? "");
       if (!leadId) continue;
-      const currentBooking = bookingsByLeadId.get(leadId);
-      if (!currentBooking) continue;
-
+      const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
       const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
       const eventCreatedAt = String((event as any)?.created_at ?? "").trim() || null;
+      const currentBooking = bookingsByLeadId.get(leadId);
+      if (!currentBooking) continue;
 
       if (
         eventType === "experimental_class_student_start_notification_sent" &&
@@ -264,11 +292,81 @@ export async function GET(req: Request) {
   }
 
   const rows = leadRows
-    .map((row) => ({
-      ...row,
-      conversation: conversationsByLeadId.get(String(row.id ?? "")) ?? null,
-      experimental_class_booking: bookingsByLeadId.get(String(row.id ?? "")) ?? null,
-    }))
+    .map((row) => {
+      const leadId = String(row.id ?? "");
+      const existingBooking = bookingsByLeadId.get(leadId) ?? null;
+      const draftDate = draftDateByLeadId.get(leadId) ?? null;
+      const draftTime = draftTimeByLeadId.get(leadId) ?? null;
+
+      const mergedProfessorDate =
+        String((row as any)?.experimental_class_professor_date ?? "").trim() ||
+        (draftTime?.professor_date ?? "") ||
+        (draftDate?.professor_date ?? "") ||
+        String((existingBooking as any)?.professor_date ?? "").trim();
+      const mergedLeadDate =
+        String((row as any)?.experimental_class_lead_date ?? "").trim() ||
+        (draftTime?.lead_date ?? "") ||
+        (draftDate?.lead_date ?? "") ||
+        String((existingBooking as any)?.lead_date ?? "").trim();
+      const mergedProfessorTime =
+        String((row as any)?.experimental_class_professor_time ?? "").trim() ||
+        (draftTime?.professor_time ?? "") ||
+        String((existingBooking as any)?.professor_time ?? "").trim();
+      const mergedLeadTime =
+        String((row as any)?.experimental_class_lead_time ?? "").trim() ||
+        (draftTime?.lead_time ?? "") ||
+        String((existingBooking as any)?.lead_time ?? "").trim();
+      const mergedProfessorStartAt =
+        String((row as any)?.experimental_class_professor_start_at ?? "").trim() ||
+        (draftTime?.professor_start_at ?? "") ||
+        String((existingBooking as any)?.professor_start_at ?? "").trim();
+      const mergedLeadStartAt =
+        String((row as any)?.experimental_class_lead_start_at ?? "").trim() ||
+        (draftTime?.lead_start_at ?? "") ||
+        String((existingBooking as any)?.lead_start_at ?? "").trim();
+      const mergedStatus =
+        String((row as any)?.experimental_class_status ?? "").trim() ||
+        (existingBooking ? "booked" : draftTime ? "time_selected" : draftDate ? "date_selected" : "");
+
+      const bookingWithFallback = existingBooking
+        ? existingBooking
+        : mergedStatus && (mergedProfessorDate || mergedProfessorTime)
+          ? ({
+              id: "",
+              status: "draft",
+              lesson_link: null,
+              student_start_notification_sent_at: null,
+              attendant_start_notification_sent_at: null,
+              attendance_status: null,
+              attendance_checked_at: null,
+              professor_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              professor_date: mergedProfessorDate,
+              professor_time: mergedProfessorTime,
+              professor_start_at: mergedProfessorStartAt,
+              lead_date: mergedLeadDate,
+              lead_time: mergedLeadTime,
+              lead_start_at: mergedLeadStartAt,
+              conversation_id: String((row as any)?.conversation_id ?? ""),
+              created_at: String(row.updated_at ?? row.created_at ?? ""),
+              source: "draft",
+              draft_stage: mergedStatus,
+            } as any)
+          : null;
+
+      return {
+        ...row,
+        experimental_class_professor_date: mergedProfessorDate || null,
+        experimental_class_lead_date: mergedLeadDate || null,
+        experimental_class_professor_time: mergedProfessorTime || null,
+        experimental_class_lead_time: mergedLeadTime || null,
+        experimental_class_professor_start_at: mergedProfessorStartAt || null,
+        experimental_class_lead_start_at: mergedLeadStartAt || null,
+        experimental_class_status: mergedStatus || null,
+        conversation: conversationsByLeadId.get(leadId) ?? null,
+        experimental_class_booking: bookingWithFallback,
+      };
+    })
     .filter((row) => {
     const name = String(row.full_name ?? "").toLowerCase();
     const phone = String(row.phone ?? "").toLowerCase();

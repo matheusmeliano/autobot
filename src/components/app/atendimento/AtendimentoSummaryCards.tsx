@@ -101,6 +101,28 @@ function LeadDetails({
   onEditName: (lead: AtendimentoLeadListItem) => void;
 }) {
   const hasName = Boolean(String(lead.full_name ?? "").trim());
+  const experimentalStatus = String((lead as any)?.experimental_class_status ?? "").trim();
+  const draftDate = String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+    String((lead as any)?.experimental_class_professor_date ?? "").trim();
+  const draftTime = String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+    String((lead as any)?.experimental_class_professor_time ?? "").trim();
+  const booking = lead.experimental_class_booking;
+  const isDraft = booking && (booking as any).source === "draft";
+  const showDraftSection = showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
+
+  const draftStageLabel = (() => {
+    switch (experimentalStatus) {
+      case "date_selected":
+        return "Data escolhida";
+      case "time_selected":
+        return "Data e horário escolhidos";
+      case "booked":
+        return "";
+      default:
+        return isDraft ? "Em definição" : "";
+    }
+  })();
+
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
@@ -150,6 +172,57 @@ function LeadDetails({
           <Field label="Pais" value={lead.country} />
           <Field label="Fuso" value={lead.timezone} />
         </div>
+
+        {showDraftSection ? (
+          <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
+              Agendamento em andamento
+            </div>
+            {draftStageLabel ? (
+              <div className="mt-2 inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
+                {draftStageLabel}
+              </div>
+            ) : null}
+            <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field
+                label="Data (aluno)"
+                value={
+                  String(booking?.lead_date ?? "").trim() ||
+                  draftDate ||
+                  null
+                }
+              />
+              <Field
+                label="Horario (aluno)"
+                value={
+                  atendimentoTimeLabel(
+                    String(booking?.lead_time ?? "").trim() || draftTime || null,
+                  )
+                }
+              />
+              <Field
+                label="Data (professor)"
+                value={
+                  formatAtendimentoDate(
+                    String(booking?.professor_date ?? "").trim() ||
+                      String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
+                      null,
+                  )
+                }
+              />
+              <Field
+                label="Horario (professor)"
+                value={
+                  atendimentoTimeLabel(
+                    String(booking?.professor_time ?? "").trim() ||
+                      String((lead as any)?.experimental_class_professor_time ?? "").trim() ||
+                      null,
+                  )
+                }
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

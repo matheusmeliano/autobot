@@ -2307,6 +2307,25 @@ export async function POST(req: Request) {
             actorType: "system",
           });
 
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                experimental_class_professor_date: chosen.professorDate,
+                experimental_class_lead_date: chosen.leadDate,
+                experimental_class_status: "date_selected",
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e2) {}
+          }
+
           const pres = await presentExperimentalClassTimeOptionsWhatsApp({
             admin,
             leadId,
@@ -2412,6 +2431,29 @@ export async function POST(req: Request) {
               flow: "whatsapp_time_retry",
               blocked: false,
             });
+          }
+
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                experimental_class_professor_date: chosen.professorDate,
+                experimental_class_lead_date: chosen.leadDate,
+                experimental_class_professor_time: chosen.professorTime,
+                experimental_class_lead_time: chosen.leadTime,
+                experimental_class_professor_start_at: chosen.professorStartAt,
+                experimental_class_lead_start_at: chosen.professorStartAt,
+                experimental_class_status: "time_selected",
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e2) {}
           }
 
           const already = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
