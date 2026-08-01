@@ -248,15 +248,18 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       return;
     }
     modalToast.success("Apelido do WhatsApp atualizado.");
+    const safeDisplayName = String(res.display_name ?? "").trim() || null;
+    const safePhone = String(res.phone ?? "").trim() || null;
+    const safeInstanceId = String(res.instance_id ?? "").trim() || null;
     setRows((prev) =>
       prev.map((r) =>
         r.id === values.user_id
           ? {
               ...r,
               whatsapp: {
-                instance_id: (r.whatsapp?.instance_id ?? res.instance_id) || null,
-                display_name: res.display_name,
-                phone: (r.whatsapp?.phone ?? res.phone) || null,
+                instance_id: (r.whatsapp?.instance_id ?? safeInstanceId) || null,
+                display_name: safeDisplayName,
+                phone: (r.whatsapp?.phone ?? safePhone) || null,
                 status: r.whatsapp?.status ?? null,
               },
             }
