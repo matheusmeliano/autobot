@@ -307,7 +307,7 @@ async function sendZapiText(params: {
   );
 }
 
-async function getZapiInstanceMeta(params: {
+export async function getZapiInstanceMeta(params: {
   instance_id: string;
   token: string;
   client_token?: string | null;

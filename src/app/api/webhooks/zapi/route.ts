@@ -35,6 +35,7 @@ import {
   hasAnyBotMessage,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
+  getZapiInstanceMeta,
 } from "@/lib/atendimento/server";
 import {
   inferBrazilianLocationFromDdd,
@@ -990,11 +991,42 @@ export async function POST(req: Request) {
   }
 
   const admin = createSupabaseAdminClient();
-  const { data: instance, error: instErr } = await admin
+  const instColsBase = ["user_id", "token"];
+  const firstInst = await admin
     .from("whatsapp_instances")
-    .select("user_id")
+    .select([...instColsBase, "client_token", "phone", "display_name"].join(", "))
     .eq("instance_id", instanceId)
     .maybeSingle();
+
+  const missingClientTokenCol =
+    firstInst.error &&
+    /client_token/i.test(firstInst.error.message) &&
+    /column/i.test(firstInst.error.message);
+  const missingPhoneCol =
+    firstInst.error &&
+    /\bphone\b/i.test(firstInst.error.message) &&
+    /column/i.test(firstInst.error.message);
+  const missingDisplayNameCol =
+    firstInst.error &&
+    /display_name/i.test(firstInst.error.message) &&
+    /column/i.test(firstInst.error.message);
+
+  let instance: any = firstInst.data;
+  let instErr = firstInst.error;
+
+  if (firstInst.error && (missingClientTokenCol || missingPhoneCol || missingDisplayNameCol)) {
+    const retryCols = [...instColsBase];
+    if (!missingClientTokenCol) retryCols.push("client_token");
+    if (!missingPhoneCol) retryCols.push("phone");
+    if (!missingDisplayNameCol) retryCols.push("display_name");
+    const retryInst = await admin
+      .from("whatsapp_instances")
+      .select(retryCols.join(", "))
+      .eq("instance_id", instanceId)
+      .maybeSingle();
+    instance = retryInst.data;
+    instErr = retryInst.error;
+  }
 
   if (instErr) {
     return Response.json({ ok: false, error: instErr.message }, { status: 500 });
@@ -1003,6 +1035,42 @@ export async function POST(req: Request) {
   const userId = instance?.user_id ? String(instance.user_id) : "";
   if (!userId) {
     return Response.json({ ok: true, ignored: true, reason: "unknown_instance" });
+  }
+
+  if (!missingPhoneCol) {
+    const currentPhoneRaw = String(instance?.phone ?? "").trim();
+    if (!currentPhoneRaw && instance?.token) {
+      try {
+        const token = String(instance.token ?? "");
+        const clientToken = missingClientTokenCol ? null : instance?.client_token ?? null;
+        const meData = await getZapiInstanceMeta({
+          instance_id: instanceId,
+          token,
+          client_token: clientToken || undefined,
+        });
+        if (meData) {
+          const candidates: string[] = [];
+          if (typeof meData.phone === "string") candidates.push(meData.phone);
+          if (typeof meData.telephone === "string") candidates.push(meData.telephone);
+          if (meData.whatsapp && typeof meData.whatsapp.phone === "string") candidates.push(meData.whatsapp.phone);
+          if (meData.me && typeof meData.me.phone === "string") candidates.push(meData.me.phone);
+          if (typeof meData.id === "string") candidates.push(meData.id);
+          const picked = candidates.find((c) => c && /\d/.test(c));
+          if (picked) {
+            const digitsOnly = picked.replace(/\D/g, "");
+            if (digitsOnly.length >= 10) {
+              await admin
+                .from("whatsapp_instances")
+                .update({ phone: digitsOnly })
+                .eq("instance_id", instanceId);
+              if (instance) instance.phone = digitsOnly;
+            }
+          }
+        }
+      } catch (_metaErr) {
+        // Falha ao consultar /me da Z-API nao deve quebrar o processamento do evento
+      }
+    }
   }
 
   const pendingPhoneValidationRef: { id: string } = { id: "" };

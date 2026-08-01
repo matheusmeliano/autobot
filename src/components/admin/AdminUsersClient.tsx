@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Key, Pencil, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Key, Pencil, Phone as PhoneIcon, Trash2, X } from "lucide-react";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
@@ -12,6 +12,14 @@ import {
   resetPasswordAdminAction,
   updateUserAdminAction,
 } from "@/app/admin/usuarios/actions";
+import { setWhatsAppInstanceDisplayNameAdminAction } from "@/app/app/whatsapp/actions";
+
+type AdminUserWhatsAppInfo = {
+  instance_id: string | null;
+  display_name: string | null;
+  phone: string | null;
+  status: string | null;
+} | null;
 
 export type AdminUserRow = {
   id: string;
@@ -22,6 +30,7 @@ export type AdminUserRow = {
   assinatura_status: string;
   vencimento: string | null;
   criado_em: string | null;
+  whatsapp?: AdminUserWhatsAppInfo;
 };
 
 type EditValues = {
@@ -37,6 +46,11 @@ type PasswordValues = {
   password: string;
 };
 
+type WhatsAppDisplayNameValues = {
+  user_id: string;
+  display_name: string;
+};
+
 function dateBR(v: string | null) {
   if (!v) return "-";
   const s = v.slice(0, 10);
@@ -45,6 +59,24 @@ function dateBR(v: string | null) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
+}
+
+function formatWhatsAppPhone(value: string | null): string {
+  if (!value) return "";
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("55") && digits.length === 13) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  }
+  if (digits.startsWith("1") && digits.length === 11) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.startsWith("55") && digits.length === 12) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
+  }
+  if (digits.length >= 10) {
+    return `+${digits.slice(0, digits.length - 10)} (${digits.slice(-10, -7)}) ${digits.slice(-7, -3)}-${digits.slice(-3)}`;
+  }
+  return value.startsWith("+") ? value : `+${value}`;
 }
 
 function normalizeStatus(v?: string | null): "ativo" | "cancelado" {
@@ -80,8 +112,10 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const [openEdit, setOpenEdit] = useState(false);
   const [openPassword, setOpenPassword] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
+  const [openWhatsApp, setOpenWhatsApp] = useState(false);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [deleting, setDeleting] = useState<AdminUserRow | null>(null);
+  const [whatsAppRow, setWhatsAppRow] = useState<AdminUserRow | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
 
@@ -91,9 +125,13 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) => {
-      return (
-        r.email.toLowerCase().includes(q) || r.nome.toLowerCase().includes(q)
-      );
+      const emailOk = r.email.toLowerCase().includes(q);
+      const nomeOk = r.nome.toLowerCase().includes(q);
+      const waDn = (r.whatsapp?.display_name ?? "").toLowerCase();
+      const waPhone = (r.whatsapp?.phone ?? "").toLowerCase();
+      const waInstance = (r.whatsapp?.instance_id ?? "").toLowerCase();
+      const waOk = waDn.includes(q) || waPhone.includes(q) || waInstance.includes(q);
+      return emailOk || nomeOk || waOk;
     });
   }, [query, rows]);
 
@@ -144,6 +182,9 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const passForm = useForm<PasswordValues>({
     defaultValues: { id: "", password: "" },
   });
+  const whatsAppForm = useForm<WhatsAppDisplayNameValues>({
+    defaultValues: { user_id: "", display_name: "" },
+  });
   const { ref: vencimentoFieldRef, ...vencimentoFieldProps } = editForm.register("vencimento");
 
   const refresh = () => {
@@ -181,6 +222,49 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     setOpenDelete(false);
     setDeleting(null);
   };
+
+  const closeWhatsApp = () => {
+    setOpenWhatsApp(false);
+    setWhatsAppRow(null);
+    whatsAppForm.reset({ user_id: "", display_name: "" });
+  };
+
+  const openWhatsAppModal = (row: AdminUserRow) => {
+    setWhatsAppRow(row);
+    setOpenWhatsApp(true);
+    whatsAppForm.reset({
+      user_id: row.id,
+      display_name: row.whatsapp?.display_name ?? "",
+    });
+  };
+
+  const saveWhatsApp = whatsAppForm.handleSubmit(async (values) => {
+    const res = await setWhatsAppInstanceDisplayNameAdminAction({
+      user_id: values.user_id,
+      display_name: values.display_name.trim() || null,
+    });
+    if (!res.ok) {
+      modalToast.error(res.error ?? "Falha ao salvar apelido.");
+      return;
+    }
+    modalToast.success("Apelido do WhatsApp atualizado.");
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === values.user_id
+          ? {
+              ...r,
+              whatsapp: {
+                instance_id: (r.whatsapp?.instance_id ?? res.instance_id) || null,
+                display_name: res.display_name,
+                phone: (r.whatsapp?.phone ?? res.phone) || null,
+                status: r.whatsapp?.status ?? null,
+              },
+            }
+          : r,
+      ),
+    );
+    closeWhatsApp();
+  });
 
   const openVencimentoPicker = () => {
     vencimentoInputRef.current?.showPicker?.();
@@ -292,12 +376,13 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           </div>
         ) : null}
         <div ref={tableScrollRef} className="overflow-x-auto">
-          <div className="min-w-[820px] min-[1201px]:min-w-0">
-            <div className="grid grid-cols-12 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
-              <div className="col-span-4">Usuário</div>
+          <div className="min-w-[1080px] min-[1201px]:min-w-0">
+            <div className="grid grid-cols-14 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
+              <div className="col-span-3">Usuário</div>
+              <div className="col-span-4">WhatsApp</div>
               <div className="col-span-2 text-center">Plano</div>
               <div className="col-span-2 text-center">Status</div>
-              <div className="col-span-2 text-center">Vencimento</div>
+              <div className="col-span-1 text-center">Venc.</div>
               <div className="col-span-2 text-right">Ações</div>
             </div>
 
@@ -310,11 +395,55 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                 {pagedRows.map((r) => (
                   <div
                     key={r.id}
-                    className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm text-white/80"
+                    className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
-                    <div className="col-span-4 min-w-0">
+                    <div className="col-span-3 min-w-0">
                       <div className="truncate font-semibold">{r.nome}</div>
                       <div className="mt-1 truncate text-xs text-white/50">{r.email}</div>
+                    </div>
+                    <div className="col-span-4 min-w-0">
+                      {r.whatsapp?.instance_id || r.whatsapp?.phone || r.whatsapp?.display_name ? (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
+                              {r.whatsapp.display_name?.trim() ||
+                                (r.whatsapp.phone
+                                  ? "WhatsApp conectado"
+                                  : "WhatsApp (sem número sincronizado)")}
+                            </div>
+                            <div
+                              className="mt-1 truncate text-xs text-[var(--app-text-55)]"
+                              title={
+                                formatWhatsAppPhone(r.whatsapp.phone) ||
+                                r.whatsapp.instance_id ||
+                                undefined
+                              }
+                            >
+                              {formatWhatsAppPhone(r.whatsapp.phone) ||
+                                r.whatsapp.instance_id ||
+                                "Número ainda não sincronizado."}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => openWhatsAppModal(r)}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+                            title="Editar apelido do WhatsApp"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-white/35">
+                              Sem WhatsApp
+                            </div>
+                            <div className="mt-1 truncate text-xs text-white/25">
+                              Não configurado
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="col-span-2 flex justify-center">
                       <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">
@@ -332,7 +461,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         </span>
                       )}
                     </div>
-                    <div className="col-span-2 text-center text-white/60">
+                    <div className="col-span-1 text-center text-white/60">
                       {normalizePlan(r.plano) === "vitalicio"
                         ? "-"
                         : normalizePlan(r.plano) === "teste" &&
@@ -600,6 +729,70 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
             Excluir
           </button>
         </div>
+      </AppModal>
+
+      <AppModal open={openWhatsApp} onClose={closeWhatsApp} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
+              <PhoneIcon className="h-4 w-4" />
+              Apelido do WhatsApp
+            </div>
+            <div className="mt-1 truncate text-xs text-white/55">{whatsAppRow?.email ?? ""}</div>
+          </div>
+          <button
+            onClick={closeWhatsApp}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="text-xs font-semibold text-white/55">Identificação atual</div>
+          <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]">
+            {whatsAppRow?.whatsapp?.display_name?.trim() ||
+              (whatsAppRow?.whatsapp?.phone
+                ? "WhatsApp conectado (sem apelido)"
+                : whatsAppRow?.whatsapp?.instance_id
+                  ? "Instância configurada (sem número sincronizado)"
+                  : "WhatsApp não configurado")}
+          </div>
+          <div className="mt-1 truncate text-xs text-[var(--app-text-55)]">
+            {formatWhatsAppPhone(whatsAppRow?.whatsapp?.phone ?? null) ||
+              whatsAppRow?.whatsapp?.instance_id ||
+              "—"}
+          </div>
+        </div>
+
+        <form onSubmit={saveWhatsApp} className="mt-5 space-y-3">
+          <input type="hidden" {...whatsAppForm.register("user_id", { required: true })} />
+          <div>
+            <label className="text-xs font-semibold text-white/60">
+              Nome (apelido) do número
+            </label>
+            <input
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              placeholder="Ex.: Suporte, Vendas, Professor Lucas, Financeiro"
+              maxLength={80}
+              {...whatsAppForm.register("display_name", { maxLength: 80 })}
+            />
+            <div className="mt-2 flex items-center justify-between text-[11px] text-white/40">
+              <span>Campo opcional. Se vazio, exibe &quot;WhatsApp conectado&quot; + número.</span>
+              <span>
+                {(whatsAppForm.watch("display_name") ?? "").length}/80
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={whatsAppForm.formState.isSubmitting}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {whatsAppForm.formState.isSubmitting ? "Salvando..." : "Salvar apelido"}
+          </button>
+        </form>
       </AppModal>
     </div>
   );

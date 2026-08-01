@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { HelpCircle } from "lucide-react";
 import { upsertWhatsAppInstanceAction } from "@/app/app/whatsapp/actions";
@@ -12,13 +13,35 @@ type InstanceRow = {
   status: string | null;
   hasToken: boolean;
   hasClientToken: boolean;
+  display_name: string | null;
+  phone: string | null;
 };
 
 type FormValues = {
   instance_id: string;
   token: string;
   client_token: string;
+  display_name: string;
 };
+
+function formatWhatsAppPhone(value: string | null): string {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return "-";
+  if (digits.startsWith("55") && digits.length >= 12) {
+    const ddd = digits.slice(2, 4);
+    const nine = digits.length === 13 ? digits.slice(4, 5) : "";
+    const block1 = digits.length === 13 ? digits.slice(5, 9) : digits.slice(4, 8);
+    const block2 = digits.length === 13 ? digits.slice(9) : digits.slice(8);
+    return `+55 (${ddd}) ${nine}${block1}-${block2}`;
+  }
+  if (digits.startsWith("1") && digits.length === 11) {
+    const area = digits.slice(1, 4);
+    const b1 = digits.slice(4, 7);
+    const b2 = digits.slice(7);
+    return `+1 (${area}) ${b1}-${b2}`;
+  }
+  return digits.replace(/^(\d{1,3})(\d{2,})(\d{4})$/, (_, p1, p2, p3) => `+${p1} (${p2}) ${p3}`);
+}
 
 export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
   const {
@@ -31,26 +54,42 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
       instance_id: initial?.instance_id ?? "",
       token: initial?.hasToken ? MASK : "",
       client_token: initial?.hasClientToken ? MASK : "",
+      display_name: initial?.display_name ?? "",
     },
   });
+
+  const displayNameValue = initial?.display_name;
+  const phoneFormatted = useMemo(() => formatWhatsAppPhone(initial?.phone ?? null), [initial?.phone]);
+  const primaryLabel = displayNameValue?.trim() ? displayNameValue.trim() : "WhatsApp não identificado";
+  const secondaryInfo =
+    initial?.phone?.trim()
+      ? phoneFormatted
+      : initial?.instance_id
+        ? `Instance: ${initial.instance_id}`
+        : "Número ainda não sincronizado. A próxima mensagem recebida atualiza automaticamente.";
 
   const onSubmit = handleSubmit(async (values) => {
     const tokenValue = String(values.token ?? "").trim();
     const clientTokenValue = String(values.client_token ?? "").trim();
+    const displayNameValueRaw = String(values.display_name ?? "").trim();
     const res = await upsertWhatsAppInstanceAction({
       instance_id: values.instance_id,
       token: tokenValue && tokenValue !== MASK ? tokenValue : undefined,
       client_token: clientTokenValue && clientTokenValue !== MASK ? clientTokenValue : undefined,
+      display_name: displayNameValueRaw ? displayNameValueRaw : null,
     });
     if (!res.ok) {
       modalToast.error(res.error ?? "Falha ao salvar.");
       return;
     }
     const toastId = modalToast.success("Configuração salva.");
+    const nextHasClientToken =
+      initial?.hasClientToken || Boolean(clientTokenValue && clientTokenValue !== MASK);
     reset({
       instance_id: values.instance_id,
       token: MASK,
-      client_token: initial?.hasClientToken || (clientTokenValue && clientTokenValue !== MASK) ? MASK : "",
+      client_token: nextHasClientToken ? MASK : "",
+      display_name: displayNameValueRaw,
     });
     await modalToast.wait(toastId);
     window.location.reload();
@@ -79,9 +118,17 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
           </div>
         </div>
         <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs font-semibold text-white/55">Instance ID</div>
-          <div className="mt-2 min-w-0 break-all text-sm font-semibold leading-relaxed text-white/80">
-            {initial?.instance_id ?? "-"}
+          <div className="text-xs font-semibold text-white/55">Número WhatsApp</div>
+          <div className="mt-2 min-w-0">
+            <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
+              {primaryLabel}
+            </div>
+            <div
+              className="mt-1 truncate text-xs text-[var(--app-text-55)]"
+              title={initial?.instance_id ?? secondaryInfo}
+            >
+              {secondaryInfo}
+            </div>
           </div>
         </div>
       </div>
@@ -112,7 +159,9 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
               ) : null}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-white/60">Token</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-white/60">Token</div>
+              </div>
               <input
                 type="password"
                 className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
@@ -135,7 +184,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="md:col-span-2">
+            <div className="min-w-0 md:col-span-2">
               <div className="flex items-center gap-2 text-xs font-semibold text-white/60">
                 <span>Client-Token</span>
                 <span className="group relative inline-flex">
@@ -152,6 +201,35 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
                 placeholder={initial?.hasClientToken ? MASK : "client-token"}
                 {...register("client_token")}
               />
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="min-w-0 md:col-span-2">
+              <div className="text-xs font-semibold text-white/60">
+                Nome (apelido) do número <span className="font-normal text-white/45">— Opcional. Ex.: Suporte, Vendas, Professor Lucas, Financeiro</span>
+              </div>
+              <input
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder="Ex.: Professor Lucas"
+                maxLength={80}
+                {...register("display_name", {
+                  validate: (value) => {
+                    const v = String(value ?? "").trim();
+                    if (v.length > 80) return "Máximo 80 caracteres.";
+                    return true;
+                  },
+                })}
+              />
+              {errors.display_name?.message ? (
+                <div className="mt-2 text-xs font-medium text-rose-300">
+                  {String(errors.display_name.message)}
+                </div>
+              ) : null}
+              <div className="mt-2 text-[11px] text-white/45">
+                Esse nome aparecerá como identificação principal no painel. O número de telefone é exibido abaixo como
+                informação secundária (automaticamente sincronizado quando a próxima mensagem é recebida da Z-API).
+              </div>
             </div>
           </div>
 

@@ -5,20 +5,59 @@ export default async function WhatsAppPage() {
   const supabase = await createSupabaseServerClient();
   const first = await supabase
     .from("whatsapp_instances")
-    .select("instance_id, token, client_token, status")
+    .select("instance_id, token, client_token, status, display_name, phone")
     .maybeSingle();
   const missingClientToken =
     first.error &&
     /client_token/i.test(first.error.message) &&
     /column/i.test(first.error.message);
-  const second = missingClientToken
-    ? await supabase
-        .from("whatsapp_instances")
-        .select("instance_id, token, status")
-        .maybeSingle()
-    : null;
-  const data = (second?.data ?? first.data) as any;
-  const error = second?.error ?? first.error;
+  const missingDisplayName =
+    first.error &&
+    /display_name/i.test(first.error.message) &&
+    /column/i.test(first.error.message);
+  const missingPhone =
+    first.error &&
+    /\bphone\b/i.test(first.error.message) &&
+    /column/i.test(first.error.message);
+  const retry: typeof first | null =
+    missingClientToken && missingDisplayName && missingPhone
+      ? await supabase
+          .from("whatsapp_instances")
+          .select("instance_id, token, status")
+          .maybeSingle()
+      : missingClientToken && missingDisplayName
+        ? await supabase
+            .from("whatsapp_instances")
+            .select("instance_id, token, status, phone")
+            .maybeSingle()
+        : missingClientToken && missingPhone
+          ? await supabase
+              .from("whatsapp_instances")
+              .select("instance_id, token, status, display_name")
+              .maybeSingle()
+          : missingDisplayName && missingPhone
+            ? await supabase
+                .from("whatsapp_instances")
+                .select("instance_id, token, status, client_token")
+                .maybeSingle()
+            : missingClientToken
+              ? await supabase
+                  .from("whatsapp_instances")
+                  .select("instance_id, token, status, display_name, phone")
+                  .maybeSingle()
+              : missingDisplayName
+                ? await supabase
+                    .from("whatsapp_instances")
+                    .select("instance_id, token, status, client_token, phone")
+                    .maybeSingle()
+                : missingPhone
+                  ? await supabase
+                      .from("whatsapp_instances")
+                      .select("instance_id, token, status, client_token, display_name")
+                      .maybeSingle()
+                  : null;
+  const data = (retry?.data ?? first.data) as any;
+  const error = retry?.error ?? first.error;
 
   if (error) {
     return (
@@ -27,8 +66,8 @@ export default async function WhatsAppPage() {
           Integração Z-API
         </h1>
         <div className="mt-2 text-sm text-white/60">
-          {missingClientToken
-            ? "Atualize o banco: rode a migration do campo client_token e recarregue."
+          {(missingClientToken || missingDisplayName || missingPhone)
+            ? "Atualize o banco: rode as migrations pendentes em whatsapp_instances e recarregue."
             : "Não foi possível carregar seus dados. Verifique se as tabelas existem e se você está logado."}
         </div>
       </div>
@@ -44,6 +83,8 @@ export default async function WhatsAppPage() {
               status: data.status ?? null,
               hasToken: Boolean(data.token),
               hasClientToken: Boolean(data.client_token),
+              display_name: String(data.display_name ?? "").trim() || null,
+              phone: String(data.phone ?? "").trim() || null,
             }
           : null
       }

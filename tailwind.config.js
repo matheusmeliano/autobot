@@ -7,7 +7,11 @@ export default {
     container: {
       center: true,
     },
-    extend: {},
+    extend: {
+      gridTemplateColumns: {
+        "14": "repeat(14, minmax(0, 1fr))",
+      },
+    },
   },
   plugins: [],
 };

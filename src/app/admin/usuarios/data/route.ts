@@ -77,11 +77,59 @@ export async function GET() {
     });
   }
 
+  let whatsappByUserId = new Map<string, {
+    instance_id: string | null;
+    display_name: string | null;
+    phone: string | null;
+    status: string | null;
+  }>();
+
+  try {
+    const whatsappBaseCols = ["user_id", "instance_id", "status"];
+    const firstWa = await supabase
+      .from("whatsapp_instances")
+      .select([...whatsappBaseCols, "display_name", "phone"].join(", "))
+      .in("user_id", ids);
+
+    const missingDisplayName =
+      firstWa.error &&
+      /display_name/i.test(firstWa.error.message) &&
+      /column/i.test(firstWa.error.message);
+    const missingPhone =
+      firstWa.error &&
+      /\bphone\b/i.test(firstWa.error.message) &&
+      /column/i.test(firstWa.error.message);
+
+    let waRows: any[] = firstWa.data ?? [];
+    if (firstWa.error && (missingDisplayName || missingPhone)) {
+      const retryCols = [...whatsappBaseCols];
+      if (!missingDisplayName) retryCols.push("display_name");
+      if (!missingPhone) retryCols.push("phone");
+      const retry = await supabase
+        .from("whatsapp_instances")
+        .select(retryCols.join(", "))
+        .in("user_id", ids);
+      waRows = retry.data ?? [];
+    }
+
+    waRows.forEach((row: any) => {
+      whatsappByUserId.set(row.user_id, {
+        instance_id: String(row.instance_id ?? "").trim() || null,
+        display_name: String(row.display_name ?? "").trim() || null,
+        phone: String(row.phone ?? "").trim() || null,
+        status: String(row.status ?? "").trim() || null,
+      });
+    });
+  } catch (_waErr) {
+    whatsappByUserId = new Map();
+  }
+
   const rows = users
     .filter((u) => String((profileById.get(u.id) as any)?.access_scope ?? "app") !== "atendimento")
     .map((u) => {
     const p = profileById.get(u.id);
     const s = subById.get(u.id);
+    const wa = whatsappByUserId.get(u.id);
     return {
       id: u.id,
       email: u.email ?? p?.email ?? "-",
@@ -91,6 +139,14 @@ export async function GET() {
       assinatura_status: s?.status ?? "-",
       vencimento: s?.vencimento ?? null,
       criado_em: u.created_at ?? p?.created_at ?? null,
+      whatsapp: wa
+        ? {
+            instance_id: wa.instance_id,
+            display_name: wa.display_name,
+            phone: wa.phone,
+            status: wa.status,
+          }
+        : null,
     };
     });
 
