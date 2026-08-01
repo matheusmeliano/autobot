@@ -155,7 +155,7 @@ test("buildExperimentalClassStudentLessonReadyWhatsAppMessage monta a mensagem d
 test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso do atendente antes da aula", () => {
   assert.equal(
     buildExperimentalClassAttendantStartReminderWhatsAppMessage("Pedro Silva", "https://meet.google.com/abc-defg-hij"),
-    "A aula experimental do(a) aluno(a) Pedro Silva está perto de começar!\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nAguarde o(a) aluno(a) acessar a sala.",
+    "A aula experimental do interessado está perto de começar!\n\nLink da aula: https://meet.google.com/abc-defg-hij",
   );
 });
 

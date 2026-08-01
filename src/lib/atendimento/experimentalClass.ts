@@ -272,13 +272,10 @@ Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula se
 }
 
 export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name: string, lessonLink: string) {
-  const safeName = String(name ?? "").trim() || "Aluno";
   const safeLessonLink = String(lessonLink ?? "").trim();
-  return `A aula experimental do(a) aluno(a) ${safeName} está perto de começar!
+  return `A aula experimental do interessado está perto de começar!
 
-Link da aula: ${safeLessonLink}
-
-Aguarde o(a) aluno(a) acessar a sala.`;
+Link da aula: ${safeLessonLink}`;
 }
 
 export function buildExperimentalClassPostAttendanceWhatsAppMessage(name: string) {
