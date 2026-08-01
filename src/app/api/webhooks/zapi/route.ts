@@ -439,6 +439,37 @@ function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | n
 const MAX_LOCATION_WHATSAPP_ATTEMPTS = 3;
 const MAX_SCHEDULE_WHATSAPP_ATTEMPTS = 3;
 
+function isValidCityInput(raw: string): { valid: boolean; reason?: string } {
+  const value = String(raw ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!value) return { valid: false, reason: "empty" };
+  if (value.length < 3) return { valid: false, reason: "too_short" };
+  if (/^[a-z]+$/.test(value) && value.length >= 10) {
+    const vowels = (value.match(/[aeiou]/g) ?? []).length;
+    const consonants = (value.match(/[bcdfghjklmnpqrstvwxyz]/g) ?? []).length;
+    const total = vowels + consonants;
+    if (total >= 10 && vowels / total < 0.2) return { valid: false, reason: "low_vowels" };
+    const unique = new Set(value.split("")).size;
+    if (unique / value.length < 0.55) return { valid: false, reason: "low_unique" };
+  }
+  if (!/[aeiou]/.test(value)) return { valid: false, reason: "no_vowels" };
+  return { valid: true };
+}
+
+function cityResolutionIsReliable(
+  resolution: ReturnType<typeof resolveTimeZoneFromCityInput> | null,
+): resolution is NonNullable<ReturnType<typeof resolveTimeZoneFromCityInput>> {
+  if (!resolution) return false;
+  if (resolution.source === "city_match") return true;
+  if (resolution.source === "state_match") return true;
+  return false;
+}
+
 const SUPPORT_FINAL_MESSAGE = `Não foi possível concluir este agendamento.
 
 Para continuar, entre em contato com nosso suporte pelo WhatsApp:
@@ -2014,12 +2045,16 @@ export async function POST(req: Request) {
         const wantsCityStage = expectedField === "city" || (!expectedField && nextMissingField === "city");
         if (wantsCityStage && hasStateValidated && !hasCityValidated && !hasReachedPostCityStage) {
           const stateSoFar = String((lead as any)?.state ?? "").trim();
-          const resolved = resolveTimeZoneFromCityInput({
-            city: inboundContent,
-            state: stateSoFar || null,
-            phone: normalizedPhoneOnly,
-            allowPhoneCountryFallback: true,
-          });
+          const inputCheck = isValidCityInput(inboundContent);
+          const rawResolved = inputCheck.valid
+            ? resolveTimeZoneFromCityInput({
+                city: inboundContent,
+                state: stateSoFar || null,
+                phone: normalizedPhoneOnly,
+                allowPhoneCountryFallback: true,
+              })
+            : null;
+          const resolved = cityResolutionIsReliable(rawResolved) ? rawResolved : null;
 
           if (!resolved) {
             const nextFail =
