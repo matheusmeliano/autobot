@@ -1594,9 +1594,27 @@ export async function POST(req: Request) {
           });
         }
 
-        const leadStateValue = String((lead as any)?.state ?? "").trim();
-        const leadCityValue = String((lead as any)?.city ?? "").trim();
-        const leadTimezoneValue = String((lead as any)?.timezone ?? "").trim();
+        const histStateMatch = await admin
+          .from("atendimento_history_events")
+          .select("event_type,details,created_at")
+          .eq("lead_id", leadId)
+          .eq("conversation_id", conversationId)
+          .in("event_type", ["state_collected", "city_collected"])
+          .order("created_at", { ascending: false })
+          .limit(2);
+        const lastHistState =
+          histStateMatch.data?.find((e: any) => e.event_type === "state_collected") ?? null;
+        const lastHistCity =
+          histStateMatch.data?.find((e: any) => e.event_type === "city_collected") ?? null;
+        const histStateValue = String((lastHistState as any)?.details?.state ?? "").trim();
+        const histTimezone = String((lastHistState as any)?.details?.timezone ?? "").trim();
+        const histCityValue = String((lastHistCity as any)?.details?.city ?? "").trim();
+
+        const leadStateValue =
+          String((lead as any)?.state ?? "").trim() || histStateValue;
+        const leadTimezoneValue =
+          String((lead as any)?.timezone ?? "").trim() || histTimezone;
+        const leadCityValue = String((lead as any)?.city ?? "").trim() || histCityValue;
         const leadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim();
         const hasStateValidated = Boolean(leadStateValue && leadTimezoneValue);
         const hasCityValidated = Boolean(leadCityValue && hasStateValidated);
@@ -1604,10 +1622,14 @@ export async function POST(req: Request) {
           hasCityValidated ||
           leadFunnelStage === "pre_cadastro_concluido" ||
           leadFunnelStage === "aula_experimental_agendada" ||
-          leadFunnelStage === "em_atendimento";
+          leadFunnelStage === "em_atendimento" ||
+          Boolean(lastHistCity);
 
         if (expectedField === "state" && hasStateValidated) {
           expectedField = hasCityValidated ? (nextMissingField ?? null) : "city";
+        }
+        if (expectedFieldByText === "city" && hasStateValidated && !hasCityValidated) {
+          expectedField = "city";
         }
         if (expectedField === "city" && hasCityValidated) {
           expectedField = nextMissingField ?? null;
@@ -1727,7 +1749,7 @@ export async function POST(req: Request) {
             });
           }
 
-          void admin
+          const stateUpdate = admin
             .from("atendimento_leads")
             .update({
               state: stateResolution.state,
@@ -1736,6 +1758,9 @@ export async function POST(req: Request) {
               updated_at: nowIso,
             })
             .eq("id", leadId);
+          try {
+            await stateUpdate;
+          } catch (_e) {}
 
           void appendHistoryEvent({
             leadId,
@@ -1837,7 +1862,7 @@ export async function POST(req: Request) {
             });
           }
 
-          void admin
+          const cityUpdate = admin
             .from("atendimento_leads")
             .update({
               city: resolved.city,
@@ -1849,6 +1874,9 @@ export async function POST(req: Request) {
               updated_at: nowIso,
             })
             .eq("id", leadId);
+          try {
+            await cityUpdate;
+          } catch (_e) {}
 
           void appendHistoryEvent({
             leadId,
