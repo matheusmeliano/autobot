@@ -351,7 +351,7 @@ export function AtendimentoSummaryCards({
   const [localSummary, setLocalSummary] = useState(summary);
   const [localLeads, setLocalLeads] = useState(leads);
   const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
-  const [openEditLeadName, setOpenEditLeadName] = useState(false);
+  const [isEditLeadNameOpen, setIsEditLeadNameOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<AtendimentoLeadListItem | null>(null);
   const [savingLeadNameLeadId, setSavingLeadNameLeadId] = useState<string | null>(null);
 
@@ -361,14 +361,14 @@ export function AtendimentoSummaryCards({
 
   function openEditLeadName(lead: AtendimentoLeadListItem) {
     setEditingLead(lead);
-    setOpenEditLeadName(true);
+    setIsEditLeadNameOpen(true);
     leadNameForm.reset({
       full_name: String(lead.full_name ?? "").trim(),
     });
   }
 
   function closeEditLeadName() {
-    setOpenEditLeadName(false);
+    setIsEditLeadNameOpen(false);
     setEditingLead(null);
     leadNameForm.reset({ full_name: "" });
   }
@@ -1034,7 +1034,7 @@ export function AtendimentoSummaryCards({
         ) : null}
 
         <AppModal
-          open={openEditLeadName}
+          open={isEditLeadNameOpen}
           onClose={closeEditLeadName}
           size="md"
           zIndexClass="z-[500]"
