@@ -109,7 +109,7 @@ function LeadDetails({
             className="truncate text-lg font-semibold text-[var(--app-text-85)]"
             title={lead.phone || lead.full_name || "Interessado sem telefone"}
           >
-            {lead.phone || lead.full_name || "Interessado sem telefone"}
+            {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
           </div>
           <div className="text-sm text-[var(--app-text-55)]">
             Ultima interacao: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
@@ -203,8 +203,11 @@ function BookingDetails({
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
-          <div className="truncate text-lg font-semibold text-[var(--app-text-85)]" title={lead.full_name || "Agendamento"}>
-            {lead.full_name || "Agendamento"}
+          <div
+            className="truncate text-lg font-semibold text-[var(--app-text-85)]"
+            title={lead.phone || lead.full_name || "Agendamento"}
+          >
+            {String(lead.full_name ?? "").trim() || lead.phone || "Agendamento"}
           </div>
           <div className="text-sm text-[var(--app-text-55)]">
             Agendamento: {formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}
@@ -898,8 +901,11 @@ export function AtendimentoSummaryCards({
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
-                        {lead.phone || lead.full_name || "Interessado sem telefone"}
+                      <div
+                        className="truncate text-sm font-semibold text-[var(--app-text-85)]"
+                        title={lead.phone || lead.full_name || "Interessado sem telefone"}
+                      >
+                        {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
                       </div>
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {buildItemMeta(lead)}
@@ -993,8 +999,11 @@ export function AtendimentoSummaryCards({
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                       {activeSectionData.label}
                     </div>
-                    <div className="mt-1 truncate text-sm font-semibold text-[var(--app-text-85)]">
-                      {selectedLead.phone || selectedLead.full_name || "Interessado sem telefone"}
+                    <div
+                      className="mt-1 truncate text-sm font-semibold text-[var(--app-text-85)]"
+                      title={selectedLead.phone || selectedLead.full_name || "Interessado sem telefone"}
+                    >
+                      {String(selectedLead.full_name ?? "").trim() || selectedLead.phone || "Interessado sem telefone"}
                     </div>
                   </div>
                   <button
