@@ -469,12 +469,22 @@ export function findExperimentalClassTimeOption(
   const normalizedFlexibleInput = normalizeFlexibleTimeSelection(input);
 
   for (const option of options) {
-    if (normalizedInput === normalizeSelectionText(option.professorTime)) return option;
     if (normalizedInput === normalizeSelectionText(option.displayLabel)) return option;
+    if (normalizedInput === normalizeSelectionText(option.leadTime)) return option;
     if (
       normalizedFlexibleInput &&
-      (normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.professorTime) ||
-        normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.displayLabel))
+      (normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.displayLabel) ||
+        normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.leadTime))
+    ) {
+      return option;
+    }
+  }
+
+  for (const option of options) {
+    if (normalizedInput === normalizeSelectionText(option.professorTime)) return option;
+    if (
+      normalizedFlexibleInput &&
+      normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.professorTime)
     ) {
       return option;
     }
@@ -514,8 +524,11 @@ export function findExperimentalClassTimeOption(
     if (Number.isFinite(inputHour) && inputHour >= 0 && inputHour <= 23 && Number.isFinite(inputMinute) && inputMinute >= 0 && inputMinute <= 59) {
       const wanted = `${String(inputHour).padStart(2, "0")}:${String(inputMinute).padStart(2, "0")}`;
       for (const option of options) {
-        if (normalizeSelectionText(option.professorTime) === wanted) return option;
         if (normalizeSelectionText(option.displayLabel) === wanted) return option;
+        if (normalizeSelectionText(option.leadTime) === wanted) return option;
+      }
+      for (const option of options) {
+        if (normalizeSelectionText(option.professorTime) === wanted) return option;
       }
     }
   }

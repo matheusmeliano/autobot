@@ -2433,6 +2433,22 @@ export async function POST(req: Request) {
             });
           }
 
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_time_selected",
+            title: "Horário da aula experimental selecionado via WhatsApp",
+            details: {
+              professor_date: chosen.professorDate,
+              professor_time: chosen.professorTime,
+              professor_start_at: chosen.professorStartAt,
+              lead_date: chosen.leadDate,
+              lead_time: chosen.leadTime,
+              label: chosen.displayLabel,
+            },
+            actorType: "system",
+          });
+
           try {
             await admin
               .from("atendimento_leads")

@@ -294,3 +294,74 @@ test("findExperimentalClassTimeOption aceita formatos equivalentes de horario", 
   assert.equal(findExperimentalClassTimeOption("13:30h", options)?.professorTime, "13:30");
   assert.equal(findExperimentalClassTimeOption("13:30 h", options)?.professorTime, "13:30");
 });
+
+test("findExperimentalClassTimeOption prioriza horario do usuario (lead/displayLabel) sobre horario do professor quando valores coincidem em opcoes diferentes (fuso LA vs Cuiaba)", () => {
+  const slotsOverlapping = [
+    {
+      id: "2026-08-03|09:30",
+      professorDate: "2026-08-03",
+      professorTime: "09:30",
+      professorStartAt: "2026-08-03T13:30:00.000Z",
+      leadDate: "2026-08-03",
+      leadTime: "06:30",
+      displayLabel: "06:30",
+    },
+    {
+      id: "2026-08-03|12:30",
+      professorDate: "2026-08-03",
+      professorTime: "12:30",
+      professorStartAt: "2026-08-03T16:30:00.000Z",
+      leadDate: "2026-08-03",
+      leadTime: "09:30",
+      displayLabel: "09:30",
+    },
+    {
+      id: "2026-08-03|15:30",
+      professorDate: "2026-08-03",
+      professorTime: "15:30",
+      professorStartAt: "2026-08-03T19:30:00.000Z",
+      leadDate: "2026-08-03",
+      leadTime: "12:30",
+      displayLabel: "12:30",
+    },
+    {
+      id: "2026-08-03|18:30",
+      professorDate: "2026-08-03",
+      professorTime: "18:30",
+      professorStartAt: "2026-08-03T22:30:00.000Z",
+      leadDate: "2026-08-03",
+      leadTime: "15:30",
+      displayLabel: "15:30",
+    },
+  ];
+
+  const pick1230 = findExperimentalClassTimeOption("12:30", slotsOverlapping);
+  assert.equal(pick1230?.leadTime, "12:30", "12:30 digitado deve bater com leadTime=12:30 do slot 15:30 professor (usuario LA escolhe o que VIU)");
+  assert.equal(pick1230?.professorTime, "15:30", "professorTime deve ser 15:30 Cuiaba (convertido)");
+
+  const pick0930 = findExperimentalClassTimeOption("09:30", slotsOverlapping);
+  assert.equal(pick0930?.leadTime, "09:30", "09:30 digitado deve bater com leadTime=09:30 do slot 12:30 professor");
+  assert.equal(pick0930?.professorTime, "12:30");
+
+  const pick12h30 = findExperimentalClassTimeOption("12h30", slotsOverlapping);
+  assert.equal(pick12h30?.leadTime, "12:30", "formato 12h30 flexivel tambem prioriza lead");
+  assert.equal(pick12h30?.professorTime, "15:30");
+});
+
+test("findExperimentalClassTimeOption fallback para professorTime quando horario NAO existe do lado do usuario", () => {
+  const options = [
+    {
+      id: "2026-08-03|14:00",
+      professorDate: "2026-08-03",
+      professorTime: "14:00",
+      professorStartAt: "2026-08-03T18:00:00.000Z",
+      leadDate: "2026-08-03",
+      leadTime: "11:00",
+      displayLabel: "11:00",
+    },
+  ];
+
+  const fallback = findExperimentalClassTimeOption("14:00", options);
+  assert.equal(fallback?.professorTime, "14:00", "se usuario digitar horario do professor diretamente, ainda deve acertar (fallback retrocompatibilidade)");
+  assert.equal(fallback?.leadTime, "11:00");
+});

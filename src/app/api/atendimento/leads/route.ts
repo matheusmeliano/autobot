@@ -339,7 +339,7 @@ export async function GET(req: Request) {
               attendant_start_notification_sent_at: null,
               attendance_status: null,
               attendance_checked_at: null,
-              professor_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
               lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
               professor_date: mergedProfessorDate,
               professor_time: mergedProfessorTime,
