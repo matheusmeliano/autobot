@@ -234,24 +234,17 @@ async function countAtendimentoDailyInterestedLeads(params: {
   return leadConversationIds.length + leadsWithoutConversationCount;
 }
 
-export function buildAtendimentoConversationPublicUrl(publicSlug: string) {
-  const safeSlug = String(publicSlug ?? "").trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
-  return `https://www.autobot.business/atendimento?slug=${encodeURIComponent(safeSlug)}`;
+/** @deprecated Notificacao offline de nova mensagem DESATIVADA por pedido do usuario (nao enviar mais). Funcao mantida apenas para compilacao, retorna string vazia. */
+export function buildAtendimentoConversationPublicUrl(_publicSlug: string) {
+  return ``;
 }
 
-export function buildOfflineAttendantNotificationMessage(params: {
+/** @deprecated Notificacao offline de nova mensagem DESATIVADA por pedido do usuario (nao enviar mais). Funcao mantida apenas para compilacao, retorna string vazia. */
+export function buildOfflineAttendantNotificationMessage(_params: {
   leadName?: string | null;
   publicSlug: string;
 }) {
-  const firstName = getLeadFirstName(params.leadName);
-  const conversationUrl = buildAtendimentoConversationPublicUrl(ATENDIMENTO_PUBLIC_LINK_SLUG);
-  return `Olá, ${firstName}! 👋
-
-Você recebeu uma nova mensagem no AutoBot.
-
-Acesse a plataforma e responda ao atendente.
-
-${conversationUrl}`;
+  return ``;
 }
 
 function buildAuthorizedZapiWebhookUrl(baseUrl: string) {

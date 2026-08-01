@@ -1,6 +1,5 @@
 import {
   appendHistoryEvent,
-  buildOfflineAttendantNotificationMessage,
   getAtendimentoActivePresenceCount,
   getAtendimentoConversationAccessForAttendant,
   sendAtendimentoWhatsAppText,
@@ -125,64 +124,18 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
       .maybeSingle();
 
     if (notificationLease?.id) {
-      const leadName = String((lead as { full_name?: string | null } | null)?.full_name ?? "").trim() || "Aluno";
-
-      if (leadPhone) {
-        const notificationMessage = buildOfflineAttendantNotificationMessage({
-          leadName,
-          publicSlug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
-        });
-
-        try {
-          await sendAtendimentoWhatsAppText({
-            phone: leadPhone,
-            message: notificationMessage,
-          });
-
-          await appendHistoryEvent({
-            leadId: String(conversation.lead_id),
-            conversationId,
-            eventType: "offline_message_notification_sent",
-            title: "Notificação enviada para lead offline",
-            details: {
-              phone: leadPhone,
-              public_slug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
-            },
-            actorType: "system",
-          });
-        } catch (notificationError) {
-          await admin
-            .from("atendimento_conversations")
-            .update({
-              offline_message_notification_sent: false,
-              offline_message_notification_sent_at: null,
-            })
-            .eq("id", conversationId);
-
-          await appendHistoryEvent({
-            leadId: String(conversation.lead_id),
-            conversationId,
-            eventType: "offline_message_notification_failed",
-            title: "Falha ao notificar lead offline",
-            details: {
-              phone: leadPhone,
-              error: notificationError instanceof Error ? notificationError.message : String(notificationError),
-            },
-            actorType: "system",
-          });
-        }
-      } else {
-        await appendHistoryEvent({
-          leadId: String(conversation.lead_id),
-          conversationId,
-          eventType: "offline_message_notification_skipped",
-          title: "Notificação offline ignorada por falta de telefone",
-          details: {
-            public_slug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
-          },
-          actorType: "system",
-        });
-      }
+      await appendHistoryEvent({
+        leadId: String(conversation.lead_id),
+        conversationId,
+        eventType: "offline_message_notification_suppressed",
+        title: "Notificação offline de nova mensagem desativada (removida)",
+        details: {
+          reason: "notificacao_manual_desativada_pedido",
+          public_slug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
+          lead_phone_captured: Boolean(leadPhone),
+        },
+        actorType: "system",
+      });
     }
   }
 
