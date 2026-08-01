@@ -2244,6 +2244,19 @@ export async function POST(req: Request) {
               1;
             const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
 
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_class_date_validation_failed",
+              title: "Falha ao identificar dia da aula experimental via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+              },
+              actorType: "system",
+            });
+
             if (blocked) {
               await sendSupportFinalAndMarkBlocked({
                 admin,
@@ -2349,6 +2362,20 @@ export async function POST(req: Request) {
               (await countWhatsAppScheduleFailures({ admin, leadId, conversationId, field: "time" })) +
               1;
             const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_class_time_validation_failed",
+              title: "Falha ao identificar horário da aula experimental via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+                professor_date: professorDate || null,
+              },
+              actorType: "system",
+            });
 
             if (blocked) {
               await sendSupportFinalAndMarkBlocked({
