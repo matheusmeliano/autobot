@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
+import { z } from "zod";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -83,6 +84,69 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
   } catch (error) {
     return Response.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
+}
+
+export async function PATCH(request: Request, context: { params: Promise<{ leadId: string }> }) {
+  const auth = await requireAtendimentoUser();
+  if (!auth.ok) {
+    return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
+  const { leadId } = await context.params;
+  let body: unknown = null;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return Response.json({ ok: false, error: "body_invalido" }, { status: 400 });
+  }
+
+  const schema = z.object({
+    full_name: z.string().trim().max(160).nullable().optional(),
+  });
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json({ ok: false, error: "dados_invalidos" }, { status: 400 });
+  }
+
+  const fullNameRaw = parsed.data.full_name;
+  const safeFullName =
+    fullNameRaw === undefined
+      ? undefined
+      : fullNameRaw === null
+        ? null
+        : String(fullNameRaw).trim() || null;
+
+  const admin = createSupabaseAdminClient();
+  const updateData: Record<string, unknown> = {};
+  if (safeFullName !== undefined) updateData.full_name = safeFullName;
+
+  if (Object.keys(updateData).length === 0) {
+    return Response.json({ ok: true, lead: null });
+  }
+
+  const { data: updated, error } = await admin
+    .from("atendimento_leads")
+    .update(updateData)
+    .eq("id", leadId)
+    .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+    .select("id, full_name, updated_at")
+    .maybeSingle();
+
+  if (error) {
+    return Response.json({ ok: false, error: error.message }, { status: 500 });
+  }
+  if (!updated?.id) {
+    return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
+  return Response.json({
+    ok: true,
+    lead: {
+      id: String(updated.id ?? ""),
+      full_name: String((updated as any).full_name ?? "").trim() || null,
+      updated_at: String((updated as any).updated_at ?? new Date().toISOString()),
+    },
+  });
 }
 
 export async function DELETE(_: Request, context: { params: Promise<{ leadId: string }> }) {

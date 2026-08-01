@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Search, Trash2, X } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { Copy, Pencil, Search, Trash2, X } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
+import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import {
   deriveExperimentalClassBookingDisplayStatus,
@@ -83,17 +85,22 @@ function Field({
   );
 }
 
+type LeadNameValues = { full_name: string };
+
 function LeadDetails({
   lead,
   showDelete,
   deleting,
   onDelete,
+  onEditName,
 }: {
   lead: AtendimentoLeadListItem;
   showDelete: boolean;
   deleting: boolean;
   onDelete: () => void;
+  onEditName: (lead: AtendimentoLeadListItem) => void;
 }) {
+  const hasName = Boolean(String(lead.full_name ?? "").trim());
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
@@ -109,17 +116,29 @@ function LeadDetails({
           </div>
         </div>
 
-        {showDelete ? (
-          <button
-            type="button"
-            onClick={() => void onDelete()}
-            disabled={deleting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/5 px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Trash2 className="h-4 w-4" />
-            {deleting ? "Excluindo..." : "Excluir interessado"}
-          </button>
-        ) : null}
+        <div className="min-w-0 flex flex-col items-stretch gap-2 min-[1176px]:ml-auto min-[1176px]:flex-row min-[1176px]:items-center min-[1176px]:justify-end">
+          {showDelete ? (
+            <button
+              type="button"
+              onClick={() => void onEditName(lead)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/[0.07] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Pencil className="h-4 w-4" />
+              {hasName ? "Alterar nome" : "Adicionar nome"}
+            </button>
+          ) : null}
+          {showDelete ? (
+            <button
+              type="button"
+              onClick={() => void onDelete()}
+              disabled={deleting}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/35 bg-red-500/5 px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleting ? "Excluindo..." : "Excluir interessado"}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
@@ -332,6 +351,73 @@ export function AtendimentoSummaryCards({
   const [localSummary, setLocalSummary] = useState(summary);
   const [localLeads, setLocalLeads] = useState(leads);
   const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
+  const [openEditLeadName, setOpenEditLeadName] = useState(false);
+  const [editingLead, setEditingLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [savingLeadNameLeadId, setSavingLeadNameLeadId] = useState<string | null>(null);
+
+  const leadNameForm = useForm<LeadNameValues>({
+    defaultValues: { full_name: "" },
+  });
+
+  function openEditLeadName(lead: AtendimentoLeadListItem) {
+    setEditingLead(lead);
+    setOpenEditLeadName(true);
+    leadNameForm.reset({
+      full_name: String(lead.full_name ?? "").trim(),
+    });
+  }
+
+  function closeEditLeadName() {
+    setOpenEditLeadName(false);
+    setEditingLead(null);
+    leadNameForm.reset({ full_name: "" });
+  }
+
+  const saveLeadNameForm = leadNameForm.handleSubmit(async (values) => {
+    const leadId = String(editingLead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para salvar o nome.");
+      return;
+    }
+
+    try {
+      setSavingLeadNameLeadId(leadId);
+      const response = await fetch(`/api/atendimento/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: values.full_name.trim() || null }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; lead?: { id?: string; full_name?: string | null; updated_at?: string } | null }
+        | null;
+
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao salvar o nome do interessado.");
+        return;
+      }
+
+      const newFullName = String(payload?.lead?.full_name ?? values.full_name.trim()).trim() || null;
+      const newUpdatedAt = String(payload?.lead?.updated_at ?? editingLead?.updated_at ?? new Date().toISOString());
+
+      setLocalLeads((current) =>
+        current.map((item) =>
+          item.id === leadId
+            ? { ...item, full_name: newFullName, updated_at: newUpdatedAt }
+            : item,
+        ),
+      );
+
+      modalToast.success(
+        newFullName ? "Nome do interessado atualizado." : "Nome do interessado removido.",
+      );
+      closeEditLeadName();
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao salvar o nome do interessado.");
+    } finally {
+      setSavingLeadNameLeadId(null);
+    }
+  });
+
   const agendamentoItems = useMemo(
     () => localLeads.filter((lead) => leadHasExperimentalClassPanelStatus(lead)),
     [localLeads],
@@ -881,6 +967,7 @@ export function AtendimentoSummaryCards({
                   showDelete={activeSection === "interessados"}
                   deleting={deletingLeadId === selectedLead.id}
                   onDelete={() => handleDeleteLead(selectedLead)}
+                  onEditName={(l) => openEditLeadName(l)}
                 />
               )
             ) : (
@@ -937,6 +1024,7 @@ export function AtendimentoSummaryCards({
                       showDelete={activeSection === "interessados"}
                       deleting={deletingLeadId === selectedLead.id}
                       onDelete={() => handleDeleteLead(selectedLead)}
+                      onEditName={(l) => openEditLeadName(l)}
                     />
                   )}
                 </div>
@@ -944,6 +1032,69 @@ export function AtendimentoSummaryCards({
             </div>
           </div>
         ) : null}
+
+        <AppModal
+          open={openEditLeadName}
+          onClose={closeEditLeadName}
+          size="md"
+          zIndexClass="z-[500]"
+          fullScreenOnMobile
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white/90">
+                {editingLead?.full_name?.trim() ? "Alterar nome do interessado" : "Adicionar nome ao interessado"}
+              </div>
+              <div className="mt-1 truncate text-xs text-white/55">
+                {editingLead?.phone || editingLead?.full_name || "Lead selecionado"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeEditLeadName}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <form onSubmit={saveLeadNameForm} className="mt-5 space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-white/60">
+                Nome completo do interessado
+              </label>
+              <input
+                autoFocus
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder="Ex.: Ana Carolina Souza"
+                maxLength={160}
+                {...leadNameForm.register("full_name", { required: false, maxLength: 160 })}
+              />
+              <div className="mt-2 flex items-center justify-between text-[11px] text-white/40">
+                <span>Campo opcional. Facilita identificar esse interessado nas listas e buscas.</span>
+                <span>{(leadNameForm.watch("full_name") ?? "").length}/160</span>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={closeEditLeadName}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={leadNameForm.formState.isSubmitting || savingLeadNameLeadId !== null}
+                className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+              >
+                {leadNameForm.formState.isSubmitting || savingLeadNameLeadId !== null ? "Salvando..." : "Salvar nome"}
+              </button>
+            </div>
+          </form>
+        </AppModal>
       </div>
     </div>
   );
