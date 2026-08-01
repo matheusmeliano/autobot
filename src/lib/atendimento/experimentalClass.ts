@@ -288,9 +288,8 @@ Agora é hora de dar o próximo passo!
 Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?`;
 }
 
-export function buildExperimentalClassFinalChatMessage(name: string) {
-  const safeName = String(name ?? "").trim() || "Aluno";
-  return `Agora é só aguardar. Em breve, enviaremos o link da sua aula. Até mais ${safeName}!`;
+export function buildExperimentalClassFinalChatMessage(_name: string) {
+  return `Agora é só aguardar. Em breve, enviaremos o link da sua aula.`;
 }
 
 export function buildExperimentalClassBookingChatMessages(name: string) {
