@@ -599,8 +599,12 @@ function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | unde
   if (
     raw.startsWith("Datas disponíveis") ||
     raw.startsWith("As datas disponíveis são:") ||
+    raw.startsWith("Dias disponíveis") ||
+    raw.startsWith("Os dias disponíveis são:") ||
     raw.includes("qual data você prefere") ||
-    raw.includes("escolha a melhor data")
+    raw.includes("qual dia você prefere") ||
+    raw.includes("escolha a melhor data") ||
+    raw.includes("escolher o melhor dia")
   ) {
     return "date" as const;
   }
@@ -2197,6 +2201,8 @@ export async function POST(req: Request) {
               /qual (dia|data|horário|hora|horario)/i.test(lastBotText) ||
               lastBotText.startsWith("Datas disponíveis") ||
               lastBotText.startsWith("As datas disponíveis são:") ||
+              lastBotText.startsWith("Dias disponíveis") ||
+              lastBotText.startsWith("Os dias disponíveis são:") ||
               lastBotText.startsWith("Horários disponíveis") ||
               lastBotText.startsWith("Os horários disponíveis são:") ||
               lastBotText.startsWith("Responda apenas com o dia desejado") ||

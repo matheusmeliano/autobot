@@ -217,7 +217,7 @@ export function buildExperimentalClassDatesMessages(options: ExperimentalClassDa
 
   const labels = options.map((option) => option.dayLabel);
   return [
-    `As datas disponíveis são:\n\n${joinWithFinalConjunction(labels)}.`,
+    `Os dias disponíveis são:\n\n${joinWithFinalConjunction(labels)}.`,
     "Responda apenas com o dia desejado.",
   ];
 }

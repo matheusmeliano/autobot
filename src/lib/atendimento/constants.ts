@@ -43,7 +43,7 @@ export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number
 export const ATENDIMENTO_PROFESSOR_TIME_ZONE = "America/Cuiaba";
 export const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com sucesso.";
 export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
-  "Agora é só escolher a melhor data e horário para sua aula experimental.";
+  "Agora é só escolher o melhor dia e horário para sua aula experimental.";
 export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual dia você prefere?";
 export function buildExperimentalClassDatePromptMessages(_name?: string | null) {
   return [
