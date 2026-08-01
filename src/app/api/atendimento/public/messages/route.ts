@@ -24,7 +24,7 @@ import {
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
-  buildExperimentalClassStudentWhatsAppMessage,
+  buildExperimentalClassStudentWhatsAppMessages,
   buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
@@ -1893,10 +1893,12 @@ export async function POST(req: Request) {
       try {
         const phone = String((lead as any)?.phone ?? "").trim();
         if (phone) {
-          await sendAtendimentoWhatsAppText({
-            phone,
-            message: buildExperimentalClassStudentWhatsAppMessage(firstName),
-          });
+          for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
+            await sendAtendimentoWhatsAppText({
+              phone,
+              message: m,
+            });
+          }
         }
       } catch (error) {
         await appendHistoryEvent({

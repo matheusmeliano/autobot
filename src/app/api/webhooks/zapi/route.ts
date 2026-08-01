@@ -19,7 +19,7 @@ import {
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
-  buildExperimentalClassStudentWhatsAppMessage,
+  buildExperimentalClassStudentWhatsAppMessages,
   buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
@@ -2100,10 +2100,12 @@ export async function POST(req: Request) {
               } catch (_e) {}
             }
             try {
-              await sendAtendimentoWhatsAppText({
-                phone: normalizedPhoneOnly,
-                message: buildExperimentalClassStudentWhatsAppMessage(firstName),
-              });
+              for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: m,
+                });
+              }
             } catch (_e) {}
             try {
               await sendAtendimentoWhatsAppText({

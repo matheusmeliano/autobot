@@ -236,13 +236,17 @@ export function buildExperimentalClassTimesMessages(params: {
   ];
 }
 
-export function buildExperimentalClassStudentWhatsAppMessage(name: string) {
-  const safeName = String(name ?? "").trim() || "Aluno";
-  return `Parabéns, ${safeName}!
+export function buildExperimentalClassStudentWhatsAppMessages(_name: string) {
+  return [
+    `Parabéns!`,
+    `É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
+    `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
+  ];
+}
 
-É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.
-
-Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
+/** @deprecated Use buildExperimentalClassStudentWhatsAppMessages (3 mensagens separadas) — a mensagem unica concatenada NAO deve mais ser enviada. Mantida apenas para compilacao temporaria, retorna a 3a msg isolada. */
+export function buildExperimentalClassStudentWhatsAppMessage(_name: string) {
+  return `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
 }
 
 export function buildExperimentalClassAttendantWhatsAppMessage() {
@@ -288,8 +292,17 @@ Agora é hora de dar o próximo passo!
 Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?`;
 }
 
+export function buildExperimentalClassFinalChatMessages() {
+  return [
+    `Parabéns!`,
+    `É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
+    `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
+  ];
+}
+
+/** @deprecated Use buildExperimentalClassFinalChatMessages (3 mensagens separadas). Mantida apenas para compilacao temporaria, retorna a 3a msg isolada. */
 export function buildExperimentalClassFinalChatMessage(_name: string) {
-  return `Agora é só aguardar. Em breve, enviaremos o link da sua aula.`;
+  return `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
 }
 
 export function buildExperimentalClassBookingChatMessages(name: string) {
@@ -297,7 +310,7 @@ export function buildExperimentalClassBookingChatMessages(name: string) {
   return [
     "Agora você receberá a confirmação da sua inscrição pelo WhatsApp.",
     `Sua aula experimental foi agendada com sucesso, ${safeName}!`,
-    buildExperimentalClassFinalChatMessage(safeName),
+    ...buildExperimentalClassFinalChatMessages(),
   ];
 }
 
