@@ -132,10 +132,9 @@ test("buildExperimentalClassBookingChatMessages monta o novo fechamento com prim
   const messages = buildExperimentalClassBookingChatMessages("Ana");
 
   assert.deepEqual(messages, [
-    "Agora você receberá a confirmação da sua inscrição pelo WhatsApp.",
-    "Sua aula experimental foi agendada com sucesso, Ana!",
     "Parabéns!",
     "É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.",
+    "Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.",
   ]);
 });
 

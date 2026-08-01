@@ -2089,15 +2089,10 @@ export async function POST(req: Request) {
             const firstName =
               String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] || "Aluno";
             const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
-            let lastSent: string | null = null;
+            let lastSaved: string | null = null;
             for (const m of chatMsgs) {
               await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
-              lastSent = m;
-            }
-            if (lastSent) {
-              try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: lastSent });
-              } catch (_e) {}
+              lastSaved = m;
             }
             try {
               for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
