@@ -185,7 +185,7 @@ function LeadDetails({
             ) : null}
             <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
               <Field
-                label="Data (aluno)"
+                label="Dia (aluno)"
                 value={
                   String(booking?.lead_date ?? "").trim() ||
                   draftDate ||
@@ -201,7 +201,7 @@ function LeadDetails({
                 }
               />
               <Field
-                label="Data (professor)"
+                label="Dia (professor)"
                 value={
                   formatAtendimentoDate(
                     String(booking?.professor_date ?? "").trim() ||
@@ -303,10 +303,10 @@ function BookingDetails({
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
           <Field label="Aluno" value={lead.full_name} />
           <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
-          <Field label="Data do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
+          <Field label="Dia do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
           <Field label="Horario do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
           <Field label="Fuso do aluno" value={booking?.lead_timezone} />
-          <Field label="Data do professor" value={formatAtendimentoDate(booking?.professor_date)} />
+          <Field label="Dia do professor" value={formatAtendimentoDate(booking?.professor_date)} />
           <Field label="Horario do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
           <Field label="Fuso do professor" value={professorTimeZone} />
         </div>
