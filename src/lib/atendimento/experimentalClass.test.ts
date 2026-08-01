@@ -136,7 +136,6 @@ test("buildExperimentalClassBookingChatMessages monta o novo fechamento com prim
     "Sua aula experimental foi agendada com sucesso, Ana!",
     "Parabéns!",
     "É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.",
-    "Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.",
   ]);
 });
 

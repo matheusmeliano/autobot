@@ -240,13 +240,12 @@ export function buildExperimentalClassStudentWhatsAppMessages(_name: string) {
   return [
     `Parabéns!`,
     `É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
-    `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
   ];
 }
 
-/** @deprecated Use buildExperimentalClassStudentWhatsAppMessages (3 mensagens separadas) — a mensagem unica concatenada NAO deve mais ser enviada. Mantida apenas para compilacao temporaria, retorna a 3a msg isolada. */
+/** @deprecated Use buildExperimentalClassStudentWhatsAppMessages (2 mensagens separadas) — a mensagem unica concatenada NAO deve mais ser enviada. Mantida apenas para compilacao temporaria, retorna string vazia. */
 export function buildExperimentalClassStudentWhatsAppMessage(_name: string) {
-  return `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
+  return ``;
 }
 
 export function buildExperimentalClassAttendantWhatsAppMessage() {
@@ -296,13 +295,12 @@ export function buildExperimentalClassFinalChatMessages() {
   return [
     `Parabéns!`,
     `É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
-    `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
   ];
 }
 
-/** @deprecated Use buildExperimentalClassFinalChatMessages (3 mensagens separadas). Mantida apenas para compilacao temporaria, retorna a 3a msg isolada. */
+/** @deprecated Use buildExperimentalClassFinalChatMessages (2 mensagens separadas). Mantida apenas para compilacao temporaria, retorna string vazia. */
 export function buildExperimentalClassFinalChatMessage(_name: string) {
-  return `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
+  return ``;
 }
 
 export function buildExperimentalClassBookingChatMessages(name: string) {
