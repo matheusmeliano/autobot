@@ -1577,13 +1577,15 @@ export async function POST(req: Request) {
         const existingBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
         const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
         if (existingScheduledBookingId && conversation.bot_enabled !== false) {
-          void admin
-            .from("atendimento_conversations")
-            .update({
-              bot_enabled: false,
-              updated_at: nowIso,
-            })
-            .eq("id", conversationId);
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({
+                bot_enabled: false,
+                updated_at: nowIso,
+              })
+              .eq("id", conversationId);
+          } catch (_e) {}
         }
         if (existingScheduledBookingId) {
           return Response.json({
@@ -1591,6 +1593,39 @@ export async function POST(req: Request) {
             ignored: true,
             reason: "flow_concluded_aula_experimental_ja_agendada",
             booking_id: existingScheduledBookingId,
+          });
+        }
+
+        const histFlowRecent = await admin
+          .from("atendimento_history_events")
+          .select("event_type,created_at")
+          .eq("lead_id", leadId)
+          .eq("conversation_id", conversationId)
+          .in("event_type", [
+            "experimental_class_scheduled",
+            "whatsapp_flow_concluded_bot_disabled",
+            "whatsapp_flow_blocked_max_attempts",
+          ])
+          .order("created_at", { ascending: false })
+          .limit(3);
+        const recentFlowConclusion = (histFlowRecent.data ?? []).length > 0;
+        if (recentFlowConclusion && conversation.bot_enabled !== false) {
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({
+                bot_enabled: false,
+                updated_at: nowIso,
+              })
+              .eq("id", conversationId);
+          } catch (_e) {}
+        }
+        if (recentFlowConclusion) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "flow_concluded_already_finalized_in_history_event",
+            event_types: (histFlowRecent.data ?? []).map((e: any) => e.event_type),
           });
         }
 
@@ -1945,6 +1980,26 @@ export async function POST(req: Request) {
           if (alreadyBooked?.id) {
             return Response.json({ ok: true, handled: true, flow: "whatsapp_already_booked" });
           }
+          const normalizedInbound = String(inboundContent ?? "").trim();
+          const looksLikeDateOrTime = /\d/.test(normalizedInbound) || /hoje|amanha|amanhã|segunda|terca|quarta|quinta|sexta|sabado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(normalizedInbound);
+          const lastAskedAboutSchedule = Boolean(
+            lastBotText && (
+              /qual (dia|data|horário|hora|horario)/i.test(lastBotText) ||
+              lastBotText.startsWith("Datas disponíveis") ||
+              lastBotText.startsWith("As datas disponíveis são:") ||
+              lastBotText.startsWith("Horários disponíveis") ||
+              lastBotText.startsWith("Os horários disponíveis são:") ||
+              lastBotText.startsWith("Responda apenas com o dia desejado") ||
+              lastBotText.startsWith("Responda apenas com o horário desejado")
+            )
+          );
+          if (hasReachedPostCityStage && !looksLikeDateOrTime && !lastAskedAboutSchedule) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "quiet_no_schedule_question_received_non_date_input",
+            });
+          }
           const leadTz =
             String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
           const { messages: fallbackDateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
@@ -2136,41 +2191,67 @@ export async function POST(req: Request) {
               .select("*")
               .maybeSingle();
 
-            void admin
-              .from("atendimento_leads")
-              .update({
-                funnel_stage: "aula_experimental_agendada",
-                status: "em_atendimento",
-                best_contact_time: chosen.leadTime,
-                updated_at: nowIso,
-              })
-              .eq("id", leadId);
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "aula_experimental_agendada",
+                  status: "em_atendimento",
+                  best_contact_time: chosen.leadTime,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
 
-            void appendHistoryEvent({
-              leadId,
-              conversationId,
-              eventType: "experimental_class_scheduled",
-              title: "Aula experimental agendada via WhatsApp",
-              details: {
-                booking_id: String((booking as any)?.id ?? ""),
-                teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-                lead_timezone: leadTz,
-                professor_date: chosen.professorDate,
-                professor_time: chosen.professorTime,
-                professor_start_at: chosen.professorStartAt,
-                lead_date: chosen.leadDate,
-                lead_time: chosen.leadTime,
-              },
-              actorType: "system",
-            });
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({
+                  bot_enabled: false,
+                  updated_at: nowIso,
+                })
+                .eq("id", conversationId);
+            } catch (_e) {}
+
+            try {
+              await appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "experimental_class_scheduled",
+                title: "Aula experimental agendada via WhatsApp",
+                details: {
+                  booking_id: String((booking as any)?.id ?? ""),
+                  teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                  lead_timezone: leadTz,
+                  professor_date: chosen.professorDate,
+                  professor_time: chosen.professorTime,
+                  professor_start_at: chosen.professorStartAt,
+                  lead_date: chosen.leadDate,
+                  lead_time: chosen.leadTime,
+                },
+                actorType: "system",
+              });
+            } catch (_e) {}
+
+            try {
+              await appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_flow_concluded_bot_disabled",
+                title: "Fluxo WhatsApp de agendamento concluido — bot desativado para novos disparos",
+                details: {
+                  reason: "aula_experimental_agendada",
+                  disabled_at: nowIso,
+                },
+                actorType: "system",
+              });
+            } catch (_e) {}
 
             const firstName =
               String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] || "Aluno";
             const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
-            let lastSaved: string | null = null;
             for (const m of chatMsgs) {
               await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
-              lastSaved = m;
             }
             try {
               for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
@@ -2186,26 +2267,6 @@ export async function POST(req: Request) {
                 message: buildExperimentalClassAttendantWhatsAppMessage(),
               });
             } catch (_e) {}
-
-            void admin
-              .from("atendimento_conversations")
-              .update({
-                bot_enabled: false,
-                updated_at: nowIso,
-              })
-              .eq("id", conversationId);
-
-            void appendHistoryEvent({
-              leadId,
-              conversationId,
-              eventType: "whatsapp_flow_concluded_bot_disabled",
-              title: "Fluxo WhatsApp de agendamento concluido — bot desativado para novos disparos",
-              details: {
-                reason: "aula_experimental_agendada",
-                disabled_at: nowIso,
-              },
-              actorType: "system",
-            });
           }
 
           return Response.json({
