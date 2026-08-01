@@ -391,11 +391,9 @@ export function listExperimentalClassAvailability(params: {
     }
   };
 
-  const professorMonthStartAtDay24 = `${professorToday.slice(0, 8)}24`;
-  const shouldUseNextMonth = professorToday >= professorMonthEnd;
+  const shouldUseNextMonth = professorToday > professorMonthEnd;
   if (!shouldUseNextMonth) {
-    const professorWindowStart = maxLocalDate(professorToday, professorMonthStartAtDay24);
-    collectDates(professorWindowStart, professorMonthEnd);
+    collectDates(professorToday, professorMonthEnd);
   }
 
   if (!dates.length) {

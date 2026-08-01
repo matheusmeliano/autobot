@@ -15,7 +15,7 @@ import {
   listExperimentalClassAvailability,
 } from "./experimentalClass.ts";
 
-test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 16:00 a partir do dia 24", () => {
+test("listExperimentalClassAvailability comeca no dia seguinte ao domingo atual, com todos os slots horarios", () => {
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-12T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
@@ -25,14 +25,14 @@ test("listExperimentalClassAvailability gera apenas slots de 1h30 entre 13:00 e 
   const firstDate = availability.dates[0];
   const slots = availability.slotsByProfessorDate.get(firstDate.professorDate) ?? [];
 
-  assert.equal(firstDate.professorDate, "2026-07-24");
+  assert.equal(firstDate.professorDate, "2026-07-13");
   assert.deepEqual(
     slots.map((slot) => slot.professorTime),
-    ["13:00", "14:30", "16:00"],
+    ["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00"],
   );
 });
 
-test("listExperimentalClassAvailability remove slots que conflitam em 1h30", () => {
+test("listExperimentalClassAvailability remove slots que conflitam em 1h30 mantendo os demais livres", () => {
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-12T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
@@ -40,11 +40,11 @@ test("listExperimentalClassAvailability remove slots que conflitam em 1h30", () 
   });
 
   const slots = availability.slotsByProfessorDate.get("2026-07-24") ?? [];
+  const times = slots.map((slot) => slot.professorTime);
 
-  assert.deepEqual(
-    slots.map((slot) => slot.professorTime),
-    ["14:30", "16:00"],
-  );
+  assert.equal(times.includes("13:00"), false);
+  assert.equal(times.includes("14:30"), true);
+  assert.equal(times.includes("16:00"), true);
 });
 
 test("listExperimentalClassAvailability nao exibe domingos entre as datas restantes do mes", () => {
@@ -56,13 +56,13 @@ test("listExperimentalClassAvailability nao exibe domingos entre as datas restan
 
   assert.deepEqual(
     availability.dates.map((option) => option.professorDate),
-    ["2026-07-24", "2026-07-25", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"],
+    ["2026-07-24", "2026-07-25", "2026-07-26", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31"],
   );
 });
 
-test("listExperimentalClassAvailability vira automaticamente para o proximo mes no ultimo dia do mes", () => {
+test("listExperimentalClassAvailability vira automaticamente para o proximo mes quando nao ha mais slots no dia final", () => {
   const availability = listExperimentalClassAvailability({
-    now: new Date("2026-07-31T10:00:00.000Z"),
+    now: new Date("2026-07-31T23:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
     bookedProfessorStartAts: [],
   });
