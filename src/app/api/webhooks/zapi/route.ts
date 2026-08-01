@@ -1571,8 +1571,56 @@ export async function POST(req: Request) {
           leadId,
           conversationId,
         });
-        const expectedField = expectedFieldByText ?? expectedFieldByHistory;
+        let expectedField = expectedFieldByText ?? expectedFieldByHistory;
         const nextMissingField = getWhatsAppNextMissingField(lead);
+
+        const existingBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+        const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
+        if (existingScheduledBookingId && conversation.bot_enabled !== false) {
+          void admin
+            .from("atendimento_conversations")
+            .update({
+              bot_enabled: false,
+              updated_at: nowIso,
+            })
+            .eq("id", conversationId);
+        }
+        if (existingScheduledBookingId) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "flow_concluded_aula_experimental_ja_agendada",
+            booking_id: existingScheduledBookingId,
+          });
+        }
+
+        const leadStateValue = String((lead as any)?.state ?? "").trim();
+        const leadCityValue = String((lead as any)?.city ?? "").trim();
+        const leadTimezoneValue = String((lead as any)?.timezone ?? "").trim();
+        const leadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim();
+        const hasStateValidated = Boolean(leadStateValue && leadTimezoneValue);
+        const hasCityValidated = Boolean(leadCityValue && hasStateValidated);
+        const hasReachedPostCityStage =
+          hasCityValidated ||
+          leadFunnelStage === "pre_cadastro_concluido" ||
+          leadFunnelStage === "aula_experimental_agendada" ||
+          leadFunnelStage === "em_atendimento";
+
+        if (expectedField === "state" && hasStateValidated) {
+          expectedField = hasCityValidated ? (nextMissingField ?? null) : "city";
+        }
+        if (expectedField === "city" && hasCityValidated) {
+          expectedField = nextMissingField ?? null;
+        }
+        if (!expectedField && hasReachedPostCityStage) {
+          expectedField = nextMissingField ?? expectedField;
+        }
+        if (expectedField === "state" && hasReachedPostCityStage) {
+          expectedField = nextMissingField ?? null;
+        }
+        if (expectedField === "city" && !hasStateValidated) {
+          expectedField = "state";
+        }
 
         if (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) {
           const firstMessage =
@@ -1623,7 +1671,8 @@ export async function POST(req: Request) {
           });
         }
 
-        if (expectedField === "state" || (!expectedField && nextMissingField === "state")) {
+        const wantsStateStage = expectedField === "state" || (!expectedField && nextMissingField === "state");
+        if (wantsStateStage && !hasStateValidated && !hasReachedPostCityStage) {
           const stateResolution = resolveTimeZoneFromStateInput({
             state: inboundContent,
             phone: normalizedPhoneOnly,
@@ -1727,7 +1776,8 @@ export async function POST(req: Request) {
           });
         }
 
-        if (expectedField === "city" || (!expectedField && nextMissingField === "city")) {
+        const wantsCityStage = expectedField === "city" || (!expectedField && nextMissingField === "city");
+        if (wantsCityStage && hasStateValidated && !hasCityValidated && !hasReachedPostCityStage) {
           const stateSoFar = String((lead as any)?.state ?? "").trim();
           const resolved = resolveTimeZoneFromCityInput({
             city: inboundContent,
@@ -2108,12 +2158,42 @@ export async function POST(req: Request) {
                 message: buildExperimentalClassAttendantWhatsAppMessage(),
               });
             } catch (_e) {}
+
+            void admin
+              .from("atendimento_conversations")
+              .update({
+                bot_enabled: false,
+                updated_at: nowIso,
+              })
+              .eq("id", conversationId);
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "whatsapp_flow_concluded_bot_disabled",
+              title: "Fluxo WhatsApp de agendamento concluido — bot desativado para novos disparos",
+              details: {
+                reason: "aula_experimental_agendada",
+                disabled_at: nowIso,
+              },
+              actorType: "system",
+            });
           }
 
           return Response.json({
             ok: true,
             handled: true,
             flow: "whatsapp_booked",
+          });
+        }
+
+        if (hasReachedPostCityStage && !isFirstBotInteraction) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "flow_inattended_or_waiting_human_stage_quiet",
+            last_expected: expectedField,
+            next_missing: nextMissingField ?? null,
           });
         }
       }
