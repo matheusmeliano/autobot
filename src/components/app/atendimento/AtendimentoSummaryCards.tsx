@@ -338,6 +338,8 @@ function BookingDetails({
     !hasStudentNotification &&
     !hasAttendantNotification;
   const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
+  const bookingIsNoShow = String(booking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
+  const displayDash = "-";
 
   useEffect(() => {
     setLessonLinkDraft(savedLessonLink);
@@ -456,14 +458,14 @@ function BookingDetails({
         ) : null}
 
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
-          <Field label="Aluno" value={lead.full_name} />
-          <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
-          <Field label="Dia do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
-          <Field label="Horário do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
-          <Field label="Fuso do aluno" value={booking?.lead_timezone} />
-          <Field label="Dia do professor" value={formatAtendimentoDate(booking?.professor_date)} />
-          <Field label="Horário do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
-          <Field label="Fuso do professor" value={professorTimeZone} />
+          <Field label="Aluno" value={bookingIsNoShow ? displayDash : lead.full_name} />
+          <Field label="Status" value={bookingIsNoShow ? displayDash : experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
+          <Field label="Dia do aluno" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.lead_date)} />
+          <Field label="Horário do aluno" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.lead_time)} />
+          <Field label="Fuso do aluno" value={bookingIsNoShow ? displayDash : booking?.lead_timezone} />
+          <Field label="Dia do professor" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.professor_date)} />
+          <Field label="Horário do professor" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.professor_time)} />
+          <Field label="Fuso do professor" value={bookingIsNoShow ? displayDash : professorTimeZone} />
         </div>
 
         {showIncompleteState ? (
