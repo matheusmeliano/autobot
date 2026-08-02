@@ -321,28 +321,8 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
-          <Field label="Aluno" value={lead.full_name} />
-          <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
-          <Field label="Dia do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
-          <Field label="Horário do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
-          <Field label="Fuso do aluno" value={booking?.lead_timezone} />
-          <Field label="Dia do professor" value={formatAtendimentoDate(booking?.professor_date)} />
-          <Field label="Horário do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
-          <Field label="Fuso do professor" value={professorTimeZone} />
-        </div>
-
-        {showIncompleteState ? (
-          <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">Agendamento</div>
-            <div className="mt-3 text-sm text-amber-50">
-              O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com dia e horário confirmados.
-            </div>
-          </div>
-        ) : null}
-
         {notificationsSent ? (
-          <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+          <div className="mb-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
               Comparecimento
             </div>
@@ -387,6 +367,26 @@ function BookingDetails({
                 </div>
               </>
             )}
+          </div>
+        ) : null}
+
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+          <Field label="Aluno" value={lead.full_name} />
+          <Field label="Status" value={experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
+          <Field label="Dia do aluno" value={formatAtendimentoDate(booking?.lead_date)} />
+          <Field label="Horário do aluno" value={atendimentoTimeLabel(booking?.lead_time)} />
+          <Field label="Fuso do aluno" value={booking?.lead_timezone} />
+          <Field label="Dia do professor" value={formatAtendimentoDate(booking?.professor_date)} />
+          <Field label="Horário do professor" value={atendimentoTimeLabel(booking?.professor_time)} />
+          <Field label="Fuso do professor" value={professorTimeZone} />
+        </div>
+
+        {showIncompleteState ? (
+          <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">Agendamento</div>
+            <div className="mt-3 text-sm text-amber-50">
+              O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com dia e horário confirmados.
+            </div>
           </div>
         ) : null}
 
