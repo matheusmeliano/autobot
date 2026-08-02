@@ -1678,27 +1678,17 @@ export async function POST(req: Request) {
           }
         }
 
-        const shouldResetAllFlowsForNewScheduling =
+        const isLeadInRepescagemNoShowLocked =
           isLeadRepescagemStatus ||
           (currentBookingId &&
             anyAttendanceResolved &&
             (bookingAttendanceNoShowByCol || bookingAttendanceNoShowByHistory));
 
-        if (shouldResetAllFlowsForNewScheduling && !conversation.bot_enabled) {
-          try {
-            await admin
-              .from("atendimento_conversations")
-              .update({ bot_enabled: true, updated_at: nowIso })
-              .eq("id", conversationId);
-            (conversation as any).bot_enabled = true;
-          } catch (_e) {}
-        }
+        const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
 
-        const effectiveWaitMessage = shouldResetAllFlowsForNewScheduling
-          ? ""
-          : anyNotificationSent
-            ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
-            : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+        const effectiveWaitMessage = anyNotificationSent
+          ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
+          : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
 
         if (isBookingWaitingAttendance) {
           const inboundContent = String(messageText ?? "").trim();
@@ -1767,6 +1757,83 @@ export async function POST(req: Request) {
           });
         }
 
+        if (isLeadInRepescagemNoShowLocked) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "whatsapp_repescagem_no_show_fixed_reply",
+              title: "Fluxo encerrado: resposta fixa de repescagem",
+              details: {
+                inbound_content_text: inboundContent || null,
+                reply_text: RESPOSTA_REPESCAGEM_FIXA,
+                source: "whatsapp_zapi",
+                is_lead_repescagem_status: isLeadRepescagemStatus,
+                booking_attendance_no_show_by_col: bookingAttendanceNoShowByCol,
+                booking_attendance_no_show_by_history: bookingAttendanceNoShowByHistory,
+              },
+              actorType: "bot",
+            });
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_repescagem_no_show_locked",
+          });
+        }
+
         if (!conversation.bot_enabled) {
           if (isBookingWaitingAttendance) {
             return Response.json({
@@ -1776,12 +1843,6 @@ export async function POST(req: Request) {
               booking_id: currentBookingId,
             });
           }
-          if (shouldResetAllFlowsForNewScheduling) {
-            // Lead em repescagem ou ja marcou nao compareceu: NAO dispara echo,
-            // deixa o fluxo seguir normalmente para a pergunta do ESTADO (novo
-            // atendimento do zero, substituindo dados antigos). Ja re-ligamos o
-            // bot_enabled acima se necessario.
-          } else {
           let finalReason = "conversation_blocked";
           let responseMessage: string | null = null;
           const hasBooking = currentBookingId ? currentBooking : null;
@@ -1848,7 +1909,6 @@ export async function POST(req: Request) {
             ignored: true,
             reason: finalReason,
           });
-          }
         }
 
         const inboundContent = String(messageText ?? "").trim();
@@ -1921,8 +1981,7 @@ export async function POST(req: Request) {
         if (
           existingScheduledBookingId &&
           conversation.bot_enabled !== false &&
-          !isBookingWaitingAttendance &&
-          !shouldResetAllFlowsForNewScheduling
+          !isBookingWaitingAttendance
         ) {
           try {
             await admin
@@ -1934,7 +1993,7 @@ export async function POST(req: Request) {
               .eq("id", conversationId);
           } catch (_e) {}
         }
-        if (existingScheduledBookingId && !isBookingWaitingAttendance && !shouldResetAllFlowsForNewScheduling) {
+        if (existingScheduledBookingId && !isBookingWaitingAttendance) {
           try {
             await insertWhatsAppBotTextMessage({
               admin,
@@ -1977,7 +2036,7 @@ export async function POST(req: Request) {
           .order("created_at", { ascending: false })
           .limit(3);
         const eventsFlowRecent = (histFlowRecent.data ?? []) as Array<{ event_type: string }>;
-        const recentFlowConclusion = eventsFlowRecent.length > 0 && !shouldResetAllFlowsForNewScheduling;
+        const recentFlowConclusion = eventsFlowRecent.length > 0;
         const recentIsScheduled = eventsFlowRecent.some(
           (e) =>
             e.event_type === "experimental_class_scheduled" ||
@@ -2059,27 +2118,20 @@ export async function POST(req: Request) {
         let histTimezone = String((lastHistState as any)?.details?.timezone ?? "").trim();
         let histCityValue = String((lastHistCity as any)?.details?.city ?? "").trim();
 
-        if (shouldResetAllFlowsForNewScheduling) {
-          histStateValue = "";
-          histTimezone = "";
-          histCityValue = "";
-        }
-
         const leadStateValue =
-          String((lead as any)?.state ?? "").trim() || (shouldResetAllFlowsForNewScheduling ? "" : histStateValue);
+          String((lead as any)?.state ?? "").trim() || histStateValue;
         const leadTimezoneValue =
-          String((lead as any)?.timezone ?? "").trim() || (shouldResetAllFlowsForNewScheduling ? "" : histTimezone);
-        const leadCityValue = String((lead as any)?.city ?? "").trim() || (shouldResetAllFlowsForNewScheduling ? "" : histCityValue);
+          String((lead as any)?.timezone ?? "").trim() || histTimezone;
+        const leadCityValue = String((lead as any)?.city ?? "").trim() || histCityValue;
         const leadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim();
         const hasStateValidated = Boolean(leadStateValue && leadTimezoneValue);
         const hasCityValidated = Boolean(leadCityValue && hasStateValidated);
         const hasReachedPostCityStage =
-          (!shouldResetAllFlowsForNewScheduling && hasCityValidated) ||
-          (!shouldResetAllFlowsForNewScheduling &&
-            (leadFunnelStage === "pre_cadastro_concluido" ||
-              leadFunnelStage === "aula_experimental_agendada" ||
-              leadFunnelStage === "em_atendimento")) ||
-          (!shouldResetAllFlowsForNewScheduling && Boolean(lastHistCity));
+          hasCityValidated ||
+          (leadFunnelStage === "pre_cadastro_concluido" ||
+            leadFunnelStage === "aula_experimental_agendada" ||
+            leadFunnelStage === "em_atendimento") ||
+          Boolean(lastHistCity);
 
 
         if (expectedField === "state" && hasStateValidated) {
@@ -2102,8 +2154,7 @@ export async function POST(req: Request) {
         }
 
         if (
-          (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) ||
-          shouldResetAllFlowsForNewScheduling
+          (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent))
         ) {
           const firstMessage =
             "Para agendarmos sua aula experimental gratuita, preciso de algumas informações rápidas. Vamos começar?";
