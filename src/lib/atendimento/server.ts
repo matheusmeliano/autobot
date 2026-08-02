@@ -636,11 +636,10 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   const admin = createSupabaseAdminClient();
   const nowIso = now.toISOString();
   const nowMs = now.getTime();
-  const lookbackMinutes = 15;
+  const lookbackMinutes = 180;
+  const forwardMinutes = 720;
   const candidateWindowStartIso = new Date(nowMs - lookbackMinutes * 60_000).toISOString();
-  const attendantReminderUpperIso = new Date(
-    nowMs + EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000,
-  ).toISOString();
+  const candidateWindowEndIso = new Date(nowMs + forwardMinutes * 60_000).toISOString();
 
   let bookings: any[] | null = null;
   let bookingsError: any = null;
@@ -655,7 +654,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     .select(bookingsSelectWithLessonLink)
     .eq("status", "scheduled")
     .gte("professor_start_at", candidateWindowStartIso)
-    .lte("professor_start_at", attendantReminderUpperIso)
+    .lte("professor_start_at", candidateWindowEndIso)
     .order("professor_start_at", { ascending: true });
 
   if (
@@ -667,7 +666,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       .select(bookingsSelectWithoutLessonLink)
       .eq("status", "scheduled")
       .gte("professor_start_at", candidateWindowStartIso)
-      .lte("professor_start_at", attendantReminderUpperIso)
+      .lte("professor_start_at", candidateWindowEndIso)
       .order("professor_start_at", { ascending: true });
 
     bookings = bookingsWithoutLessonLinkResult.data as any[] | null;
