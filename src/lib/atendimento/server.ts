@@ -167,6 +167,23 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
   );
 }
 
+function isExperimentalClassBookingsNotificationSentColumnsUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    code === "PGRST205" ||
+    code === "42P01" ||
+    /column .*(student_start_notification_sent_at|attendant_start_notification_sent_at|attendance_status|attendance_checked_at).* does not exist/i.test(
+      message,
+    ) ||
+    /could not find the '(student_start_notification_sent_at|attendant_start_notification_sent_at|attendance_status|attendance_checked_at)' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
 async function countAtendimentoDailyInterestedLeads(params: {
   rangeStartIso: string;
   rangeEndIso: string;
@@ -629,9 +646,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   let bookingsError: any = null;
 
   const bookingsSelectWithLessonLink =
-    "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+    "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
   const bookingsSelectWithoutLessonLink =
-    "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+    "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
 
   const bookingsWithLessonLinkResult = await admin
     .from("atendimento_experimental_class_bookings")
@@ -755,6 +772,38 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   let missingLessonLink = 0;
   let missingStudentPhone = 0;
 
+  async function setBookingNotificationSentAt(params: {
+    bookingId: string;
+    column:
+      | "student_start_notification_sent_at"
+      | "attendant_start_notification_sent_at";
+    nowIso: string;
+  }) {
+    try {
+      const fullUpdate = await admin
+        .from("atendimento_experimental_class_bookings")
+        .update({
+          [params.column]: params.nowIso,
+        } as any)
+        .eq("id", params.bookingId);
+      if (fullUpdate.error && isExperimentalClassBookingsNotificationSentColumnsUnavailable(fullUpdate.error)) {
+        await admin
+          .from("atendimento_experimental_class_bookings")
+          .update({ updated_at: params.nowIso })
+          .eq("id", params.bookingId);
+      }
+    } catch {
+      try {
+        await admin
+          .from("atendimento_experimental_class_bookings")
+          .update({ updated_at: params.nowIso })
+          .eq("id", params.bookingId);
+      } catch {
+        /* noop */
+      }
+    }
+  }
+
   for (const booking of bookingRows) {
     const bookingId = String((booking as any)?.id ?? "").trim();
     const leadId = String((booking as any)?.lead_id ?? "").trim();
@@ -785,11 +834,18 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       continue;
     }
 
+    const cachedStudentSent =
+      sentStudentBookingIds.has(bookingId) ||
+      Boolean(String((booking as any)?.student_start_notification_sent_at ?? "").trim());
+    const cachedAttendantSent =
+      sentAttendantBookingIds.has(bookingId) ||
+      Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
+
     const studentDue = leadStartAtMs <= nowMs;
     const attendantDue =
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
 
-    if (attendantDue && !sentAttendantBookingIds.has(bookingId)) {
+    if (attendantDue && !cachedAttendantSent) {
       try {
         await sendAtendimentoWhatsAppText({
           phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
@@ -808,6 +864,11 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
             start_at: professorStartAtRaw,
           },
           actorType: "system",
+        });
+        await setBookingNotificationSentAt({
+          bookingId,
+          column: "attendant_start_notification_sent_at",
+          nowIso,
         });
         sentAttendantBookingIds.add(bookingId);
         attendantSent += 1;
@@ -829,7 +890,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       }
     }
 
-    if (studentDue && !sentStudentBookingIds.has(bookingId)) {
+    if (studentDue && !cachedStudentSent) {
       if (!leadPhone) {
         missingStudentPhone += 1;
         continue;
@@ -853,6 +914,11 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
             start_at: leadStartAtRaw,
           },
           actorType: "system",
+        });
+        await setBookingNotificationSentAt({
+          bookingId,
+          column: "student_start_notification_sent_at",
+          nowIso,
         });
         sentStudentBookingIds.add(bookingId);
         studentSent += 1;

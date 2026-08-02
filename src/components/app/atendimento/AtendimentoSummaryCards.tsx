@@ -262,8 +262,16 @@ function BookingDetails({
   const isSendingStudentNotification = sendingStudentNotificationBookingId === bookingId;
   const lessonLinkChanged = lessonLinkDraft.trim() !== savedLessonLink;
   const canOpenSavedLessonLink = /^https?:\/\//i.test(savedLessonLink);
-  const notificationsSent = Boolean(String(booking?.student_start_notification_sent_at ?? "").trim()) &&
-    Boolean(String(booking?.attendant_start_notification_sent_at ?? "").trim());
+  const hasStudentNotification = Boolean(
+    String(booking?.student_start_notification_sent_at ?? "").trim(),
+  );
+  const hasAttendantNotification = Boolean(
+    String(booking?.attendant_start_notification_sent_at ?? "").trim(),
+  );
+  const hasAttendanceStatus =
+    String(booking?.attendance_status ?? "").trim() === "attended" ||
+    String(booking?.attendance_status ?? "").trim() === "no_show";
+  const showAttendanceCard = hasStudentNotification || hasAttendantNotification || hasAttendanceStatus;
   const attendanceStatus = booking?.attendance_status ?? null;
   const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
     bookingStatus: booking?.status,
@@ -321,7 +329,7 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {notificationsSent ? (
+        {showAttendanceCard ? (
           <div className="mb-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
               Comparecimento
