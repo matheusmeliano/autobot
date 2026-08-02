@@ -852,9 +852,10 @@ async function getScheduledExperimentalClassBookingWhatsApp(params: {
 }) {
   const { data } = await params.admin
     .from("atendimento_experimental_class_bookings")
-    .select("professor_start_at, id")
+    .select(
+      "professor_start_at, id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_checked_at",
+    )
     .eq("lead_id", params.leadId)
-    .eq("status", "scheduled")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1599,6 +1600,83 @@ export async function POST(req: Request) {
         const conversationId = String(leadContext.conversation.id);
         const lead = leadContext.lead as any;
         const conversation = leadContext.conversation as any;
+
+        const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+        if (currentBooking?.id) {
+          const hasStudentNotification = Boolean(currentBooking.student_start_notification_sent_at);
+          const hasAttendantNotification = Boolean(currentBooking.attendant_start_notification_sent_at);
+          const attendanceStatus = String(currentBooking.attendance_status ?? "").trim();
+          const attendanceResolved =
+            attendanceStatus === "attended" || attendanceStatus === "no_show" || Boolean(currentBooking.attendance_checked_at);
+          const inClassWaitingAttendance =
+            (hasStudentNotification || hasAttendantNotification) && !attendanceResolved;
+          if (inClassWaitingAttendance) {
+            const inboundContent = String(messageText ?? "").trim();
+            const inboundMediaType = mediaInfo.hasPaymentMedia
+              ? (mediaInfo.mediaUrl ? "document" : "text")
+              : "text";
+            const inboundMediaUrl = mediaInfo.mediaUrl || null;
+            try {
+              const { error: inboundErr } = await admin
+                .from("atendimento_messages")
+                .insert({
+                  conversation_id: conversationId,
+                  sender_role: "lead",
+                  content_text: inboundContent || null,
+                  media_type: inboundMediaType,
+                  media_url: inboundMediaUrl,
+                  status: "recebida",
+                  sent_at: nowIso,
+                  delivered_at: nowIso,
+                });
+              if (!inboundErr) {
+                try {
+                  void admin
+                    .from("atendimento_leads")
+                    .update({
+                      unread_count: Number(lead.unread_count ?? 0) + 1,
+                      is_new_for_attendant: true,
+                      last_interaction_at: nowIso,
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {}
+                try {
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: inboundContent || "(mensagem recebida)",
+                    createdAt: nowIso,
+                  });
+                } catch (_e) {}
+                try {
+                  void appendHistoryEvent({
+                    leadId,
+                    conversationId,
+                    eventType: "message_received_class_in_progress",
+                    title: "Mensagem recebida (aula em andamento — bloqueada)",
+                    details: {
+                      content_text: inboundContent || null,
+                      media_type: inboundMediaType,
+                      media_url: inboundMediaUrl,
+                      booking_id: String(currentBooking.id),
+                      source: "whatsapp_zapi",
+                    },
+                    actorType: "lead",
+                  });
+                } catch (_e) {}
+              }
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "experimental_class_waiting_attendance_blocked",
+              booking_id: String(currentBooking.id),
+              attendance_status: attendanceStatus || null,
+              student_start_notification_sent_at: currentBooking.student_start_notification_sent_at || null,
+              attendant_start_notification_sent_at: currentBooking.attendant_start_notification_sent_at || null,
+            });
+          }
+        }
 
         if (!conversation.bot_enabled) {
           let finalReason = "conversation_blocked";
