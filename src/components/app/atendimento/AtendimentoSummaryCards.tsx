@@ -236,17 +236,21 @@ function BookingDetails({
   cancellingBookingId,
   savingLessonLinkBookingId,
   markingAttendanceBookingId,
+  sendingStudentNotificationBookingId,
   onCancelBooking,
   onSaveLessonLink,
   onMarkAttendance,
+  onSendStudentNotification,
 }: {
   lead: AtendimentoLeadListItem;
   cancellingBookingId: string | null;
   savingLessonLinkBookingId: string | null;
   markingAttendanceBookingId: string | null;
+  sendingStudentNotificationBookingId: string | null;
   onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveLessonLink: (lead: AtendimentoLeadListItem, lessonLink: string) => Promise<void>;
   onMarkAttendance: (lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") => Promise<void>;
+  onSendStudentNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
 }) {
   const booking = lead.experimental_class_booking;
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
@@ -255,6 +259,7 @@ function BookingDetails({
   const savedLessonLink = String(booking?.lesson_link ?? "").trim();
   const isSavingLessonLink = savingLessonLinkBookingId === bookingId;
   const isMarkingAttendance = markingAttendanceBookingId === bookingId;
+  const isSendingStudentNotification = sendingStudentNotificationBookingId === bookingId;
   const lessonLinkChanged = lessonLinkDraft.trim() !== savedLessonLink;
   const canOpenSavedLessonLink = /^https?:\/\//i.test(savedLessonLink);
   const notificationsSent = Boolean(String(booking?.student_start_notification_sent_at ?? "").trim()) &&
@@ -269,6 +274,10 @@ function BookingDetails({
     hasLead: true,
   });
   const canCancel = derivedStatus === "scheduled" && Boolean(bookingId);
+  const canSendStudentNotification =
+    (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
+    Boolean(bookingId) &&
+    Boolean(savedLessonLink);
   const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
 
   useEffect(() => {
@@ -289,6 +298,17 @@ function BookingDetails({
             Agendamento: {formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}
           </div>
         </div>
+
+        {canSendStudentNotification ? (
+          <button
+            type="button"
+            onClick={() => void onSendStudentNotification(lead)}
+            disabled={isSendingStudentNotification}
+            className="inline-flex w-full items-center justify-center rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
+          </button>
+        ) : null}
 
         {canCancel ? (
           <button
@@ -539,6 +559,8 @@ export function AtendimentoSummaryCards({
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
   const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
+  const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] =
+    useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
@@ -715,6 +737,88 @@ export function AtendimentoSummaryCards({
       modalToast.error(error instanceof Error ? error.message : "Falha ao cancelar agendamento.");
     } finally {
       setCancellingBookingId(null);
+    }
+  }
+
+  async function handleSendStudentNotification(lead: AtendimentoLeadListItem) {
+    const booking = lead.experimental_class_booking;
+    const bookingId = String(booking?.id ?? "").trim();
+
+    if (!bookingId) {
+      modalToast.error("Agendamento indisponível para disparar a notificação.");
+      return;
+    }
+
+    try {
+      setSendingStudentNotificationBookingId(bookingId);
+
+      const response = await fetch(`/api/atendimento/bookings/${bookingId}/send-student-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leadId: lead.id,
+          conversationId: lead.conversation?.id ?? null,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
+        | null;
+
+      if (!response.ok || !payload?.ok || !payload.booking) {
+        if (payload?.error === "missing_lesson_link") {
+          modalToast.error("Cadastre o link da aula antes de disparar a notificação.");
+        } else if (payload?.error === "missing_lead_phone") {
+          modalToast.error("Telefone do aluno não encontrado.");
+        } else {
+          modalToast.error(payload?.error ?? "Falha ao disparar a notificação.");
+        }
+        return;
+      }
+
+      const updatedLead: AtendimentoLeadListItem = {
+        ...lead,
+        experimental_class_booking: {
+          ...(lead.experimental_class_booking ?? {
+            id: bookingId,
+            source: "table" as const,
+            created_at: lead.updated_at,
+            lesson_link: String((payload.booking as any)?.lesson_link ?? booking?.lesson_link ?? "").trim() || null,
+            student_start_notification_sent_at: null,
+            attendant_start_notification_sent_at: null,
+            attendance_status: null,
+            attendance_checked_at: null,
+            professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: null,
+            professor_date: null,
+            professor_time: null,
+            professor_start_at: null,
+            lead_date: null,
+            lead_time: null,
+            lead_start_at: null,
+            status: "scheduled",
+          }),
+          ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
+          source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
+          lesson_link:
+            String((payload.booking as any)?.lesson_link ?? lead.experimental_class_booking?.lesson_link ?? "").trim() || null,
+          student_start_notification_sent_at:
+            String(
+              (payload.booking as any)?.student_start_notification_sent_at ??
+                lead.experimental_class_booking?.student_start_notification_sent_at ??
+                "",
+            ).trim() || new Date().toISOString(),
+        },
+      };
+
+      setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
+      modalToast.success("Notificação enviada ao aluno.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao disparar a notificação.");
+    } finally {
+      setSendingStudentNotificationBookingId(null);
     }
   }
 
@@ -1056,9 +1160,11 @@ export function AtendimentoSummaryCards({
                   cancellingBookingId={cancellingBookingId}
                   savingLessonLinkBookingId={savingLessonLinkBookingId}
                   markingAttendanceBookingId={markingAttendanceBookingId}
+                  sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
                   onCancelBooking={handleCancelBooking}
                   onSaveLessonLink={handleSaveLessonLink}
                   onMarkAttendance={handleMarkAttendance}
+                  onSendStudentNotification={handleSendStudentNotification}
                 />
               ) : (
                 <LeadDetails
