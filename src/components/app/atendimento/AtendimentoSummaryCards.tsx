@@ -43,6 +43,27 @@ function leadHasExperimentalClassPanelStatus(lead: AtendimentoLeadListItem) {
   );
 }
 
+function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
+  if (!lead) return false;
+  const stage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const st = String((lead as any)?.status ?? "").trim().toLowerCase();
+  return stage === "repescagem" || st === "repescagem";
+}
+
+function RepescagemBadge({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={[
+        "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-100",
+        className,
+      ].join(" ")}
+    >
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+      Repescagem
+    </div>
+  );
+}
+
 function Field({
   label,
   value,
@@ -1106,27 +1127,6 @@ export function AtendimentoSummaryCards({
     }
 
     return formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
-  }
-
-  function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
-    if (!lead) return false;
-    const stage = String((lead as any)?.funnel_stage ?? lead.funnel_stage ?? "").trim().toLowerCase();
-    const st = String((lead as any)?.status ?? lead.status ?? "").trim().toLowerCase();
-    return stage === "repescagem" || st === "repescagem";
-  }
-
-  function RepescagemBadge({ className = "" }: { className?: string }) {
-    return (
-      <div
-        className={[
-          "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-100",
-          className,
-        ].join(" ")}
-      >
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-        Repescagem
-      </div>
-    );
   }
 
   return (

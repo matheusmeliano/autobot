@@ -366,67 +366,101 @@ export async function POST(
       actorType: "system",
     });
   } else {
-    if (leadPhone) {
-      const messages = buildExperimentalClassNoShowRepescagemWhatsAppMessages();
-      const sentMessages: string[] = [];
-      let lastError: unknown = null;
+    if (!leadPhone) {
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_attendance_no_show_phone_missing",
+        title: "Telefone do aluno ausente ao marcar nao comparecimento na aula experimental (mensagens nao enviadas)",
+        details: {
+          booking_id: normalizedBookingId,
+          lead_id: leadId,
+          lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
+        },
+        actorType: "system",
+      });
 
-      for (let i = 0; i < messages.length; i += 1) {
-        const message = messages[i];
-        try {
-          await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
-          sentMessages.push(message);
-        } catch (error) {
-          lastError = error;
-          break;
-        }
-      }
+      return Response.json(
+        {
+          ok: false,
+          error: "lead_phone_missing",
+          booking: responseBooking,
+        },
+        { status: 400 },
+      );
+    }
 
-      if (lastError) {
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_attendance_no_show_message_failed",
-          title: "Falha ao enviar as mensagens de repescagem apos aluno nao comparecer a aula experimental",
-          details: {
-            booking_id: normalizedBookingId,
-            phone: leadPhone,
-            lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
-            total_messages: messages.length,
-            sent_messages: sentMessages.length,
-            sent_message_contents: sentMessages,
-            first_failed_message_index: sentMessages.length,
-            first_failed_message_content: messages[sentMessages.length] ?? null,
-            error: lastError instanceof Error ? lastError.message : String(lastError),
-          },
-          actorType: "system",
-        });
-      } else {
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_attendance_no_show_message_sent",
-          title: "Mensagens de repescagem enviadas ao aluno apos nao comparecimento na aula experimental",
-          details: {
-            booking_id: normalizedBookingId,
-            phone: leadPhone,
-            total_messages: messages.length,
-            message_contents: messages,
-            lead_funnel_stage: nextLeadFunnelStage,
-            lead_status: nextLeadStatus,
-            cadastro_reset: {
-              cpf: null,
-              city: null,
-              state: null,
-              country: null,
-              timezone: null,
-              full_name: null,
-            },
-          },
-          actorType: "system",
-        });
+    const messages = buildExperimentalClassNoShowRepescagemWhatsAppMessages();
+    const sentMessages: string[] = [];
+    let lastError: unknown = null;
+
+    for (let i = 0; i < messages.length; i += 1) {
+      const message = messages[i];
+      try {
+        await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
+        sentMessages.push(message);
+      } catch (error) {
+        lastError = error;
+        break;
       }
     }
+
+    if (lastError) {
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_attendance_no_show_message_failed",
+        title: "Falha ao enviar as mensagens de repescagem apos aluno nao comparecer a aula experimental",
+        details: {
+          booking_id: normalizedBookingId,
+          phone: leadPhone,
+          lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
+          total_messages: messages.length,
+          sent_messages: sentMessages.length,
+          sent_message_contents: sentMessages,
+          first_failed_message_index: sentMessages.length,
+          first_failed_message_content: messages[sentMessages.length] ?? null,
+          error: lastError instanceof Error ? lastError.message : String(lastError),
+        },
+        actorType: "system",
+      });
+
+      return Response.json(
+        {
+          ok: false,
+          error:
+            lastError instanceof Error
+              ? lastError.message
+              : "attendance_no_show_repescagem_message_failed",
+          booking: responseBooking,
+        },
+        { status: 500 },
+      );
+    }
+
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "experimental_class_attendance_no_show_message_sent",
+      title: "Mensagens de repescagem enviadas ao aluno apos nao comparecimento na aula experimental",
+      details: {
+        booking_id: normalizedBookingId,
+        phone: leadPhone,
+        total_messages: messages.length,
+        message_contents: messages,
+        lead_funnel_stage: nextLeadFunnelStage,
+        lead_status: nextLeadStatus,
+        cadastro_reset: {
+          cpf: null,
+          city: null,
+          state: null,
+          country: null,
+          timezone: null,
+          full_name: null,
+        },
+      },
+      actorType: "system",
+    });
 
     await appendHistoryEvent({
       leadId,
