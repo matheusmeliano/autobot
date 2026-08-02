@@ -1604,21 +1604,50 @@ export async function POST(req: Request) {
 
         const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
         const currentBookingId = currentBooking?.id ? String(currentBooking.id) : "";
-        const isBookingWaitingAttendance = (() => {
-          if (!currentBookingId) return false;
-          const hasStudentNotification = Boolean(currentBooking.student_start_notification_sent_at);
-          const hasAttendantNotification = Boolean(currentBooking.attendant_start_notification_sent_at);
-          const attendanceStatus = String(currentBooking.attendance_status ?? "").trim();
-          const attendanceResolved =
-            attendanceStatus === "attended" ||
-            attendanceStatus === "no_show" ||
-            Boolean(currentBooking.attendance_checked_at);
-          return (hasStudentNotification || hasAttendantNotification) && !attendanceResolved;
-        })();
-        const hasAnyBookingNotificationSent =
-          Boolean(currentBooking?.student_start_notification_sent_at) ||
-          Boolean(currentBooking?.attendant_start_notification_sent_at);
-        const effectiveWaitMessage = hasAnyBookingNotificationSent
+        const hasStudentNotificationCol = Boolean(currentBooking?.student_start_notification_sent_at);
+        const hasAttendantNotificationCol = Boolean(currentBooking?.attendant_start_notification_sent_at);
+        let hasAnyBookingNotificationSentByHistory = false;
+        if (currentBookingId && !(hasStudentNotificationCol || hasAttendantNotificationCol)) {
+          try {
+            const { data: hist } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .in("event_type", [
+                "experimental_class_student_start_notification_sent",
+                "experimental_class_attendant_start_notification_sent",
+              ])
+              .limit(2);
+            hasAnyBookingNotificationSentByHistory = Array.isArray(hist) && hist.length > 0;
+          } catch (_e) {}
+        }
+        const hasAttendanceStatusCol =
+          String(currentBooking?.attendance_status ?? "").trim() === "attended" ||
+          String(currentBooking?.attendance_status ?? "").trim() === "no_show" ||
+          Boolean(currentBooking?.attendance_checked_at);
+        let hasAnyAttendanceResolvedByHistory = false;
+        if (currentBookingId && !hasAttendanceStatusCol) {
+          try {
+            const { data: histAtt } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .in("event_type", [
+                "experimental_class_attendance_attended",
+                "experimental_class_attendance_no_show",
+                "experimental_class_attendance_follow_up_required",
+              ])
+              .limit(2);
+            hasAnyAttendanceResolvedByHistory = Array.isArray(histAtt) && histAtt.length > 0;
+          } catch (_e) {}
+        }
+        const anyNotificationSent =
+          hasStudentNotificationCol || hasAttendantNotificationCol || hasAnyBookingNotificationSentByHistory;
+        const anyAttendanceResolved = hasAttendanceStatusCol || hasAnyAttendanceResolvedByHistory;
+        const isBookingWaitingAttendance = currentBookingId && anyNotificationSent && !anyAttendanceResolved;
+        const effectiveWaitMessage = anyNotificationSent
           ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
           : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
 
