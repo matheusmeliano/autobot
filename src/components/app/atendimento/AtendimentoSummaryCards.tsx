@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Copy, Pencil, Search, Trash2, X, Zap } from "lucide-react";
+import { Check, Copy, Pencil, Search, Trash2, X, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -340,10 +340,10 @@ function BookingDetails({
               Comparecimento
             </div>
             {attendanceStatus ? (
-              <>
+              <div className="mt-3 flex flex-col items-start gap-3 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between">
                 <div
                   className={[
-                    "mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                    "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
                     attendanceStatus === "attended"
                       ? "bg-emerald-500/15 text-emerald-200"
                       : "bg-amber-400/15 text-amber-200",
@@ -351,34 +351,38 @@ function BookingDetails({
                 >
                   {experimentalClassAttendanceLabel(attendanceStatus)}
                 </div>
-                <div className="mt-3 text-sm text-[var(--app-text-70)]">
+                <div className="min-w-0 text-sm text-[var(--app-text-70)] min-[560px]:text-right">
                   {attendanceStatus === "attended"
                     ? "A aula foi concluída e a mensagem de continuidade já foi enviada ao aluno."
                     : "O aluno foi marcado para repescagem, permitindo que a equipe faça um contato manual e humanizado para reagendar."}
                 </div>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="mt-3 text-sm font-semibold text-[var(--app-text-85)]">O aluno compareceu à aula?</div>
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-3 flex flex-col items-start gap-3 min-[600px]:flex-row min-[600px]:items-center min-[600px]:justify-between min-[600px]:gap-4">
+                <div className="text-sm font-semibold text-[var(--app-text-85)]">
+                  O aluno compareceu à aula?
+                </div>
+                <div className="flex w-full flex-shrink-0 flex-col gap-2 min-[500px]:w-auto min-[500px]:flex-row">
                   <button
                     type="button"
                     onClick={() => void onMarkAttendance(lead, "attended")}
                     disabled={isMarkingAttendance}
-                    className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/12 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
                   >
+                    <Check className="h-4 w-4 shrink-0" />
                     {isMarkingAttendance ? "Salvando..." : "Sim"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void onMarkAttendance(lead, "no_show")}
                     disabled={isMarkingAttendance}
-                    className="inline-flex items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/12 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/18 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/12 px-5 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
                   >
+                    <X className="h-4 w-4 shrink-0" />
                     {isMarkingAttendance ? "Salvando..." : "Não"}
                   </button>
                 </div>
-              </>
+              </div>
             )}
           </div>
         ) : null}
