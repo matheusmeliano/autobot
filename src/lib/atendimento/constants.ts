@@ -47,7 +47,6 @@ export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
 export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual dia você prefere?";
 export function buildExperimentalClassDatePromptMessages(_name?: string | null) {
   return [
-    "Maravilha!",
     EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE,
     EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   ];
