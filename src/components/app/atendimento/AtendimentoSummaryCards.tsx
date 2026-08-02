@@ -275,9 +275,7 @@ function BookingDetails({
   });
   const canCancel = derivedStatus === "scheduled" && Boolean(bookingId);
   const canSendStudentNotification =
-    (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
-    Boolean(bookingId) &&
-    Boolean(savedLessonLink);
+    (derivedStatus === "scheduled" || derivedStatus === "in_progress") && Boolean(bookingId);
   const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
 
   useEffect(() => {
