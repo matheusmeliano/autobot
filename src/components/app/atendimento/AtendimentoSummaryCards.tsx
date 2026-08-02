@@ -772,7 +772,7 @@ export function AtendimentoSummaryCards({
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
+        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null; attendant_notification_sent?: boolean; attendant_notification_error?: string | null }
         | null;
 
       if (!response.ok || !payload?.ok || !payload.booking) {
@@ -785,6 +785,9 @@ export function AtendimentoSummaryCards({
         }
         return;
       }
+
+      const attendantNotificationSent = payload.attendant_notification_sent !== false;
+      const attendantNotificationError = String(payload.attendant_notification_error ?? "").trim() || null;
 
       const updatedLead: AtendimentoLeadListItem = {
         ...lead,
@@ -818,11 +821,23 @@ export function AtendimentoSummaryCards({
                 lead.experimental_class_booking?.student_start_notification_sent_at ??
                 "",
             ).trim() || new Date().toISOString(),
+          attendant_start_notification_sent_at:
+            String(
+              (payload.booking as any)?.attendant_start_notification_sent_at ??
+                lead.experimental_class_booking?.attendant_start_notification_sent_at ??
+                "",
+            ).trim() || new Date().toISOString(),
         },
       };
 
       setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
-      modalToast.success("Notificação enviada ao aluno.");
+      if (attendantNotificationSent) {
+        modalToast.success("Notificações enviadas ao aluno e ao professor.");
+      } else {
+        modalToast.warning(
+          `Notificação enviada ao aluno. Não foi possível enviar ao professor: ${attendantNotificationError || "erro desconhecido"}`,
+        );
+      }
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao disparar a notificação.");
     } finally {

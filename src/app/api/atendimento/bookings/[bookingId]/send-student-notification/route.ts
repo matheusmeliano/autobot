@@ -3,7 +3,11 @@ import {
   requireAtendimentoUser,
   sendAtendimentoWhatsAppText,
 } from "@/lib/atendimento/server";
-import { buildExperimentalClassStudentLessonReadyWhatsAppMessage } from "@/lib/atendimento/experimentalClass";
+import {
+  buildExperimentalClassAttendantStartReminderWhatsAppMessage,
+  buildExperimentalClassStudentLessonReadyWhatsAppMessage,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+} from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function getLeadFirstName(name: string | null | undefined) {
@@ -12,6 +16,11 @@ function getLeadFirstName(name: string | null | undefined) {
     .split(/\s+/)
     .filter(Boolean);
   return parts[0] ?? "Aluno";
+}
+
+function getLeadFullName(name: string | null | undefined) {
+  const clean = String(name ?? "").trim();
+  return clean || "Aluno sem identificacao";
 }
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
@@ -38,14 +47,16 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
   );
 }
 
-function isExperimentalClassBookingsStudentNotificationColumnUnavailable(error: unknown) {
+function isExperimentalClassBookingsNotificationColumnsUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
   const message = String((error as any)?.message ?? "");
   return (
     code === "42703" ||
     code === "PGRST204" ||
-    /column .*student_start_notification_sent_at.* does not exist/i.test(message) ||
-    /could not find the 'student_start_notification_sent_at' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
+    /column .*(student_start_notification_sent_at|attendant_start_notification_sent_at).* does not exist/i.test(
+      message,
+    ) ||
+    /could not find the '(student_start_notification_sent_at|attendant_start_notification_sent_at)' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
       message,
     )
   );
@@ -79,7 +90,7 @@ export async function POST(
   const bookingWithLessonLinkResult = await admin
     .from("atendimento_experimental_class_bookings")
     .select(
-      "id, lead_id, conversation_id, status, lesson_link, professor_start_at, lead_start_at, student_start_notification_sent_at",
+      "id, lead_id, conversation_id, status, lesson_link, professor_start_at, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at",
     )
     .eq("id", normalizedBookingId)
     .maybeSingle();
@@ -88,7 +99,7 @@ export async function POST(
     const bookingWithoutLessonLinkResult = await admin
       .from("atendimento_experimental_class_bookings")
       .select(
-        "id, lead_id, conversation_id, status, professor_start_at, lead_start_at, student_start_notification_sent_at",
+        "id, lead_id, conversation_id, status, professor_start_at, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at",
       )
       .eq("id", normalizedBookingId)
       .maybeSingle();
@@ -110,6 +121,8 @@ export async function POST(
   const conversationId = String((resolvedBooking as any)?.conversation_id ?? payload?.conversationId ?? "").trim() || null;
   const bookingStatus = String((resolvedBooking as any)?.status ?? "scheduled").trim().toLowerCase();
   const studentNotificationAlreadySent = Boolean(String((resolvedBooking as any)?.student_start_notification_sent_at ?? "").trim());
+  const attendantNotificationAlreadySent = Boolean(String((resolvedBooking as any)?.attendant_start_notification_sent_at ?? "").trim());
+  const professorStartAtRaw = String((resolvedBooking as any)?.professor_start_at ?? "").trim();
 
   if (!leadId) {
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
@@ -132,6 +145,7 @@ export async function POST(
   const leadName = String((lead as any)?.full_name ?? "").trim();
   const leadPhone = String((lead as any)?.phone ?? "").trim();
   const leadFirstName = getLeadFirstName(leadName);
+  const leadFullName = getLeadFullName(leadName);
 
   let lessonLink = String((resolvedBooking as any)?.lesson_link ?? "").trim();
   if (!lessonLink) {
@@ -172,11 +186,12 @@ export async function POST(
         .from("atendimento_experimental_class_bookings")
         .update({
           student_start_notification_sent_at: sentAtIso,
+          attendant_start_notification_sent_at: sentAtIso,
           updated_at: sentAtIso,
         })
         .eq("id", String((resolvedBooking as any).id));
 
-      if (updateError && isExperimentalClassBookingsStudentNotificationColumnUnavailable(updateError)) {
+      if (updateError && isExperimentalClassBookingsNotificationColumnsUnavailable(updateError)) {
         try {
           await admin
             .from("atendimento_experimental_class_bookings")
@@ -189,7 +204,7 @@ export async function POST(
     } catch (error) {
       if (
         !(error instanceof Error) ||
-        !isExperimentalClassBookingsStudentNotificationColumnUnavailable(error)
+        !isExperimentalClassBookingsNotificationColumnsUnavailable(error)
       ) {
         throw error;
       }
@@ -202,12 +217,14 @@ export async function POST(
     }
   }
 
+  let studentSendFailedError: string | null = null;
   try {
     await sendAtendimentoWhatsAppText({
       phone: leadPhone,
       message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
     });
   } catch (error) {
+    studentSendFailedError = error instanceof Error ? error.message : String(error);
     await appendHistoryEvent({
       leadId,
       conversationId,
@@ -219,22 +236,48 @@ export async function POST(
         lesson_link: lessonLink,
         manually_triggered: true,
         was_already_sent: studentNotificationAlreadySent,
-        error: error instanceof Error ? error.message : String(error),
+        error: studentSendFailedError,
       },
       actorType: "attendant",
       actorEmail: auth.user.email,
     });
+  }
 
+  if (studentSendFailedError) {
     return Response.json(
       {
         ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "student_notification_send_failed",
+        error: studentSendFailedError,
       },
       { status: 500 },
     );
+  }
+
+  let attendantSendFailedError: string | null = null;
+  try {
+    await sendAtendimentoWhatsAppText({
+      phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+      message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
+    });
+  } catch (error) {
+    attendantSendFailedError = error instanceof Error ? error.message : String(error);
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "experimental_class_attendant_start_notification_failed",
+      title: "Falha ao disparar manualmente o lembrete do inicio da aula experimental ao atendente",
+      details: {
+        booking_id: normalizedBookingId,
+        phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+        lesson_link: lessonLink,
+        start_at: professorStartAtRaw || null,
+        manually_triggered: true,
+        was_already_sent: attendantNotificationAlreadySent,
+        error: attendantSendFailedError,
+      },
+      actorType: "attendant",
+      actorEmail: auth.user.email,
+    });
   }
 
   await appendHistoryEvent({
@@ -255,6 +298,27 @@ export async function POST(
     actorEmail: auth.user.email,
   });
 
+  if (!attendantSendFailedError) {
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "experimental_class_attendant_start_notification_sent",
+      title: attendantNotificationAlreadySent
+        ? "Lembrete de inicio da aula experimental reenviado manualmente ao atendente"
+        : "Lembrete de inicio da aula experimental disparado manualmente ao atendente",
+      details: {
+        booking_id: normalizedBookingId,
+        phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+        lesson_link: lessonLink,
+        start_at: professorStartAtRaw || null,
+        manually_triggered: true,
+        was_already_sent: attendantNotificationAlreadySent,
+      },
+      actorType: "attendant",
+      actorEmail: auth.user.email,
+    });
+  }
+
   const responseBooking = {
     ...(resolvedBooking ?? {}),
     id: String((resolvedBooking as any)?.id ?? normalizedBookingId),
@@ -262,11 +326,14 @@ export async function POST(
     conversation_id: conversationId,
     lesson_link: lessonLink,
     student_start_notification_sent_at: sentAtIso,
+    attendant_start_notification_sent_at: sentAtIso,
     status: bookingStatus,
   };
 
   return Response.json({
     ok: true,
+    attendant_notification_sent: !attendantSendFailedError,
+    attendant_notification_error: attendantSendFailedError,
     booking: responseBooking,
   });
 }
