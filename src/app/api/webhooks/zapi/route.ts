@@ -25,6 +25,7 @@ import {
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
   EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
+  EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
@@ -1614,6 +1615,12 @@ export async function POST(req: Request) {
             Boolean(currentBooking.attendance_checked_at);
           return (hasStudentNotification || hasAttendantNotification) && !attendanceResolved;
         })();
+        const hasAnyBookingNotificationSent =
+          Boolean(currentBooking?.student_start_notification_sent_at) ||
+          Boolean(currentBooking?.attendant_start_notification_sent_at);
+        const effectiveWaitMessage = hasAnyBookingNotificationSent
+          ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
+          : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
 
         if (isBookingWaitingAttendance) {
           const inboundContent = String(messageText ?? "").trim();
@@ -1696,7 +1703,7 @@ export async function POST(req: Request) {
           const hasBooking = currentBookingId ? currentBooking : null;
           if (hasBooking?.id) {
             finalReason = "conversation_blocked_echo_booking_scheduled";
-            responseMessage = EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+            responseMessage = effectiveWaitMessage;
           } else {
             const histFinal = await admin
               .from("atendimento_history_events")
@@ -1721,7 +1728,7 @@ export async function POST(req: Request) {
             );
             if (hasScheduled) {
               finalReason = "conversation_blocked_echo_scheduled_by_history";
-              responseMessage = EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+              responseMessage = effectiveWaitMessage;
             } else if (hasBlockedMaxAttempts) {
               const lastBotMsg = await getLastBotMessage({ admin, conversationId });
               const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
@@ -1842,13 +1849,13 @@ export async function POST(req: Request) {
             await insertWhatsAppBotTextMessage({
               admin,
               conversationId,
-              contentText: EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
+              contentText: effectiveWaitMessage,
             });
           } catch (_e) {}
           try {
             await sendAtendimentoWhatsAppText({
               phone: normalizedPhoneOnly,
-              message: EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
+              message: effectiveWaitMessage,
             });
           } catch (_e) {}
           return Response.json({
@@ -1913,7 +1920,7 @@ export async function POST(req: Request) {
           let finalMsg: string | null = null;
           let finalReason = "flow_concluded_already_finalized_in_history_event";
           if (recentIsScheduled) {
-            finalMsg = EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+            finalMsg = effectiveWaitMessage;
             finalReason = "flow_concluded_echo_scheduled_by_history";
           } else if (recentIsMaxAttemptsBlocked) {
             const lastBotMsg = await getLastBotMessage({ admin, conversationId });

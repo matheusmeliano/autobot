@@ -286,6 +286,9 @@ export function buildExperimentalClassPostAttendanceWhatsAppMessages(_name?: str
 export const EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE =
   `Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.`;
 
+export const EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE =
+  `Por favor, aguarde. Em breve poderemos seguir para a próxima etapa.`;
+
 export function buildExperimentalClassFinalChatMessages() {
   return [
     `Parabéns!`,
