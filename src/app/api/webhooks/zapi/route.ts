@@ -1684,7 +1684,41 @@ export async function POST(req: Request) {
             anyAttendanceResolved &&
             (bookingAttendanceNoShowByCol || bookingAttendanceNoShowByHistory));
 
+        const bookingAttendanceAttendedByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
+        let bookingAttendanceAttendedByHistory = false;
+        if (
+          currentBookingId &&
+          anyAttendanceResolved &&
+          !bookingAttendanceAttendedByCol &&
+          hasAnyAttendanceResolvedByHistory &&
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === ""
+        ) {
+          try {
+            const { data: histAtt3 } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .eq("event_type", "experimental_class_attendance_attended")
+              .limit(1);
+            bookingAttendanceAttendedByHistory =
+              Array.isArray((histAtt3 as any) ?? []) && (histAtt3 as any).length > 0;
+          } catch (_e) {
+            bookingAttendanceAttendedByHistory = false;
+          }
+        }
+
+        const isLeadInMatriculaPendentePostAttendance =
+          (!isLeadInRepescagemNoShowLocked &&
+            (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente")) ||
+          (currentBookingId &&
+            anyAttendanceResolved &&
+            (bookingAttendanceAttendedByCol || bookingAttendanceAttendedByHistory));
+
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
+
+        const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
 
         const effectiveWaitMessage = anyNotificationSent
           ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
@@ -1831,6 +1865,184 @@ export async function POST(req: Request) {
             ok: true,
             handled: true,
             flow: "whatsapp_repescagem_no_show_locked",
+          });
+        }
+
+        if (isLeadInMatriculaPendentePostAttendance && !isLeadInRepescagemNoShowLocked) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+
+          const inboundNormalized = inboundContent
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim()
+            .replace(/[.!?,\s]+$/g, "")
+            .toLowerCase();
+
+          const isYes =
+            inboundNormalized === "sim" ||
+            inboundNormalized === "s" ||
+            /^sim\b/i.test(inboundNormalized) ||
+            inboundNormalized.replace(/\s+/g, "") === "sim";
+
+          const isNo =
+            inboundNormalized === "nao" ||
+            inboundNormalized === "n" ||
+            /^nao\b/i.test(inboundNormalized) ||
+            inboundNormalized.replace(/\s+/g, "") === "nao" ||
+            /^n[aãâ]o\b/i.test(inboundContent.trim());
+
+          let replyText = MSG_SIM_NAO_INVALIDA;
+          let nextLeadFunnel = "matricula_pendente";
+          let nextLeadStatus = "matricula_pendente";
+          let historyEventType = "matricula_pendente_sim_nao_invalida";
+          let historyTitle = "Matrícula pendente: resposta inválida, pedindo sim/não";
+
+          if (isYes) {
+            replyText = "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
+            nextLeadFunnel = "matricula_confirmada";
+            nextLeadStatus = "matricula_confirmada";
+            historyEventType = "matricula_pendente_resposta_sim";
+            historyTitle = "Matrícula pendente: lead respondeu SIM";
+          } else if (isNo) {
+            replyText = "Tudo bem! Quando você estiver pronto(a) para continuar, é só nos enviar uma mensagem. Estamos aqui para ajudar.";
+            nextLeadFunnel = "matricula_pendente_recusada";
+            nextLeadStatus = "matricula_pendente_recusada";
+            historyEventType = "matricula_pendente_resposta_nao";
+            historyTitle = "Matrícula pendente: lead respondeu NÃO";
+          }
+
+          try {
+            const leadUpdate: Record<string, unknown> = {
+              funnel_stage: nextLeadFunnel,
+              status: nextLeadStatus,
+              updated_at: nowIso,
+            };
+            await admin.from("atendimento_leads").update(leadUpdate).eq("id", leadId);
+          } catch (_e) {
+            const msg = String((_e as any)?.message ?? "");
+            const code = String((_e as any)?.code ?? "");
+            if (
+              code !== "42703" &&
+              code !== "PGRST204" &&
+              code !== "PGRST205" &&
+              !/column|does not exist/i.test(msg)
+            ) {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_lead_update_failed",
+                title: "Falha ao atualizar lead (matrícula flow)",
+                details: {
+                  error_message: msg,
+                  error_code: code,
+                  try_next_funnel: nextLeadFunnel,
+                  try_next_status: nextLeadStatus,
+                },
+                actorType: "system",
+              });
+            }
+          }
+
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: replyText,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: replyText,
+            });
+          } catch (_e) {}
+
+          try {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: historyEventType,
+              title: historyTitle,
+              details: {
+                inbound_content_text: inboundContent || null,
+                inbound_normalized: inboundNormalized || null,
+                is_yes: isYes,
+                is_no: isNo,
+                reply_text: replyText,
+                next_funnel_stage: nextLeadFunnel,
+                next_status: nextLeadStatus,
+                source: "whatsapp_zapi",
+                booking_attendance_attended_by_col: bookingAttendanceAttendedByCol,
+                booking_attendance_attended_by_history: bookingAttendanceAttendedByHistory,
+              },
+              actorType: "bot",
+            });
+          } catch (_e) {}
+
+          if (isYes || isNo) {
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {
+              const msg = String((_e as any)?.message ?? "");
+              const code = String((_e as any)?.code ?? "");
+              if (
+                code !== "42703" &&
+                code !== "PGRST204" &&
+                code !== "PGRST205" &&
+                !/bot_enabled/i.test(msg)
+              ) {
+                // ignore missing column; rest flow already returned handled:true
+              }
+            }
+          }
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_post_attendance_matricula_pendente",
+            is_yes: isYes,
+            is_no: isNo,
           });
         }
 

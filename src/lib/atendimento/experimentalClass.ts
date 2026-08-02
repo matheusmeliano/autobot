@@ -277,9 +277,10 @@ Link da aula: ${safeLessonLink}`;
 
 export function buildExperimentalClassPostAttendanceWhatsAppMessages(_name?: string | null) {
   return [
-    "Ficamos felizes por você ter participado da aula experimental com o professor Lucas Brum.",
-    "Agora é hora de dar o próximo passo!",
-    "Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?",
+    "Ficamos felizes pela sua participação na aula experimental!",
+    "Agora é hora do próximo passo.",
+    "Vamos confirmar sua matrícula e iniciar suas aulas?",
+    "Responda com sim ou não.",
   ];
 }
 
