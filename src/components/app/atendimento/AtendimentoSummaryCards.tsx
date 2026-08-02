@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Copy, Pencil, Search, Trash2, X } from "lucide-react";
+import { Copy, Pencil, Search, Trash2, X, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -310,8 +310,9 @@ function BookingDetails({
             type="button"
             onClick={() => void onSendStudentNotification(lead)}
             disabled={isSendingStudentNotification}
-            className="inline-flex w-full items-center justify-center rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <Zap className="h-4 w-4 shrink-0" />
             {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
           </button>
         ) : null}
@@ -321,8 +322,9 @@ function BookingDetails({
             type="button"
             onClick={() => void onCancelBooking(lead)}
             disabled={cancellingBookingId === bookingId}
-            className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <Trash2 className="h-4 w-4 shrink-0" />
             {cancellingBookingId === bookingId ? "Cancelando..." : "Cancelar agendamento"}
           </button>
         ) : null}
