@@ -488,6 +488,27 @@ export async function POST(
     });
   }
 
+  if (attendance === "no_show" && conversationId) {
+    try {
+      await admin
+        .from("atendimento_conversations")
+        .update({ bot_enabled: true, updated_at: checkedAtIso })
+        .eq("id", conversationId);
+    } catch (_e) {
+      const msg = String((_e as any)?.message ?? "");
+      const code = String((_e as any)?.code ?? "");
+      if (
+        code !== "42703" &&
+        code !== "PGRST204" &&
+        code !== "PGRST205" &&
+        !/column .*bot_enabled.* does not exist/i.test(msg) &&
+        !/could not find the 'bot_enabled' column/i.test(msg)
+      ) {
+        throw _e;
+      }
+    }
+  }
+
   return Response.json({
     ok: true,
     booking: responseBooking,

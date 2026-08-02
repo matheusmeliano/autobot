@@ -1647,9 +1647,58 @@ export async function POST(req: Request) {
           hasStudentNotificationCol || hasAttendantNotificationCol || hasAnyBookingNotificationSentByHistory;
         const anyAttendanceResolved = hasAttendanceStatusCol || hasAnyAttendanceResolvedByHistory;
         const isBookingWaitingAttendance = currentBookingId && anyNotificationSent && !anyAttendanceResolved;
-        const effectiveWaitMessage = anyNotificationSent
-          ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
-          : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+
+        const funnelStageRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+        const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
+        const isLeadRepescagemStatus =
+          funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem";
+
+        const bookingAttendanceNoShowByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
+        let bookingAttendanceNoShowByHistory = false;
+        if (
+          currentBookingId &&
+          anyAttendanceResolved &&
+          !bookingAttendanceNoShowByCol &&
+          hasAnyAttendanceResolvedByHistory &&
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === ""
+        ) {
+          try {
+            const { data: histAtt2 } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .eq("event_type", "experimental_class_attendance_no_show")
+              .limit(1);
+            bookingAttendanceNoShowByHistory =
+              Array.isArray((histAtt2 as any) ?? []) && (histAtt2 as any).length > 0;
+          } catch (_e) {
+            bookingAttendanceNoShowByHistory = false;
+          }
+        }
+
+        const shouldResetAllFlowsForNewScheduling =
+          isLeadRepescagemStatus ||
+          (currentBookingId &&
+            anyAttendanceResolved &&
+            (bookingAttendanceNoShowByCol || bookingAttendanceNoShowByHistory));
+
+        if (shouldResetAllFlowsForNewScheduling && !conversation.bot_enabled) {
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: true, updated_at: nowIso })
+              .eq("id", conversationId);
+            (conversation as any).bot_enabled = true;
+          } catch (_e) {}
+        }
+
+        const effectiveWaitMessage = shouldResetAllFlowsForNewScheduling
+          ? ""
+          : anyNotificationSent
+            ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
+            : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
 
         if (isBookingWaitingAttendance) {
           const inboundContent = String(messageText ?? "").trim();
@@ -1727,6 +1776,12 @@ export async function POST(req: Request) {
               booking_id: currentBookingId,
             });
           }
+          if (shouldResetAllFlowsForNewScheduling) {
+            // Lead em repescagem ou ja marcou nao compareceu: NAO dispara echo,
+            // deixa o fluxo seguir normalmente para a pergunta do ESTADO (novo
+            // atendimento do zero, substituindo dados antigos). Ja re-ligamos o
+            // bot_enabled acima se necessario.
+          } else {
           let finalReason = "conversation_blocked";
           let responseMessage: string | null = null;
           const hasBooking = currentBookingId ? currentBooking : null;
@@ -1793,6 +1848,7 @@ export async function POST(req: Request) {
             ignored: true,
             reason: finalReason,
           });
+          }
         }
 
         const inboundContent = String(messageText ?? "").trim();
@@ -1862,7 +1918,12 @@ export async function POST(req: Request) {
 
         const existingBooking = currentBookingId ? currentBooking : null;
         const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
-        if (existingScheduledBookingId && conversation.bot_enabled !== false && !isBookingWaitingAttendance) {
+        if (
+          existingScheduledBookingId &&
+          conversation.bot_enabled !== false &&
+          !isBookingWaitingAttendance &&
+          !shouldResetAllFlowsForNewScheduling
+        ) {
           try {
             await admin
               .from("atendimento_conversations")
@@ -1873,7 +1934,7 @@ export async function POST(req: Request) {
               .eq("id", conversationId);
           } catch (_e) {}
         }
-        if (existingScheduledBookingId && !isBookingWaitingAttendance) {
+        if (existingScheduledBookingId && !isBookingWaitingAttendance && !shouldResetAllFlowsForNewScheduling) {
           try {
             await insertWhatsAppBotTextMessage({
               admin,
@@ -1916,7 +1977,7 @@ export async function POST(req: Request) {
           .order("created_at", { ascending: false })
           .limit(3);
         const eventsFlowRecent = (histFlowRecent.data ?? []) as Array<{ event_type: string }>;
-        const recentFlowConclusion = eventsFlowRecent.length > 0;
+        const recentFlowConclusion = eventsFlowRecent.length > 0 && !shouldResetAllFlowsForNewScheduling;
         const recentIsScheduled = eventsFlowRecent.some(
           (e) =>
             e.event_type === "experimental_class_scheduled" ||
@@ -1994,24 +2055,32 @@ export async function POST(req: Request) {
           histStateMatch.data?.find((e: any) => e.event_type === "state_collected") ?? null;
         const lastHistCity =
           histStateMatch.data?.find((e: any) => e.event_type === "city_collected") ?? null;
-        const histStateValue = String((lastHistState as any)?.details?.state ?? "").trim();
-        const histTimezone = String((lastHistState as any)?.details?.timezone ?? "").trim();
-        const histCityValue = String((lastHistCity as any)?.details?.city ?? "").trim();
+        let histStateValue = String((lastHistState as any)?.details?.state ?? "").trim();
+        let histTimezone = String((lastHistState as any)?.details?.timezone ?? "").trim();
+        let histCityValue = String((lastHistCity as any)?.details?.city ?? "").trim();
+
+        if (shouldResetAllFlowsForNewScheduling) {
+          histStateValue = "";
+          histTimezone = "";
+          histCityValue = "";
+        }
 
         const leadStateValue =
-          String((lead as any)?.state ?? "").trim() || histStateValue;
+          String((lead as any)?.state ?? "").trim() || (shouldResetAllFlowsForNewScheduling ? "" : histStateValue);
         const leadTimezoneValue =
-          String((lead as any)?.timezone ?? "").trim() || histTimezone;
-        const leadCityValue = String((lead as any)?.city ?? "").trim() || histCityValue;
+          String((lead as any)?.timezone ?? "").trim() || (shouldResetAllFlowsForNewScheduling ? "" : histTimezone);
+        const leadCityValue = String((lead as any)?.city ?? "").trim() || (shouldResetAllFlowsForNewScheduling ? "" : histCityValue);
         const leadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim();
         const hasStateValidated = Boolean(leadStateValue && leadTimezoneValue);
         const hasCityValidated = Boolean(leadCityValue && hasStateValidated);
         const hasReachedPostCityStage =
-          hasCityValidated ||
-          leadFunnelStage === "pre_cadastro_concluido" ||
-          leadFunnelStage === "aula_experimental_agendada" ||
-          leadFunnelStage === "em_atendimento" ||
-          Boolean(lastHistCity);
+          (!shouldResetAllFlowsForNewScheduling && hasCityValidated) ||
+          (!shouldResetAllFlowsForNewScheduling &&
+            (leadFunnelStage === "pre_cadastro_concluido" ||
+              leadFunnelStage === "aula_experimental_agendada" ||
+              leadFunnelStage === "em_atendimento")) ||
+          (!shouldResetAllFlowsForNewScheduling && Boolean(lastHistCity));
+
 
         if (expectedField === "state" && hasStateValidated) {
           expectedField = hasCityValidated ? (nextMissingField ?? null) : "city";
@@ -2032,7 +2101,10 @@ export async function POST(req: Request) {
           expectedField = "state";
         }
 
-        if (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) {
+        if (
+          (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)) ||
+          shouldResetAllFlowsForNewScheduling
+        ) {
           const firstMessage =
             "Para agendarmos sua aula experimental gratuita, preciso de algumas informações rápidas. Vamos começar?";
           const secondMessage = "Em qual estado você mora?";
