@@ -50,6 +50,11 @@ function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
   return stage === "repescagem" || st === "repescagem";
 }
 
+function isBookingAttendanceNoShow(booking: unknown) {
+  const status = String((booking as any)?.attendance_status ?? "").trim().toLowerCase();
+  return status === "no_show";
+}
+
 function RepescagemBadge({ className = "" }: { className?: string }) {
   return (
     <div
@@ -129,7 +134,8 @@ function LeadDetails({
     String((lead as any)?.experimental_class_professor_time ?? "").trim();
   const booking = lead.experimental_class_booking;
   const isDraft = booking && (booking as any).source === "draft";
-  const showDraftSection = showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
+  const bookingWasNoShow = isBookingAttendanceNoShow(booking);
+  const showDraftSection = !bookingWasNoShow && showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
 
   const draftStageLabel = (() => {
     switch (experimentalStatus) {
