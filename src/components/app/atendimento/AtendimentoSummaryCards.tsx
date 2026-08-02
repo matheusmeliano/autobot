@@ -55,6 +55,11 @@ function isBookingAttendanceNoShow(booking: unknown) {
   return status === "no_show";
 }
 
+function isBookingAttendanceResolved(booking: unknown) {
+  const status = String((booking as any)?.attendance_status ?? "").trim().toLowerCase();
+  return status === "attended" || status === "no_show";
+}
+
 function RepescagemBadge({ className = "" }: { className?: string }) {
   return (
     <div
@@ -135,7 +140,9 @@ function LeadDetails({
   const booking = lead.experimental_class_booking;
   const isDraft = booking && (booking as any).source === "draft";
   const bookingWasNoShow = isBookingAttendanceNoShow(booking);
-  const showDraftSection = !bookingWasNoShow && showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
+  const bookingAttendanceResolved = isBookingAttendanceResolved(booking);
+  const showDraftSection =
+    !bookingWasNoShow && !bookingAttendanceResolved && showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
 
   const draftStageLabel = (() => {
     switch (experimentalStatus) {
