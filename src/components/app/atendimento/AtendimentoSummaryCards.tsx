@@ -11,7 +11,7 @@ import {
   experimentalClassBookingDisplayStatusLabel,
 } from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
-import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
+import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime, formatAtendimentoLocationName } from "@/lib/atendimento/utils";
 
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
 const PANEL_PAGE_SIZE = 10;
@@ -185,8 +185,8 @@ function LeadDetails({
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
           <Field label="CPF" value={lead.cpf} copyable />
           <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
-          <Field label="Cidade" value={lead.city} />
-          <Field label="Estado" value={lead.state} />
+          <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
+          <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
           <Field label="País" value={lead.country} />
           <Field label="Fuso" value={lead.timezone} />
         </div>

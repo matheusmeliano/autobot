@@ -42,3 +42,43 @@ export function summarizePreview(text: unknown) {
   if (!raw) return "";
   return raw.length > 96 ? `${raw.slice(0, 93)}...` : raw;
 }
+
+const LOCATION_LOWERCASE_WORDS = new Set([
+  "de",
+  "do",
+  "da",
+  "dos",
+  "das",
+  "no",
+  "na",
+  "nos",
+  "nas",
+  "e",
+  "ou",
+  "a",
+  "o",
+  "as",
+  "os",
+  "ao",
+  "à",
+  "às",
+]);
+
+export function formatAtendimentoLocationName(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "-";
+  const words = raw
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word, index) => {
+      const lower = word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      if (index > 0 && LOCATION_LOWERCASE_WORDS.has(lower)) {
+        return word.toLowerCase();
+      }
+      const chars = [...word];
+      if (chars.length === 0) return word;
+      chars[0] = chars[0].toUpperCase();
+      return chars.join("");
+    });
+  return words.join(" ");
+}
