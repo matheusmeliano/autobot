@@ -1222,9 +1222,11 @@ export function AtendimentoSummaryCards({
                       cancellingBookingId={cancellingBookingId}
                       savingLessonLinkBookingId={savingLessonLinkBookingId}
                       markingAttendanceBookingId={markingAttendanceBookingId}
+                      sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
                       onCancelBooking={handleCancelBooking}
                       onSaveLessonLink={handleSaveLessonLink}
                       onMarkAttendance={handleMarkAttendance}
+                      onSendStudentNotification={handleSendStudentNotification}
                     />
                   ) : (
                     <LeadDetails
