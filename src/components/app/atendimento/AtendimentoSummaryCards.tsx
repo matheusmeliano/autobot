@@ -154,6 +154,11 @@ function LeadDetails({
           <div className="text-sm text-[var(--app-text-55)]">
             Última interação: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
           </div>
+          {isLeadRepescagem(lead) ? (
+            <div className="mt-2">
+              <RepescagemBadge />
+            </div>
+          ) : null}
         </div>
 
         <div className="min-w-0 flex flex-col items-stretch gap-2 min-[1176px]:ml-auto min-[1176px]:flex-row min-[1176px]:items-center min-[1176px]:justify-end">
@@ -1103,6 +1108,27 @@ export function AtendimentoSummaryCards({
     return formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
   }
 
+  function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
+    if (!lead) return false;
+    const stage = String((lead as any)?.funnel_stage ?? lead.funnel_stage ?? "").trim().toLowerCase();
+    const st = String((lead as any)?.status ?? lead.status ?? "").trim().toLowerCase();
+    return stage === "repescagem" || st === "repescagem";
+  }
+
+  function RepescagemBadge({ className = "" }: { className?: string }) {
+    return (
+      <div
+        className={[
+          "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-100",
+          className,
+        ].join(" ")}
+      >
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+        Repescagem
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 lg:h-full lg:min-h-0">
       <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1173,6 +1199,11 @@ export function AtendimentoSummaryCards({
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {buildItemMeta(lead)}
                       </div>
+                      {isLeadRepescagem(lead) ? (
+                        <div className="mt-2">
+                          <RepescagemBadge />
+                        </div>
+                      ) : null}
                       {activeSection === "agendamentos" &&
                       !String(lead.experimental_class_booking?.lesson_link ?? "")
                         .trim() ? (

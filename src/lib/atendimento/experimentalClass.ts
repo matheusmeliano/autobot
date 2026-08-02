@@ -283,6 +283,14 @@ export function buildExperimentalClassPostAttendanceWhatsAppMessages(_name?: str
   ];
 }
 
+export function buildExperimentalClassNoShowRepescagemWhatsAppMessages() {
+  return [
+    `Olá! Notamos que você não participou da sua aula experimental com o professor Lucas Brum.`,
+    `Mas não se preocupe, novas oportunidades estarão disponíveis.`,
+    `Quando desejar reagendar sua aula experimental, basta me enviar uma nova mensagem. Terei o maior prazer em ajudá-lo(a) a escolher um novo dia e horário.`,
+  ];
+}
+
 export const EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE =
   `Em breve poderemos seguir para a próxima etapa.`;
 

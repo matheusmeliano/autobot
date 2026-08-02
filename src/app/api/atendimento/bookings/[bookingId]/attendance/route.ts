@@ -3,7 +3,10 @@ import {
   requireAtendimentoUser,
   sendAtendimentoWhatsAppText,
 } from "@/lib/atendimento/server";
-import { buildExperimentalClassPostAttendanceWhatsAppMessages } from "@/lib/atendimento/experimentalClass";
+import {
+  buildExperimentalClassNoShowRepescagemWhatsAppMessages,
+  buildExperimentalClassPostAttendanceWhatsAppMessages,
+} from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
@@ -55,6 +58,19 @@ function isAtendimentoLeadsFunnelStageColumnUnavailable(error: unknown) {
     code === "PGRST204" ||
     /column .*funnel_stage.* does not exist/i.test(message) ||
     /could not find the 'funnel_stage' column of 'atendimento_leads' in the schema cache/i.test(message)
+  );
+}
+
+function isAtendimentoLeadsResetableProfileColumnsUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .*(cpf|city|state|country|timezone|full_name).* does not exist/i.test(message) ||
+    /could not find the '(cpf|city|state|country|timezone|full_name)' column of 'atendimento_leads' in the schema cache/i.test(
+      message,
+    )
   );
 }
 
@@ -198,6 +214,9 @@ export async function POST(
   if (attendance === "attended") {
     nextLeadFunnelStage = "matricula_pendente";
     nextLeadStatus = "matricula_pendente";
+  } else if (attendance === "no_show") {
+    nextLeadFunnelStage = "repescagem";
+    nextLeadStatus = "repescagem";
   }
 
   if (nextLeadFunnelStage !== currentLeadFunnelStage || nextLeadStatus !== currentLeadStatus) {
@@ -207,12 +226,24 @@ export async function POST(
       };
       if (nextLeadFunnelStage) leadUpdatePayload.funnel_stage = nextLeadFunnelStage;
       if (nextLeadStatus) leadUpdatePayload.status = nextLeadStatus;
+      if (attendance === "no_show") {
+        leadUpdatePayload.cpf = null;
+        leadUpdatePayload.city = null;
+        leadUpdatePayload.state = null;
+        leadUpdatePayload.country = null;
+        leadUpdatePayload.timezone = null;
+        leadUpdatePayload.full_name = null;
+      }
       const { error: leadUpdateError } = await admin
         .from("atendimento_leads")
         .update(leadUpdatePayload)
         .eq("id", leadId);
 
-      if (leadUpdateError && isAtendimentoLeadsFunnelStageColumnUnavailable(leadUpdateError)) {
+      if (
+        leadUpdateError &&
+        (isAtendimentoLeadsFunnelStageColumnUnavailable(leadUpdateError) ||
+          isAtendimentoLeadsResetableProfileColumnsUnavailable(leadUpdateError))
+      ) {
         try {
           await admin
             .from("atendimento_leads")
@@ -225,7 +256,8 @@ export async function POST(
     } catch (error) {
       if (
         !(error instanceof Error) ||
-        !isAtendimentoLeadsFunnelStageColumnUnavailable(error)
+        (!isAtendimentoLeadsFunnelStageColumnUnavailable(error) &&
+          !isAtendimentoLeadsResetableProfileColumnsUnavailable(error))
       ) {
         throw error;
       }
@@ -334,6 +366,68 @@ export async function POST(
       actorType: "system",
     });
   } else {
+    if (leadPhone) {
+      const messages = buildExperimentalClassNoShowRepescagemWhatsAppMessages();
+      const sentMessages: string[] = [];
+      let lastError: unknown = null;
+
+      for (let i = 0; i < messages.length; i += 1) {
+        const message = messages[i];
+        try {
+          await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
+          sentMessages.push(message);
+        } catch (error) {
+          lastError = error;
+          break;
+        }
+      }
+
+      if (lastError) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_attendance_no_show_message_failed",
+          title: "Falha ao enviar as mensagens de repescagem apos aluno nao comparecer a aula experimental",
+          details: {
+            booking_id: normalizedBookingId,
+            phone: leadPhone,
+            lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
+            total_messages: messages.length,
+            sent_messages: sentMessages.length,
+            sent_message_contents: sentMessages,
+            first_failed_message_index: sentMessages.length,
+            first_failed_message_content: messages[sentMessages.length] ?? null,
+            error: lastError instanceof Error ? lastError.message : String(lastError),
+          },
+          actorType: "system",
+        });
+      } else {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_attendance_no_show_message_sent",
+          title: "Mensagens de repescagem enviadas ao aluno apos nao comparecimento na aula experimental",
+          details: {
+            booking_id: normalizedBookingId,
+            phone: leadPhone,
+            total_messages: messages.length,
+            message_contents: messages,
+            lead_funnel_stage: nextLeadFunnelStage,
+            lead_status: nextLeadStatus,
+            cadastro_reset: {
+              cpf: null,
+              city: null,
+              state: null,
+              country: null,
+              timezone: null,
+              full_name: null,
+            },
+          },
+          actorType: "system",
+        });
+      }
+    }
+
     await appendHistoryEvent({
       leadId,
       conversationId,
@@ -344,6 +438,16 @@ export async function POST(
         lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
         reason: "no_show",
         attendance_status: "no_show",
+        lead_funnel_stage: nextLeadFunnelStage,
+        lead_status: nextLeadStatus,
+        cadastro_reset: {
+          cpf: null,
+          city: null,
+          state: null,
+          country: null,
+          timezone: null,
+          full_name: null,
+        },
       },
       actorType: "attendant",
       actorEmail: auth.user.email,
