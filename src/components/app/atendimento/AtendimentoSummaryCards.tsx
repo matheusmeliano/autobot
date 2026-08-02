@@ -216,7 +216,7 @@ function LeadDetails({
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         <div className="grid min-w-0 gap-3 md:grid-cols-2">
           <Field label="CPF" value={lead.cpf} copyable />
-          <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
+          <Field label="Origem" value={bookingWasNoShow ? "-" : atendimentoOriginLabel(lead.origin)} />
           <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
           <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
           <Field label="País" value={lead.country} />
