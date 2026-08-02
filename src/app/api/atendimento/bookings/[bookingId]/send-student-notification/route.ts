@@ -2,10 +2,17 @@ import {
   appendHistoryEvent,
   requireAtendimentoUser,
   sendAtendimentoWhatsAppText,
-  getLeadFirstName,
 } from "@/lib/atendimento/server";
 import { buildExperimentalClassStudentLessonReadyWhatsAppMessage } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+function getLeadFirstName(name: string | null | undefined) {
+  const parts = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return parts[0] ?? "Aluno";
+}
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
