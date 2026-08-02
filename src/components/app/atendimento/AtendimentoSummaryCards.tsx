@@ -413,11 +413,11 @@ function BookingDetails({
                 >
                   {experimentalClassAttendanceLabel(attendanceStatus)}
                 </div>
-                <div className="min-w-0 text-sm text-[var(--app-text-70)] min-[560px]:text-right">
-                  {attendanceStatus === "attended"
-                    ? "A aula foi concluída e a mensagem de continuidade já foi enviada ao aluno."
-                    : "O aluno foi marcado para repescagem, permitindo que a equipe faça um contato manual e humanizado para reagendar."}
-                </div>
+                {attendanceStatus === "attended" ? (
+                  <div className="min-w-0 text-sm text-[var(--app-text-70)] min-[560px]:text-right">
+                    A aula foi concluída e a mensagem de continuidade já foi enviada ao aluno.
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="mt-3 flex flex-col items-start gap-3 min-[600px]:flex-row min-[600px]:items-center min-[600px]:justify-between min-[600px]:gap-4">
