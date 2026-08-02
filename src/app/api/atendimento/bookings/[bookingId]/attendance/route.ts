@@ -3,17 +3,8 @@ import {
   requireAtendimentoUser,
   sendAtendimentoWhatsAppText,
 } from "@/lib/atendimento/server";
-import { buildExperimentalClassPostAttendanceWhatsAppMessage } from "@/lib/atendimento/experimentalClass";
+import { buildExperimentalClassPostAttendanceWhatsAppMessages } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
-function getLeadFirstName(name: string | null | undefined) {
-  const parts = String(name ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .split(" ")
-    .filter(Boolean);
-  return parts[0] ?? "Aluno";
-}
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -36,6 +27,34 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
     /could not find the 'lesson_link' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
       message,
     )
+  );
+}
+
+function isExperimentalClassBookingsAttendanceColumnsUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .*attendance_status.* does not exist/i.test(message) ||
+    /column .*attendance_checked_at.* does not exist/i.test(message) ||
+    /could not find the 'attendance_status' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
+      message,
+    ) ||
+    /could not find the 'attendance_checked_at' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
+function isAtendimentoLeadsFunnelStageColumnUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .*funnel_stage.* does not exist/i.test(message) ||
+    /could not find the 'funnel_stage' column of 'atendimento_leads' in the schema cache/i.test(message)
   );
 }
 
@@ -111,7 +130,7 @@ export async function POST(
 
   const { data: lead, error: leadError } = await admin
     .from("atendimento_leads")
-    .select("id, full_name, phone")
+    .select("id, full_name, phone, funnel_stage, status")
     .eq("id", leadId)
     .maybeSingle();
 
@@ -121,6 +140,104 @@ export async function POST(
 
   const leadName = String((lead as any)?.full_name ?? "").trim();
   const leadPhone = String((lead as any)?.phone ?? "").trim();
+  const currentLeadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase() || null;
+  const currentLeadStatus = String((lead as any)?.status ?? "").trim().toLowerCase() || null;
+
+  const checkedAtIso = new Date().toISOString();
+  const finalBookingStatus = attendance === "attended" ? "completed" : String((resolvedBooking as any)?.status ?? "scheduled").trim().toLowerCase();
+
+  if (resolvedBooking && String((resolvedBooking as any)?.id ?? "").trim()) {
+    const attendanceUpdatePayload: Record<string, unknown> = {
+      attendance_status: attendance,
+      attendance_checked_at: checkedAtIso,
+      updated_at: checkedAtIso,
+    };
+    if (attendance === "attended") {
+      attendanceUpdatePayload.status = "completed";
+    }
+
+    try {
+      const { error: updateError } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .update(attendanceUpdatePayload)
+        .eq("id", String((resolvedBooking as any).id));
+
+      if (updateError && isExperimentalClassBookingsAttendanceColumnsUnavailable(updateError)) {
+        const fallbackPayload: Record<string, unknown> = { updated_at: checkedAtIso };
+        if (attendance === "attended") fallbackPayload.status = "completed";
+        try {
+          await admin
+            .from("atendimento_experimental_class_bookings")
+            .update(fallbackPayload)
+            .eq("id", String((resolvedBooking as any).id));
+        } catch (_e) {}
+      } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
+        return Response.json({ ok: false, error: updateError.message }, { status: 500 });
+      }
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !isExperimentalClassBookingsAttendanceColumnsUnavailable(error)
+      ) {
+        throw error;
+      }
+      const fallbackPayload: Record<string, unknown> = { updated_at: checkedAtIso };
+      if (attendance === "attended") fallbackPayload.status = "completed";
+      try {
+        await admin
+          .from("atendimento_experimental_class_bookings")
+          .update(fallbackPayload)
+          .eq("id", String((resolvedBooking as any).id));
+      } catch (_e) {}
+    }
+  }
+
+  let nextLeadFunnelStage = currentLeadFunnelStage;
+  let nextLeadStatus = currentLeadStatus;
+
+  if (attendance === "attended") {
+    nextLeadFunnelStage = "matricula_pendente";
+    nextLeadStatus = "matricula_pendente";
+  }
+
+  if (nextLeadFunnelStage !== currentLeadFunnelStage || nextLeadStatus !== currentLeadStatus) {
+    try {
+      const leadUpdatePayload: Record<string, unknown> = {
+        updated_at: checkedAtIso,
+      };
+      if (nextLeadFunnelStage) leadUpdatePayload.funnel_stage = nextLeadFunnelStage;
+      if (nextLeadStatus) leadUpdatePayload.status = nextLeadStatus;
+      const { error: leadUpdateError } = await admin
+        .from("atendimento_leads")
+        .update(leadUpdatePayload)
+        .eq("id", leadId);
+
+      if (leadUpdateError && isAtendimentoLeadsFunnelStageColumnUnavailable(leadUpdateError)) {
+        try {
+          await admin
+            .from("atendimento_leads")
+            .update({ updated_at: checkedAtIso })
+            .eq("id", leadId);
+        } catch (_e) {}
+      } else if (leadUpdateError) {
+        return Response.json({ ok: false, error: leadUpdateError.message }, { status: 500 });
+      }
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !isAtendimentoLeadsFunnelStageColumnUnavailable(error)
+      ) {
+        throw error;
+      }
+      try {
+        await admin
+          .from("atendimento_leads")
+          .update({ updated_at: checkedAtIso })
+          .eq("id", leadId);
+      } catch (_e) {}
+    }
+  }
+
   const responseBooking = {
     ...(resolvedBooking ?? {}),
     id: String((resolvedBooking as any)?.id ?? normalizedBookingId),
@@ -128,7 +245,8 @@ export async function POST(
     conversation_id: conversationId,
     lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
     attendance_status: attendance,
-    attendance_checked_at: new Date().toISOString(),
+    attendance_checked_at: checkedAtIso,
+    status: finalBookingStatus,
   };
 
   if (attendance === "attended") {
@@ -136,28 +254,50 @@ export async function POST(
       return Response.json({ ok: false, error: "lead_phone_missing" }, { status: 400 });
     }
 
-    try {
-      await sendAtendimentoWhatsAppText({
-        phone: leadPhone,
-        message: buildExperimentalClassPostAttendanceWhatsAppMessage(getLeadFirstName(leadName)),
-      });
-    } catch (error) {
+    const messages = buildExperimentalClassPostAttendanceWhatsAppMessages(leadName);
+    const sentMessages: string[] = [];
+    let lastError: unknown = null;
+
+    for (let i = 0; i < messages.length; i += 1) {
+      const message = messages[i];
+      try {
+        await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
+        sentMessages.push(message);
+      } catch (error) {
+        lastError = error;
+        break;
+      }
+    }
+
+    if (lastError) {
       await appendHistoryEvent({
         leadId,
         conversationId,
         eventType: "experimental_class_attendance_confirmation_message_failed",
-        title: "Falha ao enviar a mensagem de continuidade apos o comparecimento na aula experimental",
+        title: "Falha ao enviar as mensagens de continuidade apos o comparecimento na aula experimental",
         details: {
           booking_id: normalizedBookingId,
           phone: leadPhone,
           lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
-          error: error instanceof Error ? error.message : String(error),
+          total_messages: messages.length,
+          sent_messages: sentMessages.length,
+          sent_message_contents: sentMessages,
+          first_failed_message_index: sentMessages.length,
+          first_failed_message_content: messages[sentMessages.length] ?? null,
+          error: lastError instanceof Error ? lastError.message : String(lastError),
         },
         actorType: "system",
       });
 
       return Response.json(
-        { ok: false, error: error instanceof Error ? error.message : "attendance_confirmation_message_failed" },
+        {
+          ok: false,
+          error:
+            lastError instanceof Error
+              ? lastError.message
+              : "attendance_confirmation_message_failed",
+          booking: responseBooking,
+        },
         { status: 500 },
       );
     }
@@ -171,6 +311,8 @@ export async function POST(
         booking_id: normalizedBookingId,
         lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
         phone: leadPhone,
+        lead_funnel_stage: nextLeadFunnelStage,
+        lead_status: nextLeadStatus,
       },
       actorType: "attendant",
       actorEmail: auth.user.email,
@@ -180,10 +322,14 @@ export async function POST(
       leadId,
       conversationId,
       eventType: "experimental_class_attendance_confirmation_message_sent",
-      title: "Mensagem de continuidade enviada ao aluno apos o comparecimento na aula experimental",
+      title: "Mensagens de continuidade enviadas ao aluno apos o comparecimento na aula experimental",
       details: {
         booking_id: normalizedBookingId,
         phone: leadPhone,
+        total_messages: messages.length,
+        message_contents: messages,
+        lead_funnel_stage: nextLeadFunnelStage,
+        lead_status: nextLeadStatus,
       },
       actorType: "system",
     });
@@ -197,6 +343,7 @@ export async function POST(
         booking_id: normalizedBookingId,
         lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,
         reason: "no_show",
+        attendance_status: "no_show",
       },
       actorType: "attendant",
       actorEmail: auth.user.email,
@@ -206,5 +353,11 @@ export async function POST(
   return Response.json({
     ok: true,
     booking: responseBooking,
+    lead: {
+      id: leadId,
+      funnel_stage: nextLeadFunnelStage,
+      status: nextLeadStatus,
+      updated_at: checkedAtIso,
+    },
   });
 }

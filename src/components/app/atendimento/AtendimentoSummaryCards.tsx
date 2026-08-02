@@ -840,7 +840,12 @@ export function AtendimentoSummaryCards({
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
+        | {
+            ok?: boolean;
+            error?: string;
+            booking?: Record<string, unknown> | null;
+            lead?: { funnel_stage?: string | null; status?: string | null; updated_at?: string | null } | null;
+          }
         | null;
 
       if (!response.ok || !payload?.ok || !payload.booking) {
@@ -850,6 +855,18 @@ export function AtendimentoSummaryCards({
 
       const updatedLead: AtendimentoLeadListItem = {
         ...lead,
+        status:
+          (String(payload?.lead?.status ?? "").trim() as AtendimentoLeadListItem["status"]) ||
+          (attendance === "attended"
+            ? "matricula_pendente"
+            : lead.status),
+        funnel_stage:
+          (String(payload?.lead?.funnel_stage ?? "").trim() as AtendimentoLeadListItem["funnel_stage"]) ||
+          (attendance === "attended"
+            ? "matricula_pendente"
+            : lead.funnel_stage),
+        updated_at:
+          String(payload?.lead?.updated_at ?? "").trim() || lead.updated_at || new Date().toISOString(),
         experimental_class_booking: {
           ...(lead.experimental_class_booking ?? {
             id: bookingId,

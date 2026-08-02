@@ -5,7 +5,7 @@ import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
-  buildExperimentalClassPostAttendanceWhatsAppMessage,
+  buildExperimentalClassPostAttendanceWhatsAppMessages,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildExperimentalClassTimesMessages,
   deriveExperimentalClassBookingDisplayStatus,
@@ -159,10 +159,18 @@ test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso 
   );
 });
 
-test("buildExperimentalClassPostAttendanceWhatsAppMessage monta a mensagem apos comparecimento", () => {
+test("buildExperimentalClassPostAttendanceWhatsAppMessages envia 3 mensagens SEPARADAS apos comparecimento, sem emoji", () => {
+  const messages = buildExperimentalClassPostAttendanceWhatsAppMessages("Pedro");
+  assert.equal(Array.isArray(messages), true);
+  assert.equal(messages.length, 3);
   assert.equal(
-    buildExperimentalClassPostAttendanceWhatsAppMessage("Pedro"),
-    "Show, Pedro! 😄\n\nFicamos felizes por você ter participado da aula experimental com o professor Lucas Brum.\n\nAgora é hora de dar o próximo passo!\n\nVamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?",
+    messages[0],
+    "Ficamos felizes por você ter participado da aula experimental com o professor Lucas Brum.",
+  );
+  assert.equal(messages[1], "Agora é hora de dar o próximo passo!");
+  assert.equal(
+    messages[2],
+    "Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?",
   );
 });
 

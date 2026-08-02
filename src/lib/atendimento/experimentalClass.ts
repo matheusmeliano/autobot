@@ -275,15 +275,12 @@ export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name
 Link da aula: ${safeLessonLink}`;
 }
 
-export function buildExperimentalClassPostAttendanceWhatsAppMessage(name: string) {
-  const safeName = String(name ?? "").trim() || "Aluno";
-  return `Show, ${safeName}! 😄
-
-Ficamos felizes por você ter participado da aula experimental com o professor Lucas Brum.
-
-Agora é hora de dar o próximo passo!
-
-Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?`;
+export function buildExperimentalClassPostAttendanceWhatsAppMessages(_name?: string | null) {
+  return [
+    "Ficamos felizes por você ter participado da aula experimental com o professor Lucas Brum.",
+    "Agora é hora de dar o próximo passo!",
+    "Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?",
+  ];
 }
 
 export const EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE =
