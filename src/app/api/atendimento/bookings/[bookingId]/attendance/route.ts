@@ -171,6 +171,11 @@ export async function POST(
     if (attendance === "attended") {
       attendanceUpdatePayload.status = "completed";
     }
+    if (attendance === "no_show") {
+      attendanceUpdatePayload.lesson_link = null;
+      attendanceUpdatePayload.student_start_notification_sent_at = null;
+      attendanceUpdatePayload.attendant_start_notification_sent_at = null;
+    }
 
     try {
       const { error: updateError } = await admin
@@ -188,7 +193,29 @@ export async function POST(
             .eq("id", String((resolvedBooking as any).id));
         } catch (_e) {}
       } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
-        return Response.json({ ok: false, error: updateError.message }, { status: 500 });
+        const msg = String((updateError as any)?.message ?? "");
+        const code = String((updateError as any)?.code ?? "");
+        const isLessonLinkOrNotificationMissingColError =
+          attendance === "no_show" &&
+          (code === "42703" ||
+            code === "PGRST204" ||
+            code === "PGRST205" ||
+            /lesson_link|notification_sent_at|student_start|attendant_start/i.test(msg));
+        if (isLessonLinkOrNotificationMissingColError) {
+          try {
+            const safeFallbackPayload: Record<string, unknown> = {
+              attendance_status: attendance,
+              attendance_checked_at: checkedAtIso,
+              updated_at: checkedAtIso,
+            };
+            await admin
+              .from("atendimento_experimental_class_bookings")
+              .update(safeFallbackPayload)
+              .eq("id", String((resolvedBooking as any).id));
+          } catch (_e2) {}
+        } else {
+          return Response.json({ ok: false, error: updateError.message }, { status: 500 });
+        }
       }
     } catch (error) {
       if (
