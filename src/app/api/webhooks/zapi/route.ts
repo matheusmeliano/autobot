@@ -1602,86 +1602,98 @@ export async function POST(req: Request) {
         const conversation = leadContext.conversation as any;
 
         const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
-        if (currentBooking?.id) {
+        const currentBookingId = currentBooking?.id ? String(currentBooking.id) : "";
+        const isBookingWaitingAttendance = (() => {
+          if (!currentBookingId) return false;
           const hasStudentNotification = Boolean(currentBooking.student_start_notification_sent_at);
           const hasAttendantNotification = Boolean(currentBooking.attendant_start_notification_sent_at);
           const attendanceStatus = String(currentBooking.attendance_status ?? "").trim();
           const attendanceResolved =
-            attendanceStatus === "attended" || attendanceStatus === "no_show" || Boolean(currentBooking.attendance_checked_at);
-          const inClassWaitingAttendance =
-            (hasStudentNotification || hasAttendantNotification) && !attendanceResolved;
-          if (inClassWaitingAttendance) {
-            const inboundContent = String(messageText ?? "").trim();
-            const inboundMediaType = mediaInfo.hasPaymentMedia
-              ? (mediaInfo.mediaUrl ? "document" : "text")
-              : "text";
-            const inboundMediaUrl = mediaInfo.mediaUrl || null;
-            try {
-              const { error: inboundErr } = await admin
-                .from("atendimento_messages")
-                .insert({
-                  conversation_id: conversationId,
-                  sender_role: "lead",
-                  content_text: inboundContent || null,
-                  media_type: inboundMediaType,
-                  media_url: inboundMediaUrl,
-                  status: "recebida",
-                  sent_at: nowIso,
-                  delivered_at: nowIso,
+            attendanceStatus === "attended" ||
+            attendanceStatus === "no_show" ||
+            Boolean(currentBooking.attendance_checked_at);
+          return (hasStudentNotification || hasAttendantNotification) && !attendanceResolved;
+        })();
+
+        if (isBookingWaitingAttendance) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
                 });
-              if (!inboundErr) {
-                try {
-                  void admin
-                    .from("atendimento_leads")
-                    .update({
-                      unread_count: Number(lead.unread_count ?? 0) + 1,
-                      is_new_for_attendant: true,
-                      last_interaction_at: nowIso,
-                      updated_at: nowIso,
-                    })
-                    .eq("id", leadId);
-                } catch (_e) {}
-                try {
-                  void syncConversationPreview({
-                    conversationId,
-                    contentText: inboundContent || "(mensagem recebida)",
-                    createdAt: nowIso,
-                  });
-                } catch (_e) {}
-                try {
-                  void appendHistoryEvent({
-                    leadId,
-                    conversationId,
-                    eventType: "message_received_class_in_progress",
-                    title: "Mensagem recebida (aula em andamento — bloqueada)",
-                    details: {
-                      content_text: inboundContent || null,
-                      media_type: inboundMediaType,
-                      media_url: inboundMediaUrl,
-                      booking_id: String(currentBooking.id),
-                      source: "whatsapp_zapi",
-                    },
-                    actorType: "lead",
-                  });
-                } catch (_e) {}
-              }
-            } catch (_e) {}
-            return Response.json({
-              ok: true,
-              ignored: true,
-              reason: "experimental_class_waiting_attendance_blocked",
-              booking_id: String(currentBooking.id),
-              attendance_status: attendanceStatus || null,
-              student_start_notification_sent_at: currentBooking.student_start_notification_sent_at || null,
-              attendant_start_notification_sent_at: currentBooking.attendant_start_notification_sent_at || null,
-            });
-          }
+              } catch (_e) {}
+              try {
+                void appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "message_received_class_in_progress",
+                  title: "Mensagem recebida (aula em andamento — bloqueada)",
+                  details: {
+                    content_text: inboundContent || null,
+                    media_type: inboundMediaType,
+                    media_url: inboundMediaUrl,
+                    booking_id: currentBookingId,
+                    source: "whatsapp_zapi",
+                  },
+                  actorType: "lead",
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "experimental_class_waiting_attendance_blocked",
+            booking_id: currentBookingId,
+            attendance_status: String(currentBooking.attendance_status ?? "") || null,
+            student_start_notification_sent_at: currentBooking.student_start_notification_sent_at || null,
+            attendant_start_notification_sent_at: currentBooking.attendant_start_notification_sent_at || null,
+          });
         }
 
         if (!conversation.bot_enabled) {
+          if (isBookingWaitingAttendance) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "conversation_blocked_waiting_attendance_no_reply",
+              booking_id: currentBookingId,
+            });
+          }
           let finalReason = "conversation_blocked";
           let responseMessage: string | null = null;
-          const hasBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+          const hasBooking = currentBookingId ? currentBooking : null;
           if (hasBooking?.id) {
             finalReason = "conversation_blocked_echo_booking_scheduled";
             responseMessage = EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
@@ -1725,7 +1737,7 @@ export async function POST(req: Request) {
               }
             }
           }
-          if (responseMessage) {
+          if (responseMessage && !isBookingWaitingAttendance) {
             try {
               await insertWhatsAppBotTextMessage({
                 admin,
@@ -1812,9 +1824,9 @@ export async function POST(req: Request) {
         let expectedField = expectedFieldByText ?? expectedFieldByHistory;
         const nextMissingField = getWhatsAppNextMissingField(lead);
 
-        const existingBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+        const existingBooking = currentBookingId ? currentBooking : null;
         const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
-        if (existingScheduledBookingId && conversation.bot_enabled !== false) {
+        if (existingScheduledBookingId && conversation.bot_enabled !== false && !isBookingWaitingAttendance) {
           try {
             await admin
               .from("atendimento_conversations")
@@ -1825,7 +1837,7 @@ export async function POST(req: Request) {
               .eq("id", conversationId);
           } catch (_e) {}
         }
-        if (existingScheduledBookingId) {
+        if (existingScheduledBookingId && !isBookingWaitingAttendance) {
           try {
             await insertWhatsAppBotTextMessage({
               admin,
@@ -1843,6 +1855,14 @@ export async function POST(req: Request) {
             ok: true,
             ignored: true,
             reason: "flow_concluded_aula_experimental_ja_agendada_echo",
+            booking_id: existingScheduledBookingId,
+          });
+        }
+        if (existingScheduledBookingId && isBookingWaitingAttendance) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "flow_concluded_waiting_attendance_no_reply",
             booking_id: existingScheduledBookingId,
           });
         }
@@ -1881,6 +1901,15 @@ export async function POST(req: Request) {
           } catch (_e) {}
         }
         if (recentFlowConclusion) {
+          if (isBookingWaitingAttendance) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "flow_concluded_history_waiting_attendance_no_reply",
+              booking_id: currentBookingId,
+              event_types: eventsFlowRecent.map((e: any) => e.event_type),
+            });
+          }
           let finalMsg: string | null = null;
           let finalReason = "flow_concluded_already_finalized_in_history_event";
           if (recentIsScheduled) {
