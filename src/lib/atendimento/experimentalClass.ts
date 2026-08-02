@@ -286,7 +286,7 @@ export function buildExperimentalClassPostAttendanceWhatsAppMessages(_name?: str
 
 export function buildExperimentalClassNoShowRepescagemWhatsAppMessages() {
   return [
-    `Olá! Notamos que você não compareceu à aula experimental.`,
+    `Notamos que você não compareceu à aula experimental.`,
     `Mas não se preocupe, novas oportunidades estarão disponíveis.`,
     `Em breve nossa equipe entrará em contato.`,
   ];
