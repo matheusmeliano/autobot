@@ -1710,11 +1710,10 @@ export async function POST(req: Request) {
         }
 
         const isLeadInMatriculaPendentePostAttendance =
-          (!isLeadInRepescagemNoShowLocked &&
-            (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente")) ||
-          (currentBookingId &&
-            anyAttendanceResolved &&
-            (bookingAttendanceAttendedByCol || bookingAttendanceAttendedByHistory));
+          !isLeadInRepescagemNoShowLocked &&
+          currentBookingId &&
+          anyAttendanceResolved &&
+          (bookingAttendanceAttendedByCol || bookingAttendanceAttendedByHistory);
 
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
 
