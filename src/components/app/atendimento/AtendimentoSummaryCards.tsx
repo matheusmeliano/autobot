@@ -1209,9 +1209,6 @@ export function AtendimentoSummaryCards({
                         .trim() ? (
                         <div className="mt-2 text-[11px] font-semibold text-amber-300">Adicione o link da aula</div>
                       ) : null}
-                      {activeSection === "agendamentos" && lead.experimental_class_booking?.attendance_status === "no_show" ? (
-                        <div className="mt-2 text-[11px] font-semibold text-amber-200">Repescagem manual pendente</div>
-                      ) : null}
                     </button>
                   );
                 })}
