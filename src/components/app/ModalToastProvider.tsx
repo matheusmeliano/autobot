@@ -79,6 +79,11 @@ export function ModalToastProvider() {
     if (active.variant === "confirm") resolveModalConfirm(active.id, Boolean(result));
     resolveModalClose(active.id);
     setQueue((prev) => prev.slice(1));
+    if (typeof window !== "undefined") {
+      try {
+        window.location.reload();
+      } catch (_e) {}
+    }
   };
 
   return (
