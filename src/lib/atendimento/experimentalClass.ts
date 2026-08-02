@@ -284,18 +284,18 @@ export function buildExperimentalClassPostAttendanceWhatsAppMessages(_name?: str
 }
 
 export const EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE =
-  `Aguarde! Em breve poderemos seguir para a próxima etapa.`;
+  `Em breve poderemos seguir para a próxima etapa.`;
 
 export const EXPERIMENTAL_CLASS_FINAL_THIRD_MESSAGE =
-  `Aguarde! Em breve poderemos seguir para a próxima etapa.`;
+  `Em breve poderemos seguir para a próxima etapa.`;
 
 export const EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE =
   `Por favor, aguarde. Em breve poderemos seguir para a próxima etapa.`;
 
 export function buildExperimentalClassFinalChatMessages() {
   return [
-    `Parabéns!`,
-    `É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
+    `Parabéns! É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.`,
+    `No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
     EXPERIMENTAL_CLASS_FINAL_THIRD_MESSAGE,
   ];
 }
