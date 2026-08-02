@@ -48,7 +48,6 @@ export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual di
 export function buildExperimentalClassDatePromptMessages(_name?: string | null) {
   return [
     EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE,
-    EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   ];
 }
 export const LOCATION_STATE_INVALID_MESSAGE =
