@@ -1624,7 +1624,7 @@ export async function POST(req: Request) {
     normalizedEventType === "message_received" ||
     normalizedEventType === "message" ||
     normalizedEventType === "inbound" ||
-    normalizedFrom !== "receivedcallback" && (Boolean(messageText?.trim()) || Boolean(mediaUrl?.trim())) && rawFromMe !== true;
+    (normalizedFrom !== "receivedcallback" && (Boolean(messageText?.trim()) || Boolean(mediaUrl?.trim())));
 
   if (normalizedFrom && !validatedFrom.valid) {
     return Response.json({
