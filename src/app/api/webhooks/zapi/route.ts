@@ -2551,7 +2551,7 @@ export async function POST(req: Request) {
           let finalReason = "conversation_blocked";
           let responseMessage: string | null = null;
           const hasBooking = currentBookingId ? currentBooking : null;
-          if (hasBooking?.id && !handledByPosAttendanceFlow) {
+          if (hasBooking?.id && !handledByPosAttendanceFlow && effectiveWaitMessage) {
             finalReason = "conversation_blocked_echo_booking_scheduled";
             responseMessage = effectiveWaitMessage;
           } else {
@@ -2576,7 +2576,7 @@ export async function POST(req: Request) {
             const hasBlockedMaxAttempts = events.some(
               (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
             );
-            if (hasScheduled && !handledByPosAttendanceFlow) {
+            if (hasScheduled && !handledByPosAttendanceFlow && effectiveWaitMessage) {
               finalReason = "conversation_blocked_echo_scheduled_by_history";
               responseMessage = effectiveWaitMessage;
             } else if (hasBlockedMaxAttempts) {
@@ -2708,6 +2708,14 @@ export async function POST(req: Request) {
               booking_id: existingScheduledBookingId,
             });
           }
+          if (!effectiveWaitMessage) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "flow_concluded_scheduled_echo_wait_message_null_skip",
+              booking_id: existingScheduledBookingId,
+            });
+          }
           try {
             await insertWhatsAppBotTextMessage({
               admin,
@@ -2792,6 +2800,14 @@ export async function POST(req: Request) {
           let finalReason = "flow_concluded_already_finalized_in_history_event";
           if (recentIsScheduled) {
             finalMsg = effectiveWaitMessage;
+            if (!finalMsg) {
+              return Response.json({
+                ok: true,
+                ignored: true,
+                reason: "flow_concluded_echo_scheduled_by_history_wait_message_null_skip",
+                event_types: eventsFlowRecent.map((e: any) => e.event_type),
+              });
+            }
             finalReason = "flow_concluded_echo_scheduled_by_history";
           } else if (recentIsMaxAttemptsBlocked) {
             const lastBotMsg = await getLastBotMessage({ admin, conversationId });
