@@ -9,6 +9,36 @@ import {
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+async function insertAttendanceBotTextMessage(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+  contentText: string;
+  sentAt?: string;
+}) {
+  const sentAt = params.sentAt ?? new Date().toISOString();
+  try {
+    const { error } = await params.admin
+      .from("atendimento_messages")
+      .insert({
+        conversation_id: params.conversationId,
+        sender_role: "bot",
+        content_text: params.contentText,
+        media_type: "text",
+        status: "entregue",
+        sent_at: sentAt,
+        delivered_at: sentAt,
+      });
+    if (error) {
+      const code = String((error as any)?.code ?? "").trim();
+      if (code !== "23505") {
+        void error;
+      }
+    }
+  } catch (_e) {
+    void _e;
+  }
+}
+
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
   const message = String((error as any)?.message ?? "");
@@ -322,6 +352,18 @@ export async function POST(
       try {
         await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
         sentMessages.push(message);
+        if (conversationId) {
+          try {
+            await insertAttendanceBotTextMessage({
+              admin,
+              conversationId,
+              contentText: message,
+              sentAt: checkedAtIso,
+            });
+          } catch (_e) {
+            void _e;
+          }
+        }
       } catch (error) {
         lastError = error;
         break;
@@ -437,6 +479,18 @@ export async function POST(
       try {
         await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
         sentMessages.push(message);
+        if (conversationId) {
+          try {
+            await insertAttendanceBotTextMessage({
+              admin,
+              conversationId,
+              contentText: message,
+              sentAt: checkedAtIso,
+            });
+          } catch (_e) {
+            void _e;
+          }
+        }
       } catch (error) {
         lastError = error;
         break;

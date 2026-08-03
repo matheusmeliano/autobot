@@ -1715,6 +1715,23 @@ export async function POST(req: Request) {
           (isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent) ||
           (isLeadRepescagemStatus && bookingAttendanceNoShowByCol) ||
           (postAttendanceHistoryConfirmedNoShowEvent && (funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem"));
+        const leadDirectlyInPosAttendanceStepNuclear =
+          (funnelStageRaw === "matricula_pendente" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              bookingAttendanceAttendedByCol ||
+              Boolean(currentBookingId))) ||
+          (funnelStageRaw === "matricula_pendente_recusada" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              bookingAttendanceAttendedByCol ||
+              Boolean(currentBookingId))) ||
+          (leadStatusRaw === "matricula_pendente" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              bookingAttendanceAttendedByCol ||
+              Boolean(currentBookingId))) ||
+          (leadStatusRaw === "matricula_pendente_recusada" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              bookingAttendanceAttendedByCol ||
+              Boolean(currentBookingId)));
         const entrouNoFluxoPosAttendancePorForcaBruta =
           ultimaMsgBotPedeSimNao &&
           (isYesNuclear || isNoNuclear) &&
@@ -1725,6 +1742,7 @@ export async function POST(req: Request) {
 
         if (
           entrouNoFluxoPosAttendancePorForcaBruta ||
+          leadDirectlyInPosAttendanceStepNuclear ||
           (ultimaMsgBotPedeSimNao &&
             (leadEstaEmMatriculaPendentePosAttendance ||
               postAttendanceHistoryConfirmedAttendedEvent ||
