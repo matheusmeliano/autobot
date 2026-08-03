@@ -163,6 +163,15 @@ export function AtendimentoClient() {
     };
   }, [loadPanelLeads, loadSummary, supabase]);
 
+  useEffect(() => {
+    const onRefetchRequest = () => {
+      void loadSummary({ silent: true });
+      void loadPanelLeads();
+    };
+    window.addEventListener("autobot:atendimento-refetch", onRefetchRequest as EventListener);
+    return () => window.removeEventListener("autobot:atendimento-refetch", onRefetchRequest as EventListener);
+  }, [loadPanelLeads, loadSummary]);
+
   return (
     <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 bg-[var(--app-bg)]">
       <div className="shrink-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 lg:px-5 lg:py-3.5">

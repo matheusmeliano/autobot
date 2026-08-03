@@ -81,7 +81,15 @@ export function ModalToastProvider() {
     setQueue((prev) => prev.slice(1));
     if (typeof window !== "undefined") {
       try {
-        window.location.reload();
+        window.dispatchEvent(
+          new CustomEvent("autobot:atendimento-refetch", {
+            detail: {
+              source: "modal_toast_close",
+              variant: active.variant,
+              toastId: active.id,
+            },
+          }),
+        );
       } catch (_e) {}
     }
   };
