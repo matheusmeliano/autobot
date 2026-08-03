@@ -162,12 +162,118 @@ body {
 }
 
 .app-theme[data-theme="dark"] select,
-.app-theme[data-theme="dark"] input[type="date"] {
+.app-theme[data-theme="dark"] input[type="date"],
+.app-theme[data-theme="dark"] input[type="email"],
+.app-theme[data-theme="dark"] input[type="password"],
+.app-theme[data-theme="dark"] input[type="text"],
+.app-theme[data-theme="dark"] input:not([type]),
+.app-theme[data-theme="dark"] textarea {
   color-scheme: dark !important;
 }
 
-.app-theme[data-theme="light"] input[type="date"] {
+.app-theme[data-theme="light"] input[type="date"],
+.app-theme[data-theme="light"] input[type="email"],
+.app-theme[data-theme="light"] input[type="password"],
+.app-theme[data-theme="light"] input[type="text"],
+.app-theme[data-theme="light"] input:not([type]),
+.app-theme[data-theme="light"] textarea {
   color-scheme: light !important;
+}
+
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ) {
+  background-color: var(--app-card-2) !important;
+  color: var(--app-text-85) !important;
+  -webkit-text-fill-color: var(--app-text-85) !important;
+  caret-color: var(--app-text-85) !important;
+  border-color: var(--app-border) !important;
+  border-style: solid !important;
+  background-image: none !important;
+}
+
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  )::placeholder {
+  color: var(--app-text-30) !important;
+  opacity: 1 !important;
+}
+
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill,
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:hover,
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:focus,
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:active {
+  -webkit-text-fill-color: var(--app-text-85) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--app-card-2) inset !important;
+  box-shadow: 0 0 0px 1000px var(--app-card-2) inset !important;
+  background-color: var(--app-card-2) !important;
+  caret-color: var(--app-text-85) !important;
+  border-color: var(--app-border) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+.app-theme[data-theme="dark"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-internal-autofill-selected {
+  background-color: var(--app-card-2) !important;
+  color: var(--app-text-85) !important;
 }
 
 .app-theme input[type="date"],
