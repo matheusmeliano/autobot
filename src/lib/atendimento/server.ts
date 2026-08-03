@@ -426,6 +426,8 @@ export async function sendAtendimentoWhatsAppText(params: {
     ),
   );
 
+  let resolvedConversationIdForDedupe: string | null = null;
+
   if (normalizedDest && !internalNotificationPhones.has(normalizedDest)) {
     const admin = createSupabaseAdminClient();
     const { data: leadRow } = await admin
@@ -454,6 +456,8 @@ export async function sendAtendimentoWhatsAppText(params: {
         };
       }
 
+      resolvedConversationIdForDedupe = conversationId;
+
       const { count: inboundCount } = await admin
         .from("atendimento_messages")
         .select("id", { count: "exact", head: true })
@@ -467,6 +471,30 @@ export async function sendAtendimentoWhatsAppText(params: {
           reason: "no_prior_inbound_message_from_lead",
           phone: normalizedDest,
         };
+      }
+
+      const messageText = String(params.message ?? "").trim();
+      if (messageText) {
+        const dedupeWindowStartUtc = new Date(Date.now() - 60 * 60_000).toISOString();
+        try {
+          const { count: duplicates } = await admin
+            .from("atendimento_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("conversation_id", conversationId)
+            .eq("sender_role", "bot")
+            .eq("content_text", messageText)
+            .gte("sent_at", dedupeWindowStartUtc)
+            .limit(1);
+          if (Number(duplicates ?? 0) > 0) {
+            return {
+              ok: false,
+              skipped: true,
+              reason: "duplicate_bot_message_within_60min_window",
+              phone: normalizedDest,
+              conversationId,
+            };
+          }
+        } catch (_e) {}
       }
     } else {
       return {

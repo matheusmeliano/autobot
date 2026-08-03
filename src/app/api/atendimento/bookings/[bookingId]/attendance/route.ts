@@ -192,6 +192,22 @@ export async function POST(
   const checkedAtIso = new Date().toISOString();
   const finalBookingStatus = attendance === "attended" ? "completed" : String((resolvedBooking as any)?.status ?? "scheduled").trim().toLowerCase();
 
+  const attendanceConfirmationHistoryEvent =
+    attendance === "attended"
+      ? "experimental_class_attendance_confirmation_message_sent"
+      : "experimental_class_no_show_message_sent";
+  const { data: existingPostAttendanceHistory } = await admin
+    .from("atendimento_history_events")
+    .select("id,created_at")
+    .eq("event_type", attendanceConfirmationHistoryEvent)
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const alreadySentPostAttendanceMessages =
+    !!existingPostAttendanceHistory &&
+    String((existingPostAttendanceHistory as any)?.id ?? "").trim() !== "";
+
   if (resolvedBooking && String((resolvedBooking as any)?.id ?? "").trim()) {
     const attendanceUpdatePayload: Record<string, unknown> = {
       attendance_status: attendance,
@@ -343,31 +359,38 @@ export async function POST(
       return Response.json({ ok: false, error: "lead_phone_missing" }, { status: 400 });
     }
 
+    let totalMessagesToSend = 0;
+    let messagesAlreadySent = 0;
     const messages = buildExperimentalClassPostAttendanceWhatsAppMessages(leadName);
+    totalMessagesToSend = messages.length;
     const sentMessages: string[] = [];
     let lastError: unknown = null;
 
-    for (let i = 0; i < messages.length; i += 1) {
-      const message = messages[i];
-      try {
-        await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
-        sentMessages.push(message);
-        if (conversationId) {
-          try {
-            await insertAttendanceBotTextMessage({
-              admin,
-              conversationId,
-              contentText: message,
-              sentAt: checkedAtIso,
-            });
-          } catch (_e) {
-            void _e;
+    if (!alreadySentPostAttendanceMessages) {
+      for (let i = 0; i < messages.length; i += 1) {
+        const message = messages[i];
+        try {
+          await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
+          sentMessages.push(message);
+          if (conversationId) {
+            try {
+              await insertAttendanceBotTextMessage({
+                admin,
+                conversationId,
+                contentText: message,
+                sentAt: checkedAtIso,
+              });
+            } catch (_e) {
+              void _e;
+            }
           }
+        } catch (error) {
+          lastError = error;
+          break;
         }
-      } catch (error) {
-        lastError = error;
-        break;
       }
+    } else {
+      messagesAlreadySent = messages.length;
     }
 
     if (conversationId) {
@@ -474,26 +497,28 @@ export async function POST(
     const sentMessages: string[] = [];
     let lastError: unknown = null;
 
-    for (let i = 0; i < messages.length; i += 1) {
-      const message = messages[i];
-      try {
-        await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
-        sentMessages.push(message);
-        if (conversationId) {
-          try {
-            await insertAttendanceBotTextMessage({
-              admin,
-              conversationId,
-              contentText: message,
-              sentAt: checkedAtIso,
-            });
-          } catch (_e) {
-            void _e;
+    if (!alreadySentPostAttendanceMessages) {
+      for (let i = 0; i < messages.length; i += 1) {
+        const message = messages[i];
+        try {
+          await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
+          sentMessages.push(message);
+          if (conversationId) {
+            try {
+              await insertAttendanceBotTextMessage({
+                admin,
+                conversationId,
+                contentText: message,
+                sentAt: checkedAtIso,
+              });
+            } catch (_e) {
+              void _e;
+            }
           }
+        } catch (error) {
+          lastError = error;
+          break;
         }
-      } catch (error) {
-        lastError = error;
-        break;
       }
     }
 

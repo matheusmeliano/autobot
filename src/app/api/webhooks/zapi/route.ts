@@ -985,6 +985,20 @@ export async function POST(req: Request) {
     (body as any).data?.event,
   );
 
+  const senderRaw = getFirstNonEmpty(
+    (body as any).sender,
+    (body as any).message?.sender,
+    (body as any).data?.sender,
+    (body as any).data?.message?.sender,
+  ).trim().toLowerCase();
+
+  const statusRaw = getFirstNonEmpty(
+    (body as any).status,
+    (body as any).message?.status,
+    (body as any).data?.status,
+    (body as any).data?.message?.status,
+  ).trim().toLowerCase();
+
   const rawFromMe =
     (body as any).fromMe === true ||
     (body as any).from_me === true ||
@@ -997,7 +1011,17 @@ export async function POST(req: Request) {
     (body as any).data?.is_from_me === true ||
     (body as any).data?.message?.fromMe === true ||
     (body as any).data?.message?.from_me === true ||
-    (body as any).data?.message?.is_from_me === true;
+    (body as any).data?.message?.is_from_me === true ||
+    senderRaw === "me" ||
+    /sent_by_me|sentbyme|notify_sent_by_me|notifysentbyme|sentByMe|notifySentByMe/i.test(
+      String(eventType ?? "") + String((body as any)?.event ?? "") + String((body as any)?.eventType ?? ""),
+    );
+
+  const isOutboundOnlyEvent =
+    /DeliveryCallback|MessageStatusCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me/i.test(
+      String(eventType ?? "") + String((body as any)?.event ?? ""),
+    ) ||
+    /sent|delivered|read|received_status|ack|message_status/i.test(statusRaw);
 
   const rawEventId = getFirstNonEmpty(
     (body as any).messageId,
@@ -1160,6 +1184,22 @@ export async function POST(req: Request) {
       ok: true,
       ignored: true,
       reason: "message_from_connected_number",
+    });
+  }
+
+  if (isOutboundOnlyEvent) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "outbound_only_status_event_no_inbound_reply_required",
+    });
+  }
+
+  if (rawFromMe === true) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "broad_from_me_outbound_message_or_status",
     });
   }
 
