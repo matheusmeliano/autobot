@@ -2093,7 +2093,17 @@ export async function POST(req: Request) {
           postAttendanceRepescagemByLead;
 
         const effectiveWaitMessage = (() => {
-          if (handledByPosAttendanceFlow || handledByPosAttendanceFlowNuclear) return null;
+          if (
+            leadEstaEmMatriculaPendentePosAttendance ||
+            leadEstaEmMatriculaRecusadaPosAttendance ||
+            leadEstaEmRepescagemNoShow ||
+            postAttendanceMatriculaRecusadaByLead ||
+            postAttendanceMatriculaPendenteByLead ||
+            postAttendanceRepescagemByLead ||
+            handledByPosAttendanceFlowNuclear
+          ) {
+            return null;
+          }
           return anyNotificationSent
             ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
             : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
