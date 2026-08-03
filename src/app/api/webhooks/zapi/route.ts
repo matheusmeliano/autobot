@@ -1715,6 +1715,14 @@ export async function POST(req: Request) {
           anyAttendanceResolved &&
           (bookingAttendanceAttendedByCol || bookingAttendanceAttendedByHistory);
 
+        const isLeadInMatriculaRecusadaPosAttendance =
+          !isLeadInRepescagemNoShowLocked &&
+          currentBookingId &&
+          anyAttendanceResolved &&
+          (bookingAttendanceAttendedByCol || bookingAttendanceAttendedByHistory) &&
+          (funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada");
+
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
 
         const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
@@ -1867,6 +1875,82 @@ export async function POST(req: Request) {
           });
         }
 
+        if (isLeadInMatriculaRecusadaPosAttendance) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "whatsapp_matricula_recusada_fixed_reply",
+              title: "Fluxo encerrado: resposta fixa após recusa de matrícula",
+              details: {
+                inbound_content_text: inboundContent || null,
+                reply_text: RESPOSTA_REPESCAGEM_FIXA,
+                source: "whatsapp_zapi",
+                booking_attendance_attended_by_col: bookingAttendanceAttendedByCol,
+                booking_attendance_attended_by_history: bookingAttendanceAttendedByHistory,
+              },
+              actorType: "bot",
+            });
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_matricula_recusada_locked",
+          });
+        }
+
         if (isLeadInMatriculaPendentePostAttendance && !isLeadInRepescagemNoShowLocked) {
           const inboundContent = String(messageText ?? "").trim();
           const inboundMediaType = mediaInfo.hasPaymentMedia
@@ -1929,19 +2013,24 @@ export async function POST(req: Request) {
             /^n[aãâ]o\b/i.test(inboundContent.trim());
 
           let replyText = MSG_SIM_NAO_INVALIDA;
+          let noReplies: string[] = [];
           let nextLeadFunnel = "matricula_pendente";
           let nextLeadStatus = "matricula_pendente";
           let historyEventType = "matricula_pendente_sim_nao_invalida";
           let historyTitle = "Matrícula pendente: resposta inválida, pedindo sim/não";
 
           if (isYes) {
-            replyText = "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
+            replyText =
+              "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
             nextLeadFunnel = "matricula_confirmada";
             nextLeadStatus = "matricula_confirmada";
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
           } else if (isNo) {
-            replyText = "Tudo bem! Quando você estiver pronto(a) para continuar, é só nos enviar uma mensagem. Estamos aqui para ajudar.";
+            noReplies = [
+              "Tudo bem, entendemos que talvez ainda não seja o momento.",
+              "Em breve nossa equipe entrará em contato.",
+            ];
             nextLeadFunnel = "matricula_pendente_recusada";
             nextLeadStatus = "matricula_pendente_recusada";
             historyEventType = "matricula_pendente_resposta_nao";
@@ -1980,19 +2069,37 @@ export async function POST(req: Request) {
             }
           }
 
-          try {
-            await insertWhatsAppBotTextMessage({
-              admin,
-              conversationId,
-              contentText: replyText,
-            });
-          } catch (_e) {}
-          try {
-            await sendAtendimentoWhatsAppText({
-              phone: normalizedPhoneOnly,
-              message: replyText,
-            });
-          } catch (_e) {}
+          if (isNo && noReplies.length > 0) {
+            for (const msgTxt of noReplies) {
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: msgTxt,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: msgTxt,
+                });
+              } catch (_e) {}
+            }
+          } else {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: replyText,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: replyText,
+              });
+            } catch (_e) {}
+          }
 
           try {
             void appendHistoryEvent({
@@ -2005,7 +2112,7 @@ export async function POST(req: Request) {
                 inbound_normalized: inboundNormalized || null,
                 is_yes: isYes,
                 is_no: isNo,
-                reply_text: replyText,
+                reply_text: isNo ? noReplies.join("\n---\n") : replyText,
                 next_funnel_stage: nextLeadFunnel,
                 next_status: nextLeadStatus,
                 source: "whatsapp_zapi",
@@ -2020,7 +2127,7 @@ export async function POST(req: Request) {
             try {
               await admin
                 .from("atendimento_conversations")
-                .update({ bot_enabled: false, updated_at: nowIso })
+                .update({ bot_enabled: true, updated_at: nowIso })
                 .eq("id", conversationId);
             } catch (_e) {
               const msg = String((_e as any)?.message ?? "");
