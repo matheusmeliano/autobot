@@ -1798,8 +1798,6 @@ export async function POST(req: Request) {
           } catch (_e) {}
 
           if (leadEstaEmMatriculaRecusadaPosAttendance) {
-            handledByPosAttendanceFlowNuclear = true;
-            handledByPosAttendanceFlow = true;
             return Response.json({
               ok: true,
               ignored: true,
@@ -1809,8 +1807,6 @@ export async function POST(req: Request) {
           }
 
           if (leadEstaEmRepescagemNoShow) {
-            handledByPosAttendanceFlowNuclear = true;
-            handledByPosAttendanceFlow = true;
             return Response.json({
               ok: true,
               ignored: true,
