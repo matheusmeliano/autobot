@@ -328,6 +328,17 @@ export async function POST(
       }
     }
 
+    if (conversationId) {
+      try {
+        await admin
+          .from("atendimento_conversations")
+          .update({ bot_enabled: true, updated_at: checkedAtIso })
+          .eq("id", conversationId);
+      } catch (_e) {
+        void _e;
+      }
+    }
+
     if (lastError) {
       await appendHistoryEvent({
         leadId,
@@ -429,6 +440,17 @@ export async function POST(
       } catch (error) {
         lastError = error;
         break;
+      }
+    }
+
+    if (conversationId) {
+      try {
+        await admin
+          .from("atendimento_conversations")
+          .update({ bot_enabled: true, updated_at: checkedAtIso })
+          .eq("id", conversationId);
+      } catch (_e) {
+        void _e;
       }
     }
 

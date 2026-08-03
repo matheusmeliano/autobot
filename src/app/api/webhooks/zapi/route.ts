@@ -1673,18 +1673,31 @@ export async function POST(req: Request) {
           lastBotTextNuclear === MSG_SIM_NAO_INVALIDA;
         const leadEstaEmMatriculaPendentePosAttendance =
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
-          postAttendanceHistoryConfirmedAttendedEvent;
+          (postAttendanceHistoryConfirmedAttendedEvent ||
+            Boolean(currentBookingId) ||
+            bookingAttendanceAttendedByCol);
         const leadEstaEmMatriculaRecusadaPosAttendance =
           (funnelStageRaw === "matricula_pendente_recusada" ||
             leadStatusRaw === "matricula_pendente_recusada") &&
-          postAttendanceHistoryConfirmedAttendedEvent;
+          (postAttendanceHistoryConfirmedAttendedEvent ||
+            Boolean(currentBookingId) ||
+            bookingAttendanceAttendedByCol);
         const leadEstaEmRepescagemNoShow =
-          isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent;
+          (isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent) ||
+          (isLeadRepescagemStatus && bookingAttendanceNoShowByCol) ||
+          (postAttendanceHistoryConfirmedNoShowEvent && (funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem"));
+        const bookingAttendanceAttendedByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
+        const bookingAttendanceNoShowByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
 
         if (
           ultimaMsgBotPedeSimNao &&
           (leadEstaEmMatriculaPendentePosAttendance ||
-            postAttendanceHistoryConfirmedAttendedEvent)
+            postAttendanceHistoryConfirmedAttendedEvent ||
+            (Boolean(currentBookingId) &&
+              (bookingAttendanceAttendedByCol ||
+                String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed")))
         ) {
           const inboundMediaType = mediaInfo.hasPaymentMedia
             ? mediaInfo.mediaUrl
@@ -2083,9 +2096,12 @@ export async function POST(req: Request) {
           postAttendanceMatriculaPendenteByLead ||
           postAttendanceRepescagemByLead;
 
-        const effectiveWaitMessage = anyNotificationSent
-          ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
-          : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+        const effectiveWaitMessage = (() => {
+          if (handledByPosAttendanceFlow || handledByPosAttendanceFlowNuclear) return null;
+          return anyNotificationSent
+            ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
+            : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+        })();
 
         const handledByPosAttendanceFlow =
           isLeadInMatriculaRecusadaPosAttendance ||
