@@ -1,6 +1,5 @@
 import {
   appendHistoryEvent,
-  getAtendimentoActivePresenceCount,
   getAtendimentoConversationAccessForAttendant,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
@@ -107,35 +106,6 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
           updated_at: nowIso,
         })
         .eq("id", String(conversation.lead_id));
-    }
-  }
-
-  const activePresenceCount = await getAtendimentoActivePresenceCount(conversationId);
-  if (activePresenceCount === 0) {
-    const { data: notificationLease } = await admin
-      .from("atendimento_conversations")
-      .update({
-        offline_message_notification_sent: true,
-        offline_message_notification_sent_at: nowIso,
-      })
-      .eq("id", conversationId)
-      .eq("offline_message_notification_sent", false)
-      .select("id")
-      .maybeSingle();
-
-    if (notificationLease?.id) {
-      await appendHistoryEvent({
-        leadId: String(conversation.lead_id),
-        conversationId,
-        eventType: "offline_message_notification_suppressed",
-        title: "Notificação offline de nova mensagem desativada (removida)",
-        details: {
-          reason: "notificacao_manual_desativada_pedido",
-          public_slug: String((conversation as { public_slug?: string | null }).public_slug ?? ""),
-          lead_phone_captured: Boolean(leadPhone),
-        },
-        actorType: "system",
-      });
     }
   }
 
