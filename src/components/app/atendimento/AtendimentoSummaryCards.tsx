@@ -235,7 +235,7 @@ function LeadDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {!isLeadMatriculaRecusadaPosAttendance(lead) ? (
+        {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="CPF" value={lead.cpf} copyable />
             <Field label="Origem" value={bookingWasNoShow ? "-" : atendimentoOriginLabel(lead.origin)} />
@@ -481,7 +481,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {!hasAttendanceStatus && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
+        {!hasAttendanceStatus && !isLeadRepescagem(lead) && !bookingIsNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Aluno" value={bookingIsNoShow ? displayDash : lead.full_name} />
             <Field label="Status" value={bookingIsNoShow ? displayDash : experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
@@ -503,7 +503,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {!showIncompleteState && !hasAttendanceStatus && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
+        {!showIncompleteState && !hasAttendanceStatus && !isLeadRepescagem(lead) && !bookingIsNoShow ? (
         <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
           <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
             <div className="min-w-0">
