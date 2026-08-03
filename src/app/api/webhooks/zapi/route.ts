@@ -2683,10 +2683,13 @@ export async function POST(req: Request) {
 
         const existingBooking = currentBookingId ? currentBooking : null;
         const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
+        const bookingAttendanceFullyResolvedEcho =
+          bookingAttendanceAttendedByCol || bookingAttendanceNoShowByCol;
         if (
           existingScheduledBookingId &&
-          conversation.bot_enabled !== false &&
           !isBookingWaitingAttendance &&
+          bookingAttendanceFullyResolvedEcho &&
+          conversation.bot_enabled !== false &&
           !handledByPosAttendanceFlow
         ) {
           try {
@@ -2699,7 +2702,7 @@ export async function POST(req: Request) {
               .eq("id", conversationId);
           } catch (_e) {}
         }
-        if (existingScheduledBookingId && !isBookingWaitingAttendance) {
+        if (existingScheduledBookingId && !isBookingWaitingAttendance && bookingAttendanceFullyResolvedEcho) {
           if (handledByPosAttendanceFlow) {
             return Response.json({
               ok: true,
@@ -2736,14 +2739,6 @@ export async function POST(req: Request) {
             booking_id: existingScheduledBookingId,
           });
         }
-        if (existingScheduledBookingId && isBookingWaitingAttendance) {
-          return Response.json({
-            ok: true,
-            ignored: true,
-            reason: "flow_concluded_waiting_attendance_no_reply",
-            booking_id: existingScheduledBookingId,
-          });
-        }
 
         const histFlowRecent = await admin
           .from("atendimento_history_events")
@@ -2767,7 +2762,12 @@ export async function POST(req: Request) {
         const recentIsMaxAttemptsBlocked = eventsFlowRecent.some(
           (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
         );
-        if (recentFlowConclusion && conversation.bot_enabled !== false && !handledByPosAttendanceFlow) {
+        if (
+          recentFlowConclusion &&
+          conversation.bot_enabled !== false &&
+          !handledByPosAttendanceFlow &&
+          bookingAttendanceFullyResolvedEcho
+        ) {
           try {
             await admin
               .from("atendimento_conversations")
@@ -2779,20 +2779,28 @@ export async function POST(req: Request) {
           } catch (_e) {}
         }
         if (recentFlowConclusion) {
-          if (isBookingWaitingAttendance) {
-            return Response.json({
-              ok: true,
-              ignored: true,
-              reason: "flow_concluded_history_waiting_attendance_no_reply",
-              booking_id: currentBookingId,
-              event_types: eventsFlowRecent.map((e: any) => e.event_type),
-            });
-          }
           if (handledByPosAttendanceFlow) {
             return Response.json({
               ok: true,
               ignored: true,
               reason: "flow_concluded_pos_attendance_handled_skip_history",
+              event_types: eventsFlowRecent.map((e: any) => e.event_type),
+            });
+          }
+          if (!bookingAttendanceFullyResolvedEcho) {
+            return Response.json({
+              ok: true,
+              ignored: false,
+              reason: "flow_concluded_history_attendance_not_resolved_yet_continue_normal_flow",
+              event_types: eventsFlowRecent.map((e: any) => e.event_type),
+            });
+          }
+          if (isBookingWaitingAttendance) {
+            return Response.json({
+              ok: true,
+              ignored: false,
+              reason: "flow_concluded_history_waiting_attendance_continue_normal_flow",
+              booking_id: currentBookingId,
               event_types: eventsFlowRecent.map((e: any) => e.event_type),
             });
           }
