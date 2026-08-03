@@ -576,6 +576,23 @@ async function getLastBotMessage(params: {
   return (data as { content_text: string | null; created_at: string | null } | null) ?? null;
 }
 
+async function getRecentBotMessages(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+  limit?: number;
+}) {
+  const limit = params.limit ?? 20;
+  const { data } = await params.admin
+    .from("atendimento_messages")
+    .select("content_text, created_at, id")
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const rows = Array.isArray(data) ? (data as Array<{ content_text: string | null; created_at: string | null; id?: string | null }>) : [];
+  return rows.map((r) => String(r.content_text ?? "").trim()).filter(Boolean) as string[];
+}
+
 function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | undefined) {
   const raw = String(lastBotText ?? "").trim();
   if (!raw) return null;
@@ -1640,11 +1657,18 @@ export async function POST(req: Request) {
         } catch (_e) {}
 
         let lastBotTextNuclear: string | null = null;
+        let recentBotTextsNuclear: string[] = [];
         try {
-          const _lastBotMsgNuclear = await getLastBotMessage({ admin, conversationId });
-          lastBotTextNuclear = String(_lastBotMsgNuclear?.content_text ?? "").trim() || null;
+          recentBotTextsNuclear = await getRecentBotMessages({
+            admin,
+            conversationId,
+            limit: 20,
+          });
+          const lastBotMsgNuclearSingle = await getLastBotMessage({ admin, conversationId });
+          lastBotTextNuclear = String(lastBotMsgNuclearSingle?.content_text ?? "").trim() || null;
         } catch (_e) {
           lastBotTextNuclear = null;
+          recentBotTextsNuclear = [];
         }
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
         const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
@@ -1669,8 +1693,9 @@ export async function POST(req: Request) {
           inboundNormalizedNuclear.replace(/\s+/g, "") === "nao" ||
           /^n[aãâ]o\b/i.test(inboundContentRaw.trim());
 
+        const recentBotHasMsgSimNao = recentBotTextsNuclear.some((text) => text === MSG_SIM_NAO_INVALIDA);
         const ultimaMsgBotPedeSimNao =
-          lastBotTextNuclear === MSG_SIM_NAO_INVALIDA;
+          lastBotTextNuclear === MSG_SIM_NAO_INVALIDA || recentBotHasMsgSimNao;
         const bookingAttendanceAttendedByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         const bookingAttendanceNoShowByCol =
@@ -1690,14 +1715,22 @@ export async function POST(req: Request) {
           (isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent) ||
           (isLeadRepescagemStatus && bookingAttendanceNoShowByCol) ||
           (postAttendanceHistoryConfirmedNoShowEvent && (funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem"));
+        const entrouNoFluxoPosAttendancePorForcaBruta =
+          ultimaMsgBotPedeSimNao &&
+          (isYesNuclear || isNoNuclear) &&
+          (funnelStageRaw === "matricula_pendente" ||
+            leadStatusRaw === "matricula_pendente" ||
+            funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada");
 
         if (
-          ultimaMsgBotPedeSimNao &&
-          (leadEstaEmMatriculaPendentePosAttendance ||
-            postAttendanceHistoryConfirmedAttendedEvent ||
-            (Boolean(currentBookingId) &&
-              (bookingAttendanceAttendedByCol ||
-                String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed")))
+          entrouNoFluxoPosAttendancePorForcaBruta ||
+          (ultimaMsgBotPedeSimNao &&
+            (leadEstaEmMatriculaPendentePosAttendance ||
+              postAttendanceHistoryConfirmedAttendedEvent ||
+              (Boolean(currentBookingId) &&
+                (bookingAttendanceAttendedByCol ||
+                  String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed"))))
         ) {
           const inboundMediaType = mediaInfo.hasPaymentMedia
             ? mediaInfo.mediaUrl
