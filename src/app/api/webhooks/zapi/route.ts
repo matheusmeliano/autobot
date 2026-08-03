@@ -1671,6 +1671,10 @@ export async function POST(req: Request) {
 
         const ultimaMsgBotPedeSimNao =
           lastBotTextNuclear === MSG_SIM_NAO_INVALIDA;
+        const bookingAttendanceAttendedByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
+        const bookingAttendanceNoShowByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
         const leadEstaEmMatriculaPendentePosAttendance =
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
           (postAttendanceHistoryConfirmedAttendedEvent ||
@@ -1686,10 +1690,6 @@ export async function POST(req: Request) {
           (isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent) ||
           (isLeadRepescagemStatus && bookingAttendanceNoShowByCol) ||
           (postAttendanceHistoryConfirmedNoShowEvent && (funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem"));
-        const bookingAttendanceAttendedByCol =
-          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
-        const bookingAttendanceNoShowByCol =
-          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
 
         if (
           ultimaMsgBotPedeSimNao &&
