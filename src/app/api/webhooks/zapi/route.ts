@@ -1018,10 +1018,21 @@ export async function POST(req: Request) {
     );
 
   const isOutboundOnlyEvent =
-    /DeliveryCallback|MessageStatusCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me/i.test(
-      String(eventType ?? "") + String((body as any)?.event ?? ""),
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String(eventType ?? ""),
     ) ||
-    /sent|delivered|read|received_status|ack|message_status/i.test(statusRaw);
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.event ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.eventType ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.data?.type ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.data?.event ?? ""),
+    );
 
   const rawEventId = getFirstNonEmpty(
     (body as any).messageId,
