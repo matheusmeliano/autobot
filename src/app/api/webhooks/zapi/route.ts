@@ -1000,19 +1000,55 @@ export async function POST(req: Request) {
     (body as any).data?.message?.status,
   ).trim().toLowerCase();
 
-  const rawFromMe =
+  let rawFromMe =
     (body as any).fromMe === true ||
+    (body as any).fromMe === "true" ||
+    (body as any).fromMe === 1 ||
+    (body as any).fromMe === "1" ||
     (body as any).from_me === true ||
+    (body as any).from_me === "true" ||
+    (body as any).from_me === 1 ||
+    (body as any).from_me === "1" ||
     (body as any).is_from_me === true ||
+    (body as any).is_from_me === "true" ||
+    (body as any).is_from_me === 1 ||
+    (body as any).is_from_me === "1" ||
     (body as any).message?.fromMe === true ||
+    (body as any).message?.fromMe === "true" ||
+    (body as any).message?.fromMe === 1 ||
+    (body as any).message?.fromMe === "1" ||
     (body as any).message?.from_me === true ||
+    (body as any).message?.from_me === "true" ||
+    (body as any).message?.from_me === 1 ||
+    (body as any).message?.from_me === "1" ||
     (body as any).message?.is_from_me === true ||
+    (body as any).message?.is_from_me === "true" ||
+    (body as any).message?.is_from_me === 1 ||
+    (body as any).message?.is_from_me === "1" ||
     (body as any).data?.fromMe === true ||
+    (body as any).data?.fromMe === "true" ||
+    (body as any).data?.fromMe === 1 ||
+    (body as any).data?.fromMe === "1" ||
     (body as any).data?.from_me === true ||
+    (body as any).data?.from_me === "true" ||
+    (body as any).data?.from_me === 1 ||
+    (body as any).data?.from_me === "1" ||
     (body as any).data?.is_from_me === true ||
+    (body as any).data?.is_from_me === "true" ||
+    (body as any).data?.is_from_me === 1 ||
+    (body as any).data?.is_from_me === "1" ||
     (body as any).data?.message?.fromMe === true ||
+    (body as any).data?.message?.fromMe === "true" ||
+    (body as any).data?.message?.fromMe === 1 ||
+    (body as any).data?.message?.fromMe === "1" ||
     (body as any).data?.message?.from_me === true ||
+    (body as any).data?.message?.from_me === "true" ||
+    (body as any).data?.message?.from_me === 1 ||
+    (body as any).data?.message?.from_me === "1" ||
     (body as any).data?.message?.is_from_me === true ||
+    (body as any).data?.message?.is_from_me === "true" ||
+    (body as any).data?.message?.is_from_me === 1 ||
+    (body as any).data?.message?.is_from_me === "1" ||
     senderRaw === "me" ||
     /sent_by_me|sentbyme|notify_sent_by_me|notifysentbyme|sentByMe|notifySentByMe/i.test(
       String(eventType ?? "") + String((body as any)?.event ?? "") + String((body as any)?.eventType ?? ""),
@@ -1048,17 +1084,19 @@ export async function POST(req: Request) {
   const eventId = rawEventId || crypto.createHash("sha256").update(payloadString).digest("hex");
 
   const fromPhone = getFirstNonEmpty(
-    (body as any).phone,
     (body as any).from,
     (body as any).sender?.phone,
     (body as any).senderPhone,
     (body as any).message?.from,
-    (body as any).message?.phone,
+    (body as any).message?.sender?.phone,
     (body as any).data?.message?.from,
-    (body as any).data?.message?.phone,
-    (body as any).data?.phone,
+    (body as any).data?.message?.sender?.phone,
     (body as any).data?.from,
     (body as any).data?.sender?.phone,
+    (body as any).phone,
+    (body as any).message?.phone,
+    (body as any).data?.phone,
+    (body as any).data?.message?.phone,
   );
 
   const messageText = getFirstNonEmpty(
@@ -1185,6 +1223,38 @@ export async function POST(req: Request) {
       .eq("instance_id", instanceId);
   }
 
+  const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
+  const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
+  if (!rawFromMe && connectedInstancePhoneDigits && fromPhoneDigits) {
+    if (connectedInstancePhoneDigits === fromPhoneDigits) {
+      rawFromMe = true;
+    }
+  }
+
+  const isRealInboundEventType =
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      normalizedEventType,
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.event ?? ""),
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.eventType ?? ""),
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.data?.type ?? ""),
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.data?.event ?? ""),
+    ) ||
+    Boolean(
+      String((body as any)?.isGroupMsg ?? "") === "false" &&
+        String((body as any)?.type ?? "") === "text" &&
+        (Boolean(messageText) || Boolean(mediaUrl)) &&
+        !rawFromMe &&
+        !/^(me|connected_number|bot)$/i.test(senderRaw),
+    );
+
   const isMessageFromConnectedNumber =
     rawFromMe === true &&
     normalizedEventType !== "DeliveryCallback" &&
@@ -1212,6 +1282,14 @@ export async function POST(req: Request) {
       ok: true,
       ignored: true,
       reason: "broad_from_me_outbound_message_or_status",
+    });
+  }
+
+  if (!isRealInboundEventType) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "ignored_event_type_not_inbound_message",
     });
   }
 
