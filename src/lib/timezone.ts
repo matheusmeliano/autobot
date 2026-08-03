@@ -723,6 +723,11 @@ export function resolveTimeZoneFromStateInput(params: {
   phone?: string | null;
 }) {
   const rawState = String(params.state ?? "").trim();
+  if (!rawState) return null;
+
+  const tokens = rawState.split(/\s+/).filter(Boolean);
+  if (tokens.length > 6) return null;
+
   const candidates = extractLocationCandidates(rawState);
   if (!candidates.length) return null;
 
@@ -766,6 +771,11 @@ export function resolveTimeZoneFromCityInput(params: {
 }) {
   const rawCity = String(params.city ?? "").trim();
   const rawState = String(params.state ?? "").trim();
+  if (!rawCity) return null;
+
+  const rawCityTokens = rawCity.split(/\s+/).filter(Boolean);
+  if (rawCityTokens.length > 8) return null;
+
   const cityCandidates = extractLocationCandidates(rawCity);
   const stateCandidates = rawState ? extractLocationCandidates(rawState) : [];
   if (!cityCandidates.length) return null;
@@ -809,11 +819,18 @@ export function resolveTimeZoneFromCityInput(params: {
     }
   }
 
-  const combinedCandidates = stateCandidates.length ? stateCandidates : cityCandidates;
+  if (params.allowPhoneCountryFallback === false) {
+    return null;
+  }
+
+  const phoneFallback = inferTimeZoneFromPhoneCountryCode(params.phone);
+  if (!phoneFallback) return null;
+
+  const stateCandidatesForFallback = stateCandidates.length ? stateCandidates : cityCandidates;
   const stateResolutionInput = stateCandidates.length
     ? rawState
     : rawCity;
-  const stateResolution = combinedCandidates.length
+  const stateResolution = stateCandidatesForFallback.length
     ? resolveTimeZoneFromStateInput({
         state: stateResolutionInput,
         phone: params.phone,
@@ -821,9 +838,9 @@ export function resolveTimeZoneFromCityInput(params: {
     : null;
   if (stateResolution?.country === "BR") {
     return {
-      city: rawCity.replace(/\s+/g, " ").trim(),
+      city: null,
       state: stateResolution.state,
-      normalizedCity: cityCandidates[0] ?? "",
+      normalizedCity: null,
       normalizedState: stateResolution.normalizedState,
       timeZone: stateResolution.timeZone,
       teacherTimeZone: PROFESSOR_TIME_ZONE,
@@ -832,17 +849,10 @@ export function resolveTimeZoneFromCityInput(params: {
     };
   }
 
-  if (params.allowPhoneCountryFallback === false) {
-    return null;
-  }
-
-  const phoneFallback = inferTimeZoneFromPhoneCountryCode(params.phone);
-  if (!phoneFallback) return null;
-
   return {
-    city: rawCity.replace(/\s+/g, " ").trim(),
-    state: rawState.replace(/\s+/g, " ").trim() || null,
-    normalizedCity: cityCandidates[0] ?? "",
+    city: null,
+    state: rawState?.replace(/\s+/g, " ").trim() || null,
+    normalizedCity: null,
     normalizedState: stateCandidates[0] ?? null,
     timeZone: phoneFallback.timeZone,
     teacherTimeZone: PROFESSOR_TIME_ZONE,

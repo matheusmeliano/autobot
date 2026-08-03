@@ -40,6 +40,7 @@ import {
 } from "@/lib/atendimento/server";
 import {
   inferBrazilianLocationFromDdd,
+  inferTimeZoneFromPhoneCountryCode,
   resolveTimeZoneFromCityInput,
   resolveTimeZoneFromStateInput,
 } from "@/lib/timezone";
@@ -3025,10 +3026,14 @@ export async function POST(req: Request) {
 
         const wantsStateStage = expectedField === "state" || (!expectedField && nextMissingField === "state");
         if (wantsStateStage && !hasStateValidated && !hasReachedPostCityStage) {
-          const stateResolution = resolveTimeZoneFromStateInput({
-            state: inboundContent,
-            phone: normalizedPhoneOnly,
-          });
+          const stateRawTokens = inboundContent.split(/\s+/).filter(Boolean).length;
+          const stateResolution =
+            stateRawTokens <= 8
+              ? resolveTimeZoneFromStateInput({
+                  state: inboundContent,
+                  phone: normalizedPhoneOnly,
+                })
+              : null;
           if (!stateResolution) {
             const nextFail =
               (await countWhatsAppLocationFailures({ admin, leadId, conversationId, field: "state" })) + 1;
@@ -3144,6 +3149,24 @@ export async function POST(req: Request) {
               })
             : null;
           const resolved = cityResolutionIsReliable(rawResolved) ? rawResolved : null;
+          const resolvedCityValue = String(resolved?.city ?? "").trim();
+          if (resolved && !resolvedCityValue) {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "city_validation_failed",
+              title: "Cidade nao resolvida por match real (prompt suspeito ou match apenas por estado/ddd - cidade mantida vazia)",
+              details: {
+                attempt: 1,
+                content_text: inboundContent || null,
+                blocked: false,
+                state: stateSoFar || null,
+                fallback_source: (resolved as any)?.source ?? null,
+                resolved_state: (resolved as any)?.state ?? null,
+              },
+              actorType: "system",
+            });
+          }
 
           if (!resolved) {
             const nextFail =
@@ -3193,6 +3216,42 @@ export async function POST(req: Request) {
               handled: true,
               flow: "whatsapp_city_retry",
               blocked: false,
+            });
+          }
+
+          const finalCityValue = resolved.city ? String(resolved.city).trim() : "";
+          if (!finalCityValue) {
+            const introMsgs = [] as string[];
+            const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              leadTimeZone:
+                (String((lead as any)?.timezone ?? "").trim() ||
+                  inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
+                  ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
+            });
+            const introBuilder = buildExperimentalClassDatePromptMessages(
+              String((lead as any)?.full_name ?? "").trim() || null,
+            );
+            for (const introMsg of introBuilder) {
+              await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: introMsg });
+              try {
+                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: introMsg });
+              } catch (_e) {}
+            }
+            for (const dateMsg of dateMessages) {
+              const cleanMsg = String(dateMsg ?? "").trim();
+              if (!cleanMsg) continue;
+              try {
+                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
+              } catch (_e) {}
+            }
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_city_skipped_but_date_presented",
             });
           }
 
