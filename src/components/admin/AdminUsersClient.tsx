@@ -427,13 +427,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                                 "Número ainda não sincronizado."}
                             </div>
                           </div>
-                          <button
-                            onClick={() => openWhatsAppModal(r)}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                            title="Editar apelido do WhatsApp"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
                         </div>
                       ) : (
                         <div className="flex items-start justify-between gap-2">
