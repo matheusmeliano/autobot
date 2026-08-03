@@ -2961,9 +2961,7 @@ export async function POST(req: Request) {
           expectedField = "state";
         }
 
-        if (
-          (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent))
-        ) {
+        if (isFirstBotInteraction) {
           const firstMessage =
             "Para agendarmos sua aula experimental gratuita, preciso de algumas informações rápidas. Vamos começar?";
           const secondMessage = "Em qual estado você mora?";
