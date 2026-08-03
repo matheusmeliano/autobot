@@ -1742,6 +1742,13 @@ export async function POST(req: Request) {
         const postAttendanceRepescagemByLead =
           isLeadRepescagemStatus && posAttendanceHistoryConfirmedNoShowEvent;
 
+        const isLeadInRepescagemNoShowLocked =
+          isLeadRepescagemStatus ||
+          postAttendanceRepescagemByLead ||
+          (currentBookingId &&
+            anyAttendanceResolved &&
+            (bookingAttendanceNoShowByCol || bookingAttendanceNoShowByHistory));
+
         const isLeadInMatriculaPendentePostAttendance =
           (!isLeadInRepescagemNoShowLocked || postAttendanceMatriculaPendenteByLead) &&
           (Boolean(currentBookingId) || postAttendanceMatriculaPendenteByLead) &&
@@ -1759,13 +1766,6 @@ export async function POST(req: Request) {
             postAttendanceMatriculaRecusadaByLead) &&
           (funnelStageRaw === "matricula_pendente_recusada" ||
             leadStatusRaw === "matricula_pendente_recusada");
-
-        const isLeadInRepescagemNoShowLocked =
-          isLeadRepescagemStatus ||
-          postAttendanceRepescagemByLead ||
-          (currentBookingId &&
-            anyAttendanceResolved &&
-            (bookingAttendanceNoShowByCol || bookingAttendanceNoShowByHistory));
 
         const handledByPosAttendanceFlowByLead =
           postAttendanceMatriculaRecusadaByLead ||
