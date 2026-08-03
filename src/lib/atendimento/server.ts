@@ -22,7 +22,6 @@ const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+55 65 9985-1142";
 const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
 const ATENDIMENTO_DAILY_SUMMARY_TRIGGER_HOUR = 20;
-export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 45_000;
 
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
@@ -1148,91 +1147,6 @@ export async function appendHistoryEvent(params: {
   });
 }
 
-export async function upsertAtendimentoPresenceSession(params: {
-  sessionId: string;
-  conversationId: string;
-  leadId: string;
-  publicSlug: string;
-}) {
-  const admin = createSupabaseAdminClient();
-  const nowIso = new Date().toISOString();
-
-  await admin.from("atendimento_presence_sessions").upsert(
-    {
-      id: params.sessionId,
-      conversation_id: params.conversationId,
-      lead_id: params.leadId,
-      public_slug: params.publicSlug,
-      updated_at: nowIso,
-    },
-    { onConflict: "id" },
-  );
-
-  await admin
-    .from("atendimento_conversations")
-    .update({
-      offline_message_notification_sent: false,
-      offline_message_notification_sent_at: null,
-    })
-    .eq("id", params.conversationId);
-}
-
-export async function removeAtendimentoPresenceSession(sessionId: string) {
-  if (!String(sessionId ?? "").trim()) return;
-  const admin = createSupabaseAdminClient();
-  await admin.from("atendimento_presence_sessions").delete().eq("id", sessionId);
-}
-
-export async function getAtendimentoActivePresenceCount(conversationId: string) {
-  const admin = createSupabaseAdminClient();
-  const activeSinceIso = new Date(Date.now() - ATENDIMENTO_PRESENCE_SESSION_TTL_MS).toISOString();
-  await admin
-    .from("atendimento_presence_sessions")
-    .delete()
-    .eq("conversation_id", conversationId)
-    .lt("updated_at", activeSinceIso);
-  const { count } = await admin
-    .from("atendimento_presence_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("conversation_id", conversationId)
-    .gte("updated_at", activeSinceIso);
-  return Number(count ?? 0);
-}
-
-export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: string) {
-  const auth = await requireAuthenticatedAtendimentoParticipant();
-  if (!auth.ok || !auth.user?.id) {
-    return { ok: false as const, status: 401, error: "unauthorized" };
-  }
-
-  const admin = createSupabaseAdminClient();
-  const { data: conversation } = await admin
-    .from("atendimento_conversations")
-    .select("id, lead_id, public_slug, bot_enabled")
-    .eq("public_slug", publicSlug)
-    .maybeSingle();
-
-  if (!conversation?.id) {
-    return { ok: false as const, status: 404, error: "not_found" };
-  }
-
-  const { data: lead } = await admin
-    .from("atendimento_leads")
-    .select("*")
-    .eq("id", String(conversation.lead_id))
-    .maybeSingle();
-
-  if (!lead?.id) {
-    return { ok: false as const, status: 404, error: "lead_not_found" };
-  }
-
-  if (String((lead as any).auth_user_id ?? "") !== auth.user.id) {
-    return { ok: false as const, status: 403, error: "forbidden" };
-  }
-
-  return { ok: true as const, auth, admin, conversation, lead };
-}
-
 export async function getAtendimentoConversationAccessForAttendant(conversationId: string) {
   const auth = await requireAtendimentoUser();
   if (!auth.ok || !auth.user?.email) {
@@ -1474,6 +1388,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       .from("atendimento_conversations")
       .insert({
         lead_id: String((lead as any).id),
+        public_link_id: null,
         channel: "whatsapp",
         public_slug: makeConversationSessionSlug(),
         bot_enabled: true,

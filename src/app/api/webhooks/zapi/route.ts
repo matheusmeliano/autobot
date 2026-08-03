@@ -3662,6 +3662,18 @@ export async function POST(req: Request) {
         }
       }
     } catch (_whatsappLeadErr) {
+      const errMsg = String((_whatsappLeadErr as any)?.message ?? String(_whatsappLeadErr ?? "")).trim() || "unknown";
+      try {
+        await admin.from("logs").insert({
+          user_id: userId,
+          tipo: "zapi_erro_fluxo_atendimento",
+          descricao: `Erro ao processar lead/conversa WhatsApp (engolido antes, agora logado). Telefone: ${normalizedPhoneOnly || normalizedFrom || "-"}. Erro: ${errMsg.slice(0, 800)}`,
+        });
+      } catch (_logErr) {}
+      return Response.json(
+        { ok: false, error: errMsg, ignored: true, reason: "whatsapp_lead_processing_exception", phone: normalizedPhoneOnly || null },
+        { status: 500 },
+      );
     }
   }
 
