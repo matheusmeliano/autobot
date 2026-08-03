@@ -47,7 +47,12 @@ function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
   if (!lead) return false;
   const stage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
   const st = String((lead as any)?.status ?? "").trim().toLowerCase();
-  return stage === "repescagem" || st === "repescagem";
+  return (
+    stage === "repescagem" ||
+    st === "repescagem" ||
+    stage === "matricula_pendente_recusada" ||
+    st === "matricula_pendente_recusada"
+  );
 }
 
 function isBookingAttendanceNoShow(booking: unknown) {
