@@ -226,14 +226,16 @@ function LeadDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
-          <Field label="CPF" value={lead.cpf} copyable />
-          <Field label="Origem" value={bookingWasNoShow ? "-" : atendimentoOriginLabel(lead.origin)} />
-          <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
-          <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
-          <Field label="País" value={lead.country} />
-          <Field label="Fuso" value={lead.timezone} />
-        </div>
+        {!bookingAttendanceResolved && !isLeadRepescagem(lead) ? (
+          <div className="grid min-w-0 gap-3 md:grid-cols-2">
+            <Field label="CPF" value={lead.cpf} copyable />
+            <Field label="Origem" value={bookingWasNoShow ? "-" : atendimentoOriginLabel(lead.origin)} />
+            <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
+            <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
+            <Field label="País" value={lead.country} />
+            <Field label="Fuso" value={lead.timezone} />
+          </div>
+        ) : null}
 
         {showDraftSection ? (
           <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
@@ -470,16 +472,18 @@ function BookingDetails({
           </div>
         ) : null}
 
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
-          <Field label="Aluno" value={bookingIsNoShow ? displayDash : lead.full_name} />
-          <Field label="Status" value={bookingIsNoShow ? displayDash : experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
-          <Field label="Dia do aluno" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.lead_date)} />
-          <Field label="Horário do aluno" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.lead_time)} />
-          <Field label="Fuso do aluno" value={bookingIsNoShow ? displayDash : booking?.lead_timezone} />
-          <Field label="Dia do professor" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.professor_date)} />
-          <Field label="Horário do professor" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.professor_time)} />
-          <Field label="Fuso do professor" value={bookingIsNoShow ? displayDash : professorTimeZone} />
-        </div>
+        {!hasAttendanceStatus && !isLeadRepescagem(lead) ? (
+          <div className="grid min-w-0 gap-3 md:grid-cols-2">
+            <Field label="Aluno" value={bookingIsNoShow ? displayDash : lead.full_name} />
+            <Field label="Status" value={bookingIsNoShow ? displayDash : experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
+            <Field label="Dia do aluno" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.lead_date)} />
+            <Field label="Horário do aluno" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.lead_time)} />
+            <Field label="Fuso do aluno" value={bookingIsNoShow ? displayDash : booking?.lead_timezone} />
+            <Field label="Dia do professor" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.professor_date)} />
+            <Field label="Horário do professor" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.professor_time)} />
+            <Field label="Fuso do professor" value={bookingIsNoShow ? displayDash : professorTimeZone} />
+          </div>
+        ) : null}
 
         {showIncompleteState ? (
           <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
@@ -490,7 +494,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {!showIncompleteState ? (
+        {!showIncompleteState && !hasAttendanceStatus && !isLeadRepescagem(lead) ? (
         <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
           <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
             <div className="min-w-0">
