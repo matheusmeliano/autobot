@@ -1751,6 +1751,9 @@ export async function POST(req: Request) {
             leadStatusRaw === "matricula_pendente_recusada");
 
         if (
+          postAttendanceHistoryMatriculaRecusadaEvent ||
+          leadEstaEmMatriculaRecusadaPosAttendance ||
+          leadEstaEmRepescagemNoShow ||
           entrouNoFluxoPosAttendancePorForcaBruta ||
           leadDirectlyInPosAttendanceStepNuclear ||
           (ultimaMsgBotPedeSimNao &&
