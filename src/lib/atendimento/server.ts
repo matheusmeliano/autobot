@@ -391,7 +391,7 @@ async function getAtendimentoWhatsAppConfig() {
 
   const { data: wa } = await admin
     .from("whatsapp_instances")
-    .select("instance_id, token, client_token, status")
+    .select("instance_id, token, client_token, status, phone")
     .eq("user_id", userId)
     .maybeSingle();
   const canSend =
@@ -406,6 +406,7 @@ async function getAtendimentoWhatsAppConfig() {
     instance_id: String((wa as any).instance_id),
     token: String((wa as any).token),
     client_token: String((wa as any)?.client_token ?? "").trim() || null,
+    instance_phone_digits_only: normalizePhoneDigitsOnly(String((wa as any)?.phone ?? "")),
   };
 }
 
@@ -425,6 +426,18 @@ export async function sendAtendimentoWhatsAppText(params: {
       normalizePhoneDigitsOnly(value),
     ),
   );
+
+  if (normalizedDest && !internalNotificationPhones.has(normalizedDest)) {
+    const instancePhoneDigits = normalizePhoneDigitsOnly(String(config.instance_phone_digits_only ?? ""));
+    if (instancePhoneDigits && normalizedDest === instancePhoneDigits) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "self_instance_phone_refused_to_prevent_infinite_loop",
+        phone: normalizedDest,
+      };
+    }
+  }
 
   let resolvedConversationIdForDedupe: string | null = null;
 

@@ -1231,7 +1231,11 @@ export async function POST(req: Request) {
     }
   }
 
+  const isPhoneValidationCallback =
+    normalizedEventType === "DeliveryCallback" || normalizedEventType === "MessageStatusCallback";
+
   const isRealInboundEventType =
+    isPhoneValidationCallback ||
     /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
       normalizedEventType,
     ) ||

@@ -1233,7 +1233,7 @@ export async function triggerScheduleNowAction(id: string) {
 
     const { data: wa, error: waErr } = await admin
       .from("whatsapp_instances")
-      .select("instance_id, token, client_token, status")
+      .select("instance_id, token, client_token, status, phone")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -1241,6 +1241,12 @@ export async function triggerScheduleNowAction(id: string) {
     if (!wa?.instance_id || !wa?.token) throw new Error("WhatsApp não configurado");
     if ((wa.status ?? "").toLowerCase() !== "configured" && (wa.status ?? "").toLowerCase() !== "connected") {
       throw new Error("WhatsApp desconectado");
+    }
+
+    const debtorPhoneDigitsOnly = String(debtorPhone ?? "").replace(/\D/g, "");
+    const instancePhoneDigitsOnly = String((wa as any)?.phone ?? "").replace(/\D/g, "");
+    if (instancePhoneDigitsOnly && debtorPhoneDigitsOnly && debtorPhoneDigitsOnly === instancePhoneDigitsOnly) {
+      throw new Error("Auto-envio para próprio chip conectado bloqueado.");
     }
 
     const { data: existingRun } = await admin
