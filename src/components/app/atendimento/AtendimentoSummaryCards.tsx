@@ -293,6 +293,7 @@ function BookingDetails({
   cancellingBookingId,
   savingLessonLinkBookingId,
   markingAttendanceBookingId,
+  markingAttendanceType,
   sendingStudentNotificationBookingId,
   onCancelBooking,
   onSaveLessonLink,
@@ -303,6 +304,7 @@ function BookingDetails({
   cancellingBookingId: string | null;
   savingLessonLinkBookingId: string | null;
   markingAttendanceBookingId: string | null;
+  markingAttendanceType: "attended" | "no_show" | null;
   sendingStudentNotificationBookingId: string | null;
   onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveLessonLink: (lead: AtendimentoLeadListItem, lessonLink: string) => Promise<void>;
@@ -319,6 +321,8 @@ function BookingDetails({
   const effectiveSavedLessonLink = bookingIsNoShow ? "" : savedLessonLink;
   const isSavingLessonLink = savingLessonLinkBookingId === bookingId;
   const isMarkingAttendance = markingAttendanceBookingId === bookingId;
+  const isMarkingAttendanceAttended = isMarkingAttendance && markingAttendanceType === "attended";
+  const isMarkingAttendanceNoShow = isMarkingAttendance && markingAttendanceType === "no_show";
   const isSendingStudentNotification = sendingStudentNotificationBookingId === bookingId;
   const lessonLinkChanged = effectiveLessonLinkDraft.trim() !== effectiveSavedLessonLink;
   const canOpenSavedLessonLink = /^https?:\/\//i.test(effectiveSavedLessonLink);
@@ -440,20 +444,20 @@ function BookingDetails({
                   <button
                     type="button"
                     onClick={() => void onMarkAttendance(lead, "attended")}
-                    disabled={isMarkingAttendance}
+                    disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
                     className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Check className="h-4 w-4 shrink-0" />
-                    {isMarkingAttendance ? "Salvando..." : "Sim"}
+                    {isMarkingAttendanceAttended ? "Salvando..." : "Sim"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void onMarkAttendance(lead, "no_show")}
-                    disabled={isMarkingAttendance}
+                    disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
                     className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/12 px-5 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <X className="h-4 w-4 shrink-0" />
-                    {isMarkingAttendance ? "Salvando..." : "Não"}
+                    {isMarkingAttendanceNoShow ? "Salvando..." : "Não"}
                   </button>
                 </div>
               </div>
@@ -681,6 +685,7 @@ export function AtendimentoSummaryCards({
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
   const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
+  const [markingAttendanceType, setMarkingAttendanceType] = useState<"attended" | "no_show" | null>(null);
   const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] =
     useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -1067,6 +1072,7 @@ export function AtendimentoSummaryCards({
 
     try {
       setMarkingAttendanceBookingId(bookingId);
+      setMarkingAttendanceType(attendance);
 
       const response = await fetch(`/api/atendimento/bookings/${bookingId}/attendance`, {
         method: "POST",
@@ -1160,6 +1166,7 @@ export function AtendimentoSummaryCards({
       modalToast.error(error instanceof Error ? error.message : "Falha ao registrar o comparecimento da aula.");
     } finally {
       setMarkingAttendanceBookingId(null);
+      setMarkingAttendanceType(null);
     }
   }
 
@@ -1299,6 +1306,7 @@ export function AtendimentoSummaryCards({
                   cancellingBookingId={cancellingBookingId}
                   savingLessonLinkBookingId={savingLessonLinkBookingId}
                   markingAttendanceBookingId={markingAttendanceBookingId}
+                  markingAttendanceType={markingAttendanceType}
                   sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
                   onCancelBooking={handleCancelBooking}
                   onSaveLessonLink={handleSaveLessonLink}
@@ -1361,6 +1369,7 @@ export function AtendimentoSummaryCards({
                       cancellingBookingId={cancellingBookingId}
                       savingLessonLinkBookingId={savingLessonLinkBookingId}
                       markingAttendanceBookingId={markingAttendanceBookingId}
+                      markingAttendanceType={markingAttendanceType}
                       sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
                       onCancelBooking={handleCancelBooking}
                       onSaveLessonLink={handleSaveLessonLink}
