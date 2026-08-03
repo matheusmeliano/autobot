@@ -1628,6 +1628,7 @@ export async function POST(req: Request) {
 
         let postAttendanceHistoryConfirmedAttendedEvent = false;
         let postAttendanceHistoryConfirmedNoShowEvent = false;
+        let postAttendanceHistoryMatriculaRecusadaEvent = false;
         try {
           const { data: histAttAll } = await admin
             .from("atendimento_history_events")
@@ -1639,8 +1640,10 @@ export async function POST(req: Request) {
               "experimental_class_attendance_follow_up_required",
               "experimental_class_attendance_attended",
               "experimental_class_attendance_no_show",
+              "matricula_pendente_resposta_nao_nuclear",
+              "whatsapp_matricula_recusada_fixed_reply",
             ])
-            .limit(4);
+            .limit(6);
           const histAttEvents = Array.isArray((histAttAll as any)?.data ?? [])
             ? ((histAttAll as any).data as Array<{ event_type: string }>)
             : [];
@@ -1653,6 +1656,11 @@ export async function POST(req: Request) {
             (e) =>
               e.event_type === "experimental_class_attendance_follow_up_required" ||
               e.event_type === "experimental_class_attendance_no_show",
+          );
+          postAttendanceHistoryMatriculaRecusadaEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "matricula_pendente_resposta_nao_nuclear" ||
+              e.event_type === "whatsapp_matricula_recusada_fixed_reply",
           );
         } catch (_e) {}
 
@@ -1704,13 +1712,15 @@ export async function POST(req: Request) {
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
           (postAttendanceHistoryConfirmedAttendedEvent ||
             Boolean(currentBookingId) ||
-            bookingAttendanceAttendedByCol);
+            bookingAttendanceAttendedByCol) &&
+          !postAttendanceHistoryMatriculaRecusadaEvent;
         const leadEstaEmMatriculaRecusadaPosAttendance =
-          (funnelStageRaw === "matricula_pendente_recusada" ||
+          postAttendanceHistoryMatriculaRecusadaEvent ||
+          ((funnelStageRaw === "matricula_pendente_recusada" ||
             leadStatusRaw === "matricula_pendente_recusada") &&
-          (postAttendanceHistoryConfirmedAttendedEvent ||
-            Boolean(currentBookingId) ||
-            bookingAttendanceAttendedByCol);
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              Boolean(currentBookingId) ||
+              bookingAttendanceAttendedByCol));
         const leadEstaEmRepescagemNoShow =
           (isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent) ||
           (isLeadRepescagemStatus && bookingAttendanceNoShowByCol) ||
@@ -1803,14 +1813,29 @@ export async function POST(req: Request) {
 
           if (isNoNuclear) {
             try {
-              await admin
-                .from("atendimento_leads")
-                .update({
-                  funnel_stage: "matricula_pendente_recusada",
-                  status: "matricula_pendente_recusada",
-                  updated_at: nowIso,
-                })
-                .eq("id", leadId);
+              const leadUpdatePatch: Record<string, unknown> = { updated_at: nowIso };
+              const funnelPatch: Record<string, unknown> = {
+                funnel_stage: "matricula_pendente_recusada",
+                status: "matricula_pendente_recusada",
+                ...leadUpdatePatch,
+              };
+              let patchAppliedOk = false;
+              try {
+                const { error: fullErr } = await admin
+                  .from("atendimento_leads")
+                  .update(funnelPatch)
+                  .eq("id", leadId);
+                if (!fullErr) patchAppliedOk = true;
+              } catch (_e) {}
+              if (!patchAppliedOk) {
+                try {
+                  const { error: partialErr } = await admin
+                    .from("atendimento_leads")
+                    .update(leadUpdatePatch)
+                    .eq("id", leadId);
+                  void partialErr;
+                } catch (_e) {}
+              }
             } catch (_e) {}
             const replies = [
               NAO_RECUSA_MSG_1,
@@ -2126,11 +2151,13 @@ export async function POST(req: Request) {
 
         const postAttendanceMatriculaPendenteByLead =
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
-          postAttendanceHistoryConfirmedAttendedEvent;
+          postAttendanceHistoryConfirmedAttendedEvent &&
+          !postAttendanceHistoryMatriculaRecusadaEvent;
         const postAttendanceMatriculaRecusadaByLead =
-          (funnelStageRaw === "matricula_pendente_recusada" ||
+          postAttendanceHistoryMatriculaRecusadaEvent ||
+          ((funnelStageRaw === "matricula_pendente_recusada" ||
             leadStatusRaw === "matricula_pendente_recusada") &&
-          postAttendanceHistoryConfirmedAttendedEvent;
+            postAttendanceHistoryConfirmedAttendedEvent);
         const postAttendanceRepescagemByLead =
           isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent;
 
@@ -2150,14 +2177,15 @@ export async function POST(req: Request) {
             postAttendanceMatriculaPendenteByLead);
 
         const isLeadInMatriculaRecusadaPosAttendance =
-          (!isLeadInRepescagemNoShowLocked || postAttendanceMatriculaRecusadaByLead) &&
-          (Boolean(currentBookingId) || postAttendanceMatriculaRecusadaByLead) &&
-          (anyAttendanceResolved || postAttendanceMatriculaRecusadaByLead) &&
-          (bookingAttendanceAttendedByCol ||
-            bookingAttendanceAttendedByHistory ||
-            postAttendanceMatriculaRecusadaByLead) &&
-          (funnelStageRaw === "matricula_pendente_recusada" ||
-            leadStatusRaw === "matricula_pendente_recusada");
+          postAttendanceMatriculaRecusadaByLead ||
+          ((!isLeadInRepescagemNoShowLocked || postAttendanceMatriculaRecusadaByLead) &&
+            (Boolean(currentBookingId) || postAttendanceMatriculaRecusadaByLead) &&
+            (anyAttendanceResolved || postAttendanceMatriculaRecusadaByLead) &&
+            (bookingAttendanceAttendedByCol ||
+              bookingAttendanceAttendedByHistory ||
+              postAttendanceMatriculaRecusadaByLead) &&
+            (funnelStageRaw === "matricula_pendente_recusada" ||
+              leadStatusRaw === "matricula_pendente_recusada"));
 
         const handledByPosAttendanceFlowByLead =
           postAttendanceMatriculaRecusadaByLead ||
