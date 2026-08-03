@@ -1993,11 +1993,6 @@ export async function POST(req: Request) {
         const anyAttendanceResolved = hasAttendanceStatusCol || hasAnyAttendanceResolvedByHistory;
         const isBookingWaitingAttendance = currentBookingId && anyNotificationSent && !anyAttendanceResolved;
 
-        const funnelStageRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
-        const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
-        const isLeadRepescagemStatus =
-          funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem";
-
         const bookingAttendanceNoShowByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
         let bookingAttendanceNoShowByHistory = false;
@@ -2026,35 +2021,6 @@ export async function POST(req: Request) {
         const bookingAttendanceAttendedByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         let bookingAttendanceAttendedByHistory = false;
-        let posAttendanceHistoryConfirmedAttendedEvent = false;
-        let posAttendanceHistoryConfirmedNoShowEvent = false;
-        try {
-          const { data: histAttAll } = await admin
-            .from("atendimento_history_events")
-            .select("event_type")
-            .eq("lead_id", leadId)
-            .eq("conversation_id", conversationId)
-            .in("event_type", [
-              "experimental_class_attendance_confirmed",
-              "experimental_class_attendance_follow_up_required",
-              "experimental_class_attendance_attended",
-              "experimental_class_attendance_no_show",
-            ])
-            .limit(4);
-          const histAttEvents = Array.isArray((histAttAll as any)?.data ?? [])
-            ? ((histAttAll as any).data as Array<{ event_type: string }>)
-            : [];
-          posAttendanceHistoryConfirmedAttendedEvent = histAttEvents.some(
-            (e) =>
-              e.event_type === "experimental_class_attendance_confirmed" ||
-              e.event_type === "experimental_class_attendance_attended",
-          );
-          posAttendanceHistoryConfirmedNoShowEvent = histAttEvents.some(
-            (e) =>
-              e.event_type === "experimental_class_attendance_follow_up_required" ||
-              e.event_type === "experimental_class_attendance_no_show",
-          );
-        } catch (_e) {}
         if (
           currentBookingId &&
           anyAttendanceResolved &&
@@ -2079,13 +2045,13 @@ export async function POST(req: Request) {
 
         const postAttendanceMatriculaPendenteByLead =
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
-          posAttendanceHistoryConfirmedAttendedEvent;
+          postAttendanceHistoryConfirmedAttendedEvent;
         const postAttendanceMatriculaRecusadaByLead =
           (funnelStageRaw === "matricula_pendente_recusada" ||
             leadStatusRaw === "matricula_pendente_recusada") &&
-          posAttendanceHistoryConfirmedAttendedEvent;
+          postAttendanceHistoryConfirmedAttendedEvent;
         const postAttendanceRepescagemByLead =
-          isLeadRepescagemStatus && posAttendanceHistoryConfirmedNoShowEvent;
+          isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent;
 
         const isLeadInRepescagemNoShowLocked =
           isLeadRepescagemStatus ||
@@ -2116,10 +2082,6 @@ export async function POST(req: Request) {
           postAttendanceMatriculaRecusadaByLead ||
           postAttendanceMatriculaPendenteByLead ||
           postAttendanceRepescagemByLead;
-
-        const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
-
-        const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
 
         const effectiveWaitMessage = anyNotificationSent
           ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
