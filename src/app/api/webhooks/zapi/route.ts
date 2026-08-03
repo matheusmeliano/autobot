@@ -2006,8 +2006,6 @@ export async function POST(req: Request) {
         const anyAttendanceResolved = hasAttendanceStatusCol || hasAnyAttendanceResolvedByHistory;
         const isBookingWaitingAttendance = currentBookingId && anyNotificationSent && !anyAttendanceResolved;
 
-        const bookingAttendanceNoShowByCol =
-          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
         let bookingAttendanceNoShowByHistory = false;
         if (
           currentBookingId &&
@@ -2031,8 +2029,6 @@ export async function POST(req: Request) {
           }
         }
 
-        const bookingAttendanceAttendedByCol =
-          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         let bookingAttendanceAttendedByHistory = false;
         if (
           currentBookingId &&
