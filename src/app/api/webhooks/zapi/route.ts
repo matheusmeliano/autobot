@@ -3255,13 +3255,14 @@ export async function POST(req: Request) {
             });
           }
 
+          const finalStateValue = String(resolved?.state ?? (String((lead as any)?.state ?? "").trim() || "")).trim() || null;
           const cityUpdate = admin
             .from("atendimento_leads")
             .update({
-              city: resolved.city,
-              state: resolved.state ?? (String((lead as any)?.state ?? "").trim() || null),
-              timezone: resolved.timeZone,
-              country: resolved.country === "BR" ? "Brasil" : "Estados Unidos",
+              city: finalCityValue,
+              state: finalStateValue,
+              timezone: resolved?.timeZone ?? (String((lead as any)?.timezone ?? "").trim() || null),
+              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : (String((lead as any)?.country ?? "").trim() || null),
               funnel_stage: "pre_cadastro_concluido",
               status: "matricula_pendente",
               updated_at: nowIso,
@@ -3277,11 +3278,11 @@ export async function POST(req: Request) {
             eventType: "city_collected",
             title: "Cidade do lead identificada e salva via WhatsApp",
             details: {
-              state: resolved.state,
-              city: resolved.city,
-              timezone: resolved.timeZone,
-              country: resolved.country === "BR" ? "Brasil" : "Estados Unidos",
-              source: resolved.source,
+              state: finalStateValue,
+              city: finalCityValue,
+              timezone: resolved?.timeZone ?? null,
+              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : null,
+              source: (resolved as any)?.source ?? "city_match",
             },
             actorType: "system",
           });
@@ -3292,12 +3293,12 @@ export async function POST(req: Request) {
             eventType: "lead_timezone_identified",
             title: "Cidade e fuso do lead identificados via WhatsApp",
             details: {
-              state: resolved.state,
-              city: resolved.city,
-              timezone: resolved.timeZone,
+              state: finalStateValue,
+              city: finalCityValue,
+              timezone: resolved?.timeZone ?? null,
               teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              country: resolved.country === "BR" ? "Brasil" : "Estados Unidos",
-              source: resolved.source,
+              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : null,
+              source: (resolved as any)?.source ?? "city_match",
             },
             actorType: "system",
           });

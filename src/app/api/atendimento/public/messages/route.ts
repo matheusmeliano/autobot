@@ -350,13 +350,13 @@ function buildLeadLocationContext(params: {
     };
   }
 
-  const normalizedCity = resolved.city;
-  const normalizedState = resolved.state ?? (state.replace(/\s+/g, " ").trim() || null);
+  const normalizedCity = String(resolved.city ?? "").trim();
+  const normalizedState = String(resolved.state ?? (state.replace(/\s+/g, " ").trim() || "")).trim() || null;
   const country = resolved.country === "BR" ? "Brasil" : resolved.country === "US" ? "Estados Unidos" : null;
   const leadPatch = {
     ...params.captured,
     ...(normalizedState ? { state: normalizedState } : {}),
-    city: normalizedCity,
+    ...(normalizedCity ? { city: normalizedCity } : {}),
     timezone: resolved.timeZone,
     ...(country ? { country } : {}),
   };
@@ -366,7 +366,7 @@ function buildLeadLocationContext(params: {
     capturedFieldValues: {
       ...params.captured,
       ...(normalizedState ? { state: normalizedState } : {}),
-      city: normalizedCity,
+      ...(normalizedCity ? { city: normalizedCity } : {}),
       timezone: resolved.timeZone,
       ...(country ? { country } : {}),
     },
@@ -1612,7 +1612,9 @@ export async function POST(req: Request) {
 
     if (cityResolution) {
       captured.state = cityResolution.state ?? currentState;
-      captured.city = cityResolution.city;
+      if (String(cityResolution.city ?? "").trim()) {
+        captured.city = cityResolution.city as string;
+      }
     }
   }
 
