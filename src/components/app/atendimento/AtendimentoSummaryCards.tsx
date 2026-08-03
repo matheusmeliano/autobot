@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Check, Copy, Pencil, Search, Trash2, X, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
@@ -645,6 +645,39 @@ export function AtendimentoSummaryCards({
   );
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const queryParamsInitializedRef = useRef(false);
+  useEffect(() => {
+    if (queryParamsInitializedRef.current || typeof window === "undefined") return;
+    queryParamsInitializedRef.current = true;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const rawSection = String(params.get("section") ?? "").trim().toLowerCase();
+      if (rawSection === "interessados" || rawSection === "alunos" || rawSection === "agendamentos" || rawSection === "contratos") {
+        setActiveSection(rawSection);
+      }
+      const rawLeadId = String(params.get("leadId") ?? "").trim();
+      if (rawLeadId) {
+        setSelectedLeadId(rawLeadId);
+      }
+    } catch (_e) {}
+  }, []);
+  useEffect(() => {
+    if (!queryParamsInitializedRef.current || typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      if (activeSection && activeSection !== "interessados") {
+        url.searchParams.set("section", activeSection);
+      } else {
+        url.searchParams.delete("section");
+      }
+      if (selectedLeadId) {
+        url.searchParams.set("leadId", selectedLeadId);
+      } else {
+        url.searchParams.delete("leadId");
+      }
+      window.history.replaceState({}, "", url.toString());
+    } catch (_e) {}
+  }, [activeSection, selectedLeadId]);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
   const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
