@@ -1780,6 +1780,27 @@ export async function POST(req: Request) {
               .eq("id", leadId);
           } catch (_e) {}
 
+          if (leadEstaEmMatriculaRecusadaPosAttendance) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: RESPOSTA_REPESCAGEM_FIXA,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: RESPOSTA_REPESCAGEM_FIXA,
+              });
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "nuclear_post_attendance_matricula_recusada_loop",
+            });
+          }
+
           if (isNoNuclear) {
             try {
               await admin
