@@ -1,3 +1,5 @@
+import { ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
+
 export const DEFAULT_ACCESS_SCOPE = "app";
 export const ATENDIMENTO_ONLY_ACCESS_SCOPE = "atendimento";
 
@@ -15,20 +17,23 @@ export function isAtendimentoOnlyAccessScope(value: unknown) {
   return normalizeAccessScope(value) === ATENDIMENTO_ONLY_ACCESS_SCOPE;
 }
 
-export function getAtendimentoPortalPath() {
-  return "/app/atendimento";
+export function getAtendimentoPortalPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
+  const safeSlug = String(slug || ATENDIMENTO_PUBLIC_LINK_SLUG).trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
+  return `/atendimento?slug=${encodeURIComponent(safeSlug)}`;
 }
 
-export function getAtendimentoAccountPath() {
-  return "/app/atendimento";
+export function getAtendimentoAccountPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
+  const safeSlug = String(slug || ATENDIMENTO_PUBLIC_LINK_SLUG).trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
+  return `/atendimento/conta?slug=${encodeURIComponent(safeSlug)}`;
 }
 
-export function getAtendimentoFilesPath() {
-  return "/app/atendimento";
+export function getAtendimentoFilesPath(slug = ATENDIMENTO_PUBLIC_LINK_SLUG) {
+  const safeSlug = String(slug || ATENDIMENTO_PUBLIC_LINK_SLUG).trim() || ATENDIMENTO_PUBLIC_LINK_SLUG;
+  return `/atendimento/arquivos?slug=${encodeURIComponent(safeSlug)}`;
 }
 
 export function isAtendimentoPath(pathname: string) {
-  return pathname === "/atendimento" || pathname.startsWith("/atendimento/") || pathname === "/app/atendimento" || pathname.startsWith("/app/atendimento/");
+  return pathname === "/atendimento" || pathname.startsWith("/atendimento/");
 }
 
 export function getDefaultAuthenticatedPath(accessScope: unknown) {

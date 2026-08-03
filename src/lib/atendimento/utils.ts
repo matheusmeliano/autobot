@@ -1,4 +1,4 @@
-import { ATENDIMENTO_EMAIL, STATUS_LABELS, STAGE_LABELS } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, STATUS_LABELS, STAGE_LABELS } from "@/lib/atendimento/constants";
 
 export function isAtendimentoEmail(email: unknown) {
   return String(email ?? "").trim().toLowerCase() === ATENDIMENTO_EMAIL;
@@ -26,6 +26,11 @@ export function formatAtendimentoDate(value: unknown) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00`) : new Date(raw);
   if (Number.isNaN(date.getTime())) return raw;
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(date);
+}
+
+export function buildAtendimentoPublicUrl(origin: string) {
+  const safeOrigin = origin.replace(/\/$/, "");
+  return `${safeOrigin}/atendimento?slug=${encodeURIComponent(ATENDIMENTO_PUBLIC_LINK_SLUG)}`;
 }
 
 export function makeConversationSessionSlug() {
