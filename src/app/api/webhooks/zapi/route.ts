@@ -2306,7 +2306,8 @@ export async function POST(req: Request) {
         if (
           existingScheduledBookingId &&
           conversation.bot_enabled !== false &&
-          !isBookingWaitingAttendance
+          !isBookingWaitingAttendance &&
+          !handledByPosAttendanceFlow
         ) {
           try {
             await admin
@@ -2319,6 +2320,14 @@ export async function POST(req: Request) {
           } catch (_e) {}
         }
         if (existingScheduledBookingId && !isBookingWaitingAttendance) {
+          if (handledByPosAttendanceFlow) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "flow_concluded_pos_attendance_handled_skip_scheduled_echo",
+              booking_id: existingScheduledBookingId,
+            });
+          }
           try {
             await insertWhatsAppBotTextMessage({
               admin,
@@ -2370,7 +2379,7 @@ export async function POST(req: Request) {
         const recentIsMaxAttemptsBlocked = eventsFlowRecent.some(
           (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
         );
-        if (recentFlowConclusion && conversation.bot_enabled !== false) {
+        if (recentFlowConclusion && conversation.bot_enabled !== false && !handledByPosAttendanceFlow) {
           try {
             await admin
               .from("atendimento_conversations")
@@ -2388,6 +2397,14 @@ export async function POST(req: Request) {
               ignored: true,
               reason: "flow_concluded_history_waiting_attendance_no_reply",
               booking_id: currentBookingId,
+              event_types: eventsFlowRecent.map((e: any) => e.event_type),
+            });
+          }
+          if (handledByPosAttendanceFlow) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "flow_concluded_pos_attendance_handled_skip_history",
               event_types: eventsFlowRecent.map((e: any) => e.event_type),
             });
           }
