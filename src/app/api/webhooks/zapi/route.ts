@@ -1604,6 +1604,351 @@ export async function POST(req: Request) {
 
         const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
         const currentBookingId = currentBooking?.id ? String(currentBooking.id) : "";
+        const funnelStageRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+        const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
+        const isLeadRepescagemStatus =
+          funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem";
+
+        let postAttendanceHistoryConfirmedAttendedEvent = false;
+        let postAttendanceHistoryConfirmedNoShowEvent = false;
+        try {
+          const { data: histAttAll } = await admin
+            .from("atendimento_history_events")
+            .select("event_type")
+            .eq("lead_id", leadId)
+            .eq("conversation_id", conversationId)
+            .in("event_type", [
+              "experimental_class_attendance_confirmed",
+              "experimental_class_attendance_follow_up_required",
+              "experimental_class_attendance_attended",
+              "experimental_class_attendance_no_show",
+            ])
+            .limit(4);
+          const histAttEvents = Array.isArray((histAttAll as any)?.data ?? [])
+            ? ((histAttAll as any).data as Array<{ event_type: string }>)
+            : [];
+          postAttendanceHistoryConfirmedAttendedEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "experimental_class_attendance_confirmed" ||
+              e.event_type === "experimental_class_attendance_attended",
+          );
+          postAttendanceHistoryConfirmedNoShowEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "experimental_class_attendance_follow_up_required" ||
+              e.event_type === "experimental_class_attendance_no_show",
+          );
+        } catch (_e) {}
+
+        let lastBotTextNuclear: string | null = null;
+        try {
+          const _lastBotMsgNuclear = await getLastBotMessage({ admin, conversationId });
+          lastBotTextNuclear = String(_lastBotMsgNuclear?.content_text ?? "").trim() || null;
+        } catch (_e) {
+          lastBotTextNuclear = null;
+        }
+        const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
+        const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
+        const NAO_RECUSA_MSG_1 = "Tudo bem, entendemos que talvez ainda não seja o momento.";
+
+        const inboundContentRaw = String(messageText ?? "").trim();
+        const inboundNormalizedNuclear = inboundContentRaw
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim()
+          .replace(/[.!?,\s]+$/g, "")
+          .toLowerCase();
+        const isYesNuclear =
+          inboundNormalizedNuclear === "sim" ||
+          inboundNormalizedNuclear === "s" ||
+          /^sim\b/i.test(inboundNormalizedNuclear) ||
+          inboundNormalizedNuclear.replace(/\s+/g, "") === "sim";
+        const isNoNuclear =
+          inboundNormalizedNuclear === "nao" ||
+          inboundNormalizedNuclear === "n" ||
+          /^nao\b/i.test(inboundNormalizedNuclear) ||
+          inboundNormalizedNuclear.replace(/\s+/g, "") === "nao" ||
+          /^n[aãâ]o\b/i.test(inboundContentRaw.trim());
+
+        const ultimaMsgBotPedeSimNao =
+          lastBotTextNuclear === MSG_SIM_NAO_INVALIDA;
+        const leadEstaEmMatriculaPendentePosAttendance =
+          (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
+          postAttendanceHistoryConfirmedAttendedEvent;
+        const leadEstaEmMatriculaRecusadaPosAttendance =
+          (funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada") &&
+          postAttendanceHistoryConfirmedAttendedEvent;
+        const leadEstaEmRepescagemNoShow =
+          isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent;
+
+        if (
+          ultimaMsgBotPedeSimNao &&
+          (leadEstaEmMatriculaPendentePosAttendance ||
+            postAttendanceHistoryConfirmedAttendedEvent)
+        ) {
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? mediaInfo.mediaUrl
+              ? "document"
+              : "text"
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: inboundMediaType,
+              media_url: inboundMediaUrl,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+
+          if (isNoNuclear) {
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "matricula_pendente_recusada",
+                  status: "matricula_pendente_recusada",
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            const replies = [
+              NAO_RECUSA_MSG_1,
+              RESPOSTA_REPESCAGEM_FIXA,
+            ];
+            for (const txt of replies) {
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: txt,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: txt,
+                });
+              } catch (_e) {}
+            }
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_pendente_resposta_nao_nuclear",
+                title: "Matricula pendente pos-attendance (nuclear): lead respondeu NAO",
+                details: {
+                  inbound_text: inboundContentRaw,
+                  reply_messages: replies,
+                  source: "whatsapp_zapi_nuclear",
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: true, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "nuclear_post_attendance_matricula_pendente_resposta_nao",
+            });
+          } else if (isYesNuclear) {
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "matricula_confirmada",
+                  status: "matricula_confirmada",
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            const replySim =
+              "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: replySim,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: replySim,
+              });
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_pendente_resposta_sim_nuclear",
+                title: "Matricula pendente pos-attendance (nuclear): lead respondeu SIM",
+                details: {
+                  inbound_text: inboundContentRaw,
+                  reply_message: replySim,
+                  source: "whatsapp_zapi_nuclear",
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: true, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "nuclear_post_attendance_matricula_pendente_resposta_sim",
+            });
+          } else {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: MSG_SIM_NAO_INVALIDA,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: MSG_SIM_NAO_INVALIDA,
+              });
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "nuclear_post_attendance_matricula_pendente_invalida",
+            });
+          }
+        }
+
+        if (leadEstaEmMatriculaRecusadaPosAttendance) {
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? mediaInfo.mediaUrl
+              ? "document"
+              : "text"
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: inboundMediaType,
+              media_url: inboundMediaUrl,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "nuclear_post_attendance_matricula_recusada_loop",
+          });
+        }
+
+        if (leadEstaEmRepescagemNoShow) {
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? mediaInfo.mediaUrl
+              ? "document"
+              : "text"
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: inboundMediaType,
+              media_url: inboundMediaUrl,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "nuclear_repescagem_no_show_loop",
+          });
+        }
+
+        const handledByPosAttendanceFlowNuclear =
+          leadEstaEmMatriculaPendentePosAttendance ||
+          leadEstaEmMatriculaRecusadaPosAttendance ||
+          leadEstaEmRepescagemNoShow;
+
         const hasStudentNotificationCol = Boolean(currentBooking?.student_start_notification_sent_at);
         const hasAttendantNotificationCol = Boolean(currentBooking?.attendant_start_notification_sent_at);
         let hasAnyBookingNotificationSentByHistory = false;
@@ -1784,7 +2129,8 @@ export async function POST(req: Request) {
           isLeadInMatriculaRecusadaPosAttendance ||
           isLeadInMatriculaPendentePostAttendance ||
           isLeadInRepescagemNoShowLocked ||
-          handledByPosAttendanceFlowByLead;
+          handledByPosAttendanceFlowByLead ||
+          handledByPosAttendanceFlowNuclear;
 
         if (isLeadInMatriculaRecusadaPosAttendance) {
           const inboundContent = String(messageText ?? "").trim();
