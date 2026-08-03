@@ -622,7 +622,8 @@ function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | unde
     raw.includes("qual data você prefere") ||
     raw.includes("qual dia você prefere") ||
     raw.includes("escolha a melhor data") ||
-    raw.includes("escolher o melhor dia")
+    raw.includes("escolher o melhor dia") ||
+    raw.startsWith("Responda apenas com o dia desejado")
   ) {
     return "date" as const;
   }
@@ -630,7 +631,10 @@ function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | unde
   if (
     raw.startsWith("Horários disponíveis") ||
     raw.startsWith("Os horários disponíveis são:") ||
-    raw.includes("qual horário você prefere")
+    raw.includes("qual horário você prefere") ||
+    raw.startsWith("Responda apenas com o horário desejado") ||
+    raw.startsWith("Responda apenas com o horario desejado") ||
+    raw.startsWith("Perfeito! E os horários disponíveis são:")
   ) {
     return "time" as const;
   }
