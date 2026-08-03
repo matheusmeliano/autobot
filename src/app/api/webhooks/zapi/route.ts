@@ -1731,149 +1731,10 @@ export async function POST(req: Request) {
           ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
           : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
 
-        if (isBookingWaitingAttendance) {
-          const inboundContent = String(messageText ?? "").trim();
-          const inboundMediaType = mediaInfo.hasPaymentMedia
-            ? (mediaInfo.mediaUrl ? "document" : "text")
-            : "text";
-          const inboundMediaUrl = mediaInfo.mediaUrl || null;
-          try {
-            const { error: inboundErr } = await admin
-              .from("atendimento_messages")
-              .insert({
-                conversation_id: conversationId,
-                sender_role: "lead",
-                content_text: inboundContent || null,
-                media_type: inboundMediaType,
-                media_url: inboundMediaUrl,
-                status: "recebida",
-                sent_at: nowIso,
-                delivered_at: nowIso,
-              });
-            if (!inboundErr) {
-              try {
-                void admin
-                  .from("atendimento_leads")
-                  .update({
-                    unread_count: Number(lead.unread_count ?? 0) + 1,
-                    is_new_for_attendant: true,
-                    last_interaction_at: nowIso,
-                    updated_at: nowIso,
-                  })
-                  .eq("id", leadId);
-              } catch (_e) {}
-              try {
-                void syncConversationPreview({
-                  conversationId,
-                  contentText: inboundContent || "(mensagem recebida)",
-                  createdAt: nowIso,
-                });
-              } catch (_e) {}
-              try {
-                void appendHistoryEvent({
-                  leadId,
-                  conversationId,
-                  eventType: "message_received_class_in_progress",
-                  title: "Mensagem recebida (aula em andamento — bloqueada)",
-                  details: {
-                    content_text: inboundContent || null,
-                    media_type: inboundMediaType,
-                    media_url: inboundMediaUrl,
-                    booking_id: currentBookingId,
-                    source: "whatsapp_zapi",
-                  },
-                  actorType: "lead",
-                });
-              } catch (_e) {}
-            }
-          } catch (_e) {}
-          return Response.json({
-            ok: true,
-            ignored: true,
-            reason: "experimental_class_waiting_attendance_blocked",
-            booking_id: currentBookingId,
-            attendance_status: String(currentBooking.attendance_status ?? "") || null,
-            student_start_notification_sent_at: currentBooking.student_start_notification_sent_at || null,
-            attendant_start_notification_sent_at: currentBooking.attendant_start_notification_sent_at || null,
-          });
-        }
-
-        if (isLeadInRepescagemNoShowLocked) {
-          const inboundContent = String(messageText ?? "").trim();
-          const inboundMediaType = mediaInfo.hasPaymentMedia
-            ? (mediaInfo.mediaUrl ? "document" : "text")
-            : "text";
-          const inboundMediaUrl = mediaInfo.mediaUrl || null;
-          try {
-            const { error: inboundErr } = await admin
-              .from("atendimento_messages")
-              .insert({
-                conversation_id: conversationId,
-                sender_role: "lead",
-                content_text: inboundContent || null,
-                media_type: inboundMediaType,
-                media_url: inboundMediaUrl,
-                status: "recebida",
-                sent_at: nowIso,
-                delivered_at: nowIso,
-              });
-            if (!inboundErr) {
-              try {
-                void admin
-                  .from("atendimento_leads")
-                  .update({
-                    unread_count: Number(lead.unread_count ?? 0) + 1,
-                    is_new_for_attendant: true,
-                    last_interaction_at: nowIso,
-                    updated_at: nowIso,
-                  })
-                  .eq("id", leadId);
-              } catch (_e) {}
-              try {
-                void syncConversationPreview({
-                  conversationId,
-                  contentText: inboundContent || "(mensagem recebida)",
-                  createdAt: nowIso,
-                });
-              } catch (_e) {}
-            }
-          } catch (_e) {}
-          try {
-            await insertWhatsAppBotTextMessage({
-              admin,
-              conversationId,
-              contentText: RESPOSTA_REPESCAGEM_FIXA,
-            });
-          } catch (_e) {}
-          try {
-            await sendAtendimentoWhatsAppText({
-              phone: normalizedPhoneOnly,
-              message: RESPOSTA_REPESCAGEM_FIXA,
-            });
-          } catch (_e) {}
-          try {
-            void appendHistoryEvent({
-              leadId,
-              conversationId,
-              eventType: "whatsapp_repescagem_no_show_fixed_reply",
-              title: "Fluxo encerrado: resposta fixa de repescagem",
-              details: {
-                inbound_content_text: inboundContent || null,
-                reply_text: RESPOSTA_REPESCAGEM_FIXA,
-                source: "whatsapp_zapi",
-                is_lead_repescagem_status: isLeadRepescagemStatus,
-                booking_attendance_no_show_by_col: bookingAttendanceNoShowByCol,
-                booking_attendance_no_show_by_history: bookingAttendanceNoShowByHistory,
-              },
-              actorType: "bot",
-            });
-          } catch (_e) {}
-          return Response.json({
-            ok: true,
-            handled: true,
-            flow: "whatsapp_repescagem_no_show_locked",
-          });
-        }
+        const handledByPosAttendanceFlow =
+          isLeadInMatriculaRecusadaPosAttendance ||
+          isLeadInMatriculaPendentePostAttendance ||
+          isLeadInRepescagemNoShowLocked;
 
         if (isLeadInMatriculaRecusadaPosAttendance) {
           const inboundContent = String(messageText ?? "").trim();
@@ -2152,19 +2013,165 @@ export async function POST(req: Request) {
           });
         }
 
+        if (isLeadInRepescagemNoShowLocked) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "whatsapp_repescagem_no_show_fixed_reply",
+              title: "Fluxo encerrado: resposta fixa de repescagem",
+              details: {
+                inbound_content_text: inboundContent || null,
+                reply_text: RESPOSTA_REPESCAGEM_FIXA,
+                source: "whatsapp_zapi",
+                is_lead_repescagem_status: isLeadRepescagemStatus,
+                booking_attendance_no_show_by_col: bookingAttendanceNoShowByCol,
+                booking_attendance_no_show_by_history: bookingAttendanceNoShowByHistory,
+              },
+              actorType: "bot",
+            });
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_repescagem_no_show_locked",
+          });
+        }
+
+        if (isBookingWaitingAttendance) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+              try {
+                void appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "message_received_class_in_progress",
+                  title: "Mensagem recebida (aula em andamento — bloqueada)",
+                  details: {
+                    content_text: inboundContent || null,
+                    media_type: inboundMediaType,
+                    media_url: inboundMediaUrl,
+                    booking_id: currentBookingId,
+                    source: "whatsapp_zapi",
+                  },
+                  actorType: "lead",
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "experimental_class_waiting_attendance_blocked",
+            booking_id: currentBookingId,
+            attendance_status: String(currentBooking.attendance_status ?? "") || null,
+            student_start_notification_sent_at: currentBooking.student_start_notification_sent_at || null,
+            attendant_start_notification_sent_at: currentBooking.attendant_start_notification_sent_at || null,
+          });
+        }
+
         if (!conversation.bot_enabled) {
-          if (isBookingWaitingAttendance) {
+          if (isBookingWaitingAttendance || handledByPosAttendanceFlow) {
             return Response.json({
               ok: true,
               ignored: true,
-              reason: "conversation_blocked_waiting_attendance_no_reply",
+              reason: isBookingWaitingAttendance
+                ? "conversation_blocked_waiting_attendance_no_reply"
+                : "conversation_blocked_pos_attendance_handled_above",
               booking_id: currentBookingId,
             });
           }
           let finalReason = "conversation_blocked";
           let responseMessage: string | null = null;
           const hasBooking = currentBookingId ? currentBooking : null;
-          if (hasBooking?.id) {
+          if (hasBooking?.id && !handledByPosAttendanceFlow) {
             finalReason = "conversation_blocked_echo_booking_scheduled";
             responseMessage = effectiveWaitMessage;
           } else {
@@ -2189,7 +2196,7 @@ export async function POST(req: Request) {
             const hasBlockedMaxAttempts = events.some(
               (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
             );
-            if (hasScheduled) {
+            if (hasScheduled && !handledByPosAttendanceFlow) {
               finalReason = "conversation_blocked_echo_scheduled_by_history";
               responseMessage = effectiveWaitMessage;
             } else if (hasBlockedMaxAttempts) {
@@ -2207,7 +2214,7 @@ export async function POST(req: Request) {
               }
             }
           }
-          if (responseMessage && !isBookingWaitingAttendance) {
+          if (responseMessage && !isBookingWaitingAttendance && !handledByPosAttendanceFlow) {
             try {
               await insertWhatsAppBotTextMessage({
                 admin,
