@@ -1798,23 +1798,24 @@ export async function POST(req: Request) {
           } catch (_e) {}
 
           if (leadEstaEmMatriculaRecusadaPosAttendance) {
-            try {
-              await insertWhatsAppBotTextMessage({
-                admin,
-                conversationId,
-                contentText: RESPOSTA_REPESCAGEM_FIXA,
-              });
-            } catch (_e) {}
-            try {
-              await sendAtendimentoWhatsAppText({
-                phone: normalizedPhoneOnly,
-                message: RESPOSTA_REPESCAGEM_FIXA,
-              });
-            } catch (_e) {}
+            handledByPosAttendanceFlowNuclear = true;
+            handledByPosAttendanceFlow = true;
             return Response.json({
               ok: true,
-              handled: true,
-              flow: "nuclear_post_attendance_matricula_recusada_loop",
+              ignored: true,
+              reason: "nuclear_post_attendance_matricula_recusada_ignored_quiet",
+              flow: "nuclear_post_attendance_matricula_recusada_ignored",
+            });
+          }
+
+          if (leadEstaEmRepescagemNoShow) {
+            handledByPosAttendanceFlowNuclear = true;
+            handledByPosAttendanceFlow = true;
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "nuclear_post_attendance_repescagem_no_show_ignored_quiet",
+              flow: "nuclear_post_attendance_repescagem_no_show_ignored",
             });
           }
 
@@ -1962,102 +1963,20 @@ export async function POST(req: Request) {
         }
 
         if (leadEstaEmMatriculaRecusadaPosAttendance) {
-          const inboundMediaType = mediaInfo.hasPaymentMedia
-            ? mediaInfo.mediaUrl
-              ? "document"
-              : "text"
-            : "text";
-          const inboundMediaUrl = mediaInfo.mediaUrl || null;
-          try {
-            await admin.from("atendimento_messages").insert({
-              conversation_id: conversationId,
-              sender_role: "lead",
-              content_text: inboundContentRaw || null,
-              media_type: inboundMediaType,
-              media_url: inboundMediaUrl,
-              status: "recebida",
-              sent_at: nowIso,
-              delivered_at: nowIso,
-            });
-          } catch (_e) {}
-          try {
-            void admin
-              .from("atendimento_leads")
-              .update({
-                unread_count: Number(lead.unread_count ?? 0) + 1,
-                is_new_for_attendant: true,
-                last_interaction_at: nowIso,
-                updated_at: nowIso,
-              })
-              .eq("id", leadId);
-          } catch (_e) {}
-          try {
-            await insertWhatsAppBotTextMessage({
-              admin,
-              conversationId,
-              contentText: RESPOSTA_REPESCAGEM_FIXA,
-            });
-          } catch (_e) {}
-          try {
-            await sendAtendimentoWhatsAppText({
-              phone: normalizedPhoneOnly,
-              message: RESPOSTA_REPESCAGEM_FIXA,
-            });
-          } catch (_e) {}
           return Response.json({
             ok: true,
-            handled: true,
-            flow: "nuclear_post_attendance_matricula_recusada_loop",
+            ignored: true,
+            reason: "fallback_matricula_recusada_ignored_quiet",
+            flow: "whatsapp_matricula_recusada_ignored",
           });
         }
 
         if (leadEstaEmRepescagemNoShow) {
-          const inboundMediaType = mediaInfo.hasPaymentMedia
-            ? mediaInfo.mediaUrl
-              ? "document"
-              : "text"
-            : "text";
-          const inboundMediaUrl = mediaInfo.mediaUrl || null;
-          try {
-            await admin.from("atendimento_messages").insert({
-              conversation_id: conversationId,
-              sender_role: "lead",
-              content_text: inboundContentRaw || null,
-              media_type: inboundMediaType,
-              media_url: inboundMediaUrl,
-              status: "recebida",
-              sent_at: nowIso,
-              delivered_at: nowIso,
-            });
-          } catch (_e) {}
-          try {
-            void admin
-              .from("atendimento_leads")
-              .update({
-                unread_count: Number(lead.unread_count ?? 0) + 1,
-                is_new_for_attendant: true,
-                last_interaction_at: nowIso,
-                updated_at: nowIso,
-              })
-              .eq("id", leadId);
-          } catch (_e) {}
-          try {
-            await insertWhatsAppBotTextMessage({
-              admin,
-              conversationId,
-              contentText: RESPOSTA_REPESCAGEM_FIXA,
-            });
-          } catch (_e) {}
-          try {
-            await sendAtendimentoWhatsAppText({
-              phone: normalizedPhoneOnly,
-              message: RESPOSTA_REPESCAGEM_FIXA,
-            });
-          } catch (_e) {}
           return Response.json({
             ok: true,
-            handled: true,
-            flow: "nuclear_repescagem_no_show_loop",
+            ignored: true,
+            reason: "fallback_repescagem_no_show_ignored_quiet",
+            flow: "whatsapp_repescagem_no_show_ignored",
           });
         }
 
