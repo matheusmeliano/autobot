@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { WhatsAppClient } from "@/components/app/whatsapp/WhatsAppClient";
 
 const BASE_COLS = ["instance_id", "token", "status"] as const;
-const OPTIONAL_COLS = ["display_name", "client_token", "phone"] as const;
+const OPTIONAL_COLS = ["client_token", "phone"] as const;
 
 type InstanceRow = Record<string, any>;
 
@@ -39,7 +39,6 @@ async function safeFetchWhatsappInstance(supabase: any): Promise<{
       .maybeSingle();
     if (!try2.error) {
       const fullRow: InstanceRow = {
-        display_name: null,
         client_token: null,
         phone: null,
         ...((try2.data as InstanceRow) ?? {}),
@@ -55,7 +54,6 @@ async function safeFetchWhatsappInstance(supabase: any): Promise<{
     .maybeSingle();
   if (!try3.error) {
     const fullRow: InstanceRow = {
-      display_name: null,
       client_token: null,
       phone: null,
       ...((try3.data as InstanceRow) ?? {}),
@@ -74,9 +72,7 @@ export default async function WhatsAppPage() {
   if (fatalErrorMsg) {
     const isColError =
       /column/i.test(fatalErrorMsg) &&
-      (/\bclient_token\b/i.test(fatalErrorMsg) ||
-        /\bdisplay_name\b/i.test(fatalErrorMsg) ||
-        /\bphone\b/i.test(fatalErrorMsg));
+      /\bclient_token\b/i.test(fatalErrorMsg);
     return (
       <div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
@@ -100,7 +96,6 @@ export default async function WhatsAppPage() {
               status: data.status ?? null,
               hasToken: Boolean(data.token),
               hasClientToken: Boolean(data.client_token),
-              display_name: String(data.display_name ?? "").trim() || null,
               phone: String(data.phone ?? "").trim() || null,
             }
           : null

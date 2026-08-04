@@ -13,7 +13,6 @@ type InstanceRow = {
   status: string | null;
   hasToken: boolean;
   hasClientToken: boolean;
-  display_name: string | null;
   phone: string | null;
 };
 
@@ -21,7 +20,6 @@ type FormValues = {
   instance_id: string;
   token: string;
   client_token: string;
-  display_name: string;
 };
 
 function formatWhatsAppPhone(value: string | null): string {
@@ -54,29 +52,24 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
       instance_id: initial?.instance_id ?? "",
       token: initial?.hasToken ? MASK : "",
       client_token: initial?.hasClientToken ? MASK : "",
-      display_name: initial?.display_name ?? "",
     },
   });
 
-  const displayNameValue = initial?.display_name;
   const phoneFormatted = useMemo(() => formatWhatsAppPhone(initial?.phone ?? null), [initial?.phone]);
-  const primaryLabel = displayNameValue?.trim() ? displayNameValue.trim() : "WhatsApp não identificado";
-  const secondaryInfo =
-    initial?.phone?.trim()
-      ? phoneFormatted
-      : initial?.instance_id
-        ? `Instance: ${initial.instance_id}`
-        : "Número ainda não sincronizado. A próxima mensagem recebida atualiza automaticamente.";
+  const primaryLabel = initial?.phone?.trim()
+    ? formatWhatsAppPhone(initial?.phone)
+    : "WhatsApp não identificado";
+  const secondaryInfo = initial?.instance_id
+    ? `Instance: ${initial.instance_id}`
+    : "Número ainda não sincronizado. A próxima mensagem recebida atualiza automaticamente.";
 
   const onSubmit = handleSubmit(async (values) => {
     const tokenValue = String(values.token ?? "").trim();
     const clientTokenValue = String(values.client_token ?? "").trim();
-    const displayNameValueRaw = String(values.display_name ?? "").trim();
     const res = await upsertWhatsAppInstanceAction({
       instance_id: values.instance_id,
       token: tokenValue && tokenValue !== MASK ? tokenValue : undefined,
       client_token: clientTokenValue && clientTokenValue !== MASK ? clientTokenValue : undefined,
-      display_name: displayNameValueRaw ? displayNameValueRaw : null,
     });
     if (!res.ok) {
       modalToast.error(res.error ?? "Falha ao salvar.");
@@ -89,7 +82,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
       instance_id: values.instance_id,
       token: MASK,
       client_token: nextHasClientToken ? MASK : "",
-      display_name: displayNameValueRaw,
     });
     await modalToast.wait(toastId);
     window.location.reload();
@@ -204,36 +196,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
                 placeholder={initial?.hasClientToken ? MASK : "client-token"}
                 {...register("client_token")}
               />
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="min-w-0 md:col-span-2">
-              <div className="text-xs font-semibold text-white/60">
-                Nome (apelido) do número <span className="font-normal text-white/45">— Opcional. Ex.: Suporte, Vendas, Professor Lucas, Financeiro</span>
-              </div>
-              <input
-                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#0b1220] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
-                style={{ backgroundColor: "#0b1220" }}
-                placeholder="Ex.: Professor Lucas"
-                maxLength={80}
-                {...register("display_name", {
-                  validate: (value) => {
-                    const v = String(value ?? "").trim();
-                    if (v.length > 80) return "Máximo 80 caracteres.";
-                    return true;
-                  },
-                })}
-              />
-              {errors.display_name?.message ? (
-                <div className="mt-2 text-xs font-medium text-rose-300">
-                  {String(errors.display_name.message)}
-                </div>
-              ) : null}
-              <div className="mt-2 text-[11px] text-white/45">
-                Esse nome aparecerá como identificação principal no painel. O número de telefone é exibido abaixo como
-                informação secundária (automaticamente sincronizado quando a próxima mensagem é recebida da Z-API).
-              </div>
             </div>
           </div>
 

@@ -11,7 +11,6 @@ const schema = z.object({
   instance_id: z.string().min(1),
   token: z.string().optional(),
   client_token: z.string().optional(),
-  display_name: z.string().trim().max(80).nullable().optional(),
 });
 
 export async function upsertWhatsAppInstanceAction(input: unknown) {
@@ -25,50 +24,28 @@ export async function upsertWhatsAppInstanceAction(input: unknown) {
 
   const tokenRaw = String(parsed.data.token ?? "").trim();
   const clientTokenRaw = String(parsed.data.client_token ?? "").trim();
-  const displayNameRaw =
-    typeof parsed.data.display_name === "string" || parsed.data.display_name === null
-      ? parsed.data.display_name
-      : undefined;
   const token = tokenRaw && tokenRaw !== MASK ? tokenRaw : null;
   const clientToken = clientTokenRaw && clientTokenRaw !== MASK ? clientTokenRaw : null;
-  const displayName = displayNameRaw === "" ? null : displayNameRaw;
 
   const firstExisting = await supabase
     .from("whatsapp_instances")
-    .select("token, client_token, display_name")
+    .select("token, client_token")
     .eq("user_id", userId)
     .maybeSingle();
   const missingClientToken =
     firstExisting.error &&
     /client_token/i.test(firstExisting.error.message) &&
     /column/i.test(firstExisting.error.message);
-  const missingDisplayName =
-    firstExisting.error &&
-    /display_name/i.test(firstExisting.error.message) &&
-    /column/i.test(firstExisting.error.message);
-  const secondExisting =
-    missingClientToken && missingDisplayName
-      ? await supabase
-          .from("whatsapp_instances")
-          .select("token")
-          .eq("user_id", userId)
-          .maybeSingle()
-      : missingClientToken
-        ? await supabase
-            .from("whatsapp_instances")
-            .select("token, display_name")
-            .eq("user_id", userId)
-            .maybeSingle()
-        : missingDisplayName
-          ? await supabase
-              .from("whatsapp_instances")
-              .select("token, client_token")
-              .eq("user_id", userId)
-              .maybeSingle()
-          : null;
+  const secondExisting = missingClientToken
+    ? await supabase
+        .from("whatsapp_instances")
+        .select("token")
+        .eq("user_id", userId)
+        .maybeSingle()
+    : null;
   const existing = (secondExisting?.data ?? firstExisting.data) as any;
   const existingError = secondExisting?.error ?? firstExisting.error;
-  if (existingError && !missingClientToken && !missingDisplayName) {
+  if (existingError && !missingClientToken) {
     return { ok: false, error: existingError.message };
   }
 
@@ -84,39 +61,29 @@ export async function upsertWhatsAppInstanceAction(input: unknown) {
   if (!missingClientToken) {
     baseRow.client_token = clientToken ?? existing?.client_token ?? null;
   }
-  if (!missingDisplayName) {
-    baseRow.display_name =
-      displayName !== undefined ? displayName : existing?.display_name ?? null;
-  }
 
   let error = (await supabase.from("whatsapp_instances").upsert(baseRow, { onConflict: "user_id" }))
     .error;
   if (
     error &&
-    ((!missingClientToken && /client_token/i.test(error.message ?? "") && /column/i.test(error.message ?? "")) ||
-      (!missingDisplayName && /display_name/i.test(error.message ?? "") && /column/i.test(error.message ?? "")))
+    !missingClientToken &&
+    /client_token/i.test(error.message ?? "") &&
+    /column/i.test(error.message ?? "")
   ) {
     const retryRow: any = { ...baseRow };
-    if (/client_token/i.test(error.message ?? "")) {
-      const { client_token: _omit, ...withoutClient } = retryRow;
-      Object.assign(retryRow, withoutClient);
-    }
-    if (/display_name/i.test(error.message ?? "")) {
-      const { display_name: _omit, ...withoutDisplay } = retryRow;
-      Object.assign(retryRow, withoutDisplay);
-    }
+    const { client_token: _omit, ...withoutClient } = retryRow;
+    Object.assign(retryRow, withoutClient);
     error = (await supabase.from("whatsapp_instances").upsert(retryRow, { onConflict: "user_id" })).error;
   }
 
   if (error) {
     const msg = error.message ?? "";
     const missingClientTokenOnWrite = /client_token/i.test(msg) && /column/i.test(msg);
-    const missingDisplayNameOnWrite = /display_name/i.test(msg) && /column/i.test(msg);
-    if (missingClientTokenOnWrite || missingDisplayNameOnWrite) {
+    if (missingClientTokenOnWrite) {
       return {
         ok: false,
         error:
-          "Rode a migration correspondente em whatsapp_instances (client_token e/ou display_name) e tente novamente.",
+          "Rode a migration correspondente em whatsapp_instances (client_token) e tente novamente.",
       };
     }
     return { ok: false, error: msg };
