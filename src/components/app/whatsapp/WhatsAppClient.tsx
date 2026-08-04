@@ -116,12 +116,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
             <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
               {primaryLabel}
             </div>
-            <div
-              className="mt-1 truncate text-xs text-[var(--app-text-55)]"
-              title={initial?.instance_id ?? secondaryInfo}
-            >
-              {secondaryInfo}
-            </div>
           </div>
         </div>
       </div>
