@@ -79,7 +79,11 @@ export function SignupForm() {
       footer={
         <>
           Já tem conta?{" "}
-          <Link className="font-semibold text-white hover:underline" href={loginHref}>
+          <Link
+            className="font-semibold text-sky-700 hover:text-sky-800 hover:underline transition-colors"
+            href={loginHref}
+            style={{ color: "#0369a1" }}
+          >
             Entrar
           </Link>
         </>
@@ -152,7 +156,8 @@ export function SignupForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
+          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-sky-700 bg-sky-700 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-800 hover:border-sky-800 disabled:cursor-not-allowed disabled:bg-sky-700/60 disabled:border-sky-700/60 disabled:text-white/70 disabled:hover:bg-sky-700/60 disabled:opacity-100 transition-colors"
+          style={{ backgroundColor: "#0369a1", borderColor: "#0369a1" }}
         >
           {isSubmitting ? "Criando..." : "Criar conta"}
         </button>

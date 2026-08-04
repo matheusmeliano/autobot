@@ -45,7 +45,11 @@ export function ForgotPasswordForm() {
       title="Recuperar senha"
       subtitle="Enviaremos um link para redefinir sua senha."
       footer={
-        <Link className="font-semibold text-white hover:underline" href={loginHref}>
+        <Link
+          className="font-semibold text-sky-700 hover:text-sky-800 hover:underline transition-colors"
+          href={loginHref}
+          style={{ color: "#0369a1" }}
+        >
           Voltar para entrar
         </Link>
       }
@@ -56,7 +60,8 @@ export function ForgotPasswordForm() {
           <input
             type="email"
             autoComplete="email"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
+            className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
+            style={{ backgroundColor: "#0b1220" }}
             placeholder="voce@empresa.com"
             {...register("email", { required: true })}
           />
@@ -65,7 +70,8 @@ export function ForgotPasswordForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
+          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-sky-700 bg-sky-700 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-800 hover:border-sky-800 disabled:cursor-not-allowed disabled:bg-sky-700/60 disabled:border-sky-700/60 disabled:text-white/70 disabled:hover:bg-sky-700/60 disabled:opacity-100 transition-colors"
+          style={{ backgroundColor: "#0369a1", borderColor: "#0369a1" }}
         >
           {isSubmitting ? "Enviando..." : "Enviar link"}
         </button>
