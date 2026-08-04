@@ -1,5 +1,9 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import {
+  loadHiddenWhatsAppPhoneBlocklist,
+  phoneIsInHiddenBrazilianBlocklist,
+} from "@/lib/painelHiddenPhones";
 
 export async function GET() {
   try {
@@ -11,14 +15,17 @@ export async function GET() {
     const admin = createSupabaseAdminClient();
     const { data: leads, error } = await admin
       .from("atendimento_leads")
-      .select("status, funnel_stage, unread_count")
+      .select("status, funnel_stage, unread_count, phone")
       .eq("assigned_user_email", "atendimento.usa.music@gmail.com");
 
     if (error) {
       return Response.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    const rows = (leads ?? []) as any[];
+    const hiddenBlocklist = await loadHiddenWhatsAppPhoneBlocklist({ supabaseAdmin: admin });
+
+    const rows = (leads ?? [])
+      .filter((row: any) => !phoneIsInHiddenBrazilianBlocklist(String(row?.phone ?? ""), hiddenBlocklist)) as any[];
     const summary = {
       totalLeads: rows.length,
       novosLeads: rows.filter((row) => row.status === "novo_lead").length,

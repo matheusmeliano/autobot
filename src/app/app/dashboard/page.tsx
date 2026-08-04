@@ -5,6 +5,11 @@ import { buildAgendaRows } from "@/lib/agendaRows";
 import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { getScheduleChargeAmount } from "@/lib/chargeAccumulation";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
+import {
+  areBrazilianPhonesEquivalent,
+  loadHiddenWhatsAppPhoneBlocklist,
+  normalizePhoneDigitsOnly,
+} from "@/lib/painelHiddenPhones";
 
 function scheduleLocalMonthKey(value: string | null | undefined, timeZone: string) {
   const iso = String(value ?? "").trim();
@@ -105,6 +110,7 @@ export default async function DashboardPage() {
     scheduleRunsRes,
     debtorsRes,
     schedulesRes,
+    hiddenBlocklistRaw,
   ] = await Promise.all([
     supabase
       .from("message_templates")
@@ -122,7 +128,7 @@ export default async function DashboardPage() {
     supabase
       .from("debtors")
       .select(
-        "id, nome, observacoes, valor, status, retry_time, accumulate_open_monthly_charges, debtor_charges(id, amount, due_day, recurrence_month, recurrence_year, created_at)",
+        "id, nome, telefone, observacoes, valor, status, retry_time, accumulate_open_monthly_charges, debtor_charges(id, amount, due_day, recurrence_month, recurrence_year, created_at)",
       )
       .eq("user_id", userId)
       .limit(1000),
@@ -133,9 +139,39 @@ export default async function DashboardPage() {
       )
       .eq("user_id", userId)
       .limit(2000),
+    loadHiddenWhatsAppPhoneBlocklist(),
   ]);
 
-  const schedules = (schedulesRes.data ?? []) as any[];
+  const hiddenBlocklist = (hiddenBlocklistRaw ?? new Set<string>()) as Set<string>;
+  const debtorTelefoneById = new Map<string, string>();
+  for (const d of (debtorsRes.data ?? []) as any[]) {
+    const id = String(d?.id ?? "");
+    if (!id) continue;
+    debtorTelefoneById.set(id, String(d?.telefone ?? ""));
+  }
+
+  function debtorPhoneIsBlocked(phoneRaw: any): boolean {
+    const phone = normalizePhoneDigitsOnly(String(phoneRaw ?? ""));
+    if (!phone) return false;
+    for (const blocked of hiddenBlocklist) {
+      if (!blocked) continue;
+      if (areBrazilianPhonesEquivalent(phone, blocked)) return true;
+    }
+    return false;
+  }
+
+  const debtorsFiltered = ((debtorsRes.data ?? []) as any[]).filter(
+    (d) => !debtorPhoneIsBlocked(String(d?.telefone ?? "")),
+  );
+  const schedulesFiltered = ((schedulesRes.data ?? []) as any[]).filter((s) => {
+    const debtorId = String((s as any)?.debtor_id ?? "");
+    if (!debtorId) return true;
+    const phone = debtorTelefoneById.get(debtorId) ?? "";
+    if (!debtorPhoneIsBlocked(phone)) return true;
+    return false;
+  });
+
+  const schedules = schedulesFiltered as any[];
   const latestExecutedRunBySchedule = new Map<string, string>();
   for (const run of scheduleRunsRes.data ?? []) {
     const scheduleId = String((run as any)?.schedule_id ?? "");
@@ -148,7 +184,7 @@ export default async function DashboardPage() {
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const currentMonthKey = localDateInTimeZone(now.toISOString(), effectiveTimeZone).slice(0, 7);
   const agendaRows = buildAgendaRows({
-    debtors: (debtorsRes.data ?? []) as any[],
+    debtors: debtorsFiltered as any[],
     schedules,
     latestExecutedRunBySchedule,
     templates: (templatesRes.data ?? []) as any[],
@@ -177,7 +213,7 @@ export default async function DashboardPage() {
     { valor: number | null; accumulate_open_monthly_charges?: boolean | null; charges: any[] }
   >();
   const chargeAmountById = new Map<string, number>();
-  for (const debtor of (debtorsRes.data ?? []) as any[]) {
+  for (const debtor of debtorsFiltered as any[]) {
     const debtorId = String((debtor as any)?.id ?? "");
     if (!debtorId) continue;
     const charges = Array.isArray((debtor as any)?.debtor_charges) ? ((debtor as any).debtor_charges as any[]) : [];
@@ -229,7 +265,7 @@ export default async function DashboardPage() {
   const receivableMonthRemaining = Math.max(0, receivableMonthTotal - receivableMonthPaid);
 
   const stats = {
-    clients: (debtorsRes.data ?? []).length,
+    clients: debtorsFiltered.length,
     templates: (templatesRes.data ?? []).length,
     activeSchedules: agendaRowsWithVisualStatus.filter(
       ({ visualStatus, row }) =>
