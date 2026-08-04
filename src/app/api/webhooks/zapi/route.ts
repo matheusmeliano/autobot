@@ -3822,7 +3822,6 @@ export async function POST(req: Request) {
             next_missing: nextMissingField ?? null,
           });
         }
-      }
     } catch (_whatsappLeadErr) {
     }
   }
