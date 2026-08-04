@@ -131,10 +131,7 @@ async function loadAllInstancePhoneBlocklist(): Promise<Set<string>> {
       process.env.ZAPI_INSTANCE_PHONE_FALLBACK,
       process.env.ATENDIMENTO_WHATSAPP_PHONE,
       process.env.WHATSAPP_INSTANCE_PHONE,
-      process.env.TEACHER_NOTIFICATION_PHONE,
-      process.env.PROFESSOR_WHATSAPP_PHONE,
       "556581175345",
-      "556598079407",
     ];
     for (const p of envPhones) {
       const norm = normalizePhoneDigitsOnly(p);
@@ -363,8 +360,16 @@ async function sendZapiText(params: {
 }) {
   const normalizedPhone = normalizePhone(params.phone);
 
+  const internalNotificationPhones = new Set(
+    [ATENDIMENTO_DAILY_SUMMARY_PHONE, EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE].map((value) =>
+      normalizePhoneDigitsOnly(value),
+    ),
+  );
+  const destDigits = normalizePhoneDigitsOnly(normalizedPhone);
+  const isInternalNotificationPhone = destDigits && internalNotificationPhones.has(destDigits);
+
   const { self_instance_phone_digits_only: selfPhoneOpt } = params;
-  if (destinationIsInstancePhone(normalizedPhone, null, selfPhoneOpt ?? null)) {
+  if (!isInternalNotificationPhone && destinationIsInstancePhone(normalizedPhone, null, selfPhoneOpt ?? null)) {
     return {
       ok: false,
       skipped: true,
@@ -373,14 +378,16 @@ async function sendZapiText(params: {
     } as any;
   }
 
-  const runtimeBlocklist = await loadAllInstancePhoneBlocklist();
-  if (destinationIsInstancePhone(normalizedPhone, runtimeBlocklist, selfPhoneOpt ?? null)) {
-    return {
-      ok: false,
-      skipped: true,
-      reason: "self_instance_phone_refused_blocklist_matched_whatsapp_instances",
-      phone: normalizePhoneDigitsOnly(normalizedPhone),
-    } as any;
+  if (!isInternalNotificationPhone) {
+    const runtimeBlocklist = await loadAllInstancePhoneBlocklist();
+    if (destinationIsInstancePhone(normalizedPhone, runtimeBlocklist, selfPhoneOpt ?? null)) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "self_instance_phone_refused_blocklist_matched_whatsapp_instances",
+        phone: normalizePhoneDigitsOnly(normalizedPhone),
+      } as any;
+    }
   }
 
   const body = JSON.stringify({ phone: normalizedPhone, message: params.message });
