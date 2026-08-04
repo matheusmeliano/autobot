@@ -142,7 +142,8 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
                 Instance ID
               </div>
               <input
-                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#0b1220] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
+                style={{ backgroundColor: "#0b1220" }}
                 placeholder="instance_xxx"
                 {...register("instance_id", {
                   validate: (value) => {
@@ -164,7 +165,8 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
               </div>
               <input
                 type="password"
-                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#0b1220] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
+                style={{ backgroundColor: "#0b1220" }}
                 placeholder={initial?.hasToken ? MASK : "token"}
                 {...register("token", {
                   validate: (value) => {
@@ -197,7 +199,8 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
               </div>
               <input
                 type="password"
-                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#0b1220] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
+                style={{ backgroundColor: "#0b1220" }}
                 placeholder={initial?.hasClientToken ? MASK : "client-token"}
                 {...register("client_token")}
               />
@@ -210,7 +213,8 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
                 Nome (apelido) do número <span className="font-normal text-white/45">— Opcional. Ex.: Suporte, Vendas, Professor Lucas, Financeiro</span>
               </div>
               <input
-                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#0b1220] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
+                style={{ backgroundColor: "#0b1220" }}
                 placeholder="Ex.: Professor Lucas"
                 maxLength={80}
                 {...register("display_name", {

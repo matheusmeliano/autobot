@@ -91,8 +91,9 @@ export function SignupForm() {
           <input
             type="text"
             autoComplete="name"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
+            className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
             placeholder="Seu nome"
+            style={{ backgroundColor: "#0b1220" }}
             {...register("name", { required: true })}
           />
         </div>
@@ -102,8 +103,9 @@ export function SignupForm() {
           <input
             type="email"
             autoComplete="email"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
+            className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
             placeholder="voce@empresa.com"
+            style={{ backgroundColor: "#0b1220" }}
             {...register("email", {
               required: "Informe seu e-mail.",
               pattern: {
@@ -120,8 +122,9 @@ export function SignupForm() {
             <input
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-11 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20"
+              className="w-full rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 pr-11 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
               placeholder="Mínimo 8 caracteres"
+              style={{ backgroundColor: "#0b1220" }}
               {...register("password", {
                 required: true,
                 minLength: {
@@ -134,7 +137,8 @@ export function SignupForm() {
               type="button"
               aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/50 hover:text-white/80 focus:outline-none focus:ring-2 focus:ring-white/20"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-sky-700 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-600/40 transition-colors"
+              style={{ color: "#0369a1" }}
             >
               {showPassword ? (
                 <EyeOff className="h-4 w-4" />
