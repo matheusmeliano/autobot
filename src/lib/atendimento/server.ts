@@ -55,13 +55,23 @@ function isValidWhatsAppUserPhone(digitsOnly: string): boolean {
   if (!/^\d+$/.test(d)) return false;
   if (/^0+$/.test(d)) return false;
   if (d.length < 10) return false;
-  if (d.length > 15) return false;
+  // ======= GUARD ISOLADO NUMERO ESTRANHO 246342211350770 =======
+  // MAXIMO MUNDIAL WHATSAPP: 14 digitos (ISO E.164 max 15, porem nosso pais BR=13, US=11,
+  // paises grandes como IN=13, ID=14. Nunca aceitamos 15 que vira ID SUSPEITO / Message ID / Group ID).
+  if (d.length > 14) return false;
   if (d.startsWith("0")) return false;
   if (d.startsWith("550")) return false;
+  if (/^(\d)\1{9,}$/.test(d)) return false;
+  if (/^123456789/.test(d)) return false;
+  if (/^987654321/.test(d)) return false;
+  // FIM GUARD ISOLADO ====================================================
+
   if (d.startsWith("55")) {
     if (d.length !== 12 && d.length !== 13) return false;
     const rest = d.slice(2);
     if (/^0+/.test(rest)) return false;
+    const ddd = Number(rest.slice(0, 2));
+    if (!Number.isFinite(ddd) || ddd < 11 || ddd > 99) return false;
     return true;
   }
   if (d.startsWith("1")) {
@@ -70,8 +80,33 @@ function isValidWhatsAppUserPhone(digitsOnly: string): boolean {
     if (!/^[2-9]\d{2}$/.test(npa)) return false;
     return true;
   }
+  // Internacional (nao BR, nao US):
+  // Maximo 12 digitos (ex: UK=12, ES=11, DE=12, FR=11, IT=11, AR=12, etc)
+  if (d.length > 12) return false;
   const firstDigit = Number(d[0]);
   if (!Number.isFinite(firstDigit) || firstDigit < 2) return false;
+  // Lista country calling codes validos (primeiros 1 a 3 digitos)
+  // https://en.wikipedia.org/wiki/List_of_country_calling_codes
+  const validCountryCallingCodes = new Set([
+    "2", "3", "4", "5", "6", "7", "8", "9", // fallback (qualquer 1 digito 2-9)
+  ]);
+  if (!validCountryCallingCodes.has(d[0])) return false;
+  // Rejeita explicitamente codigos suspeitos (geralmente +246 Diego Garcia / BIOT nao tem WhatsApp comercial)
+  // e qualquer outro que sabemos que nao fazem parte do fluxo do SaaS.
+  if (d.startsWith("246")) return false;
+  if (d.startsWith("247")) return false;
+  if (d.startsWith("248")) return false;
+  if (d.startsWith("269")) return false;
+  if (d.startsWith("268")) return false;
+  if (d.startsWith("264")) return false;
+  if (d.startsWith("500")) return false;
+  if (d.startsWith("599")) return false;
+  if (d.startsWith("672")) return false;
+  if (d.startsWith("683")) return false;
+  if (d.startsWith("690")) return false;
+  if (d.startsWith("881")) return false;
+  if (d.startsWith("882")) return false;
+  if (d.startsWith("883")) return false;
   return true;
 }
 
