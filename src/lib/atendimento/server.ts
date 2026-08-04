@@ -131,6 +131,10 @@ async function loadAllInstancePhoneBlocklist(): Promise<Set<string>> {
       process.env.ZAPI_INSTANCE_PHONE_FALLBACK,
       process.env.ATENDIMENTO_WHATSAPP_PHONE,
       process.env.WHATSAPP_INSTANCE_PHONE,
+      process.env.TEACHER_NOTIFICATION_PHONE,
+      process.env.PROFESSOR_WHATSAPP_PHONE,
+      "556581175345",
+      "556598079407",
     ];
     for (const p of envPhones) {
       const norm = normalizePhoneDigitsOnly(p);
@@ -1869,6 +1873,29 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       `Telefone informado nao corresponde a um usuario WhatsApp valido: ${normalizedPhone ? "len=" + normalizedPhone.length : "empty"}`,
     );
   }
+
+  const hiddenBlocklist = await (async () => {
+    try {
+      const { loadHiddenWhatsAppPhoneBlocklist } = await import("@/lib/painelHiddenPhones");
+      return (await loadHiddenWhatsAppPhoneBlocklist({ supabaseAdmin: admin })) ?? new Set<string>();
+    } catch (_e) {
+      return new Set<string>();
+    }
+  })();
+  if (hiddenBlocklist.size > 0) {
+    const { areBrazilianPhonesEquivalent } = await import("@/lib/painelHiddenPhones");
+    let isBlocked = false;
+    for (const blocked of hiddenBlocklist) {
+      if (areBrazilianPhonesEquivalent(normalizedPhone, blocked)) {
+        isBlocked = true;
+        break;
+      }
+    }
+    if (isBlocked) {
+      return null;
+    }
+  }
+
   const publicLink = await ensureAtendimentoPublicLink();
 
   let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });

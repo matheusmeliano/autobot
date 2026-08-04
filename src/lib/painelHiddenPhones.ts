@@ -48,7 +48,10 @@ export async function loadHiddenWhatsAppPhoneBlocklist(params?: {
     process.env.ZAPI_INSTANCE_PHONE_FALLBACK,
     process.env.ATENDIMENTO_WHATSAPP_PHONE,
     process.env.WHATSAPP_INSTANCE_PHONE,
+    process.env.TEACHER_NOTIFICATION_PHONE,
+    process.env.PROFESSOR_WHATSAPP_PHONE,
     "556581175345",
+    "556598079407",
   ];
   for (const raw of envPhones) {
     if (!raw) continue;

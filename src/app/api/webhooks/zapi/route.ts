@@ -1750,8 +1750,17 @@ export async function POST(req: Request) {
         initialTimezone: null,
         initialCountry: null,
       });
-      if (leadContext?.lead?.id && leadContext?.conversation?.id) {
-        const nowIso = new Date().toISOString();
+      if (!leadContext?.lead?.id || !leadContext?.conversation?.id) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason:
+            leadContext === null
+              ? "phone_hidden_blocklist_notification_number"
+              : "lead_or_conversation_missing",
+        });
+      }
+      const nowIso = new Date().toISOString();
         const leadId = String(leadContext.lead.id);
         const conversationId = String(leadContext.conversation.id);
         const lead = leadContext.lead as any;
