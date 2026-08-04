@@ -128,6 +128,23 @@ function normalizeSelectionText(value: string) {
     .trim();
 }
 
+function normalizeFlexibleDateSelection(value: string) {
+  let s = normalizeSelectionText(value);
+  if (!s) return null;
+
+  s = s
+    .replace(/(?:^|\s)(pode(?:\s+ser)?|entendeu|entende|ok|beleza|ta bom|tudo bem|obrigado|valeu|por favor|pfv|pf|por gentileza|quero|queria|gostaria|desejo|preciso|vou querer|vai ser|sera o|ser a|e|para|do|de|da|no|na|meu|minha|esse|essa|este|esta|dia|data|agendar|marcar|agendamento)(?=\s|$)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!s) return null;
+  const firstDigits = s.match(/\d+/);
+  if (!firstDigits) return s;
+  const dayNum = Number(firstDigits[0]);
+  if (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > 31) return s;
+  return String(dayNum);
+}
+
 function normalizeFlexibleTimeSelection(value: string) {
   const normalized = normalizeSelectionText(value);
   if (!normalized) return null;
@@ -420,12 +437,22 @@ export function findExperimentalClassDateOption(
 ) {
   const normalizedInput = normalizeSelectionText(input);
   if (!normalizedInput) return null;
+  const normalizedFlexibleInput = normalizeFlexibleDateSelection(input);
 
   for (const option of options) {
     const normalizedDayLabel = normalizeSelectionText(option.dayLabel);
     if (normalizedInput === normalizedDayLabel) return option;
     if (normalizedInput === normalizeSelectionText(option.displayLabel)) return option;
     if (normalizedInput === normalizeSelectionText(option.leadDate)) return option;
+
+    const dayNumFromLabel = Number(normalizedDayLabel);
+    if (normalizedFlexibleInput && Number.isFinite(dayNumFromLabel) && dayNumFromLabel >= 1 && dayNumFromLabel <= 31) {
+      if (String(dayNumFromLabel) === normalizedFlexibleInput) return option;
+    }
+
+    if (normalizedFlexibleInput && (normalizedFlexibleInput === normalizeSelectionText(option.displayLabel) || normalizedFlexibleInput === normalizeSelectionText(option.leadDate))) {
+      return option;
+    }
   }
 
   const hasAnyLetter = /[a-zA-Záàâãéèêíìîóòôõúùûçüñ]/.test(String(input ?? "").normalize("NFD"));
@@ -434,8 +461,10 @@ export function findExperimentalClassDateOption(
   const relevantDateKeywords = [
     /(^|[\s.!,?:;\-])((segunda|terca|quarta|quinta|sexta|sabado|domingo)|(seg|ter|qua|qui|sex|sab|dom)|(feira|dia|hoje|amanha|depois de amanha|proximo|proxima|mes|agosto|janeiro|fevereiro|marco|abril|maio|junho|julho|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez))([\s.!,?:;\-]|$)/,
     /\bd\s*\+\s*\d+\b/,
+    /(^|[\s.!,?:;\-])(pode(?:\s+ser)?|entendeu|entende|quero|queria|gostaria|desejo|preciso|vou querer|vai ser|sera(?:\s+[oa])?|por favor|pfv|pf)([\s.!,?:;\-]|$)/,
   ];
   const hasRelevantDateText = hasAnyLetter && relevantDateKeywords.some((rx) => rx.test(normalizedInput));
+  const hasFlexibleExtractedDay = Boolean(normalizedFlexibleInput) && /^\d+$/.test(String(normalizedFlexibleInput));
   function cleanTextLooksReasonable(raw: string): boolean {
     const t = String(raw ?? "")
       .toLowerCase()
@@ -453,9 +482,21 @@ export function findExperimentalClassDateOption(
   const canFallbackToDigitsOnly =
     seemsLikePureNumericDate ||
     !hasAnyLetter ||
+    hasFlexibleExtractedDay ||
     (hasRelevantDateText && cleanTextLooksReasonable(String(input ?? "")));
 
   if (!canFallbackToDigitsOnly) return null;
+
+  if (hasFlexibleExtractedDay && normalizedFlexibleInput) {
+    const fallbackDay = Number(normalizedFlexibleInput);
+    if (Number.isFinite(fallbackDay) && fallbackDay >= 1 && fallbackDay <= 31) {
+      const candidates = options.filter((option) => {
+        const dayNum = Number(option.dayLabel);
+        return Number.isFinite(dayNum) && dayNum === fallbackDay;
+      });
+      if (candidates.length === 1) return candidates[0] as ExperimentalClassDateOption;
+    }
+  }
 
   const digitsMatches = normalizedInput.match(/\d+/g);
   if (digitsMatches && digitsMatches.length) {
