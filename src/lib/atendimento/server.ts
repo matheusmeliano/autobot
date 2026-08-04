@@ -244,6 +244,94 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
   );
 }
 
+export function detectLenientYesNo(rawText: string | null | undefined): {
+  result: "yes" | "no" | "ambiguous";
+  yesScore: number;
+  noScore: number;
+} {
+  const text = String(rawText ?? "").trim();
+  if (!text) return { result: "ambiguous", yesScore: 0, noScore: 0 };
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  let yesScore = 0;
+  let noScore = 0;
+
+  const stripEmojisPunctuation = normalized
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const tokens = stripEmojisPunctuation.split(/\s+/).filter(Boolean);
+
+  for (const tok of tokens) {
+    if (tok === "sim" || tok === "s") yesScore += 100;
+    else if (/^sim$/.test(tok)) yesScore += 100;
+    else if (/^ss+$/.test(tok)) yesScore += 90;
+    else if (/^claro$|^claramente$|^certamente$|^exato$|^exatamente$|^com certeza$|^comcerteza$|^isso$|^isto$/.test(tok))
+      yesScore += 55;
+    else if (/^concordo$|^concordar$|^confirmo$|^confirmar$|^confirmada$|^confirmado$|^confirmou$|^confirmar$/.test(tok))
+      yesScore += 55;
+    else if (/^ok$|^okay$|^oke$|^okey$|^beleza$|^blz$|^show$|^perfeito$|^top$|^boa$|^bom$|^positivo$/.test(tok))
+      yesScore += 40;
+    else if (/^avancar$|^prosseguir$|^seguir$|^continuar$|^continua$|^seguir$|^pode$|^podemos$|^quero$|^queremos$|^desejo$|^desejamos$/.test(tok))
+      yesScore += 38;
+    else if (/^sim$/.test(tok)) yesScore += 100;
+
+    if (tok === "nao" || tok === "n") noScore += 100;
+    else if (/^no+$/.test(tok) && tok.length <= 5) noScore += 95;
+    else if (/^nah+$/.test(tok)) noScore += 80;
+    else if (/^negativo$|^naoquero$|^nao_quero$|^cancelar$|^cancela$|^cancelado$|^cancelada$/.test(tok))
+      noScore += 70;
+    else if (
+      /^recuso$|^recusar$|^recusa$|^rejeito$|^rejeitar$|^rejeita$|^desistir$|^desisto$|^parar$|^parou$/.test(tok)
+    )
+      noScore += 70;
+    else if (/^agora.*nao$|^talvez.{0,10}depois$|^depois$|^outrahora$|^outra hora$|^melhor.{0,10}nao$/.test(tok))
+      noScore += 60;
+    else if (/^acho$|^talvez$|^provavelmente.{0,10}nao$|^provavelmentenao$|^provavelmente_nao$/.test(tok))
+      noScore += 45;
+    else if (/^obrigado$|^obrigada$|^vlw$|^valeu$|^agradecido$/.test(tok)) noScore += 8;
+  }
+
+  if (/claro que sim|com certeza sim|pode sim|sim pode|sim quero|sim quero continuar|sim continuar|sim confirmo|confirmo sim|quero sim|desejo sim|concordo sim|ok sim|beleza sim|vamos sim|claro sim/.test(stripEmojisPunctuation)) {
+    yesScore += 150;
+  }
+  if (/sim.{0,8}(quero|pode|seguir|avancar|continuar|confirmar|concordo|beleza|perfeito)/.test(stripEmojisPunctuation)) {
+    yesScore += 90;
+  }
+  if (/(quero|pode|vamos|desejo|prefiro|queria).{0,10}sim/.test(stripEmojisPunctuation)) yesScore += 80;
+
+  if (/acho que nao|talvez nao|melhor nao|pode cancelar|cancela por favor|cancelar por favor|nao quero|nao desejo|nao obrigado|nao, obrigado|nao obrigada|nao quero continuar|nao continuar|nao confirmo|nao concordo|nao pode|nao, pode|nao,.{0,10}nao/.test(stripEmojisPunctuation)) {
+    noScore += 150;
+  }
+  if (/nao.{0,10}(quero|desejo|gosto|pode|queremos|desejamos|confirmo|concordo|continuar|avancar|seguir|matricular|matricula)/.test(stripEmojisPunctuation)) {
+    noScore += 90;
+  }
+  if (/(cancelar|cancela|cancelado|cancelada|parar|desisto|recuso|rejeito|não quero|nao quero).{0,25}(por favor|pf|obrigado|obrigada|valeu|tchau|ate logo|abraço|abracos)?$/.test(stripEmojisPunctuation)) {
+    noScore += 80;
+  }
+
+  if (/^nao\b/.test(normalized) && /\bsim\b/.test(normalized) && noScore > 0 && yesScore > 0) {
+    noScore += 20;
+  } else if (/\bsim\b/.test(normalized) && /\bnao\b/.test(normalized) && yesScore > 0 && noScore > 0) {
+    yesScore += 20;
+  }
+
+  if (yesScore >= 60 && yesScore - noScore >= 40) return { result: "yes", yesScore, noScore };
+  if (noScore >= 60 && noScore - yesScore >= 40) return { result: "no", yesScore, noScore };
+
+  const simpleYes = /(^|[^a-z])sim([^a-z]|$)/.test(stripEmojisPunctuation);
+  const simpleNo = /(^|[^a-z])nao([^a-z]|$)/.test(stripEmojisPunctuation);
+  if (simpleYes && !simpleNo) return { result: "yes", yesScore: yesScore + 100, noScore };
+  if (simpleNo && !simpleYes) return { result: "no", yesScore, noScore: noScore + 100 };
+
+  return { result: "ambiguous", yesScore, noScore };
+}
+
 function isExperimentalClassBookingsNotificationSentColumnsUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
   const message = String((error as any)?.message ?? "");

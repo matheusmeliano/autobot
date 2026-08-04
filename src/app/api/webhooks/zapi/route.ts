@@ -37,6 +37,7 @@ import {
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
   getZapiInstanceMeta,
+  detectLenientYesNo,
 } from "@/lib/atendimento/server";
 import {
   inferBrazilianLocationFromDdd,
@@ -1836,17 +1837,10 @@ export async function POST(req: Request) {
           .trim()
           .replace(/[.!?,\s]+$/g, "")
           .toLowerCase();
-        const isYesNuclear =
-          inboundNormalizedNuclear === "sim" ||
-          inboundNormalizedNuclear === "s" ||
-          /^sim\b/i.test(inboundNormalizedNuclear) ||
-          inboundNormalizedNuclear.replace(/\s+/g, "") === "sim";
-        const isNoNuclear =
-          inboundNormalizedNuclear === "nao" ||
-          inboundNormalizedNuclear === "n" ||
-          /^nao\b/i.test(inboundNormalizedNuclear) ||
-          inboundNormalizedNuclear.replace(/\s+/g, "") === "nao" ||
-          /^n[aãâ]o\b/i.test(inboundContentRaw.trim());
+        const lenientYesNoNuclear = detectLenientYesNo(inboundContentRaw);
+        const isYesNuclear = lenientYesNoNuclear.result === "yes";
+        const isNoNuclear = lenientYesNoNuclear.result === "no";
+        const isAmbiguousNuclear = lenientYesNoNuclear.result === "ambiguous";
 
         const recentBotHasMsgSimNao = recentBotTextsNuclear.some((text) => text === MSG_SIM_NAO_INVALIDA);
         const ultimaMsgBotPedeSimNao =
@@ -2080,23 +2074,126 @@ export async function POST(req: Request) {
               flow: "nuclear_post_attendance_matricula_pendente_resposta_sim",
             });
           } else {
+            let invalidYesNoAttemptsForAmbiguousOnly = 0;
+            try {
+              const { data: histInvalidAttempts } = await admin
+                .from("atendimento_history_events")
+                .select("event_type, details")
+                .eq("lead_id", leadId)
+                .eq("conversation_id", conversationId)
+                .in("event_type", [
+                  "matricula_pendente_sim_nao_invalida_ambiguous",
+                  "nuclear_matricula_pendente_sim_nao_invalida_ambiguous",
+                ])
+                .order("created_at", { ascending: false })
+                .limit(10);
+              const arrHist = (histInvalidAttempts ?? []) as any[];
+              const eventsAfterLastClear = [] as any[];
+              for (const ev of arrHist) {
+                const typ = String(ev?.event_type ?? "");
+                if (
+                  typ === "matricula_pendente_resposta_sim" ||
+                  typ === "matricula_pendente_resposta_nao" ||
+                  typ === "matricula_pendente_resposta_sim_nuclear" ||
+                  typ === "matricula_pendente_resposta_nao_nuclear"
+                ) {
+                  break;
+                }
+                if (
+                  typ === "matricula_pendente_sim_nao_invalida_ambiguous" ||
+                  typ === "nuclear_matricula_pendente_sim_nao_invalida_ambiguous"
+                ) {
+                  eventsAfterLastClear.push(ev);
+                }
+              }
+              invalidYesNoAttemptsForAmbiguousOnly = eventsAfterLastClear.length;
+            } catch (_e) {
+              invalidYesNoAttemptsForAmbiguousOnly = 0;
+            }
+
+            const ambiguousCount = invalidYesNoAttemptsForAmbiguousOnly + 1;
+            const maxAmbiguousAttempts = 3;
+            let maxExceeded = ambiguousCount > maxAmbiguousAttempts && isAmbiguousNuclear;
+
+            if (maxExceeded) {
+              try {
+                void appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "whatsapp_flow_blocked_max_attempts",
+                  title: "Fluxo pos-attendance matricula pendente bloqueado apos 3 tentativas ambiguas de sim/nao",
+                  details: {
+                    reason: "max_ambiguous_yes_no_attempts",
+                    ambiguous_attempts: ambiguousCount,
+                    max_ambiguous_attempts: maxAmbiguousAttempts,
+                    inbound_text: inboundContentRaw,
+                    lenient_yes_score: lenientYesNoNuclear.yesScore,
+                    lenient_no_score: lenientYesNoNuclear.noScore,
+                    source: "nuclear_post_attendance",
+                  },
+                  actorType: "system",
+                });
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_conversations")
+                  .update({ bot_enabled: false, updated_at: nowIso })
+                  .eq("id", conversationId);
+              } catch (_e) {}
+              return Response.json({
+                ok: true,
+                handled: true,
+                blocked: true,
+                reason: "max_ambiguous_yes_no_attempts_post_attendance_nuclear",
+                attempts: ambiguousCount,
+                flow: "nuclear_post_attendance_matricula_pendente_bloqueado_max_ambiguous",
+              });
+            }
+
+            const replyInvalid =
+              ambiguousCount > 1
+                ? `${MSG_SIM_NAO_INVALIDA}\n\nTentativa ${Math.min(ambiguousCount, maxAmbiguousAttempts)} de ${maxAmbiguousAttempts}.`
+                : MSG_SIM_NAO_INVALIDA;
+
             try {
               await insertWhatsAppBotTextMessage({
                 admin,
                 conversationId,
-                contentText: MSG_SIM_NAO_INVALIDA,
+                contentText: replyInvalid,
               });
             } catch (_e) {}
             try {
               await sendAtendimentoWhatsAppText({
                 phone: normalizedPhoneOnly,
-                message: MSG_SIM_NAO_INVALIDA,
+                message: replyInvalid,
+              });
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "nuclear_matricula_pendente_sim_nao_invalida_ambiguous",
+                title: "Matricula pendente pos-attendance (nuclear): resposta ambigua, pedindo sim/não",
+                details: {
+                  inbound_text: inboundContentRaw,
+                  is_ambiguous_nuclear: isAmbiguousNuclear,
+                  ambiguous_attempt: ambiguousCount,
+                  max_ambiguous_attempts: maxAmbiguousAttempts,
+                  lenient_yes_score: lenientYesNoNuclear.yesScore,
+                  lenient_no_score: lenientYesNoNuclear.noScore,
+                  reply_invalid_message: replyInvalid,
+                },
+                actorType: "bot",
               });
             } catch (_e) {}
             return Response.json({
               ok: true,
               handled: true,
-              flow: "nuclear_post_attendance_matricula_pendente_invalida",
+              ambiguous: isAmbiguousNuclear,
+              ambiguous_attempt: ambiguousCount,
+              flow: isAmbiguousNuclear
+                ? "nuclear_post_attendance_matricula_pendente_invalida_ambiguous"
+                : "nuclear_post_attendance_matricula_pendente_invalida",
             });
           }
         }
@@ -2405,18 +2502,10 @@ export async function POST(req: Request) {
             .replace(/[.!?,\s]+$/g, "")
             .toLowerCase();
 
-          const isYes =
-            inboundNormalized === "sim" ||
-            inboundNormalized === "s" ||
-            /^sim\b/i.test(inboundNormalized) ||
-            inboundNormalized.replace(/\s+/g, "") === "sim";
-
-          const isNo =
-            inboundNormalized === "nao" ||
-            inboundNormalized === "n" ||
-            /^nao\b/i.test(inboundNormalized) ||
-            inboundNormalized.replace(/\s+/g, "") === "nao" ||
-            /^n[aãâ]o\b/i.test(inboundContent.trim());
+          const lenientYesNo = detectLenientYesNo(inboundContent);
+          const isYes = lenientYesNo.result === "yes";
+          const isNo = lenientYesNo.result === "no";
+          const isAmbiguous = lenientYesNo.result === "ambiguous";
 
           let replyText = MSG_SIM_NAO_INVALIDA;
           let noReplies: string[] = [];
@@ -2424,6 +2513,97 @@ export async function POST(req: Request) {
           let nextLeadStatus = "matricula_pendente";
           let historyEventType = "matricula_pendente_sim_nao_invalida";
           let historyTitle = "Matrícula pendente: resposta inválida, pedindo sim/não";
+
+          let invalidYesNoAttemptsGeneralAmbiguousOnly = 0;
+          if (isAmbiguous) {
+            try {
+              const { data: histGeneralAmb } = await admin
+                .from("atendimento_history_events")
+                .select("event_type, details, created_at")
+                .eq("lead_id", leadId)
+                .eq("conversation_id", conversationId)
+                .in("event_type", [
+                  "matricula_pendente_sim_nao_invalida",
+                  "matricula_pendente_sim_nao_invalida_ambiguous",
+                ])
+                .order("created_at", { ascending: false })
+                .limit(10);
+              const arrGeneral = (histGeneralAmb ?? []) as any[];
+              const afterReset = [] as any[];
+              for (const ev of arrGeneral) {
+                const typ = String(ev?.event_type ?? "");
+                if (
+                  typ === "matricula_pendente_resposta_sim" ||
+                  typ === "matricula_pendente_resposta_nao"
+                ) {
+                  break;
+                }
+                if (
+                  typ === "matricula_pendente_sim_nao_invalida" ||
+                  typ === "matricula_pendente_sim_nao_invalida_ambiguous"
+                ) {
+                  const details: any = (ev as any).details ?? null;
+                  const wasAmbiguous =
+                    details && typeof details === "object" && details.is_ambiguous === true;
+                  if (wasAmbiguous || typ === "matricula_pendente_sim_nao_invalida_ambiguous") {
+                    afterReset.push(ev);
+                  }
+                }
+              }
+              invalidYesNoAttemptsGeneralAmbiguousOnly = afterReset.length;
+            } catch (_e) {
+              invalidYesNoAttemptsGeneralAmbiguousOnly = 0;
+            }
+          }
+          const generalAmbiguousCount =
+            (isAmbiguous ? invalidYesNoAttemptsGeneralAmbiguousOnly + 1 : 0);
+          const maxAmbiguousAttemptsGeneral = 3;
+          const shouldStopAfterMaxAmbiguous =
+            isAmbiguous && generalAmbiguousCount > maxAmbiguousAttemptsGeneral;
+
+          if (shouldStopAfterMaxAmbiguous) {
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_flow_blocked_max_attempts",
+                title: "Fluxo pos-attendance matricula pendente bloqueado apos 3 tentativas ambiguas (geral)",
+                details: {
+                  reason: "max_ambiguous_yes_no_attempts_general",
+                  ambiguous_attempts: generalAmbiguousCount,
+                  max_ambiguous_attempts: maxAmbiguousAttemptsGeneral,
+                  inbound_text: inboundContent,
+                  inbound_normalized: inboundNormalized,
+                  lenient_yes_score: lenientYesNo.yesScore,
+                  lenient_no_score: lenientYesNo.noScore,
+                  source: "whatsapp_zapi_general",
+                },
+                actorType: "system",
+              });
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              blocked: true,
+              ambiguous: true,
+              ambiguous_attempt: generalAmbiguousCount,
+              reason: "max_ambiguous_yes_no_attempts_post_attendance_general",
+              flow: "whatsapp_post_attendance_matricula_pendente_bloqueado_max_ambiguous",
+            });
+          }
+
+          if (isAmbiguous && generalAmbiguousCount >= 1) {
+            replyText =
+              generalAmbiguousCount > 1
+                ? `${MSG_SIM_NAO_INVALIDA}\n\nTentativa ${Math.min(generalAmbiguousCount, maxAmbiguousAttemptsGeneral)} de ${maxAmbiguousAttemptsGeneral}.`
+                : MSG_SIM_NAO_INVALIDA;
+          }
 
           if (isYes) {
             replyText =
@@ -2441,6 +2621,9 @@ export async function POST(req: Request) {
             nextLeadStatus = "matricula_pendente_recusada";
             historyEventType = "matricula_pendente_resposta_nao";
             historyTitle = "Matrícula pendente: lead respondeu NÃO";
+          } else if (isAmbiguous) {
+            historyEventType = "matricula_pendente_sim_nao_invalida_ambiguous";
+            historyTitle = "Matrícula pendente: resposta ambígua, pedindo sim/não";
           }
 
           try {
@@ -2518,6 +2701,11 @@ export async function POST(req: Request) {
                 inbound_normalized: inboundNormalized || null,
                 is_yes: isYes,
                 is_no: isNo,
+                is_ambiguous: isAmbiguous,
+                ambiguous_attempt: generalAmbiguousCount,
+                max_ambiguous_attempts: maxAmbiguousAttemptsGeneral,
+                lenient_yes_score: lenientYesNo.yesScore,
+                lenient_no_score: lenientYesNo.noScore,
                 reply_text: isNo ? noReplies.join("\n---\n") : replyText,
                 next_funnel_stage: nextLeadFunnel,
                 next_status: nextLeadStatus,
@@ -2555,6 +2743,10 @@ export async function POST(req: Request) {
             flow: "whatsapp_post_attendance_matricula_pendente",
             is_yes: isYes,
             is_no: isNo,
+            is_ambiguous: isAmbiguous,
+            ambiguous_attempt: generalAmbiguousCount,
+            lenient_yes_score: lenientYesNo.yesScore,
+            lenient_no_score: lenientYesNo.noScore,
           });
         }
 
