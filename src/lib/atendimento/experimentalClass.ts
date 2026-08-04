@@ -146,38 +146,100 @@ function normalizeFlexibleDateSelection(value: string) {
 }
 
 function normalizeFlexibleTimeSelection(value: string) {
-  const normalized = normalizeSelectionText(value);
-  if (!normalized) return null;
+  let s = normalizeSelectionText(value);
+  if (!s) return null;
 
-  const compact = normalized
+  s = s
+    .replace(/(?:^|\s)(as?|as 0?|a 0?|as horas?|a horas?)(?=\s|$)/g, " ")
+    .replace(/\b(as?\s+)?(\d{1,2}(?::\d{1,2}|h\d{0,2}))\s*(horas?|hrs?|h?)\b/g, (_m, _a, core) => ` ${core} `)
+    .replace(/\bda (manha|tarde|noite|madrugada|meio dia|meio-dia)\b/g, (_m, period: string) => {
+      const periodClean = period.replace(/\s+/g, "").replace(/\-/g, "");
+      return ` ${periodClean} `;
+    })
+    .replace(/\b(d[eao]|no|na|pela|pelo|pro|pra|esse|essa|este|esta|horario|horario|horas|hora|hrs?|minutos?|mins?)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const amPmMatch = s.match(/(\d{1,2})(?::(\d{1,2}))?\s*(?:h|h)?\s*(?:\s?[ap]\.?m\.?| [ap])/i);
+  if (amPmMatch) {
+    let hour = Number(amPmMatch[1]);
+    const minute = amPmMatch[2] ? Number(amPmMatch[2]) : 0;
+    const suffix = s.toLowerCase().includes("p") ? "PM" : "AM";
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    if (suffix === "PM" && hour < 12) hour += 12;
+    if (suffix === "AM" && hour === 12) hour = 0;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  const periodMatch = s.match(/manha|tarde|noite|madrugada|meiodia/i);
+  const hasPeriodWord = Boolean(periodMatch);
+  const periodWord = periodMatch ? periodMatch[0].toLowerCase() : "";
+
+  function applyPeriodDefault(hour: number, minute: number): { hour: number; minute: number } | null {
+    if (!hasPeriodWord) return { hour, minute };
+    const h = Number(hour);
+    const m = Number(minute);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    let adjusted = h;
+    if (periodWord === "manha" || periodWord === "madrugada") {
+      if (adjusted >= 12) adjusted = adjusted % 12;
+      if (adjusted === 0 && periodWord === "manha") adjusted = 0;
+    } else if (periodWord === "tarde" || periodWord === "noite") {
+      if (adjusted < 12) adjusted += 12;
+      if (adjusted === 12 && periodWord === "tarde") adjusted = 12;
+      if (adjusted === 24) adjusted = 0;
+    } else if (periodWord === "meiodia") {
+      if (adjusted === 12 || adjusted === 0) adjusted = 12;
+    }
+    if (adjusted < 0 || adjusted > 23 || m < 0 || m > 59) return null;
+    return { hour: adjusted, minute: m };
+  }
+
+  const compact = s
     .replace(/\s+/g, "")
     .replace(/horas?/g, "h")
     .replace(/hrs?/g, "h")
     .replace(/minutos?/g, "min")
     .replace(/mins?/g, "min")
-    .replace(/^(\d{1,2}:\d{1,2})h$/, "$1");
+    .replace(/manha|tarde|noite|madrugada|meiodia/g, "");
 
-  const colonMatch = compact.match(/^(\d{1,2}):(\d{1,2})$/);
+  const colonMatch = compact.match(/^(\d{1,2}):(\d{1,2})h?$/);
   if (colonMatch) {
     const hour = Number(colonMatch[1]);
     const minute = Number(colonMatch[2]);
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const final = hasPeriodWord ? applyPeriodDefault(hour, minute) : { hour, minute };
+    if (!final || final.hour < 0 || final.hour > 23 || final.minute < 0 || final.minute > 59) return null;
+    return `${String(final.hour).padStart(2, "0")}:${String(final.minute).padStart(2, "0")}`;
   }
 
   const hourMinuteMatch = compact.match(/^(\d{1,2})h(\d{1,2})(?:min)?$/);
   if (hourMinuteMatch) {
     const hour = Number(hourMinuteMatch[1]);
     const minute = Number(hourMinuteMatch[2]);
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const final = hasPeriodWord ? applyPeriodDefault(hour, minute) : { hour, minute };
+    if (!final || final.hour < 0 || final.hour > 23 || final.minute < 0 || final.minute > 59) return null;
+    return `${String(final.hour).padStart(2, "0")}:${String(final.minute).padStart(2, "0")}`;
   }
 
-  const hourOnlyMatch = compact.match(/^(\d{1,2})h$/);
+  const hourOnlyMatch = compact.match(/^(\d{1,2})h?$/);
   if (hourOnlyMatch) {
     const hour = Number(hourOnlyMatch[1]);
-    if (hour < 0 || hour > 23) return null;
-    return `${String(hour).padStart(2, "0")}:00`;
+    const final = hasPeriodWord ? applyPeriodDefault(hour, 0) : { hour, minute: 0 };
+    if (!final || final.hour < 0 || final.hour > 23) return null;
+    return `${String(final.hour).padStart(2, "0")}:00`;
+  }
+
+  if (hasPeriodWord) {
+    const periodDigitsMatch = s.match(/(\d{1,2})(?:\s*[:h]\s*(\d{1,2}))?/);
+    if (periodDigitsMatch) {
+      const hour = Number(periodDigitsMatch[1]);
+      const minute = periodDigitsMatch[2] ? Number(periodDigitsMatch[2]) : 0;
+      const final = applyPeriodDefault(hour, minute);
+      if (final && final.hour >= 0 && final.hour <= 23 && final.minute >= 0 && final.minute <= 59) {
+        return `${String(final.hour).padStart(2, "0")}:${String(final.minute).padStart(2, "0")}`;
+      }
+    }
   }
 
   return null;
@@ -546,7 +608,7 @@ export function findExperimentalClassTimeOption(
   const hasAnyLetter = /[a-zA-Záàâãéèêíìîóòôõúùûçüñ]/.test(String(input ?? "").normalize("NFD"));
   const hasTimeSeparatorsOnlyNoLetters = /^[0-9\s.:\-hH]+$/.test(String(input ?? "").trim());
   const relevantTimeKeywords = [
-    /(^|[\s.!,?:;\-])((horas|hora|hrs|hr|minutos|minuto|mins|min|meio dia|meio-dia|manha|tarde|noite|almoco|jantar|agora)|([0-9]{1,2}h([0-9]{1,2}min?)?))([\s.!,?:;\-]|$)/,
+    /(^|[\s.!,?:;\-])((horas|hora|hrs|hr|minutos|minuto|mins|min|meio dia|meio-dia|manha|tarde|noite|almoco|jantar|agora|as 0?|a 0?|as|a|am|pm|a\.m|p\.m|periodo|da manha|da tarde|da noite|de manha|de tarde|de noite|madrugada)|([0-9]{1,2}h([0-9]{1,2}min?)?))([\s.!,?:;\-]|$)/,
   ];
   const hasRelevantTimeText = hasAnyLetter && relevantTimeKeywords.some((rx) => rx.test(normalizedInput));
   function cleanTextLooksReasonable(raw: string): boolean {
@@ -566,9 +628,21 @@ export function findExperimentalClassTimeOption(
   const canUseNumericFallback =
     !hasAnyLetter ||
     hasTimeSeparatorsOnlyNoLetters ||
+    Boolean(normalizedFlexibleInput) ||
     (hasRelevantTimeText && cleanTextLooksReasonable(String(input ?? "")));
 
   if (!canUseNumericFallback) return null;
+
+  if (normalizedFlexibleInput) {
+    const wanted = normalizedFlexibleInput;
+    for (const option of options) {
+      if (normalizeSelectionText(option.displayLabel) === wanted) return option;
+      if (normalizeSelectionText(option.leadTime) === wanted) return option;
+    }
+    for (const option of options) {
+      if (normalizeSelectionText(option.professorTime) === wanted) return option;
+    }
+  }
 
   const digitsMatches = normalizedInput.match(/\d+/g);
   if (digitsMatches && digitsMatches.length) {
