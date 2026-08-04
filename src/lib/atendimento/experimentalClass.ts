@@ -132,16 +132,59 @@ function normalizeFlexibleDateSelection(value: string) {
   let s = normalizeSelectionText(value);
   if (!s) return null;
 
-  s = s
-    .replace(/(?:^|\s)(pode(?:\s+ser)?|entendeu|entende|ok|beleza|ta bom|tudo bem|obrigado|valeu|por favor|pfv|pf|por gentileza|quero|queria|gostaria|desejo|preciso|vou querer|vai ser|sera o|ser a|e|para|do|de|da|no|na|meu|minha|esse|essa|este|esta|dia|data|agendar|marcar|agendamento)(?=\s|$)/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const stopWords = [
+    "pode ser", "pode",
+    "entendeu", "entende",
+    "ok", "beleza", "ta bom", "tudo bem",
+    "obrigado", "obrigada", "valeu",
+    "por favor", "por gentileza", "pfv", "pf",
+    "quero", "queria", "gostaria", "desejo", "preciso", "vou querer",
+    "vai ser", "sera o", "sera a", "ser o", "ser a",
+    "e", "ou", "mas", "porque", "pois",
+    "para", "pra", "pro",
+    "do", "de", "da", "dos", "das", "dum", "duma", "duns", "dumas",
+    "no", "na", "nos", "nas", "num", "numa", "nuns", "numas",
+    "em",
+    "o", "a", "os", "as", "um", "uma", "uns", "umas",
+    "meu", "minha", "meus", "minhas", "teu", "tua", "teus", "tuas", "seu", "sua", "seus", "suas",
+    "esse", "essa", "esses", "essas", "este", "esta", "estes", "estas", "aquele", "aquela", "aqueles", "aquelas", "isso", "isto", "aquilo",
+    "dia", "dias", "data", "datas",
+    "agendar", "marcar", "agendamento", "marcacao",
+    "escolher", "escolho", "selecionar", "seleciono", "optar", "opto",
+    "hoje", "amanha", "depois de amanha",
+    "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo", "feira",
+    "mes",
+  ];
+
+  const wordsToRegex = new RegExp(
+    stopWords
+      .map((w) => {
+        const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const normalized = escaped
+          .replace(/a/g, "[aáàâã]")
+          .replace(/e/g, "[eéèê]")
+          .replace(/i/g, "[iíìî]")
+          .replace(/o/g, "[oóòôõ]")
+          .replace(/u/g, "[uúùû]")
+          .replace(/c/g, "[cç]");
+        return `(?<![\\p{L}\\d])${normalized}(?![\\p{L}\\d])`;
+      })
+      .join("|"),
+    "giu",
+  );
+
+  s = s.replace(wordsToRegex, " ").replace(/\s+/g, " ").trim();
 
   if (!s) return null;
+
   const firstDigits = s.match(/\d+/);
-  if (!firstDigits) return s;
+  if (!firstDigits) {
+    return s;
+  }
   const dayNum = Number(firstDigits[0]);
-  if (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > 31) return s;
+  if (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > 31) {
+    return s;
+  }
   return String(dayNum);
 }
 
@@ -517,11 +560,36 @@ export function findExperimentalClassDateOption(
     }
   }
 
+  function extractSingleDayFromAnyText(raw: string): number | null {
+    const digitsMatches = String(raw ?? "").match(/\d+/g);
+    if (!digitsMatches || !digitsMatches.length) return null;
+    for (const dig of digitsMatches) {
+      const n = Number(dig);
+      if (Number.isFinite(n) && n >= 1 && n <= 31) {
+        const count = options.filter((opt) => Number(opt.dayLabel) === n).length;
+        if (count === 1) return n;
+      }
+    }
+    return null;
+  }
+
+  if (normalizedFlexibleInput && /^\d+$/.test(String(normalizedFlexibleInput))) {
+    const fallbackDay = Number(normalizedFlexibleInput);
+    const candidates = options.filter((option) => Number(option.dayLabel) === fallbackDay);
+    if (candidates.length === 1) return candidates[0] as ExperimentalClassDateOption;
+  }
+
+  const anyExtractedDay = extractSingleDayFromAnyText(input);
+  if (anyExtractedDay !== null) {
+    const match = options.find((option) => Number(option.dayLabel) === anyExtractedDay);
+    if (match) return match as ExperimentalClassDateOption;
+  }
+
   const hasAnyLetter = /[a-zA-Záàâãéèêíìîóòôõúùûçüñ]/.test(String(input ?? "").normalize("NFD"));
   const hasDateSeparatorsOnlyNoLetters = /^[0-9\s./\-]+$/.test(String(input ?? "").trim());
   const seemsLikePureNumericDate = !hasAnyLetter && hasDateSeparatorsOnlyNoLetters;
   const relevantDateKeywords = [
-    /(^|[\s.!,?:;\-])((segunda|terca|quarta|quinta|sexta|sabado|domingo)|(seg|ter|qua|qui|sex|sab|dom)|(feira|dia|hoje|amanha|depois de amanha|proximo|proxima|mes|agosto|janeiro|fevereiro|marco|abril|maio|junho|julho|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez))([\s.!,?:;\-]|$)/,
+    /(^|[\s.!,?:;\-])((segunda|terca|quarta|quinta|sexta|sabado|domingo)|(seg|ter|qua|qui|sex|sab|dom)|(feira|dia|dias|data|datas|hoje|amanha|depois de amanha|proximo|proxima|mes|agosto|janeiro|fevereiro|marco|abril|maio|junho|julho|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez|as|a|o|os|as|pra|pro|para|no|na|nos|nas|de|do|da|dos|das|agendar|marcar|agendamento|marcacao|escolher|selecionar|optar|quero|queria|gostaria|desejo|preciso|obrigado|obrigada|valeu|beleza|entendeu|entende|pode|por favor|por gentileza))([\s.!,?:;\-]|$)/,
     /\bd\s*\+\s*\d+\b/,
     /(^|[\s.!,?:;\-])(pode(?:\s+ser)?|entendeu|entende|quero|queria|gostaria|desejo|preciso|vou querer|vai ser|sera(?:\s+[oa])?|por favor|pfv|pf)([\s.!,?:;\-]|$)/,
   ];
@@ -545,7 +613,7 @@ export function findExperimentalClassDateOption(
     seemsLikePureNumericDate ||
     !hasAnyLetter ||
     hasFlexibleExtractedDay ||
-    (hasRelevantDateText && cleanTextLooksReasonable(String(input ?? "")));
+    hasRelevantDateText;
 
   if (!canFallbackToDigitsOnly) return null;
 
