@@ -304,50 +304,54 @@ export function detectLenientYesNo(rawText: string | null | undefined): {
 
   for (const tok of tokens) {
     if (tok === "sim" || tok === "s") yesScore += 100;
-    else if (/^sim$/.test(tok)) yesScore += 100;
     else if (/^ss+$/.test(tok)) yesScore += 90;
-    else if (/^claro$|^claramente$|^certamente$|^exato$|^exatamente$|^com certeza$|^comcerteza$|^isso$|^isto$/.test(tok))
+    else if (/^claro$|^claramente$|^certamente$|^exato$|^exatamente$|^comcerteza$|^isso$|^isto$/.test(tok))
       yesScore += 55;
-    else if (/^concordo$|^concordar$|^confirmo$|^confirmar$|^confirmada$|^confirmado$|^confirmou$|^confirmar$/.test(tok))
+    else if (/^concordo$|^concordar$|^confirmo$|^confirmar$|^confirmada$|^confirmado$|^confirmou$/.test(tok))
       yesScore += 55;
     else if (/^ok$|^okay$|^oke$|^okey$|^beleza$|^blz$|^show$|^perfeito$|^top$|^boa$|^bom$|^positivo$/.test(tok))
       yesScore += 40;
-    else if (/^avancar$|^prosseguir$|^seguir$|^continuar$|^continua$|^seguir$|^pode$|^podemos$|^quero$|^queremos$|^desejo$|^desejamos$/.test(tok))
-      yesScore += 38;
-    else if (/^sim$/.test(tok)) yesScore += 100;
+    // NOTE: "pode", "quero", "continuar", "seguir", "avancar", "desejo" NAO sao
+    // tokens SIM isolados (evita enviesar "pode cancelar" como SIM).
+    // Eles so contam em frases compostas (ver regexes abaixo, ex: "sim quero continuar").
 
     if (tok === "nao" || tok === "n") noScore += 100;
     else if (/^no+$/.test(tok) && tok.length <= 5) noScore += 95;
     else if (/^nah+$/.test(tok)) noScore += 80;
     else if (/^negativo$|^naoquero$|^nao_quero$|^cancelar$|^cancela$|^cancelado$|^cancelada$/.test(tok))
-      noScore += 70;
+      noScore += 90;
     else if (
       /^recuso$|^recusar$|^recusa$|^rejeito$|^rejeitar$|^rejeita$|^desistir$|^desisto$|^parar$|^parou$/.test(tok)
     )
-      noScore += 70;
-    else if (/^agora.*nao$|^talvez.{0,10}depois$|^depois$|^outrahora$|^outra hora$|^melhor.{0,10}nao$/.test(tok))
-      noScore += 60;
-    else if (/^acho$|^talvez$|^provavelmente.{0,10}nao$|^provavelmentenao$|^provavelmente_nao$/.test(tok))
+      noScore += 90;
+    else if (/^acho$|^talvez$|^provavelmentenao$|^provavelmente_nao$/.test(tok))
       noScore += 45;
-    else if (/^obrigado$|^obrigada$|^vlw$|^valeu$|^agradecido$/.test(tok)) noScore += 8;
+    // Obrigado/a sozinho nao eh NÃO (evita enviesar "sim, obrigado").
+    // Mas NÃO pesa em NÃO se aparecer JUNTO (ver regexes de frase).
   }
 
   if (/claro que sim|com certeza sim|pode sim|sim pode|sim quero|sim quero continuar|sim continuar|sim confirmo|confirmo sim|quero sim|desejo sim|concordo sim|ok sim|beleza sim|vamos sim|claro sim/.test(stripEmojisPunctuation)) {
-    yesScore += 150;
+    yesScore += 180;
   }
   if (/sim.{0,8}(quero|pode|seguir|avancar|continuar|confirmar|concordo|beleza|perfeito)/.test(stripEmojisPunctuation)) {
-    yesScore += 90;
+    yesScore += 100;
   }
-  if (/(quero|pode|vamos|desejo|prefiro|queria).{0,10}sim/.test(stripEmojisPunctuation)) yesScore += 80;
+  if (/(quero|vamos|desejo|prefiro|queria).{0,10}sim/.test(stripEmojisPunctuation)) yesScore += 90;
 
-  if (/acho que nao|talvez nao|melhor nao|pode cancelar|cancela por favor|cancelar por favor|nao quero|nao desejo|nao obrigado|nao, obrigado|nao obrigada|nao quero continuar|nao continuar|nao confirmo|nao concordo|nao pode|nao, pode|nao,.{0,10}nao/.test(stripEmojisPunctuation)) {
-    noScore += 150;
+  if (/acho que nao|talvez nao|melhor nao|pode cancelar|cancela por favor|cancelar por favor|nao quero|nao desejo|nao obrigado|nao obrigada|nao quero continuar|nao continuar|nao confirmo|nao concordo|nao pode|nao,.{0,10}nao/.test(stripEmojisPunctuation)) {
+    noScore += 180;
   }
   if (/nao.{0,10}(quero|desejo|gosto|pode|queremos|desejamos|confirmo|concordo|continuar|avancar|seguir|matricular|matricula)/.test(stripEmojisPunctuation)) {
-    noScore += 90;
+    noScore += 100;
   }
-  if (/(cancelar|cancela|cancelado|cancelada|parar|desisto|recuso|rejeito|não quero|nao quero).{0,25}(por favor|pf|obrigado|obrigada|valeu|tchau|ate logo|abraço|abracos)?$/.test(stripEmojisPunctuation)) {
-    noScore += 80;
+  if (/(cancelar|cancela|cancelado|cancelada|parar|desisto|recuso|rejeito).{0,25}(por favor|pf|obrigado|obrigada|valeu|tchau|ate logo|abraço|abracos)?$/.test(stripEmojisPunctuation)) {
+    noScore += 110;
+  }
+  if (/(obrigado|obrigada|valeu|agradecido).{0,25}$/.test(stripEmojisPunctuation)) {
+    // Frase curta termina com obrigado e nao possui token SIM → peso leve NÃO (tipo "nao, obrigado" ou so "obrigado" apos nao perguntado)
+    if (yesScore < 100) {
+      noScore += 25;
+    }
   }
 
   if (/^nao\b/.test(normalized) && /\bsim\b/.test(normalized) && noScore > 0 && yesScore > 0) {
@@ -356,8 +360,11 @@ export function detectLenientYesNo(rawText: string | null | undefined): {
     yesScore += 20;
   }
 
-  if (yesScore >= 60 && yesScore - noScore >= 40) return { result: "yes", yesScore, noScore };
-  if (noScore >= 60 && noScore - yesScore >= 40) return { result: "no", yesScore, noScore };
+  // THRESHOLDS MENOS RIGIDOS (ajuste isolated):
+  // Antes: min 60 pts + diferenca >= 40
+  // Agora: min 50 pts + diferenca >= 25 (aceita frases mais naturais sem ambiguous)
+  if (yesScore >= 50 && yesScore - noScore >= 25) return { result: "yes", yesScore, noScore };
+  if (noScore >= 50 && noScore - yesScore >= 25) return { result: "no", yesScore, noScore };
 
   const simpleYes = /(^|[^a-z])sim([^a-z]|$)/.test(stripEmojisPunctuation);
   const simpleNo = /(^|[^a-z])nao([^a-z]|$)/.test(stripEmojisPunctuation);
