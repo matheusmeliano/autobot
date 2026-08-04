@@ -85,11 +85,7 @@ export function LoginForm() {
       footer={
         <>
           Não tem conta?{" "}
-          <Link
-            className="font-semibold text-sky-700 hover:text-sky-800 hover:underline transition-colors"
-            href={signupHref}
-            style={{ color: "#0369a1" }}
-          >
+          <Link className="font-semibold text-white hover:underline" href={signupHref}>
             Criar conta
           </Link>
         </>
@@ -148,11 +144,7 @@ export function LoginForm() {
             <div className="mt-2 text-xs font-medium text-rose-300">{errors.password.message}</div>
           ) : null}
           <div className="mt-2 flex justify-end">
-            <Link
-              href={forgotPasswordHref}
-              className="text-xs font-semibold text-sky-700 hover:text-sky-800 transition-colors"
-              style={{ color: "#0369a1" }}
-            >
+            <Link href={forgotPasswordHref} className="text-xs font-semibold text-white/55 hover:text-white">
               Esqueceu a senha?
             </Link>
           </div>
@@ -161,8 +153,7 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-sky-700 bg-sky-700 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-800 hover:border-sky-800 disabled:cursor-not-allowed disabled:bg-sky-700/60 disabled:border-sky-700/60 disabled:text-white/70 disabled:hover:bg-sky-700/60 disabled:opacity-100 transition-colors"
-          style={{ backgroundColor: "#0369a1", borderColor: "#0369a1" }}
+          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
         >
           {isSubmitting ? "Entrando..." : "Entrar"}
         </button>

@@ -45,11 +45,7 @@ export function ForgotPasswordForm() {
       title="Recuperar senha"
       subtitle="Enviaremos um link para redefinir sua senha."
       footer={
-        <Link
-          className="font-semibold text-sky-700 hover:text-sky-800 hover:underline transition-colors"
-          href={loginHref}
-          style={{ color: "#0369a1" }}
-        >
+        <Link className="font-semibold text-white hover:underline" href={loginHref}>
           Voltar para entrar
         </Link>
       }
@@ -70,8 +66,7 @@ export function ForgotPasswordForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-sky-700 bg-sky-700 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-800 hover:border-sky-800 disabled:cursor-not-allowed disabled:bg-sky-700/60 disabled:border-sky-700/60 disabled:text-white/70 disabled:hover:bg-sky-700/60 disabled:opacity-100 transition-colors"
-          style={{ backgroundColor: "#0369a1", borderColor: "#0369a1" }}
+          className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
         >
           {isSubmitting ? "Enviando..." : "Enviar link"}
         </button>
