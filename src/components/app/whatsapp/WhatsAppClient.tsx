@@ -56,12 +56,13 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
   });
 
   const phoneFormatted = useMemo(() => formatWhatsAppPhone(initial?.phone ?? null), [initial?.phone]);
-  const primaryLabel = initial?.phone?.trim()
-    ? formatWhatsAppPhone(initial?.phone)
-    : "WhatsApp não identificado";
+  const hasPhoneDigits = Boolean(String(initial?.phone ?? "").replace(/\D/g, ""));
+  const primaryLabel = hasPhoneDigits
+    ? phoneFormatted
+    : "Número ainda não sincronizado";
   const secondaryInfo = initial?.instance_id
     ? `Instance: ${initial.instance_id}`
-    : "Número ainda não sincronizado. A próxima mensagem recebida atualiza automaticamente.";
+    : "A próxima mensagem recebida da Z-API atualiza automaticamente.";
 
   const onSubmit = handleSubmit(async (values) => {
     const tokenValue = String(values.token ?? "").trim();
