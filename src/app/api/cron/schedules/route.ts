@@ -70,6 +70,81 @@ function normalizePhone(phone: string) {
   return d;
 }
 
+function normalizePhoneDigitsOnly(value: string | null | undefined): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function areBrazilianPhonesEquivalent(aRaw: string | null | undefined, bRaw: string | null | undefined): boolean {
+  const a = normalizePhoneDigitsOnly(aRaw);
+  const b = normalizePhoneDigitsOnly(bRaw);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  function toComparableBr(digits: string): string | null {
+    if (!digits) return null;
+    if (digits.length <= 11 && digits.length >= 10) {
+      return digits.replace(/^9(\d{10})$/, "$1").replace(/^9(\d{9})$/, "$1");
+    }
+    if (digits.length === 12 && digits.startsWith("55")) {
+      const local = digits.slice(2);
+      return local.replace(/^9(\d{10})$/, "$1").replace(/^9(\d{9})$/, "$1");
+    }
+    if (digits.length === 13 && digits.startsWith("55")) {
+      const local = digits.slice(2);
+      return local.replace(/^9(\d{10})$/, "$1").replace(/^9(\d{9})$/, "$1");
+    }
+    return digits.replace(/^9/, "");
+  }
+  const aComp = toComparableBr(a);
+  const bComp = toComparableBr(b);
+  if (!aComp || !bComp) return false;
+  if (aComp === bComp) return true;
+  const aStripped55 = aComp.startsWith("55") ? aComp.slice(2) : aComp;
+  const bStripped55 = bComp.startsWith("55") ? bComp.slice(2) : bComp;
+  if (aStripped55 === bStripped55) return true;
+  const aNo9 = aStripped55.length === 11 && aStripped55.startsWith("9") ? aStripped55.slice(1) : aStripped55;
+  const bNo9 = bStripped55.length === 11 && bStripped55.startsWith("9") ? bStripped55.slice(1) : bStripped55;
+  if (aNo9 === bNo9) return true;
+  return false;
+}
+
+async function loadAllInstancePhoneBlocklist(): Promise<Set<string>> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data } = await admin.from("whatsapp_instances").select("phone").limit(50);
+    const set = new Set<string>();
+    for (const row of data ?? []) {
+      const p = normalizePhoneDigitsOnly(String((row as any)?.phone ?? ""));
+      if (p) set.add(p);
+    }
+    const envPhones = [
+      process.env.ZAPI_INSTANCE_PHONE,
+      process.env.ZAPI_INSTANCE_PHONE_FALLBACK,
+      process.env.ATENDIMENTO_WHATSAPP_PHONE,
+      process.env.WHATSAPP_INSTANCE_PHONE,
+    ];
+    for (const p of envPhones) {
+      const norm = normalizePhoneDigitsOnly(p);
+      if (norm) set.add(norm);
+    }
+    return set;
+  } catch (_e) {
+    return new Set();
+  }
+}
+
+function destinationIsInstancePhone(destination: string | null | undefined, blocklistDigitsOnly: Iterable<string> | null, selfPhoneDigitsOnly: string | null | undefined): boolean {
+  const dest = normalizePhoneDigitsOnly(destination);
+  if (!dest) return false;
+  if (selfPhoneDigitsOnly && areBrazilianPhonesEquivalent(dest, selfPhoneDigitsOnly)) return true;
+  if (blocklistDigitsOnly) {
+    for (const instancePhone of blocklistDigitsOnly) {
+      if (!instancePhone) continue;
+      if (areBrazilianPhonesEquivalent(dest, instancePhone)) return true;
+    }
+  }
+  return false;
+}
+
 function applyTemplate(text: string, vars: Record<string, string>) {
   return Object.entries(vars).reduce((acc, [k, v]) => acc.split(`{${k}}`).join(v), text);
 }
@@ -168,8 +243,30 @@ async function sendZapiText(params: {
   client_token?: string | null;
   phone: string;
   message: string;
+  self_instance_phone_digits_only?: string | null;
 }) {
-  const body = JSON.stringify({ phone: normalizePhone(params.phone), message: params.message });
+  const normalizedPhone = normalizePhone(params.phone);
+
+  const selfPhoneOpt = params.self_instance_phone_digits_only ?? null;
+  if (destinationIsInstancePhone(normalizedPhone, null, selfPhoneOpt)) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: "self_instance_phone_refused_to_prevent_infinite_loop_at_low_level_cron_sendZapiText",
+      phone: normalizePhoneDigitsOnly(normalizedPhone),
+    } as any;
+  }
+  const runtimeBlocklist = await loadAllInstancePhoneBlocklist();
+  if (destinationIsInstancePhone(normalizedPhone, runtimeBlocklist, selfPhoneOpt)) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: "self_instance_phone_refused_blocklist_matched_whatsapp_instances_cron",
+      phone: normalizePhoneDigitsOnly(normalizedPhone),
+    } as any;
+  }
+
+  const body = JSON.stringify({ phone: normalizedPhone, message: params.message });
   const baseUrl = `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}`;
   const urlWithTokenInPath = `${baseUrl}/token/${encodeURIComponent(params.token)}/send-text`;
   const urlWithHeader = `${baseUrl}/send-text`;
