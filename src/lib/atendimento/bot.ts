@@ -1,4 +1,5 @@
 import {
+  ACTIVE_CAPTURED_FIELD_ORDER,
   CAPTURED_FIELD_ORDER,
   CAPTURED_FIELD_PROMPTS,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
@@ -17,6 +18,24 @@ export function firstTwoNamesFromFullName(value: string | null | undefined) {
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0] ?? "";
   return `${parts[0]} ${parts[1]}`;
+}
+
+export function isValidCPF(value: string | null | undefined): { ok: boolean; digits: string; formatted: string } {
+  const digits = String(value ?? "").replace(/\D+/g, "").slice(0, 11);
+  if (digits.length !== 11) return { ok: false, digits, formatted: "" };
+  if (/^(\d)\1+$/.test(digits)) return { ok: false, digits, formatted: "" };
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(digits[i] ?? "0") * (10 - i);
+  let v1 = 11 - (sum % 11);
+  if (v1 >= 10) v1 = 0;
+  if (Number(digits[9] ?? "-1") !== v1) return { ok: false, digits, formatted: "" };
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(digits[i] ?? "0") * (11 - i);
+  let v2 = 11 - (sum % 11);
+  if (v2 >= 10) v2 = 0;
+  if (Number(digits[10] ?? "-1") !== v2) return { ok: false, digits, formatted: "" };
+  const formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+  return { ok: true, digits, formatted };
 }
 
 export function looksLikeFullName(value: string) {
@@ -109,9 +128,10 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
   return result;
 }
 
-export function getNextMissingField(lead: Partial<AtendimentoLead>) {
+export function getNextMissingField(lead: Partial<AtendimentoLead>, orderOverride?: ReadonlyArray<CapturedFieldName>) {
+  const order = orderOverride ?? ACTIVE_CAPTURED_FIELD_ORDER;
   return (
-    CAPTURED_FIELD_ORDER.find((field) => {
+    order.find((field) => {
       const value = String((lead as any)?.[field] ?? "").trim();
       return !value;
     }) ?? null

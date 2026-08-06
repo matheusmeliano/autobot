@@ -3,8 +3,14 @@ import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
-import { botReplyForLead, firstTwoNamesFromFullName, getNextMissingField } from "@/lib/atendimento/bot";
 import {
+  botReplyForLead,
+  firstTwoNamesFromFullName,
+  getNextMissingField,
+  isValidCPF,
+} from "@/lib/atendimento/bot";
+import {
+  ACTIVE_CAPTURED_FIELD_ORDER,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   buildExperimentalClassDatePromptMessages,
   CAPTURED_FIELD_PROMPTS,
@@ -595,7 +601,7 @@ async function getRecentBotMessages(params: {
   return rows.map((r) => String(r.content_text ?? "").trim()).filter(Boolean) as string[];
 }
 
-function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | undefined): "full_name" | "state" | "city" | "date" | "time" | null {
+function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | undefined): "full_name" | "cpf" | "state" | "city" | "date" | "time" | null {
   const raw = String(lastBotText ?? "").trim();
   if (!raw) return null;
   if (raw.startsWith(LOCATION_STATE_INVALID_MESSAGE)) return "state" as const;
@@ -607,6 +613,15 @@ function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | unde
     raw.includes("Seu nome?")
   ) {
     return "full_name" as const;
+  }
+  if (
+    raw === CAPTURED_FIELD_PROMPTS.cpf ||
+    raw.includes("Qual é o seu CPF") ||
+    raw.includes("qual é o seu cpf") ||
+    raw.includes("informe o seu CPF") ||
+    raw.includes("seu CPF")
+  ) {
+    return "cpf" as const;
   }
   if (
     raw === CAPTURED_FIELD_PROMPTS.state ||
@@ -691,9 +706,12 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
-}): Promise<"full_name" | "state" | "city" | "date" | "time" | null> {
+}): Promise<"full_name" | "cpf" | "state" | "city" | "date" | "time" | null> {
   const eventTypes = [
     "full_name_collected",
+    "cpf_collected",
+    "cpf_validation_failed",
+    "cpf_prompt_presented",
     "lead_timezone_collection_started",
     "state_collected",
     "city_prompt_presented",
@@ -715,12 +733,13 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
     .eq("conversation_id", params.conversationId)
     .in("event_type", eventTypes)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(30);
   if (!events || !events.length) return "full_name";
-  let blocked: "full_name" | "state" | "city" | "date" | "time" | null = null;
+  let blocked: "full_name" | "cpf" | "state" | "city" | "date" | "time" | null = null;
   let hasStateCollected = false;
   let hasCityCollected = false;
   let hasNameCollected = false;
+  let hasCpfCollected = false;
   for (const evt of events as Array<{ event_type: string; created_at: string }>) {
     const t = String(evt.event_type ?? "");
     switch (t) {
@@ -755,29 +774,38 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
       case "state_validation_failed":
         blocked = "state";
         break;
+      case "cpf_collected":
+        hasCpfCollected = true;
+        if (!blocked && !hasStateCollected) return "state";
+        break;
+      case "cpf_validation_failed":
+        blocked = "cpf";
+        break;
+      case "cpf_prompt_presented":
+        if (!blocked) return "cpf";
+        break;
       case "full_name_collected":
         hasNameCollected = true;
+        if (!hasCpfCollected && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) {
+          if (!blocked) return "cpf";
+        }
         if (!blocked && !hasStateCollected) return "state";
         break;
       case "lead_timezone_collection_started":
         if (hasStateCollected && !blocked && !hasCityCollected) return "city";
         if (blocked) return blocked;
         if (!hasNameCollected) return "full_name";
+        if (!hasCpfCollected && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) return "cpf";
         return "state";
     }
   }
   if (!hasNameCollected) return "full_name";
+  if (!hasCpfCollected && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) return "cpf";
   return blocked;
 }
 
-function getWhatsAppNextMissingField(lead: any): "full_name" | "state" | "city" | null {
-  const hasName = Boolean(String(lead?.full_name ?? "").trim());
-  const hasState = Boolean(String(lead?.state ?? "").trim());
-  const hasCity = Boolean(String(lead?.city ?? "").trim());
-  if (!hasName) return "full_name";
-  if (!hasState) return "state";
-  if (!hasCity) return "city";
-  return null;
+function getWhatsAppNextMissingField(lead: any): "full_name" | "cpf" | "state" | "city" | null {
+  return getNextMissingField(lead, ACTIVE_CAPTURED_FIELD_ORDER as any) as any;
 }
 
 async function presentExperimentalClassDateOptionsWhatsApp(params: {
@@ -3368,7 +3396,17 @@ export async function POST(req: Request) {
             actorType: "system",
           });
 
-          const nextMsg = CAPTURED_FIELD_PROMPTS.state;
+          const afterNameNextField =
+            ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any) && !String((lead as any)?.cpf ?? "").trim()
+              ? "cpf"
+              : !String((lead as any)?.state ?? "").trim()
+                ? "state"
+                : !String((lead as any)?.city ?? "").trim()
+                  ? "city"
+                  : null;
+          const nextMsg = afterNameNextField
+            ? CAPTURED_FIELD_PROMPTS[afterNameNextField as any]
+            : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
           await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
           try {
             await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
@@ -3378,6 +3416,81 @@ export async function POST(req: Request) {
             ok: true,
             handled: true,
             flow: "whatsapp_name_collected",
+          });
+        }
+
+        const wantsCpfStage = expectedField === "cpf" || (!expectedField && nextMissingField === "cpf");
+        const leadCPF = String((lead as any)?.cpf ?? "").trim();
+        if (wantsCpfStage && !leadCPF && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) {
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "cpf_prompt_presented",
+            title: "Prompt de CPF apresentado ao lead via WhatsApp",
+            details: { phone: normalizedPhoneOnly },
+            actorType: "system",
+          });
+          const cpfCheck = isValidCPF(inboundContent || "");
+          if (!cpfCheck.ok) {
+            const msg =
+              "Não consegui identificar um CPF válido. Responda novamente com os 11 dígitos (ex: 123.456.789-09).";
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "cpf_validation_failed",
+              title: "Falha ao validar CPF informado via WhatsApp",
+              details: { raw_value: inboundContent || null, phone: normalizedPhoneOnly },
+              actorType: "system",
+            });
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_cpf_retry",
+              blocked: false,
+            });
+          }
+          try {
+            await admin.from("atendimento_leads").update({ cpf: cpfCheck.formatted, updated_at: nowIso }).eq("id", leadId);
+          } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "cpf_collected",
+            title: "CPF do lead identificado e salvo via WhatsApp",
+            details: {
+              raw_value: inboundContent || null,
+              stored_cpf: cpfCheck.formatted,
+              digits: cpfCheck.digits,
+              phone: normalizedPhoneOnly,
+            },
+            actorType: "system",
+          });
+
+          const afterCpfNext: "state" | "city" | null =
+            !String((lead as any)?.state ?? "").trim()
+              ? "state"
+              : !String((lead as any)?.city ?? "").trim()
+                ? "city"
+                : null;
+          const nextMsg = afterCpfNext
+            ? CAPTURED_FIELD_PROMPTS[afterCpfNext]
+            : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
+          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
+          } catch (_e) {}
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_cpf_collected",
           });
         }
 
