@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
-import { botReplyForLead, getNextMissingField } from "@/lib/atendimento/bot";
+import { botReplyForLead, firstNameFromFullName, getNextMissingField } from "@/lib/atendimento/bot";
 import {
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   buildExperimentalClassDatePromptMessages,
@@ -595,11 +595,19 @@ async function getRecentBotMessages(params: {
   return rows.map((r) => String(r.content_text ?? "").trim()).filter(Boolean) as string[];
 }
 
-function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | undefined) {
+function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | undefined): "full_name" | "state" | "city" | "date" | "time" | null {
   const raw = String(lastBotText ?? "").trim();
   if (!raw) return null;
   if (raw.startsWith(LOCATION_STATE_INVALID_MESSAGE)) return "state" as const;
   if (raw.startsWith(LOCATION_CITY_INVALID_MESSAGE)) return "city" as const;
+  if (
+    raw === CAPTURED_FIELD_PROMPTS.full_name ||
+    raw.includes("Qual é o seu nome?") ||
+    raw.includes("Qual seu nome?") ||
+    raw.includes("Seu nome?")
+  ) {
+    return "full_name" as const;
+  }
   if (
     raw === CAPTURED_FIELD_PROMPTS.state ||
     raw.includes("Em qual estado você mora?") ||
@@ -683,8 +691,9 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
-}): Promise<"state" | "city" | "date" | "time" | null> {
+}): Promise<"full_name" | "state" | "city" | "date" | "time" | null> {
   const eventTypes = [
+    "full_name_collected",
     "lead_timezone_collection_started",
     "state_collected",
     "city_prompt_presented",
@@ -707,10 +716,11 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
     .in("event_type", eventTypes)
     .order("created_at", { ascending: false })
     .limit(20);
-  if (!events || !events.length) return null;
-  let blocked: "state" | "city" | "date" | "time" | null = null;
+  if (!events || !events.length) return "full_name";
+  let blocked: "full_name" | "state" | "city" | "date" | "time" | null = null;
   let hasStateCollected = false;
   let hasCityCollected = false;
+  let hasNameCollected = false;
   for (const evt of events as Array<{ event_type: string; created_at: string }>) {
     const t = String(evt.event_type ?? "");
     switch (t) {
@@ -745,21 +755,27 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
       case "state_validation_failed":
         blocked = "state";
         break;
+      case "full_name_collected":
+        hasNameCollected = true;
+        if (!blocked && !hasStateCollected) return "state";
+        break;
       case "lead_timezone_collection_started":
         if (hasStateCollected && !blocked && !hasCityCollected) return "city";
         if (blocked) return blocked;
+        if (!hasNameCollected) return "full_name";
         return "state";
     }
   }
+  if (!hasNameCollected) return "full_name";
   return blocked;
 }
 
-function getWhatsAppNextMissingField(lead: any): "state" | "city" | null {
-  const origin = String(lead?.origin ?? "").trim().toLowerCase();
-  const isWhatsAppDirect = origin === "whatsapp_trafego_pago";
+function getWhatsAppNextMissingField(lead: any): "full_name" | "state" | "city" | null {
+  const hasName = Boolean(String(lead?.full_name ?? "").trim());
   const hasState = Boolean(String(lead?.state ?? "").trim());
   const hasCity = Boolean(String(lead?.city ?? "").trim());
-  if (isWhatsAppDirect && !hasState) return "state";
+  if (!hasName) return "full_name";
+  if (!hasState) return "state";
   if (!hasCity) return "city";
   return null;
 }
@@ -3262,7 +3278,7 @@ export async function POST(req: Request) {
         ) {
           const firstMessage =
             "Para agendarmos sua aula experimental gratuita, preciso de algumas informações rápidas. Vamos começar?";
-          const secondMessage = "Em qual estado você mora?";
+          const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;
 
           await insertWhatsAppBotTextMessage({
             admin,
@@ -3305,6 +3321,63 @@ export async function POST(req: Request) {
             ok: true,
             handled: true,
             flow: "whatsapp_direct_lead_first",
+          });
+        }
+
+        const wantsNameStage = expectedField === "full_name" || (!expectedField && nextMissingField === "full_name");
+        const leadFullName = String((lead as any)?.full_name ?? "").trim();
+        if (wantsNameStage && !leadFullName) {
+          const firstNameCandidate = firstNameFromFullName(inboundContent || "");
+          const isValidName =
+            firstNameCandidate.length >= 2 &&
+            !/\d/.test(firstNameCandidate) &&
+            !/[/:@\\{}[\]]/.test(firstNameCandidate) &&
+            firstNameCandidate.length <= 40;
+          if (!isValidName) {
+            const msg = "Não consegui identificar seu nome. Responda novamente apenas com seu primeiro nome.";
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_name_retry",
+              blocked: false,
+            });
+          }
+
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({ full_name: firstNameCandidate, updated_at: nowIso })
+              .eq("id", leadId);
+          } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "full_name_collected",
+            title: "Primeiro nome do lead identificado e salvo via WhatsApp",
+            details: {
+              raw_value: inboundContent || null,
+              stored_first_name: firstNameCandidate,
+              phone: normalizedPhoneOnly,
+            },
+            actorType: "system",
+          });
+
+          const nextMsg = CAPTURED_FIELD_PROMPTS.state;
+          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
+          } catch (_e) {}
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_name_collected",
           });
         }
 

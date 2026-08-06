@@ -10,7 +10,7 @@ type CapturedData = Partial<Record<CapturedFieldName, string>>;
 const YES_WORDS = ["sim", "quero", "vamos", "pode", "tenho interesse", "quero agendar", "agendar"];
 const NAME_CONNECTORS = new Set(["da", "de", "do", "das", "dos", "e"]);
 
-function firstNameFromFullName(value: string | null | undefined) {
+export function firstNameFromFullName(value: string | null | undefined) {
   const clean = String(value ?? "").trim().replace(/\s+/g, " ");
   if (!clean) return "";
   return clean.split(" ")[0] ?? "";
@@ -109,9 +109,6 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
 export function getNextMissingField(lead: Partial<AtendimentoLead>) {
   return (
     CAPTURED_FIELD_ORDER.find((field) => {
-      if (field === "full_name" && String(lead.phone ?? "").trim()) {
-        return false;
-      }
       const value = String((lead as any)?.[field] ?? "").trim();
       return !value;
     }) ?? null

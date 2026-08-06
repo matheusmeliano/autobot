@@ -33,10 +33,10 @@ export const NUMERIC_ONLY_FIELDS = [
 ] as const;
 
 export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number], string> = {
-  full_name: "Perfeito. Para começarmos, me diga seu nome completo.",
+  full_name: "Qual é o seu nome?",
   phone:
     "Perfeito! Para começarmos, informe o número do seu WhatsApp.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\n\nImportante: inclua o código do país no início do número (+55 para Brasil ou +1 para Estados Unidos).",
-  state: "Perfeito! Agora, informe o estado onde você mora.",
+  state: "Em qual estado você mora?",
   city: "E a cidade?",
 };
 
