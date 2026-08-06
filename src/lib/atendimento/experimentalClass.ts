@@ -666,17 +666,6 @@ export function findExperimentalClassTimeOption(
     }
   }
 
-
-  for (const option of options) {
-    if (normalizedInput === normalizeSelectionText(option.professorTime)) return option;
-    if (
-      normalizedFlexibleInput &&
-      normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.professorTime)
-    ) {
-      return option;
-    }
-  }
-
   const hasAnyLetter = /[a-zA-Záàâãéèêíìîóòôõúùûçüñ]/.test(String(input ?? "").normalize("NFD"));
   const hasTimeSeparatorsOnlyNoLetters = /^[0-9\s.:\-hH]+$/.test(String(input ?? "").trim());
   const relevantTimeKeywords = [
@@ -711,9 +700,6 @@ export function findExperimentalClassTimeOption(
       if (normalizeSelectionText(option.displayLabel) === wanted) return option;
       if (normalizeSelectionText(option.leadTime) === wanted) return option;
     }
-    for (const option of options) {
-      if (normalizeSelectionText(option.professorTime) === wanted) return option;
-    }
   }
 
   const digitsMatches = normalizedInput.match(/\d+/g);
@@ -725,9 +711,6 @@ export function findExperimentalClassTimeOption(
       for (const option of options) {
         if (normalizeSelectionText(option.displayLabel) === wanted) return option;
         if (normalizeSelectionText(option.leadTime) === wanted) return option;
-      }
-      for (const option of options) {
-        if (normalizeSelectionText(option.professorTime) === wanted) return option;
       }
     }
   }
