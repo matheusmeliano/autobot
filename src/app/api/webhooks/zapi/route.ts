@@ -3901,10 +3901,14 @@ export async function POST(req: Request) {
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-          const professorDate = String(
+          let professorDate = String(
             (((latestTimeEvt as any)?.details ?? {}) as Record<string, unknown>).professor_date ?? "",
           ).trim();
-          if (!professorDate) {
+
+          const hasAnyDateContext = Boolean(professorDate) ||
+            Boolean(String((lead as any)?.experimental_class_professor_date ?? "").trim()) ||
+            Boolean(String((lead as any)?.experimental_class_lead_date ?? "").trim());
+          if (!hasAnyDateContext) {
             const fallback = await presentExperimentalClassDateOptionsWhatsApp({
               admin,
               leadId,
@@ -3918,8 +3922,11 @@ export async function POST(req: Request) {
                 await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
               } catch (_e) {}
             }
-            return Response.json({ ok: true, handled: true, flow: "whatsapp_date_represented" });
+            return Response.json({ ok: true, handled: true, flow: "whatsapp_date_represented_missing_context" });
           }
+          professorDate = professorDate ||
+            String((lead as any)?.experimental_class_professor_date ?? "").trim();
+
           const pres = await presentExperimentalClassTimeOptionsWhatsApp({
             admin,
             leadId,
@@ -3927,6 +3934,24 @@ export async function POST(req: Request) {
             leadTimeZone: leadTz,
             professorDate,
           });
+
+          if (!pres.slots.length) {
+            const fallback = await presentExperimentalClassDateOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              leadTimeZone: leadTz,
+            });
+            for (const dateMsg of fallback.messages) {
+              const cleanMsg = String(dateMsg ?? "").trim();
+              if (!cleanMsg) continue;
+              try {
+                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
+              } catch (_e) {}
+            }
+            return Response.json({ ok: true, handled: true, flow: "whatsapp_no_more_times_returned_dates" });
+          }
+
           const chosen = findExperimentalClassTimeOption(inboundContent, pres.slots);
           if (!chosen) {
             const nextFail =
@@ -3944,6 +3969,7 @@ export async function POST(req: Request) {
                 content_text: inboundContent || null,
                 blocked,
                 professor_date: professorDate || null,
+                remaining_slot_labels: pres.slots.map((s: any) => String(s?.displayLabel ?? "")).filter(Boolean),
               },
               actorType: "system",
             });
@@ -3966,7 +3992,7 @@ export async function POST(req: Request) {
               });
             }
 
-            const msg = `${EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+            const msg = `${EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE}\n\nHorários disponíveis para esse dia:\n${pres.slots.map((s: any) => `• ${String(s?.displayLabel ?? "")}`).filter(Boolean).join("\n")}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
             await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
