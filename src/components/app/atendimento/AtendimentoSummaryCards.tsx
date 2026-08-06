@@ -39,17 +39,18 @@ function experimentalClassAttendanceLabel(status: "pending" | "attended" | "no_s
 function leadHasExperimentalClassPanelStatus(lead: AtendimentoLeadListItem) {
   const booking = lead.experimental_class_booking ?? null;
   const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+  const bookingSource = String((booking as any)?.source ?? "").trim().toLowerCase();
   if (booking) {
-    if (bookingStatus === "cancelled" || bookingStatus === "draft") return false;
-    return true;
+    if (bookingStatus === "cancelled") return false;
+    if (bookingSource !== "draft") return true;
   }
   const stage = String(lead.funnel_stage ?? "").trim().toLowerCase();
   if (!["aula_experimental_convidada", "pre_cadastro_concluido", "aula_experimental_agendada"].includes(stage)) {
     return false;
   }
   const wasCancelled =
-    String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim() ||
-    String((lead as any)?.latest_experimental_class_event ?? "").trim().toLowerCase() === "experimental_class_cancelled";
+    String(lead.latest_experimental_class_cancelled_at ?? "").trim() ||
+    String(lead.latest_experimental_class_event ?? "").trim().toLowerCase() === "experimental_class_cancelled";
   if (wasCancelled) return false;
   return true;
 }

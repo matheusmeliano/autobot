@@ -106,7 +106,7 @@ export type AtendimentoExperimentalClassBookingSummary = {
   lead_date: string | null;
   lead_time: string | null;
   lead_start_at: string | null;
-  source: "table" | "history";
+  source: "table" | "history" | "draft";
   created_at: string | null;
 };
 
@@ -114,6 +114,8 @@ export type AtendimentoLeadListItem = AtendimentoLead & {
   conversation: AtendimentoConversation | null;
   last_message: AtendimentoMessage | null;
   experimental_class_booking: AtendimentoExperimentalClassBookingSummary | null;
+  latest_experimental_class_cancelled_at: string | null;
+  latest_experimental_class_event: string | null;
 };
 
 export type AtendimentoSummary = {
