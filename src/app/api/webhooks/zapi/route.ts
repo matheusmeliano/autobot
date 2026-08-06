@@ -3894,26 +3894,16 @@ export async function POST(req: Request) {
             String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
           const { data: latestTimeEvt } = await admin
             .from("atendimento_history_events")
-            .select("details, created_at")
+            .select("details")
             .eq("lead_id", leadId)
             .eq("conversation_id", conversationId)
             .eq("event_type", "experimental_class_time_options_presented")
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-          const staleProfessorDate = String(
+          const professorDate = String(
             (((latestTimeEvt as any)?.details ?? {}) as Record<string, unknown>).professor_date ?? "",
           ).trim();
-          const availability = listExperimentalClassAvailability({
-            now: new Date(),
-            leadTimeZone: leadTz,
-            bookedProfessorStartAts: [],
-          });
-          const validDates = new Set(
-            availability.dates.map((d: any) => String(d.professorDate ?? "")),
-          );
-          const professorDate =
-            staleProfessorDate && validDates.has(staleProfessorDate) ? staleProfessorDate : "";
           if (!professorDate) {
             const fallback = await presentExperimentalClassDateOptionsWhatsApp({
               admin,
