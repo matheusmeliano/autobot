@@ -353,14 +353,11 @@ export function buildExperimentalClassTimesMessages(params: {
     return [`Não há horários livres para o dia ${params.dayLabel}. Escolha outro dia disponível.`];
   }
 
-  const letterLabels = params.options.map((_, i) => String.fromCharCode(65 + i));
-  const lines = params.options.map(
-    (option, i) => `${letterLabels[i]}) ${option.displayLabel}`,
-  );
+  const lines = params.options.map((option) => `• ${option.displayLabel}`);
 
   return [
     `Perfeito! E os horários disponíveis são:\n\n${lines.join("\n")}`,
-    "Responda apenas com a letra ou o horário desejado.",
+    "Responda apenas com o horário desejado.",
   ];
 }
 
