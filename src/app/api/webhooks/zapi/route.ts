@@ -4170,9 +4170,9 @@ export async function POST(req: Request) {
         }
 
         const leadCPF = String((lead as any)?.cpf ?? "").trim();
-        const leadFunnelStage = String((lead as any)?.funnel_stage ?? "");
+        const postBookingStage = String((lead as any)?.funnel_stage ?? "");
         const isPostBookingStage =
-          leadFunnelStage === "aula_experimental_agendada" ||
+          postBookingStage === "aula_experimental_agendada" ||
           expectedField === "cpf";
         if (
           POST_BOOKING_CPF_STAGE_ENABLED &&
