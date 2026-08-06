@@ -78,6 +78,7 @@ export async function GET(req: Request) {
   const conversationsByLeadId = new Map<string, any>();
   const bookingsByLeadId = new Map<string, any>();
   const cancelledLeadBookingIds = new Set<string>();
+  const cancelledByHistoryLeadIds = new Set<string>();
 
   if (leadIds.length > 0) {
     const { data: conversations, error: conversationsError } = await admin
@@ -179,7 +180,6 @@ export async function GET(req: Request) {
     }
 
     const lessonLinkByLeadId = new Map<string, string | null>();
-    const cancelledByHistoryLeadIds = new Set<string>();
     for (const event of historyEvents ?? []) {
       const leadId = String((event as any)?.lead_id ?? "");
       if (!leadId) continue;
