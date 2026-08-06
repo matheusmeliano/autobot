@@ -453,16 +453,7 @@ export function SchedulesClient({
   const { theme } = useAppTheme();
   const pageSize = 5;
   const [isPending, startTransition] = useTransition();
-  const sanitizeScheduleRows = (arr: ScheduleRow[]) =>
-    (arr ?? []).filter((row) => {
-      const sourceKind = String((row as any).source_kind ?? "schedule").trim().toLowerCase();
-      const isPhantom =
-        sourceKind === "charge" ||
-        Boolean((row as any).schedule_missing) ||
-        String(row.id ?? "").startsWith("charge:");
-      return !isPhantom;
-    });
-  const [rows, setRows] = useState<ScheduleRow[]>(() => sanitizeScheduleRows(initial));
+  const [rows, setRows] = useState<ScheduleRow[]>(initial);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
@@ -1065,7 +1056,7 @@ export function SchedulesClient({
     startTransition(async () => {
       const r = await fetch("/app/agendar/data", { cache: "no-store" });
       const json = (await r.json()) as ScheduleRow[];
-      setRows(sanitizeScheduleRows(json));
+      setRows(json);
     });
 
   const onSubmit = handleSubmit(async (values) => {
