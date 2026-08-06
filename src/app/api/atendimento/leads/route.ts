@@ -79,6 +79,8 @@ export async function GET(req: Request) {
   const bookingsByLeadId = new Map<string, any>();
   const cancelledLeadBookingIds = new Set<string>();
   const cancelledByHistoryLeadIds = new Set<string>();
+  const cancelledAtByLeadId = new Map<string, string>();
+  const latestClassEventByLeadId = new Map<string, string>();
 
   if (leadIds.length > 0) {
     const { data: conversations, error: conversationsError } = await admin
@@ -186,6 +188,12 @@ export async function GET(req: Request) {
       const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
       if (eventType === "experimental_class_cancelled") {
         cancelledByHistoryLeadIds.add(leadId);
+        if (!cancelledAtByLeadId.has(leadId)) {
+          cancelledAtByLeadId.set(leadId, String((event as any)?.created_at ?? "").trim());
+        }
+      }
+      if (eventType.startsWith("experimental_class_") && !latestClassEventByLeadId.has(leadId)) {
+        latestClassEventByLeadId.set(leadId, eventType);
       }
     }
     for (const event of historyEvents ?? []) {
@@ -420,6 +428,8 @@ export async function GET(req: Request) {
         experimental_class_status: mergedStatus || null,
         conversation: conversationsByLeadId.get(leadId) ?? null,
         experimental_class_booking: bookingWithFallback,
+        latest_experimental_class_cancelled_at: cancelledAtByLeadId.get(leadId) ?? null,
+        latest_experimental_class_event: latestClassEventByLeadId.get(leadId) ?? null,
       };
     })
     .filter((row) => {

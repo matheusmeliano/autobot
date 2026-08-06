@@ -44,7 +44,14 @@ function leadHasExperimentalClassPanelStatus(lead: AtendimentoLeadListItem) {
     return true;
   }
   const stage = String(lead.funnel_stage ?? "").trim().toLowerCase();
-  return ["aula_experimental_convidada", "pre_cadastro_concluido", "aula_experimental_agendada"].includes(stage);
+  if (!["aula_experimental_convidada", "pre_cadastro_concluido", "aula_experimental_agendada"].includes(stage)) {
+    return false;
+  }
+  const wasCancelled =
+    String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim() ||
+    String((lead as any)?.latest_experimental_class_event ?? "").trim().toLowerCase() === "experimental_class_cancelled";
+  if (wasCancelled) return false;
+  return true;
 }
 
 function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
