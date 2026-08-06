@@ -299,14 +299,6 @@ export async function POST(
       };
       if (nextLeadFunnelStage) leadUpdatePayload.funnel_stage = nextLeadFunnelStage;
       if (nextLeadStatus) leadUpdatePayload.status = nextLeadStatus;
-      if (attendance === "no_show") {
-        leadUpdatePayload.cpf = null;
-        leadUpdatePayload.city = null;
-        leadUpdatePayload.state = null;
-        leadUpdatePayload.country = null;
-        leadUpdatePayload.timezone = null;
-        leadUpdatePayload.full_name = null;
-      }
       const { error: leadUpdateError } = await admin
         .from("atendimento_leads")
         .update(leadUpdatePayload)
