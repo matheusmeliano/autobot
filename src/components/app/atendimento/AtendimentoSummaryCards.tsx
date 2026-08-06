@@ -156,11 +156,13 @@ function LeadDetails({
   const draftTime = String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
     String((lead as any)?.experimental_class_professor_time ?? "").trim();
   const booking = lead.experimental_class_booking;
+  const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+  const bookingIsCancelled = bookingStatus === "cancelled";
   const isDraft = booking && (booking as any).source === "draft";
   const bookingWasNoShow = isBookingAttendanceNoShow(booking);
   const bookingAttendanceResolved = isBookingAttendanceResolved(booking);
   const showDraftSection =
-    !bookingWasNoShow && !bookingAttendanceResolved && showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
+    !bookingIsCancelled && !bookingWasNoShow && !bookingAttendanceResolved && showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
 
   const draftStageLabel = (() => {
     switch (experimentalStatus) {
@@ -241,12 +243,12 @@ function LeadDetails({
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
-            <Field label="CPF" value={lead.cpf} copyable />
-            <Field label="Origem" value={bookingWasNoShow ? "-" : atendimentoOriginLabel(lead.origin)} />
-            <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
-            <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
-            <Field label="País" value={lead.country} />
-            <Field label="Fuso" value={lead.timezone} />
+            <Field label="CPF" value={bookingIsCancelled ? "-" : lead.cpf} copyable={!bookingIsCancelled} />
+            <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
+            <Field label="Cidade" value={bookingIsCancelled ? "-" : formatAtendimentoLocationName(lead.city)} />
+            <Field label="Estado" value={bookingIsCancelled ? "-" : formatAtendimentoLocationName(lead.state)} />
+            <Field label="País" value={bookingIsCancelled ? "-" : lead.country} />
+            <Field label="Fuso" value={bookingIsCancelled ? "-" : lead.timezone} />
           </div>
         ) : null}
 
@@ -334,6 +336,8 @@ function BookingDetails({
   const booking = lead.experimental_class_booking;
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const bookingId = String(booking?.id ?? "").trim();
+  const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+  const bookingIsCancelled = bookingStatus === "cancelled";
   const bookingIsNoShow = String(booking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
   const [lessonLinkDraft, setLessonLinkDraft] = useState(String(booking?.lesson_link ?? "").trim());
   const savedLessonLink = String(booking?.lesson_link ?? "").trim();
