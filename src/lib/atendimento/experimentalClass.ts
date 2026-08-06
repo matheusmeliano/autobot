@@ -352,9 +352,14 @@ export function buildExperimentalClassTimesMessages(params: {
     return [`Não há horários livres para o dia ${params.dayLabel}. Escolha outro dia disponível.`];
   }
 
+  const letterLabels = params.options.map((_, i) => String.fromCharCode(65 + i));
+  const lines = params.options.map(
+    (option, i) => `${letterLabels[i]}) ${option.displayLabel}`,
+  );
+
   return [
-    `Perfeito! E os horários disponíveis são:\n\n${params.options.map((option) => option.displayLabel).join(", ")}`,
-    "Responda apenas com o horário desejado.",
+    `Perfeito! E os horários disponíveis são:\n\n${lines.join("\n")}`,
+    "Responda apenas com a letra ou o horário desejado.",
   ];
 }
 
@@ -651,6 +656,22 @@ export function findExperimentalClassTimeOption(
   if (!normalizedInput) return null;
   const normalizedFlexibleInput = normalizeFlexibleTimeSelection(input);
 
+  const letterMatch = String(input ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .match(/(?:^|[\s.,;:!?\-_\(\)\[\]'"\/]|letra\s+|opcao\s+|op\s+|alternativa\s+)([a-z])(?:[\s).,\-;:!?]|$)/) ||
+    String(input ?? "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .match(/^([a-z])[\s).,\-;:!?]?$/);
+  if (letterMatch && letterMatch[1]) {
+    const idx = letterMatch[1].charCodeAt(0) - "a".charCodeAt(0);
+    if (idx >= 0 && idx < options.length) return options[idx];
+  }
+
   for (const option of options) {
     if (normalizedInput === normalizeSelectionText(option.displayLabel)) return option;
     if (normalizedInput === normalizeSelectionText(option.leadTime)) return option;
@@ -662,6 +683,7 @@ export function findExperimentalClassTimeOption(
       return option;
     }
   }
+
 
   for (const option of options) {
     if (normalizedInput === normalizeSelectionText(option.professorTime)) return option;
