@@ -23,7 +23,6 @@ export const ATENDIMENTO_STATUS_ORDER = [
 
 export const CAPTURED_FIELD_ORDER = [
   "full_name",
-  "cpf",
   "phone",
   "state",
   "city",
@@ -43,12 +42,17 @@ export const NUMERIC_ONLY_FIELDS = [
 
 export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number], string> = {
   full_name: "Qual é o seu nome?",
-  cpf: "Para continuarmos, qual é o seu CPF?\n\nVocê pode informar com ou sem pontos e traço.\nExemplo: 123.456.789-09",
   phone:
     "Perfeito! Para começarmos, informe o número do seu WhatsApp.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\n\nImportante: inclua o código do país no início do número (+55 para Brasil ou +1 para Estados Unidos).",
   state: "Em qual estado você mora?",
   city: "E a cidade?",
 };
+
+export const POST_BOOKING_CPF_STAGE_ENABLED = false;
+export const POST_BOOKING_CPF_PROMPT =
+  "Para finalizarmos e enviarmos o convite da aula experimental, qual é o seu CPF?\n\nVocê pode informar com ou sem pontos e traço.\nExemplo: 123.456.789-09";
+export const POST_BOOKING_CPF_SUCCESS_MESSAGE =
+  "Obrigado! CPF recebido e cadastro concluído com sucesso. Em breve entraremos em contato com o link e os detalhes da sua aula experimental.";
 
 export const ATENDIMENTO_PROFESSOR_TIME_ZONE = "America/Cuiaba";
 export const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com sucesso.";

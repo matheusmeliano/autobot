@@ -19,6 +19,9 @@ import {
   EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE,
   LOCATION_STATE_INVALID_MESSAGE,
   LOCATION_CITY_INVALID_MESSAGE,
+  POST_BOOKING_CPF_PROMPT,
+  POST_BOOKING_CPF_STAGE_ENABLED,
+  POST_BOOKING_CPF_SUCCESS_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
 } from "@/lib/atendimento/constants";
 import {
@@ -615,7 +618,7 @@ function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | unde
     return "full_name" as const;
   }
   if (
-    raw === CAPTURED_FIELD_PROMPTS.cpf ||
+    raw === POST_BOOKING_CPF_PROMPT ||
     raw.includes("Qual é o seu CPF") ||
     raw.includes("qual é o seu cpf") ||
     raw.includes("informe o seu CPF") ||
@@ -733,18 +736,34 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
     .eq("conversation_id", params.conversationId)
     .in("event_type", eventTypes)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(40);
   if (!events || !events.length) return "full_name";
   let blocked: "full_name" | "cpf" | "state" | "city" | "date" | "time" | null = null;
   let hasStateCollected = false;
   let hasCityCollected = false;
   let hasNameCollected = false;
   let hasCpfCollected = false;
+  let hasScheduled = false;
   for (const evt of events as Array<{ event_type: string; created_at: string }>) {
     const t = String(evt.event_type ?? "");
     switch (t) {
       case "experimental_class_scheduled":
+        hasScheduled = true;
+        if (POST_BOOKING_CPF_STAGE_ENABLED && !hasCpfCollected) {
+          if (blocked) return blocked;
+          return "cpf";
+        }
         return null;
+      case "cpf_collected":
+        hasCpfCollected = true;
+        if (hasScheduled) return null;
+        break;
+      case "cpf_validation_failed":
+        blocked = "cpf";
+        break;
+      case "cpf_prompt_presented":
+        if (!blocked) return "cpf";
+        break;
       case "experimental_class_time_validation_failed":
         blocked = "time";
         break;
@@ -774,33 +793,22 @@ async function detectExpectedWhatsAppFieldFromHistory(params: {
       case "state_validation_failed":
         blocked = "state";
         break;
-      case "cpf_collected":
-        hasCpfCollected = true;
-        if (!blocked && !hasStateCollected) return "state";
-        break;
-      case "cpf_validation_failed":
-        blocked = "cpf";
-        break;
-      case "cpf_prompt_presented":
-        if (!blocked) return "cpf";
-        break;
       case "full_name_collected":
         hasNameCollected = true;
-        if (!hasCpfCollected && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) {
-          if (!blocked) return "cpf";
-        }
         if (!blocked && !hasStateCollected) return "state";
         break;
       case "lead_timezone_collection_started":
         if (hasStateCollected && !blocked && !hasCityCollected) return "city";
         if (blocked) return blocked;
         if (!hasNameCollected) return "full_name";
-        if (!hasCpfCollected && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) return "cpf";
         return "state";
     }
   }
   if (!hasNameCollected) return "full_name";
-  if (!hasCpfCollected && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) return "cpf";
+  if (hasScheduled && POST_BOOKING_CPF_STAGE_ENABLED && !hasCpfCollected) {
+    if (blocked) return blocked;
+    return "cpf";
+  }
   return blocked;
 }
 
@@ -3396,16 +3404,14 @@ export async function POST(req: Request) {
             actorType: "system",
           });
 
-          const afterNameNextField =
-            ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any) && !String((lead as any)?.cpf ?? "").trim()
-              ? "cpf"
-              : !String((lead as any)?.state ?? "").trim()
-                ? "state"
-                : !String((lead as any)?.city ?? "").trim()
-                  ? "city"
-                  : null;
+          const afterNameNextField: "state" | "city" | null =
+            !String((lead as any)?.state ?? "").trim()
+              ? "state"
+              : !String((lead as any)?.city ?? "").trim()
+                ? "city"
+                : null;
           const nextMsg = afterNameNextField
-            ? CAPTURED_FIELD_PROMPTS[afterNameNextField as any]
+            ? CAPTURED_FIELD_PROMPTS[afterNameNextField]
             : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
           await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
           try {
@@ -3416,81 +3422,6 @@ export async function POST(req: Request) {
             ok: true,
             handled: true,
             flow: "whatsapp_name_collected",
-          });
-        }
-
-        const wantsCpfStage = expectedField === "cpf" || (!expectedField && nextMissingField === "cpf");
-        const leadCPF = String((lead as any)?.cpf ?? "").trim();
-        if (wantsCpfStage && !leadCPF && ACTIVE_CAPTURED_FIELD_ORDER.includes("cpf" as any)) {
-          void appendHistoryEvent({
-            leadId,
-            conversationId,
-            eventType: "cpf_prompt_presented",
-            title: "Prompt de CPF apresentado ao lead via WhatsApp",
-            details: { phone: normalizedPhoneOnly },
-            actorType: "system",
-          });
-          const cpfCheck = isValidCPF(inboundContent || "");
-          if (!cpfCheck.ok) {
-            const msg =
-              "Não consegui identificar um CPF válido. Responda novamente com os 11 dígitos (ex: 123.456.789-09).";
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
-            try {
-              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
-            } catch (_e) {}
-
-            void appendHistoryEvent({
-              leadId,
-              conversationId,
-              eventType: "cpf_validation_failed",
-              title: "Falha ao validar CPF informado via WhatsApp",
-              details: { raw_value: inboundContent || null, phone: normalizedPhoneOnly },
-              actorType: "system",
-            });
-
-            return Response.json({
-              ok: true,
-              handled: true,
-              flow: "whatsapp_cpf_retry",
-              blocked: false,
-            });
-          }
-          try {
-            await admin.from("atendimento_leads").update({ cpf: cpfCheck.formatted, updated_at: nowIso }).eq("id", leadId);
-          } catch (_e) {}
-
-          void appendHistoryEvent({
-            leadId,
-            conversationId,
-            eventType: "cpf_collected",
-            title: "CPF do lead identificado e salvo via WhatsApp",
-            details: {
-              raw_value: inboundContent || null,
-              stored_cpf: cpfCheck.formatted,
-              digits: cpfCheck.digits,
-              phone: normalizedPhoneOnly,
-            },
-            actorType: "system",
-          });
-
-          const afterCpfNext: "state" | "city" | null =
-            !String((lead as any)?.state ?? "").trim()
-              ? "state"
-              : !String((lead as any)?.city ?? "").trim()
-                ? "city"
-                : null;
-          const nextMsg = afterCpfNext
-            ? CAPTURED_FIELD_PROMPTS[afterCpfNext]
-            : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
-          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
-          try {
-            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
-          } catch (_e) {}
-
-          return Response.json({
-            ok: true,
-            handled: true,
-            flow: "whatsapp_cpf_collected",
           });
         }
 
@@ -4119,15 +4050,21 @@ export async function POST(req: Request) {
                 .eq("id", leadId);
             } catch (_e) {}
 
-            try {
-              await admin
-                .from("atendimento_conversations")
-                .update({
-                  bot_enabled: false,
-                  updated_at: nowIso,
-                })
-                .eq("id", conversationId);
-            } catch (_e) {}
+            const leadCPFBefore = String((lead as any)?.cpf ?? "").trim();
+            const needsPostBookingCpf =
+              POST_BOOKING_CPF_STAGE_ENABLED && !leadCPFBefore;
+
+            if (!needsPostBookingCpf) {
+              try {
+                await admin
+                  .from("atendimento_conversations")
+                  .update({
+                    bot_enabled: false,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", conversationId);
+              } catch (_e) {}
+            }
 
             try {
               await appendHistoryEvent({
@@ -4144,51 +4081,189 @@ export async function POST(req: Request) {
                   professor_start_at: chosen.professorStartAt,
                   lead_date: chosen.leadDate,
                   lead_time: chosen.leadTime,
+                  post_booking_cpf_required: needsPostBookingCpf,
                 },
                 actorType: "system",
               });
             } catch (_e) {}
 
-            try {
-              await appendHistoryEvent({
-                leadId,
-                conversationId,
-                eventType: "whatsapp_flow_concluded_bot_disabled",
-                title: "Fluxo WhatsApp de agendamento concluido — bot desativado para novos disparos",
-                details: {
-                  reason: "aula_experimental_agendada",
-                  disabled_at: nowIso,
-                },
-                actorType: "system",
-              });
-            } catch (_e) {}
+            if (!needsPostBookingCpf) {
+              try {
+                await appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "whatsapp_flow_concluded_bot_disabled",
+                  title: "Fluxo WhatsApp de agendamento concluido — bot desativado para novos disparos",
+                  details: {
+                    reason: "aula_experimental_agendada",
+                    disabled_at: nowIso,
+                  },
+                  actorType: "system",
+                });
+              } catch (_e) {}
+            }
 
             const firstName =
               String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] || "Aluno";
-            const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
-            for (const m of chatMsgs) {
-              await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
-            }
-            try {
-              for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
+
+            if (needsPostBookingCpf) {
+              const bookingChat = buildExperimentalClassBookingChatMessages(firstName);
+              for (const m of bookingChat) {
+                await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
+              }
+              try {
+                for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
+                  await sendAtendimentoWhatsAppText({
+                    phone: normalizedPhoneOnly,
+                    message: m,
+                  });
+                }
+              } catch (_e) {}
+
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "cpf_prompt_presented",
+                title: "Prompt pós-agendamento de CPF apresentado ao lead via WhatsApp",
+                details: { phone: normalizedPhoneOnly, stage: "immediately_after_booking" },
+                actorType: "system",
+              });
+
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: POST_BOOKING_CPF_PROMPT,
+              });
+              try {
                 await sendAtendimentoWhatsAppText({
                   phone: normalizedPhoneOnly,
-                  message: m,
+                  message: POST_BOOKING_CPF_PROMPT,
                 });
+              } catch (_e) {}
+            } else {
+              const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
+              for (const m of chatMsgs) {
+                await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
               }
-            } catch (_e) {}
-            try {
-              await sendAtendimentoWhatsAppText({
-                phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
-                message: buildExperimentalClassAttendantWhatsAppMessage(),
-              });
-            } catch (_e) {}
+              try {
+                for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
+                  await sendAtendimentoWhatsAppText({
+                    phone: normalizedPhoneOnly,
+                    message: m,
+                  });
+                }
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+                  message: buildExperimentalClassAttendantWhatsAppMessage(),
+                });
+              } catch (_e) {}
+            }
           }
 
           return Response.json({
             ok: true,
             handled: true,
             flow: "whatsapp_booked",
+          });
+        }
+
+        const leadCPF = String((lead as any)?.cpf ?? "").trim();
+        const leadFunnelStage = String((lead as any)?.funnel_stage ?? "");
+        const isPostBookingStage =
+          leadFunnelStage === "aula_experimental_agendada" ||
+          expectedField === "cpf";
+        if (
+          POST_BOOKING_CPF_STAGE_ENABLED &&
+          isPostBookingStage &&
+          !leadCPF
+        ) {
+          const inboundIsExpectedCpf = expectedField === "cpf";
+          if (!inboundIsExpectedCpf && expectedField !== "cpf") {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "cpf_prompt_presented",
+              title: "Prompt pós-agendamento de CPF apresentado ao lead via WhatsApp",
+              details: { phone: normalizedPhoneOnly, stage: "post_booking" },
+              actorType: "system",
+            });
+            const msg = POST_BOOKING_CPF_PROMPT;
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_post_booking_cpf_prompted",
+              blocked: false,
+            });
+          }
+
+          const cpfCheck = isValidCPF(inboundContent || "");
+          if (!cpfCheck.ok) {
+            const msg =
+              "Não consegui identificar um CPF válido. Responda novamente com os 11 dígitos (ex: 123.456.789-09).";
+            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "cpf_validation_failed",
+              title: "Falha ao validar CPF (pós-agendamento) informado via WhatsApp",
+              details: { raw_value: inboundContent || null, phone: normalizedPhoneOnly },
+              actorType: "system",
+            });
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_post_booking_cpf_retry",
+              blocked: false,
+            });
+          }
+          try {
+            await admin.from("atendimento_leads").update({ cpf: cpfCheck.formatted, updated_at: nowIso }).eq("id", leadId);
+          } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "cpf_collected",
+            title: "CPF do lead coletado via WhatsApp (pós-agendamento da aula experimental)",
+            details: {
+              raw_value: inboundContent || null,
+              stored_cpf: cpfCheck.formatted,
+              digits: cpfCheck.digits,
+              phone: normalizedPhoneOnly,
+              stage: "post_booking",
+            },
+            actorType: "system",
+          });
+
+          const finalMsg = POST_BOOKING_CPF_SUCCESS_MESSAGE;
+          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: finalMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: finalMsg });
+          } catch (_e) {}
+
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_post_booking_cpf_collected",
           });
         }
 
