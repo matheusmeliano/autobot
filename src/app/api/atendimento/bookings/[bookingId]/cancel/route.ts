@@ -134,6 +134,34 @@ export async function POST(
       actorEmail: auth.user.email,
     });
 
+    const nowIsoAfterCancel = new Date().toISOString();
+    const leadIdAfterCancel = String((updatedBooking as any).lead_id ?? "");
+    const conversationIdAfterCancel = String((updatedBooking as any).conversation_id ?? "");
+
+    if (leadIdAfterCancel) {
+      try {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            funnel_stage: "novo_lead",
+            status: "novo_lead",
+            updated_at: nowIsoAfterCancel,
+          })
+          .eq("id", leadIdAfterCancel);
+      } catch (_eLeadReset) {}
+    }
+    if (conversationIdAfterCancel) {
+      try {
+        await admin
+          .from("atendimento_conversations")
+          .update({
+            bot_enabled: true,
+            updated_at: nowIsoAfterCancel,
+          })
+          .eq("id", conversationIdAfterCancel);
+      } catch (_eConvReset) {}
+    }
+
     return Response.json({
       ok: true,
       booking: {
@@ -167,6 +195,34 @@ export async function POST(
     actorType: "attendant",
     actorEmail: auth.user.email,
   });
+
+  const nowIsoFallback = new Date().toISOString();
+  const fallbackLeadId = String(payload.leadId ?? "");
+  const fallbackConversationId = String(payload.conversationId ?? "");
+
+  if (fallbackLeadId) {
+    try {
+      await admin
+        .from("atendimento_leads")
+        .update({
+          funnel_stage: "novo_lead",
+          status: "novo_lead",
+          updated_at: nowIsoFallback,
+        })
+        .eq("id", fallbackLeadId);
+    } catch (_eLeadFallback) {}
+  }
+  if (fallbackConversationId) {
+    try {
+      await admin
+        .from("atendimento_conversations")
+        .update({
+          bot_enabled: true,
+          updated_at: nowIsoFallback,
+        })
+        .eq("id", fallbackConversationId);
+    } catch (_eConvFallback) {}
+  }
 
   return Response.json({
     ok: true,

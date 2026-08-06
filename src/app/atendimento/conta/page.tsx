@@ -145,6 +145,7 @@ export default async function AtendimentoAccountPage({
       .from("atendimento_experimental_class_bookings")
       .select("status, lead_date, lead_time, professor_date, professor_time, created_at, updated_at")
       .eq("lead_id", String(lead.id))
+      .eq("status", "scheduled")
       .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(1)

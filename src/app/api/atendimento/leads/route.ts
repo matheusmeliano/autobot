@@ -129,9 +129,17 @@ export async function GET(req: Request) {
       return Response.json({ ok: false, error: bookingsError.message }, { status: 500 });
     }
 
+    const cancelledLeadBookingIds = new Set<string>();
     for (const booking of bookings ?? []) {
       const leadId = String((booking as any)?.lead_id ?? "");
-      if (!leadId || bookingsByLeadId.has(leadId)) continue;
+      const status = String((booking as any)?.status ?? "").trim().toLowerCase();
+      if (!leadId) continue;
+      if (status === "cancelled") {
+        cancelledLeadBookingIds.add(leadId);
+        continue;
+      }
+      if (status !== "scheduled") continue;
+      if (bookingsByLeadId.has(leadId)) continue;
       bookingsByLeadId.set(leadId, {
         ...(booking as any),
         lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
@@ -171,6 +179,15 @@ export async function GET(req: Request) {
     }
 
     const lessonLinkByLeadId = new Map<string, string | null>();
+    const cancelledByHistoryLeadIds = new Set<string>();
+    for (const event of historyEvents ?? []) {
+      const leadId = String((event as any)?.lead_id ?? "");
+      if (!leadId) continue;
+      const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+      if (eventType === "experimental_class_cancelled") {
+        cancelledByHistoryLeadIds.add(leadId);
+      }
+    }
     for (const event of historyEvents ?? []) {
       const leadId = String((event as any)?.lead_id ?? "");
       if (!leadId) continue;
@@ -186,8 +203,14 @@ export async function GET(req: Request) {
         continue;
       }
 
-      if (!bookingsByLeadId.has(leadId) && eventType === "experimental_class_scheduled") {
+      if (
+        !bookingsByLeadId.has(leadId) &&
+        eventType === "experimental_class_scheduled" &&
+        !cancelledLeadBookingIds.has(leadId) &&
+        !cancelledByHistoryLeadIds.has(leadId)
+      ) {
         const bookingStatus = String(details.status ?? "").trim().toLowerCase() || "scheduled";
+        if (bookingStatus === "cancelled") continue;
         bookingsByLeadId.set(leadId, {
           id: String((event as any)?.id ?? ""),
           status: bookingStatus,

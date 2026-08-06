@@ -880,6 +880,7 @@ async function getScheduledExperimentalClassBookingWhatsApp(params: {
       "professor_start_at, id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_checked_at",
     )
     .eq("lead_id", params.leadId)
+    .eq("status", "scheduled")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
