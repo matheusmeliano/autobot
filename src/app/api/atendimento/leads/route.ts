@@ -408,7 +408,6 @@ export async function GET(req: Request) {
       const sanitizedRow = isCancelledLead
         ? {
             ...(row as any),
-            cpf: "",
             email: "",
             city: "",
             state: "",

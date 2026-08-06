@@ -250,7 +250,7 @@ function LeadDetails({
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
-            <Field label="CPF" value={bookingIsCancelled ? "-" : lead.cpf} copyable={!bookingIsCancelled} />
+            <Field label="CPF" value={lead.cpf} copyable />
             <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
             <Field label="Cidade" value={bookingIsCancelled ? "-" : formatAtendimentoLocationName(lead.city)} />
             <Field label="Estado" value={bookingIsCancelled ? "-" : formatAtendimentoLocationName(lead.state)} />
