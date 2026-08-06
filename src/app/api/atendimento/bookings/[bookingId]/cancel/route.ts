@@ -138,15 +138,30 @@ export async function POST(
     const leadIdAfterCancel = String((updatedBooking as any).lead_id ?? "");
     const conversationIdAfterCancel = String((updatedBooking as any).conversation_id ?? "");
 
+    const leadResetPreservingNamePhone = {
+      funnel_stage: "novo_lead",
+      status: "novo_lead",
+      state: "",
+      city: "",
+      timezone: "",
+      country: "",
+      cpf: "",
+      email: "",
+      experimental_class_status: "",
+      experimental_class_lead_date: "",
+      experimental_class_lead_time: "",
+      experimental_class_lead_start_at: "" as any,
+      experimental_class_professor_date: "",
+      experimental_class_professor_time: "",
+      experimental_class_professor_start_at: "" as any,
+      updated_at: nowIsoAfterCancel,
+    };
+
     if (leadIdAfterCancel) {
       try {
         await admin
           .from("atendimento_leads")
-          .update({
-            funnel_stage: "novo_lead",
-            status: "novo_lead",
-            updated_at: nowIsoAfterCancel,
-          })
+          .update(leadResetPreservingNamePhone)
           .eq("id", leadIdAfterCancel);
       } catch (_eLeadReset) {}
     }
@@ -200,15 +215,30 @@ export async function POST(
   const fallbackLeadId = String(payload.leadId ?? "");
   const fallbackConversationId = String(payload.conversationId ?? "");
 
+  const leadResetPreservingNamePhoneFallback = {
+    funnel_stage: "novo_lead",
+    status: "novo_lead",
+    state: "",
+    city: "",
+    timezone: "",
+    country: "",
+    cpf: "",
+    email: "",
+    experimental_class_status: "",
+    experimental_class_lead_date: "",
+    experimental_class_lead_time: "",
+    experimental_class_lead_start_at: "" as any,
+    experimental_class_professor_date: "",
+    experimental_class_professor_time: "",
+    experimental_class_professor_start_at: "" as any,
+    updated_at: nowIsoFallback,
+  };
+
   if (fallbackLeadId) {
     try {
       await admin
         .from("atendimento_leads")
-        .update({
-          funnel_stage: "novo_lead",
-          status: "novo_lead",
-          updated_at: nowIsoFallback,
-        })
+        .update(leadResetPreservingNamePhoneFallback)
         .eq("id", fallbackLeadId);
     } catch (_eLeadFallback) {}
   }
