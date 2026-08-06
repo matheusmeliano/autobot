@@ -164,7 +164,7 @@ export async function POST(
         await admin
           .from("atendimento_conversations")
           .update({
-            bot_enabled: true,
+            bot_enabled: false,
             updated_at: nowIsoAfterCancel,
           })
           .eq("id", conversationIdAfterCancel);
@@ -235,7 +235,7 @@ export async function POST(
       await admin
         .from("atendimento_conversations")
         .update({
-          bot_enabled: true,
+          bot_enabled: false,
           updated_at: nowIsoFallback,
         })
         .eq("id", fallbackConversationId);
