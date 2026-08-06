@@ -252,10 +252,10 @@ function LeadDetails({
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="CPF" value={lead.cpf} copyable />
             <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
-            <Field label="Cidade" value={bookingIsCancelled ? "-" : formatAtendimentoLocationName(lead.city)} />
-            <Field label="Estado" value={bookingIsCancelled ? "-" : formatAtendimentoLocationName(lead.state)} />
-            <Field label="País" value={bookingIsCancelled ? "-" : lead.country} />
-            <Field label="Fuso" value={bookingIsCancelled ? "-" : lead.timezone} />
+            <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
+            <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
+            <Field label="País" value={lead.country} />
+            <Field label="Fuso" value={lead.timezone} />
           </div>
         ) : null}
 

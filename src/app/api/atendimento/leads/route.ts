@@ -405,19 +405,8 @@ export async function GET(req: Request) {
             } as any)
           : null;
 
-      const sanitizedRow = isCancelledLead
-        ? {
-            ...(row as any),
-            email: "",
-            city: "",
-            state: "",
-            country: "",
-            timezone: "",
-          }
-        : row;
-
       return {
-        ...sanitizedRow,
+        ...row,
         experimental_class_professor_date: mergedProfessorDate || null,
         experimental_class_lead_date: mergedLeadDate || null,
         experimental_class_professor_time: mergedProfessorTime || null,

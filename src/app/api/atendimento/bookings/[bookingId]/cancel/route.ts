@@ -141,11 +141,6 @@ export async function POST(
     const leadResetPreservingNamePhone = {
       funnel_stage: "novo_lead",
       status: "novo_lead",
-      state: "",
-      city: "",
-      timezone: "",
-      country: "",
-      email: "",
       experimental_class_status: "",
       experimental_class_lead_date: "",
       experimental_class_lead_time: "",
@@ -217,11 +212,6 @@ export async function POST(
   const leadResetPreservingNamePhoneFallback = {
     funnel_stage: "novo_lead",
     status: "novo_lead",
-    state: "",
-    city: "",
-    timezone: "",
-    country: "",
-    email: "",
     experimental_class_status: "",
     experimental_class_lead_date: "",
     experimental_class_lead_time: "",
