@@ -300,7 +300,13 @@ export function buildAgendaRows(params: {
     });
   }
 
-  return rows.sort((a, b) => {
+  const onlyRealSchedules = rows.filter(
+    (row) =>
+      String(row.source_kind ?? "schedule") === "schedule" &&
+      !Boolean(row.schedule_missing) &&
+      !String(row.id ?? "").startsWith("charge:"),
+  );
+  return onlyRealSchedules.sort((a, b) => {
     const debtorCompare = String(a.debtor_nome ?? "").localeCompare(String(b.debtor_nome ?? ""), "pt-BR", {
       sensitivity: "base",
     });

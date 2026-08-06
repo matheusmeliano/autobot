@@ -1167,12 +1167,29 @@ export async function deleteScheduleAction(id: string) {
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) return { ok: false, error: "Sem sessão." };
-  const { data: schedule } = await supabase.from("schedules").select("debtor_id").eq("id", id).maybeSingle();
-  const { error } = await supabase.from("schedules").delete().eq("id", id);
+  const admin = createSupabaseAdminClient();
+  const { data: schedule } = await admin
+    .from("schedules")
+    .select("id, debtor_id, user_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!schedule?.id) return { ok: false, error: "Agendamento não encontrado." };
+  if (String((schedule as any).user_id ?? "") !== userId) {
+    return { ok: false, error: "Sem permissão." };
+  }
+  const { error } = await admin.from("schedules").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  const { data: verifyRow } = await admin
+    .from("schedules")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (verifyRow?.id) {
+    return { ok: false, error: "Falha ao excluir agendamento (linha persiste após delete)." };
+  }
   const debtorId = String((schedule as any)?.debtor_id ?? "");
   if (debtorId) {
-    await syncDebtorChargeStatus(createSupabaseAdminClient(), userId, debtorId);
+    await syncDebtorChargeStatus(admin, userId, debtorId);
   }
   return { ok: true };
 }
