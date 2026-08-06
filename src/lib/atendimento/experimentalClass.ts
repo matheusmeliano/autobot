@@ -13,6 +13,7 @@ export const EXPERIMENTAL_CLASS_SLOT_TIMES = [
   "20:00",
 ] as const;
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
+export const EXPERIMENTAL_CLASS_MIN_BOOKING_LEAD_MINUTES = 90;
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
 export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
@@ -465,8 +466,10 @@ export function listExperimentalClassAvailability(params: {
     .map((value) => new Date(value).getTime())
     .filter((value) => Number.isFinite(value));
 
+  const minBookingLeadMs = EXPERIMENTAL_CLASS_MIN_BOOKING_LEAD_MINUTES * 60 * 1000;
   const professorToday = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
   const professorMonthEnd = endOfMonthLocalDate(professorToday);
+  const leadToday = localDateInTimeZone(now, leadTimeZone);
   const dates: ExperimentalClassDateOption[] = [];
   const slotsByProfessorDate = new Map<string, ExperimentalClassTimeOption[]>();
   const collectDates = (startDate: string, endDate: string) => {
@@ -488,7 +491,8 @@ export function listExperimentalClassAvailability(params: {
           timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
         });
         const professorStartMs = new Date(professorStartAt).getTime();
-        if (!Number.isFinite(professorStartMs) || professorStartMs <= nowMs) continue;
+        if (!Number.isFinite(professorStartMs)) continue;
+        if (professorStartMs - nowMs < minBookingLeadMs) continue;
         const professorEndMs = professorStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
         const overlapsExistingBooking = bookedProfessorStartMs.some((bookedStartMs) => {
           const bookedEndMs = bookedStartMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
@@ -497,6 +501,7 @@ export function listExperimentalClassAvailability(params: {
         if (overlapsExistingBooking) continue;
 
         const leadDate = localDateInTimeZone(professorStartAt, leadTimeZone);
+        if (leadDate < leadToday) continue;
         daySlots.push({
           id: `${currentDate}|${professorTime}`,
           professorDate: currentDate,
@@ -512,6 +517,7 @@ export function listExperimentalClassAvailability(params: {
 
       slotsByProfessorDate.set(currentDate, daySlots);
       const leadDate = daySlots[0]?.leadDate ?? currentDate;
+      if (leadDate < leadToday) continue;
       const dayLabel = leadDate.slice(8, 10);
       dates.push({
         id: currentDate,
