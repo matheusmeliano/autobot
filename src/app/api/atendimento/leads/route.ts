@@ -234,6 +234,7 @@ export async function GET(req: Request) {
       }
 
       if (eventType === "experimental_class_date_selected" && !draftDateByLeadId.has(leadId)) {
+        if (cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId)) continue;
         draftDateByLeadId.set(leadId, {
           professor_date: String(details.professor_date ?? "").trim(),
           lead_date: String(details.lead_date ?? "").trim(),
@@ -243,6 +244,7 @@ export async function GET(req: Request) {
         continue;
       }
       if (eventType === "experimental_class_time_selected" && !draftTimeByLeadId.has(leadId)) {
+        if (cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId)) continue;
         draftTimeByLeadId.set(leadId, {
           professor_date: String(details.professor_date ?? "").trim(),
           professor_time: String(details.professor_time ?? "").trim(),
@@ -325,42 +327,53 @@ export async function GET(req: Request) {
     .map((row) => {
       const leadId = String(row.id ?? "");
       const existingBooking = bookingsByLeadId.get(leadId) ?? null;
-      const draftDate = draftDateByLeadId.get(leadId) ?? null;
-      const draftTime = draftTimeByLeadId.get(leadId) ?? null;
+      const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
+      const cleanDraftDate = isCancelledLead ? null : draftDateByLeadId.get(leadId) ?? null;
+      const cleanDraftTime = isCancelledLead ? null : draftTimeByLeadId.get(leadId) ?? null;
+      const mergedRowExperimentalClassStatus = isCancelledLead
+        ? ""
+        : String((row as any)?.experimental_class_status ?? "").trim();
 
-      const mergedProfessorDate =
-        String((row as any)?.experimental_class_professor_date ?? "").trim() ||
-        (draftTime?.professor_date ?? "") ||
-        (draftDate?.professor_date ?? "") ||
-        String((existingBooking as any)?.professor_date ?? "").trim();
-      const mergedLeadDate =
-        String((row as any)?.experimental_class_lead_date ?? "").trim() ||
-        (draftTime?.lead_date ?? "") ||
-        (draftDate?.lead_date ?? "") ||
-        String((existingBooking as any)?.lead_date ?? "").trim();
-      const mergedProfessorTime =
-        String((row as any)?.experimental_class_professor_time ?? "").trim() ||
-        (draftTime?.professor_time ?? "") ||
-        String((existingBooking as any)?.professor_time ?? "").trim();
-      const mergedLeadTime =
-        String((row as any)?.experimental_class_lead_time ?? "").trim() ||
-        (draftTime?.lead_time ?? "") ||
-        String((existingBooking as any)?.lead_time ?? "").trim();
-      const mergedProfessorStartAt =
-        String((row as any)?.experimental_class_professor_start_at ?? "").trim() ||
-        (draftTime?.professor_start_at ?? "") ||
-        String((existingBooking as any)?.professor_start_at ?? "").trim();
-      const mergedLeadStartAt =
-        String((row as any)?.experimental_class_lead_start_at ?? "").trim() ||
-        (draftTime?.lead_start_at ?? "") ||
-        String((existingBooking as any)?.lead_start_at ?? "").trim();
-      const mergedStatus =
-        String((row as any)?.experimental_class_status ?? "").trim() ||
-        (existingBooking ? "booked" : draftTime ? "time_selected" : draftDate ? "date_selected" : "");
+      const mergedProfessorDate = isCancelledLead
+        ? ""
+        : String((row as any)?.experimental_class_professor_date ?? "").trim() ||
+          (cleanDraftTime?.professor_date ?? "") ||
+          (cleanDraftDate?.professor_date ?? "") ||
+          String((existingBooking as any)?.professor_date ?? "").trim();
+      const mergedLeadDate = isCancelledLead
+        ? ""
+        : String((row as any)?.experimental_class_lead_date ?? "").trim() ||
+          (cleanDraftTime?.lead_date ?? "") ||
+          (cleanDraftDate?.lead_date ?? "") ||
+          String((existingBooking as any)?.lead_date ?? "").trim();
+      const mergedProfessorTime = isCancelledLead
+        ? ""
+        : String((row as any)?.experimental_class_professor_time ?? "").trim() ||
+          (cleanDraftTime?.professor_time ?? "") ||
+          String((existingBooking as any)?.professor_time ?? "").trim();
+      const mergedLeadTime = isCancelledLead
+        ? ""
+        : String((row as any)?.experimental_class_lead_time ?? "").trim() ||
+          (cleanDraftTime?.lead_time ?? "") ||
+          String((existingBooking as any)?.lead_time ?? "").trim();
+      const mergedProfessorStartAt = isCancelledLead
+        ? ""
+        : String((row as any)?.experimental_class_professor_start_at ?? "").trim() ||
+          (cleanDraftTime?.professor_start_at ?? "") ||
+          String((existingBooking as any)?.professor_start_at ?? "").trim();
+      const mergedLeadStartAt = isCancelledLead
+        ? ""
+        : String((row as any)?.experimental_class_lead_start_at ?? "").trim() ||
+          (cleanDraftTime?.lead_start_at ?? "") ||
+          String((existingBooking as any)?.lead_start_at ?? "").trim();
+      const mergedStatus = isCancelledLead
+        ? ""
+        : mergedRowExperimentalClassStatus ||
+          (existingBooking ? "booked" : cleanDraftTime ? "time_selected" : cleanDraftDate ? "date_selected" : "");
 
       const bookingWithFallback = existingBooking
         ? existingBooking
-        : mergedStatus && (mergedProfessorDate || mergedProfessorTime)
+        : !isCancelledLead && mergedStatus && (mergedProfessorDate || mergedProfessorTime)
           ? ({
               id: "",
               status: "draft",
