@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
-import { botReplyForLead, firstNameFromFullName, getNextMissingField } from "@/lib/atendimento/bot";
+import { botReplyForLead, firstTwoNamesFromFullName, getNextMissingField } from "@/lib/atendimento/bot";
 import {
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   buildExperimentalClassDatePromptMessages,
@@ -3327,14 +3327,14 @@ export async function POST(req: Request) {
         const wantsNameStage = expectedField === "full_name" || (!expectedField && nextMissingField === "full_name");
         const leadFullName = String((lead as any)?.full_name ?? "").trim();
         if (wantsNameStage && !leadFullName) {
-          const firstNameCandidate = firstNameFromFullName(inboundContent || "");
+          const nameCandidate = firstTwoNamesFromFullName(inboundContent || "");
           const isValidName =
-            firstNameCandidate.length >= 2 &&
-            !/\d/.test(firstNameCandidate) &&
-            !/[/:@\\{}[\]]/.test(firstNameCandidate) &&
-            firstNameCandidate.length <= 40;
+            nameCandidate.length >= 2 &&
+            !/\d/.test(nameCandidate) &&
+            !/[/:@\\{}[\]]/.test(nameCandidate) &&
+            nameCandidate.length <= 40;
           if (!isValidName) {
-            const msg = "Não consegui identificar seu nome. Responda novamente apenas com seu primeiro nome.";
+            const msg = "Não consegui identificar seu nome. Responda novamente com seu primeiro e segundo nome.";
             await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
@@ -3351,7 +3351,7 @@ export async function POST(req: Request) {
           try {
             await admin
               .from("atendimento_leads")
-              .update({ full_name: firstNameCandidate, updated_at: nowIso })
+              .update({ full_name: nameCandidate, updated_at: nowIso })
               .eq("id", leadId);
           } catch (_e) {}
 
@@ -3359,10 +3359,10 @@ export async function POST(req: Request) {
             leadId,
             conversationId,
             eventType: "full_name_collected",
-            title: "Primeiro nome do lead identificado e salvo via WhatsApp",
+            title: "Primeiro e segundo nome do lead identificados e salvos via WhatsApp",
             details: {
               raw_value: inboundContent || null,
-              stored_first_name: firstNameCandidate,
+              stored_name: nameCandidate,
               phone: normalizedPhoneOnly,
             },
             actorType: "system",

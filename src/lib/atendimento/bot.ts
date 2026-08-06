@@ -10,10 +10,13 @@ type CapturedData = Partial<Record<CapturedFieldName, string>>;
 const YES_WORDS = ["sim", "quero", "vamos", "pode", "tenho interesse", "quero agendar", "agendar"];
 const NAME_CONNECTORS = new Set(["da", "de", "do", "das", "dos", "e"]);
 
-export function firstNameFromFullName(value: string | null | undefined) {
+export function firstTwoNamesFromFullName(value: string | null | undefined) {
   const clean = String(value ?? "").trim().replace(/\s+/g, " ");
   if (!clean) return "";
-  return clean.split(" ")[0] ?? "";
+  const parts = clean.split(" ").filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0] ?? "";
+  return `${parts[0]} ${parts[1]}`;
 }
 
 export function looksLikeFullName(value: string) {
@@ -58,9 +61,9 @@ export function filterCapturedDataForLead(params: {
 }
 
 export function initialBotMessages(params?: { userName?: string | null }) {
-  const firstName = firstNameFromFullName(params?.userName);
-  const welcomeMessage = firstName
-    ? `Olá, ${firstName}! Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.`
+  const displayName = firstTwoNamesFromFullName(params?.userName);
+  const welcomeMessage = displayName
+    ? `Olá, ${displayName}! Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.`
     : "Olá. Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.";
   return [
     welcomeMessage,
