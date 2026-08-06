@@ -77,6 +77,7 @@ export async function GET(req: Request) {
   const leadIds = leadRows.map((row) => String(row.id ?? "")).filter(Boolean);
   const conversationsByLeadId = new Map<string, any>();
   const bookingsByLeadId = new Map<string, any>();
+  const cancelledLeadBookingIds = new Set<string>();
 
   if (leadIds.length > 0) {
     const { data: conversations, error: conversationsError } = await admin
@@ -129,7 +130,6 @@ export async function GET(req: Request) {
       return Response.json({ ok: false, error: bookingsError.message }, { status: 500 });
     }
 
-    const cancelledLeadBookingIds = new Set<string>();
     for (const booking of bookings ?? []) {
       const leadId = String((booking as any)?.lead_id ?? "");
       const status = String((booking as any)?.status ?? "").trim().toLowerCase();
