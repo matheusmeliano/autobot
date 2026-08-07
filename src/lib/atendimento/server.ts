@@ -928,135 +928,273 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   const admin = createSupabaseAdminClient();
   const nowIso = now.toISOString();
   const nowMs = now.getTime();
-  const lookbackMinutes = 180;
+  const lookbackMinutes = 60 * 72; // 3 dias - recupera disparos perdidos em deploy/erros
   const forwardMinutes = 720;
   const candidateWindowStartIso = new Date(nowMs - lookbackMinutes * 60_000).toISOString();
   const candidateWindowEndIso = new Date(nowMs + forwardMinutes * 60_000).toISOString();
+  const PROF_TZ = (
+    process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
+    process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
+    "America/Sao_Paulo"
+  ).trim();
 
-  let bookings: any[] | null = null;
-  let bookingsError: any = null;
+  const bookingsByLeadId = new Map<string, any>();
+  const cancelledLeadBookingIds = new Set<string>();
+  const cancelledByHistoryLeadIds = new Set<string>();
+  const sentStudentBookingIds = new Set<string>();
+  const sentAttendantBookingIds = new Set<string>();
+  const latestLessonLinkByLeadId = new Map<string, string | null>();
 
-  const bookingsSelectWithLessonLink =
-    "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
-  const bookingsSelectWithoutLessonLink =
-    "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
+  // Step 1: Tabela real de bookings
+  {
+    const bookingsSelectWithLessonLink =
+      "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
+    const bookingsSelectWithoutLessonLink =
+      "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
 
-  const bookingsWithLessonLinkResult = await admin
-    .from("atendimento_experimental_class_bookings")
-    .select(bookingsSelectWithLessonLink)
-    .eq("status", "scheduled")
-    .gte("professor_start_at", candidateWindowStartIso)
-    .lte("professor_start_at", candidateWindowEndIso)
-    .order("professor_start_at", { ascending: true });
-
-  if (
-    bookingsWithLessonLinkResult.error &&
-    isExperimentalClassBookingsLessonLinkColumnUnavailable(bookingsWithLessonLinkResult.error)
-  ) {
-    const bookingsWithoutLessonLinkResult = await admin
-      .from("atendimento_experimental_class_bookings")
-      .select(bookingsSelectWithoutLessonLink)
-      .eq("status", "scheduled")
-      .gte("professor_start_at", candidateWindowStartIso)
-      .lte("professor_start_at", candidateWindowEndIso)
-      .order("professor_start_at", { ascending: true });
-
-    bookings = bookingsWithoutLessonLinkResult.data as any[] | null;
-    bookingsError = bookingsWithoutLessonLinkResult.error;
-  } else {
-    bookings = bookingsWithLessonLinkResult.data as any[] | null;
-    bookingsError = bookingsWithLessonLinkResult.error;
-  }
-
-  if (bookingsError) {
-    if (isExperimentalClassBookingsTableUnavailable(bookingsError)) {
-      return {
-        ok: true as const,
-        skipped: true as const,
-        reason: "bookings_table_unavailable",
-        checkedBookings: 0,
-        studentSent: 0,
-        attendantSent: 0,
-        missingLessonLink: 0,
-        missingStudentPhone: 0,
-      };
+    let data: any[] | null = null;
+    try {
+      const r1 = await admin
+        .from("atendimento_experimental_class_bookings")
+        .select(bookingsSelectWithLessonLink)
+        .eq("status", "scheduled")
+        .gte("professor_start_at", candidateWindowStartIso)
+        .lte("professor_start_at", candidateWindowEndIso)
+        .order("professor_start_at", { ascending: true });
+      if (r1.error && isExperimentalClassBookingsLessonLinkColumnUnavailable(r1.error)) {
+        const r2 = await admin
+          .from("atendimento_experimental_class_bookings")
+          .select(bookingsSelectWithoutLessonLink)
+          .eq("status", "scheduled")
+          .gte("professor_start_at", candidateWindowStartIso)
+          .lte("professor_start_at", candidateWindowEndIso)
+          .order("professor_start_at", { ascending: true });
+        if (!r2.error) data = r2.data as any[];
+      } else if (!r1.error) {
+        data = r1.data as any[];
+      }
+    } catch (_e) {
+      data = null;
     }
 
-    throw new Error(bookingsError.message || "Falha ao consultar agendamentos da aula experimental.");
+    for (const booking of (data ?? []) as any[]) {
+      const leadId = String(booking?.lead_id ?? "").trim();
+      const status = String(booking?.status ?? "").trim().toLowerCase();
+      if (!leadId) continue;
+      if (status === "cancelled") {
+        cancelledLeadBookingIds.add(leadId);
+        continue;
+      }
+      if (status !== "scheduled") continue;
+      if (bookingsByLeadId.has(leadId)) continue;
+      bookingsByLeadId.set(leadId, {
+        ...booking,
+        source: "table",
+      });
+    }
   }
 
-  const bookingRows = (bookings ?? []).filter((booking) => String((booking as any)?.id ?? "").trim());
-  if (!bookingRows.length) {
-    return {
-      ok: true as const,
-      skipped: true as const,
-      reason: "no_due_bookings",
-      checkedBookings: 0,
-      studentSent: 0,
-      attendantSent: 0,
-      missingLessonLink: 0,
-      missingStudentPhone: 0,
-    };
+  // Step 2: Leads com experimental_class_professor_start_at na janela (agendamentos feitos no painel manual sem tabela bookings)
+  const extraLeadIds: string[] = [];
+  try {
+    const leadsQ = await admin
+      .from("atendimento_leads")
+      .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, cpf, city, state, country, timezone, origin")
+      .gte("experimental_class_professor_start_at", candidateWindowStartIso)
+      .lte("experimental_class_professor_start_at", candidateWindowEndIso);
+    if (!leadsQ.error && Array.isArray(leadsQ.data)) {
+      for (const row of (leadsQ.data as any[])) {
+        const id = String(row?.id ?? "").trim();
+        if (!id) continue;
+        extraLeadIds.push(id);
+      }
+    }
+  } catch (_e) {}
+
+  // Step 3: Todos os leadIds para buscar no history / detalhes completos
+  const allLeadIds = Array.from(new Set<string>([...Array.from(bookingsByLeadId.keys()), ...extraLeadIds]));
+
+  let fullLeads: any[] = [];
+  if (allLeadIds.length > 0) {
+    try {
+      const r = await admin
+        .from("atendimento_leads")
+        .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_status, cpf, city, state, country, timezone, origin")
+        .in("id", allLeadIds);
+      if (!r.error) fullLeads = (r.data as any[]) ?? [];
+    } catch (_e) {
+      fullLeads = [];
+    }
   }
 
-  const leadIds = Array.from(
-    new Set(bookingRows.map((booking) => String((booking as any)?.lead_id ?? "").trim()).filter(Boolean)),
-  );
+  // Step 4: History events (scheduled / cancelled / link / notifications)
+  if (allLeadIds.length > 0) {
+    let historyEvents: any[] = [];
+    try {
+      const r = await admin
+        .from("atendimento_history_events")
+        .select("id, lead_id, event_type, conversation_id, created_at, details")
+        .in("lead_id", allLeadIds)
+        .in("event_type", [
+          "experimental_class_date_selected",
+          "experimental_class_time_selected",
+          "experimental_class_scheduled",
+          "experimental_class_cancelled",
+          "experimental_class_link_updated",
+          "experimental_class_student_start_notification_sent",
+          "experimental_class_attendant_start_notification_sent",
+        ])
+        .order("created_at", { ascending: false });
+      if (!r.error) historyEvents = (r.data as any[]) ?? [];
+    } catch (_e) {
+      historyEvents = [];
+    }
 
-  const { data: leads, error: leadsError } = await admin
-    .from("atendimento_leads")
-    .select("id, full_name, phone")
-    .in("id", leadIds);
+    for (const event of historyEvents) {
+      const leadId = String(event?.lead_id ?? "");
+      if (!leadId) continue;
+      const eventType = String(event?.event_type ?? "").trim().toLowerCase();
+      const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+      const eventCreatedAt = String((event as any)?.created_at ?? "").trim();
+      const bookingIdFromDetails = String(details.booking_id ?? "").trim();
+      const lessonLink = String(details.lesson_link ?? "").trim() || null;
 
-  if (leadsError) {
-    throw new Error(leadsError.message || "Falha ao consultar os leads da aula experimental.");
+      if (eventType === "experimental_class_cancelled") {
+        cancelledByHistoryLeadIds.add(leadId);
+        continue;
+      }
+
+      if (eventType === "experimental_class_link_updated") {
+        if (!latestLessonLinkByLeadId.has(leadId)) {
+          latestLessonLinkByLeadId.set(leadId, lessonLink);
+        }
+        continue;
+      }
+
+      if (eventType === "experimental_class_student_start_notification_sent") {
+        if (bookingIdFromDetails) sentStudentBookingIds.add(bookingIdFromDetails);
+        continue;
+      }
+      if (eventType === "experimental_class_attendant_start_notification_sent") {
+        if (bookingIdFromDetails) sentAttendantBookingIds.add(bookingIdFromDetails);
+        continue;
+      }
+
+      if (
+        !bookingsByLeadId.has(leadId) &&
+        eventType === "experimental_class_scheduled" &&
+        !cancelledLeadBookingIds.has(leadId) &&
+        !cancelledByHistoryLeadIds.has(leadId)
+      ) {
+        const bookingStatus = String(details.status ?? "").trim().toLowerCase() || "scheduled";
+        if (bookingStatus === "cancelled") continue;
+        bookingsByLeadId.set(leadId, {
+          id: String(event?.id ?? ""),
+          lead_id: leadId,
+          conversation_id: String(event?.conversation_id ?? ""),
+          status: bookingStatus,
+          lesson_link: lessonLink,
+          student_start_notification_sent_at: null,
+          attendant_start_notification_sent_at: null,
+          attendance_status: null,
+          attendance_checked_at: null,
+          professor_timezone: String(details.professor_timezone ?? "").trim() || PROF_TZ,
+          lead_timezone: String(details.lead_timezone ?? "").trim(),
+          professor_date: String(details.professor_date ?? ""),
+          professor_time: String(details.professor_time ?? ""),
+          professor_start_at: String(details.professor_start_at ?? ""),
+          lead_date: String(details.lead_date ?? ""),
+          lead_time: String(details.lead_time ?? ""),
+          lead_start_at: String(details.lead_start_at ?? details.professor_start_at ?? ""),
+          created_at: eventCreatedAt,
+          source: "history",
+        });
+      }
+    }
+
+    // Step 5: Preenche notificações enviadas (sent_at) via history no booking mergeado
+    for (const event of historyEvents) {
+      const leadId = String(event?.lead_id ?? "");
+      if (!leadId) continue;
+      const eventType = String(event?.event_type ?? "").trim().toLowerCase();
+      const eventCreatedAt = String((event as any)?.created_at ?? "").trim();
+      const currentBooking = bookingsByLeadId.get(leadId);
+      if (!currentBooking) continue;
+      if (
+        eventType === "experimental_class_student_start_notification_sent" &&
+        !String(currentBooking.student_start_notification_sent_at ?? "").trim()
+      ) {
+        bookingsByLeadId.set(leadId, { ...currentBooking, student_start_notification_sent_at: eventCreatedAt });
+      }
+      if (
+        eventType === "experimental_class_attendant_start_notification_sent" &&
+        !String(currentBooking.attendant_start_notification_sent_at ?? "").trim()
+      ) {
+        bookingsByLeadId.set(leadId, { ...currentBooking, attendant_start_notification_sent_at: eventCreatedAt });
+      }
+      if (eventType === "experimental_class_link_updated" && !String(currentBooking.lesson_link ?? "").trim()) {
+        const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+        const link = String(details.lesson_link ?? "").trim() || null;
+        if (link) bookingsByLeadId.set(leadId, { ...currentBooking, lesson_link: link });
+      }
+    }
   }
 
-  const { data: historyEvents, error: historyError } = await admin
-    .from("atendimento_history_events")
-    .select("lead_id, conversation_id, event_type, details, created_at")
-    .in("lead_id", leadIds)
-    .in("event_type", [
-      "experimental_class_link_updated",
-      "experimental_class_student_start_notification_sent",
-      "experimental_class_attendant_start_notification_sent",
-    ])
-    .order("created_at", { ascending: false });
+  // Step 6: draft via experimental_class_lead/professor fields (agendamento manual no painel sem booking)
+  for (const row of fullLeads as any[]) {
+    const leadId = String(row?.id ?? "").trim();
+    if (!leadId) continue;
+    if (cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId)) continue;
+    if (bookingsByLeadId.has(leadId)) continue;
 
-  if (historyError) {
-    throw new Error(historyError.message || "Falha ao consultar o histórico da aula experimental.");
+    const stage = String(row?.funnel_stage ?? "").trim().toLowerCase();
+    const statusLead = String(row?.status ?? "").trim().toLowerCase();
+    const professorStart = String(row?.experimental_class_professor_start_at ?? "").trim();
+    if (!professorStart) continue;
+    if (!stage.startsWith("aula_experimental") && !statusLead.startsWith("aula_experimental")) continue;
+
+    bookingsByLeadId.set(leadId, {
+      id: `draft-${leadId}`,
+      lead_id: leadId,
+      conversation_id: null,
+      status: "scheduled",
+      lesson_link: latestLessonLinkByLeadId.get(leadId) || null,
+      student_start_notification_sent_at: null,
+      attendant_start_notification_sent_at: null,
+      attendance_status: null,
+      attendance_checked_at: null,
+      professor_timezone: PROF_TZ,
+      lead_timezone: String(row?.timezone ?? "").trim() || PROF_TZ,
+      professor_date: String(row?.experimental_class_professor_date ?? ""),
+      professor_time: String(row?.experimental_class_professor_time ?? ""),
+      professor_start_at: professorStart,
+      lead_date: String(row?.experimental_class_lead_date ?? ""),
+      lead_time: String(row?.experimental_class_lead_time ?? ""),
+      lead_start_at: String(row?.experimental_class_lead_start_at ?? professorStart),
+      created_at: nowIso,
+      source: "draft",
+    });
+  }
+
+  // Step 7: Filter dentro da janela e preparar bookingRows
+  const bookingRows: any[] = [];
+  for (const booking of Array.from(bookingsByLeadId.values())) {
+    const status = String(booking?.status ?? "").trim().toLowerCase();
+    const leadId = String(booking?.lead_id ?? "").trim();
+    if (!leadId) continue;
+    if (status === "cancelled") continue;
+    if (status !== "scheduled" && status !== "in_progress") continue;
+    if (cancelledByHistoryLeadIds.has(leadId)) continue;
+
+    const startAt = String(booking?.professor_start_at ?? "");
+    if (startAt && startAt >= candidateWindowStartIso && startAt <= candidateWindowEndIso) {
+      bookingRows.push(booking);
+    }
   }
 
   const leadsById = new Map(
-    (leads ?? []).map((lead) => [String((lead as any)?.id ?? "").trim(), lead]),
+    (fullLeads ?? []).map((lead) => [String((lead as any)?.id ?? "").trim(), lead]),
   );
-  const latestLessonLinkByLeadId = new Map<string, string | null>();
-  const sentStudentBookingIds = new Set<string>();
-  const sentAttendantBookingIds = new Set<string>();
-
-  for (const event of historyEvents ?? []) {
-    const leadId = String((event as any)?.lead_id ?? "").trim();
-    const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
-    const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
-    const bookingId = String(details.booking_id ?? "").trim();
-    const lessonLink = String(details.lesson_link ?? "").trim() || null;
-
-    if (eventType === "experimental_class_link_updated") {
-      if (leadId && !latestLessonLinkByLeadId.has(leadId)) {
-        latestLessonLinkByLeadId.set(leadId, lessonLink);
-      }
-      continue;
-    }
-
-    if (!bookingId) continue;
-    if (eventType === "experimental_class_student_start_notification_sent") {
-      sentStudentBookingIds.add(bookingId);
-      continue;
-    }
-    if (eventType === "experimental_class_attendant_start_notification_sent") {
-      sentAttendantBookingIds.add(bookingId);
-    }
-  }
 
   let studentSent = 0;
   let attendantSent = 0;
