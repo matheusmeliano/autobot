@@ -2154,8 +2154,14 @@ export async function POST(req: Request) {
             try {
               await admin
                 .from("atendimento_conversations")
-                .update({ bot_enabled: true, updated_at: nowIso })
+                .update({ bot_enabled: false, updated_at: nowIso })
                 .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", leadId);
             } catch (_e) {}
             return Response.json({
               ok: true,
@@ -2205,8 +2211,14 @@ export async function POST(req: Request) {
             try {
               await admin
                 .from("atendimento_conversations")
-                .update({ bot_enabled: true, updated_at: nowIso })
+                .update({ bot_enabled: false, updated_at: nowIso })
                 .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", leadId);
             } catch (_e) {}
             return Response.json({
               ok: true,
