@@ -1956,10 +1956,60 @@ export async function POST(req: Request) {
         const entrouNoFluxoPosAttendancePorForcaBruta =
           ultimaMsgBotPedeSimNao &&
           (isYesNuclear || isNoNuclear) &&
+          !postAttendanceHistoryMatriculaRecusadaEvent &&
+          !postAttendanceHistoryMatriculaConfirmadaEvent &&
           (funnelStageRaw === "matricula_pendente" ||
             leadStatusRaw === "matricula_pendente" ||
             funnelStageRaw === "matricula_pendente_recusada" ||
             leadStatusRaw === "matricula_pendente_recusada");
+
+        if (
+          postAttendanceHistoryMatriculaRecusadaEvent ||
+          postAttendanceHistoryMatriculaConfirmadaEvent
+        ) {
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: mediaInfo.hasPaymentMedia
+                ? mediaInfo.mediaUrl
+                  ? "document"
+                  : "text"
+                : "text",
+              media_url: mediaInfo.mediaUrl || null,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+
+          if (postAttendanceHistoryMatriculaRecusadaEvent || leadEstaEmMatriculaRecusadaPosAttendance) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "global_nuclear_post_attendance_matricula_recusada_ignored_quiet",
+              flow: "nuclear_post_attendance_matricula_recusada_ignored",
+            });
+          }
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "global_nuclear_post_attendance_matricula_confirmada_ignored_quiet",
+            flow: "nuclear_post_attendance_matricula_confirmada_ignored",
+          });
+        }
 
         if (
           postAttendanceHistoryMatriculaRecusadaEvent ||
@@ -2021,6 +2071,15 @@ export async function POST(req: Request) {
               ignored: true,
               reason: "nuclear_post_attendance_matricula_confirmada_ignored_quiet",
               flow: "nuclear_post_attendance_matricula_confirmada_ignored",
+            });
+          }
+
+          if (postAttendanceHistoryMatriculaRecusadaEvent || postAttendanceHistoryMatriculaConfirmadaEvent) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "redundant_sim_nao_response_ignored_after_first_answer",
+              flow: "post_attendance_first_answer_lock",
             });
           }
 
