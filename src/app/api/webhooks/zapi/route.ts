@@ -1830,6 +1830,7 @@ export async function POST(req: Request) {
         let postAttendanceHistoryConfirmedAttendedEvent = false;
         let postAttendanceHistoryConfirmedNoShowEvent = false;
         let postAttendanceHistoryMatriculaRecusadaEvent = false;
+        let postAttendanceHistoryMatriculaConfirmadaEvent = false;
         try {
           const { data: histAttAll } = await admin
             .from("atendimento_history_events")
@@ -1843,8 +1844,11 @@ export async function POST(req: Request) {
               "experimental_class_attendance_no_show",
               "matricula_pendente_resposta_nao_nuclear",
               "whatsapp_matricula_recusada_fixed_reply",
+              "matricula_pendente_resposta_sim_nuclear",
+              "matricula_pendente_resposta_sim",
+              "matricula_pendente_resposta_nao",
             ])
-            .limit(6);
+            .limit(10);
           const histAttEvents = Array.isArray((histAttAll as any)?.data ?? [])
             ? ((histAttAll as any).data as Array<{ event_type: string }>)
             : [];
@@ -1861,7 +1865,13 @@ export async function POST(req: Request) {
           postAttendanceHistoryMatriculaRecusadaEvent = histAttEvents.some(
             (e) =>
               e.event_type === "matricula_pendente_resposta_nao_nuclear" ||
-              e.event_type === "whatsapp_matricula_recusada_fixed_reply",
+              e.event_type === "whatsapp_matricula_recusada_fixed_reply" ||
+              e.event_type === "matricula_pendente_resposta_nao",
+          );
+          postAttendanceHistoryMatriculaConfirmadaEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "matricula_pendente_resposta_sim_nuclear" ||
+              e.event_type === "matricula_pendente_resposta_sim",
           );
         } catch (_e) {}
 
@@ -1907,11 +1917,18 @@ export async function POST(req: Request) {
           (postAttendanceHistoryConfirmedAttendedEvent ||
             Boolean(currentBookingId) ||
             bookingAttendanceAttendedByCol) &&
-          !postAttendanceHistoryMatriculaRecusadaEvent;
+          !postAttendanceHistoryMatriculaRecusadaEvent &&
+          !postAttendanceHistoryMatriculaConfirmadaEvent;
         const leadEstaEmMatriculaRecusadaPosAttendance =
           postAttendanceHistoryMatriculaRecusadaEvent ||
           ((funnelStageRaw === "matricula_pendente_recusada" ||
             leadStatusRaw === "matricula_pendente_recusada") &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              Boolean(currentBookingId) ||
+              bookingAttendanceAttendedByCol));
+        const leadEstaEmMatriculaConfirmadaPosAttendance =
+          postAttendanceHistoryMatriculaConfirmadaEvent ||
+          ((funnelStageRaw === "matricula_confirmada" || leadStatusRaw === "matricula_confirmada") &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
               Boolean(currentBookingId) ||
               bookingAttendanceAttendedByCol));
@@ -1946,7 +1963,9 @@ export async function POST(req: Request) {
 
         if (
           postAttendanceHistoryMatriculaRecusadaEvent ||
+          postAttendanceHistoryMatriculaConfirmadaEvent ||
           leadEstaEmMatriculaRecusadaPosAttendance ||
+          leadEstaEmMatriculaConfirmadaPosAttendance ||
           leadEstaEmRepescagemNoShow ||
           entrouNoFluxoPosAttendancePorForcaBruta ||
           leadDirectlyInPosAttendanceStepNuclear ||
@@ -1993,6 +2012,15 @@ export async function POST(req: Request) {
               ignored: true,
               reason: "nuclear_post_attendance_matricula_recusada_ignored_quiet",
               flow: "nuclear_post_attendance_matricula_recusada_ignored",
+            });
+          }
+
+          if (leadEstaEmMatriculaConfirmadaPosAttendance) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "nuclear_post_attendance_matricula_confirmada_ignored_quiet",
+              flow: "nuclear_post_attendance_matricula_confirmada_ignored",
             });
           }
 
@@ -2137,9 +2165,13 @@ export async function POST(req: Request) {
                 .in("event_type", [
                   "matricula_pendente_sim_nao_invalida_ambiguous",
                   "nuclear_matricula_pendente_sim_nao_invalida_ambiguous",
+                  "matricula_pendente_resposta_sim",
+                  "matricula_pendente_resposta_nao",
+                  "matricula_pendente_resposta_sim_nuclear",
+                  "matricula_pendente_resposta_nao_nuclear",
                 ])
                 .order("created_at", { ascending: false })
-                .limit(10);
+                .limit(20);
               const arrHist = (histInvalidAttempts ?? []) as any[];
               const eventsAfterLastClear = [] as any[];
               for (const ev of arrHist) {
