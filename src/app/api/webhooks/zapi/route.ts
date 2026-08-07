@@ -2610,6 +2610,73 @@ export async function POST(req: Request) {
           });
         }
 
+        const leadRawFunnel = String((lead as any)?.funnel_stage ?? "").trim();
+        const leadRawStatus = String((lead as any)?.status ?? "").trim();
+        const isLeadLockedByMatriculaStage =
+          leadRawFunnel === "matricula_pendente_recusada" ||
+          leadRawStatus === "matricula_pendente_recusada" ||
+          leadRawFunnel === "matricula_confirmada" ||
+          leadRawStatus === "matricula_confirmada";
+        if (isLeadLockedByMatriculaStage) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", leadId);
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "isolated_post_attendance_stage_lock_" + leadRawFunnel + "_" + leadRawStatus,
+            flow: "post_attendance_matricula_stage_locked_quiet",
+          });
+        }
+
         if (isLeadInMatriculaPendentePostAttendance && !isLeadInRepescagemNoShowLocked) {
           const inboundContent = String(messageText ?? "").trim();
           const inboundMediaType = mediaInfo.hasPaymentMedia
@@ -2877,7 +2944,7 @@ export async function POST(req: Request) {
             try {
               await admin
                 .from("atendimento_conversations")
-                .update({ bot_enabled: true, updated_at: nowIso })
+                .update({ bot_enabled: false, updated_at: nowIso })
                 .eq("id", conversationId);
             } catch (_e) {
               const msg = String((_e as any)?.message ?? "");
@@ -2891,6 +2958,12 @@ export async function POST(req: Request) {
                 // ignore missing column; rest flow already returned handled:true
               }
             }
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e) {}
           }
 
           return Response.json({
@@ -2981,6 +3054,75 @@ export async function POST(req: Request) {
             handled: true,
             flow: "whatsapp_repescagem_no_show_locked",
           });
+        }
+
+        {
+          const lrf = String((lead as any)?.funnel_stage ?? "").trim();
+          const lrs = String((lead as any)?.status ?? "").trim();
+          const locked =
+            lrf === "matricula_pendente_recusada" ||
+            lrs === "matricula_pendente_recusada" ||
+            lrf === "matricula_confirmada" ||
+            lrs === "matricula_confirmada";
+          if (locked) {
+            const inboundContent = String(messageText ?? "").trim();
+            const inboundMediaType = mediaInfo.hasPaymentMedia
+              ? (mediaInfo.mediaUrl ? "document" : "text")
+              : "text";
+            const inboundMediaUrl = mediaInfo.mediaUrl || null;
+            try {
+              const { error: inboundErr } = await admin
+                .from("atendimento_messages")
+                .insert({
+                  conversation_id: conversationId,
+                  sender_role: "lead",
+                  content_text: inboundContent || null,
+                  media_type: inboundMediaType,
+                  media_url: inboundMediaUrl,
+                  status: "recebida",
+                  sent_at: nowIso,
+                  delivered_at: nowIso,
+                });
+              if (!inboundErr) {
+                try {
+                  void admin
+                    .from("atendimento_leads")
+                    .update({
+                      unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                      is_new_for_attendant: true,
+                      last_interaction_at: nowIso,
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {}
+                try {
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: inboundContent || "(mensagem recebida)",
+                    createdAt: nowIso,
+                  });
+                } catch (_e) {}
+              }
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "secondary_isolated_stage_lock_" + lrf + "_" + lrs,
+              flow: "post_attendance_matricula_stage_locked_quiet_secondary",
+            });
+          }
         }
 
         if (isBookingWaitingAttendance) {
