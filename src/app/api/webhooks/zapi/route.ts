@@ -1964,7 +1964,6 @@ export async function POST(req: Request) {
             leadStatusRaw === "matricula_pendente_recusada");
 
         if (
-          postAttendanceHistoryMatriculaRecusadaEvent ||
           postAttendanceHistoryMatriculaConfirmadaEvent
         ) {
           try {
@@ -1994,15 +1993,18 @@ export async function POST(req: Request) {
               })
               .eq("id", leadId);
           } catch (_e) {}
-
-          if (postAttendanceHistoryMatriculaRecusadaEvent || leadEstaEmMatriculaRecusadaPosAttendance) {
-            return Response.json({
-              ok: true,
-              ignored: true,
-              reason: "global_nuclear_post_attendance_matricula_recusada_ignored_quiet",
-              flow: "nuclear_post_attendance_matricula_recusada_ignored",
-            });
-          }
+          try {
+            void admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", leadId);
+          } catch (_e) {}
           return Response.json({
             ok: true,
             ignored: true,
@@ -2056,15 +2058,6 @@ export async function POST(req: Request) {
               .eq("id", leadId);
           } catch (_e) {}
 
-          if (leadEstaEmMatriculaRecusadaPosAttendance) {
-            return Response.json({
-              ok: true,
-              ignored: true,
-              reason: "nuclear_post_attendance_matricula_recusada_ignored_quiet",
-              flow: "nuclear_post_attendance_matricula_recusada_ignored",
-            });
-          }
-
           if (leadEstaEmMatriculaConfirmadaPosAttendance) {
             return Response.json({
               ok: true,
@@ -2074,12 +2067,12 @@ export async function POST(req: Request) {
             });
           }
 
-          if (postAttendanceHistoryMatriculaRecusadaEvent || postAttendanceHistoryMatriculaConfirmadaEvent) {
+          if (postAttendanceHistoryMatriculaConfirmadaEvent) {
             return Response.json({
               ok: true,
               ignored: true,
-              reason: "redundant_sim_nao_response_ignored_after_first_answer",
-              flow: "post_attendance_first_answer_lock",
+              reason: "redundant_sim_response_ignored_after_first_confirm",
+              flow: "post_attendance_first_answer_lock_confirm_only",
             });
           }
 
@@ -2536,85 +2529,89 @@ export async function POST(req: Request) {
 
         if (isLeadInMatriculaRecusadaPosAttendance) {
           const inboundContent = String(messageText ?? "").trim();
-          const inboundMediaType = mediaInfo.hasPaymentMedia
-            ? (mediaInfo.mediaUrl ? "document" : "text")
-            : "text";
-          const inboundMediaUrl = mediaInfo.mediaUrl || null;
-          try {
-            const { error: inboundErr } = await admin
-              .from("atendimento_messages")
-              .insert({
-                conversation_id: conversationId,
-                sender_role: "lead",
-                content_text: inboundContent || null,
-                media_type: inboundMediaType,
-                media_url: inboundMediaUrl,
-                status: "recebida",
-                sent_at: nowIso,
-                delivered_at: nowIso,
-              });
-            if (!inboundErr) {
-              try {
-                void admin
-                  .from("atendimento_leads")
-                  .update({
-                    unread_count: Number(lead.unread_count ?? 0) + 1,
-                    is_new_for_attendant: true,
-                    last_interaction_at: nowIso,
-                    updated_at: nowIso,
-                  })
-                  .eq("id", leadId);
-              } catch (_e) {}
-              try {
-                void syncConversationPreview({
-                  conversationId,
-                  contentText: inboundContent || "(mensagem recebida)",
-                  createdAt: nowIso,
+          const detectAfterNo = detectLenientYesNo(inboundContent);
+          if (detectAfterNo.result === "yes") {
+            // Usuário recusou mas respondeu SIM depois -> deixar passar para fluxo de confirmar
+            // (nao grava msg nem envia resposta fixa; cai no bloco nuclear/geral a seguir)
+          } else {
+            const inboundMediaType = mediaInfo.hasPaymentMedia
+              ? (mediaInfo.mediaUrl ? "document" : "text")
+              : "text";
+            const inboundMediaUrl = mediaInfo.mediaUrl || null;
+            try {
+              const { error: inboundErr } = await admin
+                .from("atendimento_messages")
+                .insert({
+                  conversation_id: conversationId,
+                  sender_role: "lead",
+                  content_text: inboundContent || null,
+                  media_type: inboundMediaType,
+                  media_url: inboundMediaUrl,
+                  status: "recebida",
+                  sent_at: nowIso,
+                  delivered_at: nowIso,
                 });
-              } catch (_e) {}
-            }
-          } catch (_e) {}
-          try {
-            await insertWhatsAppBotTextMessage({
-              admin,
-              conversationId,
-              contentText: RESPOSTA_REPESCAGEM_FIXA,
+              if (!inboundErr) {
+                try {
+                  void admin
+                    .from("atendimento_leads")
+                    .update({
+                      unread_count: Number(lead.unread_count ?? 0) + 1,
+                      is_new_for_attendant: true,
+                      last_interaction_at: nowIso,
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {}
+                try {
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: inboundContent || "(mensagem recebida)",
+                    createdAt: nowIso,
+                  });
+                } catch (_e) {}
+              }
+            } catch (_e) {}
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: RESPOSTA_REPESCAGEM_FIXA,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: RESPOSTA_REPESCAGEM_FIXA,
+              });
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_matricula_recusada_fixed_reply",
+                title: "Fluxo encerrado: resposta fixa após recusa de matrícula",
+                details: {
+                  inbound_content_text: inboundContent || null,
+                  reply_text: RESPOSTA_REPESCAGEM_FIXA,
+                  source: "whatsapp_zapi",
+                  booking_attendance_attended_by_col: bookingAttendanceAttendedByCol,
+                  booking_attendance_attended_by_history: bookingAttendanceAttendedByHistory,
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_matricula_recusada_locked",
             });
-          } catch (_e) {}
-          try {
-            await sendAtendimentoWhatsAppText({
-              phone: normalizedPhoneOnly,
-              message: RESPOSTA_REPESCAGEM_FIXA,
-            });
-          } catch (_e) {}
-          try {
-            void appendHistoryEvent({
-              leadId,
-              conversationId,
-              eventType: "whatsapp_matricula_recusada_fixed_reply",
-              title: "Fluxo encerrado: resposta fixa após recusa de matrícula",
-              details: {
-                inbound_content_text: inboundContent || null,
-                reply_text: RESPOSTA_REPESCAGEM_FIXA,
-                source: "whatsapp_zapi",
-                booking_attendance_attended_by_col: bookingAttendanceAttendedByCol,
-                booking_attendance_attended_by_history: bookingAttendanceAttendedByHistory,
-              },
-              actorType: "bot",
-            });
-          } catch (_e) {}
-          return Response.json({
-            ok: true,
-            handled: true,
-            flow: "whatsapp_matricula_recusada_locked",
-          });
+          }
         }
 
         const leadRawFunnel = String((lead as any)?.funnel_stage ?? "").trim();
         const leadRawStatus = String((lead as any)?.status ?? "").trim();
         const isLeadLockedByMatriculaStage =
-          leadRawFunnel === "matricula_pendente_recusada" ||
-          leadRawStatus === "matricula_pendente_recusada" ||
           leadRawFunnel === "matricula_confirmada" ||
           leadRawStatus === "matricula_confirmada";
         if (isLeadLockedByMatriculaStage) {
@@ -3060,8 +3057,6 @@ export async function POST(req: Request) {
           const lrf = String((lead as any)?.funnel_stage ?? "").trim();
           const lrs = String((lead as any)?.status ?? "").trim();
           const locked =
-            lrf === "matricula_pendente_recusada" ||
-            lrs === "matricula_pendente_recusada" ||
             lrf === "matricula_confirmada" ||
             lrs === "matricula_confirmada";
           if (locked) {
