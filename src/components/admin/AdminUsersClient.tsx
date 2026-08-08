@@ -431,20 +431,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                                     ? "WhatsApp conectado"
                                     : "WhatsApp (sem número sincronizado)")}
                             </div>
-                            <div
-                              className="mt-1 truncate text-xs text-[var(--app-text-55)]"
-                              title={
-                                r.whatsapp.status === "disconnected"
-                                  ? "-"
-                                  : formatWhatsAppPhone(r.whatsapp.phone) ||
-                                    undefined
-                              }
-                            >
-                              {r.whatsapp.status === "disconnected"
-                                ? "-"
-                                : formatWhatsAppPhone(r.whatsapp.phone) ||
-                                  "Número ainda não sincronizado."}
-                            </div>
                           </div>
                         </div>
                       ) : (
@@ -452,9 +438,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold text-white/35">
                               Sem WhatsApp
-                            </div>
-                            <div className="mt-1 truncate text-xs text-white/25">
-                              Não configurado
                             </div>
                           </div>
                         </div>
@@ -774,12 +757,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                   : whatsAppRow?.whatsapp?.instance_id
                     ? "Instância configurada (sem número sincronizado)"
                     : "WhatsApp não configurado")}
-          </div>
-          <div className="mt-1 truncate text-xs text-[var(--app-text-55)]">
-            {whatsAppRow?.whatsapp?.status === "disconnected"
-              ? "-"
-              : formatWhatsAppPhone(whatsAppRow?.whatsapp?.phone ?? null) ||
-                "—"}
           </div>
         </div>
 
