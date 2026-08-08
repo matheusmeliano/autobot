@@ -1303,14 +1303,31 @@ export async function POST(req: Request) {
 
   const pendingPhoneValidationRef: { id: string } = { id: "" };
   const normalizedEventType = String(eventType ?? "").trim();
-  const nextInstanceStatus =
-    normalizedEventType === "DisconnectedCallback"
-      ? "disconnected"
-      : normalizedEventType === "ReceivedCallback" ||
-          normalizedEventType === "MessageStatusCallback" ||
-          normalizedEventType === "DeliveryCallback"
-        ? "connected"
-        : null;
+  const normalizedEventField = String((body as any)?.event ?? "").trim();
+  const normalizedEventTypeField = String((body as any)?.eventType ?? "").trim();
+  const normalizedDataTypeField = String((body as any)?.data?.type ?? "").trim();
+  const normalizedDataEventField = String((body as any)?.data?.event ?? "").trim();
+  const eventStringUnion = [
+    normalizedEventType,
+    normalizedEventField,
+    normalizedEventTypeField,
+    normalizedDataTypeField,
+    normalizedDataEventField,
+  ].join("|");
+
+  const hasDisconnectedSignal =
+    /\bdisconnected\b|\bdesconectado\b|\bDisconnectedCallback\b/i.test(eventStringUnion);
+
+  const hasConnectedSignal =
+    /\breceived\b|\binbound\b|\bincoming\b|\bmessage\b|\bmessages\b|\bchat\b|\btext\b|\bnew_message\b|\bReceivedCallback\b|\bdelivered\b|\bread\b|\back\b|\bsent\b|\bsended\b|\bsendStatus\b|\bsend_status\b|\bMessageStatusCallback\b|\bDeliveryCallback\b|\bdelivery_callback\b|\bstatus_callback\b|\bmessage_status_callback\b|\breadReceipt\b|\bread_receipt\b|\bdeliveredReceipt\b|\bdelivered_receipt\b|\bnotifySentByMe\b|\bnotify_sent_by_me\b|\bsentByMe\b|\bsent_by_me\b|\bdeleteMessage\b|\bdelete_message\b|\brevoke\b|\bconnecting\b|\bconnected\b/i.test(
+      eventStringUnion,
+    );
+
+  const nextInstanceStatus = hasDisconnectedSignal
+    ? "disconnected"
+    : hasConnectedSignal
+      ? "connected"
+      : null;
 
   if (nextInstanceStatus) {
     await admin
