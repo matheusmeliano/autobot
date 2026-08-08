@@ -3,6 +3,41 @@ import { listAllAuthUsers } from "@/lib/adminUsers";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan } from "@/lib/plans";
+import { getZapiInstanceMeta } from "@/lib/atendimento/server";
+
+async function refreshOneInstanceStatus(supabase: any, row: {
+  user_id: string;
+  instance_id: string | null;
+  token: string | null;
+  client_token: string | null;
+  status: string | null;
+}) {
+  const instanceId = String(row.instance_id ?? "").trim();
+  const token = String(row.token ?? "").trim();
+  if (!instanceId || !token) return row.status ?? null;
+  try {
+    const meData = await getZapiInstanceMeta({
+      instance_id: instanceId,
+      token,
+      client_token: row.client_token ?? undefined,
+    });
+    if (!meData) {
+      try {
+        await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("user_id", row.user_id);
+      } catch {}
+      return "disconnected";
+    }
+    try {
+      await supabase.from("whatsapp_instances").update({ status: "connected" }).eq("user_id", row.user_id);
+    } catch {}
+    return "connected";
+  } catch (_err) {
+    try {
+      await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("user_id", row.user_id);
+    } catch {}
+    return "disconnected";
+  }
+}
 
 export async function GET() {
   const supabaseAuth = await createSupabaseServerClient({ canSetCookies: true });
@@ -85,10 +120,10 @@ export async function GET() {
   }>();
 
   try {
-    const whatsappBaseCols = ["user_id", "instance_id", "status"];
+    const whatsappBaseCols = ["user_id", "instance_id", "status", "token"];
     const firstWa = await supabase
       .from("whatsapp_instances")
-      .select([...whatsappBaseCols, "display_name", "phone"].join(", "))
+      .select([...whatsappBaseCols, "display_name", "phone", "client_token"].join(", "))
       .in("user_id", ids);
 
     const missingDisplayName =
@@ -99,12 +134,17 @@ export async function GET() {
       firstWa.error &&
       /\bphone\b/i.test(firstWa.error.message) &&
       /column/i.test(firstWa.error.message);
+    const missingClientToken =
+      firstWa.error &&
+      /client_token/i.test(firstWa.error.message) &&
+      /column/i.test(firstWa.error.message);
 
     let waRows: any[] = firstWa.data ?? [];
-    if (firstWa.error && (missingDisplayName || missingPhone)) {
+    if (firstWa.error && (missingDisplayName || missingPhone || missingClientToken)) {
       const retryCols = [...whatsappBaseCols];
       if (!missingDisplayName) retryCols.push("display_name");
       if (!missingPhone) retryCols.push("phone");
+      if (!missingClientToken) retryCols.push("client_token");
       const retry = await supabase
         .from("whatsapp_instances")
         .select(retryCols.join(", "))
@@ -112,12 +152,29 @@ export async function GET() {
       waRows = retry.data ?? [];
     }
 
+    const refreshedStatusByUser = new Map<string, string | null>();
+    try {
+      const refreshTasks = waRows.map((row: any) =>
+        refreshOneInstanceStatus(supabase, {
+          user_id: String(row.user_id ?? ""),
+          instance_id: String(row.instance_id ?? "").trim() || null,
+          token: String(row.token ?? "").trim() || null,
+          client_token: missingClientToken ? null : (String(row.client_token ?? "").trim() || null),
+          status: String(row.status ?? "").trim() || null,
+        }).then((st) => refreshedStatusByUser.set(String(row.user_id ?? ""), st)),
+      );
+      await Promise.all(refreshTasks);
+    } catch (_refreshErr) {}
+
     waRows.forEach((row: any) => {
-      whatsappByUserId.set(row.user_id, {
+      const uid = String(row.user_id ?? "");
+      const refreshedStatus = refreshedStatusByUser.get(uid);
+      const finalStatus = refreshedStatus ?? (String(row.status ?? "").trim() || null);
+      whatsappByUserId.set(uid, {
         instance_id: String(row.instance_id ?? "").trim() || null,
         display_name: String(row.display_name ?? "").trim() || null,
         phone: String(row.phone ?? "").trim() || null,
-        status: String(row.status ?? "").trim() || null,
+        status: finalStatus,
       });
     });
   } catch (_waErr) {

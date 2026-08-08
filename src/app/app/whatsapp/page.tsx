@@ -1,10 +1,40 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { WhatsAppClient } from "@/components/app/whatsapp/WhatsAppClient";
+import { getZapiInstanceMeta } from "@/lib/atendimento/server";
 
 const BASE_COLS = ["instance_id", "token", "status"] as const;
 const OPTIONAL_COLS = ["client_token", "phone"] as const;
 
 type InstanceRow = Record<string, any>;
+
+async function safeRefreshInstanceStatusLive(supabase: any, row: InstanceRow | null): Promise<string | null> {
+  if (!row) return null;
+  const instanceId = String(row.instance_id ?? "").trim();
+  const token = String(row.token ?? "").trim();
+  if (!instanceId || !token) return String(row.status ?? "").trim() || null;
+  try {
+    const meData = await getZapiInstanceMeta({
+      instance_id: instanceId,
+      token,
+      client_token: (row.client_token ? String(row.client_token).trim() : undefined) || undefined,
+    });
+    if (!meData) {
+      try {
+        await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("instance_id", instanceId);
+      } catch {}
+      return "disconnected";
+    }
+    try {
+      await supabase.from("whatsapp_instances").update({ status: "connected" }).eq("instance_id", instanceId);
+    } catch {}
+    return "connected";
+  } catch (_err) {
+    try {
+      await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("instance_id", instanceId);
+    } catch {}
+    return "disconnected";
+  }
+}
 
 async function safeFetchWhatsappInstance(supabase: any): Promise<{
   data: InstanceRow | null;
@@ -87,13 +117,16 @@ export default async function WhatsAppPage() {
     );
   }
 
+  const liveStatus = await safeRefreshInstanceStatusLive(supabase, data);
+  const status = liveStatus ?? (data?.status ?? null);
+
   return (
     <WhatsAppClient
       initial={
         data
           ? {
               instance_id: data.instance_id ?? null,
-              status: data.status ?? null,
+              status,
               hasToken: Boolean(data.token),
               hasClientToken: Boolean(data.client_token),
               phone: String(data.phone ?? "").trim() || null,
