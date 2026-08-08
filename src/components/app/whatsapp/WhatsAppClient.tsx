@@ -138,18 +138,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
             {statusLabel}
           </div>
         </div>
-        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs font-semibold text-white/55">Número WhatsApp</div>
-          <div className="mt-2 min-w-0">
-            <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
-              {!isConnected
-                ? "-"
-                : hasPhoneDigits
-                  ? "Número sincronizado"
-                  : "Número ainda não sincronizado"}
-            </div>
-          </div>
-        </div>
       </div>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
