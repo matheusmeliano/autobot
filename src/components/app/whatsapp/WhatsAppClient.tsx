@@ -131,15 +131,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs font-semibold text-white/55">Status</div>
-          <div className="mt-2 text-xl font-semibold tracking-tight">
-            {statusLabel}
-          </div>
-        </div>
-      </div>
-
       <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="text-sm font-semibold">Configuração</div>
         <form onSubmit={onSubmit} className="mt-4 grid gap-3">
