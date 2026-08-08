@@ -25,6 +25,7 @@ type FormValues = {
 function formatWhatsAppPhone(value: string | null): string {
   const digits = String(value ?? "").replace(/\D/g, "");
   if (!digits) return "";
+  if (digits.length < 10 || digits.length > 15) return "";
   if (digits.startsWith("55") && digits.length >= 12) {
     const ddd = digits.slice(2, 4);
     const nine = digits.length === 13 ? digits.slice(4, 5) : "";
@@ -55,7 +56,7 @@ function formatWhatsAppPhone(value: string | null): string {
     if (remaining) groups.push(remaining);
     return groups.join(" ").replace("+ ", "+");
   }
-  return digits;
+  return "";
 }
 
 export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
@@ -77,24 +78,23 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
 
   const phoneFormatted = useMemo(() => formatWhatsAppPhone(initial?.phone ?? null), [initial?.phone]);
-  const hasPhoneDigits = Boolean(String(initial?.phone ?? "").replace(/\D/g, ""));
-  const phonePrimary = phoneFormatted || "";
-  const phoneCardTitle = phonePrimary;
+  const rawDigits = String(initial?.phone ?? "").replace(/\D/g, "");
+  const hasPhoneDigits = rawDigits.length >= 10 && rawDigits.length <= 15;
+  const phoneCardTitle = phoneFormatted || "";
   const phonePrimaryLabel = !isConnected
     ? "-"
     : hasPhoneDigits
       ? phoneCardTitle
       : "Número ainda não sincronizado";
-  const phoneSecondary = !isConnected
-    ? "-"
-    : phoneCardTitle || "A próxima mensagem recebida da Z-API atualiza automaticamente.";
 
   const primaryLabel = phonePrimaryLabel;
   const secondaryInfo = !isConnected
     ? "Instância desconectada na Z-API."
-    : initial?.instance_id
-      ? `Instance: ${initial.instance_id}`
-      : "A próxima mensagem recebida da Z-API atualiza automaticamente.";
+    : phoneCardTitle
+      ? (initial?.instance_id ? `Instance: ${initial.instance_id}` : "")
+      : (initial?.instance_id
+        ? `Instance: ${initial.instance_id}. A próxima mensagem recebida da Z-API atualiza o número.`
+        : "A próxima mensagem recebida da Z-API atualiza automaticamente.");
 
   const onSubmit = handleSubmit(async (values) => {
     const tokenValue = String(values.token ?? "").trim();

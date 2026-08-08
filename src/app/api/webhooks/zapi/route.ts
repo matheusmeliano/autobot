@@ -1225,7 +1225,10 @@ export async function POST(req: Request) {
 
   if (!missingPhoneCol) {
     const currentPhoneRaw = String(instance?.phone ?? "").trim();
-    if (!currentPhoneRaw && instance?.token) {
+    const currentDigits = currentPhoneRaw.replace(/\D/g, "");
+    const currentPhoneLooksValid = currentDigits.length >= 10 && currentDigits.length <= 15;
+    const shouldTryRefreshPhone = (!currentPhoneRaw || !currentPhoneLooksValid) && instance?.token;
+    if (shouldTryRefreshPhone) {
       try {
         const token = String(instance.token ?? "");
         const clientToken = missingClientTokenCol ? null : instance?.client_token ?? null;
@@ -1242,8 +1245,10 @@ export async function POST(req: Request) {
           if (meData.me && typeof meData.me.phone === "string") candidates.push(meData.me.phone);
           if (typeof meData.id === "string") candidates.push(meData.id);
           let cleaned = "";
-          for (const raw of candidates) {
+          for (let i = 0; i < candidates.length; i++) {
+            const raw = candidates[i];
             if (!raw || typeof raw !== "string") continue;
+            const isLastCandidate = i === candidates.length - 1;
             const pieces = raw.split(/[^0-9]+/).filter(Boolean);
             for (const piece of pieces) {
               if (piece.length >= 10 && piece.length <= 15) {
@@ -1257,7 +1262,7 @@ export async function POST(req: Request) {
               cleaned = fallbackDigits;
               break;
             }
-            if (fallbackDigits.length > 15) {
+            if (isLastCandidate && fallbackDigits.length > 15) {
               const cc2 = fallbackDigits.startsWith("55")
                 || fallbackDigits.startsWith("34")
                 || fallbackDigits.startsWith("44")
@@ -1267,7 +1272,7 @@ export async function POST(req: Request) {
                 || fallbackDigits.startsWith("57");
               if (cc2 && fallbackDigits.length >= 12) {
                 cleaned = fallbackDigits.slice(0, 13);
-                if (cleaned.length === 13) break;
+                if (cleaned.length >= 10) break;
               }
               if (fallbackDigits.startsWith("1") && fallbackDigits.length >= 11) {
                 cleaned = fallbackDigits.slice(0, 11);
@@ -1275,12 +1280,19 @@ export async function POST(req: Request) {
               }
             }
           }
-          if (cleaned && cleaned.length >= 10) {
+          if (cleaned && cleaned.length >= 10 && cleaned.length <= 15) {
             await admin
               .from("whatsapp_instances")
               .update({ phone: cleaned })
               .eq("instance_id", instanceId);
             if (instance) instance.phone = cleaned;
+          } else if (!currentPhoneLooksValid && currentPhoneRaw) {
+            try {
+              await admin
+                .from("whatsapp_instances")
+                .update({ phone: null })
+                .eq("instance_id", instanceId);
+            } catch (_clrErr) {}
           }
         }
       } catch (_metaErr) {

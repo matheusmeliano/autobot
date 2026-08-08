@@ -64,6 +64,7 @@ function dateBR(v: string | null) {
 function formatWhatsAppPhone(value: string | null): string {
   if (!value) return "";
   const digits = value.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 15) return "";
   if (digits.startsWith("55") && digits.length === 13) {
     return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
   }
@@ -90,7 +91,7 @@ function formatWhatsAppPhone(value: string | null): string {
     if (remaining) groups.push(remaining);
     return groups.join(" ").replace("+ ", "+");
   }
-  return value.startsWith("+") ? value : `+${value}`;
+  return "";
 }
 
 function normalizeStatus(v?: string | null): "ativo" | "cancelado" {
