@@ -10,6 +10,52 @@ import {
   loadHiddenWhatsAppPhoneBlocklist,
   normalizePhoneDigitsOnly,
 } from "@/lib/painelHiddenPhones";
+import { getZapiInstanceMeta, isZapiResponseActuallyConnected } from "@/lib/atendimento/server";
+
+async function dashboardRefreshWhatsAppStatusLive(
+  supabase: any,
+  whatsappRow: any,
+): Promise<string | null> {
+  if (!whatsappRow) return "disconnected";
+  const instanceId = String(whatsappRow.instance_id ?? "").trim();
+  const token = String(whatsappRow.token ?? "").trim();
+  if (!instanceId || !token) {
+    return String(whatsappRow.status ?? "").trim() || "disconnected";
+  }
+  try {
+    const meData = await getZapiInstanceMeta({
+      instance_id: instanceId,
+      token,
+      client_token: (whatsappRow.client_token ? String(whatsappRow.client_token).trim() : undefined) ||
+        undefined,
+    });
+    const actuallyConnected = isZapiResponseActuallyConnected(meData);
+    if (!actuallyConnected) {
+      try {
+        await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq(
+          "instance_id",
+          instanceId,
+        );
+      } catch {}
+      return "disconnected";
+    }
+    try {
+      await supabase.from("whatsapp_instances").update({ status: "connected" }).eq(
+        "instance_id",
+        instanceId,
+      );
+    } catch {}
+    return "connected";
+  } catch (_err) {
+    try {
+      await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq(
+        "instance_id",
+        instanceId,
+      );
+    } catch {}
+    return "disconnected";
+  }
+}
 
 function scheduleLocalMonthKey(value: string | null | undefined, timeZone: string) {
   const iso = String(value ?? "").trim();
@@ -117,7 +163,7 @@ export default async function DashboardPage() {
       .select("id, nome, created_at")
       .order("created_at", { ascending: true })
       .limit(200),
-    supabase.from("whatsapp_instances").select("status").maybeSingle(),
+    supabase.from("whatsapp_instances").select("instance_id, token, client_token, status").maybeSingle(),
     supabase.from("profiles").select("nome, timezone").eq("user_id", userId).maybeSingle(),
     supabase
       .from("schedule_runs")
@@ -141,6 +187,8 @@ export default async function DashboardPage() {
       .limit(2000),
     loadHiddenWhatsAppPhoneBlocklist(),
   ]);
+
+  const liveWhatsappStatus = await dashboardRefreshWhatsAppStatusLive(supabase, whatsappRes.data);
 
   const hiddenBlocklist = (hiddenBlocklistRaw ?? new Set<string>()) as Set<string>;
   const debtorTelefoneById = new Map<string, string>();
@@ -271,7 +319,7 @@ export default async function DashboardPage() {
       ({ visualStatus, row }) =>
         visualStatus.label === "Agendado" || String(row.status ?? "").trim().toLowerCase() === "executando",
     ).length,
-    whatsappStatus: whatsappRes.data?.status ?? "disconnected",
+    whatsappStatus: liveWhatsappStatus ?? whatsappRes.data?.status ?? "disconnected",
     receivableMonthTotal,
     receivableMonthPaid,
     receivableMonthRemaining,

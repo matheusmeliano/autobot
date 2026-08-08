@@ -586,6 +586,50 @@ export async function getZapiInstanceMeta(params: {
   return data;
 }
 
+export function isZapiResponseActuallyConnected(meData: unknown): boolean {
+  if (!meData || typeof meData !== "object") return false;
+  const d = meData as Record<string, unknown>;
+  const statusRaw = [
+    String(d.status ?? ""),
+    String((d as any).state ?? ""),
+    String((d as any).connectionStatus ?? ""),
+    String((d as any).whatsapp?.status ?? ""),
+    String((d as any).me?.status ?? ""),
+  ].join(" ").toLowerCase();
+  const isExplicitlyDisconnected =
+    /\bdisconnected\b|\bdesconectado\b|\boffline\b|\bclosed\b|\bfail\b|\berror\b|\bexpired\b|\binvalid\b|\bnot.?connected\b|\bsem.?conexao\b|\bsem.?conexão\b/.test(
+      statusRaw,
+    );
+  if (isExplicitlyDisconnected) return false;
+  const isExplicitlyConnected =
+    /\bconnected\b|\bconectado\b|\bonline\b|\bopen\b|\bactive\b|\bconnected_number\b|\bauthenticated\b/.test(
+      statusRaw,
+    );
+  const phonePieces = [
+    d.phone,
+    d.telephone,
+    d.id,
+    (d as any).whatsapp?.phone,
+    (d as any).whatsapp?.id,
+    (d as any).me?.phone,
+    (d as any).me?.id,
+    (d as any).connectedNumber,
+    (d as any).connected_number,
+  ];
+  let hasAnyPhone = false;
+  for (const raw of phonePieces) {
+    if (!raw || typeof raw !== "string") continue;
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length >= 10 && digits.length <= 15) {
+      hasAnyPhone = true;
+      break;
+    }
+  }
+  if (isExplicitlyConnected) return true;
+  if (hasAnyPhone) return true;
+  return false;
+}
+
 async function updateZapiWebhook(params: {
   instance_id: string;
   token: string;

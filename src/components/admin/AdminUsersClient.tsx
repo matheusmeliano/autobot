@@ -424,12 +424,12 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
-                              {r.whatsapp.status === "disconnected"
-                                ? "WhatsApp desconectado"
-                                : r.whatsapp.display_name?.trim() ||
+                              {r.whatsapp.status === "connected"
+                                ? r.whatsapp.display_name?.trim() ||
                                   (r.whatsapp.phone
                                     ? "WhatsApp conectado"
-                                    : "WhatsApp (sem número sincronizado)")}
+                                    : "WhatsApp conectado (sem número sincronizado)")
+                                : "WhatsApp desconectado"}
                             </div>
                           </div>
                         </div>
@@ -749,14 +749,14 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Identificação atual</div>
           <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]">
-            {whatsAppRow?.whatsapp?.status === "disconnected"
-              ? "WhatsApp desconectado"
-              : whatsAppRow?.whatsapp?.display_name?.trim() ||
+            {whatsAppRow?.whatsapp?.status === "connected"
+              ? whatsAppRow?.whatsapp?.display_name?.trim() ||
                 (whatsAppRow?.whatsapp?.phone
                   ? "WhatsApp conectado (sem apelido)"
                   : whatsAppRow?.whatsapp?.instance_id
-                    ? "Instância configurada (sem número sincronizado)"
-                    : "WhatsApp não configurado")}
+                    ? "WhatsApp conectado (sem número sincronizado)"
+                    : "WhatsApp conectado")
+              : "WhatsApp desconectado"}
           </div>
         </div>
 

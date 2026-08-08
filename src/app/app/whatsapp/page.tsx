@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { WhatsAppClient } from "@/components/app/whatsapp/WhatsAppClient";
-import { getZapiInstanceMeta } from "@/lib/atendimento/server";
+import { getZapiInstanceMeta, isZapiResponseActuallyConnected } from "@/lib/atendimento/server";
 
 const BASE_COLS = ["instance_id", "token", "status"] as const;
 const OPTIONAL_COLS = ["client_token", "phone"] as const;
@@ -18,7 +18,8 @@ async function safeRefreshInstanceStatusLive(supabase: any, row: InstanceRow | n
       token,
       client_token: (row.client_token ? String(row.client_token).trim() : undefined) || undefined,
     });
-    if (!meData) {
+    const actuallyConnected = isZapiResponseActuallyConnected(meData);
+    if (!actuallyConnected) {
       try {
         await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("instance_id", instanceId);
       } catch {}

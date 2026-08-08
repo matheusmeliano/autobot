@@ -3,7 +3,7 @@ import { listAllAuthUsers } from "@/lib/adminUsers";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan } from "@/lib/plans";
-import { getZapiInstanceMeta } from "@/lib/atendimento/server";
+import { getZapiInstanceMeta, isZapiResponseActuallyConnected } from "@/lib/atendimento/server";
 
 async function refreshOneInstanceStatus(supabase: any, row: {
   user_id: string;
@@ -21,7 +21,8 @@ async function refreshOneInstanceStatus(supabase: any, row: {
       token,
       client_token: row.client_token ?? undefined,
     });
-    if (!meData) {
+    const actuallyConnected = isZapiResponseActuallyConnected(meData);
+    if (!actuallyConnected) {
       try {
         await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("user_id", row.user_id);
       } catch {}

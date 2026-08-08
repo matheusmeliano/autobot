@@ -73,8 +73,7 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
     },
   });
 
-  const isConnected =
-    initial?.status === "connected" || initial?.status === "configured";
+  const isConnected = initial?.status === "connected";
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
 
   const phoneFormatted = useMemo(() => formatWhatsAppPhone(initial?.phone ?? null), [initial?.phone]);

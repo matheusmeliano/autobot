@@ -331,8 +331,7 @@ export function DashboardClient({
 
   const chart = useMemo(() => buildChartPoints(chartFilter, chartDates), [chartDates, chartFilter]);
 
-  const isConnected =
-    stats.whatsappStatus === "connected" || stats.whatsappStatus === "configured";
+  const isConnected = stats.whatsappStatus === "connected";
   const statusLabel = isConnected ? "Conectado" : "Desconectado";
   const visibleStats = hasCurrentMonthSchedules
     ? stats
