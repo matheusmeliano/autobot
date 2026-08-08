@@ -67,14 +67,28 @@ function formatWhatsAppPhone(value: string | null): string {
   if (digits.startsWith("55") && digits.length === 13) {
     return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
   }
-  if (digits.startsWith("1") && digits.length === 11) {
-    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-  }
   if (digits.startsWith("55") && digits.length === 12) {
     return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
   }
-  if (digits.length >= 10) {
-    return `+${digits.slice(0, digits.length - 10)} (${digits.slice(-10, -7)}) ${digits.slice(-7, -3)}-${digits.slice(-3)}`;
+  if (digits.startsWith("1") && digits.length === 11) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length >= 7 && digits.length <= 15) {
+    const groups: string[] = [];
+    let remaining = digits;
+    if (remaining.length > 10) {
+      const ccLen = remaining.length >= 12 ? 2 : remaining.length >= 11 ? 1 : 2;
+      groups.push(`+${remaining.slice(0, ccLen)}`);
+      remaining = remaining.slice(ccLen);
+    } else {
+      groups.push("+");
+    }
+    while (remaining.length > 4) {
+      groups.push(remaining.slice(0, 3));
+      remaining = remaining.slice(3);
+    }
+    if (remaining) groups.push(remaining);
+    return groups.join(" ").replace("+ ", "+");
   }
   return value.startsWith("+") ? value : `+${value}`;
 }
@@ -409,22 +423,28 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
-                              {r.whatsapp.display_name?.trim() ||
-                                (r.whatsapp.phone
-                                  ? "WhatsApp conectado"
-                                  : "WhatsApp (sem número sincronizado)")}
+                              {r.whatsapp.status === "disconnected"
+                                ? "WhatsApp desconectado"
+                                : r.whatsapp.display_name?.trim() ||
+                                  (r.whatsapp.phone
+                                    ? "WhatsApp conectado"
+                                    : "WhatsApp (sem número sincronizado)")}
                             </div>
                             <div
                               className="mt-1 truncate text-xs text-[var(--app-text-55)]"
                               title={
-                                formatWhatsAppPhone(r.whatsapp.phone) ||
-                                r.whatsapp.instance_id ||
-                                undefined
+                                r.whatsapp.status === "disconnected"
+                                  ? "-"
+                                  : formatWhatsAppPhone(r.whatsapp.phone) ||
+                                    r.whatsapp.instance_id ||
+                                    undefined
                               }
                             >
-                              {formatWhatsAppPhone(r.whatsapp.phone) ||
-                                r.whatsapp.instance_id ||
-                                "Número ainda não sincronizado."}
+                              {r.whatsapp.status === "disconnected"
+                                ? "-"
+                                : formatWhatsAppPhone(r.whatsapp.phone) ||
+                                  r.whatsapp.instance_id ||
+                                  "Número ainda não sincronizado."}
                             </div>
                           </div>
                         </div>
@@ -747,17 +767,21 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs font-semibold text-white/55">Identificação atual</div>
           <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]">
-            {whatsAppRow?.whatsapp?.display_name?.trim() ||
-              (whatsAppRow?.whatsapp?.phone
-                ? "WhatsApp conectado (sem apelido)"
-                : whatsAppRow?.whatsapp?.instance_id
-                  ? "Instância configurada (sem número sincronizado)"
-                  : "WhatsApp não configurado")}
+            {whatsAppRow?.whatsapp?.status === "disconnected"
+              ? "WhatsApp desconectado"
+              : whatsAppRow?.whatsapp?.display_name?.trim() ||
+                (whatsAppRow?.whatsapp?.phone
+                  ? "WhatsApp conectado (sem apelido)"
+                  : whatsAppRow?.whatsapp?.instance_id
+                    ? "Instância configurada (sem número sincronizado)"
+                    : "WhatsApp não configurado")}
           </div>
           <div className="mt-1 truncate text-xs text-[var(--app-text-55)]">
-            {formatWhatsAppPhone(whatsAppRow?.whatsapp?.phone ?? null) ||
-              whatsAppRow?.whatsapp?.instance_id ||
-              "—"}
+            {whatsAppRow?.whatsapp?.status === "disconnected"
+              ? "-"
+              : formatWhatsAppPhone(whatsAppRow?.whatsapp?.phone ?? null) ||
+                whatsAppRow?.whatsapp?.instance_id ||
+                "—"}
           </div>
         </div>
 

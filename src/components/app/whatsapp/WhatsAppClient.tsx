@@ -24,7 +24,7 @@ type FormValues = {
 
 function formatWhatsAppPhone(value: string | null): string {
   const digits = String(value ?? "").replace(/\D/g, "");
-  if (!digits) return "-";
+  if (!digits) return "";
   if (digits.startsWith("55") && digits.length >= 12) {
     const ddd = digits.slice(2, 4);
     const nine = digits.length === 13 ? digits.slice(4, 5) : "";
@@ -38,7 +38,24 @@ function formatWhatsAppPhone(value: string | null): string {
     const b2 = digits.slice(7);
     return `+1 (${area}) ${b1}-${b2}`;
   }
-  return digits.replace(/^(\d{1,3})(\d{2,})(\d{4})$/, (_, p1, p2, p3) => `+${p1} (${p2}) ${p3}`);
+  if (digits.length >= 7 && digits.length <= 15) {
+    const groups: string[] = [];
+    let remaining = digits;
+    if (remaining.length > 10) {
+      const ccLen = remaining.length >= 12 ? 2 : remaining.length >= 11 ? 1 : 2;
+      groups.push(`+${remaining.slice(0, ccLen)}`);
+      remaining = remaining.slice(ccLen);
+    } else {
+      groups.push("+");
+    }
+    while (remaining.length > 4) {
+      groups.push(remaining.slice(0, 3));
+      remaining = remaining.slice(3);
+    }
+    if (remaining) groups.push(remaining);
+    return groups.join(" ").replace("+ ", "+");
+  }
+  return digits;
 }
 
 export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
@@ -55,14 +72,29 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
     },
   });
 
+  const isConnected =
+    initial?.status === "connected" || initial?.status === "configured";
+  const statusLabel = isConnected ? "Conectado" : "Desconectado";
+
   const phoneFormatted = useMemo(() => formatWhatsAppPhone(initial?.phone ?? null), [initial?.phone]);
   const hasPhoneDigits = Boolean(String(initial?.phone ?? "").replace(/\D/g, ""));
-  const primaryLabel = hasPhoneDigits
-    ? phoneFormatted
-    : "Número ainda não sincronizado";
-  const secondaryInfo = initial?.instance_id
-    ? `Instance: ${initial.instance_id}`
-    : "A próxima mensagem recebida da Z-API atualiza automaticamente.";
+  const phonePrimary = phoneFormatted || "";
+  const phoneCardTitle = phonePrimary;
+  const phonePrimaryLabel = !isConnected
+    ? "-"
+    : hasPhoneDigits
+      ? phoneCardTitle
+      : "Número ainda não sincronizado";
+  const phoneSecondary = !isConnected
+    ? "-"
+    : phoneCardTitle || "A próxima mensagem recebida da Z-API atualiza automaticamente.";
+
+  const primaryLabel = phonePrimaryLabel;
+  const secondaryInfo = !isConnected
+    ? "Instância desconectada na Z-API."
+    : initial?.instance_id
+      ? `Instance: ${initial.instance_id}`
+      : "A próxima mensagem recebida da Z-API atualiza automaticamente.";
 
   const onSubmit = handleSubmit(async (values) => {
     const tokenValue = String(values.token ?? "").trim();
@@ -88,10 +120,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
     window.location.reload();
   });
 
-  const isConnected =
-    initial?.status === "connected" || initial?.status === "configured";
-  const statusLabel = isConnected ? "Conectado" : "Desconectado";
-
   return (
     <div>
       <div>
@@ -116,6 +144,11 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
             <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
               {primaryLabel}
             </div>
+            {secondaryInfo ? (
+              <div className="mt-1 truncate text-xs text-[var(--app-text-55)]">
+                {secondaryInfo}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

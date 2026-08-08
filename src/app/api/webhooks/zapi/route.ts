@@ -1241,16 +1241,46 @@ export async function POST(req: Request) {
           if (meData.whatsapp && typeof meData.whatsapp.phone === "string") candidates.push(meData.whatsapp.phone);
           if (meData.me && typeof meData.me.phone === "string") candidates.push(meData.me.phone);
           if (typeof meData.id === "string") candidates.push(meData.id);
-          const picked = candidates.find((c) => c && /\d/.test(c));
-          if (picked) {
-            const digitsOnly = picked.replace(/\D/g, "");
-            if (digitsOnly.length >= 10) {
-              await admin
-                .from("whatsapp_instances")
-                .update({ phone: digitsOnly })
-                .eq("instance_id", instanceId);
-              if (instance) instance.phone = digitsOnly;
+          let cleaned = "";
+          for (const raw of candidates) {
+            if (!raw || typeof raw !== "string") continue;
+            const pieces = raw.split(/[^0-9]+/).filter(Boolean);
+            for (const piece of pieces) {
+              if (piece.length >= 10 && piece.length <= 15) {
+                cleaned = piece;
+                break;
+              }
             }
+            if (cleaned) break;
+            const fallbackDigits = raw.replace(/\D/g, "");
+            if (fallbackDigits.length >= 10 && fallbackDigits.length <= 15) {
+              cleaned = fallbackDigits;
+              break;
+            }
+            if (fallbackDigits.length > 15) {
+              const cc2 = fallbackDigits.startsWith("55")
+                || fallbackDigits.startsWith("34")
+                || fallbackDigits.startsWith("44")
+                || fallbackDigits.startsWith("52")
+                || fallbackDigits.startsWith("54")
+                || fallbackDigits.startsWith("56")
+                || fallbackDigits.startsWith("57");
+              if (cc2 && fallbackDigits.length >= 12) {
+                cleaned = fallbackDigits.slice(0, 13);
+                if (cleaned.length === 13) break;
+              }
+              if (fallbackDigits.startsWith("1") && fallbackDigits.length >= 11) {
+                cleaned = fallbackDigits.slice(0, 11);
+                break;
+              }
+            }
+          }
+          if (cleaned && cleaned.length >= 10) {
+            await admin
+              .from("whatsapp_instances")
+              .update({ phone: cleaned })
+              .eq("instance_id", instanceId);
+            if (instance) instance.phone = cleaned;
           }
         }
       } catch (_metaErr) {
