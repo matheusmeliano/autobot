@@ -437,14 +437,12 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                                 r.whatsapp.status === "disconnected"
                                   ? "-"
                                   : formatWhatsAppPhone(r.whatsapp.phone) ||
-                                    r.whatsapp.instance_id ||
                                     undefined
                               }
                             >
                               {r.whatsapp.status === "disconnected"
                                 ? "-"
                                 : formatWhatsAppPhone(r.whatsapp.phone) ||
-                                  r.whatsapp.instance_id ||
                                   "Número ainda não sincronizado."}
                             </div>
                           </div>
@@ -781,7 +779,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
             {whatsAppRow?.whatsapp?.status === "disconnected"
               ? "-"
               : formatWhatsAppPhone(whatsAppRow?.whatsapp?.phone ?? null) ||
-                whatsAppRow?.whatsapp?.instance_id ||
                 "—"}
           </div>
         </div>
