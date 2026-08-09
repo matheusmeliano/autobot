@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarDays, MessageSquareText, Users, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
@@ -318,24 +318,6 @@ export function DashboardClient({
   const [chartFilter, setChartFilter] = useState<ChartFilter>("days");
   const activityPages = Math.max(1, Math.ceil(activities.length / pageSize));
   const safeActivityPage = Math.min(activityPage, activityPages);
-
-  const [liveWhatsappStatus, setLiveWhatsappStatus] = useState<string | null>(null);
-  const [waRefreshing, setWaRefreshing] = useState(false);
-  void liveWhatsappStatus;
-  void setLiveWhatsappStatus;
-  void waRefreshing;
-  void setWaRefreshing;
-  const visibleWaStatus = stats.whatsappStatus;
-  void visibleWaStatus;
-
-  const refreshWhatsAppStatus = useCallback(async (_opts?: { silent?: boolean }) => {
-    return;
-  }, []);
-  void refreshWhatsAppStatus;
-
-  useEffect(() => {
-    setLiveWhatsappStatus(stats.whatsappStatus);
-  }, [stats.whatsappStatus]);
 
   useEffect(() => {
     if (activityPage !== safeActivityPage) setActivityPage(safeActivityPage);

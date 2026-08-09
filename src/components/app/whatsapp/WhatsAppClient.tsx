@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { HelpCircle } from "lucide-react";
 import { upsertWhatsAppInstanceAction } from "@/app/app/whatsapp/actions";
@@ -22,43 +21,6 @@ type FormValues = {
   client_token: string;
 };
 
-function formatWhatsAppPhone(value: string | null): string {
-  const digits = String(value ?? "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.length < 10 || digits.length > 15) return "";
-  if (digits.startsWith("55") && digits.length >= 12) {
-    const ddd = digits.slice(2, 4);
-    const nine = digits.length === 13 ? digits.slice(4, 5) : "";
-    const block1 = digits.length === 13 ? digits.slice(5, 9) : digits.slice(4, 8);
-    const block2 = digits.length === 13 ? digits.slice(9) : digits.slice(8);
-    return `+55 (${ddd}) ${nine}${block1}-${block2}`;
-  }
-  if (digits.startsWith("1") && digits.length === 11) {
-    const area = digits.slice(1, 4);
-    const b1 = digits.slice(4, 7);
-    const b2 = digits.slice(7);
-    return `+1 (${area}) ${b1}-${b2}`;
-  }
-  if (digits.length >= 7 && digits.length <= 15) {
-    const groups: string[] = [];
-    let remaining = digits;
-    if (remaining.length > 10) {
-      const ccLen = remaining.length >= 12 ? 2 : remaining.length >= 11 ? 1 : 2;
-      groups.push(`+${remaining.slice(0, ccLen)}`);
-      remaining = remaining.slice(ccLen);
-    } else {
-      groups.push("+");
-    }
-    while (remaining.length > 4) {
-      groups.push(remaining.slice(0, 3));
-      remaining = remaining.slice(3);
-    }
-    if (remaining) groups.push(remaining);
-    return groups.join(" ").replace("+ ", "+");
-  }
-  return "";
-}
-
 export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
   const {
     register,
@@ -72,28 +34,6 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
       client_token: initial?.hasClientToken ? MASK : "",
     },
   });
-
-  const isConnected = initial?.status === "connected";
-  const statusLabel = isConnected ? "Conectado" : "Desconectado";
-
-  const phoneFormatted = useMemo(() => formatWhatsAppPhone(initial?.phone ?? null), [initial?.phone]);
-  const rawDigits = String(initial?.phone ?? "").replace(/\D/g, "");
-  const hasPhoneDigits = rawDigits.length >= 10 && rawDigits.length <= 15;
-  const phoneCardTitle = phoneFormatted || "";
-  const phonePrimaryLabel = !isConnected
-    ? "-"
-    : hasPhoneDigits
-      ? phoneCardTitle
-      : "Número ainda não sincronizado";
-
-  const primaryLabel = phonePrimaryLabel;
-  const secondaryInfo = !isConnected
-    ? "Instância desconectada na Z-API."
-    : phoneCardTitle
-      ? (initial?.instance_id ? `Instance: ${initial.instance_id}` : "")
-      : (initial?.instance_id
-        ? `Instance: ${initial.instance_id}. A próxima mensagem recebida da Z-API atualiza o número.`
-        : "A próxima mensagem recebida da Z-API atualiza automaticamente.");
 
   const onSubmit = handleSubmit(async (values) => {
     const tokenValue = String(values.token ?? "").trim();
