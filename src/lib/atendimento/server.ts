@@ -734,16 +734,17 @@ export async function refreshOneWhatsAppInstanceStatusLive(params: {
       }
     }
   } else {
-    if (explicitDisconnectSignal && (httpStatus === 0 || httpStatus >= 400)) {
+    const httpStatusSafe: number = httpStatus ?? 0;
+    if (explicitDisconnectSignal && (httpStatusSafe === 0 || httpStatusSafe >= 400)) {
       nextStatus = "disconnected";
     } else if (result?.explicitDisconnect) {
       nextStatus = "disconnected";
-    } else if (sticky && prevStatus === "connected" && !explicitDisconnectSignal && (httpStatus ?? 0) < 400) {
+    } else if (sticky && prevStatus === "connected" && !explicitDisconnectSignal && httpStatusSafe < 400) {
       nextStatus = "connected";
     } else if (!sticky) {
       nextStatus = prevStatus ?? "disconnected";
     } else if (prevStatus === "connected") {
-      if (httpStatus === 0 || httpStatus >= 500 || httpStatus === 404 || httpStatus === 401 || httpStatus === 403) {
+      if (httpStatusSafe === 0 || httpStatusSafe >= 500 || httpStatusSafe === 404 || httpStatusSafe === 401 || httpStatusSafe === 403) {
         nextStatus = "disconnected";
       } else {
         nextStatus = "connected";
