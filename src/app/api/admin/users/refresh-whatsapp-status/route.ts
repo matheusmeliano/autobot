@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         .select(["user_id", "instance_id", "token", "status"].join(", "))
         .eq("user_id", uid)
         .maybeSingle();
-      r = { client_token: null, ...(r2.data ?? {}) };
+      r = { client_token: null, ...((r2.data ?? {}) as Record<string, unknown>) };
       if (r2.error) {
         return { user_id: uid, status: null, ok: false, error: r2.error.message };
       }
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     }
     if (!r) return { user_id: uid, status: "disconnected", ok: true, reason: "no_instance" };
     const st = await refreshOneWhatsAppInstanceStatusLive({
-      supabase,
+      supabase: db,
       row: {
         user_id: uid,
         instance_id: String(r.instance_id ?? "").trim() || null,
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
   }
 
   if (all) {
-    const list = await supabase
+    const list = await db
       .from("whatsapp_instances")
       .select(baseCols.join(", "));
     const missClient =
@@ -82,10 +82,13 @@ export async function POST(req: Request) {
       /client_token/i.test(String(list.error.message ?? ""));
     let rows: any[] = [];
     if (missClient) {
-      const r2 = await supabase
+      const r2 = await db
         .from("whatsapp_instances")
         .select(["user_id", "instance_id", "token", "status"].join(", "));
-      rows = (r2.data ?? []).map((r) => ({ client_token: null, ...r }));
+      rows = (r2.data ?? [] as any[]).map((r: any) => ({
+        client_token: null,
+        ...(r as Record<string, unknown>),
+      }));
       if (r2.error) {
         return Response.json({ ok: false, error: r2.error.message }, { status: 500 });
       }
@@ -98,7 +101,7 @@ export async function POST(req: Request) {
     const results = await Promise.all(
       rows.map((r) =>
         refreshOneWhatsAppInstanceStatusLive({
-          supabase,
+          supabase: db,
           row: {
             user_id: String(r.user_id ?? ""),
             instance_id: String(r.instance_id ?? "").trim() || null,
