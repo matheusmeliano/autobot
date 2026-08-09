@@ -28,7 +28,7 @@ export async function POST() {
         .select(["instance_id", "token", "status", "user_id"].join(", "))
         .eq("user_id", userId)
         .maybeSingle();
-      row = { client_token: null, ...(try2.data ?? {}) };
+      row = { client_token: null, ...((try2.data ?? {}) as Record<string, unknown>) };
       errObj = try2.error;
     }
     if (errObj) {
