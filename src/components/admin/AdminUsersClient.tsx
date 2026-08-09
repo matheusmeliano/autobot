@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Key, Pencil, Phone as PhoneIcon, RefreshCw, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Key, Pencil, Phone as PhoneIcon, Trash2, X } from "lucide-react";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
@@ -204,92 +204,10 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
 
   const [waRefreshingGlobal, setWaRefreshingGlobal] = useState(false);
   const [waRefreshingByUser, setWaRefreshingByUser] = useState<Record<string, boolean>>({});
-
-  const refreshOneWhatsAppStatus = useCallback(async (uid: string) => {
-    if (!uid) return;
-    setWaRefreshingByUser((prev) => ({ ...prev, [uid]: true }));
-    try {
-      const r = await fetch("/api/admin/users/refresh-whatsapp-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: uid }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (j && j.result && typeof j.result.status === "string") {
-        setRows((prev) =>
-          prev.map((row) =>
-            row.id !== uid
-              ? row
-              : {
-                  ...row,
-                  whatsapp: {
-                    ...(row.whatsapp ?? {
-                      instance_id: null,
-                      display_name: null,
-                      phone: null,
-                    }),
-                    status: j.result.status,
-                  } as AdminUserWhatsAppInfo,
-                },
-          ),
-        );
-      }
-    } catch {} finally {
-      setWaRefreshingByUser((prev) => {
-        const next = { ...prev };
-        delete next[uid];
-        return next;
-      });
-    }
-  }, []);
-
-  const refreshAllWhatsAppStatus = useCallback(async () => {
-    setWaRefreshingGlobal(true);
-    try {
-      const r = await fetch("/api/admin/users/refresh-whatsapp-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ all: true }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (j && Array.isArray(j.results)) {
-        const byId = new Map<string, string | null>();
-        for (const it of j.results) {
-          if (it && typeof it.user_id === "string") {
-            byId.set(it.user_id, typeof it.status === "string" ? it.status : null);
-          }
-        }
-        if (byId.size) {
-          setRows((prev) =>
-            prev.map((row) => {
-              const s = byId.get(row.id);
-              if (typeof s !== "string") return row;
-              return {
-                ...row,
-                whatsapp: {
-                  ...(row.whatsapp ?? {
-                    instance_id: null,
-                    display_name: null,
-                    phone: null,
-                  }),
-                  status: s,
-                } as AdminUserWhatsAppInfo,
-              };
-            }),
-          );
-        }
-      }
-    } catch {} finally {
-      setWaRefreshingGlobal(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      void refreshAllWhatsAppStatus();
-    }, 15000);
-    return () => clearInterval(t);
-  }, [refreshAllWhatsAppStatus]);
+  void waRefreshingGlobal;
+  void setWaRefreshingGlobal;
+  void waRefreshingByUser;
+  void setWaRefreshingByUser;
 
   const refresh = () => {
     startTransition(async () => {
@@ -469,20 +387,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         </div>
 
         <div className="flex w-full flex-col items-stretch gap-2 min-[1201px]:w-auto min-[1201px]:flex-row min-[1201px]:items-center">
-          <button
-            type="button"
-            onClick={() => void refreshAllWhatsAppStatus()}
-            disabled={waRefreshingGlobal || isPending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/[0.06] min-[1201px]:w-auto disabled:opacity-40"
-          >
-            <RefreshCw
-              className={[
-                "h-3.5 w-3.5",
-                waRefreshingGlobal ? "animate-spin" : "",
-              ].join(" ")}
-            />
-            Atualizar status WhatsApp
-          </button>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -525,36 +429,13 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                       <div className="mt-1 truncate text-xs text-white/50">{r.email}</div>
                     </div>
                     <div className="col-span-4 min-w-0">
-                      {r.whatsapp?.instance_id || r.whatsapp?.phone || r.whatsapp?.display_name ? (
+                      {r.whatsapp?.instance_id || r.whatsapp?.display_name ? (
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
-                              {r.whatsapp.status === "connected"
-                                ? r.whatsapp.display_name?.trim() ||
-                                  (r.whatsapp.phone
-                                    ? "WhatsApp conectado"
-                                    : "WhatsApp conectado (sem número sincronizado)")
-                                : "WhatsApp desconectado"}
+                              {r.whatsapp.display_name?.trim() || "-"}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => void refreshOneWhatsAppStatus(r.id)}
-                            disabled={waRefreshingByUser[r.id] || waRefreshingGlobal}
-                            className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] font-semibold text-white/70 hover:bg-white/[0.06] disabled:opacity-40"
-                            aria-label="Atualizar status WhatsApp"
-                            title="Atualizar status"
-                          >
-                            <RefreshCw
-                              className={[
-                                "h-3 w-3",
-                                waRefreshingByUser[r.id] || waRefreshingGlobal
-                                  ? "animate-spin"
-                                  : "",
-                              ].join(" ")}
-                            />
-                            Atualizar
-                          </button>
                         </div>
                       ) : (
                         <div className="flex items-start justify-between gap-2">
@@ -869,21 +750,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           </button>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs font-semibold text-white/55">Identificação atual</div>
-          <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]">
-            {whatsAppRow?.whatsapp?.status === "connected"
-              ? whatsAppRow?.whatsapp?.display_name?.trim() ||
-                (whatsAppRow?.whatsapp?.phone
-                  ? "WhatsApp conectado (sem apelido)"
-                  : whatsAppRow?.whatsapp?.instance_id
-                    ? "WhatsApp conectado (sem número sincronizado)"
-                    : "WhatsApp conectado")
-              : "WhatsApp desconectado"}
-          </div>
-        </div>
-
-        <form onSubmit={saveWhatsApp} className="mt-5 space-y-3">
+        <form onSubmit={saveWhatsApp} className="mt-0 space-y-3">
           <input type="hidden" {...whatsAppForm.register("user_id", { required: true })} />
           <div>
             <label className="text-xs font-semibold text-white/60">
@@ -896,7 +763,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
               {...whatsAppForm.register("display_name", { maxLength: 80 })}
             />
             <div className="mt-2 flex items-center justify-between text-[11px] text-white/40">
-              <span>Campo opcional. Se vazio, exibe &quot;WhatsApp conectado&quot; + número.</span>
+              <span>Campo opcional. Apelido interno para identificar o número no painel.</span>
               <span>
                 {(whatsAppForm.watch("display_name") ?? "").length}/80
               </span>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, MessageSquareText, RefreshCw, Users, Wallet } from "lucide-react";
+import { CalendarDays, MessageSquareText, Users, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { deriveAgendarVisualStatus, getAgendarDisplayReferenceMoment } from "@/lib/agendarStatus";
 import { type BrazilTimeZone } from "@/lib/timezone";
@@ -321,33 +321,21 @@ export function DashboardClient({
 
   const [liveWhatsappStatus, setLiveWhatsappStatus] = useState<string | null>(null);
   const [waRefreshing, setWaRefreshing] = useState(false);
-  const visibleWaStatus = liveWhatsappStatus ?? stats.whatsappStatus;
+  void liveWhatsappStatus;
+  void setLiveWhatsappStatus;
+  void waRefreshing;
+  void setWaRefreshing;
+  const visibleWaStatus = stats.whatsappStatus;
+  void visibleWaStatus;
 
-  const refreshWhatsAppStatus = useCallback(async (opts?: { silent?: boolean }) => {
-    setWaRefreshing(true);
-    try {
-      const r = await fetch("/api/app/whatsapp/refresh-status", {
-        method: "POST",
-      });
-      const j = await r.json().catch(() => ({}));
-      if (j && typeof j.status === "string") {
-        setLiveWhatsappStatus(j.status);
-      }
-    } catch {} finally {
-      setWaRefreshing(false);
-    }
+  const refreshWhatsAppStatus = useCallback(async (_opts?: { silent?: boolean }) => {
+    return;
   }, []);
+  void refreshWhatsAppStatus;
 
   useEffect(() => {
     setLiveWhatsappStatus(stats.whatsappStatus);
   }, [stats.whatsappStatus]);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      void refreshWhatsAppStatus({ silent: true });
-    }, 15000);
-    return () => clearInterval(t);
-  }, [refreshWhatsAppStatus]);
 
   useEffect(() => {
     if (activityPage !== safeActivityPage) setActivityPage(safeActivityPage);
@@ -361,8 +349,6 @@ export function DashboardClient({
 
   const chart = useMemo(() => buildChartPoints(chartFilter, chartDates), [chartDates, chartFilter]);
 
-  const isConnected = visibleWaStatus === "connected";
-  const statusLabel = isConnected ? "Conectado" : "Desconectado";
   const visibleStats = hasCurrentMonthSchedules
     ? stats
     : {
@@ -397,25 +383,6 @@ export function DashboardClient({
         </div>
 
         <div className="hidden w-full flex-wrap items-center gap-2 min-[1201px]:flex min-[1201px]:justify-end">
-          <div className="inline-flex w-full items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)] min-[1201px]:w-auto">
-            <span
-              className={[
-                "h-2 w-2 rounded-full",
-                statusLabel === "Conectado" ? "bg-emerald-400" : "bg-[var(--app-text-30)]",
-              ].join(" ")}
-            />
-            WhatsApp: {statusLabel}
-          </div>
-          <button
-            type="button"
-            onClick={() => void refreshWhatsAppStatus()}
-            disabled={waRefreshing}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2 text-xs font-semibold text-[var(--app-text-70)] hover:bg-[var(--app-hover)] min-[1201px]:w-auto disabled:opacity-50"
-            aria-label="Atualizar status WhatsApp"
-          >
-            <RefreshCw className={["h-3.5 w-3.5", waRefreshing ? "animate-spin" : ""].join(" ")} />
-            Atualizar
-          </button>
           <div className="inline-flex w-full items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-70)] min-[1201px]:w-auto">
             <CalendarDays className="h-3.5 w-3.5" />
             Operação: {operationMonthLabel}
