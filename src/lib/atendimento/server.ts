@@ -615,6 +615,8 @@ export function isZapiResponseActuallyConnected(meData: unknown): boolean {
     (d as any).me?.id,
     (d as any).connectedNumber,
     (d as any).connected_number,
+    (d as any).idInstance,
+    (d as any).id_instance,
   ];
   let hasAnyPhone = false;
   for (const raw of phonePieces) {
@@ -628,6 +630,62 @@ export function isZapiResponseActuallyConnected(meData: unknown): boolean {
   if (isExplicitlyConnected) return true;
   if (hasAnyPhone) return true;
   return false;
+}
+
+export async function refreshOneWhatsAppInstanceStatusLive(params: {
+  supabase: any;
+  row: {
+    user_id?: string | null;
+    instance_id?: string | null;
+    token?: string | null;
+    client_token?: string | null;
+    status?: string | null;
+  };
+  filterMode?: "by_instance_id" | "by_user_id";
+}): Promise<"connected" | "disconnected" | null> {
+  const mode = params.filterMode ?? (params.row.instance_id ? "by_instance_id" : "by_user_id");
+  const instanceId = String(params.row.instance_id ?? "").trim();
+  const token = String(params.row.token ?? "").trim();
+  const userId = String(params.row.user_id ?? "").trim();
+  if ((!instanceId || !token)) {
+    return (String(params.row.status ?? "").trim() as any) || null;
+  }
+  try {
+    const meData = await getZapiInstanceMeta({
+      instance_id: instanceId,
+      token,
+      client_token: params.row.client_token ?? undefined,
+    });
+    const actuallyConnected = isZapiResponseActuallyConnected(meData);
+    const nextStatus = actuallyConnected ? "connected" : "disconnected";
+    try {
+      const q = params.supabase
+        .from("whatsapp_instances")
+        .update({ status: nextStatus });
+      if (mode === "by_instance_id") {
+        await q.eq("instance_id", instanceId);
+      } else if (userId) {
+        await q.eq("user_id", userId);
+      } else {
+        await q.eq("instance_id", instanceId);
+      }
+    } catch {}
+    return nextStatus;
+  } catch (_err) {
+    try {
+      const q = params.supabase
+        .from("whatsapp_instances")
+        .update({ status: "disconnected" });
+      if (mode === "by_instance_id") {
+        await q.eq("instance_id", instanceId);
+      } else if (userId) {
+        await q.eq("user_id", userId);
+      } else {
+        await q.eq("instance_id", instanceId);
+      }
+    } catch {}
+    return "disconnected";
+  }
 }
 
 async function updateZapiWebhook(params: {
