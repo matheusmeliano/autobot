@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   if (!supabase) {
     return Response.json({ ok: false, error: "Configuração admin incompleta." }, { status: 500 });
   }
+  const db = supabase as NonNullable<typeof supabase>;
 
   let body: any = {};
   try {
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
 
   async function refreshSingle(uid: string) {
     if (!uid) return { user_id: uid, status: null, ok: false, error: "missing user_id" };
-    const row = await supabase
+    const row = await db
       .from("whatsapp_instances")
       .select(baseCols.join(", "))
       .eq("user_id", uid)
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       /client_token/i.test(String(row.error.message ?? ""));
     let r: any = row.data;
     if (missClient) {
-      const r2 = await supabase
+      const r2 = await db
         .from("whatsapp_instances")
         .select(["user_id", "instance_id", "token", "status"].join(", "))
         .eq("user_id", uid)
