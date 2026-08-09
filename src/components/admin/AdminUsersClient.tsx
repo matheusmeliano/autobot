@@ -296,11 +296,11 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         <div ref={tableScrollRef} className="overflow-x-auto">
           <div className="min-w-[1080px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-14 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
-              <div className="col-span-7">Usuário</div>
+              <div className="col-span-5">Usuário</div>
               <div className="col-span-2 text-center">Plano</div>
               <div className="col-span-2 text-center">Status</div>
-              <div className="col-span-1 text-center">Venc.</div>
-              <div className="col-span-2 text-right">Ações</div>
+              <div className="col-span-2 text-center">Venc.</div>
+              <div className="col-span-3 text-right">Ações</div>
             </div>
 
             {filtered.length === 0 ? (
@@ -314,7 +314,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                     key={r.id}
                     className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
-                    <div className="col-span-7 min-w-0">
+                    <div className="col-span-5 min-w-0">
                       <div className="truncate font-semibold">{r.nome}</div>
                       <div className="mt-1 truncate text-xs text-white/50">{r.email}</div>
                     </div>
@@ -334,7 +334,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         </span>
                       )}
                     </div>
-                    <div className="col-span-1 text-center text-white/60">
+                    <div className="col-span-2 text-center text-white/60">
                       {normalizePlan(r.plano) === "vitalicio"
                         ? "-"
                         : normalizePlan(r.plano) === "teste" &&
@@ -344,7 +344,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                           ? "Expirado"
                           : dateBR(r.vencimento)}
                     </div>
-                    <div className="col-span-2 flex justify-end gap-2">
+                    <div className="col-span-3 flex justify-end gap-2">
                       {!isSelfAdmin(r.email) ? (
                         <button
                           onClick={() => openEditModal(r)}
