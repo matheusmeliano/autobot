@@ -1223,6 +1223,31 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, ignored: true, reason: "unknown_instance" });
   }
 
+  {
+    const { data: userInstances, error: uiErr } = await admin
+      .from("whatsapp_instances")
+      .select("instance_id, created_at, status")
+      .eq("user_id", userId);
+    if (!uiErr && Array.isArray(userInstances) && userInstances.length > 1) {
+      const sorted = [...userInstances].sort((a, b) => {
+        const aT = a.created_at ? new Date(String(a.created_at)).getTime() : 0;
+        const bT = b.created_at ? new Date(String(b.created_at)).getTime() : 0;
+        return bT - aT;
+      });
+      const canonicalInstanceId = String(sorted[0].instance_id ?? "").trim();
+      const receivedInstanceId = String(instanceId ?? "").trim();
+      if (canonicalInstanceId && canonicalInstanceId !== receivedInstanceId) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "stale_instance_not_current_for_user",
+          current_instance_id: canonicalInstanceId,
+          received_instance_id: receivedInstanceId,
+        });
+      }
+    }
+  }
+
   if (!missingPhoneCol) {
     const currentPhoneRaw = String(instance?.phone ?? "").trim();
     const currentDigits = currentPhoneRaw.replace(/\D/g, "");
