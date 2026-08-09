@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Key, Pencil, Phone as PhoneIcon, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Key, Pencil, Trash2, X } from "lucide-react";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
@@ -12,14 +12,6 @@ import {
   resetPasswordAdminAction,
   updateUserAdminAction,
 } from "@/app/admin/usuarios/actions";
-import { setWhatsAppInstanceDisplayNameAdminAction } from "@/app/app/whatsapp/actions";
-
-type AdminUserWhatsAppInfo = {
-  instance_id: string | null;
-  display_name: string | null;
-  phone: string | null;
-  status: string | null;
-} | null;
 
 export type AdminUserRow = {
   id: string;
@@ -30,7 +22,6 @@ export type AdminUserRow = {
   assinatura_status: string;
   vencimento: string | null;
   criado_em: string | null;
-  whatsapp?: AdminUserWhatsAppInfo;
 };
 
 type EditValues = {
@@ -46,11 +37,6 @@ type PasswordValues = {
   password: string;
 };
 
-type WhatsAppDisplayNameValues = {
-  user_id: string;
-  display_name: string;
-};
-
 function dateBR(v: string | null) {
   if (!v) return "-";
   const s = v.slice(0, 10);
@@ -59,39 +45,6 @@ function dateBR(v: string | null) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
-}
-
-function formatWhatsAppPhone(value: string | null): string {
-  if (!value) return "";
-  const digits = value.replace(/\D/g, "");
-  if (digits.length < 10 || digits.length > 15) return "";
-  if (digits.startsWith("55") && digits.length === 13) {
-    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
-  }
-  if (digits.startsWith("55") && digits.length === 12) {
-    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
-  }
-  if (digits.startsWith("1") && digits.length === 11) {
-    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-  }
-  if (digits.length >= 7 && digits.length <= 15) {
-    const groups: string[] = [];
-    let remaining = digits;
-    if (remaining.length > 10) {
-      const ccLen = remaining.length >= 12 ? 2 : remaining.length >= 11 ? 1 : 2;
-      groups.push(`+${remaining.slice(0, ccLen)}`);
-      remaining = remaining.slice(ccLen);
-    } else {
-      groups.push("+");
-    }
-    while (remaining.length > 4) {
-      groups.push(remaining.slice(0, 3));
-      remaining = remaining.slice(3);
-    }
-    if (remaining) groups.push(remaining);
-    return groups.join(" ").replace("+ ", "+");
-  }
-  return "";
 }
 
 function normalizeStatus(v?: string | null): "ativo" | "cancelado" {
@@ -127,10 +80,8 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const [openEdit, setOpenEdit] = useState(false);
   const [openPassword, setOpenPassword] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
-  const [openWhatsApp, setOpenWhatsApp] = useState(false);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [deleting, setDeleting] = useState<AdminUserRow | null>(null);
-  const [whatsAppRow, setWhatsAppRow] = useState<AdminUserRow | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
 
@@ -142,11 +93,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     return rows.filter((r) => {
       const emailOk = r.email.toLowerCase().includes(q);
       const nomeOk = r.nome.toLowerCase().includes(q);
-      const waDn = (r.whatsapp?.display_name ?? "").toLowerCase();
-      const waPhone = (r.whatsapp?.phone ?? "").toLowerCase();
-      const waInstance = (r.whatsapp?.instance_id ?? "").toLowerCase();
-      const waOk = waDn.includes(q) || waPhone.includes(q) || waInstance.includes(q);
-      return emailOk || nomeOk || waOk;
+      return emailOk || nomeOk;
     });
   }, [query, rows]);
 
@@ -197,17 +144,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const passForm = useForm<PasswordValues>({
     defaultValues: { id: "", password: "" },
   });
-  const whatsAppForm = useForm<WhatsAppDisplayNameValues>({
-    defaultValues: { user_id: "", display_name: "" },
-  });
   const { ref: vencimentoFieldRef, ...vencimentoFieldProps } = editForm.register("vencimento");
-
-  const [waRefreshingGlobal, setWaRefreshingGlobal] = useState(false);
-  const [waRefreshingByUser, setWaRefreshingByUser] = useState<Record<string, boolean>>({});
-  void waRefreshingGlobal;
-  void setWaRefreshingGlobal;
-  void waRefreshingByUser;
-  void setWaRefreshingByUser;
 
   const refresh = () => {
     startTransition(async () => {
@@ -244,52 +181,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     setOpenDelete(false);
     setDeleting(null);
   };
-
-  const closeWhatsApp = () => {
-    setOpenWhatsApp(false);
-    setWhatsAppRow(null);
-    whatsAppForm.reset({ user_id: "", display_name: "" });
-  };
-
-  const openWhatsAppModal = (row: AdminUserRow) => {
-    setWhatsAppRow(row);
-    setOpenWhatsApp(true);
-    whatsAppForm.reset({
-      user_id: row.id,
-      display_name: row.whatsapp?.display_name ?? "",
-    });
-  };
-
-  const saveWhatsApp = whatsAppForm.handleSubmit(async (values) => {
-    const res = await setWhatsAppInstanceDisplayNameAdminAction({
-      user_id: values.user_id,
-      display_name: values.display_name.trim() || null,
-    });
-    if (!res.ok) {
-      modalToast.error(res.error ?? "Falha ao salvar apelido.");
-      return;
-    }
-    modalToast.success("Apelido do WhatsApp atualizado.");
-    const safeDisplayName = String(res.display_name ?? "").trim() || null;
-    const safePhone = String(res.phone ?? "").trim() || null;
-    const safeInstanceId = String(res.instance_id ?? "").trim() || null;
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id === values.user_id
-          ? {
-              ...r,
-              whatsapp: {
-                instance_id: (r.whatsapp?.instance_id ?? safeInstanceId) || null,
-                display_name: safeDisplayName,
-                phone: (r.whatsapp?.phone ?? safePhone) || null,
-                status: r.whatsapp?.status ?? null,
-              },
-            }
-          : r,
-      ),
-    );
-    closeWhatsApp();
-  });
 
   const openVencimentoPicker = () => {
     vencimentoInputRef.current?.showPicker?.();
@@ -405,8 +296,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         <div ref={tableScrollRef} className="overflow-x-auto">
           <div className="min-w-[1080px] min-[1201px]:min-w-0">
             <div className="grid grid-cols-14 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
-              <div className="col-span-3">Usuário</div>
-              <div className="col-span-4">WhatsApp</div>
+              <div className="col-span-7">Usuário</div>
               <div className="col-span-2 text-center">Plano</div>
               <div className="col-span-2 text-center">Status</div>
               <div className="col-span-1 text-center">Venc.</div>
@@ -424,28 +314,9 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                     key={r.id}
                     className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-white/80"
                   >
-                    <div className="col-span-3 min-w-0">
+                    <div className="col-span-7 min-w-0">
                       <div className="truncate font-semibold">{r.nome}</div>
                       <div className="mt-1 truncate text-xs text-white/50">{r.email}</div>
-                    </div>
-                    <div className="col-span-4 min-w-0">
-                      {r.whatsapp?.instance_id || r.whatsapp?.display_name ? (
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold leading-relaxed text-[var(--app-text-85)]">
-                              {r.whatsapp.display_name?.trim() || "-"}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-white/35">
-                              Sem WhatsApp
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div className="col-span-2 flex justify-center">
                       <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">
@@ -731,53 +602,6 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
             Excluir
           </button>
         </div>
-      </AppModal>
-
-      <AppModal open={openWhatsApp} onClose={closeWhatsApp} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
-              <PhoneIcon className="h-4 w-4" />
-              Apelido do WhatsApp
-            </div>
-            <div className="mt-1 truncate text-xs text-white/55">{whatsAppRow?.email ?? ""}</div>
-          </div>
-          <button
-            onClick={closeWhatsApp}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <form onSubmit={saveWhatsApp} className="mt-0 space-y-3">
-          <input type="hidden" {...whatsAppForm.register("user_id", { required: true })} />
-          <div>
-            <label className="text-xs font-semibold text-white/60">
-              Nome (apelido) do número
-            </label>
-            <input
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-              placeholder="Ex.: Suporte, Vendas, Professor Lucas, Financeiro"
-              maxLength={80}
-              {...whatsAppForm.register("display_name", { maxLength: 80 })}
-            />
-            <div className="mt-2 flex items-center justify-between text-[11px] text-white/40">
-              <span>Campo opcional. Apelido interno para identificar o número no painel.</span>
-              <span>
-                {(whatsAppForm.watch("display_name") ?? "").length}/80
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={whatsAppForm.formState.isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
-          >
-            {whatsAppForm.formState.isSubmitting ? "Salvando..." : "Salvar apelido"}
-          </button>
-        </form>
       </AppModal>
     </div>
   );
