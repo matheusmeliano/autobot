@@ -3,7 +3,7 @@ import { listAllAuthUsers } from "@/lib/adminUsers";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { normalizePlan } from "@/lib/plans";
-import { getZapiInstanceMeta, isZapiResponseActuallyConnected } from "@/lib/atendimento/server";
+import { getZapiInstanceMeta, refreshOneWhatsAppInstanceStatusLive } from "@/lib/atendimento/server";
 
 async function refreshOneInstanceStatus(supabase: any, row: {
   user_id: string;
@@ -12,32 +12,18 @@ async function refreshOneInstanceStatus(supabase: any, row: {
   client_token: string | null;
   status: string | null;
 }) {
-  const instanceId = String(row.instance_id ?? "").trim();
-  const token = String(row.token ?? "").trim();
-  if (!instanceId || !token) return row.status ?? null;
-  try {
-    const meData = await getZapiInstanceMeta({
-      instance_id: instanceId,
-      token,
-      client_token: row.client_token ?? undefined,
-    });
-    const actuallyConnected = isZapiResponseActuallyConnected(meData);
-    if (!actuallyConnected) {
-      try {
-        await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("user_id", row.user_id);
-      } catch {}
-      return "disconnected";
-    }
-    try {
-      await supabase.from("whatsapp_instances").update({ status: "connected" }).eq("user_id", row.user_id);
-    } catch {}
-    return "connected";
-  } catch (_err) {
-    try {
-      await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("user_id", row.user_id);
-    } catch {}
-    return "disconnected";
-  }
+  return await refreshOneWhatsAppInstanceStatusLive({
+    supabase,
+    row: {
+      user_id: row.user_id,
+      instance_id: row.instance_id,
+      token: row.token,
+      client_token: row.client_token,
+      status: row.status,
+    },
+    filterMode: "by_user_id",
+    stickyConnected: false,
+  });
 }
 
 export async function GET() {

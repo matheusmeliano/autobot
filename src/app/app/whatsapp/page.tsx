@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { WhatsAppClient } from "@/components/app/whatsapp/WhatsAppClient";
-import { getZapiInstanceMeta, isZapiResponseActuallyConnected } from "@/lib/atendimento/server";
+import { refreshOneWhatsAppInstanceStatusLive } from "@/lib/atendimento/server";
 
 const BASE_COLS = ["instance_id", "token", "status"] as const;
 const OPTIONAL_COLS = ["client_token", "phone"] as const;
@@ -8,33 +8,18 @@ const OPTIONAL_COLS = ["client_token", "phone"] as const;
 type InstanceRow = Record<string, any>;
 
 async function safeRefreshInstanceStatusLive(supabase: any, row: InstanceRow | null): Promise<string | null> {
-  if (!row) return null;
-  const instanceId = String(row.instance_id ?? "").trim();
-  const token = String(row.token ?? "").trim();
-  if (!instanceId || !token) return String(row.status ?? "").trim() || null;
-  try {
-    const meData = await getZapiInstanceMeta({
-      instance_id: instanceId,
-      token,
-      client_token: (row.client_token ? String(row.client_token).trim() : undefined) || undefined,
-    });
-    const actuallyConnected = isZapiResponseActuallyConnected(meData);
-    if (!actuallyConnected) {
-      try {
-        await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("instance_id", instanceId);
-      } catch {}
-      return "disconnected";
-    }
-    try {
-      await supabase.from("whatsapp_instances").update({ status: "connected" }).eq("instance_id", instanceId);
-    } catch {}
-    return "connected";
-  } catch (_err) {
-    try {
-      await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq("instance_id", instanceId);
-    } catch {}
-    return "disconnected";
-  }
+  return await refreshOneWhatsAppInstanceStatusLive({
+    supabase,
+    row: {
+      user_id: null,
+      instance_id: row?.instance_id ?? null,
+      token: row?.token ?? null,
+      client_token: row?.client_token ?? null,
+      status: row?.status ?? null,
+    },
+    filterMode: "by_instance_id",
+    stickyConnected: false,
+  });
 }
 
 async function safeFetchWhatsappInstance(supabase: any): Promise<{

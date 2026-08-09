@@ -10,51 +10,26 @@ import {
   loadHiddenWhatsAppPhoneBlocklist,
   normalizePhoneDigitsOnly,
 } from "@/lib/painelHiddenPhones";
-import { getZapiInstanceMeta, isZapiResponseActuallyConnected } from "@/lib/atendimento/server";
+import { getZapiInstanceMeta, refreshOneWhatsAppInstanceStatusLive } from "@/lib/atendimento/server";
 
 async function dashboardRefreshWhatsAppStatusLive(
   supabase: any,
   whatsappRow: any,
 ): Promise<string | null> {
-  if (!whatsappRow) return "disconnected";
-  const instanceId = String(whatsappRow.instance_id ?? "").trim();
-  const token = String(whatsappRow.token ?? "").trim();
-  if (!instanceId || !token) {
-    return String(whatsappRow.status ?? "").trim() || "disconnected";
-  }
-  try {
-    const meData = await getZapiInstanceMeta({
-      instance_id: instanceId,
-      token,
-      client_token: (whatsappRow.client_token ? String(whatsappRow.client_token).trim() : undefined) ||
-        undefined,
-    });
-    const actuallyConnected = isZapiResponseActuallyConnected(meData);
-    if (!actuallyConnected) {
-      try {
-        await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq(
-          "instance_id",
-          instanceId,
-        );
-      } catch {}
-      return "disconnected";
-    }
-    try {
-      await supabase.from("whatsapp_instances").update({ status: "connected" }).eq(
-        "instance_id",
-        instanceId,
-      );
-    } catch {}
-    return "connected";
-  } catch (_err) {
-    try {
-      await supabase.from("whatsapp_instances").update({ status: "disconnected" }).eq(
-        "instance_id",
-        instanceId,
-      );
-    } catch {}
-    return "disconnected";
-  }
+  return await refreshOneWhatsAppInstanceStatusLive({
+    supabase,
+    row: {
+      user_id: null,
+      instance_id: String(whatsappRow?.instance_id ?? "").trim() || null,
+      token: String(whatsappRow?.token ?? "").trim() || null,
+      client_token: (whatsappRow?.client_token
+        ? String(whatsappRow.client_token).trim()
+        : undefined) || undefined,
+      status: String(whatsappRow?.status ?? "").trim() || null,
+    },
+    filterMode: "by_instance_id",
+    stickyConnected: false,
+  });
 }
 
 function scheduleLocalMonthKey(value: string | null | undefined, timeZone: string) {
@@ -187,7 +162,6 @@ export default async function DashboardPage() {
       .limit(2000),
     loadHiddenWhatsAppPhoneBlocklist(),
   ]);
-
   const liveWhatsappStatus = await dashboardRefreshWhatsAppStatusLive(supabase, whatsappRes.data);
 
   const hiddenBlocklist = (hiddenBlocklistRaw ?? new Set<string>()) as Set<string>;

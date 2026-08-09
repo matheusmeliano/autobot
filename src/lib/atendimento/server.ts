@@ -586,24 +586,48 @@ export async function getZapiInstanceMeta(params: {
   return data;
 }
 
-export function isZapiResponseActuallyConnected(meData: unknown): boolean {
-  if (!meData || typeof meData !== "object") return false;
+export function isZapiResponseActuallyConnected(meData: unknown): {
+  connected: boolean;
+  explicitDisconnect: boolean;
+} {
+  if (!meData || typeof meData !== "object") {
+    return { connected: false, explicitDisconnect: false };
+  }
   const d = meData as Record<string, unknown>;
-  const statusRaw = [
-    String(d.status ?? ""),
-    String((d as any).state ?? ""),
-    String((d as any).connectionStatus ?? ""),
-    String((d as any).whatsapp?.status ?? ""),
-    String((d as any).me?.status ?? ""),
-  ].join(" ").toLowerCase();
-  const isExplicitlyDisconnected =
-    /\bdisconnected\b|\bdesconectado\b|\boffline\b|\bclosed\b|\bfail\b|\berror\b|\bexpired\b|\binvalid\b|\bnot.?connected\b|\bsem.?conexao\b|\bsem.?conexão\b/.test(
-      statusRaw,
+  const scanKeys = [
+    d,
+    (d as any).whatsapp ?? null,
+    (d as any).me ?? null,
+    (d as any).data ?? null,
+    (d as any).body ?? null,
+    (d as any).response ?? null,
+  ];
+  const allChunks: string[] = [];
+  for (const node of scanKeys) {
+    if (!node || typeof node !== "object") continue;
+    const n = node as Record<string, unknown>;
+    const vals = [
+      String(n.status ?? ""),
+      String(n.state ?? ""),
+      String(n.connectionStatus ?? ""),
+      String(n.connected ?? ""),
+      String(n.authenticated ?? ""),
+      String(n.online ?? ""),
+      String(n.disconnected ?? ""),
+    ];
+    for (const v of vals) allChunks.push(String(v ?? "").toLowerCase());
+    const objStr = String(JSON.stringify(node ?? {})).toLowerCase();
+    allChunks.push(objStr);
+  }
+  const union = allChunks.join(" ");
+  const explicitDisconnect =
+    /\bdisconnected\b|\bdesconectado\b|\boffline\b|\bclosed\b|\bsession.*closed\b|\bsession.*expired\b|\bsession.*invalid\b|\binvalid.*session\b|\bexpired\b|\bsession_disconnected\b|\bsession.*logout\b|\blogout\b|\bnot.?connected\b|\bsem.?conexao\b|\bsem.?conexão\b/.test(
+      union,
     );
-  if (isExplicitlyDisconnected) return false;
-  const isExplicitlyConnected =
-    /\bconnected\b|\bconectado\b|\bonline\b|\bopen\b|\bactive\b|\bconnected_number\b|\bauthenticated\b/.test(
-      statusRaw,
+  if (explicitDisconnect) return { connected: false, explicitDisconnect: true };
+  const explicitConnect =
+    /\bconnected\b|\bconectado\b|\bonline\b|\bopen\b|\bactive\b|\bconnected_number\b|\bauthenticated\b|\bsession.*ok\b|\bsuccess\b|\btrue\b/.test(
+      union,
     );
   const phonePieces = [
     d.phone,
@@ -617,19 +641,28 @@ export function isZapiResponseActuallyConnected(meData: unknown): boolean {
     (d as any).connected_number,
     (d as any).idInstance,
     (d as any).id_instance,
+    (d as any).data?.phone,
+    (d as any).data?.telephone,
+    (d as any).data?.id,
+    (d as any).response?.phone,
+    (d as any).response?.telephone,
+    (d as any).remoteJid,
+    (d as any).wid,
   ];
   let hasAnyPhone = false;
   for (const raw of phonePieces) {
-    if (!raw || typeof raw !== "string") continue;
-    const digits = raw.replace(/\D/g, "");
+    if (!raw) continue;
+    const s = typeof raw === "number" ? String(raw) : String(raw ?? "");
+    const digits = s.replace(/\D/g, "");
     if (digits.length >= 10 && digits.length <= 15) {
       hasAnyPhone = true;
       break;
     }
   }
-  if (isExplicitlyConnected) return true;
-  if (hasAnyPhone) return true;
-  return false;
+  return {
+    connected: explicitConnect || hasAnyPhone,
+    explicitDisconnect: false,
+  };
 }
 
 export async function refreshOneWhatsAppInstanceStatusLive(params: {
@@ -642,50 +675,71 @@ export async function refreshOneWhatsAppInstanceStatusLive(params: {
     status?: string | null;
   };
   filterMode?: "by_instance_id" | "by_user_id";
+  stickyConnected?: boolean;
 }): Promise<"connected" | "disconnected" | null> {
   const mode = params.filterMode ?? (params.row.instance_id ? "by_instance_id" : "by_user_id");
   const instanceId = String(params.row.instance_id ?? "").trim();
   const token = String(params.row.token ?? "").trim();
   const userId = String(params.row.user_id ?? "").trim();
+  const prevStatus = (String(params.row.status ?? "").trim() as any) || null;
   if ((!instanceId || !token)) {
-    return (String(params.row.status ?? "").trim() as any) || null;
+    return prevStatus;
   }
+  let result: { connected: boolean; explicitDisconnect: boolean } | null = null;
+  let fetchOk = false;
   try {
     const meData = await getZapiInstanceMeta({
       instance_id: instanceId,
       token,
       client_token: params.row.client_token ?? undefined,
     });
-    const actuallyConnected = isZapiResponseActuallyConnected(meData);
-    const nextStatus = actuallyConnected ? "connected" : "disconnected";
-    try {
-      const q = params.supabase
-        .from("whatsapp_instances")
-        .update({ status: nextStatus });
-      if (mode === "by_instance_id") {
-        await q.eq("instance_id", instanceId);
-      } else if (userId) {
-        await q.eq("user_id", userId);
-      } else {
-        await q.eq("instance_id", instanceId);
-      }
-    } catch {}
-    return nextStatus;
+    fetchOk = true;
+    result = isZapiResponseActuallyConnected(meData);
   } catch (_err) {
-    try {
-      const q = params.supabase
-        .from("whatsapp_instances")
-        .update({ status: "disconnected" });
-      if (mode === "by_instance_id") {
-        await q.eq("instance_id", instanceId);
-      } else if (userId) {
-        await q.eq("user_id", userId);
-      } else {
-        await q.eq("instance_id", instanceId);
-      }
-    } catch {}
-    return "disconnected";
+    fetchOk = false;
+    result = { connected: false, explicitDisconnect: false };
   }
+
+  const sticky = Boolean(params.stickyConnected);
+  let nextStatus: "connected" | "disconnected" | null = prevStatus;
+
+  if (fetchOk && result) {
+    if (result.connected) {
+      nextStatus = "connected";
+    } else if (result.explicitDisconnect) {
+      nextStatus = "disconnected";
+    } else {
+      if (sticky && prevStatus === "connected") {
+        nextStatus = "connected";
+      } else {
+        nextStatus = prevStatus === "connected" ? "connected" : "disconnected";
+      }
+    }
+  } else {
+    if (sticky && prevStatus === "connected") {
+      nextStatus = "connected";
+    } else if (result?.explicitDisconnect) {
+      nextStatus = "disconnected";
+    } else if (prevStatus === "connected") {
+      nextStatus = "connected";
+    } else {
+      nextStatus = prevStatus ?? "disconnected";
+    }
+  }
+
+  try {
+    const q = params.supabase
+      .from("whatsapp_instances")
+      .update({ status: nextStatus });
+    if (mode === "by_instance_id") {
+      await q.eq("instance_id", instanceId);
+    } else if (userId) {
+      await q.eq("user_id", userId);
+    } else {
+      await q.eq("instance_id", instanceId);
+    }
+  } catch {}
+  return nextStatus;
 }
 
 async function updateZapiWebhook(params: {

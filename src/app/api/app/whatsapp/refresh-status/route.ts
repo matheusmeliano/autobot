@@ -54,6 +54,7 @@ export async function POST() {
       status: String(row.status ?? "").trim() || null,
     },
     filterMode: "by_user_id",
+    stickyConnected: true,
   });
 
   return Response.json({

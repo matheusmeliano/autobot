@@ -61,6 +61,7 @@ export async function POST(req: Request) {
         status: String(r.status ?? "").trim() || null,
       },
       filterMode: "by_user_id",
+      stickyConnected: true,
     });
     return { user_id: uid, status: st ?? "disconnected", ok: true };
   }
@@ -105,6 +106,7 @@ export async function POST(req: Request) {
             status: String(r.status ?? "").trim() || null,
           },
           filterMode: "by_user_id",
+          stickyConnected: true,
         }).then((status) => ({
           user_id: String(r.user_id ?? ""),
           status: status ?? "disconnected",

@@ -343,7 +343,6 @@ export function DashboardClient({
   }, [stats.whatsappStatus]);
 
   useEffect(() => {
-    void refreshWhatsAppStatus({ silent: true });
     const t = setInterval(() => {
       void refreshWhatsAppStatus({ silent: true });
     }, 15000);
