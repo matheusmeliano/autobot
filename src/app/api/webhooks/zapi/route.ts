@@ -1232,11 +1232,12 @@ export async function POST(req: Request) {
       try {
         const token = String(instance.token ?? "");
         const clientToken = missingClientTokenCol ? null : instance?.client_token ?? null;
-        const meData = await getZapiInstanceMeta({
+        const meta = await getZapiInstanceMeta({
           instance_id: instanceId,
           token,
           client_token: clientToken || undefined,
         });
+        const meData = meta.ok ? meta.data : null;
         if (meData) {
           const candidates: string[] = [];
           if (typeof meData.phone === "string") candidates.push(meData.phone);

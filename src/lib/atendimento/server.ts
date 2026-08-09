@@ -567,23 +567,32 @@ export async function getZapiInstanceMeta(params: {
   instance_id: string;
   token: string;
   client_token?: string | null;
-}) {
-  const response = await fetch(
-    `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}/token/${encodeURIComponent(params.token)}/me`,
-    {
-      method: "GET",
-      headers: {
-        ...(params.client_token ? { "Client-Token": params.client_token } : {}),
+}): Promise<{
+  ok: boolean;
+  httpStatus: number;
+  data: any;
+}> {
+  let response: Response | null = null;
+  try {
+    response = await fetch(
+      `https://api.z-api.io/instances/${encodeURIComponent(params.instance_id)}/token/${encodeURIComponent(params.token)}/me`,
+      {
+        method: "GET",
+        headers: {
+          ...(params.client_token ? { "Client-Token": params.client_token } : {}),
+        },
       },
-    },
-  );
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(
-      `Falha ao consultar instância Z-API: ${response.status} ${JSON.stringify(data) ?? ""}`.trim(),
     );
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      return { ok: false, httpStatus: response.status, data };
+    }
+    return { ok: true, httpStatus: response.status, data };
+  } catch (err) {
+    const httpStatus = response?.status ?? 0;
+    const data = response ? await response.json().catch(() => null) : null;
+    return { ok: false, httpStatus, data: data ?? String((err as any)?.message ?? "") };
   }
-  return data;
 }
 
 export function isZapiResponseActuallyConnected(meData: unknown): {
@@ -687,14 +696,23 @@ export async function refreshOneWhatsAppInstanceStatusLive(params: {
   }
   let result: { connected: boolean; explicitDisconnect: boolean } | null = null;
   let fetchOk = false;
+  let httpStatus: number | null = null;
+  let explicitDisconnectSignal = false;
   try {
-    const meData = await getZapiInstanceMeta({
+    const meta = await getZapiInstanceMeta({
       instance_id: instanceId,
       token,
       client_token: params.row.client_token ?? undefined,
     });
-    fetchOk = true;
-    result = isZapiResponseActuallyConnected(meData);
+    httpStatus = meta.httpStatus;
+    fetchOk = meta.ok;
+    if (meta.ok) {
+      result = isZapiResponseActuallyConnected(meta.data);
+      explicitDisconnectSignal = result.explicitDisconnect;
+    } else {
+      explicitDisconnectSignal = true;
+      result = { connected: false, explicitDisconnect: true };
+    }
   } catch (_err) {
     fetchOk = false;
     result = { connected: false, explicitDisconnect: false };
@@ -706,7 +724,7 @@ export async function refreshOneWhatsAppInstanceStatusLive(params: {
   if (fetchOk && result) {
     if (result.connected) {
       nextStatus = "connected";
-    } else if (result.explicitDisconnect) {
+    } else if (explicitDisconnectSignal || result.explicitDisconnect) {
       nextStatus = "disconnected";
     } else {
       if (sticky && prevStatus === "connected") {
@@ -716,12 +734,20 @@ export async function refreshOneWhatsAppInstanceStatusLive(params: {
       }
     }
   } else {
-    if (sticky && prevStatus === "connected") {
-      nextStatus = "connected";
+    if (explicitDisconnectSignal && (httpStatus === 0 || httpStatus >= 400)) {
+      nextStatus = "disconnected";
     } else if (result?.explicitDisconnect) {
       nextStatus = "disconnected";
-    } else if (prevStatus === "connected") {
+    } else if (sticky && prevStatus === "connected" && !explicitDisconnectSignal && (httpStatus ?? 0) < 400) {
       nextStatus = "connected";
+    } else if (!sticky) {
+      nextStatus = prevStatus ?? "disconnected";
+    } else if (prevStatus === "connected") {
+      if (httpStatus === 0 || httpStatus >= 500 || httpStatus === 404 || httpStatus === 401 || httpStatus === 403) {
+        nextStatus = "disconnected";
+      } else {
+        nextStatus = "connected";
+      }
     } else {
       nextStatus = prevStatus ?? "disconnected";
     }
