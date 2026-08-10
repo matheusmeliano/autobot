@@ -138,7 +138,12 @@ export default async function DashboardPage() {
       .select("id, nome, created_at")
       .order("created_at", { ascending: true })
       .limit(200),
-    supabase.from("whatsapp_instances").select("instance_id, token, client_token, status").maybeSingle(),
+    supabase
+      .from("whatsapp_instances")
+      .select("instance_id, token, client_token, status")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     supabase.from("profiles").select("nome, timezone").eq("user_id", userId).maybeSingle(),
     supabase
       .from("schedule_runs")

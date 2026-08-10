@@ -31,6 +31,8 @@ export async function upsertWhatsAppInstanceAction(input: unknown) {
     .from("whatsapp_instances")
     .select("token, client_token")
     .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   const missingClientToken =
     firstExisting.error &&
@@ -41,6 +43,8 @@ export async function upsertWhatsAppInstanceAction(input: unknown) {
         .from("whatsapp_instances")
         .select("token")
         .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle()
     : null;
   const existing = (secondExisting?.data ?? firstExisting.data) as any;
@@ -119,6 +123,8 @@ export async function setWhatsAppInstanceDisplayNameAdminAction(input: unknown) 
     .from("whatsapp_instances")
     .select(selectCols.join(", "))
     .eq("user_id", parsed.data.user_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   const missingDisplayName =
     first.error &&
@@ -134,6 +140,8 @@ export async function setWhatsAppInstanceDisplayNameAdminAction(input: unknown) 
       .update({ display_name: safeDisplayName })
       .eq("user_id", parsed.data.user_id)
       .select(selectCols.join(", "))
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     updatedData = data;
     errorObject = error;

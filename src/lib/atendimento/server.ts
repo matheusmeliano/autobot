@@ -775,6 +775,8 @@ async function getAtendimentoWhatsAppConfig() {
     .from("whatsapp_instances")
     .select("instance_id, token, client_token, status, phone")
     .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   const canSend =
     Boolean((wa as any)?.instance_id) &&

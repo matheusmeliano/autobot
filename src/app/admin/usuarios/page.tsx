@@ -97,7 +97,8 @@ export default async function AdminUsuariosPage() {
     const firstWa = await supabase
       .from("whatsapp_instances")
       .select([...whatsappBaseCols, "display_name", "phone"].join(", "))
-      .in("user_id", ids);
+      .in("user_id", ids)
+      .order("created_at", { ascending: false });
 
     const missingDisplayName =
       firstWa.error &&
@@ -117,7 +118,8 @@ export default async function AdminUsuariosPage() {
       const retry = await supabase
         .from("whatsapp_instances")
         .select(retryCols.join(", "))
-        .in("user_id", ids);
+        .in("user_id", ids)
+        .order("created_at", { ascending: false });
       waRows = retry.data ?? [];
     }
 

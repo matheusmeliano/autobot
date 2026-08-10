@@ -32,6 +32,8 @@ async function safeFetchWhatsappInstance(supabase: any): Promise<{
   const try1 = await supabase
     .from("whatsapp_instances")
     .select(allCols.join(", "))
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (!try1.error) {
     return { data: (try1.data as InstanceRow) ?? null, fatalErrorMsg: null };
@@ -52,6 +54,8 @@ async function safeFetchWhatsappInstance(supabase: any): Promise<{
     const try2 = await supabase
       .from("whatsapp_instances")
       .select(colsToTry.join(", "))
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (!try2.error) {
       const fullRow: InstanceRow = {
@@ -67,6 +71,8 @@ async function safeFetchWhatsappInstance(supabase: any): Promise<{
   const try3 = await supabase
     .from("whatsapp_instances")
     .select(BASE_COLS.join(", "))
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (!try3.error) {
     const fullRow: InstanceRow = {

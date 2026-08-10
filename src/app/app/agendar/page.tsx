@@ -23,7 +23,12 @@ export default async function AgendarPage() {
     listAllAgendarDebtors(supabase),
     listAllAgendarTemplates(supabase),
     supabase.from("profiles").select("timezone").maybeSingle(),
-    supabase.from("whatsapp_instances").select("instance_id, token, status").maybeSingle(),
+    supabase
+      .from("whatsapp_instances")
+      .select("instance_id, token, status")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (schedulesRes.error || scheduleRunsRes.error || debtorsRes.error || templatesRes.error) {

@@ -135,7 +135,8 @@ export async function GET() {
       const retry = await supabase
         .from("whatsapp_instances")
         .select(retryCols.join(", "))
-        .in("user_id", ids);
+        .in("user_id", ids)
+        .order("created_at", { ascending: false });
       waRows = retry.data ?? [];
     }
 
