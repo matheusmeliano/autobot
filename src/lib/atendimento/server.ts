@@ -246,13 +246,9 @@ function localTimePartsInTimeZone(value: Date | string | number, timeZone: strin
 }
 
 function buildAtendimentoDailySummaryMessage(leadsCount: number) {
-  return `📊 Resumo diário de interessados – AutoBot
+  return `Resumo diário de interessados – AutoBot
 
-Hoje entraram ${leadsCount} novos interessados na fila de atendimento.
-
-Acesse o painel para visualizar todos os leads e iniciar os atendimentos:
-
-${ATENDIMENTO_DAILY_SUMMARY_LINK}`;
+Hoje entraram ${leadsCount} novos interessados na fila de atendimento.`;
 }
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
