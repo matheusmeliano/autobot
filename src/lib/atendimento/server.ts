@@ -387,71 +387,35 @@ function isExperimentalClassBookingsNotificationSentColumnsUnavailable(error: un
   );
 }
 
-async function countAtendimentoDailyInterestedLeads(params: {
+async function countAtendimentoDailyExperimentalClassBookings(params: {
   rangeStartIso: string;
   rangeEndIso: string;
 }) {
   const admin = createSupabaseAdminClient();
-  const [
-    { data: createdLeads, error: leadsError },
-    { data: leadMessages, error: leadMessagesError },
-  ] =
-    await Promise.all([
-      admin
-        .from("atendimento_leads")
-        .select("id")
-        .gte("created_at", params.rangeStartIso)
-        .lt("created_at", params.rangeEndIso),
-      admin
-        .from("atendimento_messages")
-        .select("conversation_id")
-        .eq("sender_role", "lead")
-        .gte("created_at", params.rangeStartIso)
-        .lt("created_at", params.rangeEndIso),
-    ]);
+  const { data, error } = await admin
+    .from("atendimento_experimental_class_bookings")
+    .select("id, lead_id")
+    .gte("created_at", params.rangeStartIso)
+    .lt("created_at", params.rangeEndIso);
 
-  if (leadsError) {
-    throw new Error(leadsError.message || "Falha ao listar leads do resumo diario do atendimento.");
-  }
-
-  if (leadMessagesError) {
-    throw new Error(leadMessagesError.message || "Falha ao listar mensagens do lead no resumo diario do atendimento.");
-  }
-
-  const leadConversationIds = Array.from(
-    new Set(
-      (leadMessages ?? [])
-        .map((row: any) => String(row?.conversation_id ?? "").trim())
-        .filter(Boolean),
-    ),
-  );
-
-  let conversationLeadIds = new Set<string>();
-  if (leadConversationIds.length > 0) {
-    const { data: conversations, error: conversationsError } = await admin
-      .from("atendimento_conversations")
-      .select("id, lead_id")
-      .in("id", leadConversationIds);
-
-    if (conversationsError) {
-      throw new Error(conversationsError.message || "Falha ao listar conversas do resumo diario do atendimento.");
+  if (error) {
+    const code = String((error as any)?.code ?? "").trim();
+    const message = String((error as any)?.message ?? "");
+    if (
+      code === "42P01" ||
+      /relation .*atendimento_experimental_class_bookings.* does not exist/i.test(message)
+    ) {
+      return 0;
     }
-
-    conversationLeadIds = new Set(
-      (conversations ?? [])
-        .map((row: any) => String(row?.lead_id ?? "").trim())
-        .filter(Boolean),
-    );
+    throw new Error(error.message || "Falha ao contar agendamentos do dia para o resumo diario.");
   }
 
-  let leadsWithoutConversationCount = 0;
-  for (const row of createdLeads ?? []) {
-    const leadId = String((row as any)?.id ?? "").trim();
-    if (!leadId) continue;
-    if (!conversationLeadIds.has(leadId)) leadsWithoutConversationCount += 1;
+  const uniqueLeadIds = new Set<string>();
+  for (const row of (data ?? []) as any[]) {
+    const leadId = String(row?.lead_id ?? "").trim();
+    if (leadId) uniqueLeadIds.add(leadId);
   }
-
-  return leadConversationIds.length + leadsWithoutConversationCount;
+  return uniqueLeadIds.size;
 }
 
 /** @deprecated Notificacao offline de nova mensagem DESATIVADA por pedido do usuario (nao enviar mais). Funcao mantida apenas para compilacao, retorna string vazia. */
@@ -1059,7 +1023,7 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
 
   let leadsCount = 0;
   try {
-    leadsCount = await countAtendimentoDailyInterestedLeads({
+    leadsCount = await countAtendimentoDailyExperimentalClassBookings({
       rangeStartIso,
       rangeEndIso,
     });
