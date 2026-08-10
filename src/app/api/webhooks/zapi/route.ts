@@ -13,6 +13,7 @@ import {
   ACTIVE_CAPTURED_FIELD_ORDER,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   buildExperimentalClassDatePromptMessages,
+  buildStatePrompt,
   CAPTURED_FIELD_PROMPTS,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE,
@@ -1730,6 +1731,10 @@ export async function POST(req: Request) {
       if (followUpMessage === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
         outgoingMessages.push(
           ...buildExperimentalClassDatePromptMessages(String((nextLead as any)?.full_name ?? "").trim()),
+        );
+      } else if (followUpMessage === CAPTURED_FIELD_PROMPTS.state) {
+        outgoingMessages.push(
+          buildStatePrompt(String((nextLead as any)?.full_name ?? "").trim()),
         );
       } else {
         outgoingMessages.push(followUpMessage);
@@ -3735,8 +3740,10 @@ export async function POST(req: Request) {
               : !String((lead as any)?.city ?? "").trim()
                 ? "city"
                 : null;
-          const nextMsg = afterNameNextField
-            ? CAPTURED_FIELD_PROMPTS[afterNameNextField]
+          const nextMsg: string = afterNameNextField
+            ? afterNameNextField === "state"
+              ? buildStatePrompt(nameCandidate)
+              : CAPTURED_FIELD_PROMPTS.city
             : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
           await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
           try {

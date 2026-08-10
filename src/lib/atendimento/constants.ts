@@ -48,6 +48,12 @@ export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number
   city: "E a cidade?",
 };
 
+export function buildStatePrompt(name: string | null | undefined): string {
+  const safeName = String(name ?? "").trim();
+  const prefix = safeName ? `Beleza, ${safeName}! ` : "";
+  return `${prefix}Em qual estado você mora?`;
+}
+
 export const POST_BOOKING_CPF_STAGE_ENABLED = false;
 export const POST_BOOKING_CPF_PROMPT =
   "Para finalizarmos e enviarmos o convite da aula experimental, qual é o seu CPF?\n\nVocê pode informar com ou sem pontos e traço.\nExemplo: 123.456.789-09";
