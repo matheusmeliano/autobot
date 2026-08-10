@@ -132,9 +132,8 @@ test("buildExperimentalClassBookingChatMessages monta o novo fechamento com prim
   const messages = buildExperimentalClassBookingChatMessages("Ana");
 
   assert.deepEqual(messages, [
-    "Parabéns!",
-    "É uma satisfação receber você para a sua primeira aula em Lucas Brum Online Music USA.",
-    "Agora é só aguardar. No dia e horário escolhidos, enviaremos o link da sua aula experimental.",
+    "Show, Ana! Vai ser um prazer conhecer você na aula. 😊",
+    "Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.",
   ]);
 });
 
@@ -155,7 +154,7 @@ test("buildExperimentalClassAttendantWhatsAppMessage usa fallback quando nome va
 test("buildExperimentalClassStudentLessonReadyWhatsAppMessage monta a mensagem de inicio da aula para o aluno", () => {
   assert.equal(
     buildExperimentalClassStudentLessonReadyWhatsAppMessage("Pedro", "https://meet.google.com/abc-defg-hij"),
-    "Sua aula experimental já está disponível.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nO professor Lucas Brum já está te aguardando.\n\nLembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.",
+    "Pedro, sua aula experimental já está disponível.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nO professor Lucas Brum já está te aguardando.\n\nLembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.",
   );
 });
 

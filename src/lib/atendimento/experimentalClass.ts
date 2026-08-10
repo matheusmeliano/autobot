@@ -361,15 +361,15 @@ export function buildExperimentalClassTimesMessages(params: {
 }
 
 
-export function buildExperimentalClassStudentWhatsAppMessages(_name: string) {
+export function buildExperimentalClassStudentWhatsAppMessages(name: string) {
+  const safeName = String(name ?? "").trim() || "Aluno(a)";
   return [
-    `Estamos felizes em receber você para sua primeira aula.`,
-    `No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
-    EXPERIMENTAL_CLASS_FINAL_THIRD_MESSAGE,
+    `Show, ${safeName}! Vai ser um prazer conhecer você na aula. 😊`,
+    `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`,
   ];
 }
 
-/** @deprecated Use buildExperimentalClassStudentWhatsAppMessages (3 mensagens separadas) — a mensagem unica concatenada NAO deve mais ser enviada. Mantida apenas para compilacao temporaria, retorna string vazia. */
+/** @deprecated Use buildExperimentalClassStudentWhatsAppMessages (mensagens separadas) — a mensagem unica concatenada NAO deve mais ser enviada. Mantida apenas para compilacao temporaria, retorna string vazia. */
 export function buildExperimentalClassStudentWhatsAppMessage(_name: string) {
   return ``;
 }
@@ -421,23 +421,23 @@ export function buildExperimentalClassNoShowRepescagemWhatsAppMessages() {
 }
 
 export const EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE =
-  `Em breve poderemos seguir para a próxima etapa.`;
+  `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`;
 
 export const EXPERIMENTAL_CLASS_FINAL_THIRD_MESSAGE =
-  `Em breve poderemos seguir para a próxima etapa.`;
+  `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`;
 
 export const EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE =
   `Por favor, aguarde. Em breve poderemos seguir para a próxima etapa.`;
 
-export function buildExperimentalClassFinalChatMessages() {
+export function buildExperimentalClassFinalChatMessages(name: string) {
+  const safeName = String(name ?? "").trim() || "Aluno(a)";
   return [
-    `Estamos felizes em receber você para sua primeira aula.`,
-    `No dia e horário escolhidos, enviaremos o link da sua aula experimental.`,
-    EXPERIMENTAL_CLASS_FINAL_THIRD_MESSAGE,
+    `Show, ${safeName}! Vai ser um prazer conhecer você na aula. 😊`,
+    `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`,
   ];
 }
 
-/** @deprecated Use buildExperimentalClassFinalChatMessages (3 mensagens separadas). Mantida apenas para compilacao temporaria, retorna string vazia. */
+/** @deprecated Use buildExperimentalClassFinalChatMessages (mensagens separadas). Mantida apenas para compilacao temporaria, retorna string vazia. */
 export function buildExperimentalClassFinalChatMessage(_name: string) {
   return ``;
 }
@@ -445,7 +445,7 @@ export function buildExperimentalClassFinalChatMessage(_name: string) {
 export function buildExperimentalClassBookingChatMessages(name: string) {
   const safeName = String(name ?? "").trim() || "Aluno";
   return [
-    ...buildExperimentalClassFinalChatMessages(),
+    ...buildExperimentalClassFinalChatMessages(safeName),
   ];
 }
 
