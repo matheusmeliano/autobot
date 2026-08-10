@@ -3638,7 +3638,7 @@ export async function POST(req: Request) {
           (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent))
         ) {
           const firstMessage =
-            "Para agendarmos sua aula experimental gratuita, preciso de algumas informações rápidas. Vamos começar?";
+            "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
           const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;
 
           await insertWhatsAppBotTextMessage({
