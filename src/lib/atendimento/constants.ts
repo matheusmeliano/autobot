@@ -49,8 +49,9 @@ export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number
 };
 
 export function buildStatePrompt(name: string | null | undefined): string {
-  const safeName = String(name ?? "").trim();
-  const prefix = safeName ? `Beleza, ${safeName}! ` : "";
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "";
+  const prefix = safeFirst ? `Beleza, ${safeFirst}! ` : "";
   return `${prefix}Em qual estado você mora?`;
 }
 
@@ -66,8 +67,9 @@ export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
   "Agora é só escolher o melhor dia e horário para sua aula experimental.";
 export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual dia você prefere?";
 export function buildExperimentalClassDatePromptMessages(name?: string | null) {
-  const safeName = String(name ?? "").trim();
-  const suffix = safeName ? `, ${safeName}` : "";
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "";
+  const suffix = safeFirst ? `, ${safeFirst}` : "";
   return [
     `Agora é só escolher o melhor dia e horário para sua aula experimental${suffix}.`,
   ];

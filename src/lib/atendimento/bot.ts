@@ -80,7 +80,8 @@ export function filterCapturedDataForLead(params: {
 }
 
 export function initialBotMessages(params?: { userName?: string | null }) {
-  const displayName = firstTwoNamesFromFullName(params?.userName);
+  const fullClean = String(params?.userName ?? "").trim();
+  const displayName = fullClean ? fullClean.split(/\s+/)[0] ?? "" : "";
   const welcomeMessage = displayName
     ? `Olá, ${displayName}! Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.`
     : "Olá. Seja muito bem-vindo(a) ao Lucas Brum Online Music USA.";

@@ -362,9 +362,10 @@ export function buildExperimentalClassTimesMessages(params: {
 
 
 export function buildExperimentalClassStudentWhatsAppMessages(name: string) {
-  const safeName = String(name ?? "").trim() || "Aluno(a)";
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
   return [
-    `Show, ${safeName}! Vai ser um prazer conhecer você na aula. 😊`,
+    `Show, ${safeFirst}! Vai ser um prazer conhecer você na aula. 😊`,
     `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`,
   ];
 }
@@ -375,8 +376,9 @@ export function buildExperimentalClassStudentWhatsAppMessage(_name: string) {
 }
 
 export function buildExperimentalClassAttendantWhatsAppMessage(name: string) {
-  const safeName = String(name ?? "").trim() || "o interessado";
-  return `Você recebeu um novo agendamento de aula experimental para ${safeName}.
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "o interessado";
+  return `Você recebeu um novo agendamento de aula experimental para ${safeFirst}.
 
 Acesse o link abaixo e adicione o link da aula ao interessado.
 
@@ -385,8 +387,9 @@ ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 
 export function buildExperimentalClassStudentLessonReadyWhatsAppMessage(name: string, lessonLink: string) {
   const safeLessonLink = String(lessonLink ?? "").trim();
-  const safeName = String(name ?? "").trim() || "Aluno(a)";
-  return `${safeName}, sua aula experimental já está disponível.
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
+  return `${safeFirst}, sua aula experimental já está disponível.
 
 Link da aula: ${safeLessonLink}
 
@@ -397,8 +400,9 @@ Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula se
 
 export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name: string, lessonLink: string) {
   const safeLessonLink = String(lessonLink ?? "").trim();
-  const safeName = String(name ?? "").trim() || "o interessado";
-  return `A aula experimental de ${safeName} está perto de começar!
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "o interessado";
+  return `A aula experimental de ${safeFirst} está perto de começar!
 
 Link da aula: ${safeLessonLink}`;
 }
@@ -430,9 +434,10 @@ export const EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE =
   `Por favor, aguarde. Em breve poderemos seguir para a próxima etapa.`;
 
 export function buildExperimentalClassFinalChatMessages(name: string) {
-  const safeName = String(name ?? "").trim() || "Aluno(a)";
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
   return [
-    `Show, ${safeName}! Vai ser um prazer conhecer você na aula. 😊`,
+    `Show, ${safeFirst}! Vai ser um prazer conhecer você na aula. 😊`,
     `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`,
   ];
 }
@@ -443,9 +448,10 @@ export function buildExperimentalClassFinalChatMessage(_name: string) {
 }
 
 export function buildExperimentalClassBookingChatMessages(name: string) {
-  const safeName = String(name ?? "").trim() || "Aluno";
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
   return [
-    ...buildExperimentalClassFinalChatMessages(safeName),
+    ...buildExperimentalClassFinalChatMessages(safeFirst),
   ];
 }
 
