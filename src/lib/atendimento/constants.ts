@@ -65,9 +65,11 @@ export const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com suce
 export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
   "Agora é só escolher o melhor dia e horário para sua aula experimental.";
 export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual dia você prefere?";
-export function buildExperimentalClassDatePromptMessages(_name?: string | null) {
+export function buildExperimentalClassDatePromptMessages(name?: string | null) {
+  const safeName = String(name ?? "").trim();
+  const suffix = safeName ? `, ${safeName}` : "";
   return [
-    EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE,
+    `Agora é só escolher o melhor dia e horário para sua aula experimental${suffix}.`,
   ];
 }
 export const LOCATION_STATE_INVALID_MESSAGE =
