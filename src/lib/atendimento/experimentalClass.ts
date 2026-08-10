@@ -407,18 +407,28 @@ export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name
 Link da aula: ${safeLessonLink}`;
 }
 
-export function buildExperimentalClassPostAttendanceWhatsAppMessages(_name?: string | null) {
+export function buildExperimentalClassPostAttendanceWhatsAppMessages(name?: string | null) {
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "";
+  const line1 = safeFirst
+    ? `${safeFirst}, ficamos felizes pela sua participação na aula experimental!`
+    : "Ficamos felizes pela sua participação na aula experimental!";
   return [
-    "Ficamos felizes pela sua participação na aula experimental!",
+    line1,
     "Agora é hora do próximo passo.",
     "Vamos confirmar sua matrícula e iniciar suas aulas?",
     "Responda com sim ou não.",
   ];
 }
 
-export function buildExperimentalClassNoShowRepescagemWhatsAppMessages() {
+export function buildExperimentalClassNoShowRepescagemWhatsAppMessages(name?: string | null) {
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "";
+  const line1 = safeFirst
+    ? `${safeFirst}, notamos que você não compareceu à aula experimental.`
+    : "Notamos que você não compareceu à aula experimental.";
   return [
-    `Notamos que você não compareceu à aula experimental.`,
+    line1,
     `Mas não se preocupe, novas oportunidades estarão disponíveis.`,
     `Em breve nossa equipe entrará em contato.`,
   ];

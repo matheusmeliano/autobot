@@ -485,7 +485,7 @@ export async function POST(
       );
     }
 
-    const messages = buildExperimentalClassNoShowRepescagemWhatsAppMessages();
+    const messages = buildExperimentalClassNoShowRepescagemWhatsAppMessages(leadName);
     const sentMessages: string[] = [];
     let lastError: unknown = null;
 

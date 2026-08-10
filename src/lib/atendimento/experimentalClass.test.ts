@@ -5,6 +5,7 @@ import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
+  buildExperimentalClassNoShowRepescagemWhatsAppMessages,
   buildExperimentalClassPostAttendanceWhatsAppMessages,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildExperimentalClassTimesMessages,
@@ -165,19 +166,27 @@ test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso 
   );
 });
 
-test("buildExperimentalClassPostAttendanceWhatsAppMessages envia 3 mensagens SEPARADAS apos comparecimento, sem emoji", () => {
-  const messages = buildExperimentalClassPostAttendanceWhatsAppMessages("Pedro");
+test("buildExperimentalClassPostAttendanceWhatsAppMessages envia 4 mensagens SEPARADAS apos comparecimento, com primeiro nome", () => {
+  const messages = buildExperimentalClassPostAttendanceWhatsAppMessages("Pedro Henrique");
   assert.equal(Array.isArray(messages), true);
-  assert.equal(messages.length, 3);
+  assert.equal(messages.length, 4);
   assert.equal(
     messages[0],
-    "Ficamos felizes por você ter participado da aula experimental com o professor Lucas Brum.",
+    "Pedro, ficamos felizes pela sua participação na aula experimental!",
   );
-  assert.equal(messages[1], "Agora é hora de dar o próximo passo!");
-  assert.equal(
-    messages[2],
-    "Vamos confirmar sua matrícula e realizar o pagamento da primeira mensalidade para iniciar suas aulas?",
-  );
+  assert.equal(messages[1], "Agora é hora do próximo passo.");
+  assert.equal(messages[2], "Vamos confirmar sua matrícula e iniciar suas aulas?");
+  assert.equal(messages[3], "Responda com sim ou não.");
+});
+
+test("buildExperimentalClassNoShowRepescagemWhatsAppMessages prefixa o primeiro nome na 1a mensagem", () => {
+  const withName = buildExperimentalClassNoShowRepescagemWhatsAppMessages("Maria Silva");
+  assert.equal(withName[0], "Maria, notamos que você não compareceu à aula experimental.");
+  assert.equal(withName[1], "Mas não se preocupe, novas oportunidades estarão disponíveis.");
+  assert.equal(withName[2], "Em breve nossa equipe entrará em contato.");
+
+  const withoutName = buildExperimentalClassNoShowRepescagemWhatsAppMessages(null);
+  assert.equal(withoutName[0], "Notamos que você não compareceu à aula experimental.");
 });
 
 test("deriveExperimentalClassBookingDisplayStatus resolve os status padronizados do agendamento", () => {
