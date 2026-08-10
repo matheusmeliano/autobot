@@ -138,10 +138,17 @@ test("buildExperimentalClassBookingChatMessages monta o novo fechamento com prim
   ]);
 });
 
-test("buildExperimentalClassAttendantWhatsAppMessage monta a notificacao do atendente", () => {
+test("buildExperimentalClassAttendantWhatsAppMessage monta a notificacao do atendente com nome", () => {
   assert.equal(
-    buildExperimentalClassAttendantWhatsAppMessage(),
-    "Você recebeu um novo agendamento de aula experimental.\n\nAcesse o link abaixo e adicione o link da aula ao interessado.\n\nhttps://www.autobot.business/app/atendimento",
+    buildExperimentalClassAttendantWhatsAppMessage("Maria Souza"),
+    "Você recebeu um novo agendamento de aula experimental para Maria Souza.\n\nAcesse o link abaixo e adicione o link da aula ao interessado.\n\nhttps://www.autobot.business/app/atendimento",
+  );
+});
+
+test("buildExperimentalClassAttendantWhatsAppMessage usa fallback quando nome vazio", () => {
+  assert.equal(
+    buildExperimentalClassAttendantWhatsAppMessage(""),
+    "Você recebeu um novo agendamento de aula experimental para o interessado.\n\nAcesse o link abaixo e adicione o link da aula ao interessado.\n\nhttps://www.autobot.business/app/atendimento",
   );
 });
 

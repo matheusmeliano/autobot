@@ -1918,7 +1918,7 @@ export async function POST(req: Request) {
       try {
         await sendAtendimentoWhatsAppText({
           phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
-          message: buildExperimentalClassAttendantWhatsAppMessage(),
+          message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
         });
 
         await appendHistoryEvent({

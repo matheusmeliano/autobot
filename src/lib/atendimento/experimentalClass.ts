@@ -374,8 +374,9 @@ export function buildExperimentalClassStudentWhatsAppMessage(_name: string) {
   return ``;
 }
 
-export function buildExperimentalClassAttendantWhatsAppMessage() {
-  return `Você recebeu um novo agendamento de aula experimental.
+export function buildExperimentalClassAttendantWhatsAppMessage(name: string) {
+  const safeName = String(name ?? "").trim() || "o interessado";
+  return `Você recebeu um novo agendamento de aula experimental para ${safeName}.
 
 Acesse o link abaixo e adicione o link da aula ao interessado.
 
