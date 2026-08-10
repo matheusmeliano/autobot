@@ -69,9 +69,13 @@ export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual di
 export function buildExperimentalClassDatePromptMessages(name?: string | null) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "";
-  const suffix = safeFirst ? `, ${safeFirst}` : "";
+  if (safeFirst) {
+    return [
+      `${safeFirst}, agora é só escolher o melhor dia e horário para sua aula experimental.`,
+    ];
+  }
   return [
-    `Agora é só escolher o melhor dia e horário para sua aula experimental${suffix}.`,
+    `Agora é só escolher o melhor dia e horário para sua aula experimental.`,
   ];
 }
 export const LOCATION_STATE_INVALID_MESSAGE =
