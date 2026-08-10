@@ -159,10 +159,10 @@ test("buildExperimentalClassStudentLessonReadyWhatsAppMessage monta a mensagem d
   );
 });
 
-test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso do atendente antes da aula", () => {
+test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso do atendente antes da aula com nome", () => {
   assert.equal(
     buildExperimentalClassAttendantStartReminderWhatsAppMessage("Pedro Silva", "https://meet.google.com/abc-defg-hij"),
-    "A aula experimental do interessado está perto de começar!\n\nLink da aula: https://meet.google.com/abc-defg-hij",
+    "A aula experimental de Pedro Silva está perto de começar!\n\nLink da aula: https://meet.google.com/abc-defg-hij",
   );
 });
 

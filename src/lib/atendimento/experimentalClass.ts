@@ -396,7 +396,8 @@ Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula se
 
 export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name: string, lessonLink: string) {
   const safeLessonLink = String(lessonLink ?? "").trim();
-  return `A aula experimental do interessado está perto de começar!
+  const safeName = String(name ?? "").trim() || "o interessado";
+  return `A aula experimental de ${safeName} está perto de começar!
 
 Link da aula: ${safeLessonLink}`;
 }
