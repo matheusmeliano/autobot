@@ -496,7 +496,9 @@ function BookingDetails({
             </button>
           </div>
           <div className="text-sm text-[var(--app-text-55)]">
-            Agendamento: {formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}
+            {hasRecurringClass
+              ? "Aluno(a) confirmado"
+              : `Agendamento: ${formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}`}
           </div>
         </div>
 
@@ -1294,50 +1296,29 @@ export function AtendimentoSummaryCards({
 
   function buildItemMeta(lead: AtendimentoLeadListItem) {
     if (activeSection === "agendamentos") {
-      const booking = lead.experimental_class_booking;
-      const hasBook = Boolean(booking && String(booking.id ?? "").trim() && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft" && String(booking?.status ?? "").trim().toLowerCase() !== "cancelled");
-
       const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-      const recurringWeekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
-        recurringWeekdayRaw,
-      )
-        ? (recurringWeekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")
-        : null;
-      const recurringTime = /^\d{2}:\d{2}$/.test(String(lead.recurring_class_professor_time ?? "").trim())
-        ? String(lead.recurring_class_professor_time ?? "").trim()
-        : String(lead.recurring_class_lead_time ?? "").trim();
-      const nextRecurring =
-        recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
-          ? calculateNextRecurringOccurrence({
-              weekday: recurringWeekday,
-              professorTimeHHMM: recurringTime,
-              professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              leadTimeZone: lead.timezone || null,
-            })
-          : null;
-
-      const experimentalMeta = (() => {
-        if (!hasBook) return null;
+      const hasRecurring =
+        ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw) ||
+        Boolean(String(lead.recurring_class_status ?? "").trim()) ||
+        Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim()) ||
+        Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+        Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+      if (hasRecurring) {
+        return "Aluno(a) confirmado";
+      }
+      const booking = lead.experimental_class_booking;
+      const hasBook = Boolean(
+        booking &&
+          String(booking.id ?? "").trim() &&
+          String(booking?.source ?? "draft").trim().toLowerCase() !== "draft" &&
+          String(booking?.status ?? "").trim().toLowerCase() !== "cancelled",
+      );
+      if (hasBook) {
         const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
         const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
-        return [dateLabel, timeLabel].filter((value) => value && value !== "-").join(", ") || null;
-      })();
-      const recurringMeta = (() => {
-        if (!nextRecurring) return null;
-        const dateLabel = formatAtendimentoDate(nextRecurring.professorDate);
-        const timeLabel = nextRecurring.professorTime;
-        return [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ") || null;
-      })();
-
-      if (recurringMeta && experimentalMeta) {
-        return `Histórico: ${experimentalMeta}  ·  Próxima: ${recurringMeta}`;
+        return [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ") || "Agendamento incompleto";
       }
-      if (experimentalMeta) return experimentalMeta;
-      if (recurringMeta) return `Próxima aula recorrente: ${recurringMeta}`;
-
-      return nextRecurring
-        ? "Agendamento recorrente sem data calculada"
-        : "Agendamento incompleto";
+      return "Agendamento incompleto";
     }
 
     return formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
