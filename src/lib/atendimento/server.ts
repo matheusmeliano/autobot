@@ -2313,11 +2313,24 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    let allInstancePhones: string[] = [];
+    try {
+      const { data: allInstRows } = await admin
+        .from("whatsapp_instances")
+        .select("phone")
+        .not("phone", "is", null);
+      allInstancePhones = (allInstRows ?? [])
+        .map((r: any) => String(r?.phone ?? "").replace(/\D/g, ""))
+        .filter((d: string) => d.length >= 10);
+    } catch (_e) {}
     const candidateOurPhones: string[] = [];
     const p1 = String((instRow as any)?.phone ?? "").replace(/\D/g, "");
     if (p1.length >= 10) candidateOurPhones.push(p1);
     const p2 = String((instRowGlobal as any)?.phone ?? "").replace(/\D/g, "");
     if (p2.length >= 10) candidateOurPhones.push(p2);
+    for (const extra of allInstancePhones) {
+      if (!candidateOurPhones.includes(extra)) candidateOurPhones.push(extra);
+    }
     for (const ourPhoneDigits of candidateOurPhones) {
       if (ourPhoneDigits.length >= 10 && normalizedPhone.length >= 10) {
         const ourKey = ourPhoneDigits.slice(-10);
