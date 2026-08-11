@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Check, Copy, Pencil, Search, Trash2, X, Zap } from "lucide-react";
+import { Check, Copy, ExternalLink, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -451,6 +451,8 @@ function BookingDetails({
         .replace(/\b\w/g, (c) => c.toUpperCase())
     : "Agendado";
   const canCancel = derivedStatus === "scheduled" && Boolean(bookingId) && !hasRecurringClass;
+  const canEditLessonLink =
+    Boolean(bookingId) && bookingStatus !== "cancelled" && !bookingIsNoShow;
   const canSendStudentNotification =
     (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
     Boolean(bookingId) &&
@@ -559,6 +561,63 @@ function BookingDetails({
                 label="Horário"
                 value={atendimentoTimeLabel(booking?.lead_time ?? booking?.professor_time ?? null)}
               />
+            </div>
+          </div>
+        ) : null}
+
+        {canEditLessonLink ? (
+          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                Link da aula
+              </div>
+              {effectiveSavedLessonLink ? (
+                <a
+                  href={effectiveSavedLessonLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
+                  title="Abrir link da aula"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  Abrir aula
+                </a>
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+              <div className="min-w-0 flex-1">
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  URL
+                </label>
+                <input
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://meet.google.com/..."
+                  value={effectiveLessonLinkDraft}
+                  onChange={(e) => setLessonLinkDraft(e.target.value)}
+                  className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isSavingLessonLink}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void onSaveLessonLink(lead, effectiveLessonLinkDraft)}
+                disabled={isSavingLessonLink || !lessonLinkChanged}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSavingLessonLink ? (
+                  <>
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 shrink-0" />
+                    {effectiveSavedLessonLink ? "Atualizar" : "Salvar"}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         ) : null}
