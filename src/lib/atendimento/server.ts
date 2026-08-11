@@ -12,8 +12,14 @@ import { initialBotMessages } from "@/lib/atendimento/bot";
 import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
+  buildRecurringClassAttendantStartReminderWhatsAppMessage,
+  buildRecurringClassStudentLessonReadyWhatsAppMessage,
+  calculateNextRecurringOccurrence,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
+  RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
+  RECURRING_WEEKDAY_LABELS_PT_BR,
+  type RecurringWeekdayKey,
 } from "@/lib/atendimento/experimentalClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
@@ -1523,6 +1529,279 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     attendantSent,
     missingLessonLink,
     missingStudentPhone,
+  };
+}
+
+export async function sendRecurringClassStartNotifications(now = new Date()) {
+  const admin = createSupabaseAdminClient();
+  const nowIso = now.toISOString();
+  const nowMs = now.getTime();
+  const PROF_TZ = (
+    process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
+    process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
+    "America/Sao_Paulo"
+  ).trim();
+
+  const allRecurringColumns = [
+    "id",
+    "user_id",
+    "full_name",
+    "phone",
+    "status",
+    "funnel_stage",
+    "timezone",
+    "recurring_class_weekday",
+    "recurring_class_professor_time",
+    "recurring_class_lead_time",
+    "recurring_class_professor_timezone",
+    "recurring_class_lead_timezone",
+    "recurring_class_link",
+    "recurring_class_professor_date",
+    "recurring_class_professor_start_at",
+    "recurring_class_lead_date",
+    "recurring_class_lead_start_at",
+    "recurring_class_student_start_notification_sent_at",
+    "recurring_class_attendant_start_notification_sent_at",
+  ];
+
+  let rows: any[] = [];
+  try {
+    const { data, error } = await admin
+      .from("atendimento_leads")
+      .select(allRecurringColumns.join(", "))
+      .in("status", ["aluno", "matriculado", "cadastro_recorrente_pendente_plataforma"])
+      .not("recurring_class_weekday", "is", null);
+    if (!error && Array.isArray(data)) rows = data as any[];
+  } catch (_e) {
+    rows = [];
+  }
+
+  let studentSent = 0;
+  let attendantSent = 0;
+  let missingLessonLink = 0;
+  let missingStudentPhone = 0;
+  let missingRecurringMeta = 0;
+
+  const validWeekdayKeys = new Set<string>(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+
+  const recurringLeadIds = (rows as any[]).map((r: any) => String(r?.id ?? "")).filter(Boolean);
+  const sentOccurrencesByLeadId = new Map<string, Set<string>>();
+  if (recurringLeadIds.length > 0) {
+    try {
+      const { data: hist } = await admin
+        .from("atendimento_history_events")
+        .select("lead_id, event_type, details")
+        .in("lead_id", recurringLeadIds)
+        .in("event_type", [
+          "recurring_class_attendant_start_notification_sent",
+          "recurring_class_student_start_notification_sent",
+        ])
+        .order("created_at", { ascending: false })
+        .limit(2000);
+      if (Array.isArray(hist)) {
+        for (const ev of hist as any[]) {
+          const lid = String(ev?.lead_id ?? "").trim();
+          const startIso = String((ev?.details ?? {})?.start_at ?? "").trim();
+          const etype = String(ev?.event_type ?? "").trim();
+          if (!lid || !startIso) continue;
+          const key = `${etype}|${startIso}`;
+          const set = sentOccurrencesByLeadId.get(lid) ?? new Set<string>();
+          set.add(key);
+          sentOccurrencesByLeadId.set(lid, set);
+        }
+      }
+    } catch (_e) {}
+  }
+
+  for (const row of rows as any[]) {
+    const leadId = String(row?.id ?? "").trim();
+    const userId = String(row?.user_id ?? "").trim();
+    if (!leadId) continue;
+
+    const weekdayRaw = String(row?.recurring_class_weekday ?? "").trim().toLowerCase();
+    const professorTimeHHMM = /^\d{2}:\d{2}$/.test(String(row?.recurring_class_professor_time ?? ""))
+      ? String(row?.recurring_class_professor_time ?? "").trim()
+      : /^\d{2}:\d{2}$/.test(String(row?.recurring_class_lead_time ?? ""))
+        ? String(row?.recurring_class_lead_time ?? "").trim()
+        : "";
+    const professorTz = String(row?.recurring_class_professor_timezone ?? "").trim() || PROF_TZ;
+    const leadTz = String(row?.recurring_class_lead_timezone ?? "").trim() || professorTz;
+
+    if (!validWeekdayKeys.has(weekdayRaw) || !professorTimeHHMM) {
+      missingRecurringMeta += 1;
+      continue;
+    }
+
+    const occurrence = calculateNextRecurringOccurrence({
+      weekday: weekdayRaw as RecurringWeekdayKey,
+      professorTimeHHMM,
+      professorTimeZone: professorTz,
+      leadTimeZone: leadTz,
+      fromDate: now,
+    });
+
+    if (!occurrence) {
+      missingRecurringMeta += 1;
+      continue;
+    }
+
+    const leadPhone = String(row?.phone ?? "").trim();
+    const leadFirstName = getLeadFirstName(row?.full_name);
+    const leadFullName = getLeadFullName(row?.full_name);
+    const lessonLink = String(row?.recurring_class_link ?? "").trim() || "";
+
+    if (!lessonLink) {
+      missingLessonLink += 1;
+      continue;
+    }
+
+    const professorStartAtMs = new Date(occurrence.professorStartAt).getTime();
+    const leadStartAtMs = new Date(
+      occurrence.leadStartAt || occurrence.professorStartAt,
+    ).getTime();
+
+    if (!Number.isFinite(professorStartAtMs) || !Number.isFinite(leadStartAtMs)) continue;
+
+    const existingSentSet = sentOccurrencesByLeadId.get(leadId) ?? new Set<string>();
+    const thisProfessorOccurrenceKey = occurrence.professorStartAt;
+    const studentOccurrenceAlreadySent = existingSentSet.has(
+      `recurring_class_student_start_notification_sent|${thisProfessorOccurrenceKey}`,
+    );
+    const attendantOccurrenceAlreadySent = existingSentSet.has(
+      `recurring_class_attendant_start_notification_sent|${thisProfessorOccurrenceKey}`,
+    );
+
+    const cachedStudentSent =
+      studentOccurrenceAlreadySent ||
+      Boolean(String(row?.recurring_class_student_start_notification_sent_at ?? "").trim());
+    const cachedAttendantSent =
+      attendantOccurrenceAlreadySent ||
+      Boolean(String(row?.recurring_class_attendant_start_notification_sent_at ?? "").trim());
+
+    const studentDue = leadStartAtMs <= nowMs;
+    const attendantDue =
+      professorStartAtMs - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
+
+    const weekdayLabel =
+      (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)[weekdayRaw] ??
+      weekdayRaw.toUpperCase();
+
+    if (attendantDue && !cachedAttendantSent) {
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          message: buildRecurringClassAttendantStartReminderWhatsAppMessage(
+            leadFullName,
+            weekdayLabel,
+            lessonLink,
+          ),
+        });
+        try {
+          await admin
+            .from("atendimento_leads")
+            .update({
+              recurring_class_attendant_start_notification_sent_at: nowIso,
+              updated_at: nowIso,
+            } as any)
+            .eq("id", leadId);
+        } catch (_colErr) {}
+        void userId;
+        await appendHistoryEvent({
+          leadId,
+          conversationId: null,
+          eventType: "recurring_class_attendant_start_notification_sent",
+          title: "Lembrete de inicio da aula recorrente enviado ao atendente",
+          details: {
+            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: occurrence.professorStartAt,
+            weekday: weekdayRaw,
+            professor_time: professorTimeHHMM,
+            source: "cron_recurring_class",
+          },
+          actorType: "system",
+        });
+        attendantSent += 1;
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId: null,
+          eventType: "recurring_class_attendant_start_notification_failed",
+          title: "Falha ao enviar lembrete de inicio da aula recorrente ao atendente",
+          details: {
+            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: occurrence.professorStartAt,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+    }
+
+    if (studentDue && !cachedStudentSent) {
+      if (!leadPhone) {
+        missingStudentPhone += 1;
+        continue;
+      }
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: leadPhone,
+          message: buildRecurringClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+        });
+        try {
+          await admin
+            .from("atendimento_leads")
+            .update({
+              recurring_class_student_start_notification_sent_at: nowIso,
+              updated_at: nowIso,
+            } as any)
+            .eq("id", leadId);
+        } catch (_colErr) {}
+        await appendHistoryEvent({
+          leadId,
+          conversationId: null,
+          eventType: "recurring_class_student_start_notification_sent",
+          title: "Link da aula recorrente enviado ao aluno no inicio da aula",
+          details: {
+            phone: leadPhone,
+            lesson_link: lessonLink,
+            start_at: occurrence.leadStartAt || occurrence.professorStartAt,
+            weekday: weekdayRaw,
+            professor_time: professorTimeHHMM,
+            source: "cron_recurring_class",
+          },
+          actorType: "system",
+        });
+        studentSent += 1;
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId: null,
+          eventType: "recurring_class_student_start_notification_failed",
+          title: "Falha ao enviar link da aula recorrente ao aluno",
+          details: {
+            phone: leadPhone,
+            lesson_link: lessonLink,
+            start_at: occurrence.leadStartAt || occurrence.professorStartAt,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+    }
+  }
+
+  return {
+    ok: true as const,
+    ranAt: nowIso,
+    skipped: false as const,
+    checkedLeads: rows.length,
+    studentSent,
+    attendantSent,
+    missingLessonLink,
+    missingStudentPhone,
+    missingRecurringMeta,
   };
 }
 

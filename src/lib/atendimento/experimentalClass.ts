@@ -16,6 +16,7 @@ export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
 export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
+export const RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 
 export type ExperimentalClassDateOption = {
   id: string;
@@ -405,6 +406,42 @@ export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name
   return `A aula experimental de ${safeFirst} está perto de começar!
 
 Link da aula: ${safeLessonLink}`;
+}
+
+export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: string | null | undefined, lessonLink: string | null | undefined) {
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
+  return `${safeFirst}, sua aula já está disponível.
+
+Link da aula: ${safeLessonLink}
+
+O professor Lucas Brum já está te aguardando.`;
+}
+
+export function buildRecurringClassAttendantStartReminderWhatsAppMessage(name: string | null | undefined, weekdayLabel: string | null | undefined, lessonLink: string | null | undefined) {
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "o aluno";
+  const safeWeekday = String(weekdayLabel ?? "semanais").trim() || "semanais";
+  return `A aula recorrente de ${safeFirst} (${safeWeekday}) está perto de começar!
+
+Link da aula: ${safeLessonLink}`;
+}
+
+export function buildRecurringClassPostEnrollmentAttendantNotification(name: string | null | undefined, weekdayLabel: string | null | undefined, timeLabel: string | null | undefined) {
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Novo aluno";
+  const safeWeekday = String(weekdayLabel ?? "").trim() || "horário fixo";
+  const safeTime = String(timeLabel ?? "").trim() || "a confirmar";
+  return `Novo aluno matriculado! 🎉
+
+Aluno: ${safeFirst}
+Dia: ${safeWeekday}
+Horário: ${safeTime}
+
+Acesse o painel para adicionar o link da aula recorrente:
+${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 
 export function buildExperimentalClassPostAttendanceWhatsAppMessages(name?: string | null) {
