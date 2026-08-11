@@ -1079,6 +1079,7 @@ export function calculateNextRecurringOccurrence(params: {
       professorStartAt: startUtcIso,
       leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
       leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
+      leadStartAt: startUtcIso,
       leadTimeZone: leadTz,
       weekdayLabel:
         (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)?.[wantWeekday] ??
