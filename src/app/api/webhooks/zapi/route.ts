@@ -2581,7 +2581,9 @@ export async function POST(req: Request) {
                 } catch (_e2) {}
               }
             } catch (_e) {}
-            let calendarMsgs: string[] = [];
+            const FIXO_FALLBACK_DIAS_DISPONIVEIS_4: string = "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.";
+            const FIXO_FALLBACK_RESPONDA_DIA_5: string = "Responda apenas com o dia desejado.";
+            let msgDias: [string, string] = [FIXO_FALLBACK_DIAS_DISPONIVEIS_4, FIXO_FALLBACK_RESPONDA_DIA_5];
             try {
               const { data: bdata } = await admin
                 .from("atendimento_experimental_class_bookings")
@@ -2593,20 +2595,34 @@ export async function POST(req: Request) {
                 leadTimeZone: leadTz,
                 bookedProfessorStartAts: bookedArr,
               });
-              calendarMsgs = buildExperimentalClassDatesMessages(av.dates);
-            } catch (_e) { calendarMsgs = []; }
-            if (!calendarMsgs.length) {
-              calendarMsgs = [
-                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-                "Responda apenas com o dia desejado.",
-              ];
+              const realMsgs = buildExperimentalClassDatesMessages(av.dates);
+              if (Array.isArray(realMsgs) && realMsgs.length >= 2) {
+                const m4 = String(realMsgs[0] ?? "").trim();
+                const m5 = String(realMsgs[1] ?? "").trim();
+                if (m4 && m5) {
+                  msgDias = [m4, m5];
+                }
+              }
+            } catch (_e) {
+              msgDias = [FIXO_FALLBACK_DIAS_DISPONIVEIS_4, FIXO_FALLBACK_RESPONDA_DIA_5];
             }
             const allFinalMessages: string[] = [
               ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
               ...buildRecurringSchedulePromptMessages(),
-              ...calendarMsgs,
+              msgDias[0],
+              msgDias[1],
             ];
+            if (allFinalMessages.length < 5) {
+              const faltam = 5 - allFinalMessages.length;
+              if (faltam >= 2) {
+                allFinalMessages.push(FIXO_FALLBACK_DIAS_DISPONIVEIS_4);
+                allFinalMessages.push(FIXO_FALLBACK_RESPONDA_DIA_5);
+              } else if (faltam === 1) {
+                allFinalMessages.push(FIXO_FALLBACK_RESPONDA_DIA_5);
+              }
+            }
             for (const message of allFinalMessages) {
+              if (!String(message ?? "").trim()) continue;
               try {
                 await insertWhatsAppBotTextMessage({
                   admin,
@@ -3266,6 +3282,9 @@ export async function POST(req: Request) {
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
             const leadTzGeneral = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+            const FIXO_FB_DIAS_4: string = "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.";
+            const FIXO_FB_RESP_5: string = "Responda apenas com o dia desejado.";
+            let fbMsgDias: [string, string] = [FIXO_FB_DIAS_4, FIXO_FB_RESP_5];
             try {
               try {
                 await admin
@@ -3273,7 +3292,6 @@ export async function POST(req: Request) {
                   .update({ recurring_class_status: "dia_pendente" } as any)
                   .eq("id", leadId);
               } catch (_e) {}
-              let generalCalendarMsgs: string[] = [];
               try {
                 const { data: bd } = await admin
                   .from("atendimento_experimental_class_bookings")
@@ -3285,20 +3303,34 @@ export async function POST(req: Request) {
                   leadTimeZone: leadTzGeneral,
                   bookedProfessorStartAts: bArr,
                 });
-                generalCalendarMsgs = buildExperimentalClassDatesMessages(ag.dates);
-              } catch (_e) { generalCalendarMsgs = []; }
-              if (!generalCalendarMsgs.length) {
-                generalCalendarMsgs = [
-                  "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-                  "Responda apenas com o dia desejado.",
-                ];
+                const realFb = buildExperimentalClassDatesMessages(ag.dates);
+                if (Array.isArray(realFb) && realFb.length >= 2) {
+                  const m4f = String(realFb[0] ?? "").trim();
+                  const m5f = String(realFb[1] ?? "").trim();
+                  if (m4f && m5f) {
+                    fbMsgDias = [m4f, m5f];
+                  }
+                }
+              } catch (_e) {
+                fbMsgDias = [FIXO_FB_DIAS_4, FIXO_FB_RESP_5];
               }
               const allMessages: string[] = [
                 ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
                 ...buildRecurringSchedulePromptMessages(),
-                ...generalCalendarMsgs,
+                fbMsgDias[0],
+                fbMsgDias[1],
               ];
+              if (allMessages.length < 5) {
+                const faltamFb = 5 - allMessages.length;
+                if (faltamFb >= 2) {
+                  allMessages.push(FIXO_FB_DIAS_4);
+                  allMessages.push(FIXO_FB_RESP_5);
+                } else if (faltamFb === 1) {
+                  allMessages.push(FIXO_FB_RESP_5);
+                }
+              }
               for (const message of allMessages) {
+                if (!String(message ?? "").trim()) continue;
                 try {
                   await insertWhatsAppBotTextMessage({
                     admin,
