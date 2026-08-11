@@ -265,19 +265,15 @@ function LeadDetails({
         lead.recurring_class_weekday ||
         lead.recurring_class_professor_time ||
         lead.recurring_class_lead_time ? (
-          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+          <div className="relative mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85 max-w-[calc(100%-180px)] pr-4">
               Aula recorrente / fixa
             </div>
-            {String(lead.recurring_class_status ?? "").trim() ? (
-              <div className="mt-2 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-                {String(lead.recurring_class_status ?? "")
-                  .trim()
-                  .toLowerCase()
-                  .replace(/_/g, " ")
-                  .replace(/\b\w/g, (c) => c.toUpperCase())}
+            <div className="absolute top-4 right-4">
+              <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                Aluno(a) confirmado
               </div>
-            ) : null}
+            </div>
             <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
               <Field
                 label="Dia da semana"
