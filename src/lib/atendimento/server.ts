@@ -2294,6 +2294,11 @@ export async function ensureWhatsAppLeadAndConversation(params: {
     );
   }
 
+  const { isZapiInternalBlocklistedPhone } = await import("@/lib/atendimento/constants");
+  if (isZapiInternalBlocklistedPhone(normalizedPhone)) {
+    return null;
+  }
+
   {
     const { data: instRow } = await admin
       .from("whatsapp_instances")

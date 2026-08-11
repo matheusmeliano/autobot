@@ -24,6 +24,7 @@ import {
   POST_BOOKING_CPF_STAGE_ENABLED,
   POST_BOOKING_CPF_SUCCESS_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
+  isZapiInternalBlocklistedPhone,
 } from "@/lib/atendimento/constants";
 import {
   buildExperimentalClassAttendantWhatsAppMessage,
@@ -1506,6 +1507,17 @@ export async function POST(req: Request) {
     equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
     equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
 
+  if (
+    isZapiInternalBlocklistedPhone(fromPhoneDigits) ||
+    isZapiInternalBlocklistedPhone(toPhoneDigitsBroad)
+  ) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "zapi_internal_phone_number_blocklisted",
+    });
+  }
+
   if (rawFromMe || equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad)) {
     return Response.json({
       ok: true,
@@ -2036,6 +2048,14 @@ export async function POST(req: Request) {
         ok: true,
         ignored: true,
         reason: "from_and_to_phones_are_equivalent_loopback",
+        phone: String(candidateDigits ?? "").slice(0, 8) || "-",
+      });
+    }
+    if (isZapiInternalBlocklistedPhone(candidateDigits)) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "zapi_internal_phone_number_blocklisted_candidate",
         phone: String(candidateDigits ?? "").slice(0, 8) || "-",
       });
     }

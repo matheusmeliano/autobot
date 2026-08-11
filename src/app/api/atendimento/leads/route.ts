@@ -1,4 +1,4 @@
-import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE, isZapiInternalBlocklistedPhone } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import {
@@ -454,6 +454,7 @@ export async function GET(req: Request) {
     if (status && String(row.status ?? "").toLowerCase() !== status) return false;
     if (stage && String(row.funnel_stage ?? "").toLowerCase() !== stage) return false;
     if (cutoffInstanceTimeMs > 0 && getLeadSortTime(row) < cutoffInstanceTimeMs) return false;
+    if (isZapiInternalBlocklistedPhone(String(row.phone ?? ""))) return false;
     if (connectedBotPhoneDigits.length >= 10) {
       const rowDigits = String(row.phone ?? "").replace(/\D/g, "");
       if (rowDigits.length >= 10) {

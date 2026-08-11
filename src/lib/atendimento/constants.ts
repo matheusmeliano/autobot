@@ -1,6 +1,23 @@
 export const ATENDIMENTO_EMAIL = "atendimento.usa.music@gmail.com";
 export const ATENDIMENTO_PUBLIC_LINK_SLUG = "lucas-brum-online-music-usa";
 
+export const ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10: readonly string[] = [
+  "6599495594",
+  "6581175345",
+];
+
+export function isZapiInternalBlocklistedPhone(digitsRaw: string | null | undefined): boolean {
+  const d = String(digitsRaw ?? "").replace(/\D/g, "");
+  const key = d.length >= 10 ? d.slice(-10) : d;
+  if (!key) return false;
+  for (const suffix of ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10) {
+    if (key === suffix || key.endsWith(suffix) || suffix.endsWith(key)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export const ATENDIMENTO_STAGE_ORDER = [
   "novo_lead",
   "em_atendimento",

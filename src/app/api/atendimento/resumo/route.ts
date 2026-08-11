@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { isZapiInternalBlocklistedPhone } from "@/lib/atendimento/constants";
 import {
   loadHiddenWhatsAppPhoneBlocklist,
   phoneIsInHiddenBrazilianBlocklist,
@@ -54,6 +55,7 @@ export async function GET() {
     const rows = (leads ?? [])
       .filter((row: any) => !phoneIsInHiddenBrazilianBlocklist(String(row?.phone ?? ""), hiddenBlocklist))
       .filter((row: any) => {
+        if (isZapiInternalBlocklistedPhone(String(row?.phone ?? ""))) return false;
         if (connectedBotPhoneDigits.length >= 10) {
           const rowDigits = String(row?.phone ?? "").replace(/\D/g, "");
           if (rowDigits.length >= 10) {
