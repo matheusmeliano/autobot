@@ -544,7 +544,7 @@ function BookingDetails({
               <button
                 type="button"
                 onClick={() => void onMarkAttendance(lead, "attended")}
-                disabled={isMarkingAttendance || attendanceStatus === "attended"}
+                disabled={isMarkingAttendance || hasAttendanceStatus}
                 className={[
                   "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
                   attendanceStatus === "attended"
@@ -567,7 +567,7 @@ function BookingDetails({
               <button
                 type="button"
                 onClick={() => void onMarkAttendance(lead, "no_show")}
-                disabled={isMarkingAttendance || attendanceStatus === "no_show"}
+                disabled={isMarkingAttendance || hasAttendanceStatus}
                 className={[
                   "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
                   attendanceStatus === "no_show"
