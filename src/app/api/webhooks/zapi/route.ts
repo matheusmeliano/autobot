@@ -2613,6 +2613,16 @@ export async function POST(req: Request) {
             } catch (_e) {
               recurringAvail = null;
             }
+            if (recurringAvail && recurringAvail.messages.length) {
+              for (const message of recurringAvail.messages) {
+                try {
+                  await sendAtendimentoWhatsAppText({
+                    phone: normalizedPhoneOnly,
+                    message,
+                  });
+                } catch (_e) {}
+              }
+            }
             try {
               void appendHistoryEvent({
                 leadId,
@@ -3285,6 +3295,7 @@ export async function POST(req: Request) {
                   });
                 } catch (_e) {}
               }
+              let calendarSentCount = 0;
               try {
                 const r = await presentRecurringCalendarDateOptionsWhatsApp({
                   admin,
@@ -3292,9 +3303,36 @@ export async function POST(req: Request) {
                   conversationId,
                   leadTimeZone: leadTzGeneral,
                 });
-                for (const m of r.messages) allMessages.push(m);
+                for (const m of r.messages) {
+                  allMessages.push(m);
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: normalizedPhoneOnly,
+                      message: m,
+                    });
+                    calendarSentCount++;
+                  } catch (_e) {}
+                }
               } catch (_e) {}
               replyText = allMessages.join("\n\n");
+              if (calendarSentCount === 0) {
+                try {
+                  const r2 = await presentRecurringCalendarDateOptionsWhatsApp({
+                    admin,
+                    leadId,
+                    conversationId,
+                    leadTimeZone: leadTzGeneral,
+                  });
+                  for (const m of r2.messages) {
+                    try {
+                      await sendAtendimentoWhatsAppText({
+                        phone: normalizedPhoneOnly,
+                        message: m,
+                      });
+                    } catch (_e) {}
+                  }
+                } catch (_e) {}
+              }
             } catch (_e) {
               replyText =
                 "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
