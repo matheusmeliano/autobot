@@ -2294,6 +2294,26 @@ export async function ensureWhatsAppLeadAndConversation(params: {
     );
   }
 
+  {
+    const { data: instRow } = await admin
+      .from("whatsapp_instances")
+      .select("phone, instance_id")
+      .eq("user_id", String(params.userId ?? ""))
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ourPhoneDigits = String((instRow as any)?.phone ?? "").replace(/\D/g, "");
+    if (ourPhoneDigits && ourPhoneDigits.length >= 10 && normalizedPhone.length >= 10) {
+      const matchesOur =
+        normalizedPhone === ourPhoneDigits ||
+        normalizedPhone.endsWith(ourPhoneDigits) ||
+        ourPhoneDigits.endsWith(normalizedPhone);
+      if (matchesOur) {
+        return null;
+      }
+    }
+  }
+
   const hiddenBlocklist = await (async () => {
     try {
       const { loadHiddenWhatsAppPhoneBlocklist } = await import("@/lib/painelHiddenPhones");

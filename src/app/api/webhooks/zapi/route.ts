@@ -1979,6 +1979,25 @@ export async function POST(req: Request) {
     });
   }
 
+  {
+    const ourDigits = connectedInstancePhoneDigits;
+    const candidateDigits = validatedFrom.digitsOnly || String(fromPhone ?? "").replace(/\D/g, "");
+    if (ourDigits && candidateDigits && ourDigits.length >= 10 && candidateDigits.length >= 10) {
+      const matchesOurNumber =
+        candidateDigits === ourDigits ||
+        candidateDigits.endsWith(ourDigits) ||
+        ourDigits.endsWith(candidateDigits);
+      if (matchesOurNumber) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "connected_bot_own_phone_must_not_be_registered_as_interessado",
+          phone: String(candidateDigits ?? "").slice(0, 8) || "-",
+        });
+      }
+    }
+  }
+
   if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id) {
     return Response.json({
       ok: true,

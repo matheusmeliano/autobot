@@ -15,13 +15,14 @@ export async function GET() {
     const admin = createSupabaseAdminClient();
 
     let cutoffInstanceTimeMs = 0;
+    let connectedBotPhoneDigits = "";
     {
       const userId = String(auth.user?.id ?? "").trim();
       if (userId) {
         try {
           const { data: inst } = await admin
             .from("whatsapp_instances")
-            .select("instance_id, created_at, updated_at")
+            .select("instance_id, created_at, updated_at, phone")
             .eq("user_id", userId)
             .order("created_at", { ascending: false })
             .limit(1)
@@ -30,9 +31,11 @@ export async function GET() {
             const cAt = new Date(String((inst as any)?.created_at ?? 0)).getTime();
             const uAt = new Date(String((inst as any)?.updated_at ?? (inst as any)?.created_at ?? 0)).getTime();
             cutoffInstanceTimeMs = Math.max(cAt, uAt);
+            connectedBotPhoneDigits = String((inst as any)?.phone ?? "").replace(/\D/g, "");
           }
         } catch (_cutoffErr) {
           cutoffInstanceTimeMs = 0;
+          connectedBotPhoneDigits = "";
         }
       }
     }
@@ -51,6 +54,16 @@ export async function GET() {
     const rows = (leads ?? [])
       .filter((row: any) => !phoneIsInHiddenBrazilianBlocklist(String(row?.phone ?? ""), hiddenBlocklist))
       .filter((row: any) => {
+        if (connectedBotPhoneDigits && connectedBotPhoneDigits.length >= 10) {
+          const rowDigits = String(row?.phone ?? "").replace(/\D/g, "");
+          if (rowDigits.length >= 10) {
+            const matches =
+              rowDigits === connectedBotPhoneDigits ||
+              rowDigits.endsWith(connectedBotPhoneDigits) ||
+              connectedBotPhoneDigits.endsWith(rowDigits);
+            if (matches) return false;
+          }
+        }
         if (cutoffInstanceTimeMs <= 0) return true;
         const candidates = [
           row?.last_interaction_at,
