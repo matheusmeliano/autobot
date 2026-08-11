@@ -1286,78 +1286,81 @@ export async function POST(req: Request) {
     const shouldTryRefreshPhone = instance?.token;
     if (shouldTryRefreshPhone) {
       let cleanedFresh = "";
-      try {
-        const token = String(instance.token ?? "");
-        const clientToken = missingClientTokenCol ? null : instance?.client_token ?? null;
-        const meta = await getZapiInstanceMeta({
-          instance_id: instanceId,
-          token,
-          client_token: clientToken || undefined,
-        });
-        const meData = meta.ok ? meta.data : null;
-        if (meData) {
-          const candidates: string[] = [];
-          if (typeof meData.phone === "string") candidates.push(meData.phone);
-          if (typeof meData.telephone === "string") candidates.push(meData.telephone);
-          if (meData.whatsapp && typeof meData.whatsapp.phone === "string") candidates.push(meData.whatsapp.phone);
-          if (meData.me && typeof meData.me.phone === "string") candidates.push(meData.me.phone);
-          if (typeof meData.id === "string") candidates.push(meData.id);
-          for (let i = 0; i < candidates.length; i++) {
-            const raw = candidates[i];
-            if (!raw || typeof raw !== "string") continue;
-            const isLastCandidate = i === candidates.length - 1;
-            const pieces = raw.split(/[^0-9]+/).filter(Boolean);
-            for (const piece of pieces) {
-              if (piece.length >= 10 && piece.length <= 15) {
-                cleanedFresh = piece;
+      const token = String(instance.token ?? "");
+      const clientToken = missingClientTokenCol ? null : instance?.client_token ?? null;
+      const MAX_META_ATTEMPTS = 2;
+      for (let attempt = 1; attempt <= MAX_META_ATTEMPTS && !cleanedFresh; attempt++) {
+        try {
+          const meta = await getZapiInstanceMeta({
+            instance_id: instanceId,
+            token,
+            client_token: clientToken || undefined,
+          });
+          const meData = meta.ok ? meta.data : null;
+          if (meData) {
+            const candidates: string[] = [];
+            if (typeof meData.phone === "string") candidates.push(meData.phone);
+            if (typeof meData.telephone === "string") candidates.push(meData.telephone);
+            if (meData.whatsapp && typeof meData.whatsapp.phone === "string") candidates.push(meData.whatsapp.phone);
+            if (meData.me && typeof meData.me.phone === "string") candidates.push(meData.me.phone);
+            if (typeof meData.id === "string") candidates.push(meData.id);
+            for (let i = 0; i < candidates.length; i++) {
+              const raw = candidates[i];
+              if (!raw || typeof raw !== "string") continue;
+              const isLastCandidate = i === candidates.length - 1;
+              const pieces = raw.split(/[^0-9]+/).filter(Boolean);
+              for (const piece of pieces) {
+                if (piece.length >= 10 && piece.length <= 15) {
+                  cleanedFresh = piece;
+                  break;
+                }
+              }
+              if (cleanedFresh) break;
+              const fallbackDigits = raw.replace(/\D/g, "");
+              if (fallbackDigits.length >= 10 && fallbackDigits.length <= 15) {
+                cleanedFresh = fallbackDigits;
                 break;
               }
-            }
-            if (cleanedFresh) break;
-            const fallbackDigits = raw.replace(/\D/g, "");
-            if (fallbackDigits.length >= 10 && fallbackDigits.length <= 15) {
-              cleanedFresh = fallbackDigits;
-              break;
-            }
-            if (isLastCandidate && fallbackDigits.length > 15) {
-              const cc2 = fallbackDigits.startsWith("55")
-                || fallbackDigits.startsWith("34")
-                || fallbackDigits.startsWith("44")
-                || fallbackDigits.startsWith("52")
-                || fallbackDigits.startsWith("54")
-                || fallbackDigits.startsWith("56")
-                || fallbackDigits.startsWith("57");
-              if (cc2 && fallbackDigits.length >= 12) {
-                cleanedFresh = fallbackDigits.slice(0, 13);
-                if (cleanedFresh.length >= 10) break;
-              }
-              if (fallbackDigits.startsWith("1") && fallbackDigits.length >= 11) {
-                cleanedFresh = fallbackDigits.slice(0, 11);
-                break;
+              if (isLastCandidate && fallbackDigits.length > 15) {
+                const cc2 = fallbackDigits.startsWith("55")
+                  || fallbackDigits.startsWith("34")
+                  || fallbackDigits.startsWith("44")
+                  || fallbackDigits.startsWith("52")
+                  || fallbackDigits.startsWith("54")
+                  || fallbackDigits.startsWith("56")
+                  || fallbackDigits.startsWith("57");
+                if (cc2 && fallbackDigits.length >= 12) {
+                  cleanedFresh = fallbackDigits.slice(0, 13);
+                  if (cleanedFresh.length >= 10) break;
+                }
+                if (fallbackDigits.startsWith("1") && fallbackDigits.length >= 11) {
+                  cleanedFresh = fallbackDigits.slice(0, 11);
+                  break;
+                }
               }
             }
-          }
-          if (cleanedFresh && cleanedFresh.length >= 10 && cleanedFresh.length <= 15) {
-            if (!currentPhoneLooksValid || cleanedFresh !== currentDigits) {
+            if (cleanedFresh && cleanedFresh.length >= 10 && cleanedFresh.length <= 15) {
+              if (!currentPhoneLooksValid || cleanedFresh !== currentDigits) {
+                try {
+                  await admin
+                    .from("whatsapp_instances")
+                    .update({ phone: cleanedFresh })
+                    .eq("instance_id", instanceId);
+                } catch (_wrErr) {}
+              }
+              if (instance) instance.phone = cleanedFresh;
+            } else if (!cleanedFresh && !currentPhoneLooksValid && currentPhoneRaw) {
               try {
                 await admin
                   .from("whatsapp_instances")
-                  .update({ phone: cleanedFresh })
+                  .update({ phone: null })
                   .eq("instance_id", instanceId);
-              } catch (_wrErr) {}
+              } catch (_clrErr) {}
             }
-            if (instance) instance.phone = cleanedFresh;
-          } else if (!cleanedFresh && !currentPhoneLooksValid && currentPhoneRaw) {
-            try {
-              await admin
-                .from("whatsapp_instances")
-                .update({ phone: null })
-                .eq("instance_id", instanceId);
-            } catch (_clrErr) {}
           }
+        } catch (_metaErr) {
+          // Falha no /me: tenta novamente (MAX_META_ATTEMPTS)
         }
-      } catch (_metaErr) {
-        // Falha ao consultar /me da Z-API nao deve quebrar o processamento do evento
       }
     }
   }
@@ -1376,6 +1379,14 @@ export async function POST(req: Request) {
     normalizedDataEventField,
   ].join("|");
 
+  const isOnlyStatusEvent =
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String(eventType ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.event ?? ""),
+    );
+
   const hasDisconnectedSignal =
     /\bdisconnected\b|\bdesconectado\b|\bDisconnectedCallback\b/i.test(eventStringUnion);
 
@@ -1391,10 +1402,12 @@ export async function POST(req: Request) {
       : null;
 
   if (nextInstanceStatus) {
-    await admin
-      .from("whatsapp_instances")
-      .update({ status: nextInstanceStatus })
-      .eq("instance_id", instanceId);
+    try {
+      await admin
+        .from("whatsapp_instances")
+        .update({ status: nextInstanceStatus })
+        .eq("instance_id", instanceId);
+    } catch (_statusErr) {}
   }
 
   const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
@@ -1412,6 +1425,19 @@ export async function POST(req: Request) {
         reason: "stale_connected_phone_not_current_instance",
         current_instance_phone_digits: connectedInstancePhoneDigits,
         received_event_to_phone_digits: toPhoneDigits,
+      });
+    }
+  }
+
+  {
+    const resolvedConnectedDigitsOk = connectedInstancePhoneDigits.length >= 10;
+    const resolvedToDigitsOk = toPhoneDigits.length >= 10;
+    const looksLikeRealInbound = Boolean(messageText || mediaUrl) && !isOnlyStatusEvent && !rawFromMe;
+    if (!resolvedConnectedDigitsOk && !resolvedToDigitsOk && looksLikeRealInbound && !pendingPhoneValidationRef.id) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "cannot_verify_connected_phone_without_validating_stale_payload",
       });
     }
   }

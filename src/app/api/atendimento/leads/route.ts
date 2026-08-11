@@ -59,6 +59,29 @@ export async function GET(req: Request) {
   const stage = String(searchParams.get("stage") ?? "").trim().toLowerCase();
   const admin = createSupabaseAdminClient();
 
+  let cutoffInstanceTimeMs = 0;
+  {
+    const userId = String(auth.user?.id ?? "").trim();
+    if (userId) {
+      try {
+        const { data: inst } = await admin
+          .from("whatsapp_instances")
+          .select("instance_id, created_at, updated_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (inst) {
+          const cAt = new Date(String((inst as any)?.created_at ?? 0)).getTime();
+          const uAt = new Date(String((inst as any)?.updated_at ?? (inst as any)?.created_at ?? 0)).getTime();
+          cutoffInstanceTimeMs = Math.max(cAt, uAt);
+        }
+      } catch (_cutoffErr) {
+        cutoffInstanceTimeMs = 0;
+      }
+    }
+  }
+
   const { data: leads, error } = await admin
     .from("atendimento_leads")
     .select("*")
@@ -427,6 +450,7 @@ export async function GET(req: Request) {
     if (q && !name.includes(q) && !phone.includes(q) && !cpf.includes(q)) return false;
     if (status && String(row.status ?? "").toLowerCase() !== status) return false;
     if (stage && String(row.funnel_stage ?? "").toLowerCase() !== stage) return false;
+    if (cutoffInstanceTimeMs > 0 && getLeadSortTime(row) < cutoffInstanceTimeMs) return false;
     return true;
     })
     .sort((left, right) => {
