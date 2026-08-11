@@ -660,9 +660,15 @@ export function AtendimentoSummaryCards({
       {
         id: "alunos" as const,
         label: "Alunos",
-        value: 0,
+        value: localSummary.matriculados ?? 0,
         emptyMessage: "Nenhum aluno disponível no momento.",
-        items: [],
+        items: localLeads.filter(
+          (lead) =>
+            lead.status === "matriculado" ||
+            (lead as any).funnel_stage === "matriculado" ||
+            (lead as any).status === "aluno" ||
+            (lead as any).funnel_stage === "aluno_recorrente_cadastrado",
+        ),
       },
       {
         id: "agendamentos" as const,
