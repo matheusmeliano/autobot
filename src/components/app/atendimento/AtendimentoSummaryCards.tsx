@@ -164,11 +164,11 @@ function LeadDetails({
 }) {
   const hasName = Boolean(String(lead.full_name ?? "").trim());
   const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-  const hasRecurring =
-    ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw) ||
-    Boolean(String(lead.recurring_class_status ?? "").trim()) ||
+  const hasRecurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+  const hasRecurringTimeOk =
     Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
     Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+  const hasRecurring = hasRecurringWeekdayOk && hasRecurringTimeOk;
   const initialRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
   const [recurringLinkDraft, setRecurringLinkDraft] = useState(initialRecurringLink);
   useEffect(() => {

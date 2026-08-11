@@ -60,11 +60,36 @@ export default function CadastroRecorrenteBody() {
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [submitResult, setSubmitResult] = useState<SubmitResponse["scheduled"] | null>(null);
+  const [draftSaving, setDraftSaving] = useState<"weekday" | "time" | null>(null);
 
   const firstName = useMemo(() => {
     const parts = (nome || "Aluno(a)").trim().split(/\s+/).filter(Boolean);
     return parts[0] || "Aluno(a)";
   }, [nome]);
+
+  async function saveDraftRecurring(payload: {
+    weekday?: RecurringWeekdayKey | null;
+    weekdayLabel?: string | null;
+    professorTime?: string | null;
+    leadTime?: string | null;
+  }) {
+    try {
+      const telefone = phoneField.replace(/\D/g, "");
+      if (!telefone || telefone.length < 10) return;
+      await fetch("/api/cadastro/recorrente/draft", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefone,
+          nome: nome.trim() || null,
+          weekday: payload.weekday ?? null,
+          weekdayLabel: payload.weekdayLabel ?? null,
+          professorTime: payload.professorTime ?? null,
+          leadTime: payload.leadTime ?? null,
+        }),
+      }).catch(() => {});
+    } catch {}
+  }
 
   const availableWeekdays = useMemo<RecurringWeekdayOption[]>(() => {
     if (!availability?.dates) return [];
@@ -128,6 +153,18 @@ export default function CadastroRecorrenteBody() {
 
   function handleAdvance1() {
     if (!selectedWeekday) return;
+    (async () => {
+      setDraftSaving("weekday");
+      try {
+        const opt = availableWeekdays.find((d) => d.weekday === selectedWeekday);
+        await saveDraftRecurring({
+          weekday: selectedWeekday,
+          weekdayLabel: opt?.displayLabel || opt?.label || null,
+        });
+      } finally {
+        setDraftSaving(null);
+      }
+    })();
     goStep(2);
   }
 
@@ -136,6 +173,18 @@ export default function CadastroRecorrenteBody() {
     setSubmitLoading(true);
     setSubmitError("");
     try {
+      setDraftSaving("time");
+      try {
+        const opt = availableWeekdays.find((d) => d.weekday === selectedWeekday);
+        await saveDraftRecurring({
+          weekday: selectedWeekday,
+          weekdayLabel: opt?.displayLabel || opt?.label || selectedWeekdayLabel || null,
+          professorTime: selectedTimeOpt.professorTime,
+          leadTime: selectedTimeOpt.leadTime || selectedTimeOpt.displayLabel,
+        });
+      } finally {
+        setDraftSaving(null);
+      }
       const res = await fetch("/api/cadastro/recorrente/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
