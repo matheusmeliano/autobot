@@ -3190,6 +3190,7 @@ export async function POST(req: Request) {
           let nextLeadStatus = "matricula_pendente";
           let historyEventType = "matricula_pendente_sim_nao_invalida";
           let historyTitle = "Matrícula pendente: resposta inválida, pedindo sim/não";
+          let historyDetailsPatch: Record<string, unknown> | undefined = undefined;
 
           let invalidYesNoAttemptsGeneralAmbiguousOnly = 0;
           if (isAmbiguous) {
@@ -3427,6 +3428,7 @@ export async function POST(req: Request) {
                 source: "whatsapp_zapi",
                 booking_attendance_attended_by_col: bookingAttendanceAttendedByCol,
                 booking_attendance_attended_by_history: bookingAttendanceAttendedByHistory,
+                ...(historyDetailsPatch ?? {}),
               },
               actorType: "bot",
             });
