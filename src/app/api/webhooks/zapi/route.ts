@@ -2585,8 +2585,36 @@ export async function POST(req: Request) {
               ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
               ...buildRecurringSchedulePromptMessages(),
             ];
+            let calendarMsgs: string[] = [];
+            try {
+              const nowA = new Date();
+              const { data: bs, error: be } = await admin
+                .from("atendimento_experimental_class_bookings")
+                .select("professor_start_at")
+                .eq("status", "scheduled")
+                .gte("professor_start_at", nowA.toISOString())
+                .order("professor_start_at", { ascending: true });
+              const booked = be
+                ? []
+                : (bs ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+              const avail = listExperimentalClassAvailability({
+                now: nowA,
+                leadTimeZone: leadTz,
+                bookedProfessorStartAts: booked,
+              });
+              calendarMsgs = buildRecurringCalendarDatesMessages(avail.dates);
+            } catch (_e) {
+              calendarMsgs = [];
+            }
+            if (!calendarMsgs.length) {
+              calendarMsgs = [
+                "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para informar os dias e horários disponíveis.",
+                "Responda apenas com o dia desejado.",
+              ];
+            }
+            const allFinalMessages: string[] = [...introMsgs, ...calendarMsgs];
             const outPlan: string[] = [];
-            for (const message of introMsgs) {
+            for (const message of allFinalMessages) {
               outPlan.push(message);
               try {
                 await insertWhatsAppBotTextMessage({
@@ -2602,27 +2630,6 @@ export async function POST(req: Request) {
                 });
               } catch (_e) {}
             }
-            let recurringAvail: { lastOutbound: any; availability: any; messages: string[] } | null = null;
-            try {
-              recurringAvail = await presentRecurringCalendarDateOptionsWhatsApp({
-                admin,
-                leadId,
-                conversationId,
-                leadTimeZone: leadTz,
-              });
-            } catch (_e) {
-              recurringAvail = null;
-            }
-            if (recurringAvail && recurringAvail.messages.length) {
-              for (const message of recurringAvail.messages) {
-                try {
-                  await sendAtendimentoWhatsAppText({
-                    phone: normalizedPhoneOnly,
-                    message,
-                  });
-                } catch (_e) {}
-              }
-            }
             try {
               void appendHistoryEvent({
                 leadId,
@@ -2631,7 +2638,7 @@ export async function POST(req: Request) {
                 title: "Matricula pendente pos-attendance (nuclear): lead respondeu SIM",
                 details: {
                   inbound_text: inboundContentRaw,
-                  reply_messages: introMsgs.concat(recurringAvail?.messages ?? []),
+                  reply_messages: allFinalMessages,
                   next_funnel_stage: "aula_recorrente_dia_pendente",
                   source: "whatsapp_zapi_nuclear",
                 },
@@ -3279,8 +3286,35 @@ export async function POST(req: Request) {
                 ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
                 ...buildRecurringSchedulePromptMessages(),
               ];
-              const allMessages: string[] = [...introGeneral];
-              for (const message of introGeneral) {
+              let generalCalendarMsgs: string[] = [];
+              try {
+                const nowG = new Date();
+                const { data: bsg, error: beg } = await admin
+                  .from("atendimento_experimental_class_bookings")
+                  .select("professor_start_at")
+                  .eq("status", "scheduled")
+                  .gte("professor_start_at", nowG.toISOString())
+                  .order("professor_start_at", { ascending: true });
+                const bookedG = beg
+                  ? []
+                  : (bsg ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+                const availG = listExperimentalClassAvailability({
+                  now: nowG,
+                  leadTimeZone: leadTzGeneral,
+                  bookedProfessorStartAts: bookedG,
+                });
+                generalCalendarMsgs = buildRecurringCalendarDatesMessages(availG.dates);
+              } catch (_e) {
+                generalCalendarMsgs = [];
+              }
+              if (!generalCalendarMsgs.length) {
+                generalCalendarMsgs = [
+                  "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para informar os dias e horários disponíveis.",
+                  "Responda apenas com o dia desejado.",
+                ];
+              }
+              const allMessages: string[] = [...introGeneral, ...generalCalendarMsgs];
+              for (const message of allMessages) {
                 try {
                   await insertWhatsAppBotTextMessage({
                     admin,
@@ -3295,44 +3329,7 @@ export async function POST(req: Request) {
                   });
                 } catch (_e) {}
               }
-              let calendarSentCount = 0;
-              try {
-                const r = await presentRecurringCalendarDateOptionsWhatsApp({
-                  admin,
-                  leadId,
-                  conversationId,
-                  leadTimeZone: leadTzGeneral,
-                });
-                for (const m of r.messages) {
-                  allMessages.push(m);
-                  try {
-                    await sendAtendimentoWhatsAppText({
-                      phone: normalizedPhoneOnly,
-                      message: m,
-                    });
-                    calendarSentCount++;
-                  } catch (_e) {}
-                }
-              } catch (_e) {}
               replyText = allMessages.join("\n\n");
-              if (calendarSentCount === 0) {
-                try {
-                  const r2 = await presentRecurringCalendarDateOptionsWhatsApp({
-                    admin,
-                    leadId,
-                    conversationId,
-                    leadTimeZone: leadTzGeneral,
-                  });
-                  for (const m of r2.messages) {
-                    try {
-                      await sendAtendimentoWhatsAppText({
-                        phone: normalizedPhoneOnly,
-                        message: m,
-                      });
-                    } catch (_e) {}
-                  }
-                } catch (_e) {}
-              }
             } catch (_e) {
               replyText =
                 "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
