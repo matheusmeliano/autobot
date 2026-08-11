@@ -781,7 +781,7 @@ function firstOnlyNameForRecurring(full: string | null | undefined): string {
 
 export function buildRecurringPlanIntroMessages(name: string | null | undefined): string[] {
   const safeFirst = firstOnlyNameForRecurring(name) || "Aluno(a)";
-  const msg1 = `${safeFirst}, o plano escolhido é:`;
+  const msg1 = `${safeFirst}, o plano disponível é:`;
   const msg2 = [
     "Modelo Individual",
     "• 1 aula online ao vivo por semana",
