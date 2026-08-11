@@ -2581,25 +2581,6 @@ export async function POST(req: Request) {
                 } catch (_e2) {}
               }
             } catch (_e) {}
-            const introMsgs = [
-              ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
-              ...buildRecurringSchedulePromptMessages(),
-            ];
-            for (const message of introMsgs) {
-              try {
-                await insertWhatsAppBotTextMessage({
-                  admin,
-                  conversationId,
-                  contentText: message,
-                });
-              } catch (_e) {}
-              try {
-                await sendAtendimentoWhatsAppText({
-                  phone: normalizedPhoneOnly,
-                  message,
-                });
-              } catch (_e) {}
-            }
             let calendarMsgs: string[] = [];
             try {
               const { data: bdata } = await admin
@@ -2620,7 +2601,12 @@ export async function POST(req: Request) {
                 "Responda apenas com o dia desejado.",
               ];
             }
-            for (const message of calendarMsgs) {
+            const allFinalMessages: string[] = [
+              ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
+              ...buildRecurringSchedulePromptMessages(),
+              ...calendarMsgs,
+            ];
+            for (const message of allFinalMessages) {
               try {
                 await insertWhatsAppBotTextMessage({
                   admin,
@@ -2635,7 +2621,6 @@ export async function POST(req: Request) {
                 });
               } catch (_e) {}
             }
-            const allFinalMessages = [...introMsgs, ...calendarMsgs];
             try {
               void appendHistoryEvent({
                 leadId,
@@ -3288,25 +3273,6 @@ export async function POST(req: Request) {
                   .update({ recurring_class_status: "dia_pendente" } as any)
                   .eq("id", leadId);
               } catch (_e) {}
-              const introGeneral = [
-                ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
-                ...buildRecurringSchedulePromptMessages(),
-              ];
-              for (const message of introGeneral) {
-                try {
-                  await insertWhatsAppBotTextMessage({
-                    admin,
-                    conversationId,
-                    contentText: message,
-                  });
-                } catch (_e) {}
-                try {
-                  await sendAtendimentoWhatsAppText({
-                    phone: normalizedPhoneOnly,
-                    message,
-                  });
-                } catch (_e) {}
-              }
               let generalCalendarMsgs: string[] = [];
               try {
                 const { data: bd } = await admin
@@ -3327,7 +3293,12 @@ export async function POST(req: Request) {
                   "Responda apenas com o dia desejado.",
                 ];
               }
-              for (const message of generalCalendarMsgs) {
+              const allMessages: string[] = [
+                ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
+                ...buildRecurringSchedulePromptMessages(),
+                ...generalCalendarMsgs,
+              ];
+              for (const message of allMessages) {
                 try {
                   await insertWhatsAppBotTextMessage({
                     admin,
@@ -3342,7 +3313,6 @@ export async function POST(req: Request) {
                   });
                 } catch (_e) {}
               }
-              const allMessages = [...introGeneral, ...generalCalendarMsgs];
               replyText = allMessages.join("\n\n");
             } catch (_e) {
               replyText =
