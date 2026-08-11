@@ -159,6 +159,15 @@ function LeadDetails({
   onEditName: (lead: AtendimentoLeadListItem) => void;
 }) {
   const hasName = Boolean(String(lead.full_name ?? "").trim());
+  const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+  const hasRecurring =
+    ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw) ||
+    Boolean(String(lead.recurring_class_status ?? "").trim()) ||
+    Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+    Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+  const statusRaw = String(lead.status ?? "").trim().toLowerCase();
+  const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const isMatriculado = statusRaw === "matriculado" || statusRaw === "aluno" || funnelRaw.includes("aluno") || hasRecurring;
   const experimentalStatus = String((lead as any)?.experimental_class_status ?? "").trim();
   const draftDate = String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
     String((lead as any)?.experimental_class_professor_date ?? "").trim();
@@ -240,7 +249,7 @@ function LeadDetails({
               className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4 shrink-0" />
-              {deleting ? "Excluindo..." : "Excluir interessado"}
+              {deleting ? "Excluindo..." : isMatriculado ? "Excluir aluno" : "Excluir interessado"}
             </button>
           ) : null}
         </div>
