@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
 import {
   ATENDIMENTO_FILES_BUCKET,
   ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES,
@@ -2381,6 +2381,43 @@ export async function ensureWhatsAppLeadAndConversation(params: {
   let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });
 
   if (!lead?.id) {
+    {
+      const userPhonesCheck: string[] = [];
+      try {
+        const { data: instRows } = await admin
+          .from("whatsapp_instances")
+          .select("phone")
+          .eq("user_id", String(params.userId ?? ""))
+          .not("phone", "is", null);
+        for (const r of (instRows ?? []) as Array<{ phone?: string | null }>) {
+          const d = String(r?.phone ?? "").replace(/\D/g, "");
+          if (d.length >= 10 && !userPhonesCheck.includes(d)) userPhonesCheck.push(d);
+        }
+      } catch (_pe) {}
+      try {
+        const { data: globalInstRows } = await admin
+          .from("whatsapp_instances")
+          .select("phone")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if ((globalInstRows as any)?.phone) {
+          const d = String((globalInstRows as any).phone ?? "").replace(/\D/g, "");
+          if (d.length >= 10 && !userPhonesCheck.includes(d)) userPhonesCheck.push(d);
+        }
+      } catch (_p2) {}
+      let anyInstanceIsOwnerPersonalPrivateNumber = false;
+      for (const d of userPhonesCheck) {
+        if (isOwnerPersonalPrivatePhone(d)) {
+          anyInstanceIsOwnerPersonalPrivateNumber = true;
+          break;
+        }
+      }
+      if (anyInstanceIsOwnerPersonalPrivateNumber && params.creationOrigin === "zapi_from_header") {
+        return null;
+      }
+    }
+
     const nameRaw = String(params.firstNameFromMessage ?? "").trim() || null;
     const initialState = params.initialState ? String(params.initialState).trim() : null;
     const initialCountry = params.initialCountry ? String(params.initialCountry).trim() : null;

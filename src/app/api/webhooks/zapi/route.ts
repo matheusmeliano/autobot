@@ -24,6 +24,7 @@ import {
   POST_BOOKING_CPF_STAGE_ENABLED,
   POST_BOOKING_CPF_SUCCESS_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
+  isOwnerPersonalPrivatePhone,
   isZapiInternalBlocklistedPhone,
 } from "@/lib/atendimento/constants";
 import {
@@ -51,6 +52,7 @@ import {
 import {
   appendHistoryEvent,
   ensureWhatsAppLeadAndConversation,
+  findLeadByPhone,
   hasAnyBotMessage,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
@@ -2405,6 +2407,25 @@ export async function POST(req: Request) {
 
   if (normalizedFrom) {
     try {
+      {
+        const connectedIsOwnerPrivatePhone = isOwnerPersonalPrivatePhone(connectedInstancePhoneDigits);
+        if (connectedIsOwnerPrivatePhone) {
+          const existingLead = normalizedPhoneOnly
+            ? await findLeadByPhone({ phone: normalizedPhoneOnly, userId })
+            : null;
+          if (!existingLead?.id) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason:
+                "owner_personal_private_number_cannot_create_new_leads_inbound_only_updates_existing_private_conversation_blocked",
+              phone_sample: String(normalizedPhoneOnly ?? "").slice(0, 8) || "-",
+              connected_instance: "owner_personal_number",
+            });
+          }
+        }
+      }
+
       const leadContext = await ensureWhatsAppLeadAndConversation({
         phone: normalizedPhoneOnly,
         userId,
