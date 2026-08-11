@@ -793,7 +793,7 @@ export function buildRecurringPlanIntroMessages(name: string | null | undefined)
 
 export function buildRecurringSchedulePromptMessages(): string[] {
   return [
-    "Antes do contrato e pagamento, qual dia e horário da semana você prefere reservar para suas aulas?",
+    "Antes de prosseguirmos com o contrato e o pagamento, qual dia e horário da semana você prefere reservar para suas aulas?",
   ];
 }
 
