@@ -312,11 +312,6 @@ function LeadDetails({
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
               Agendamento aula experimental
             </div>
-            {draftStageLabel ? (
-              <div className="mt-2 inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
-                {draftStageLabel}
-              </div>
-            ) : null}
             <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
               <Field
                 label="Dia (aluno)"
