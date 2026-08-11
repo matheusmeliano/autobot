@@ -2600,33 +2600,26 @@ export async function POST(req: Request) {
                 });
               } catch (_e) {}
             }
-            let calendarMsgs: string[] = [
-              "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para confirmar os dias e horários disponíveis.",
-              "Responda apenas com o dia desejado.",
-            ];
+            let calendarMsgs: string[] = [];
             try {
-              const nowA = new Date();
-              const { data: bs, error: be } = await admin
+              const { data: bdata } = await admin
                 .from("atendimento_experimental_class_bookings")
                 .select("professor_start_at")
-                .eq("status", "scheduled")
-                .gte("professor_start_at", nowA.toISOString())
-                .order("professor_start_at", { ascending: true });
-              if (!be) {
-                const booked = (bs ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
-                const avail = listExperimentalClassAvailability({
-                  now: nowA,
-                  leadTimeZone: leadTz,
-                  bookedProfessorStartAts: booked,
-                });
-                if (avail && Array.isArray(avail.dates) && avail.dates.length > 0) {
-                  const built = buildRecurringCalendarDatesMessages(avail.dates);
-                  if (Array.isArray(built) && built.length > 0) {
-                    calendarMsgs = built;
-                  }
-                }
-              }
-            } catch (_e) {}
+                .eq("status", "scheduled");
+              const bookedArr = (bdata ?? [] as any[]).map((r: any) => String(r?.professor_start_at ?? "").trim()).filter(Boolean);
+              const av = listExperimentalClassAvailability({
+                now: new Date(),
+                leadTimeZone: leadTz,
+                bookedProfessorStartAts: bookedArr,
+              });
+              calendarMsgs = buildExperimentalClassDatesMessages(av.dates);
+            } catch (_e) { calendarMsgs = []; }
+            if (!calendarMsgs.length) {
+              calendarMsgs = [
+                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+                "Responda apenas com o dia desejado.",
+              ];
+            }
             for (const message of calendarMsgs) {
               try {
                 await insertWhatsAppBotTextMessage({
@@ -3314,33 +3307,26 @@ export async function POST(req: Request) {
                   });
                 } catch (_e) {}
               }
-              let generalCalendarMsgs: string[] = [
-                "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para confirmar os dias e horários disponíveis.",
-                "Responda apenas com o dia desejado.",
-              ];
+              let generalCalendarMsgs: string[] = [];
               try {
-                const nowG = new Date();
-                const { data: bsg, error: beg } = await admin
+                const { data: bd } = await admin
                   .from("atendimento_experimental_class_bookings")
                   .select("professor_start_at")
-                  .eq("status", "scheduled")
-                  .gte("professor_start_at", nowG.toISOString())
-                  .order("professor_start_at", { ascending: true });
-                if (!beg) {
-                  const bookedG = (bsg ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
-                  const availG = listExperimentalClassAvailability({
-                    now: nowG,
-                    leadTimeZone: leadTzGeneral,
-                    bookedProfessorStartAts: bookedG,
-                  });
-                  if (availG && Array.isArray(availG.dates) && availG.dates.length > 0) {
-                    const bg = buildRecurringCalendarDatesMessages(availG.dates);
-                    if (Array.isArray(bg) && bg.length > 0) {
-                      generalCalendarMsgs = bg;
-                    }
-                  }
-                }
-              } catch (_e) {}
+                  .eq("status", "scheduled");
+                const bArr = (bd ?? [] as any[]).map((r: any) => String(r?.professor_start_at ?? "").trim()).filter(Boolean);
+                const ag = listExperimentalClassAvailability({
+                  now: new Date(),
+                  leadTimeZone: leadTzGeneral,
+                  bookedProfessorStartAts: bArr,
+                });
+                generalCalendarMsgs = buildExperimentalClassDatesMessages(ag.dates);
+              } catch (_e) { generalCalendarMsgs = []; }
+              if (!generalCalendarMsgs.length) {
+                generalCalendarMsgs = [
+                  "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+                  "Responda apenas com o dia desejado.",
+                ];
+              }
               for (const message of generalCalendarMsgs) {
                 try {
                   await insertWhatsAppBotTextMessage({
