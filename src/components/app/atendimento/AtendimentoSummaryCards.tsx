@@ -306,7 +306,7 @@ function LeadDetails({
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1 pr-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
-                  Aula recorrente / fixa
+                  Aula recorrente
                 </div>
               </div>
               <div className="shrink-0">
