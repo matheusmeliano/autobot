@@ -310,7 +310,7 @@ function LeadDetails({
         {showDraftSection ? (
           <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
-              Agendamento em andamento
+              Agendamento aula experimental
             </div>
             {draftStageLabel ? (
               <div className="mt-2 inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
