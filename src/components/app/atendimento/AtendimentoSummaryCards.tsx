@@ -572,13 +572,13 @@ function BookingDetails({
         ) : null}
 
         {hasRecurringClass ? (
-          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-4">
-            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
-                Agendamentos em andamento — Próxima aula recorrente
-              </div>
+          <div className="relative mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85 max-w-[calc(100%-180px)] pr-4">
+              Agendamentos em andamento — Próxima aula recorrente
+            </div>
+            <div className="absolute top-4 right-4">
               <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/12 px-3 py-1 text-xs font-semibold text-emerald-100">
-                {recurringStatusLabel || "Agendado"}
+                Aluno(a) confirmado
               </div>
             </div>
 
