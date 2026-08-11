@@ -215,7 +215,12 @@ function LeadDetails({
             </button>
           </div>
           <div className="text-sm text-[var(--app-text-55)]">
-            Última interação: {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
+            {lead.recurring_class_status ||
+            lead.recurring_class_weekday ||
+            lead.recurring_class_professor_time ||
+            lead.recurring_class_lead_time
+              ? "Aluno(a) confirmado"
+              : `Última interação: ${formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}`}
           </div>
           {isLeadRepescagem(lead) ? (
             <div className="mt-2">
@@ -1295,17 +1300,18 @@ export function AtendimentoSummaryCards({
   }
 
   function buildItemMeta(lead: AtendimentoLeadListItem) {
+    const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+    const hasRecurring =
+      ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw) ||
+      Boolean(String(lead.recurring_class_status ?? "").trim()) ||
+      Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim()) ||
+      Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+      Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+    if (hasRecurring) {
+      return "Aluno(a) confirmado";
+    }
+
     if (activeSection === "agendamentos") {
-      const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-      const hasRecurring =
-        ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw) ||
-        Boolean(String(lead.recurring_class_status ?? "").trim()) ||
-        Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim()) ||
-        Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-        Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-      if (hasRecurring) {
-        return "Aluno(a) confirmado";
-      }
       const booking = lead.experimental_class_booking;
       const hasBook = Boolean(
         booking &&
