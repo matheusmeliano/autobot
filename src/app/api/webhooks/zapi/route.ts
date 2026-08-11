@@ -2581,34 +2581,62 @@ export async function POST(req: Request) {
                 } catch (_e2) {}
               }
             } catch (_e) {}
-            const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
-              admin,
-              leadId,
-              conversationId,
-              leadTimeZone: leadTz,
-            });
-            const introMsgs: string[] = [
+            let localDateMsgs: [string, string] = [
+              "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+              "Responda apenas com o dia desejado.",
+            ];
+            try {
+              const nowX = new Date();
+              const { data: bk, error: bkErr } = await admin
+                .from("atendimento_experimental_class_bookings")
+                .select("professor_start_at")
+                .eq("status", "scheduled")
+                .gte("professor_start_at", nowX.toISOString())
+                .order("professor_start_at", { ascending: true });
+              if (!bkErr) {
+                const bookedX = (bk ?? []).map((r: any) => String(r?.professor_start_at ?? "").trim()).filter(Boolean);
+                const avX = listExperimentalClassAvailability({
+                  now: nowX,
+                  leadTimeZone: leadTz,
+                  bookedProfessorStartAts: bookedX,
+                });
+                const realLocal = buildExperimentalClassDatesMessages(avX.dates);
+                if (Array.isArray(realLocal) && realLocal.length >= 2) {
+                  const d1 = String(realLocal[0] ?? "").trim();
+                  const d2 = String(realLocal[1] ?? "").trim();
+                  if (d1 && d2) {
+                    localDateMsgs = [d1, d2];
+                  }
+                }
+              }
+            } catch (_e) {
+              localDateMsgs = [
+                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+                "Responda apenas com o dia desejado.",
+              ];
+            }
+            const allFinalMessages: string[] = [
               ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
               ...buildRecurringSchedulePromptMessages(),
+              localDateMsgs[0],
+              localDateMsgs[1],
             ];
-            for (const introMsg of introMsgs) {
-              const cleanIntro = String(introMsg ?? "").trim();
-              if (!cleanIntro) continue;
+            for (const message of allFinalMessages) {
+              if (!String(message ?? "").trim()) continue;
               try {
-                await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: cleanIntro });
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: message,
+                });
               } catch (_e) {}
               try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanIntro });
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message,
+                });
               } catch (_e) {}
             }
-            for (const dateMsg of dateMessages) {
-              const cleanMsg = String(dateMsg ?? "").trim();
-              if (!cleanMsg) continue;
-              try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-              } catch (_e) {}
-            }
-            const allFinalMessages = [...introMsgs, ...(dateMessages ?? [])];
             try {
               void appendHistoryEvent({
                 leadId,
@@ -3261,34 +3289,62 @@ export async function POST(req: Request) {
                   .update({ recurring_class_status: "dia_pendente" } as any)
                   .eq("id", leadId);
               } catch (_e) {}
-              const { messages: fbDateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
-                admin,
-                leadId,
-                conversationId,
-                leadTimeZone: leadTzGeneral,
-              });
-              const fbIntroMsgs: string[] = [
+              let fbLocalDateMsgs: [string, string] = [
+                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+                "Responda apenas com o dia desejado.",
+              ];
+              try {
+                const nowG = new Date();
+                const { data: bkG, error: bkGErr } = await admin
+                  .from("atendimento_experimental_class_bookings")
+                  .select("professor_start_at")
+                  .eq("status", "scheduled")
+                  .gte("professor_start_at", nowG.toISOString())
+                  .order("professor_start_at", { ascending: true });
+                if (!bkGErr) {
+                  const bookedG = (bkG ?? []).map((r: any) => String(r?.professor_start_at ?? "").trim()).filter(Boolean);
+                  const avG = listExperimentalClassAvailability({
+                    now: nowG,
+                    leadTimeZone: leadTzGeneral,
+                    bookedProfessorStartAts: bookedG,
+                  });
+                  const realFb = buildExperimentalClassDatesMessages(avG.dates);
+                  if (Array.isArray(realFb) && realFb.length >= 2) {
+                    const d1 = String(realFb[0] ?? "").trim();
+                    const d2 = String(realFb[1] ?? "").trim();
+                    if (d1 && d2) {
+                      fbLocalDateMsgs = [d1, d2];
+                    }
+                  }
+                }
+              } catch (_e) {
+                fbLocalDateMsgs = [
+                  "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+                  "Responda apenas com o dia desejado.",
+                ];
+              }
+              const allMessages: string[] = [
                 ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
                 ...buildRecurringSchedulePromptMessages(),
+                fbLocalDateMsgs[0],
+                fbLocalDateMsgs[1],
               ];
-              for (const introMsg of fbIntroMsgs) {
-                const cleanIntro = String(introMsg ?? "").trim();
-                if (!cleanIntro) continue;
+              for (const message of allMessages) {
+                if (!String(message ?? "").trim()) continue;
                 try {
-                  await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: cleanIntro });
+                  await insertWhatsAppBotTextMessage({
+                    admin,
+                    conversationId,
+                    contentText: message,
+                  });
                 } catch (_e) {}
                 try {
-                  await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanIntro });
+                  await sendAtendimentoWhatsAppText({
+                    phone: normalizedPhoneOnly,
+                    message,
+                  });
                 } catch (_e) {}
               }
-              for (const dateMsg of fbDateMessages) {
-                const cleanMsg = String(dateMsg ?? "").trim();
-                if (!cleanMsg) continue;
-                try {
-                  await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-                } catch (_e) {}
-              }
-              const allMessages = [...fbIntroMsgs, ...(fbDateMessages ?? [])];
               replyText = allMessages.join("\n\n");
             } catch (_e) {
               replyText =
