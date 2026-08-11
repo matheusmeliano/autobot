@@ -1987,6 +1987,8 @@ export async function POST(req: Request) {
         const conversationId = String(leadContext.conversation.id);
         const lead = leadContext.lead as any;
         const conversation = leadContext.conversation as any;
+        const leadFullNameRaw = String((lead as any)?.full_name ?? "").trim();
+        const leadFirstName = leadFullNameRaw ? leadFullNameRaw.split(/\s+/)[0] || "" : "";
 
         const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
         const currentBookingId = currentBooking?.id ? String(currentBooking.id) : "";
@@ -2059,7 +2061,10 @@ export async function POST(req: Request) {
         }
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
         const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
-        const NAO_RECUSA_MSG_1 = "Tudo bem, entendemos que talvez ainda não seja o momento.";
+        const NAO_RECUSA_MSG_1_PREFIX = leadFirstName
+          ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
+          : "Tudo bem, entendemos que talvez ainda não seja o momento.";
+        const NAO_RECUSA_MSG_1 = NAO_RECUSA_MSG_1_PREFIX;
 
         const inboundContentRaw = String(messageText ?? "").trim();
         const inboundNormalizedNuclear = inboundContentRaw
@@ -3001,8 +3006,11 @@ export async function POST(req: Request) {
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
           } else if (isNo) {
+            const refusalMsg1 = leadFirstName
+              ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
+              : "Tudo bem, entendemos que talvez ainda não seja o momento.";
             noReplies = [
-              "Tudo bem, entendemos que talvez ainda não seja o momento.",
+              refusalMsg1,
               "Em breve nossa equipe entrará em contato.",
             ];
             nextLeadFunnel = "matricula_pendente_recusada";
