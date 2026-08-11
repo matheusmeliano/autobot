@@ -794,19 +794,18 @@ export function buildRecurringPlanIntroMessages(name: string | null | undefined)
 export function buildRecurringSchedulePromptMessages(): string[] {
   return [
     "Antes do contrato e pagamento, qual dia e horário da semana você prefere reservar para suas aulas?",
-    "Confira os dias disponíveis:",
   ];
 }
 
-export function buildRecurringWeekdayDatesMessages(options: RecurringWeekdayOption[]): string[] {
+export function buildRecurringCalendarDatesMessages(options: ExperimentalClassDateOption[]): string[] {
   if (!options.length) {
     return ["No momento, não há dias e horários recorrentes disponíveis até o fim deste mês. Nossa equipe entrará em contato para ajustar."];
   }
-  const lines = options
-    .map((opt) => `${opt.displayLabel} (${opt.slotCount} horário${opt.slotCount === 1 ? "" : "s"})`)
-    .map((line, idx) => `${idx + 1}. ${line}`);
-  const header = ["Confira os dias disponíveis para aula recorrente fixa semanal:"];
-  return [...header, ...lines];
+  const labels = options.map((option) => option.dayLabel);
+  return [
+    `Os dias disponíveis são:\n\n${joinWithFinalConjunction(labels)}.`,
+    "Responda apenas com o dia desejado.",
+  ];
 }
 
 export function buildRecurringWeekdayTimesMessages(params: {

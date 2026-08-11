@@ -42,11 +42,11 @@ import {
   listExperimentalClassAvailability,
   buildRecurringPlanIntroMessages,
   buildRecurringSchedulePromptMessages,
-  buildRecurringWeekdayDatesMessages,
-  buildRecurringWeekdayTimesMessages,
-  findRecurringWeekdayOption,
-  findRecurringWeekdayTimeOption,
-  listRecurringWeekdayAvailability,
+  buildRecurringCalendarDatesMessages,
+  buildExperimentalClassTimesMessages as buildRecurringCalendarTimesMessages,
+  findExperimentalClassDateOption as findRecurringCalendarDateOption,
+  findExperimentalClassTimeOption as findRecurringCalendarTimeOption,
+  listExperimentalClassAvailability as listRecurringCalendarAvailability,
 } from "@/lib/atendimento/experimentalClass";
 import {
   appendHistoryEvent,
@@ -950,7 +950,7 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
   return { lastOutbound, dateOption, slots, messages };
 }
 
-async function presentRecurringWeekdayDateOptionsWhatsApp(params: {
+async function presentRecurringCalendarDateOptionsWhatsApp(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
@@ -966,14 +966,12 @@ async function presentRecurringWeekdayDateOptionsWhatsApp(params: {
   const bookedProfessorStarts = bErr
     ? []
     : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
-  const availability = listRecurringWeekdayAvailability({
+  const availability = listRecurringCalendarAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
   });
-  const messages = [
-    ...buildRecurringWeekdayDatesMessages(availability.dates),
-  ];
+  const messages = buildRecurringCalendarDatesMessages(availability.dates);
   let lastOutbound: Record<string, unknown> | null = null;
   for (const message of messages) {
     lastOutbound = await insertWhatsAppBotTextMessage({
@@ -985,8 +983,8 @@ async function presentRecurringWeekdayDateOptionsWhatsApp(params: {
   await appendHistoryEvent({
     leadId: params.leadId,
     conversationId: params.conversationId,
-    eventType: "recurring_weekday_date_options_presented",
-    title: "Dias da semana disponiveis para aula recorrente apresentados",
+    eventType: "recurring_calendar_date_options_presented",
+    title: "Dias do calendario para aula recorrente apresentados",
     details: {
       teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
@@ -1002,13 +1000,12 @@ async function presentRecurringWeekdayDateOptionsWhatsApp(params: {
   return { lastOutbound, availability, messages };
 }
 
-async function presentRecurringWeekdayTimeOptionsWhatsApp(params: {
+async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
   leadTimeZone?: string | null;
-  weekdayKey: "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
-  weekdayLabel: string;
+  professorDate: string;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -1020,14 +1017,15 @@ async function presentRecurringWeekdayTimeOptionsWhatsApp(params: {
   const bookedProfessorStarts = bErr
     ? []
     : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
-  const availability = listRecurringWeekdayAvailability({
+  const availability = listRecurringCalendarAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
   });
-  const slots = availability.slotsByWeekday.get(params.weekdayKey) ?? [];
-  const messages = buildRecurringWeekdayTimesMessages({
-    weekdayLabel: params.weekdayLabel,
+  const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
+  const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
+  const messages = buildRecurringCalendarTimesMessages({
+    dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
   let lastOutbound: Record<string, unknown> | null = null;
@@ -1041,13 +1039,12 @@ async function presentRecurringWeekdayTimeOptionsWhatsApp(params: {
   await appendHistoryEvent({
     leadId: params.leadId,
     conversationId: params.conversationId,
-    eventType: "recurring_weekday_time_options_presented",
-    title: "Horarios disponiveis da semana recorrente apresentados",
+    eventType: "recurring_calendar_time_options_presented",
+    title: "Horarios disponiveis da aula recorrente apresentados",
     details: {
       teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      weekday: params.weekdayKey,
-      weekday_label: params.weekdayLabel,
+      professor_date: params.professorDate,
     },
     actorType: "system",
   });
@@ -1056,7 +1053,7 @@ async function presentRecurringWeekdayTimeOptionsWhatsApp(params: {
     contentText: messages[messages.length - 1] ?? "",
     createdAt: new Date().toISOString(),
   });
-  return { lastOutbound, slots, messages };
+  return { lastOutbound, dateOption, slots, messages };
 }
 
 async function getScheduledExperimentalClassBookingWhatsApp(params: {
@@ -2607,7 +2604,7 @@ export async function POST(req: Request) {
             }
             let recurringAvail: { lastOutbound: any; availability: any; messages: string[] } | null = null;
             try {
-              recurringAvail = await presentRecurringWeekdayDateOptionsWhatsApp({
+              recurringAvail = await presentRecurringCalendarDateOptionsWhatsApp({
                 admin,
                 leadId,
                 conversationId,
@@ -3289,7 +3286,7 @@ export async function POST(req: Request) {
                 } catch (_e) {}
               }
               try {
-                const r = await presentRecurringWeekdayDateOptionsWhatsApp({
+                const r = await presentRecurringCalendarDateOptionsWhatsApp({
                   admin,
                   leadId,
                   conversationId,
