@@ -1693,14 +1693,11 @@ export async function POST(req: Request) {
     equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
     equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
 
-  if (
-    isZapiInternalBlocklistedPhone(fromPhoneDigits) ||
-    isZapiInternalBlocklistedPhone(toPhoneDigitsBroad)
-  ) {
+  if (isZapiInternalBlocklistedPhone(fromPhoneDigits)) {
     return Response.json({
       ok: true,
       ignored: true,
-      reason: "zapi_internal_phone_number_blocklisted",
+      reason: "zapi_internal_phone_number_blocklisted_sender_loopback_only",
     });
   }
 
