@@ -302,12 +302,6 @@ function LeadDetails({
                   )
                 }
               />
-              {String(lead.recurring_class_created_at ?? "").trim() ? (
-                <Field
-                  label="Cadastrado em"
-                  value={formatAtendimentoDateTime(String(lead.recurring_class_created_at ?? "").trim())}
-                />
-              ) : null}
             </div>
           </div>
         ) : null}
