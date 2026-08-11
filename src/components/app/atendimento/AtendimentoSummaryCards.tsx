@@ -591,7 +591,14 @@ function BookingDetails({
         ) : null}
 
         {booking || showIncompleteState ? (
-          <div className={showAttendanceCard ? "mt-4 " : ""} className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+          <div
+            className={[
+              showAttendanceCard ? "mt-4" : "",
+              "rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                 Histórico — Aula experimental
