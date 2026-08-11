@@ -102,6 +102,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
 
   const schema = z.object({
     full_name: z.string().trim().max(160).nullable().optional(),
+    recurring_class_link: z.string().trim().max(500).nullable().optional(),
   });
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -116,9 +117,27 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
         ? null
         : String(fullNameRaw).trim() || null;
 
+  const recurringLinkRaw = parsed.data.recurring_class_link;
+  let safeRecurringLink: undefined | null | string = undefined;
+  if (recurringLinkRaw === undefined) {
+    safeRecurringLink = undefined;
+  } else if (recurringLinkRaw === null) {
+    safeRecurringLink = null;
+  } else {
+    const trimmed = String(recurringLinkRaw).trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      safeRecurringLink = trimmed;
+    } else if (trimmed.length === 0) {
+      safeRecurringLink = null;
+    } else {
+      safeRecurringLink = null;
+    }
+  }
+
   const admin = createSupabaseAdminClient();
   const updateData: Record<string, unknown> = {};
   if (safeFullName !== undefined) updateData.full_name = safeFullName;
+  if (safeRecurringLink !== undefined) updateData.recurring_class_link = safeRecurringLink;
 
   if (Object.keys(updateData).length === 0) {
     return Response.json({ ok: true, lead: null });
@@ -129,7 +148,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     .update(updateData)
     .eq("id", leadId)
     .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-    .select("id, full_name, updated_at")
+    .select("id, full_name, recurring_class_link, updated_at")
     .maybeSingle();
 
   if (error) {
@@ -144,6 +163,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     lead: {
       id: String(updated.id ?? ""),
       full_name: String((updated as any).full_name ?? "").trim() || null,
+      recurring_class_link: String((updated as any).recurring_class_link ?? "").trim() || null,
       updated_at: String((updated as any).updated_at ?? new Date().toISOString()),
     },
   });

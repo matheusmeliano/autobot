@@ -151,12 +151,16 @@ function LeadDetails({
   deleting,
   onDelete,
   onEditName,
+  savingRecurringLink,
+  onSaveRecurringLink,
 }: {
   lead: AtendimentoLeadListItem;
   showDelete: boolean;
   deleting: boolean;
   onDelete: () => void;
   onEditName: (lead: AtendimentoLeadListItem) => void;
+  savingRecurringLink: boolean;
+  onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
 }) {
   const hasName = Boolean(String(lead.full_name ?? "").trim());
   const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
@@ -165,6 +169,14 @@ function LeadDetails({
     Boolean(String(lead.recurring_class_status ?? "").trim()) ||
     Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
     Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+  const initialRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
+  const [recurringLinkDraft, setRecurringLinkDraft] = useState(initialRecurringLink);
+  useEffect(() => {
+    setRecurringLinkDraft(String((lead as any).recurring_class_link ?? "").trim());
+  }, [lead.id, (lead as any).recurring_class_link]);
+  const savedRecurringLink = initialRecurringLink;
+  const recurringLinkChanged = recurringLinkDraft.trim() !== savedRecurringLink;
+  const canOpenRecurringLink = /^https?:\/\//i.test(savedRecurringLink);
   const statusRaw = String(lead.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
   const isMatriculado = statusRaw === "matriculado" || statusRaw === "aluno" || funnelRaw.includes("aluno") || hasRecurring;
@@ -304,6 +316,61 @@ function LeadDetails({
                 }
               />
             </div>
+
+            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Link fixo da aula (todas as recorrentes)
+                </div>
+                {canOpenRecurringLink ? (
+                  <a
+                    href={savedRecurringLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
+                    title="Abrir link da aula recorrente"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    Abrir aula
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                    URL da aula
+                  </label>
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://meet.google.com/..."
+                    value={recurringLinkDraft}
+                    onChange={(e) => setRecurringLinkDraft(e.target.value)}
+                    className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={savingRecurringLink}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onSaveRecurringLink(lead, recurringLinkDraft)}
+                  disabled={savingRecurringLink || !recurringLinkChanged}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingRecurringLink ? (
+                    <>
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 shrink-0" />
+                      {savedRecurringLink ? "Atualizar" : "Salvar"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -367,10 +434,12 @@ function BookingDetails({
   markingAttendanceBookingId,
   markingAttendanceType,
   sendingStudentNotificationBookingId,
+  savingRecurringLink,
   onCancelBooking,
   onSaveLessonLink,
   onMarkAttendance,
   onSendStudentNotification,
+  onSaveRecurringLink,
 }: {
   lead: AtendimentoLeadListItem;
   cancellingBookingId: string | null;
@@ -378,12 +447,22 @@ function BookingDetails({
   markingAttendanceBookingId: string | null;
   markingAttendanceType: "attended" | "no_show" | null;
   sendingStudentNotificationBookingId: string | null;
+  savingRecurringLink: boolean;
   onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveLessonLink: (lead: AtendimentoLeadListItem, lessonLink: string) => Promise<void>;
   onMarkAttendance: (lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") => Promise<void>;
   onSendStudentNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
+  onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
 }) {
   const booking = lead.experimental_class_booking;
+  const initialSavedRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
+  const [recurringLinkDraft, setRecurringLinkDraft] = useState(initialSavedRecurringLink);
+  const savedRecurringLink = initialSavedRecurringLink;
+  useEffect(() => {
+    setRecurringLinkDraft(String((lead as any).recurring_class_link ?? "").trim());
+  }, [lead.id, (lead as any).recurring_class_link]);
+  const recurringLinkChanged = recurringLinkDraft.trim() !== savedRecurringLink;
+  const canOpenSavedRecurringLink = /^https?:\/\//i.test(savedRecurringLink);
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const bookingId = String(booking?.id ?? "").trim();
   const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
@@ -761,6 +840,61 @@ function BookingDetails({
                 />
               ) : null}
             </div>
+
+            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Link fixo da aula (todas as recorrentes)
+                </div>
+                {canOpenSavedRecurringLink ? (
+                  <a
+                    href={savedRecurringLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
+                    title="Abrir link da aula recorrente"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    Abrir aula
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                    URL da aula
+                  </label>
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://meet.google.com/..."
+                    value={recurringLinkDraft}
+                    onChange={(e) => setRecurringLinkDraft(e.target.value)}
+                    className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={savingRecurringLink}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onSaveRecurringLink(lead, recurringLinkDraft)}
+                  disabled={savingRecurringLink || !recurringLinkChanged}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingRecurringLink ? (
+                    <>
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 shrink-0" />
+                      {savedRecurringLink ? "Atualizar" : "Salvar"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
       </div>
@@ -958,6 +1092,7 @@ export function AtendimentoSummaryCards({
   const [markingAttendanceType, setMarkingAttendanceType] = useState<"attended" | "no_show" | null>(null);
   const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] =
     useState<string | null>(null);
+  const [savingRecurringLinkLeadId, setSavingRecurringLinkLeadId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
@@ -1331,6 +1466,47 @@ export function AtendimentoSummaryCards({
     }
   }
 
+  async function handleSaveRecurringLink(lead: AtendimentoLeadListItem, recurringLink: string) {
+    const leadId = String(lead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para salvar o link da aula recorrente.");
+      return;
+    }
+    const trimmed = recurringLink.trim();
+
+    try {
+      setSavingRecurringLinkLeadId(leadId);
+      const response = await fetch(`/api/atendimento/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recurring_class_link: trimmed || null }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; lead?: { id?: string; recurring_class_link?: string | null; updated_at?: string } | null }
+        | null;
+
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao salvar o link da aula recorrente.");
+        return;
+      }
+
+      const newLink = String(payload?.lead?.recurring_class_link ?? trimmed).trim() || null;
+      const newUpdatedAt = String(payload?.lead?.updated_at ?? lead.updated_at ?? new Date().toISOString());
+      setLocalLeads((current) =>
+        current.map((item) =>
+          item.id === leadId
+            ? ({ ...item, recurring_class_link: newLink, updated_at: newUpdatedAt } as AtendimentoLeadListItem & { recurring_class_link: string | null })
+            : item,
+        ),
+      );
+      modalToast.success(newLink ? "Link fixo da aula recorrente salvo." : "Link fixo da aula recorrente removido.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao salvar o link da aula recorrente.");
+    } finally {
+      setSavingRecurringLinkLeadId(null);
+    }
+  }
+
   async function handleMarkAttendance(lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") {
     const booking = lead.experimental_class_booking;
     const bookingId = String(booking?.id ?? "").trim();
@@ -1598,10 +1774,12 @@ export function AtendimentoSummaryCards({
                   markingAttendanceBookingId={markingAttendanceBookingId}
                   markingAttendanceType={markingAttendanceType}
                   sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
+                  savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                   onCancelBooking={handleCancelBooking}
                   onSaveLessonLink={handleSaveLessonLink}
                   onMarkAttendance={handleMarkAttendance}
                   onSendStudentNotification={handleSendStudentNotification}
+                  onSaveRecurringLink={handleSaveRecurringLink}
                 />
               ) : (
                 <LeadDetails
@@ -1610,6 +1788,8 @@ export function AtendimentoSummaryCards({
                   deleting={deletingLeadId === selectedLead.id}
                   onDelete={() => handleDeleteLead(selectedLead)}
                   onEditName={(l) => openEditLeadName(l)}
+                  savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
+                  onSaveRecurringLink={handleSaveRecurringLink}
                 />
               )
             ) : (
@@ -1661,10 +1841,12 @@ export function AtendimentoSummaryCards({
                       markingAttendanceBookingId={markingAttendanceBookingId}
                       markingAttendanceType={markingAttendanceType}
                       sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
+                      savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                       onCancelBooking={handleCancelBooking}
                       onSaveLessonLink={handleSaveLessonLink}
                       onMarkAttendance={handleMarkAttendance}
                       onSendStudentNotification={handleSendStudentNotification}
+                      onSaveRecurringLink={handleSaveRecurringLink}
                     />
                   ) : (
                     <LeadDetails
@@ -1673,6 +1855,8 @@ export function AtendimentoSummaryCards({
                       deleting={deletingLeadId === selectedLead.id}
                       onDelete={() => handleDeleteLead(selectedLead)}
                       onEditName={(l) => openEditLeadName(l)}
+                      savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
+                      onSaveRecurringLink={handleSaveRecurringLink}
                     />
                   )}
                 </div>
