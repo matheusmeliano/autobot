@@ -1455,7 +1455,7 @@ export function AtendimentoSummaryCards({
               ) : (
                 <LeadDetails
                   lead={selectedLead}
-                  showDelete={activeSection === "interessados"}
+                  showDelete={activeSection === "interessados" || activeSection === "alunos"}
                   deleting={deletingLeadId === selectedLead.id}
                   onDelete={() => handleDeleteLead(selectedLead)}
                   onEditName={(l) => openEditLeadName(l)}
@@ -1518,7 +1518,7 @@ export function AtendimentoSummaryCards({
                   ) : (
                     <LeadDetails
                       lead={selectedLead}
-                      showDelete={activeSection === "interessados"}
+                      showDelete={activeSection === "interessados" || activeSection === "alunos"}
                       deleting={deletingLeadId === selectedLead.id}
                       onDelete={() => handleDeleteLead(selectedLead)}
                       onEditName={(l) => openEditLeadName(l)}
