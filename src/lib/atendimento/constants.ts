@@ -27,6 +27,9 @@ export const ATENDIMENTO_STAGE_ORDER = [
   "pre_cadastro_concluido",
   "matricula_pendente",
   "matriculado",
+  "matricula_pendente_recusada",
+  "cadastro_recorrente_pendente_plataforma",
+  "aluno_recorrente_cadastrado",
   "encerrado",
 ] as const;
 
@@ -35,6 +38,9 @@ export const ATENDIMENTO_STATUS_ORDER = [
   "em_atendimento",
   "matricula_pendente",
   "matriculado",
+  "matricula_pendente_recusada",
+  "cadastro_recorrente_pendente_plataforma",
+  "aluno",
   "encerrado",
 ] as const;
 
