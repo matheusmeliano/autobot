@@ -28,6 +28,7 @@ type AvailabilityResponse = {
   slotsByWeekday: Record<RecurringWeekdayKey, RecurringWeekdayTimeOption[]>;
   timeZone: string;
   generatedAt?: string;
+  error?: string;
 };
 
 type SubmitResponse = {
