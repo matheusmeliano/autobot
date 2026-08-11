@@ -409,19 +409,6 @@ function BookingDetails({
   const hasAttendanceStatus =
     String(booking?.attendance_status ?? "").trim() === "attended" ||
     String(booking?.attendance_status ?? "").trim() === "no_show";
-  const leadIsRecurringAlunoNow = Boolean(
-    hasRecurringClass ||
-      lead.status === "aluno" ||
-      lead.status === "matriculado" ||
-      lead.status === "cadastro_recorrente_pendente_plataforma" ||
-      lead.funnel_stage === "aluno_recorrente_cadastrado" ||
-      lead.funnel_stage === "cadastro_recorrente_pendente_plataforma" ||
-      (lead as any).funnel_stage === "matriculado" ||
-      (lead as any).status === "aluno",
-  );
-  const showAttendanceCard =
-    !leadIsRecurringAlunoNow &&
-    (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
   const attendanceStatus = booking?.attendance_status ?? null;
   const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
     bookingStatus: booking?.status,
@@ -447,6 +434,19 @@ function BookingDetails({
   const hasRecurringClass = Boolean(
     recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime),
   );
+  const leadIsRecurringAlunoNow = Boolean(
+    hasRecurringClass ||
+      lead.status === "aluno" ||
+      lead.status === "matriculado" ||
+      lead.status === "cadastro_recorrente_pendente_plataforma" ||
+      lead.funnel_stage === "aluno_recorrente_cadastrado" ||
+      lead.funnel_stage === "cadastro_recorrente_pendente_plataforma" ||
+      (lead as any).funnel_stage === "matriculado" ||
+      (lead as any).status === "aluno",
+  );
+  const showAttendanceCard =
+    !leadIsRecurringAlunoNow &&
+    (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
       ? calculateNextRecurringOccurrence({
