@@ -31,6 +31,13 @@ export type AtendimentoLead = {
   experimental_class_professor_start_at?: string | null;
   experimental_class_lead_start_at?: string | null;
   experimental_class_status?: string | null;
+  recurring_class_status?: string | null;
+  recurring_class_weekday?: string | null;
+  recurring_class_weekday_label?: string | null;
+  recurring_class_professor_time?: string | null;
+  recurring_class_lead_time?: string | null;
+  recurring_class_created_at?: string | null;
+  signup_password_raw_temp?: string | null;
 };
 
 export type AtendimentoConversation = {

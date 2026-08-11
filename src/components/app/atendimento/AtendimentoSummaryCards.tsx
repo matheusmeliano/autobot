@@ -260,6 +260,52 @@ function LeadDetails({
           </div>
         ) : null}
 
+        {lead.recurring_class_status ||
+        lead.recurring_class_weekday ||
+        lead.recurring_class_professor_time ||
+        lead.recurring_class_lead_time ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+              Aula recorrente / fixa
+            </div>
+            {String(lead.recurring_class_status ?? "").trim() ? (
+              <div className="mt-2 inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                {String(lead.recurring_class_status ?? "")
+                  .trim()
+                  .toLowerCase()
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())}
+              </div>
+            ) : null}
+            <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field
+                label="Dia da semana"
+                value={
+                  String(lead.recurring_class_weekday_label ?? "").trim() ||
+                  String(lead.recurring_class_weekday ?? "").trim() ||
+                  null
+                }
+              />
+              <Field
+                label="Horário fixo"
+                value={
+                  atendimentoTimeLabel(
+                    String(lead.recurring_class_lead_time ?? "").trim() ||
+                      String(lead.recurring_class_professor_time ?? "").trim() ||
+                      null,
+                  )
+                }
+              />
+              {String(lead.recurring_class_created_at ?? "").trim() ? (
+                <Field
+                  label="Cadastrado em"
+                  value={formatAtendimentoDateTime(String(lead.recurring_class_created_at ?? "").trim())}
+                />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         {showDraftSection ? (
           <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
@@ -648,27 +694,39 @@ export function AtendimentoSummaryCards({
     () => localLeads.filter((lead) => leadHasExperimentalClassPanelStatus(lead)),
     [localLeads],
   );
+  const interessadosItems = useMemo(
+    () =>
+      localLeads.filter(
+        (lead) => lead.status !== "matriculado" && lead.funnel_stage !== "matriculado",
+      ),
+    [localLeads],
+  );
+  const alunosItems = useMemo(
+    () =>
+      localLeads.filter(
+        (lead) =>
+          lead.status === "matriculado" ||
+          (lead as any).funnel_stage === "matriculado" ||
+          (lead as any).status === "aluno" ||
+          (lead as any).funnel_stage === "aluno_recorrente_cadastrado",
+      ),
+    [localLeads],
+  );
   const sections = useMemo(
     () => [
       {
         id: "interessados" as const,
         label: "Interessados",
-        value: localSummary.totalLeads,
+        value: interessadosItems.length,
         emptyMessage: "Nenhum interessado disponível no momento.",
-        items: localLeads.filter((lead) => lead.status !== "matriculado" && lead.funnel_stage !== "matriculado"),
+        items: interessadosItems,
       },
       {
         id: "alunos" as const,
         label: "Alunos",
-        value: localSummary.matriculados ?? 0,
+        value: alunosItems.length,
         emptyMessage: "Nenhum aluno disponível no momento.",
-        items: localLeads.filter(
-          (lead) =>
-            lead.status === "matriculado" ||
-            (lead as any).funnel_stage === "matriculado" ||
-            (lead as any).status === "aluno" ||
-            (lead as any).funnel_stage === "aluno_recorrente_cadastrado",
-        ),
+        items: alunosItems,
       },
       {
         id: "agendamentos" as const,
@@ -685,7 +743,7 @@ export function AtendimentoSummaryCards({
         items: [],
       },
     ],
-    [agendamentoItems, localLeads, localSummary],
+    [agendamentoItems, interessadosItems, alunosItems],
   );
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
