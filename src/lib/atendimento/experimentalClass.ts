@@ -736,3 +736,257 @@ export function findExperimentalClassTimeOption(
 
   return null;
 }
+
+export type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+
+export const RECURRING_WEEKDAY_LABELS_PT_BR: Record<RecurringWeekdayKey, string> = {
+  mon: "Segunda-feira",
+  tue: "Terça-feira",
+  wed: "Quarta-feira",
+  thu: "Quinta-feira",
+  fri: "Sexta-feira",
+  sat: "Sábado",
+};
+
+export const RECURRING_WEEKDAY_SHORT_LABELS: Record<RecurringWeekdayKey, string> = {
+  mon: "Seg",
+  tue: "Ter",
+  wed: "Qua",
+  thu: "Qui",
+  fri: "Sex",
+  sat: "Sáb",
+};
+
+export type RecurringWeekdayOption = {
+  id: RecurringWeekdayKey;
+  weekday: RecurringWeekdayKey;
+  label: string;
+  shortLabel: string;
+  displayLabel: string;
+  slotCount: number;
+};
+
+export type RecurringWeekdayTimeOption = {
+  id: string;
+  weekday: RecurringWeekdayKey;
+  professorTime: string;
+  leadTime: string;
+  displayLabel: string;
+};
+
+function firstOnlyNameForRecurring(full: string | null | undefined): string {
+  const safe = String(full ?? "").trim();
+  return safe.split(/\s+/)[0] || "";
+}
+
+export function buildRecurringPlanIntroMessages(name: string | null | undefined): string[] {
+  const safeFirst = firstOnlyNameForRecurring(name) || "Aluno(a)";
+  const msg1 = `${safeFirst}, o plano escolhido é:`;
+  const msg2 = [
+    "Modelo Individual",
+    "• 1 aula online ao vivo por semana",
+    "• Ensino personalizado",
+    "• Acompanhamento contínuo",
+  ].join("\n");
+  return [msg1, msg2];
+}
+
+export function buildRecurringSchedulePromptMessages(): string[] {
+  return [
+    "Antes do contrato e pagamento, qual dia e horário da semana você prefere reservar para suas aulas?",
+    "Confira os dias disponíveis:",
+  ];
+}
+
+export function buildRecurringWeekdayDatesMessages(options: RecurringWeekdayOption[]): string[] {
+  if (!options.length) {
+    return ["No momento, não há dias e horários recorrentes disponíveis até o fim deste mês. Nossa equipe entrará em contato para ajustar."];
+  }
+  const lines = options
+    .map((opt) => `${opt.displayLabel} (${opt.slotCount} horário${opt.slotCount === 1 ? "" : "s"})`)
+    .map((line, idx) => `${idx + 1}. ${line}`);
+  const header = ["Confira os dias disponíveis para aula recorrente fixa semanal:"];
+  return [...header, ...lines];
+}
+
+export function buildRecurringWeekdayTimesMessages(params: {
+  weekdayLabel: string;
+  options: RecurringWeekdayTimeOption[];
+}): string[] {
+  if (!params.options.length) {
+    return [`No momento, não há horários disponíveis para ${params.weekdayLabel}.`];
+  }
+  const lines = params.options
+    .map((opt) => opt.displayLabel)
+    .map((line, idx) => `${idx + 1}. ${line}`);
+  return [`Horários disponíveis para ${params.weekdayLabel}:`, ...lines];
+}
+
+export function listRecurringWeekdayAvailability(params: {
+  now?: Date;
+  leadTimeZone?: string | null;
+  bookedProfessorStartAts?: string[];
+  lookAheadWeeks?: number;
+}) {
+  const now = params.now ?? new Date();
+  const lookAheadWeeks = Number.isFinite(Number(params.lookAheadWeeks))
+    ? Math.max(1, Number(params.lookAheadWeeks))
+    : 4;
+  const leadTimeZone = String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+
+  const bookedProfessorStarts = (params.bookedProfessorStartAts ?? [])
+    .map((value) => new Date(String(value ?? "")).toISOString())
+    .filter(Boolean);
+  const booked = bookedProfessorStarts
+    .map((iso) => {
+      const d = new Date(iso);
+      const ms = d.getTime();
+      if (!Number.isFinite(ms)) return null;
+      const weekday = weekdayInTimeZone(d, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
+      const hh = new Intl.DateTimeFormat("en-GB", {
+        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(d);
+      const hour = hh.find((p) => p.type === "hour")?.value ?? "";
+      const minute = hh.find((p) => p.type === "minute")?.value ?? "";
+      const timeKey = `${hour}:${minute}`;
+      return { weekday, timeKey, ms };
+    })
+    .filter((x): x is { weekday: string; timeKey: string; ms: number } => Boolean(x));
+
+  const blockedCombos = new Set<string>();
+  for (const b of booked) {
+    blockedCombos.add(`${b.weekday}|${b.timeKey}`);
+    for (let w = 1; w < lookAheadWeeks; w++) {
+      const futureMs = b.ms + w * 7 * 24 * 60 * 60 * 1000;
+      if (futureMs > now.getTime() - 24 * 60 * 60 * 1000) {
+        const future = new Date(futureMs);
+        const weekdayF = weekdayInTimeZone(future, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
+        const hh = new Intl.DateTimeFormat("en-GB", {
+          timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).formatToParts(future);
+        const hourF = hh.find((p) => p.type === "hour")?.value ?? "";
+        const minuteF = hh.find((p) => p.type === "minute")?.value ?? "";
+        const timeKeyF = `${hourF}:${minuteF}`;
+        blockedCombos.add(`${weekdayF}|${timeKeyF}`);
+      }
+    }
+  }
+
+  const weekdayOrder: RecurringWeekdayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
+  const optionsByWeekday = new Map<RecurringWeekdayKey, RecurringWeekdayTimeOption[]>();
+
+  for (const weekday of weekdayOrder) {
+    const slots: RecurringWeekdayTimeOption[] = [];
+    for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
+      const comboKey = `${weekday}|${professorTime}`;
+      if (blockedCombos.has(comboKey)) continue;
+
+      const nextMonday = (() => {
+        const base = new Date(now);
+        const dow = base.getUTCDay();
+        const diff = (dow + 6) % 7;
+        const d = new Date(base.getTime() - diff * 24 * 60 * 60 * 1000);
+        return d;
+      })();
+      const weekdayOffset = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5 }[weekday];
+      const sampleDate = new Date(nextMonday.getTime() + weekdayOffset * 24 * 60 * 60 * 1000);
+      const localDate = localDateInTimeZone(sampleDate, ATENDIMENTO_PROFESSOR_TIME_ZONE);
+      const sampleStartAt = zonedDateTimeToUtcIso({
+        date: localDate,
+        time: professorTime,
+        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      });
+      slots.push({
+        id: `${weekday}|${professorTime}`,
+        weekday,
+        professorTime,
+        leadTime: formatTimeInTimeZone(sampleStartAt, leadTimeZone),
+        displayLabel: formatTimeInTimeZone(sampleStartAt, leadTimeZone),
+      });
+    }
+    if (slots.length > 0) {
+      optionsByWeekday.set(weekday, slots);
+    }
+  }
+
+  const dates: RecurringWeekdayOption[] = weekdayOrder
+    .filter((wd) => (optionsByWeekday.get(wd) ?? []).length > 0)
+    .map((wd) => ({
+      id: wd,
+      weekday: wd,
+      label: RECURRING_WEEKDAY_LABELS_PT_BR[wd],
+      shortLabel: RECURRING_WEEKDAY_SHORT_LABELS[wd],
+      displayLabel: RECURRING_WEEKDAY_LABELS_PT_BR[wd],
+      slotCount: (optionsByWeekday.get(wd) ?? []).length,
+    }));
+
+  return { dates, slotsByWeekday: optionsByWeekday };
+}
+
+export function findRecurringWeekdayOption(input: string, options: RecurringWeekdayOption[]): RecurringWeekdayOption | null {
+  const normalized = normalizeSelectionText(input);
+  if (!normalized) return null;
+  const digitsOnly = (normalized.match(/\d+/) || [])[0] ?? "";
+
+  for (const opt of options) {
+    if (normalized === normalizeSelectionText(opt.displayLabel)) return opt;
+    if (normalized === normalizeSelectionText(opt.label)) return opt;
+    if (normalized === normalizeSelectionText(opt.shortLabel)) return opt;
+    if (normalized === normalizeSelectionText(opt.weekday)) return opt;
+  }
+
+  if (digitsOnly) {
+    const idx = Number(digitsOnly);
+    if (Number.isFinite(idx) && idx >= 1 && idx <= options.length) {
+      return options[idx - 1] ?? null;
+    }
+  }
+
+  const keywordMap: Array<[RegExp, RecurringWeekdayKey]> = [
+    [/(segunda|^seg)/i, "mon"],
+    [/(terca|terça|^ter)/i, "tue"],
+    [/(quarta|^qua)/i, "wed"],
+    [/(quinta|^qui)/i, "thu"],
+    [/(sexta|^sex)/i, "fri"],
+    [/(sabado|sábado|^sab|^sáb)/i, "sat"],
+  ];
+  for (const [regex, key] of keywordMap) {
+    if (regex.test(String(input ?? ""))) {
+      return options.find((o) => o.weekday === key) ?? null;
+    }
+  }
+  return null;
+}
+
+export function findRecurringWeekdayTimeOption(input: string, options: RecurringWeekdayTimeOption[]): RecurringWeekdayTimeOption | null {
+  const normalized = normalizeSelectionText(input);
+  if (!normalized) return null;
+  for (const opt of options) {
+    if (normalized === normalizeSelectionText(opt.displayLabel)) return opt;
+    if (normalized === normalizeSelectionText(opt.leadTime)) return opt;
+    if (normalized === normalizeSelectionText(opt.professorTime)) return opt;
+  }
+  const digitsMatches = normalized.match(/\d+/g);
+  if (digitsMatches && digitsMatches.length) {
+    const inputHour = Number(digitsMatches[0]);
+    const inputMinute = digitsMatches[1] ? Number(digitsMatches[1]) : 0;
+    if (Number.isFinite(inputHour) && inputHour >= 0 && inputHour <= 23 && Number.isFinite(inputMinute) && inputMinute >= 0 && inputMinute <= 59) {
+      const wanted = `${String(inputHour).padStart(2, "0")}:${String(inputMinute).padStart(2, "0")}`;
+      for (const option of options) {
+        if (normalizeSelectionText(option.displayLabel) === wanted) return option;
+        if (normalizeSelectionText(option.leadTime) === wanted) return option;
+      }
+    }
+    const idx = Number(digitsMatches[0]);
+    if (Number.isFinite(idx) && idx >= 1 && idx <= options.length) {
+      return options[idx - 1] ?? null;
+    }
+  }
+  return null;
+}

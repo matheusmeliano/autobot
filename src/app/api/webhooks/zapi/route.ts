@@ -40,6 +40,13 @@ import {
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
+  buildRecurringPlanIntroMessages,
+  buildRecurringSchedulePromptMessages,
+  buildRecurringWeekdayDatesMessages,
+  buildRecurringWeekdayTimesMessages,
+  findRecurringWeekdayOption,
+  findRecurringWeekdayTimeOption,
+  listRecurringWeekdayAvailability,
 } from "@/lib/atendimento/experimentalClass";
 import {
   appendHistoryEvent,
@@ -941,6 +948,115 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
     createdAt: new Date().toISOString(),
   });
   return { lastOutbound, dateOption, slots, messages };
+}
+
+async function presentRecurringWeekdayDateOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  leadTimeZone?: string | null;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listRecurringWeekdayAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const messages = [
+    ...buildRecurringWeekdayDatesMessages(availability.dates),
+  ];
+  let lastOutbound: Record<string, unknown> | null = null;
+  for (const message of messages) {
+    lastOutbound = await insertWhatsAppBotTextMessage({
+      admin: params.admin,
+      conversationId: params.conversationId,
+      contentText: message,
+    });
+  }
+  await appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "recurring_weekday_date_options_presented",
+    title: "Dias da semana disponiveis para aula recorrente apresentados",
+    details: {
+      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      options: availability.dates,
+    },
+    actorType: "system",
+  });
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: messages[messages.length - 1] ?? "",
+    createdAt: new Date().toISOString(),
+  });
+  return { lastOutbound, availability, messages };
+}
+
+async function presentRecurringWeekdayTimeOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  leadTimeZone?: string | null;
+  weekdayKey: "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+  weekdayLabel: string;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listRecurringWeekdayAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const slots = availability.slotsByWeekday.get(params.weekdayKey) ?? [];
+  const messages = buildRecurringWeekdayTimesMessages({
+    weekdayLabel: params.weekdayLabel,
+    options: slots,
+  });
+  let lastOutbound: Record<string, unknown> | null = null;
+  for (const message of messages) {
+    lastOutbound = await insertWhatsAppBotTextMessage({
+      admin: params.admin,
+      conversationId: params.conversationId,
+      contentText: message,
+    });
+  }
+  await appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "recurring_weekday_time_options_presented",
+    title: "Horarios disponiveis da semana recorrente apresentados",
+    details: {
+      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      weekday: params.weekdayKey,
+      weekday_label: params.weekdayLabel,
+    },
+    actorType: "system",
+  });
+  await syncConversationPreview({
+    conversationId: params.conversationId,
+    contentText: messages[messages.length - 1] ?? "",
+    createdAt: new Date().toISOString(),
+  });
+  return { lastOutbound, slots, messages };
 }
 
 async function getScheduledExperimentalClassBookingWhatsApp(params: {
@@ -2443,31 +2559,63 @@ export async function POST(req: Request) {
               flow: "nuclear_post_attendance_matricula_pendente_resposta_nao",
             });
           } else if (isYesNuclear) {
+            const leadTz = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
             try {
-              await admin
-                .from("atendimento_leads")
-                .update({
-                  funnel_stage: "matricula_confirmada",
-                  status: "matricula_confirmada",
-                  updated_at: nowIso,
-                })
-                .eq("id", leadId);
+              const updatePatch: Record<string, unknown> = {
+                funnel_stage: "aula_recorrente_dia_pendente",
+                status: "aula_recorrente_dia_pendente",
+                updated_at: nowIso,
+              };
+              try {
+                const _testErr = await admin
+                  .from("atendimento_leads")
+                  .update({
+                    ...updatePatch,
+                    recurring_class_status: "dia_pendente",
+                  } as any)
+                  .eq("id", leadId);
+                void _testErr;
+              } catch (_e) {
+                try {
+                  await admin
+                    .from("atendimento_leads")
+                    .update(updatePatch)
+                    .eq("id", leadId);
+                } catch (_e2) {}
+              }
             } catch (_e) {}
-            const replySim =
-              "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
+            const introMsgs = [
+              ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
+              ...buildRecurringSchedulePromptMessages(),
+            ];
+            const outPlan: string[] = [];
+            for (const message of introMsgs) {
+              outPlan.push(message);
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: message,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message,
+                });
+              } catch (_e) {}
+            }
+            let recurringAvail: { lastOutbound: any; availability: any; messages: string[] } | null = null;
             try {
-              await insertWhatsAppBotTextMessage({
+              recurringAvail = await presentRecurringWeekdayDateOptionsWhatsApp({
                 admin,
+                leadId,
                 conversationId,
-                contentText: replySim,
+                leadTimeZone: leadTz,
               });
-            } catch (_e) {}
-            try {
-              await sendAtendimentoWhatsAppText({
-                phone: normalizedPhoneOnly,
-                message: replySim,
-              });
-            } catch (_e) {}
+            } catch (_e) {
+              recurringAvail = null;
+            }
             try {
               void appendHistoryEvent({
                 leadId,
@@ -2476,7 +2624,8 @@ export async function POST(req: Request) {
                 title: "Matricula pendente pos-attendance (nuclear): lead respondeu SIM",
                 details: {
                   inbound_text: inboundContentRaw,
-                  reply_message: replySim,
+                  reply_messages: introMsgs.concat(recurringAvail?.messages ?? []),
+                  next_funnel_stage: "aula_recorrente_dia_pendente",
                   source: "whatsapp_zapi_nuclear",
                 },
                 actorType: "bot",
@@ -2485,19 +2634,19 @@ export async function POST(req: Request) {
             try {
               await admin
                 .from("atendimento_conversations")
-                .update({ bot_enabled: false, updated_at: nowIso })
+                .update({ updated_at: nowIso })
                 .eq("id", conversationId);
             } catch (_e) {}
             try {
               await admin
                 .from("atendimento_leads")
-                .update({ bot_enabled: false, updated_at: nowIso })
+                .update({ updated_at: nowIso })
                 .eq("id", leadId);
             } catch (_e) {}
             return Response.json({
               ok: true,
               handled: true,
-              flow: "nuclear_post_attendance_matricula_pendente_resposta_sim",
+              flow: "nuclear_post_attendance_matricula_pendente_resposta_sim_recurring_schedule",
             });
           } else {
             let invalidYesNoAttemptsForAmbiguousOnly = 0;
@@ -3107,12 +3256,52 @@ export async function POST(req: Request) {
           }
 
           if (isYes) {
-            replyText =
-              "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
-            nextLeadFunnel = "matricula_confirmada";
-            nextLeadStatus = "matricula_confirmada";
+            nextLeadFunnel = "aula_recorrente_dia_pendente";
+            nextLeadStatus = "aula_recorrente_dia_pendente";
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
+            const leadTzGeneral = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+            try {
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update({ recurring_class_status: "dia_pendente" } as any)
+                  .eq("id", leadId);
+              } catch (_e) {}
+              const introGeneral = [
+                ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
+                ...buildRecurringSchedulePromptMessages(),
+              ];
+              const allMessages: string[] = [...introGeneral];
+              for (const message of introGeneral) {
+                try {
+                  await insertWhatsAppBotTextMessage({
+                    admin,
+                    conversationId,
+                    contentText: message,
+                  });
+                } catch (_e) {}
+                try {
+                  await sendAtendimentoWhatsAppText({
+                    phone: normalizedPhoneOnly,
+                    message,
+                  });
+                } catch (_e) {}
+              }
+              try {
+                const r = await presentRecurringWeekdayDateOptionsWhatsApp({
+                  admin,
+                  leadId,
+                  conversationId,
+                  leadTimeZone: leadTzGeneral,
+                });
+                for (const m of r.messages) allMessages.push(m);
+              } catch (_e) {}
+              replyText = allMessages.join("\n\n");
+            } catch (_e) {
+              replyText =
+                "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
+            }
           } else if (isNo) {
             const refusalMsg1 = leadFirstName
               ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
@@ -3178,7 +3367,7 @@ export async function POST(req: Request) {
                 });
               } catch (_e) {}
             }
-          } else {
+          } else if (!isYes) {
             try {
               await insertWhatsAppBotTextMessage({
                 admin,
