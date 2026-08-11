@@ -292,10 +292,7 @@ function LeadDetails({
           </div>
         ) : null}
 
-        {lead.recurring_class_status ||
-        lead.recurring_class_weekday ||
-        lead.recurring_class_professor_time ||
-        lead.recurring_class_lead_time ? (
+        {hasRecurring ? (
           <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1 pr-4">
@@ -998,12 +995,12 @@ export function AtendimentoSummaryCards({
     () =>
       localLeads.filter((lead) => {
         if (leadHasExperimentalClassPanelStatus(lead)) return true;
-        const hasRecurring =
-          Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
-          Boolean(String((lead as any)?.recurring_class_weekday ?? "").trim()) ||
+        const recurringWeekdayRaw = String((lead as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
+        const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+        const hasTimeOk =
           Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) ||
           Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
-        return hasRecurring;
+        return hasWeekdayOk && hasTimeOk;
       }),
     [localLeads],
   );
@@ -1633,12 +1630,11 @@ export function AtendimentoSummaryCards({
 
   function buildItemMeta(lead: AtendimentoLeadListItem) {
     const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-    const hasRecurring =
-      ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw) ||
-      Boolean(String(lead.recurring_class_status ?? "").trim()) ||
-      Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim()) ||
+    const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+    const hasTimeOk =
       Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
       Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+    const hasRecurring = hasWeekdayOk && hasTimeOk;
     if (hasRecurring) {
       return "Aluno confirmado";
     }
