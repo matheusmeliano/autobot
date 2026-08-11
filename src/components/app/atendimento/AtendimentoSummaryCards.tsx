@@ -265,16 +265,20 @@ function LeadDetails({
         lead.recurring_class_weekday ||
         lead.recurring_class_professor_time ||
         lead.recurring_class_lead_time ? (
-          <div className="relative mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85 max-w-[calc(100%-180px)] pr-4">
-              Aula recorrente / fixa
-            </div>
-            <div className="absolute top-4 right-4">
-              <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-                Aluno(a) confirmado
+          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1 pr-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+                  Aula recorrente / fixa
+                </div>
+              </div>
+              <div className="shrink-0">
+                <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-4 py-1.5 text-xs font-semibold text-emerald-100">
+                  Aluno(a) confirmado
+                </div>
               </div>
             </div>
-            <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
+            <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2">
               <Field
                 label="Dia da semana"
                 value={
@@ -568,17 +572,21 @@ function BookingDetails({
         ) : null}
 
         {hasRecurringClass ? (
-          <div className="relative mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85 max-w-[calc(100%-180px)] pr-4">
-              Agendamentos em andamento — Próxima aula recorrente
-            </div>
-            <div className="absolute top-4 right-4">
-              <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/12 px-3 py-1 text-xs font-semibold text-emerald-100">
-                Aluno(a) confirmado
+          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-6">
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1 pr-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+                  Agendamentos em andamento — Próxima aula recorrente
+                </div>
+              </div>
+              <div className="shrink-0">
+                <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/12 px-4 py-1.5 text-xs font-semibold text-emerald-100">
+                  Aluno(a) confirmado
+                </div>
               </div>
             </div>
 
-            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+            <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2">
               <Field
                 label="Dia fixo da semana"
                 value={String(lead.recurring_class_weekday_label ?? "").trim() || nextRecurring?.weekdayLabel || null}
