@@ -2697,7 +2697,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
           break;
         }
       }
-      if (params.creationOrigin === "zapi_from_header" && anyInstanceIsOwnerPersonalPrivateNumber) {
+      if (anyInstanceIsOwnerPersonalPrivateNumber && params.creationOrigin === "zapi_from_header") {
         return null;
       }
     }

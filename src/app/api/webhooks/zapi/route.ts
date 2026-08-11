@@ -1590,32 +1590,25 @@ export async function POST(req: Request) {
   {
     const allToPhoneCandidates: string[] = [toPhoneDigits, connectedInstancePhoneDigits].filter(Boolean);
     let toPhoneIsDedicatedBot = false;
-    let anyConnectedInstanceIsOwnerPrivatePure = false;
     for (const p of allToPhoneCandidates) {
       if (isDedicatedExclusiveBotPhone(p)) {
         toPhoneIsDedicatedBot = true;
-      }
-      if (isOwnerPersonalPrivatePhone(p)) {
-        anyConnectedInstanceIsOwnerPrivatePure = true;
+        break;
       }
     }
-    if (String(messageText || mediaUrl || "").trim()) {
-      if (!toPhoneIsDedicatedBot || anyConnectedInstanceIsOwnerPrivatePure) {
-        const explicitBlockList = Array.from(new Set<string>([
-          ...BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
-        ])).join(",");
-        return Response.json({
-          ok: true,
-          ignored: true,
-          reason:
-            "inbound_recipient_must_be_exclusive_dedicated_bot_number_not_owner_private_phone",
-          connected_instance_phone_sample: connectedInstancePhoneDigits.slice(0, 8) || "-",
-          to_phone_sample: toPhoneDigits.slice(0, 8) || "-",
-          connected_is_owner_private_pure_number: anyConnectedInstanceIsOwnerPrivatePure,
-          recipient_was_not_dedicated_bot_number: !toPhoneIsDedicatedBot,
-          required_recipient_suffixes: explicitBlockList,
-        });
-      }
+    if (!toPhoneIsDedicatedBot && String(messageText || mediaUrl || "").trim()) {
+      const explicitBlockList = Array.from(new Set<string>([
+        ...BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
+      ])).join(",");
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason:
+          "inbound_recipient_must_be_exclusive_dedicated_bot_number_not_owner_private_phone",
+        connected_instance_phone_sample: connectedInstancePhoneDigits.slice(0, 8) || "-",
+        to_phone_sample: toPhoneDigits.slice(0, 8) || "-",
+        required_recipient_suffixes: explicitBlockList,
+      });
     }
   }
 
@@ -1693,11 +1686,14 @@ export async function POST(req: Request) {
     equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
     equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
 
-  if (isZapiInternalBlocklistedPhone(fromPhoneDigits)) {
+  if (
+    isZapiInternalBlocklistedPhone(fromPhoneDigits) ||
+    isZapiInternalBlocklistedPhone(toPhoneDigitsBroad)
+  ) {
     return Response.json({
       ok: true,
       ignored: true,
-      reason: "zapi_internal_phone_number_blocklisted_sender_loopback_only",
+      reason: "zapi_internal_phone_number_blocklisted",
     });
   }
 
@@ -2440,13 +2436,7 @@ export async function POST(req: Request) {
     try {
       {
         const connectedIsOwnerPrivatePhone = isOwnerPersonalPrivatePhone(connectedInstancePhoneDigits);
-        const toPhoneLooksOwnerPrivate = isOwnerPersonalPrivatePhone(toPhoneDigits);
-        const connectedIsDedicated = isDedicatedExclusiveBotPhone(connectedInstancePhoneDigits);
-        const toPhoneIsDedicated = isDedicatedExclusiveBotPhone(toPhoneDigits);
-        const recipientIsRealDedicatedBot = connectedIsDedicated || toPhoneIsDedicated;
-        const recipientIsOwnerPrivate = connectedIsOwnerPrivatePhone || toPhoneLooksOwnerPrivate;
-
-        if (recipientIsOwnerPrivate && !recipientIsRealDedicatedBot) {
+        if (connectedIsOwnerPrivatePhone) {
           const existingLead = normalizedPhoneOnly
             ? await findLeadByPhone({ phone: normalizedPhoneOnly, userId })
             : null;
@@ -2455,18 +2445,9 @@ export async function POST(req: Request) {
               ok: true,
               ignored: true,
               reason:
-                "owner_personal_private_number_or_non_dedicated_recipient_absolutely_cannot_create_new_leads_inbound_only_updates_existing_private_conversation_blocked",
+                "owner_personal_private_number_cannot_create_new_leads_inbound_only_updates_existing_private_conversation_blocked",
               phone_sample: String(normalizedPhoneOnly ?? "").slice(0, 8) || "-",
-              connected_instance: connectedIsOwnerPrivatePhone
-                ? "owner_personal_number"
-                : connectedIsDedicated
-                  ? "dedicated_bot_number"
-                  : "unknown_non_whitelisted",
-              recipient_to_phone: toPhoneLooksOwnerPrivate
-                ? "owner_personal_number"
-                : toPhoneIsDedicated
-                  ? "dedicated_bot_number"
-                  : "unknown_non_whitelisted",
+              connected_instance: "owner_personal_number",
             });
           }
         }
