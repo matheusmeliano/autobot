@@ -1325,35 +1325,22 @@ export async function POST(req: Request) {
   {
     const t0_from = String(fromPhone ?? "").replace(/\D/g, "");
     const t0_to = String(toPhone ?? "").replace(/\D/g, "");
-    const t0_bl_fn = (digits: string) => {
-      if (!digits) return false;
-      const k = digits.length >= 10 ? digits.slice(-10) : digits;
-      if (!k) return false;
-      for (const suffix of ["6599495594", "6581175345"]) {
-        if (k === suffix || k.endsWith(suffix) || suffix.endsWith(k)) return true;
-      }
-      return false;
-    };
-    const t0_fromBlocked = t0_bl_fn(t0_from);
-    const t0_toBlocked = t0_bl_fn(t0_to);
     const t0_loopback =
       t0_from && t0_to && t0_from.length >= 10 && t0_to.length >= 10 &&
       (t0_from === t0_to ||
         t0_from.slice(-10) === t0_to.slice(-10) ||
         t0_to.endsWith(t0_from.slice(-10)) ||
         t0_from.endsWith(t0_to.slice(-10)));
-    if (t0_fromBlocked || t0_toBlocked || t0_loopback || rawFromMe || isOutboundOnlyEvent) {
+    if (t0_loopback || rawFromMe || isOutboundOnlyEvent) {
       return Response.json({
         ok: true,
         ignored: true,
         reason:
-          t0_fromBlocked || t0_toBlocked
-            ? "tier_minus_1_zapi_internal_blocklisted"
-            : t0_loopback
-              ? "tier_minus_1_loopback_from_equals_to_bot_conversation"
-              : rawFromMe
-                ? "tier_minus_1_fromMe_outbound_or_status"
-                : "tier_minus_1_status_only_event",
+          t0_loopback
+            ? "tier_minus_1_loopback_from_equals_to_bot_conversation"
+            : rawFromMe
+              ? "tier_minus_1_fromMe_outbound_or_status"
+              : "tier_minus_1_status_only_event",
       });
     }
   }
@@ -1587,31 +1574,6 @@ export async function POST(req: Request) {
   const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
   const toPhoneDigits = String(toPhone ?? "").replace(/\D/g, "");
 
-  {
-    const allToPhoneCandidates: string[] = [toPhoneDigits, connectedInstancePhoneDigits].filter(Boolean);
-    let toPhoneIsDedicatedBot = false;
-    for (const p of allToPhoneCandidates) {
-      if (isDedicatedExclusiveBotPhone(p)) {
-        toPhoneIsDedicatedBot = true;
-        break;
-      }
-    }
-    if (!toPhoneIsDedicatedBot && String(messageText || mediaUrl || "").trim()) {
-      const explicitBlockList = Array.from(new Set<string>([
-        ...BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
-      ])).join(",");
-      return Response.json({
-        ok: true,
-        ignored: true,
-        reason:
-          "inbound_recipient_must_be_exclusive_dedicated_bot_number_not_owner_private_phone",
-        connected_instance_phone_sample: connectedInstancePhoneDigits.slice(0, 8) || "-",
-        to_phone_sample: toPhoneDigits.slice(0, 8) || "-",
-        required_recipient_suffixes: explicitBlockList,
-      });
-    }
-  }
-
   if (connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
     const toMatchInstance =
       toPhoneDigits.endsWith(connectedInstancePhoneDigits) ||
@@ -1685,17 +1647,6 @@ export async function POST(req: Request) {
   const isToOrFromOurNumber =
     equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
     equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
-
-  if (
-    isZapiInternalBlocklistedPhone(fromPhoneDigits) ||
-    isZapiInternalBlocklistedPhone(toPhoneDigitsBroad)
-  ) {
-    return Response.json({
-      ok: true,
-      ignored: true,
-      reason: "zapi_internal_phone_number_blocklisted",
-    });
-  }
 
   if (rawFromMe || equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad)) {
     return Response.json({
@@ -2434,30 +2385,10 @@ export async function POST(req: Request) {
 
   if (normalizedFrom) {
     try {
-      {
-        const connectedIsOwnerPrivatePhone = isOwnerPersonalPrivatePhone(connectedInstancePhoneDigits);
-        if (connectedIsOwnerPrivatePhone) {
-          const existingLead = normalizedPhoneOnly
-            ? await findLeadByPhone({ phone: normalizedPhoneOnly, userId })
-            : null;
-          if (!existingLead?.id) {
-            return Response.json({
-              ok: true,
-              ignored: true,
-              reason:
-                "owner_personal_private_number_cannot_create_new_leads_inbound_only_updates_existing_private_conversation_blocked",
-              phone_sample: String(normalizedPhoneOnly ?? "").slice(0, 8) || "-",
-              connected_instance: "owner_personal_number",
-            });
-          }
-        }
-      }
-
       const leadContext = await ensureWhatsAppLeadAndConversation({
         phone: normalizedPhoneOnly,
         userId,
         creationOrigin: "zapi_from_header",
-        recipientPhoneValidatedAsDedicatedBot: true,
         firstNameFromMessage: null,
         initialState: null,
         initialTimezone: null,
@@ -4278,9 +4209,7 @@ export async function POST(req: Request) {
           expectedField = "state";
         }
 
-        if (
-          (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent))
-        ) {
+        if (isFirstBotInteraction) {
           const firstMessage =
             "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
           const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;

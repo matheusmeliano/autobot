@@ -2560,7 +2560,6 @@ export async function ensureWhatsAppLeadAndConversation(params: {
   phone: string;
   userId: string;
   creationOrigin: "zapi_from_header" | "trusted_explicit_call";
-  recipientPhoneValidatedAsDedicatedBot?: boolean;
   firstNameFromMessage?: string | null;
   initialState?: string | null;
   initialStateNormalized?: string | null;
@@ -2579,15 +2578,6 @@ export async function ensureWhatsAppLeadAndConversation(params: {
     throw new Error(
       `Telefone informado nao corresponde a um usuario WhatsApp valido: ${normalizedPhone ? "len=" + normalizedPhone.length : "empty"}`,
     );
-  }
-
-  if (params.creationOrigin === "zapi_from_header" && !params.recipientPhoneValidatedAsDedicatedBot) {
-    return null;
-  }
-
-  const { isZapiInternalBlocklistedPhone } = await import("@/lib/atendimento/constants");
-  if (isZapiInternalBlocklistedPhone(normalizedPhone)) {
-    return null;
   }
 
   {
@@ -2631,11 +2621,6 @@ export async function ensureWhatsAppLeadAndConversation(params: {
         }
       }
     }
-    for (const suffix of ["6599495594", "6581175345"]) {
-      if (normalizedPhone.endsWith(suffix) || suffix.endsWith(normalizedPhone.slice(-10))) {
-        return null;
-      }
-    }
   }
 
   const hiddenBlocklist = await (async () => {
@@ -2665,43 +2650,6 @@ export async function ensureWhatsAppLeadAndConversation(params: {
   let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });
 
   if (!lead?.id) {
-    {
-      const userPhonesCheck: string[] = [];
-      try {
-        const { data: instRows } = await admin
-          .from("whatsapp_instances")
-          .select("phone")
-          .eq("user_id", String(params.userId ?? ""))
-          .not("phone", "is", null);
-        for (const r of (instRows ?? []) as Array<{ phone?: string | null }>) {
-          const d = String(r?.phone ?? "").replace(/\D/g, "");
-          if (d.length >= 10 && !userPhonesCheck.includes(d)) userPhonesCheck.push(d);
-        }
-      } catch (_pe) {}
-      try {
-        const { data: globalInstRows } = await admin
-          .from("whatsapp_instances")
-          .select("phone")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if ((globalInstRows as any)?.phone) {
-          const d = String((globalInstRows as any).phone ?? "").replace(/\D/g, "");
-          if (d.length >= 10 && !userPhonesCheck.includes(d)) userPhonesCheck.push(d);
-        }
-      } catch (_p2) {}
-      let anyInstanceIsOwnerPersonalPrivateNumber = false;
-      for (const d of userPhonesCheck) {
-        if (isOwnerPersonalPrivatePhone(d)) {
-          anyInstanceIsOwnerPersonalPrivateNumber = true;
-          break;
-        }
-      }
-      if (anyInstanceIsOwnerPersonalPrivateNumber && params.creationOrigin === "zapi_from_header") {
-        return null;
-      }
-    }
-
     const nameRaw = String(params.firstNameFromMessage ?? "").trim() || null;
     const initialState = params.initialState ? String(params.initialState).trim() : null;
     const initialCountry = params.initialCountry ? String(params.initialCountry).trim() : null;

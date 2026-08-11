@@ -1,42 +1,26 @@
 export const ATENDIMENTO_EMAIL = "atendimento.usa.music@gmail.com";
 export const ATENDIMENTO_PUBLIC_LINK_SLUG = "lucas-brum-online-music-usa";
 
-export const ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10: readonly string[] = [
-  "6599495594",
-  "6581175345",
-];
+export const ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10: readonly string[] = [];
 
-export const OWNER_PERSONAL_PRIVATE_PHONE_SUFFIXES_10: readonly string[] = [
-  "6596933336",
-];
+export const OWNER_PERSONAL_PRIVATE_PHONE_SUFFIXES_10: readonly string[] = [];
 
-export const BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10: readonly string[] = [
-  "6599495594",
-  "6581175345",
-];
+export const BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10: readonly string[] = [];
 
 function matchBrazilianPhoneSuffix(digitsRaw: string | null | undefined, suffixesList: readonly string[]): boolean {
-  const d = String(digitsRaw ?? "").replace(/\D/g, "");
-  const key = d.length >= 10 ? d.slice(-10) : d;
-  if (!key) return false;
-  for (const suffix of suffixesList) {
-    if (key === suffix || key.endsWith(suffix) || suffix.endsWith(key)) {
-      return true;
-    }
-  }
   return false;
 }
 
-export function isZapiInternalBlocklistedPhone(digitsRaw: string | null | undefined): boolean {
-  return matchBrazilianPhoneSuffix(digitsRaw, ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10);
+export function isZapiInternalBlocklistedPhone(_digitsRaw: string | null | undefined): boolean {
+  return false;
 }
 
-export function isOwnerPersonalPrivatePhone(digitsRaw: string | null | undefined): boolean {
-  return matchBrazilianPhoneSuffix(digitsRaw, OWNER_PERSONAL_PRIVATE_PHONE_SUFFIXES_10);
+export function isOwnerPersonalPrivatePhone(_digitsRaw: string | null | undefined): boolean {
+  return false;
 }
 
-export function isDedicatedExclusiveBotPhone(digitsRaw: string | null | undefined): boolean {
-  return matchBrazilianPhoneSuffix(digitsRaw, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10);
+export function isDedicatedExclusiveBotPhone(_digitsRaw: string | null | undefined): boolean {
+  return true;
 }
 
 export const ATENDIMENTO_STAGE_ORDER = [
