@@ -1686,10 +1686,7 @@ export async function POST(req: Request) {
     equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
     equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
 
-  if (
-    isZapiInternalBlocklistedPhone(fromPhoneDigits) ||
-    isZapiInternalBlocklistedPhone(toPhoneDigitsBroad)
-  ) {
+  if (isZapiInternalBlocklistedPhone(fromPhoneDigits)) {
     return Response.json({
       ok: true,
       ignored: true,
