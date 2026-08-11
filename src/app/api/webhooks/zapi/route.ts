@@ -2598,7 +2598,7 @@ export async function POST(req: Request) {
             try {
               const updatePatch: Record<string, unknown> = {
                 funnel_stage: "cadastro_recorrente_pendente_plataforma",
-                status: "cadastro_recorrente_pendente_plataforma",
+                status: "aluno",
                 updated_at: nowIso,
               };
               try {
@@ -3285,7 +3285,7 @@ export async function POST(req: Request) {
 
           if (isYes) {
             nextLeadFunnel = "cadastro_recorrente_pendente_plataforma";
-            nextLeadStatus = "cadastro_recorrente_pendente_plataforma";
+            nextLeadStatus = "aluno";
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
             const leadTzGeneral = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;

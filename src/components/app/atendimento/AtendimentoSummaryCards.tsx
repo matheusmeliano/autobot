@@ -849,7 +849,13 @@ export function AtendimentoSummaryCards({
   const interessadosItems = useMemo(
     () =>
       localLeads.filter(
-        (lead) => lead.status !== "matriculado" && lead.funnel_stage !== "matriculado",
+        (lead) =>
+          lead.status !== "matriculado" &&
+          lead.funnel_stage !== "matriculado" &&
+          lead.status !== "aluno" &&
+          (lead as any).funnel_stage !== "aluno_recorrente_cadastrado" &&
+          lead.status !== "cadastro_recorrente_pendente_plataforma" &&
+          lead.funnel_stage !== "cadastro_recorrente_pendente_plataforma",
       ),
     [localLeads],
   );
@@ -860,7 +866,9 @@ export function AtendimentoSummaryCards({
           lead.status === "matriculado" ||
           (lead as any).funnel_stage === "matriculado" ||
           (lead as any).status === "aluno" ||
-          (lead as any).funnel_stage === "aluno_recorrente_cadastrado",
+          (lead as any).funnel_stage === "aluno_recorrente_cadastrado" ||
+          lead.status === "cadastro_recorrente_pendente_plataforma" ||
+          lead.funnel_stage === "cadastro_recorrente_pendente_plataforma",
       ),
     [localLeads],
   );
