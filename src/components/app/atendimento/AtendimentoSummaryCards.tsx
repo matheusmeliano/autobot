@@ -520,8 +520,78 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {booking || showAttendanceCard || showIncompleteState ? (
+        {showAttendanceCard ? (
           <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                Comparecimento
+              </div>
+              {hasAttendanceStatus ? (
+                <div
+                  className={[
+                    "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                    attendanceStatus === "attended"
+                      ? "bg-emerald-500/15 text-emerald-200"
+                      : "bg-amber-400/15 text-amber-200",
+                  ].join(" ")}
+                >
+                  {attendanceStatus === "attended" ? "Compareceu" : "Não compareceu"}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => void onMarkAttendance(lead, "attended")}
+                disabled={isMarkingAttendance || attendanceStatus === "attended"}
+                className={[
+                  "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
+                  attendanceStatus === "attended"
+                    ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-100"
+                    : "border-emerald-500/20 bg-emerald-500/8 text-emerald-100 hover:bg-emerald-500/12",
+                ].join(" ")}
+              >
+                {isMarkingAttendanceAttended ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 shrink-0" />
+                )}
+                {isMarkingAttendanceAttended
+                  ? "Marcando..."
+                  : attendanceStatus === "attended"
+                  ? "Compareceu"
+                  : "Marcar como compareceu"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void onMarkAttendance(lead, "no_show")}
+                disabled={isMarkingAttendance || attendanceStatus === "no_show"}
+                className={[
+                  "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
+                  attendanceStatus === "no_show"
+                    ? "border-amber-400/30 bg-amber-400/15 text-amber-100"
+                    : "border-amber-400/20 bg-amber-400/8 text-amber-100 hover:bg-amber-400/12",
+                ].join(" ")}
+              >
+                {isMarkingAttendanceNoShow ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <X className="h-4 w-4 shrink-0" />
+                )}
+                {isMarkingAttendanceNoShow
+                  ? "Marcando..."
+                  : attendanceStatus === "no_show"
+                  ? "Não compareceu"
+                  : "Marcar como não compareceu"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {booking || showIncompleteState ? (
+          <div className={showAttendanceCard ? "mt-4 " : ""} className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                 Histórico — Aula experimental
@@ -617,78 +687,6 @@ function BookingDetails({
                     {effectiveSavedLessonLink ? "Atualizar" : "Salvar"}
                   </>
                 )}
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {showAttendanceCard ? (
-          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                Comparecimento
-              </div>
-              {hasAttendanceStatus ? (
-                <div
-                  className={[
-                    "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
-                    attendanceStatus === "attended"
-                      ? "bg-emerald-500/15 text-emerald-200"
-                      : "bg-amber-400/15 text-amber-200",
-                  ].join(" ")}
-                >
-                  {attendanceStatus === "attended" ? "Compareceu" : "Não compareceu"}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => void onMarkAttendance(lead, "attended")}
-                disabled={isMarkingAttendance || attendanceStatus === "attended"}
-                className={[
-                  "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
-                  attendanceStatus === "attended"
-                    ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-100"
-                    : "border-emerald-500/20 bg-emerald-500/8 text-emerald-100 hover:bg-emerald-500/12",
-                ].join(" ")}
-              >
-                {isMarkingAttendanceAttended ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : attendanceStatus === "attended" ? (
-                  <Check className="h-4 w-4 shrink-0" />
-                ) : (
-                  <Check className="h-4 w-4 shrink-0" />
-                )}
-                {isMarkingAttendanceAttended
-                  ? "Marcando..."
-                  : attendanceStatus === "attended"
-                  ? "Compareceu"
-                  : "Marcar como compareceu"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void onMarkAttendance(lead, "no_show")}
-                disabled={isMarkingAttendance || attendanceStatus === "no_show"}
-                className={[
-                  "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
-                  attendanceStatus === "no_show"
-                    ? "border-amber-400/30 bg-amber-400/15 text-amber-100"
-                    : "border-amber-400/20 bg-amber-400/8 text-amber-100 hover:bg-amber-400/12",
-                ].join(" ")}
-              >
-                {isMarkingAttendanceNoShow ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <X className="h-4 w-4 shrink-0" />
-                )}
-                {isMarkingAttendanceNoShow
-                  ? "Marcando..."
-                  : attendanceStatus === "no_show"
-                  ? "Não compareceu"
-                  : "Marcar como não compareceu"}
               </button>
             </div>
           </div>
