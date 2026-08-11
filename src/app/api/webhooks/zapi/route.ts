@@ -1416,6 +1416,32 @@ export async function POST(req: Request) {
     }
   }
 
+  {
+    const rawTs: unknown = getFirstNonEmpty(
+      String((body as any)?.timestamp ?? ""),
+      String((body as any)?.message?.timestamp ?? ""),
+      String((body as any)?.date ?? ""),
+      String((body as any)?.message?.date ?? ""),
+      String((body as any)?.created_at ?? ""),
+      String((body as any)?.data?.timestamp ?? ""),
+      String((body as any)?.data?.message?.timestamp ?? ""),
+      String((body as any)?.data?.date ?? ""),
+      String((body as any)?.time ?? ""),
+    );
+    const ts = Number(rawTs || 0);
+    const nowMs = Date.now();
+    const tsMs = ts > 1_000_000_000_000 ? ts : ts * 1000;
+    if (tsMs > 0 && nowMs - tsMs > 6 * 60 * 60 * 1000) {
+      const diffHours = (nowMs - tsMs) / (60 * 60 * 1000);
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "stale_inbound_event_timestamp_too_old",
+        event_age_hours: Number(diffHours.toFixed(1)),
+      });
+    }
+  }
+
   const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
   if (!rawFromMe && connectedInstancePhoneDigits && fromPhoneDigits) {
     if (connectedInstancePhoneDigits === fromPhoneDigits) {
