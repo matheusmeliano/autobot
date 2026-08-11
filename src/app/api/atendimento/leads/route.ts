@@ -455,6 +455,12 @@ export async function GET(req: Request) {
     if (stage && String(row.funnel_stage ?? "").toLowerCase() !== stage) return false;
     if (cutoffInstanceTimeMs > 0 && getLeadSortTime(row) < cutoffInstanceTimeMs) return false;
     if (isZapiInternalBlocklistedPhone(String(row.phone ?? ""))) return false;
+    {
+      const rowDigits = String(row.phone ?? "").replace(/\D/g, "");
+      for (const suffix of ["6599495594", "6581175345"]) {
+        if (rowDigits && (rowDigits.endsWith(suffix) || suffix.endsWith(rowDigits.slice(-10)))) return false;
+      }
+    }
     if (connectedBotPhoneDigits.length >= 10) {
       const rowDigits = String(row.phone ?? "").replace(/\D/g, "");
       if (rowDigits.length >= 10) {

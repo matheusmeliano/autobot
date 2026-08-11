@@ -2307,11 +2307,28 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const ourPhoneDigits = String((instRow as any)?.phone ?? "").replace(/\D/g, "");
-    if (ourPhoneDigits.length >= 10 && normalizedPhone.length >= 10) {
-      const ourKey = ourPhoneDigits.slice(-10);
-      const rowKey = normalizedPhone.slice(-10);
-      if (ourKey === rowKey || normalizedPhone.endsWith(ourKey) || ourPhoneDigits.endsWith(rowKey)) {
+    const { data: instRowGlobal } = await admin
+      .from("whatsapp_instances")
+      .select("phone, instance_id")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const candidateOurPhones: string[] = [];
+    const p1 = String((instRow as any)?.phone ?? "").replace(/\D/g, "");
+    if (p1.length >= 10) candidateOurPhones.push(p1);
+    const p2 = String((instRowGlobal as any)?.phone ?? "").replace(/\D/g, "");
+    if (p2.length >= 10) candidateOurPhones.push(p2);
+    for (const ourPhoneDigits of candidateOurPhones) {
+      if (ourPhoneDigits.length >= 10 && normalizedPhone.length >= 10) {
+        const ourKey = ourPhoneDigits.slice(-10);
+        const rowKey = normalizedPhone.slice(-10);
+        if (ourKey === rowKey || normalizedPhone.endsWith(ourKey) || ourPhoneDigits.endsWith(rowKey)) {
+          return null;
+        }
+      }
+    }
+    for (const suffix of ["6599495594", "6581175345"]) {
+      if (normalizedPhone.endsWith(suffix) || suffix.endsWith(normalizedPhone.slice(-10))) {
         return null;
       }
     }

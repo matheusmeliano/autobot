@@ -1317,6 +1317,42 @@ export async function POST(req: Request) {
     (body as any).data?.instancePhone,
   );
 
+  {
+    const t0_from = String(fromPhone ?? "").replace(/\D/g, "");
+    const t0_to = String(toPhone ?? "").replace(/\D/g, "");
+    const t0_bl_fn = (digits: string) => {
+      if (!digits) return false;
+      const k = digits.length >= 10 ? digits.slice(-10) : digits;
+      if (!k) return false;
+      for (const suffix of ["6599495594", "6581175345"]) {
+        if (k === suffix || k.endsWith(suffix) || suffix.endsWith(k)) return true;
+      }
+      return false;
+    };
+    const t0_fromBlocked = t0_bl_fn(t0_from);
+    const t0_toBlocked = t0_bl_fn(t0_to);
+    const t0_loopback =
+      t0_from && t0_to && t0_from.length >= 10 && t0_to.length >= 10 &&
+      (t0_from === t0_to ||
+        t0_from.slice(-10) === t0_to.slice(-10) ||
+        t0_to.endsWith(t0_from.slice(-10)) ||
+        t0_from.endsWith(t0_to.slice(-10)));
+    if (t0_fromBlocked || t0_toBlocked || t0_loopback || rawFromMe || isOutboundOnlyEvent) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason:
+          t0_fromBlocked || t0_toBlocked
+            ? "tier_minus_1_zapi_internal_blocklisted"
+            : t0_loopback
+              ? "tier_minus_1_loopback_from_equals_to_bot_conversation"
+              : rawFromMe
+                ? "tier_minus_1_fromMe_outbound_or_status"
+                : "tier_minus_1_status_only_event",
+      });
+    }
+  }
+
   const messageText = getFirstNonEmpty(
     (body as any).text?.message,
     (body as any).text?.body,
