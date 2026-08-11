@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
 import {
   ATENDIMENTO_FILES_BUCKET,
   ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES,
@@ -2281,6 +2281,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
   phone: string;
   userId: string;
   creationOrigin: "zapi_from_header" | "trusted_explicit_call";
+  recipientPhoneValidatedAsDedicatedBot?: boolean;
   firstNameFromMessage?: string | null;
   initialState?: string | null;
   initialStateNormalized?: string | null;
@@ -2299,6 +2300,10 @@ export async function ensureWhatsAppLeadAndConversation(params: {
     throw new Error(
       `Telefone informado nao corresponde a um usuario WhatsApp valido: ${normalizedPhone ? "len=" + normalizedPhone.length : "empty"}`,
     );
+  }
+
+  if (params.creationOrigin === "zapi_from_header" && !params.recipientPhoneValidatedAsDedicatedBot) {
+    return null;
   }
 
   const { isZapiInternalBlocklistedPhone } = await import("@/lib/atendimento/constants");

@@ -12,6 +12,7 @@ import {
 import {
   ACTIVE_CAPTURED_FIELD_ORDER,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
   buildExperimentalClassDatePromptMessages,
   buildStatePrompt,
   CAPTURED_FIELD_PROMPTS,
@@ -24,6 +25,7 @@ import {
   POST_BOOKING_CPF_STAGE_ENABLED,
   POST_BOOKING_CPF_SUCCESS_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
+  isDedicatedExclusiveBotPhone,
   isOwnerPersonalPrivatePhone,
   isZapiInternalBlocklistedPhone,
 } from "@/lib/atendimento/constants";
@@ -1585,6 +1587,31 @@ export async function POST(req: Request) {
   const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
   const toPhoneDigits = String(toPhone ?? "").replace(/\D/g, "");
 
+  {
+    const allToPhoneCandidates: string[] = [toPhoneDigits, connectedInstancePhoneDigits].filter(Boolean);
+    let toPhoneIsDedicatedBot = false;
+    for (const p of allToPhoneCandidates) {
+      if (isDedicatedExclusiveBotPhone(p)) {
+        toPhoneIsDedicatedBot = true;
+        break;
+      }
+    }
+    if (!toPhoneIsDedicatedBot && String(messageText || mediaUrl || "").trim()) {
+      const explicitBlockList = Array.from(new Set<string>([
+        ...BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
+      ])).join(",");
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason:
+          "inbound_recipient_must_be_exclusive_dedicated_bot_number_not_owner_private_phone",
+        connected_instance_phone_sample: connectedInstancePhoneDigits.slice(0, 8) || "-",
+        to_phone_sample: toPhoneDigits.slice(0, 8) || "-",
+        required_recipient_suffixes: explicitBlockList,
+      });
+    }
+  }
+
   if (connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
     const toMatchInstance =
       toPhoneDigits.endsWith(connectedInstancePhoneDigits) ||
@@ -2430,6 +2457,7 @@ export async function POST(req: Request) {
         phone: normalizedPhoneOnly,
         userId,
         creationOrigin: "zapi_from_header",
+        recipientPhoneValidatedAsDedicatedBot: true,
         firstNameFromMessage: null,
         initialState: null,
         initialTimezone: null,
