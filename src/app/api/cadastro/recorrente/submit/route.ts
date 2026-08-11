@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       "";
     const nowIso = new Date().toISOString();
 
-    const patch: Record<string, unknown> = {
+    const patchFull: Record<string, unknown> = {
       recurring_class_status: "confirmado",
       recurring_class_weekday: weekday,
       recurring_class_weekday_label: safeWeekdayLabel,
@@ -73,26 +73,33 @@ export async function POST(req: NextRequest) {
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
     };
 
+    const patchMinimalGuaranteed: Record<string, unknown> = {
+      funnel_stage: "aluno_recorrente_cadastrado",
+      status: "matriculado",
+      updated_at: nowIso,
+      ...(String(nome ?? "").trim() && !String((lead as any)?.full_name ?? "").trim()
+        ? { full_name: String(nome ?? "").trim() }
+        : {}),
+    };
+
+    let appliedPatch: "full" | "minimal" = "minimal";
+    let fullPatchError: string | null = null;
     try {
-      await admin
+      const { error: errFull } = await admin
         .from("atendimento_leads")
-        .update(patch as any)
+        .update(patchFull as any)
         .eq("id", String(lead.id));
+      if (errFull) throw errFull;
+      appliedPatch = "full";
     } catch (e1) {
+      appliedPatch = "minimal";
+      fullPatchError = e1 instanceof Error ? e1.message : String(e1 ?? "");
       try {
-        const fallback: Record<string, unknown> = {
-          recurring_class_status: "confirmado",
-          funnel_stage: "aluno_recorrente_cadastrado",
-          status: "matriculado",
-          updated_at: nowIso,
-        };
-        if (String(nome ?? "").trim() && !String((lead as any)?.full_name ?? "").trim()) {
-          fallback.full_name = String(nome ?? "").trim();
-        }
-        await admin
+        const { error: errMin } = await admin
           .from("atendimento_leads")
-          .update(fallback as any)
+          .update(patchMinimalGuaranteed as any)
           .eq("id", String(lead.id));
+        if (errMin) throw errMin;
       } catch (e2) {
         return NextResponse.json(
           {
@@ -125,6 +132,8 @@ export async function POST(req: NextRequest) {
             weekday_label: safeWeekdayLabel,
             professor_time: String(professorTime ?? ""),
             lead_time: String(leadTime ?? String(professorTime ?? "")),
+            applied_patch: appliedPatch,
+            full_patch_error: fullPatchError,
             source: "cadastro_recorrente_plataforma",
           },
           actorType: "lead",
@@ -135,6 +144,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       leadId: String(lead.id),
+      appliedPatch,
+      fullPatchError,
       scheduled: {
         weekday,
         weekdayLabel: safeWeekdayLabel,
