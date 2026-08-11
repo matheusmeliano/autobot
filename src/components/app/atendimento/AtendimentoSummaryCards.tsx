@@ -1307,9 +1307,9 @@ export function AtendimentoSummaryCards({
       if (hasBook) {
         const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
         const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
-        return [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ") || "Agendamento incompleto";
+        return [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ") || "";
       }
-      return "Agendamento incompleto";
+      return "";
     }
 
     return formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
