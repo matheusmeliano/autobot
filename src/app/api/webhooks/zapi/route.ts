@@ -2585,37 +2585,7 @@ export async function POST(req: Request) {
               ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
               ...buildRecurringSchedulePromptMessages(),
             ];
-            let calendarMsgs: string[] = [];
-            try {
-              const nowA = new Date();
-              const { data: bs, error: be } = await admin
-                .from("atendimento_experimental_class_bookings")
-                .select("professor_start_at")
-                .eq("status", "scheduled")
-                .gte("professor_start_at", nowA.toISOString())
-                .order("professor_start_at", { ascending: true });
-              const booked = be
-                ? []
-                : (bs ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
-              const avail = listExperimentalClassAvailability({
-                now: nowA,
-                leadTimeZone: leadTz,
-                bookedProfessorStartAts: booked,
-              });
-              calendarMsgs = buildRecurringCalendarDatesMessages(avail.dates);
-            } catch (_e) {
-              calendarMsgs = [];
-            }
-            if (!calendarMsgs.length) {
-              calendarMsgs = [
-                "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para informar os dias e horários disponíveis.",
-                "Responda apenas com o dia desejado.",
-              ];
-            }
-            const allFinalMessages: string[] = [...introMsgs, ...calendarMsgs];
-            const outPlan: string[] = [];
-            for (const message of allFinalMessages) {
-              outPlan.push(message);
+            for (const message of introMsgs) {
               try {
                 await insertWhatsAppBotTextMessage({
                   admin,
@@ -2630,6 +2600,49 @@ export async function POST(req: Request) {
                 });
               } catch (_e) {}
             }
+            let calendarMsgs: string[] = [
+              "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para confirmar os dias e horários disponíveis.",
+              "Responda apenas com o dia desejado.",
+            ];
+            try {
+              const nowA = new Date();
+              const { data: bs, error: be } = await admin
+                .from("atendimento_experimental_class_bookings")
+                .select("professor_start_at")
+                .eq("status", "scheduled")
+                .gte("professor_start_at", nowA.toISOString())
+                .order("professor_start_at", { ascending: true });
+              if (!be) {
+                const booked = (bs ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+                const avail = listExperimentalClassAvailability({
+                  now: nowA,
+                  leadTimeZone: leadTz,
+                  bookedProfessorStartAts: booked,
+                });
+                if (avail && Array.isArray(avail.dates) && avail.dates.length > 0) {
+                  const built = buildRecurringCalendarDatesMessages(avail.dates);
+                  if (Array.isArray(built) && built.length > 0) {
+                    calendarMsgs = built;
+                  }
+                }
+              }
+            } catch (_e) {}
+            for (const message of calendarMsgs) {
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: message,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message,
+                });
+              } catch (_e) {}
+            }
+            const allFinalMessages = [...introMsgs, ...calendarMsgs];
             try {
               void appendHistoryEvent({
                 leadId,
@@ -3286,35 +3299,7 @@ export async function POST(req: Request) {
                 ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
                 ...buildRecurringSchedulePromptMessages(),
               ];
-              let generalCalendarMsgs: string[] = [];
-              try {
-                const nowG = new Date();
-                const { data: bsg, error: beg } = await admin
-                  .from("atendimento_experimental_class_bookings")
-                  .select("professor_start_at")
-                  .eq("status", "scheduled")
-                  .gte("professor_start_at", nowG.toISOString())
-                  .order("professor_start_at", { ascending: true });
-                const bookedG = beg
-                  ? []
-                  : (bsg ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
-                const availG = listExperimentalClassAvailability({
-                  now: nowG,
-                  leadTimeZone: leadTzGeneral,
-                  bookedProfessorStartAts: bookedG,
-                });
-                generalCalendarMsgs = buildRecurringCalendarDatesMessages(availG.dates);
-              } catch (_e) {
-                generalCalendarMsgs = [];
-              }
-              if (!generalCalendarMsgs.length) {
-                generalCalendarMsgs = [
-                  "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para informar os dias e horários disponíveis.",
-                  "Responda apenas com o dia desejado.",
-                ];
-              }
-              const allMessages: string[] = [...introGeneral, ...generalCalendarMsgs];
-              for (const message of allMessages) {
+              for (const message of introGeneral) {
                 try {
                   await insertWhatsAppBotTextMessage({
                     admin,
@@ -3329,6 +3314,49 @@ export async function POST(req: Request) {
                   });
                 } catch (_e) {}
               }
+              let generalCalendarMsgs: string[] = [
+                "Os dias disponíveis são:\n\nEm breve nossa equipe entrará em contato para confirmar os dias e horários disponíveis.",
+                "Responda apenas com o dia desejado.",
+              ];
+              try {
+                const nowG = new Date();
+                const { data: bsg, error: beg } = await admin
+                  .from("atendimento_experimental_class_bookings")
+                  .select("professor_start_at")
+                  .eq("status", "scheduled")
+                  .gte("professor_start_at", nowG.toISOString())
+                  .order("professor_start_at", { ascending: true });
+                if (!beg) {
+                  const bookedG = (bsg ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+                  const availG = listExperimentalClassAvailability({
+                    now: nowG,
+                    leadTimeZone: leadTzGeneral,
+                    bookedProfessorStartAts: bookedG,
+                  });
+                  if (availG && Array.isArray(availG.dates) && availG.dates.length > 0) {
+                    const bg = buildRecurringCalendarDatesMessages(availG.dates);
+                    if (Array.isArray(bg) && bg.length > 0) {
+                      generalCalendarMsgs = bg;
+                    }
+                  }
+                }
+              } catch (_e) {}
+              for (const message of generalCalendarMsgs) {
+                try {
+                  await insertWhatsAppBotTextMessage({
+                    admin,
+                    conversationId,
+                    contentText: message,
+                  });
+                } catch (_e) {}
+                try {
+                  await sendAtendimentoWhatsAppText({
+                    phone: normalizedPhoneOnly,
+                    message,
+                  });
+                } catch (_e) {}
+              }
+              const allMessages = [...introGeneral, ...generalCalendarMsgs];
               replyText = allMessages.join("\n\n");
             } catch (_e) {
               replyText =
