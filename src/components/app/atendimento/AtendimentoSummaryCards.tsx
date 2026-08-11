@@ -214,14 +214,6 @@ function LeadDetails({
               Copiar
             </button>
           </div>
-          <div className="text-sm text-[var(--app-text-55)]">
-            {lead.recurring_class_status ||
-            lead.recurring_class_weekday ||
-            lead.recurring_class_professor_time ||
-            lead.recurring_class_lead_time
-              ? "Aluno(a) confirmado"
-              : `Última interação: ${formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}`}
-          </div>
           {isLeadRepescagem(lead) ? (
             <div className="mt-2">
               <RepescagemBadge />
@@ -493,11 +485,6 @@ function BookingDetails({
               <Copy className="h-3.5 w-3.5 shrink-0" />
               Copiar
             </button>
-          </div>
-          <div className="text-sm text-[var(--app-text-55)]">
-            {hasRecurringClass
-              ? "Aluno(a) confirmado"
-              : `Agendamento: ${formatAtendimentoDateTime(booking?.professor_start_at || booking?.created_at || lead.updated_at)}`}
           </div>
         </div>
 
