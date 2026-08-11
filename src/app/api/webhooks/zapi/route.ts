@@ -2787,7 +2787,7 @@ export async function POST(req: Request) {
             const cadastroLink =
               `${baseUrl.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFirstName)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
             const allFinalMessages: string[] = [
-              `${safeFirstName}, acesse o link e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLink}`,
+              `Maravilha, ${safeFirstName}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLink}`,
             ];
             for (const message of allFinalMessages) {
               if (!String(message ?? "").trim()) continue;
@@ -3464,7 +3464,7 @@ export async function POST(req: Request) {
               const cadastroLinkGeneral =
                 `${baseUrlGeneral.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFirstGeneral)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
               const allMessages: string[] = [
-                `${safeFirstGeneral}, acesse o link e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkGeneral}`,
+                `Maravilha, ${safeFirstGeneral}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkGeneral}`,
               ];
               for (const message of allMessages) {
                 if (!String(message ?? "").trim()) continue;
