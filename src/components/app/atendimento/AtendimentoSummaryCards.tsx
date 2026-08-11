@@ -1760,10 +1760,13 @@ export function AtendimentoSummaryCards({
                           <RepescagemBadge />
                         </div>
                       ) : null}
-                      {activeSection === "agendamentos" &&
-                      !String(lead.experimental_class_booking?.lesson_link ?? "")
-                        .trim() ? (
-                        <div className="mt-2 text-[11px] font-semibold text-amber-300">Adicione o link da aula</div>
+                      {!String(lead.experimental_class_booking?.lesson_link ?? "")
+                        .trim() &&
+                      lead.experimental_class_booking?.status &&
+                      String(lead.experimental_class_booking.status).toLowerCase() !== "cancelled" ? (
+                        <div className="mt-2 text-[11px] font-semibold text-amber-300">
+                          Adicione link da aula experimental
+                        </div>
                       ) : null}
                     </button>
                   );
