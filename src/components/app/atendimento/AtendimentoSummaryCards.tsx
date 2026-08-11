@@ -192,7 +192,7 @@ function LeadDetails({
   const bookingWasNoShow = isBookingAttendanceNoShow(booking);
   const bookingAttendanceResolved = isBookingAttendanceResolved(booking);
   const showDraftSection =
-    !bookingIsCancelled && !bookingWasNoShow && !bookingAttendanceResolved && showDelete && (experimentalStatus || draftDate || draftTime || isDraft);
+    !bookingIsCancelled && !bookingWasNoShow && !bookingAttendanceResolved && (experimentalStatus || draftDate || draftTime || isDraft);
 
   const draftStageLabel = (() => {
     switch (experimentalStatus) {
