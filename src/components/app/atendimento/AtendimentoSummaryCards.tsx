@@ -280,7 +280,7 @@ function LeadDetails({
               </div>
               <div className="shrink-0">
                 <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-4 py-1.5 text-xs font-semibold text-emerald-100">
-                  Aluno(a) confirmado
+                  Aluno confirmado
                 </div>
               </div>
             </div>
@@ -721,7 +721,7 @@ function BookingDetails({
               </div>
               <div className="shrink-0">
                 <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/12 px-4 py-1.5 text-xs font-semibold text-emerald-100">
-                  Aluno(a) confirmado
+                  Aluno confirmado
                 </div>
               </div>
             </div>
@@ -1449,7 +1449,7 @@ export function AtendimentoSummaryCards({
       Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
       Boolean(String(lead.recurring_class_lead_time ?? "").trim());
     if (hasRecurring) {
-      return "Aluno(a) confirmado";
+      return "Aluno confirmado";
     }
 
     if (activeSection === "agendamentos") {
