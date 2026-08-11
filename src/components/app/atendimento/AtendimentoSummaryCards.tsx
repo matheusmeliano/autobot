@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Check, Copy, ExternalLink, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
+import { AlertTriangle, Check, Copy, ExternalLink, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -238,6 +238,25 @@ function LeadDetails({
           {isLeadRepescagem(lead) ? (
             <div className="mt-2">
               <RepescagemBadge />
+            </div>
+          ) : null}
+
+          {hasRecurring && !savedRecurringLink ? (
+            <div className="mt-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle
+                  className="mt-0.5 h-4 w-4 shrink-0 text-amber-300"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200/90">
+                    Adicionar link da aula recorrente
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-amber-100">
+                    O link fixo da aula recorrente ainda não foi preenchido. Role a tela e cole o link no campo abaixo para as notificações começarem a ser enviadas.
+                  </div>
+                </div>
+              </div>
             </div>
           ) : null}
         </div>
@@ -583,6 +602,25 @@ function BookingDetails({
               Copiar
             </button>
           </div>
+
+          {hasRecurringClass && !savedRecurringLink ? (
+            <div className="mt-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle
+                  className="mt-0.5 h-4 w-4 shrink-0 text-amber-300"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200/90">
+                    Adicionar link da aula recorrente
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-amber-100">
+                    O link fixo da aula recorrente ainda não foi preenchido. Role a tela e cole o link no campo abaixo para as notificações começarem a ser enviadas.
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {canSendStudentNotification ? (
@@ -1811,7 +1849,7 @@ export function AtendimentoSummaryCards({
             <div className="absolute inset-0 flex min-h-0 flex-col">
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--app-bg)]">
                 <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 shrink-0">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1 pr-2">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                       {activeSectionData.label}
                     </div>
@@ -1821,6 +1859,37 @@ export function AtendimentoSummaryCards({
                     >
                       {String(selectedLead.full_name ?? "").trim() || selectedLead.phone || "Interessado sem telefone"}
                     </div>
+                    {(() => {
+                      const recurringWeekdayRaw = String(selectedLead.recurring_class_weekday ?? "").trim().toLowerCase();
+                      const recurringStatus = String(selectedLead.recurring_class_status ?? "").trim();
+                      const recurringProfessorTime = String(selectedLead.recurring_class_professor_time ?? "").trim();
+                      const recurringLeadTime = String(selectedLead.recurring_class_lead_time ?? "").trim();
+                      const hasRecurring =
+                        ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw) ||
+                        Boolean(recurringStatus) ||
+                        Boolean(recurringProfessorTime) ||
+                        Boolean(recurringLeadTime);
+                      const savedLink = String((selectedLead as any).recurring_class_link ?? "").trim();
+                      if (!hasRecurring || savedLink) return null;
+                      return (
+                        <div className="mt-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle
+                              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300"
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200/90">
+                                Adicionar link da aula recorrente
+                              </div>
+                              <div className="mt-0.5 text-xs font-semibold text-amber-100">
+                                Link ainda não preenchido — cole o link no campo abaixo.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <button
                     type="button"
