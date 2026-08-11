@@ -13,6 +13,7 @@ export const OWNER_PERSONAL_PRIVATE_PHONE_SUFFIXES_10: readonly string[] = [
 
 export const BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10: readonly string[] = [
   "6599495594",
+  "6581175345",
 ];
 
 function matchBrazilianPhoneSuffix(digitsRaw: string | null | undefined, suffixesList: readonly string[]): boolean {

@@ -2691,14 +2691,22 @@ export async function ensureWhatsAppLeadAndConversation(params: {
         }
       } catch (_p2) {}
       let anyInstanceIsOwnerPersonalPrivateNumber = false;
+      let anyInstanceIsDedicatedBot = false;
       for (const d of userPhonesCheck) {
         if (isOwnerPersonalPrivatePhone(d)) {
           anyInstanceIsOwnerPersonalPrivateNumber = true;
-          break;
+        }
+        if (isDedicatedExclusiveBotPhone(d)) {
+          anyInstanceIsDedicatedBot = true;
         }
       }
-      if (anyInstanceIsOwnerPersonalPrivateNumber && params.creationOrigin === "zapi_from_header") {
-        return null;
+      if (params.creationOrigin === "zapi_from_header") {
+        if (anyInstanceIsOwnerPersonalPrivateNumber) {
+          return null;
+        }
+        if (!anyInstanceIsDedicatedBot) {
+          return null;
+        }
       }
     }
 
