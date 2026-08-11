@@ -1590,33 +1590,32 @@ export async function POST(req: Request) {
   {
     const allToPhoneCandidates: string[] = [toPhoneDigits, connectedInstancePhoneDigits].filter(Boolean);
     let toPhoneIsDedicatedBot = false;
-    let anyPrivateInstanceUsedForRecurringOrWhatsappNumber = false;
+    let anyConnectedInstanceIsOwnerPrivatePure = false;
     for (const p of allToPhoneCandidates) {
       if (isDedicatedExclusiveBotPhone(p)) {
         toPhoneIsDedicatedBot = true;
-        break;
       }
       if (isOwnerPersonalPrivatePhone(p)) {
-        anyPrivateInstanceUsedForRecurringOrWhatsappNumber = true;
+        anyConnectedInstanceIsOwnerPrivatePure = true;
       }
     }
-    if (
-      String(messageText || mediaUrl || "").trim() &&
-      (!toPhoneIsDedicatedBot || anyPrivateInstanceUsedForRecurringOrWhatsappNumber)
-    ) {
-      const explicitBlockList = Array.from(new Set<string>([
-        ...BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
-      ])).join(",");
-      return Response.json({
-        ok: true,
-        ignored: true,
-        reason:
-          "inbound_recipient_must_be_exclusive_dedicated_bot_number_not_owner_private_phone",
-        connected_instance_phone_sample: connectedInstancePhoneDigits.slice(0, 8) || "-",
-        to_phone_sample: toPhoneDigits.slice(0, 8) || "-",
-        recipient_was_private_owner_number: anyPrivateInstanceUsedForRecurringOrWhatsappNumber,
-        required_recipient_suffixes: explicitBlockList,
-      });
+    if (String(messageText || mediaUrl || "").trim()) {
+      if (!toPhoneIsDedicatedBot || anyConnectedInstanceIsOwnerPrivatePure) {
+        const explicitBlockList = Array.from(new Set<string>([
+          ...BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
+        ])).join(",");
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason:
+            "inbound_recipient_must_be_exclusive_dedicated_bot_number_not_owner_private_phone",
+          connected_instance_phone_sample: connectedInstancePhoneDigits.slice(0, 8) || "-",
+          to_phone_sample: toPhoneDigits.slice(0, 8) || "-",
+          connected_is_owner_private_pure_number: anyConnectedInstanceIsOwnerPrivatePure,
+          recipient_was_not_dedicated_bot_number: !toPhoneIsDedicatedBot,
+          required_recipient_suffixes: explicitBlockList,
+        });
+      }
     }
   }
 
@@ -2445,14 +2444,12 @@ export async function POST(req: Request) {
       {
         const connectedIsOwnerPrivatePhone = isOwnerPersonalPrivatePhone(connectedInstancePhoneDigits);
         const toPhoneLooksOwnerPrivate = isOwnerPersonalPrivatePhone(toPhoneDigits);
-        const toPhoneIsDedicated = isDedicatedExclusiveBotPhone(toPhoneDigits);
         const connectedIsDedicated = isDedicatedExclusiveBotPhone(connectedInstancePhoneDigits);
-        const recipientOkForNewLead =
-          (toPhoneIsDedicated || connectedIsDedicated) &&
-          !connectedIsOwnerPrivatePhone &&
-          !toPhoneLooksOwnerPrivate;
+        const toPhoneIsDedicated = isDedicatedExclusiveBotPhone(toPhoneDigits);
+        const recipientIsRealDedicatedBot = connectedIsDedicated || toPhoneIsDedicated;
+        const recipientIsOwnerPrivate = connectedIsOwnerPrivatePhone || toPhoneLooksOwnerPrivate;
 
-        if (connectedIsOwnerPrivatePhone || toPhoneLooksOwnerPrivate || !recipientOkForNewLead) {
+        if (recipientIsOwnerPrivate && !recipientIsRealDedicatedBot) {
           const existingLead = normalizedPhoneOnly
             ? await findLeadByPhone({ phone: normalizedPhoneOnly, userId })
             : null;

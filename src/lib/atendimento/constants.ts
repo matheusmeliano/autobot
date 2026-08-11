@@ -7,7 +7,6 @@ export const ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10: readonly string[] = [
 ];
 
 export const OWNER_PERSONAL_PRIVATE_PHONE_SUFFIXES_10: readonly string[] = [
-  "6581175345",
   "6596933336",
 ];
 
