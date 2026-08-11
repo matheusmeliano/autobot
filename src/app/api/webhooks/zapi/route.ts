@@ -2581,45 +2581,11 @@ export async function POST(req: Request) {
                 } catch (_e2) {}
               }
             } catch (_e) {}
-            let localDateMsgs: [string, string] = [
-              "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-              "Responda apenas com o dia desejado.",
-            ];
-            try {
-              const nowX = new Date();
-              const { data: bk, error: bkErr } = await admin
-                .from("atendimento_experimental_class_bookings")
-                .select("professor_start_at")
-                .eq("status", "scheduled")
-                .gte("professor_start_at", nowX.toISOString())
-                .order("professor_start_at", { ascending: true });
-              if (!bkErr) {
-                const bookedX = (bk ?? []).map((r: any) => String(r?.professor_start_at ?? "").trim()).filter(Boolean);
-                const avX = listExperimentalClassAvailability({
-                  now: nowX,
-                  leadTimeZone: leadTz,
-                  bookedProfessorStartAts: bookedX,
-                });
-                const realLocal = buildExperimentalClassDatesMessages(avX.dates);
-                if (Array.isArray(realLocal) && realLocal.length >= 2) {
-                  const d1 = String(realLocal[0] ?? "").trim();
-                  const d2 = String(realLocal[1] ?? "").trim();
-                  if (d1 && d2) {
-                    localDateMsgs = [d1, d2];
-                  }
-                }
-              }
-            } catch (_e) {
-              localDateMsgs = [
-                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-                "Responda apenas com o dia desejado.",
-              ];
-            }
             const allFinalMessages: string[] = [
               ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
               ...buildRecurringSchedulePromptMessages(),
-              localDateMsgs[0],
-              localDateMsgs[1],
+              "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+              "Responda apenas com o dia desejado.",
             ];
             for (const message of allFinalMessages) {
               if (!String(message ?? "").trim()) continue;
@@ -3289,45 +3255,11 @@ export async function POST(req: Request) {
                   .update({ recurring_class_status: "dia_pendente" } as any)
                   .eq("id", leadId);
               } catch (_e) {}
-              let fbLocalDateMsgs: [string, string] = [
-                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-                "Responda apenas com o dia desejado.",
-              ];
-              try {
-                const nowG = new Date();
-                const { data: bkG, error: bkGErr } = await admin
-                  .from("atendimento_experimental_class_bookings")
-                  .select("professor_start_at")
-                  .eq("status", "scheduled")
-                  .gte("professor_start_at", nowG.toISOString())
-                  .order("professor_start_at", { ascending: true });
-                if (!bkGErr) {
-                  const bookedG = (bkG ?? []).map((r: any) => String(r?.professor_start_at ?? "").trim()).filter(Boolean);
-                  const avG = listExperimentalClassAvailability({
-                    now: nowG,
-                    leadTimeZone: leadTzGeneral,
-                    bookedProfessorStartAts: bookedG,
-                  });
-                  const realFb = buildExperimentalClassDatesMessages(avG.dates);
-                  if (Array.isArray(realFb) && realFb.length >= 2) {
-                    const d1 = String(realFb[0] ?? "").trim();
-                    const d2 = String(realFb[1] ?? "").trim();
-                    if (d1 && d2) {
-                      fbLocalDateMsgs = [d1, d2];
-                    }
-                  }
-                }
-              } catch (_e) {
-                fbLocalDateMsgs = [
-                  "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-                  "Responda apenas com o dia desejado.",
-                ];
-              }
               const allMessages: string[] = [
                 ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
                 ...buildRecurringSchedulePromptMessages(),
-                fbLocalDateMsgs[0],
-                fbLocalDateMsgs[1],
+                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
+                "Responda apenas com o dia desejado.",
               ];
               for (const message of allMessages) {
                 if (!String(message ?? "").trim()) continue;
