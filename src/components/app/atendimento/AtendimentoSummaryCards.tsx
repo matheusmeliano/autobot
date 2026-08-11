@@ -253,7 +253,7 @@ function LeadDetails({
           ) : null}
 
           {hasRecurring && !savedRecurringLink ? (
-            <div className="mt-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
+            <div className="mt-2 hidden rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 min-[1176px]:block">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle
                   className="mt-0.5 h-4 w-4 shrink-0 text-amber-300"
@@ -615,7 +615,7 @@ function BookingDetails({
           </div>
 
           {hasRecurringClass && !savedRecurringLink ? (
-            <div className="mt-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
+            <div className="mt-2 hidden rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 min-[1176px]:block">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle
                   className="mt-0.5 h-4 w-4 shrink-0 text-amber-300"
