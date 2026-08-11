@@ -730,7 +730,7 @@ function BookingDetails({
           >
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                Histórico — Aula experimental
+                Aula experimental
               </div>
               {hasAttendanceStatus || bookingStatus === "cancelled" ? (
                 <div
