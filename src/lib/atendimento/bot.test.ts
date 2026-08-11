@@ -4,13 +4,13 @@ import { botReplyForLead, extractLeadDataFromMessage, filterCapturedDataForLead,
 import { buildExperimentalClassDatePromptMessages, EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE } from "./constants.ts";
 import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "../timezone.ts";
 
-test("extractLeadDataFromMessage captura nome e telefone", () => {
+test("extractLeadDataFromMessage captura apenas nome, captura de telefone e proibida para evitar contatos importados", () => {
   const data = extractLeadDataFromMessage(
     "Olá, meu nome é Ana Maria, meu CPF é 123.456.789-10, meu e-mail é ana@email.com e meu telefone é +1 321 555 9988.",
   );
 
   assert.equal(data.full_name, "Ana Maria");
-  assert.equal(data.phone, "+1 321 555 9988");
+  assert.equal(data.phone, undefined);
 });
 
 test("getNextMissingField retorna null quando o pre-cadastro estiver completo", () => {

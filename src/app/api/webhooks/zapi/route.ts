@@ -2224,6 +2224,7 @@ export async function POST(req: Request) {
       const leadContext = await ensureWhatsAppLeadAndConversation({
         phone: normalizedPhoneOnly,
         userId,
+        creationOrigin: "zapi_from_header",
         firstNameFromMessage: null,
         initialState: null,
         initialTimezone: null,

@@ -2280,6 +2280,7 @@ export async function findLeadConversationByChannel(params: {
 export async function ensureWhatsAppLeadAndConversation(params: {
   phone: string;
   userId: string;
+  creationOrigin: "zapi_from_header" | "trusted_explicit_call";
   firstNameFromMessage?: string | null;
   initialState?: string | null;
   initialStateNormalized?: string | null;
@@ -2287,6 +2288,12 @@ export async function ensureWhatsAppLeadAndConversation(params: {
   initialCountry?: string | null;
 }) {
   const admin = createSupabaseAdminClient();
+
+  const allowedOrigins = new Set<unknown>(["zapi_from_header", "trusted_explicit_call"]);
+  if (!allowedOrigins.has(params.creationOrigin)) {
+    return null;
+  }
+
   const normalizedPhone = normalizePhoneDigitsOnly(params.phone);
   if (!normalizedPhone || !isValidWhatsAppUserPhone(normalizedPhone)) {
     throw new Error(

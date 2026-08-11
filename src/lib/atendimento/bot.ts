@@ -108,9 +108,7 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
   if (!clean) return {};
 
   const result: CapturedData = {};
-  const phone = clean.match(/(?:\+?\d{1,3}\s*)?(?:\(?\d{2,3}\)?\s*)?\d(?:[\d\s-]){7,}\d/);
 
-  if (phone) result.phone = phone[0];
   if (!result.full_name) {
     const explicitName = clean.match(/(?:meu nome(?: completo)?\s*(?:é|e)?|sou)\s+([A-Za-zÀ-ÿ'’ -]{3,})/i);
     const explicitValue = explicitName?.[1]?.trim() ?? "";
@@ -120,7 +118,6 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
   }
   if (
     !result.full_name &&
-    !phone &&
     looksLikeFullName(clean)
   ) {
     result.full_name = clean.replace(/\s+/g, " ").trim();
