@@ -2209,6 +2209,189 @@ export async function POST(req: Request) {
         phone: String(candidateDigits ?? "").slice(0, 8) || "-",
       });
     }
+
+    // --- INICIO: BLOQUEIOS CRITERIOSOS PARA GARANTIR QUE SO O REMETENTE DIRETO SEJA REGISTRADO ---
+
+    // (BLOQUEIO 1) Grupo / participant: mensagens de grupo ou com participant sao bloqueadas.
+    // Apenas conversas DIRETAS 1:1 entre o aluno/interessado e o BOT são aceitas.
+    {
+      const participantRaw = getFirstNonEmpty(
+        (body as any).participant,
+        (body as any).message?.participant,
+        (body as any).data?.participant,
+        (body as any).data?.message?.participant,
+        (body as any).mentioned_participant,
+        (body as any).participants?.[0],
+        (body as any).chat_participant,
+      );
+      const isGroupChat = Boolean(
+        getFirstNonEmpty(
+          (body as any).isGroup,
+          (body as any).is_group,
+          (body as any).chatIsGroup,
+          (body as any).chat_is_group,
+          (body as any).message?.isGroup,
+          (body as any).message?.is_group,
+          (body as any).data?.isGroup,
+          (body as any).data?.is_group,
+          (body as any).data?.message?.isGroup,
+          (body as any).data?.message?.is_group,
+          (body as any).fromMe === false && participantRaw,
+        ),
+      );
+      if (String(participantRaw ?? "").trim() || isGroupChat) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "group_or_participant_message_blocked_only_direct_1to1_allowed",
+          has_participant: Boolean(String(participantRaw ?? "").trim()),
+          is_group_chat: isGroupChat,
+        });
+      }
+    }
+
+    // (BLOQUEIO 2) Mencoes / mentionedPhones: qualquer telefone mencionado em 3os bloqueia a mensagem.
+    // Nunca podemos transformar contatos mencionados em leads.
+    {
+      const thirdPartyMentions: string[] = [];
+      const allMentionedArrays = [
+        (body as any).mentionedPhones,
+        (body as any).mentioned_phones,
+        (body as any).mentionedNumbers,
+        (body as any).mentioned_numbers,
+        (body as any).mentions,
+        (body as any).message?.mentionedPhones,
+        (body as any).message?.mentions,
+        (body as any).data?.mentionedPhones,
+        (body as any).data?.message?.mentionedPhones,
+        (body as any).data?.message?.mentions,
+      ];
+      for (const arr of allMentionedArrays) {
+        if (!arr || !Array.isArray(arr)) continue;
+        for (const mention of arr) {
+          try {
+            const digits = typeof mention === "string"
+              ? mention.replace(/\D/g, "")
+              : String((mention as any)?.phone ?? (mention as any)?.number ?? (mention as any)?.id ?? "")
+                  .replace(/\D/g, "");
+            if (digits.length >= 10 && !equivalentBrazilianPhoneSuffix(digits, candidateDigits)) {
+              thirdPartyMentions.push(digits.slice(0, 8));
+            }
+          } catch (_me) {}
+        }
+      }
+      if (thirdPartyMentions.length > 0) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "third_party_mentions_blocked_no_contacts_from_third_parties",
+          mention_count: thirdPartyMentions.length,
+        });
+      }
+    }
+
+    // (BLOQUEIO 3) Contacts array da agenda de terceiros: bloqueia mensagens que contem
+    // array de contatos (vcard/contacts) com telefones diferentes do proprio sender.
+    {
+      const thirdPartyContacts: string[] = [];
+      const allContactsArrays = [
+        (body as any).contacts,
+        (body as any).Contacts,
+        (body as any).message?.contacts,
+        (body as any).message?.vcards,
+        (body as any).data?.contacts,
+        (body as any).data?.message?.contacts,
+      ];
+      for (const arr of allContactsArrays) {
+        if (!arr || !Array.isArray(arr)) continue;
+        for (const contactItem of arr) {
+          try {
+            const innerPhones: string[] = [];
+            if (Array.isArray((contactItem as any)?.phones)) {
+              for (const ph of (contactItem as any).phones) {
+                const d = String((ph as any)?.phone ?? (ph as any)?.number ?? ph ?? "").replace(/\D/g, "");
+                if (d.length >= 10) innerPhones.push(d);
+              }
+            }
+            const flat = String(
+              (contactItem as any)?.phone ??
+              (contactItem as any)?.number ??
+              (contactItem as any)?.id ??
+              (contactItem as any)?.wa_id ??
+              "",
+            ).replace(/\D/g, "");
+            if (flat.length >= 10) innerPhones.push(flat);
+            for (const phoneDigits of innerPhones) {
+              if (!equivalentBrazilianPhoneSuffix(phoneDigits, candidateDigits)) {
+                thirdPartyContacts.push(phoneDigits.slice(0, 8));
+              }
+            }
+          } catch (_cme) {}
+        }
+      }
+      if (thirdPartyContacts.length > 0) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "third_party_vcard_contacts_blocked_cannot_register_sender_agenda_entries",
+          contact_count: thirdPartyContacts.length,
+        });
+      }
+    }
+
+    // (BLOQUEIO 4) Anti-spoofing: se sender.phone foi fornecido explicitamente,
+    // ELE TEM QUE SER IDENTICO ao fromPhone. Se forem diferentes, bloqueamos.
+    {
+      const explicitSenderPhone = getFirstNonEmpty(
+        (body as any).sender?.phone,
+        (body as any).sender?.number,
+        (body as any).senderPhone,
+        (body as any).sender_number,
+        (body as any).message?.sender?.phone,
+        (body as any).data?.sender?.phone,
+        (body as any).data?.message?.sender?.phone,
+        (body as any).from_number,
+      );
+      if (String(explicitSenderPhone ?? "").trim()) {
+        const senderDigits = String(explicitSenderPhone ?? "").replace(/\D/g, "");
+        const fromDigits = String(fromPhone ?? "").replace(/\D/g, "");
+        if (
+          senderDigits.length >= 10 &&
+          fromDigits.length >= 10 &&
+          !equivalentBrazilianPhoneSuffix(senderDigits, fromDigits)
+        ) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "anti_spoofing_sender_phone_mismatch_from_header",
+            sender_phone_sample: senderDigits.slice(0, 8) || "-",
+            from_phone_sample: fromDigits.slice(0, 8) || "-",
+          });
+        }
+      }
+    }
+
+    // (BLOQUEIO 5) DESTINATARIO como candidato bloqueado: NUNCA registramos toPhone
+    // (destinatario) como lead. O lead É SÓ quem ENVIOU (fromPhone).
+    // Isso garante contra qualquer erro futuro que possa inverter from/to.
+    {
+      const toDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
+      if (
+        toDigitsBroad.length >= 10 &&
+        equivalentBrazilianPhoneSuffix(candidateDigits, toDigitsBroad) &&
+        !equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)
+      ) {
+        // Caso extremamente raro: from === to (mas caiu fora do loopback). Bloqueia.
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "recipient_phone_cannot_become_lead_only_sender_is_registered",
+          candidate_sample: String(candidateDigits ?? "").slice(0, 8) || "-",
+        });
+      }
+    }
+
+    // --- FIM: BLOQUEIOS CRITERIOSOS ---
   }
 
   if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id) {
