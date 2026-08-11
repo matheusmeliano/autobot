@@ -2303,12 +2303,10 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       .limit(1)
       .maybeSingle();
     const ourPhoneDigits = String((instRow as any)?.phone ?? "").replace(/\D/g, "");
-    if (ourPhoneDigits && ourPhoneDigits.length >= 10 && normalizedPhone.length >= 10) {
-      const matchesOur =
-        normalizedPhone === ourPhoneDigits ||
-        normalizedPhone.endsWith(ourPhoneDigits) ||
-        ourPhoneDigits.endsWith(normalizedPhone);
-      if (matchesOur) {
+    if (ourPhoneDigits.length >= 10 && normalizedPhone.length >= 10) {
+      const ourKey = ourPhoneDigits.slice(-10);
+      const rowKey = normalizedPhone.slice(-10);
+      if (ourKey === rowKey || normalizedPhone.endsWith(ourKey) || ourPhoneDigits.endsWith(rowKey)) {
         return null;
       }
     }

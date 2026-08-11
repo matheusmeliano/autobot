@@ -454,14 +454,14 @@ export async function GET(req: Request) {
     if (status && String(row.status ?? "").toLowerCase() !== status) return false;
     if (stage && String(row.funnel_stage ?? "").toLowerCase() !== stage) return false;
     if (cutoffInstanceTimeMs > 0 && getLeadSortTime(row) < cutoffInstanceTimeMs) return false;
-    if (connectedBotPhoneDigits && connectedBotPhoneDigits.length >= 10) {
+    if (connectedBotPhoneDigits.length >= 10) {
       const rowDigits = String(row.phone ?? "").replace(/\D/g, "");
       if (rowDigits.length >= 10) {
-        const matches =
-          rowDigits === connectedBotPhoneDigits ||
-          rowDigits.endsWith(connectedBotPhoneDigits) ||
-          connectedBotPhoneDigits.endsWith(rowDigits);
-        if (matches) return false;
+        const rowKey = rowDigits.slice(-10);
+        const ourKey = connectedBotPhoneDigits.slice(-10);
+        if (rowKey && ourKey && rowKey === ourKey) return false;
+        if (rowDigits.endsWith(connectedBotPhoneDigits.slice(-10))) return false;
+        if (connectedBotPhoneDigits.endsWith(rowDigits.slice(-10))) return false;
       }
     }
     return true;

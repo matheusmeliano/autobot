@@ -152,6 +152,25 @@ function getFirstNonEmpty(...values: Array<unknown>) {
   return "";
 }
 
+function equivalentBrazilianPhoneSuffix(aDigitsRaw: string | null | undefined, bDigitsRaw: string | null | undefined): boolean {
+  const a = String(aDigitsRaw ?? "").replace(/\D/g, "");
+  const b = String(bDigitsRaw ?? "").replace(/\D/g, "");
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const a10 = a.length >= 10 ? a.slice(-10) : "";
+  const b10 = b.length >= 10 ? b.slice(-10) : "";
+  if (a10 && b10 && a10 === b10) return true;
+  const c1: boolean = Boolean(a10) && b.endsWith(a10);
+  const c2: boolean = Boolean(b10) && a.endsWith(b10);
+  return c1 || c2;
+}
+
+function getEquivalentBrazilianPhoneSuffixKey(digitsRaw: string | null | undefined): string {
+  const a = String(digitsRaw ?? "").replace(/\D/g, "");
+  if (a.length >= 10) return a.slice(-10);
+  return a;
+}
+
 function normalizeText(text: string) {
   return text
     .toLowerCase()
@@ -1469,10 +1488,32 @@ export async function POST(req: Request) {
   }
 
   const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
-  if (!rawFromMe && connectedInstancePhoneDigits && fromPhoneDigits) {
-    if (connectedInstancePhoneDigits === fromPhoneDigits) {
-      rawFromMe = true;
+  const toPhoneDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
+
+  if (!rawFromMe && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
+    rawFromMe = true;
+  }
+
+  {
+    const fromIsOur = equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
+    const toIsOur = equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+    if (fromIsOur || toIsOur) {
+      if (!rawFromMe && fromIsOur) rawFromMe = true;
     }
+  }
+
+  const isToOrFromOurNumber =
+    equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
+    equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+
+  if (rawFromMe || equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad)) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: rawFromMe
+        ? "outbound_from_me_message_or_status_never_creates_lead"
+        : "loopback_or_self_message_bot_number_not_registered_as_interessado",
+    });
   }
 
   const isPhoneValidationCallback =
@@ -1504,7 +1545,7 @@ export async function POST(req: Request) {
     );
 
   const isMessageFromConnectedNumber =
-    rawFromMe === true &&
+    Boolean(rawFromMe) &&
     normalizedEventType !== "DeliveryCallback" &&
     normalizedEventType !== "MessageStatusCallback" &&
     normalizedEventType !== "DisconnectedCallback";
@@ -1525,7 +1566,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (rawFromMe === true) {
+  if (Boolean(rawFromMe)) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -1982,19 +2023,21 @@ export async function POST(req: Request) {
   {
     const ourDigits = connectedInstancePhoneDigits;
     const candidateDigits = validatedFrom.digitsOnly || String(fromPhone ?? "").replace(/\D/g, "");
-    if (ourDigits && candidateDigits && ourDigits.length >= 10 && candidateDigits.length >= 10) {
-      const matchesOurNumber =
-        candidateDigits === ourDigits ||
-        candidateDigits.endsWith(ourDigits) ||
-        ourDigits.endsWith(candidateDigits);
-      if (matchesOurNumber) {
-        return Response.json({
-          ok: true,
-          ignored: true,
-          reason: "connected_bot_own_phone_must_not_be_registered_as_interessado",
-          phone: String(candidateDigits ?? "").slice(0, 8) || "-",
-        });
-      }
+    if (equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "connected_bot_own_phone_must_not_be_registered_as_interessado",
+        phone: String(candidateDigits ?? "").slice(0, 8) || "-",
+      });
+    }
+    if (equivalentBrazilianPhoneSuffix(candidateDigits, String(toPhone ?? "").replace(/\D/g, ""))) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "from_and_to_phones_are_equivalent_loopback",
+        phone: String(candidateDigits ?? "").slice(0, 8) || "-",
+      });
     }
   }
 
