@@ -1154,6 +1154,36 @@ export async function POST(req: Request) {
     (body as any).data?.message?.phone,
   );
 
+  const toPhone = getFirstNonEmpty(
+    (body as any).to,
+    (body as any).recipient,
+    (body as any).receiver,
+    (body as any).destination,
+    (body as any).peer,
+    (body as any).chatId,
+    (body as any).chat_id,
+    (body as any).participant,
+    (body as any).message?.to,
+    (body as any).message?.recipient,
+    (body as any).message?.receiver,
+    (body as any).message?.chatId,
+    (body as any).message?.chat_id,
+    (body as any).data?.to,
+    (body as any).data?.recipient,
+    (body as any).data?.receiver,
+    (body as any).data?.message?.to,
+    (body as any).data?.message?.recipient,
+    (body as any).data?.message?.receiver,
+    (body as any).data?.message?.chatId,
+    (body as any).data?.message?.chat_id,
+    (body as any).data?.chatId,
+    (body as any).data?.chat_id,
+    (body as any).instance_phone,
+    (body as any).instancePhone,
+    (body as any).data?.instance_phone,
+    (body as any).data?.instancePhone,
+  );
+
   const messageText = getFirstNonEmpty(
     (body as any).text?.message,
     (body as any).text?.body,
@@ -1253,8 +1283,9 @@ export async function POST(req: Request) {
     const currentPhoneRaw = String(instance?.phone ?? "").trim();
     const currentDigits = currentPhoneRaw.replace(/\D/g, "");
     const currentPhoneLooksValid = currentDigits.length >= 10 && currentDigits.length <= 15;
-    const shouldTryRefreshPhone = (!currentPhoneRaw || !currentPhoneLooksValid) && instance?.token;
+    const shouldTryRefreshPhone = instance?.token;
     if (shouldTryRefreshPhone) {
+      let cleanedFresh = "";
       try {
         const token = String(instance.token ?? "");
         const clientToken = missingClientTokenCol ? null : instance?.client_token ?? null;
@@ -1271,7 +1302,6 @@ export async function POST(req: Request) {
           if (meData.whatsapp && typeof meData.whatsapp.phone === "string") candidates.push(meData.whatsapp.phone);
           if (meData.me && typeof meData.me.phone === "string") candidates.push(meData.me.phone);
           if (typeof meData.id === "string") candidates.push(meData.id);
-          let cleaned = "";
           for (let i = 0; i < candidates.length; i++) {
             const raw = candidates[i];
             if (!raw || typeof raw !== "string") continue;
@@ -1279,14 +1309,14 @@ export async function POST(req: Request) {
             const pieces = raw.split(/[^0-9]+/).filter(Boolean);
             for (const piece of pieces) {
               if (piece.length >= 10 && piece.length <= 15) {
-                cleaned = piece;
+                cleanedFresh = piece;
                 break;
               }
             }
-            if (cleaned) break;
+            if (cleanedFresh) break;
             const fallbackDigits = raw.replace(/\D/g, "");
             if (fallbackDigits.length >= 10 && fallbackDigits.length <= 15) {
-              cleaned = fallbackDigits;
+              cleanedFresh = fallbackDigits;
               break;
             }
             if (isLastCandidate && fallbackDigits.length > 15) {
@@ -1298,22 +1328,26 @@ export async function POST(req: Request) {
                 || fallbackDigits.startsWith("56")
                 || fallbackDigits.startsWith("57");
               if (cc2 && fallbackDigits.length >= 12) {
-                cleaned = fallbackDigits.slice(0, 13);
-                if (cleaned.length >= 10) break;
+                cleanedFresh = fallbackDigits.slice(0, 13);
+                if (cleanedFresh.length >= 10) break;
               }
               if (fallbackDigits.startsWith("1") && fallbackDigits.length >= 11) {
-                cleaned = fallbackDigits.slice(0, 11);
+                cleanedFresh = fallbackDigits.slice(0, 11);
                 break;
               }
             }
           }
-          if (cleaned && cleaned.length >= 10 && cleaned.length <= 15) {
-            await admin
-              .from("whatsapp_instances")
-              .update({ phone: cleaned })
-              .eq("instance_id", instanceId);
-            if (instance) instance.phone = cleaned;
-          } else if (!currentPhoneLooksValid && currentPhoneRaw) {
+          if (cleanedFresh && cleanedFresh.length >= 10 && cleanedFresh.length <= 15) {
+            if (!currentPhoneLooksValid || cleanedFresh !== currentDigits) {
+              try {
+                await admin
+                  .from("whatsapp_instances")
+                  .update({ phone: cleanedFresh })
+                  .eq("instance_id", instanceId);
+              } catch (_wrErr) {}
+            }
+            if (instance) instance.phone = cleanedFresh;
+          } else if (!cleanedFresh && !currentPhoneLooksValid && currentPhoneRaw) {
             try {
               await admin
                 .from("whatsapp_instances")
@@ -1364,6 +1398,24 @@ export async function POST(req: Request) {
   }
 
   const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
+  const toPhoneDigits = String(toPhone ?? "").replace(/\D/g, "");
+
+  if (connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
+    const toMatchInstance =
+      toPhoneDigits.endsWith(connectedInstancePhoneDigits) ||
+      connectedInstancePhoneDigits.endsWith(toPhoneDigits) ||
+      toPhoneDigits === connectedInstancePhoneDigits;
+    if (!toMatchInstance) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "stale_connected_phone_not_current_instance",
+        current_instance_phone_digits: connectedInstancePhoneDigits,
+        received_event_to_phone_digits: toPhoneDigits,
+      });
+    }
+  }
+
   const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
   if (!rawFromMe && connectedInstancePhoneDigits && fromPhoneDigits) {
     if (connectedInstancePhoneDigits === fromPhoneDigits) {
