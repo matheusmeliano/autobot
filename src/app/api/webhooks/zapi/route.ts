@@ -4276,7 +4276,8 @@ export async function POST(req: Request) {
         }
 
         if (
-          (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent))
+          isFirstBotInteraction ||
+          looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)
         ) {
           const firstMessage =
             "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
