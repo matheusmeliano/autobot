@@ -424,12 +424,6 @@ function BookingDetails({
     hasSchedulingProgress: leadHasExperimentalClassPanelStatus(lead),
     hasLead: true,
   });
-  const canCancel = derivedStatus === "scheduled" && Boolean(bookingId);
-  const canSendStudentNotification =
-    (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
-    Boolean(bookingId) &&
-    !hasStudentNotification &&
-    !hasAttendantNotification;
   const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
   const displayDash = "-";
 
@@ -461,6 +455,13 @@ function BookingDetails({
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase())
     : "Agendado";
+  const canCancel = derivedStatus === "scheduled" && Boolean(bookingId) && !hasRecurringClass;
+  const canSendStudentNotification =
+    (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
+    Boolean(bookingId) &&
+    !hasStudentNotification &&
+    !hasAttendantNotification &&
+    !hasRecurringClass;
 
   useEffect(() => {
     setLessonLinkDraft(savedLessonLink);
@@ -557,132 +558,16 @@ function BookingDetails({
               )}
             </div>
 
-            {showAttendanceCard ? (
-              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  Comparecimento
-                </div>
-                {attendanceStatus ? (
-                  <div className="mt-3 flex flex-col items-start gap-3 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between">
-                    <div
-                      className={[
-                        "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
-                        attendanceStatus === "attended"
-                          ? "bg-emerald-500/15 text-emerald-200"
-                          : "bg-amber-400/15 text-amber-200",
-                      ].join(" ")}
-                    >
-                      {experimentalClassAttendanceLabel(attendanceStatus)}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 flex flex-col items-start gap-3 min-[600px]:flex-row min-[600px]:items-center min-[600px]:justify-between min-[600px]:gap-4">
-                    <div className="text-sm font-semibold text-[var(--app-text-85)]">
-                      O aluno compareceu à aula?
-                    </div>
-                    <div className="flex w-full flex-shrink-0 flex-col gap-2 min-[500px]:w-auto min-[500px]:flex-row">
-                      <button
-                        type="button"
-                        onClick={() => void onMarkAttendance(lead, "attended")}
-                        disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
-                        className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Check className="h-4 w-4 shrink-0" />
-                        {isMarkingAttendanceAttended ? "Salvando..." : "Sim"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void onMarkAttendance(lead, "no_show")}
-                        disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
-                        className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/12 px-5 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <X className="h-4 w-4 shrink-0" />
-                        {isMarkingAttendanceNoShow ? "Salvando..." : "Não"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {!bookingIsNoShow && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
-              <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-                <Field label="Aluno" value={bookingIsNoShow ? displayDash : lead.full_name} />
-                <Field
-                  label="Status"
-                  value={bookingIsNoShow ? displayDash : experimentalClassBookingDisplayStatusLabel(derivedStatus)}
-                />
-                <Field label="Dia do aluno" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.lead_date)} />
-                <Field
-                  label="Horário do aluno"
-                  value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.lead_time)}
-                />
-                <Field label="Fuso do aluno" value={bookingIsNoShow ? displayDash : booking?.lead_timezone} />
-                <Field label="Dia do professor" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.professor_date)} />
-                <Field
-                  label="Horário do professor"
-                  value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.professor_time)}
-                />
-                <Field label="Fuso do professor" value={bookingIsNoShow ? displayDash : professorTimeZone} />
-              </div>
-            ) : null}
-
-            {showIncompleteState ? (
-              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
-                  Agendamento
-                </div>
-                <div className="mt-3 text-sm text-amber-50">
-                  O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com dia e horário confirmados.
-                </div>
-              </div>
-            ) : null}
-
-            {!showIncompleteState && !bookingIsNoShow && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
-              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
-                <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                      Link da Aula
-                    </div>
-                    <div className="mt-2 text-xs text-[var(--app-text-55)]">
-                      Adicione manualmente o link que será enviado ao aluno no dia e horário agendados.
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => void onSaveLessonLink(lead, effectiveLessonLinkDraft)}
-                    disabled={isSavingLessonLink || !lessonLinkChanged}
-                    className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {isSavingLessonLink ? "Salvando..." : "Salvar link"}
-                  </button>
-                </div>
-
-                <input
-                  type="text"
-                  value={effectiveLessonLinkDraft}
-                  onChange={(event) => setLessonLinkDraft(event.target.value)}
-                  placeholder="https://meet.google.com/..."
-                  className="mt-4 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-medium text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
-                />
-
-                {effectiveSavedLessonLink ? (
-                  <a
-                    href={canOpenSavedLessonLink ? effectiveSavedLessonLink : "#"}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="mt-3 inline-flex text-sm font-semibold text-emerald-300 underline underline-offset-2 break-all"
-                    onClick={(event) => {
-                      if (!canOpenSavedLessonLink) event.preventDefault();
-                    }}
-                  >
-                    {effectiveSavedLessonLink}
-                  </a>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field
+                label="Dia"
+                value={formatAtendimentoDate(booking?.lead_date || booking?.professor_date)}
+              />
+              <Field
+                label="Horário"
+                value={atendimentoTimeLabel(booking?.lead_time ?? booking?.professor_time ?? null)}
+              />
+            </div>
           </div>
         ) : null}
 
