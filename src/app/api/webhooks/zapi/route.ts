@@ -2581,7 +2581,6 @@ export async function POST(req: Request) {
                 } catch (_e2) {}
               }
             } catch (_e) {}
-            const leadTz = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
             const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
               admin,
               leadId,
