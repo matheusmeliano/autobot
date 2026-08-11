@@ -63,6 +63,7 @@ import {
   resolveTimeZoneFromCityInput,
   resolveTimeZoneFromStateInput,
 } from "@/lib/timezone";
+import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
@@ -2596,8 +2597,8 @@ export async function POST(req: Request) {
             const leadTz = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
             try {
               const updatePatch: Record<string, unknown> = {
-                funnel_stage: "aula_recorrente_dia_pendente",
-                status: "aula_recorrente_dia_pendente",
+                funnel_stage: "cadastro_recorrente_pendente_plataforma",
+                status: "cadastro_recorrente_pendente_plataforma",
                 updated_at: nowIso,
               };
               try {
@@ -2605,7 +2606,7 @@ export async function POST(req: Request) {
                   .from("atendimento_leads")
                   .update({
                     ...updatePatch,
-                    recurring_class_status: "dia_pendente",
+                    recurring_class_status: "cadastro_plataforma_pendente",
                   } as any)
                   .eq("id", leadId);
                 void _testErr;
@@ -2618,11 +2619,12 @@ export async function POST(req: Request) {
                 } catch (_e2) {}
               }
             } catch (_e) {}
+            const safeFirstName = leadFirstName || leadFullNameRaw || "Aluno(a)";
+            const baseUrl = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
+            const cadastroLink =
+              `${baseUrl.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFirstName)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
             const allFinalMessages: string[] = [
-              ...buildRecurringPlanIntroMessages(leadFirstName || leadFullNameRaw || null),
-              ...buildRecurringSchedulePromptMessages(),
-              "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-              "Responda apenas com o dia desejado.",
+              `${safeFirstName}, agora acesse o link abaixo, siga os passos e conclua seu cadastro em nossa plataforma.\n\nLink: ${cadastroLink}`,
             ];
             for (const message of allFinalMessages) {
               if (!String(message ?? "").trim()) continue;
@@ -2649,7 +2651,8 @@ export async function POST(req: Request) {
                 details: {
                   inbound_text: inboundContentRaw,
                   reply_messages: allFinalMessages,
-                  next_funnel_stage: "aula_recorrente_dia_pendente",
+                  next_funnel_stage: "cadastro_recorrente_pendente_plataforma",
+                  cadastro_link: cadastroLink,
                   source: "whatsapp_zapi_nuclear",
                 },
                 actorType: "bot",
@@ -2670,7 +2673,7 @@ export async function POST(req: Request) {
             return Response.json({
               ok: true,
               handled: true,
-              flow: "nuclear_post_attendance_matricula_pendente_resposta_sim_recurring_schedule",
+              flow: "nuclear_post_attendance_matricula_pendente_resposta_sim_recurring_cadastro_plataforma",
             });
           } else {
             let invalidYesNoAttemptsForAmbiguousOnly = 0;
@@ -3280,8 +3283,8 @@ export async function POST(req: Request) {
           }
 
           if (isYes) {
-            nextLeadFunnel = "aula_recorrente_dia_pendente";
-            nextLeadStatus = "aula_recorrente_dia_pendente";
+            nextLeadFunnel = "cadastro_recorrente_pendente_plataforma";
+            nextLeadStatus = "cadastro_recorrente_pendente_plataforma";
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
             const leadTzGeneral = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
@@ -3289,14 +3292,15 @@ export async function POST(req: Request) {
               try {
                 await admin
                   .from("atendimento_leads")
-                  .update({ recurring_class_status: "dia_pendente" } as any)
+                  .update({ recurring_class_status: "cadastro_plataforma_pendente" } as any)
                   .eq("id", leadId);
               } catch (_e) {}
+              const safeFirstGeneral = leadFirstName || String((lead as any)?.full_name ?? "") || "Aluno(a)";
+              const baseUrlGeneral = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
+              const cadastroLinkGeneral =
+                `${baseUrlGeneral.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFirstGeneral)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
               const allMessages: string[] = [
-                ...buildRecurringPlanIntroMessages(leadFirstName || String((lead as any)?.full_name ?? "") || null),
-                ...buildRecurringSchedulePromptMessages(),
-                "Os dias disponíveis são:\n\n11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29 e 31.",
-                "Responda apenas com o dia desejado.",
+                `${safeFirstGeneral}, agora acesse o link abaixo, siga os passos e conclua seu cadastro em nossa plataforma.\n\nLink: ${cadastroLinkGeneral}`,
               ];
               for (const message of allMessages) {
                 if (!String(message ?? "").trim()) continue;
@@ -3315,6 +3319,7 @@ export async function POST(req: Request) {
                 } catch (_e) {}
               }
               replyText = allMessages.join("\n\n");
+              historyDetailsPatch = { ...(historyDetailsPatch ?? {}), cadastro_link: cadastroLinkGeneral };
             } catch (_e) {
               replyText =
                 "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
