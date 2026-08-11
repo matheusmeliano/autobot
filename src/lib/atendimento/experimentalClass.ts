@@ -989,3 +989,65 @@ export function findRecurringWeekdayTimeOption(input: string, options: Recurring
   }
   return null;
 }
+
+export function calculateNextRecurringOccurrence(params: {
+  weekday: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  professorTimeHHMM: string;
+  professorTimeZone?: string | null;
+  leadTimeZone?: string | null;
+  fromDate?: Date;
+}) {
+  const wantWeekday = String(params.weekday ?? "").trim().toLowerCase();
+  if (!wantWeekday) return null;
+  const time = String(params.professorTimeHHMM ?? "").trim();
+  if (!/^\d{2}:\d{2}$/.test(time)) return null;
+  const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
+  const now = params.fromDate ?? new Date();
+
+  const todayLocal = localDateInTimeZone(now, profTz);
+  for (let dayOffset = 0; dayOffset < 40; dayOffset++) {
+    const candidateLocal = addDaysToLocalDate(todayLocal, dayOffset);
+    const noonUtc = zonedDateTimeToUtcIso({
+      date: candidateLocal,
+      time: "12:00",
+      timeZone: profTz,
+    });
+    const candidateWeekday = weekdayInTimeZone(noonUtc, profTz).toLowerCase();
+    if (candidateWeekday !== wantWeekday) continue;
+
+    const startUtcIso = zonedDateTimeToUtcIso({
+      date: candidateLocal,
+      time,
+      timeZone: profTz,
+    });
+    const startUtcMs = new Date(startUtcIso).getTime();
+    if (!Number.isFinite(startUtcMs)) continue;
+    if (dayOffset === 0 && startUtcMs <= now.getTime()) continue;
+
+    const ptbrLabels: Record<string, string> = {
+      mon: "Segunda-feira",
+      tue: "Terça-feira",
+      wed: "Quarta-feira",
+      thu: "Quinta-feira",
+      fri: "Sexta-feira",
+      sat: "Sábado",
+      sun: "Domingo",
+    };
+
+    return {
+      professorDate: candidateLocal,
+      professorTime: time,
+      professorTimeZone: profTz,
+      professorStartAt: startUtcIso,
+      leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
+      leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
+      leadTimeZone: leadTz,
+      weekdayLabel:
+        (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)?.[wantWeekday] ??
+        ptbrLabels[wantWeekday] ??
+        wantWeekday.toUpperCase(),
+    };
+  }
+  return null;
+}

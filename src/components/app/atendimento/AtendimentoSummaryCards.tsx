@@ -9,6 +9,7 @@ import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import {
   deriveExperimentalClassBookingDisplayStatus,
   experimentalClassBookingDisplayStatusLabel,
+  calculateNextRecurringOccurrence,
 } from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime, formatAtendimentoLocationName } from "@/lib/atendimento/utils";
@@ -432,6 +433,35 @@ function BookingDetails({
   const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
   const displayDash = "-";
 
+  const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+  const recurringWeekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
+    recurringWeekdayRaw,
+  )
+    ? (recurringWeekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")
+    : null;
+  const recurringProfessorTime = String(lead.recurring_class_professor_time ?? "").trim();
+  const recurringLeadTimeRaw = String(lead.recurring_class_lead_time ?? "").trim();
+  const recurringTime =
+    /^\d{2}:\d{2}$/.test(recurringProfessorTime) ? recurringProfessorTime : recurringLeadTimeRaw;
+  const hasRecurringClass = Boolean(
+    recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime),
+  );
+  const nextRecurring =
+    hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
+      ? calculateNextRecurringOccurrence({
+          weekday: recurringWeekday,
+          professorTimeHHMM: recurringTime,
+          professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          leadTimeZone: lead.timezone || null,
+        })
+      : null;
+  const recurringStatusLabel = String(lead.recurring_class_status ?? "").trim()
+    ? String(lead.recurring_class_status ?? "")
+        .toLowerCase()
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    : "Agendado";
+
   useEffect(() => {
     setLessonLinkDraft(savedLessonLink);
   }, [savedLessonLink, bookingId]);
@@ -495,118 +525,214 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {showAttendanceCard ? (
-          <div className="mb-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-              Comparecimento
-            </div>
-            {attendanceStatus ? (
-              <div className="mt-3 flex flex-col items-start gap-3 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between">
+        {booking || showAttendanceCard || showIncompleteState ? (
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                Histórico — Aula experimental
+              </div>
+              {hasAttendanceStatus || bookingStatus === "cancelled" ? (
                 <div
                   className={[
                     "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
-                    attendanceStatus === "attended"
+                    bookingStatus === "cancelled"
+                      ? "bg-red-500/15 text-red-200"
+                      : attendanceStatus === "attended"
                       ? "bg-emerald-500/15 text-emerald-200"
                       : "bg-amber-400/15 text-amber-200",
                   ].join(" ")}
                 >
-                  {experimentalClassAttendanceLabel(attendanceStatus)}
+                  {bookingStatus === "cancelled"
+                    ? "Cancelado"
+                    : attendanceStatus === "attended"
+                    ? "Concluído"
+                    : attendanceStatus === "no_show"
+                    ? "Não compareceu"
+                    : experimentalClassBookingDisplayStatusLabel(derivedStatus)}
                 </div>
-              </div>
-            ) : (
-              <div className="mt-3 flex flex-col items-start gap-3 min-[600px]:flex-row min-[600px]:items-center min-[600px]:justify-between min-[600px]:gap-4">
-                <div className="text-sm font-semibold text-[var(--app-text-85)]">
-                  O aluno compareceu à aula?
+              ) : (
+                <div className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)]">
+                  {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
                 </div>
-                <div className="flex w-full flex-shrink-0 flex-col gap-2 min-[500px]:w-auto min-[500px]:flex-row">
-                  <button
-                    type="button"
-                    onClick={() => void onMarkAttendance(lead, "attended")}
-                    disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
-                    className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Check className="h-4 w-4 shrink-0" />
-                    {isMarkingAttendanceAttended ? "Salvando..." : "Sim"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void onMarkAttendance(lead, "no_show")}
-                    disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
-                    className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/12 px-5 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <X className="h-4 w-4 shrink-0" />
-                    {isMarkingAttendanceNoShow ? "Salvando..." : "Não"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {!bookingIsNoShow && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
-          <div className="grid min-w-0 gap-3 md:grid-cols-2">
-            <Field label="Aluno" value={bookingIsNoShow ? displayDash : lead.full_name} />
-            <Field label="Status" value={bookingIsNoShow ? displayDash : experimentalClassBookingDisplayStatusLabel(derivedStatus)} />
-            <Field label="Dia do aluno" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.lead_date)} />
-            <Field label="Horário do aluno" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.lead_time)} />
-            <Field label="Fuso do aluno" value={bookingIsNoShow ? displayDash : booking?.lead_timezone} />
-            <Field label="Dia do professor" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.professor_date)} />
-            <Field label="Horário do professor" value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.professor_time)} />
-            <Field label="Fuso do professor" value={bookingIsNoShow ? displayDash : professorTimeZone} />
-          </div>
-        ) : null}
-
-        {showIncompleteState ? (
-          <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">Agendamento</div>
-            <div className="mt-3 text-sm text-amber-50">
-              O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com dia e horário confirmados.
-            </div>
-          </div>
-        ) : null}
-
-        {!showIncompleteState && !bookingIsNoShow && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
-        <div className="mt-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-          <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
-            <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">Link da Aula</div>
-              <div className="mt-2 text-xs text-[var(--app-text-55)]">
-                Adicione manualmente o link que será enviado ao aluno no dia e horário agendados.
-              </div>
+              )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => void onSaveLessonLink(lead, effectiveLessonLinkDraft)}
-              disabled={isSavingLessonLink || !lessonLinkChanged}
-              className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isSavingLessonLink ? "Salvando..." : "Salvar link"}
-            </button>
+            {showAttendanceCard ? (
+              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Comparecimento
+                </div>
+                {attendanceStatus ? (
+                  <div className="mt-3 flex flex-col items-start gap-3 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between">
+                    <div
+                      className={[
+                        "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                        attendanceStatus === "attended"
+                          ? "bg-emerald-500/15 text-emerald-200"
+                          : "bg-amber-400/15 text-amber-200",
+                      ].join(" ")}
+                    >
+                      {experimentalClassAttendanceLabel(attendanceStatus)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex flex-col items-start gap-3 min-[600px]:flex-row min-[600px]:items-center min-[600px]:justify-between min-[600px]:gap-4">
+                    <div className="text-sm font-semibold text-[var(--app-text-85)]">
+                      O aluno compareceu à aula?
+                    </div>
+                    <div className="flex w-full flex-shrink-0 flex-col gap-2 min-[500px]:w-auto min-[500px]:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => void onMarkAttendance(lead, "attended")}
+                        disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
+                        className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Check className="h-4 w-4 shrink-0" />
+                        {isMarkingAttendanceAttended ? "Salvando..." : "Sim"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void onMarkAttendance(lead, "no_show")}
+                        disabled={isMarkingAttendanceAttended || isMarkingAttendanceNoShow}
+                        className="inline-flex w-full min-w-[140px] items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/12 px-5 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/18 min-[500px]:w-auto disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <X className="h-4 w-4 shrink-0" />
+                        {isMarkingAttendanceNoShow ? "Salvando..." : "Não"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {!bookingIsNoShow && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
+              <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+                <Field label="Aluno" value={bookingIsNoShow ? displayDash : lead.full_name} />
+                <Field
+                  label="Status"
+                  value={bookingIsNoShow ? displayDash : experimentalClassBookingDisplayStatusLabel(derivedStatus)}
+                />
+                <Field label="Dia do aluno" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.lead_date)} />
+                <Field
+                  label="Horário do aluno"
+                  value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.lead_time)}
+                />
+                <Field label="Fuso do aluno" value={bookingIsNoShow ? displayDash : booking?.lead_timezone} />
+                <Field label="Dia do professor" value={bookingIsNoShow ? displayDash : formatAtendimentoDate(booking?.professor_date)} />
+                <Field
+                  label="Horário do professor"
+                  value={bookingIsNoShow ? displayDash : atendimentoTimeLabel(booking?.professor_time)}
+                />
+                <Field label="Fuso do professor" value={bookingIsNoShow ? displayDash : professorTimeZone} />
+              </div>
+            ) : null}
+
+            {showIncompleteState ? (
+              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
+                  Agendamento
+                </div>
+                <div className="mt-3 text-sm text-amber-50">
+                  O fluxo de agendamento foi interrompido antes da confirmação final. O status permanece como incompleto até a conclusão com dia e horário confirmados.
+                </div>
+              </div>
+            ) : null}
+
+            {!showIncompleteState && !bookingIsNoShow && !isLeadMatriculaRecusadaPosAttendance(lead) ? (
+              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4">
+                <div className="flex flex-col gap-3 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                      Link da Aula
+                    </div>
+                    <div className="mt-2 text-xs text-[var(--app-text-55)]">
+                      Adicione manualmente o link que será enviado ao aluno no dia e horário agendados.
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void onSaveLessonLink(lead, effectiveLessonLinkDraft)}
+                    disabled={isSavingLessonLink || !lessonLinkChanged}
+                    className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {isSavingLessonLink ? "Salvando..." : "Salvar link"}
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  value={effectiveLessonLinkDraft}
+                  onChange={(event) => setLessonLinkDraft(event.target.value)}
+                  placeholder="https://meet.google.com/..."
+                  className="mt-4 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-medium text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
+                />
+
+                {effectiveSavedLessonLink ? (
+                  <a
+                    href={canOpenSavedLessonLink ? effectiveSavedLessonLink : "#"}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="mt-3 inline-flex text-sm font-semibold text-emerald-300 underline underline-offset-2 break-all"
+                    onClick={(event) => {
+                      if (!canOpenSavedLessonLink) event.preventDefault();
+                    }}
+                  >
+                    {effectiveSavedLessonLink}
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
           </div>
+        ) : null}
 
-          <input
-            type="text"
-            value={effectiveLessonLinkDraft}
-            onChange={(event) => setLessonLinkDraft(event.target.value)}
-            placeholder="https://meet.google.com/..."
-            className="mt-4 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-medium text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
-          />
+        {hasRecurringClass ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+                Agendamentos em andamento — Próxima aula recorrente
+              </div>
+              <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/12 px-3 py-1 text-xs font-semibold text-emerald-100">
+                {recurringStatusLabel || "Agendado"}
+              </div>
+            </div>
 
-          {effectiveSavedLessonLink ? (
-            <a
-              href={canOpenSavedLessonLink ? effectiveSavedLessonLink : "#"}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="mt-3 inline-flex text-sm font-semibold text-emerald-300 underline underline-offset-2 break-all"
-              onClick={(event) => {
-                if (!canOpenSavedLessonLink) event.preventDefault();
-              }}
-            >
-              {effectiveSavedLessonLink}
-            </a>
-          ) : null}
-        </div>
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field
+                label="Dia fixo da semana"
+                value={String(lead.recurring_class_weekday_label ?? "").trim() || nextRecurring?.weekdayLabel || null}
+              />
+              {nextRecurring?.professorDate ? (
+                <Field label="Próxima aula" value={formatAtendimentoDate(nextRecurring.professorDate)} />
+              ) : null}
+              <Field
+                label="Horário fixo"
+                value={atendimentoTimeLabel(
+                  String(lead.recurring_class_lead_time ?? "").trim() ||
+                    String(lead.recurring_class_professor_time ?? "").trim() ||
+                    nextRecurring?.professorTime ||
+                    null,
+                )}
+              />
+              <Field
+                label="Fuso horário"
+                value={nextRecurring?.professorTimeZone || ATENDIMENTO_PROFESSOR_TIME_ZONE}
+              />
+              {nextRecurring?.leadDate && nextRecurring?.leadDate !== nextRecurring?.professorDate ? (
+                <Field label="Dia (horário do aluno)" value={formatAtendimentoDate(nextRecurring.leadDate)} />
+              ) : null}
+              {nextRecurring?.leadTime &&
+              nextRecurring.leadTime !== String(lead.recurring_class_professor_time ?? "").trim() ? (
+                <Field label="Horário (fuso do aluno)" value={atendimentoTimeLabel(nextRecurring.leadTime)} />
+              ) : null}
+              {String(lead.recurring_class_created_at ?? "").trim() ? (
+                <Field
+                  label="Cadastrado em"
+                  value={formatAtendimentoDateTime(String(lead.recurring_class_created_at ?? "").trim())}
+                />
+              ) : null}
+            </div>
+          </div>
         ) : null}
       </div>
     </div>
@@ -691,7 +817,16 @@ export function AtendimentoSummaryCards({
   });
 
   const agendamentoItems = useMemo(
-    () => localLeads.filter((lead) => leadHasExperimentalClassPanelStatus(lead)),
+    () =>
+      localLeads.filter((lead) => {
+        if (leadHasExperimentalClassPanelStatus(lead)) return true;
+        const hasRecurring =
+          Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
+          Boolean(String((lead as any)?.recurring_class_weekday ?? "").trim()) ||
+          Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) ||
+          Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
+        return hasRecurring;
+      }),
     [localLeads],
   );
   const interessadosItems = useMemo(
@@ -1271,9 +1406,49 @@ export function AtendimentoSummaryCards({
   function buildItemMeta(lead: AtendimentoLeadListItem) {
     if (activeSection === "agendamentos") {
       const booking = lead.experimental_class_booking;
-      const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
-      const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
-      return [dateLabel, timeLabel].filter((value) => value && value !== "-").join(", ") || "Agendamento incompleto";
+      const hasBook = Boolean(booking && String(booking.id ?? "").trim() && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft" && String(booking?.status ?? "").trim().toLowerCase() !== "cancelled");
+
+      const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+      const recurringWeekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
+        recurringWeekdayRaw,
+      )
+        ? (recurringWeekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")
+        : null;
+      const recurringTime = /^\d{2}:\d{2}$/.test(String(lead.recurring_class_professor_time ?? "").trim())
+        ? String(lead.recurring_class_professor_time ?? "").trim()
+        : String(lead.recurring_class_lead_time ?? "").trim();
+      const nextRecurring =
+        recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
+          ? calculateNextRecurringOccurrence({
+              weekday: recurringWeekday,
+              professorTimeHHMM: recurringTime,
+              professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              leadTimeZone: lead.timezone || null,
+            })
+          : null;
+
+      const experimentalMeta = (() => {
+        if (!hasBook) return null;
+        const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
+        const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
+        return [dateLabel, timeLabel].filter((value) => value && value !== "-").join(", ") || null;
+      })();
+      const recurringMeta = (() => {
+        if (!nextRecurring) return null;
+        const dateLabel = formatAtendimentoDate(nextRecurring.professorDate);
+        const timeLabel = nextRecurring.professorTime;
+        return [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ") || null;
+      })();
+
+      if (recurringMeta && experimentalMeta) {
+        return `Histórico: ${experimentalMeta}  ·  Próxima: ${recurringMeta}`;
+      }
+      if (experimentalMeta) return experimentalMeta;
+      if (recurringMeta) return `Próxima aula recorrente: ${recurringMeta}`;
+
+      return nextRecurring
+        ? "Agendamento recorrente sem data calculada"
+        : "Agendamento incompleto";
     }
 
     return formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
