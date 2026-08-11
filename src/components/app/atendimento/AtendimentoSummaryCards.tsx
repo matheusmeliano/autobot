@@ -187,16 +187,22 @@ function LeadDetails({
     String((lead as any)?.experimental_class_professor_time ?? "").trim();
   const booking = lead.experimental_class_booking;
   const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+  const bookingId = String(booking?.id ?? "").trim();
   const bookingIsCancelled = bookingStatus === "cancelled";
   const isDraft = booking && (booking as any).source === "draft";
   const bookingWasNoShow = isBookingAttendanceNoShow(booking);
   const bookingAttendanceResolved = isBookingAttendanceResolved(booking);
+  const hasBookingDateAndTime = Boolean(
+    (String(booking?.professor_date ?? "").trim() || String(booking?.lead_date ?? "").trim()) &&
+    (String(booking?.professor_time ?? "").trim() || String(booking?.lead_time ?? "").trim())
+  );
   const showDraftSection =
     !bookingIsCancelled && !bookingWasNoShow && !bookingAttendanceResolved &&
     (
-      (experimentalStatus && experimentalStatus !== "date_selected") ||
-      (draftDate && draftTime) ||
-      isDraft
+      experimentalStatus === "time_selected" ||
+      experimentalStatus === "booked" ||
+      (bookingId && !isDraft && hasBookingDateAndTime) ||
+      (isDraft && hasBookingDateAndTime)
     );
 
   const draftStageLabel = (() => {
