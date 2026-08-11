@@ -1342,12 +1342,12 @@ export async function POST(req: Request) {
         t0_from.slice(-10) === t0_to.slice(-10) ||
         t0_to.endsWith(t0_from.slice(-10)) ||
         t0_from.endsWith(t0_to.slice(-10)));
-    if (t0_fromBlocked || t0_loopback || rawFromMe || isOutboundOnlyEvent) {
+    if (t0_fromBlocked || t0_toBlocked || t0_loopback || rawFromMe || isOutboundOnlyEvent) {
       return Response.json({
         ok: true,
         ignored: true,
         reason:
-          t0_fromBlocked
+          t0_fromBlocked || t0_toBlocked
             ? "tier_minus_1_zapi_internal_blocklisted"
             : t0_loopback
               ? "tier_minus_1_loopback_from_equals_to_bot_conversation"
@@ -1686,7 +1686,10 @@ export async function POST(req: Request) {
     equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
     equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
 
-  if (isZapiInternalBlocklistedPhone(fromPhoneDigits)) {
+  if (
+    isZapiInternalBlocklistedPhone(fromPhoneDigits) ||
+    isZapiInternalBlocklistedPhone(toPhoneDigitsBroad)
+  ) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -4276,8 +4279,7 @@ export async function POST(req: Request) {
         }
 
         if (
-          isFirstBotInteraction ||
-          looksLikeWhatsAppDirectLeadFirstMessage(inboundContent)
+          (isFirstBotInteraction && looksLikeWhatsAppDirectLeadFirstMessage(inboundContent))
         ) {
           const firstMessage =
             "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
