@@ -858,6 +858,7 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
   phone: string;
   leadTimeZone?: string | null;
   insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -875,32 +876,38 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
     bookedProfessorStartAts: bookedProfessorStarts,
   });
   const messages = buildExperimentalClassDatesMessages(availability.dates);
-  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
-  const batch = await sendAtendimentoWhatsAppTextBatch({
-    phone: params.phone,
-    messages,
-    admin: params.admin,
-    conversationId: params.conversationId,
-    insertIntoConversation: shouldInsert,
-  });
-  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
-  void appendHistoryEvent({
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-    eventType: "experimental_class_date_options_presented",
-    title: "Datas disponíveis da aula experimental apresentadas",
-    details: {
-      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      options: availability.dates,
-    },
-    actorType: "system",
-  });
-  void syncConversationPreview({
-    conversationId: params.conversationId,
-    contentText: messages[messages.length - 1] ?? "",
-    createdAt: new Date().toISOString(),
-  });
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "experimental_class_date_options_presented",
+      title: "Datas disponíveis da aula experimental apresentadas",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        options: availability.dates,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
   return { lastOutbound, availability, messages };
 }
 
@@ -912,6 +919,7 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
   leadTimeZone?: string | null;
   professorDate: string;
   insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -934,32 +942,38 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
-  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
-  const batch = await sendAtendimentoWhatsAppTextBatch({
-    phone: params.phone,
-    messages,
-    admin: params.admin,
-    conversationId: params.conversationId,
-    insertIntoConversation: shouldInsert,
-  });
-  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
-  void appendHistoryEvent({
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-    eventType: "experimental_class_time_options_presented",
-    title: "Horários disponíveis da aula experimental apresentados",
-    details: {
-      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      professor_date: params.professorDate,
-    },
-    actorType: "system",
-  });
-  void syncConversationPreview({
-    conversationId: params.conversationId,
-    contentText: messages[messages.length - 1] ?? "",
-    createdAt: new Date().toISOString(),
-  });
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "experimental_class_time_options_presented",
+      title: "Horários disponíveis da aula experimental apresentados",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        professor_date: params.professorDate,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
   return { lastOutbound, dateOption, slots, messages };
 }
 
@@ -970,6 +984,7 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
   phone: string;
   leadTimeZone?: string | null;
   insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -987,32 +1002,38 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
     bookedProfessorStartAts: bookedProfessorStarts,
   });
   const messages = buildRecurringCalendarDatesMessages(availability.dates);
-  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
-  const batch = await sendAtendimentoWhatsAppTextBatch({
-    phone: params.phone,
-    messages,
-    admin: params.admin,
-    conversationId: params.conversationId,
-    insertIntoConversation: shouldInsert,
-  });
-  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
-  void appendHistoryEvent({
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-    eventType: "recurring_calendar_date_options_presented",
-    title: "Dias do calendario para aula recorrente apresentados",
-    details: {
-      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      options: availability.dates,
-    },
-    actorType: "system",
-  });
-  void syncConversationPreview({
-    conversationId: params.conversationId,
-    contentText: messages[messages.length - 1] ?? "",
-    createdAt: new Date().toISOString(),
-  });
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "recurring_calendar_date_options_presented",
+      title: "Dias do calendario para aula recorrente apresentados",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        options: availability.dates,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
   return { lastOutbound, availability, messages };
 }
 
@@ -1024,6 +1045,7 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
   leadTimeZone?: string | null;
   professorDate: string;
   insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -1046,32 +1068,38 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
-  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
-  const batch = await sendAtendimentoWhatsAppTextBatch({
-    phone: params.phone,
-    messages,
-    admin: params.admin,
-    conversationId: params.conversationId,
-    insertIntoConversation: shouldInsert,
-  });
-  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
-  void appendHistoryEvent({
-    leadId: params.leadId,
-    conversationId: params.conversationId,
-    eventType: "recurring_calendar_time_options_presented",
-    title: "Horarios disponiveis da aula recorrente apresentados",
-    details: {
-      teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      professor_date: params.professorDate,
-    },
-    actorType: "system",
-  });
-  void syncConversationPreview({
-    conversationId: params.conversationId,
-    contentText: messages[messages.length - 1] ?? "",
-    createdAt: new Date().toISOString(),
-  });
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "recurring_calendar_time_options_presented",
+      title: "Horarios disponiveis da aula recorrente apresentados",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        professor_date: params.professorDate,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
   return { lastOutbound, dateOption, slots, messages };
 }
 
@@ -4531,7 +4559,7 @@ export async function POST(req: Request) {
           const finalCityValue = resolved.city ? String(resolved.city).trim() : "";
           if (!finalCityValue) {
             const introMsgs = [] as string[];
-            const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
+            const { messages: dateMessages, availability } = await presentExperimentalClassDateOptionsWhatsApp({
               admin,
               leadId,
               conversationId,
@@ -4540,17 +4568,33 @@ export async function POST(req: Request) {
                 (String((lead as any)?.timezone ?? "").trim() ||
                   inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
                   ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
-              insertIntoConversation: false,
+              skipWhatsAppSend: true,
             });
             const introBuilder = buildExperimentalClassDatePromptMessages(
               String((lead as any)?.full_name ?? "").trim() || null,
             );
+            const combinedBatch = [...introBuilder, ...dateMessages];
             await sendAtendimentoWhatsAppTextBatch({
               phone: normalizedPhoneOnly,
-              messages: [...introBuilder, ...dateMessages],
+              messages: combinedBatch,
               admin,
               conversationId,
               insertIntoConversation: true,
+            });
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_class_date_options_presented",
+              title: "Datas disponíveis da aula experimental apresentadas",
+              details: {
+                teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                lead_timezone:
+                  (String((lead as any)?.timezone ?? "").trim() ||
+                    inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
+                    ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
+                options: availability.dates,
+              },
+              actorType: "system",
             });
 
             return Response.json({
@@ -4611,20 +4655,33 @@ export async function POST(req: Request) {
           const introMsgs = buildExperimentalClassDatePromptMessages(
             String((lead as any)?.full_name ?? "").trim() || null,
           );
-          const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
+          const { messages: dateMessages, availability } = await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
             conversationId,
             phone: normalizedPhoneOnly,
             leadTimeZone: resolved.timeZone,
-            insertIntoConversation: false,
+            skipWhatsAppSend: true,
           });
+          const combinedBatch = [...introMsgs, ...dateMessages];
           await sendAtendimentoWhatsAppTextBatch({
             phone: normalizedPhoneOnly,
-            messages: [...introMsgs, ...dateMessages],
+            messages: combinedBatch,
             admin,
             conversationId,
             insertIntoConversation: true,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_date_options_presented",
+            title: "Datas disponíveis da aula experimental apresentadas",
+            details: {
+              teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              lead_timezone: resolved.timeZone,
+              options: availability.dates,
+            },
+            actorType: "system",
           });
 
           return Response.json({
