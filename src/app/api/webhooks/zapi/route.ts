@@ -2783,9 +2783,10 @@ export async function POST(req: Request) {
               }
             } catch (_e) {}
             const safeFirstName = leadFirstName || leadFullNameRaw || "Aluno(a)";
+            const safeFullNameForLink = leadFullNameRaw || safeFirstName || "Aluno(a)";
             const baseUrl = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
             const cadastroLink =
-              `${baseUrl.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFirstName)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
+              `${baseUrl.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullNameForLink)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
             const allFinalMessages: string[] = [
               `Maravilha, ${safeFirstName}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLink}`,
             ];
@@ -3460,9 +3461,10 @@ export async function POST(req: Request) {
                   .eq("id", leadId);
               } catch (_e) {}
               const safeFirstGeneral = leadFirstName || String((lead as any)?.full_name ?? "") || "Aluno(a)";
+              const safeFullGeneral = String((lead as any)?.full_name ?? "").trim() || safeFirstGeneral || "Aluno(a)";
               const baseUrlGeneral = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
               const cadastroLinkGeneral =
-                `${baseUrlGeneral.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFirstGeneral)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
+                `${baseUrlGeneral.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullGeneral)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
               const allMessages: string[] = [
                 `Maravilha, ${safeFirstGeneral}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkGeneral}`,
               ];

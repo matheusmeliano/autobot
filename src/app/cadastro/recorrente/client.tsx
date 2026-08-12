@@ -86,11 +86,15 @@ export default function CadastroRecorrenteBody() {
         if (res.ok && json?.ok && json?.lead) {
           const leadFullName = String(json.lead?.full_name ?? "").trim();
           const leadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
-          if (leadFullName && !initialNameParam) {
+          if (leadFullName) {
             setNome(leadFullName);
+          } else if (initialNameParam && !leadFullName) {
+            setNome(initialNameParam);
           }
-          if (leadPhone && !initialPhoneParam) {
+          if (leadPhone) {
             setPhoneField(leadPhone);
+          } else if (initialPhoneParam && !leadPhone) {
+            setPhoneField(initialPhoneParam);
           }
         }
       } catch (e) {
