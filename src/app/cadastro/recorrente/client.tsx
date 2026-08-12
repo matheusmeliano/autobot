@@ -363,21 +363,6 @@ export default function CadastroRecorrenteBody() {
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                     placeholder="Ex: Ana Maria Silva"
                   />
-                  <p className="mt-2 text-xs text-slate-500">
-                    Informe seu primeiro nome e último sobrenome.
-                  </p>
-                  {(() => {
-                    const p = nome.trim().split(/\s+/).filter((s) => s && s.trim());
-                    if (!nome.trim()) return null;
-                    if (p.length < 2) {
-                      return (
-                        <p className="mt-2 text-xs font-semibold text-amber-700">
-                          ⚠️ Por favor, informe seu sobrenome também.
-                        </p>
-                      );
-                    }
-                    return null;
-                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-800 mb-2">
