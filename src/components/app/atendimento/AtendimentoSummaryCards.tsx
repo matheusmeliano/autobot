@@ -253,6 +253,12 @@ function LeadDetails({
           ) : null}
 
           {null /* Banner link da aula recorrente: REMOVIDO solicitacao usuario */}
+
+          {hasRecurring && !savedRecurringLink ? (
+            <div className="mt-2 text-[11px] font-semibold text-amber-300">
+              Adicione link da aula recorrente
+            </div>
+          ) : null}
         </div>
 
         <div className="min-w-0 flex flex-col items-stretch gap-2 min-[1176px]:ml-auto min-[1176px]:flex-row min-[1176px]:items-center min-[1176px]:justify-end">
@@ -523,6 +529,7 @@ function BookingDetails({
   const hasRecurringClass = Boolean(
     recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime),
   );
+  const savedBookingRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
   const leadIsRecurringAlunoNow = Boolean(
     hasRecurringClass ||
       lead.status === "aluno" ||
@@ -595,6 +602,12 @@ function BookingDetails({
           </div>
 
           {null /* Banner link da aula recorrente: REMOVIDO solicitacao usuario */}
+
+          {hasRecurringClass && !savedBookingRecurringLink ? (
+            <div className="mt-2 text-[11px] font-semibold text-amber-300">
+              Adicione link da aula recorrente
+            </div>
+          ) : null}
         </div>
 
         {canSendStudentNotification ? (
