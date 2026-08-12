@@ -300,16 +300,9 @@ function LeadDetails({
 
         {hasRecurring ? (
           <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
-            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1 pr-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
-                  Aula recorrente
-                </div>
-              </div>
-              <div className="shrink-0">
-                <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/10 px-4 py-1.5 text-xs font-semibold text-emerald-100">
-                  Aluno confirmado
-                </div>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+                Aula recorrente
               </div>
             </div>
             <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2">
@@ -817,16 +810,9 @@ function BookingDetails({
 
         {hasRecurringClass ? (
           <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-6">
-            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1 pr-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
-                  Agendamentos em andamento — Próxima aula recorrente
-                </div>
-              </div>
-              <div className="shrink-0">
-                <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/12 px-4 py-1.5 text-xs font-semibold text-emerald-100">
-                  Aluno confirmado
-                </div>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+                Agendamentos em andamento — Próxima aula recorrente
               </div>
             </div>
 
