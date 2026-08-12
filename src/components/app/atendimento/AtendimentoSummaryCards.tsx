@@ -254,11 +254,7 @@ function LeadDetails({
 
           {null /* Banner link da aula recorrente: REMOVIDO solicitacao usuario */}
 
-          {hasRecurring && !savedRecurringLink ? (
-            <div className="mt-2 text-[11px] font-semibold text-amber-300">
-              Adicione link da aula recorrente
-            </div>
-          ) : null}
+          {null /* Aviso link da aula recorrente: REMOVIDO do painel lateral solicitacao usuario */}
         </div>
 
         <div className="min-w-0 flex flex-col items-stretch gap-2 min-[1176px]:ml-auto min-[1176px]:flex-row min-[1176px]:items-center min-[1176px]:justify-end">
@@ -596,11 +592,7 @@ function BookingDetails({
 
           {null /* Banner link da aula recorrente: REMOVIDO solicitacao usuario */}
 
-          {hasRecurringClass && !savedBookingRecurringLink ? (
-            <div className="mt-2 text-[11px] font-semibold text-amber-300">
-              Adicione link da aula recorrente
-            </div>
-          ) : null}
+          {null /* Aviso link da aula recorrente: REMOVIDO do painel lateral solicitacao usuario */}
         </div>
 
         {canSendStudentNotification ? (
