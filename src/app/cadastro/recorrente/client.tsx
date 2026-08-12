@@ -47,8 +47,17 @@ export default function CadastroRecorrenteBody() {
   const sp = useSearchParams();
   const initialNameParam = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
   const initialPhoneParam = decodeURIComponent(String(sp.get("telefone") ?? "").trim()) || "";
+
+  function toNomeESobrenome(raw: string | null | undefined): string {
+    const clean = String(raw ?? "").trim();
+    if (!clean) return "";
+    const parts = clean.split(/\s+/).filter((s) => s && s.trim());
+    if (parts.length <= 2) return clean;
+    return `${parts[0]} ${parts[parts.length - 1]}`;
+  }
+
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
-  const [nome, setNome] = useState<string>(initialNameParam);
+  const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>("");
   const [initialDataLoading, setInitialDataLoading] = useState<boolean>(true);
@@ -86,10 +95,11 @@ export default function CadastroRecorrenteBody() {
         if (res.ok && json?.ok && json?.lead) {
           const leadFullName = String(json.lead?.full_name ?? "").trim();
           const leadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
-          if (leadFullName) {
-            setNome(leadFullName);
+          const normalizedLeadFullName = toNomeESobrenome(leadFullName);
+          if (normalizedLeadFullName) {
+            setNome(normalizedLeadFullName);
           } else if (initialNameParam && !leadFullName) {
-            setNome(initialNameParam);
+            setNome(toNomeESobrenome(initialNameParam));
           }
           if (leadPhone) {
             setPhoneField(leadPhone);
@@ -186,7 +196,13 @@ export default function CadastroRecorrenteBody() {
   }
 
   function canAdvanceFromStep0() {
-    return nome.trim().length >= 2 && phoneField.replace(/\D/g, "").length >= 10 && senha.trim().length >= 4;
+    const parts = nome.trim().split(/\s+/).filter((s) => s && s.trim());
+    return (
+      nome.trim().length >= 2 &&
+      parts.length >= 2 &&
+      phoneField.replace(/\D/g, "").length >= 10 &&
+      senha.trim().length >= 4
+    );
   }
 
   function handleAdvance0() {
@@ -337,14 +353,31 @@ export default function CadastroRecorrenteBody() {
               </div>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-2">Nome completo</label>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    Nome e sobrenome
+                  </label>
                   <input
                     type="text"
                     value={nome}
-                    onChange={(e) => setNome(e.target.value)}
+                    onChange={(e) => setNome(toNomeESobrenome(e.target.value))}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                     placeholder="Ex: Ana Maria Silva"
                   />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Informe seu primeiro nome e último sobrenome.
+                  </p>
+                  {(() => {
+                    const p = nome.trim().split(/\s+/).filter((s) => s && s.trim());
+                    if (!nome.trim()) return null;
+                    if (p.length < 2) {
+                      return (
+                        <p className="mt-2 text-xs font-semibold text-amber-700">
+                          ⚠️ Por favor, informe seu sobrenome também.
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-800 mb-2">

@@ -3,6 +3,14 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findLeadByPhone } from "@/lib/atendimento/server";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
 
+function toNomeESobrenome(raw: string | null | undefined): string {
+  const clean = String(raw ?? "").trim();
+  if (!clean) return "";
+  const parts = clean.split(/\s+/).filter((s) => s && s.trim());
+  if (parts.length <= 2) return clean;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
 export const runtime = "nodejs";
 
 type DraftPayload = {
@@ -62,6 +70,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Telefone inválido." }, { status: 400 });
     }
 
+    const safeNome = toNomeESobrenome(nome);
+
     const safeWeekday = weekday ? String(weekday).trim().toLowerCase() : "";
     const validWeekday = safeWeekday && ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(safeWeekday)
       ? (safeWeekday as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")
@@ -106,8 +116,8 @@ export async function PATCH(req: NextRequest) {
       patch.recurring_class_lead_time = safeProfessorTime;
     }
 
-    if (String(nome ?? "").trim()) {
-      patch.full_name = String(nome ?? "").trim();
+    if (safeNome) {
+      patch.full_name = safeNome;
     }
 
     try {
@@ -121,8 +131,8 @@ export async function PATCH(req: NextRequest) {
       if (/column|does not exist|PGRST204|PGRST205|42703/i.test(msg)) {
         try {
           const fallback: Record<string, unknown> = { updated_at: nowIso };
-      if (String(nome ?? "").trim()) {
-            fallback.full_name = String(nome ?? "").trim();
+      if (safeNome) {
+            fallback.full_name = safeNome;
           }
           await admin
             .from("atendimento_leads")

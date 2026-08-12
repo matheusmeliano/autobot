@@ -3,6 +3,14 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findLeadByPhone } from "@/lib/atendimento/server";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
 
+function toNomeESobrenome(raw: string | null | undefined): string {
+  const clean = String(raw ?? "").trim();
+  if (!clean) return "";
+  const parts = clean.split(/\s+/).filter((s) => s && s.trim());
+  if (parts.length <= 2) return clean;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
 export const runtime = "nodejs";
 
 type SubmitPayload = {
@@ -42,6 +50,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Horário inválido." }, { status: 400 });
     }
 
+    const safeNome = toNomeESobrenome(nome);
+
     const admin = createSupabaseAdminClient();
     const lead = await findLeadByPhone({ phone: safePhoneDigits });
     if (!lead?.id) {
@@ -67,7 +77,7 @@ export async function POST(req: NextRequest) {
       funnel_stage: "aluno_recorrente_cadastrado",
       status: "matriculado",
       updated_at: nowIso,
-      ...(String(nome ?? "").trim() ? { full_name: String(nome ?? "").trim() } : {}),
+      ...(safeNome ? { full_name: safeNome } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
     };
 
@@ -75,7 +85,7 @@ export async function POST(req: NextRequest) {
       funnel_stage: "aluno_recorrente_cadastrado",
       status: "matriculado",
       updated_at: nowIso,
-      ...(String(nome ?? "").trim() ? { full_name: String(nome ?? "").trim() } : {}),
+      ...(safeNome ? { full_name: safeNome } : {}),
     };
 
     let appliedPatch: "full" | "minimal" = "minimal";
