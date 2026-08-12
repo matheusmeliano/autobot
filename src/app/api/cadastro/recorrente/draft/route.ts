@@ -14,6 +14,41 @@ type DraftPayload = {
   leadTime?: string | null;
 };
 
+export async function GET(req: NextRequest) {
+  try {
+    const admin = createSupabaseAdminClient();
+    const sp = req.nextUrl.searchParams;
+    const telefoneRaw = String(sp.get("telefone") ?? "").trim();
+    const safePhoneDigits = telefoneRaw.replace(/\D/g, "").trim();
+    if (safePhoneDigits.length < 10) {
+      return NextResponse.json({ ok: false, error: "telefone obrigatório" }, { status: 400 });
+    }
+    const normalizedPhone = safePhoneDigits;
+    const { data } = await admin
+      .from("atendimento_leads")
+      .select("id, phone, full_name")
+      .eq("phone", normalizedPhone)
+      .limit(1)
+      .maybeSingle();
+    if (!data) {
+      return NextResponse.json({ ok: true, lead: null });
+    }
+    return NextResponse.json({
+      ok: true,
+      lead: {
+        id: (data as any).id,
+        phone: String((data as any).phone ?? ""),
+        full_name: String((data as any).full_name ?? "").trim() || null,
+      },
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { ok: false, error: e instanceof Error ? e.message : String(e ?? "Erro GET recorrente draft.") },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   try {
     const rawBody = (await req.json().catch(() => null)) as DraftPayload | null;

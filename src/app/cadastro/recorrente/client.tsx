@@ -45,13 +45,14 @@ type SubmitResponse = {
 
 export default function CadastroRecorrenteBody() {
   const sp = useSearchParams();
-  const initialName = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
-  const initialPhone = decodeURIComponent(String(sp.get("telefone") ?? "").trim()) || "";
-
+  const initialNameParam = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
+  const initialPhoneParam = decodeURIComponent(String(sp.get("telefone") ?? "").trim()) || "";
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
-  const [nome, setNome] = useState<string>(initialName);
-  const [phoneField, setPhoneField] = useState<string>(initialPhone);
+  const [nome, setNome] = useState<string>(initialNameParam);
+  const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>("");
+  const [initialDataLoading, setInitialDataLoading] = useState<boolean>(true);
+  const [initialDataError, setInitialDataError] = useState<string>("");
   const [availLoading, setAvailLoading] = useState<boolean>(false);
   const [availError, setAvailError] = useState<string>("");
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
@@ -61,6 +62,44 @@ export default function CadastroRecorrenteBody() {
   const [submitError, setSubmitError] = useState<string>("");
   const [submitResult, setSubmitResult] = useState<SubmitResponse["scheduled"] | null>(null);
   const [draftSaving, setDraftSaving] = useState<"weekday" | "time" | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      setInitialDataLoading(true);
+      setInitialDataError("");
+      try {
+        const phoneDigits = initialPhoneParam.replace(/\D/g, "").trim();
+        if (phoneDigits.length < 10) return;
+        const res = await fetch(
+          `/api/cadastro/recorrente/draft?telefone=${encodeURIComponent(phoneDigits)}`,
+          { method: "GET" },
+        );
+        const json = (await res.json().catch(() => null)) as
+          | {
+              ok?: boolean;
+              lead?: {
+                full_name?: string | null;
+                phone?: string | null;
+              } | null;
+            }
+          | null;
+        if (res.ok && json?.ok && json?.lead) {
+          const leadFullName = String(json.lead?.full_name ?? "").trim();
+          const leadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
+          if (leadFullName && !initialNameParam) {
+            setNome(leadFullName);
+          }
+          if (leadPhone && !initialPhoneParam) {
+            setPhoneField(leadPhone);
+          }
+        }
+      } catch (e) {
+        setInitialDataError(e instanceof Error ? e.message : "");
+      } finally {
+        setInitialDataLoading(false);
+      }
+    })();
+  }, []);
 
   const firstName = useMemo(() => {
     const parts = (nome || "Aluno(a)").trim().split(/\s+/).filter(Boolean);
@@ -288,6 +327,9 @@ export default function CadastroRecorrenteBody() {
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">Crie sua conta</h2>
                 <p className="mt-1 text-slate-600">Preencha os dados abaixo para prosseguir.</p>
+                {initialDataLoading && (
+                  <p className="mt-2 text-xs text-slate-500">Sincronizando seus dados...</p>
+                )}
               </div>
               <div className="space-y-5">
                 <div>
