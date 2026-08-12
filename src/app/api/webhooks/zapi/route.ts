@@ -57,6 +57,7 @@ import {
   findLeadByPhone,
   hasAnyBotMessage,
   sendAtendimentoWhatsAppText,
+  sendAtendimentoWhatsAppTextBatch,
   syncConversationPreview,
   getZapiInstanceMeta,
   detectLenientYesNo,
@@ -854,6 +855,7 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
+  phone: string;
   leadTimeZone?: string | null;
 }) {
   const now = new Date();
@@ -872,15 +874,15 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
     bookedProfessorStartAts: bookedProfessorStarts,
   });
   const messages = buildExperimentalClassDatesMessages(availability.dates);
-  let lastOutbound: Record<string, unknown> | null = null;
-  for (const message of messages) {
-    lastOutbound = await insertWhatsAppBotTextMessage({
-      admin: params.admin,
-      conversationId: params.conversationId,
-      contentText: message,
-    });
-  }
-  await appendHistoryEvent({
+  const batch = await sendAtendimentoWhatsAppTextBatch({
+    phone: params.phone,
+    messages,
+    admin: params.admin,
+    conversationId: params.conversationId,
+    insertIntoConversation: true,
+  });
+  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+  void appendHistoryEvent({
     leadId: params.leadId,
     conversationId: params.conversationId,
     eventType: "experimental_class_date_options_presented",
@@ -904,6 +906,7 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
+  phone: string;
   leadTimeZone?: string | null;
   professorDate: string;
 }) {
@@ -928,15 +931,15 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
-  let lastOutbound: Record<string, unknown> | null = null;
-  for (const message of messages) {
-    lastOutbound = await insertWhatsAppBotTextMessage({
-      admin: params.admin,
-      conversationId: params.conversationId,
-      contentText: message,
-    });
-  }
-  await appendHistoryEvent({
+  const batch = await sendAtendimentoWhatsAppTextBatch({
+    phone: params.phone,
+    messages,
+    admin: params.admin,
+    conversationId: params.conversationId,
+    insertIntoConversation: true,
+  });
+  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+  void appendHistoryEvent({
     leadId: params.leadId,
     conversationId: params.conversationId,
     eventType: "experimental_class_time_options_presented",
@@ -948,7 +951,7 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
     },
     actorType: "system",
   });
-  await syncConversationPreview({
+  void syncConversationPreview({
     conversationId: params.conversationId,
     contentText: messages[messages.length - 1] ?? "",
     createdAt: new Date().toISOString(),
@@ -960,6 +963,7 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
+  phone: string;
   leadTimeZone?: string | null;
 }) {
   const now = new Date();
@@ -978,15 +982,15 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
     bookedProfessorStartAts: bookedProfessorStarts,
   });
   const messages = buildRecurringCalendarDatesMessages(availability.dates);
-  let lastOutbound: Record<string, unknown> | null = null;
-  for (const message of messages) {
-    lastOutbound = await insertWhatsAppBotTextMessage({
-      admin: params.admin,
-      conversationId: params.conversationId,
-      contentText: message,
-    });
-  }
-  await appendHistoryEvent({
+  const batch = await sendAtendimentoWhatsAppTextBatch({
+    phone: params.phone,
+    messages,
+    admin: params.admin,
+    conversationId: params.conversationId,
+    insertIntoConversation: true,
+  });
+  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+  void appendHistoryEvent({
     leadId: params.leadId,
     conversationId: params.conversationId,
     eventType: "recurring_calendar_date_options_presented",
@@ -998,7 +1002,7 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
     },
     actorType: "system",
   });
-  await syncConversationPreview({
+  void syncConversationPreview({
     conversationId: params.conversationId,
     contentText: messages[messages.length - 1] ?? "",
     createdAt: new Date().toISOString(),
@@ -1010,6 +1014,7 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId: string;
+  phone: string;
   leadTimeZone?: string | null;
   professorDate: string;
 }) {
@@ -1034,15 +1039,15 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
-  let lastOutbound: Record<string, unknown> | null = null;
-  for (const message of messages) {
-    lastOutbound = await insertWhatsAppBotTextMessage({
-      admin: params.admin,
-      conversationId: params.conversationId,
-      contentText: message,
-    });
-  }
-  await appendHistoryEvent({
+  const batch = await sendAtendimentoWhatsAppTextBatch({
+    phone: params.phone,
+    messages,
+    admin: params.admin,
+    conversationId: params.conversationId,
+    insertIntoConversation: true,
+  });
+  const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+  void appendHistoryEvent({
     leadId: params.leadId,
     conversationId: params.conversationId,
     eventType: "recurring_calendar_time_options_presented",
@@ -1054,7 +1059,7 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
     },
     actorType: "system",
   });
-  await syncConversationPreview({
+  void syncConversationPreview({
     conversationId: params.conversationId,
     contentText: messages[messages.length - 1] ?? "",
     createdAt: new Date().toISOString(),
@@ -2029,23 +2034,38 @@ export async function POST(req: Request) {
       }
     }
 
+    const convIdForOutgoing = String((pendingEvent as any).conversation_id ?? "");
     let previewText = successMessage;
-    for (const message of outgoingMessages) {
-      const { data: outbound } = await admin
-        .from("atendimento_messages")
-        .insert({
-          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
-          sender_role: "bot",
-          content_text: message,
-          media_type: "text",
-          status: "entregue",
-          sent_at: nowIso,
-          delivered_at: nowIso,
-        })
-        .select("content_text")
-        .maybeSingle();
-
-      previewText = String((outbound as any)?.content_text ?? message);
+    if (outgoingMessages.length) {
+      const outs = await Promise.allSettled(
+        outgoingMessages.map((message) =>
+          admin
+            .from("atendimento_messages")
+            .insert({
+              conversation_id: convIdForOutgoing,
+              sender_role: "bot",
+              content_text: message,
+              media_type: "text",
+              status: "entregue",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            })
+            .select("content_text")
+            .maybeSingle(),
+        ),
+      );
+      const lastFulfilled = [...outs].reverse().find((o) => o.status === "fulfilled") as
+        | { status: "fulfilled"; value: { data?: unknown } }
+        | undefined;
+      const lastOutboundContent = lastFulfilled?.value?.data as
+        | { content_text?: string | null }
+        | null
+        | undefined;
+      previewText = String(
+        lastOutboundContent?.content_text ??
+          outgoingMessages[outgoingMessages.length - 1] ??
+          successMessage,
+      );
     }
 
     if (followUpMessage === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
@@ -2059,25 +2079,39 @@ export async function POST(req: Request) {
       });
       const availabilityMessages = buildExperimentalClassDatesMessages(availability.dates);
 
-      for (const availabilityMessage of availabilityMessages) {
-        const { data: availabilityOutbound } = await admin
-          .from("atendimento_messages")
-          .insert({
-            conversation_id: String((pendingEvent as any).conversation_id ?? ""),
-            sender_role: "bot",
-            content_text: availabilityMessage,
-            media_type: "text",
-            status: "entregue",
-            sent_at: nowIso,
-            delivered_at: nowIso,
-          })
-          .select("content_text")
-          .maybeSingle();
-
-        previewText = String((availabilityOutbound as any)?.content_text ?? availabilityMessage);
+      if (availabilityMessages.length) {
+        const dateOuts = await Promise.allSettled(
+          availabilityMessages.map((availabilityMessage) =>
+            admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: convIdForOutgoing,
+                sender_role: "bot",
+                content_text: availabilityMessage,
+                media_type: "text",
+                status: "entregue",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              })
+              .select("content_text")
+              .maybeSingle(),
+          ),
+        );
+        const lastDateFulfilled = [...dateOuts].reverse().find((o) => o.status === "fulfilled") as
+          | { status: "fulfilled"; value: { data?: unknown } }
+          | undefined;
+        const lastDateContent = lastDateFulfilled?.value?.data as
+          | { content_text?: string | null }
+          | null
+          | undefined;
+        previewText = String(
+          lastDateContent?.content_text ??
+            availabilityMessages[availabilityMessages.length - 1] ??
+            previewText,
+        );
       }
 
-      await appendHistoryEvent({
+      void appendHistoryEvent({
         leadId: String((pendingEvent as any).lead_id ?? ""),
         conversationId: String((pendingEvent as any).conversation_id ?? ""),
         eventType: "experimental_class_date_options_presented",
@@ -2711,21 +2745,13 @@ export async function POST(req: Request) {
               NAO_RECUSA_MSG_1,
               RESPOSTA_REPESCAGEM_FIXA,
             ];
-            for (const txt of replies) {
-              try {
-                await insertWhatsAppBotTextMessage({
-                  admin,
-                  conversationId,
-                  contentText: txt,
-                });
-              } catch (_e) {}
-              try {
-                await sendAtendimentoWhatsAppText({
-                  phone: normalizedPhoneOnly,
-                  message: txt,
-                });
-              } catch (_e) {}
-            }
+            await sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: replies,
+              admin,
+              conversationId,
+              insertIntoConversation: true,
+            });
             try {
               void appendHistoryEvent({
                 leadId,
@@ -2791,22 +2817,13 @@ export async function POST(req: Request) {
             const allFinalMessages: string[] = [
               `Maravilha, ${safeFirstName}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLink}`,
             ];
-            for (const message of allFinalMessages) {
-              if (!String(message ?? "").trim()) continue;
-              try {
-                await insertWhatsAppBotTextMessage({
-                  admin,
-                  conversationId,
-                  contentText: message,
-                });
-              } catch (_e) {}
-              try {
-                await sendAtendimentoWhatsAppText({
-                  phone: normalizedPhoneOnly,
-                  message,
-                });
-              } catch (_e) {}
-            }
+            await sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: allFinalMessages,
+              admin,
+              conversationId,
+              insertIntoConversation: true,
+            });
             try {
               void appendHistoryEvent({
                 leadId,
@@ -3469,22 +3486,13 @@ export async function POST(req: Request) {
               const allMessages: string[] = [
                 `Maravilha, ${safeFirstGeneral}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkGeneral}`,
               ];
-              for (const message of allMessages) {
-                if (!String(message ?? "").trim()) continue;
-                try {
-                  await insertWhatsAppBotTextMessage({
-                    admin,
-                    conversationId,
-                    contentText: message,
-                  });
-                } catch (_e) {}
-                try {
-                  await sendAtendimentoWhatsAppText({
-                    phone: normalizedPhoneOnly,
-                    message,
-                  });
-                } catch (_e) {}
-              }
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: allMessages,
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+              });
               replyText = allMessages.join("\n\n");
               historyDetailsPatch = { ...(historyDetailsPatch ?? {}), cadastro_link: cadastroLinkGeneral };
             } catch (_e) {
@@ -4217,31 +4225,13 @@ export async function POST(req: Request) {
             "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
           const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;
 
-          const __firstInsertPromise = insertWhatsAppBotTextMessage({
+          await sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: [firstMessage, secondMessage],
             admin,
             conversationId,
-            contentText: firstMessage,
+            insertIntoConversation: true,
           });
-          try {
-            await sendAtendimentoWhatsAppText({
-              phone: normalizedPhoneOnly,
-              message: firstMessage,
-            });
-          } catch (_sendErr) {}
-          void __firstInsertPromise.catch(() => {});
-
-          const __secondInsertPromise = insertWhatsAppBotTextMessage({
-            admin,
-            conversationId,
-            contentText: secondMessage,
-          });
-          try {
-            await sendAtendimentoWhatsAppText({
-              phone: normalizedPhoneOnly,
-              message: secondMessage,
-            });
-          } catch (_sendErr) {}
-          void __secondInsertPromise.catch(() => {});
 
           void appendHistoryEvent({
             leadId,
@@ -4537,6 +4527,7 @@ export async function POST(req: Request) {
               admin,
               leadId,
               conversationId,
+              phone: normalizedPhoneOnly,
               leadTimeZone:
                 (String((lead as any)?.timezone ?? "").trim() ||
                   inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
@@ -4545,19 +4536,18 @@ export async function POST(req: Request) {
             const introBuilder = buildExperimentalClassDatePromptMessages(
               String((lead as any)?.full_name ?? "").trim() || null,
             );
-            for (const introMsg of introBuilder) {
-              await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: introMsg });
-              try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: introMsg });
-              } catch (_e) {}
-            }
-            for (const dateMsg of dateMessages) {
-              const cleanMsg = String(dateMsg ?? "").trim();
-              if (!cleanMsg) continue;
-              try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-              } catch (_e) {}
-            }
+            await sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: introBuilder,
+              admin,
+              conversationId,
+              insertIntoConversation: true,
+            });
+            void sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: dateMessages,
+              insertIntoConversation: false,
+            }).catch(() => {});
 
             return Response.json({
               ok: true,
@@ -4617,27 +4607,26 @@ export async function POST(req: Request) {
           const introMsgs = buildExperimentalClassDatePromptMessages(
             String((lead as any)?.full_name ?? "").trim() || null,
           );
-          for (const introMsg of introMsgs) {
-            const __botMsgInsertIntro = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: introMsg });
-            try {
-              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: introMsg });
-            } catch (_e) {}
-            void __botMsgInsertIntro.catch(() => {});
-          }
+          await sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: introMsgs,
+            admin,
+            conversationId,
+            insertIntoConversation: true,
+          });
 
           const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
             conversationId,
+            phone: normalizedPhoneOnly,
             leadTimeZone: resolved.timeZone,
           });
-          for (const dateMsg of dateMessages) {
-            const cleanMsg = String(dateMsg ?? "").trim();
-            if (!cleanMsg) continue;
-            try {
-              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-            } catch (_e) {}
-          }
+          void sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: dateMessages,
+            insertIntoConversation: false,
+          }).catch(() => {});
 
           return Response.json({
             ok: true,
@@ -4679,15 +4668,14 @@ export async function POST(req: Request) {
             admin,
             leadId,
             conversationId,
+            phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
           });
-          for (const dateMsg of fallbackDateMessages) {
-            const cleanMsg = String(dateMsg ?? "").trim();
-            if (!cleanMsg) continue;
-            try {
-              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-            } catch (_e) {}
-          }
+          void sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: fallbackDateMessages,
+            insertIntoConversation: false,
+          }).catch(() => {});
           return Response.json({ ok: true, handled: true, flow: "whatsapp_date_presented_fallback" });
         }
 
@@ -4698,6 +4686,7 @@ export async function POST(req: Request) {
             admin,
             leadId,
             conversationId,
+            phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
           });
           const chosen = findExperimentalClassDateOption(inboundContent, availability.dates);
@@ -4788,16 +4777,15 @@ export async function POST(req: Request) {
             admin,
             leadId,
             conversationId,
+            phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
             professorDate: chosen.professorDate,
           });
-          for (const timeMsg of pres.messages) {
-            const cleanMsg = String(timeMsg ?? "").trim();
-            if (!cleanMsg) continue;
-            try {
-              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-            } catch (_e) {}
-          }
+          void sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: pres.messages,
+            insertIntoConversation: false,
+          }).catch(() => {});
           return Response.json({ ok: true, handled: true, flow: "whatsapp_time_presented" });
         }
 
@@ -4825,15 +4813,14 @@ export async function POST(req: Request) {
               admin,
               leadId,
               conversationId,
+              phone: normalizedPhoneOnly,
               leadTimeZone: leadTz,
             });
-            for (const dateMsg of fallback.messages) {
-              const cleanMsg = String(dateMsg ?? "").trim();
-              if (!cleanMsg) continue;
-              try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-              } catch (_e) {}
-            }
+            void sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: fallback.messages,
+              insertIntoConversation: false,
+            }).catch(() => {});
             return Response.json({ ok: true, handled: true, flow: "whatsapp_date_represented_missing_context" });
           }
           professorDate = professorDate ||
@@ -4843,6 +4830,7 @@ export async function POST(req: Request) {
             admin,
             leadId,
             conversationId,
+            phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
             professorDate,
           });
@@ -4852,15 +4840,14 @@ export async function POST(req: Request) {
               admin,
               leadId,
               conversationId,
+              phone: normalizedPhoneOnly,
               leadTimeZone: leadTz,
             });
-            for (const dateMsg of fallback.messages) {
-              const cleanMsg = String(dateMsg ?? "").trim();
-              if (!cleanMsg) continue;
-              try {
-                await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: cleanMsg });
-              } catch (_e) {}
-            }
+            void sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: fallback.messages,
+              insertIntoConversation: false,
+            }).catch(() => {});
             return Response.json({ ok: true, handled: true, flow: "whatsapp_no_more_times_returned_dates" });
           }
 
@@ -5047,17 +5034,15 @@ export async function POST(req: Request) {
 
             if (needsPostBookingCpf) {
               const bookingChat = buildExperimentalClassBookingChatMessages(firstName);
-              for (const m of bookingChat) {
-                await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
-              }
-              try {
-                for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
-                  await sendAtendimentoWhatsAppText({
-                    phone: normalizedPhoneOnly,
-                    message: m,
-                  });
-                }
-              } catch (_e) {}
+              const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
+              const combinedBatch = [...bookingChat, ...studentMsgs];
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: combinedBatch,
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+              });
 
               void appendHistoryEvent({
                 leadId,
@@ -5068,7 +5053,7 @@ export async function POST(req: Request) {
                 actorType: "system",
               });
 
-              await insertWhatsAppBotTextMessage({
+              const __cpfInsert = insertWhatsAppBotTextMessage({
                 admin,
                 conversationId,
                 contentText: POST_BOOKING_CPF_PROMPT,
@@ -5079,19 +5064,18 @@ export async function POST(req: Request) {
                   message: POST_BOOKING_CPF_PROMPT,
                 });
               } catch (_e) {}
+              void __cpfInsert.catch(() => {});
             } else {
               const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
-              for (const m of chatMsgs) {
-                await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: m });
-              }
-              try {
-                for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
-                  await sendAtendimentoWhatsAppText({
-                    phone: normalizedPhoneOnly,
-                    message: m,
-                  });
-                }
-              } catch (_e) {}
+              const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
+              const combinedBatch = [...chatMsgs, ...studentMsgs];
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: combinedBatch,
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+              });
               try {
                 await sendAtendimentoWhatsAppText({
                   phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,

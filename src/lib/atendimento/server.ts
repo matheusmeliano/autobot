@@ -972,6 +972,69 @@ export async function sendAtendimentoWhatsAppText(params: {
   return result;
 }
 
+export async function sendAtendimentoWhatsAppTextBatch(params: {
+  phone: string;
+  messages: string[];
+  baseUrl?: string | null;
+  admin?: any;
+  conversationId?: string | null;
+  insertIntoConversation?: boolean;
+}) {
+  const { phone, messages, baseUrl, admin, conversationId, insertIntoConversation = Boolean(admin && conversationId) } = params;
+  const safeMessages = (messages ?? []).filter((msg) => typeof msg === "string" && msg.trim().length > 0);
+  if (!safeMessages.length) return { results: [], insertedRows: [] };
+
+  const sends = safeMessages.map(async (message) => {
+    try {
+      const r = await sendAtendimentoWhatsAppText({ phone, message, baseUrl });
+      return { ok: true, message, result: r };
+    } catch (e) {
+      return { ok: false, message, error: String((e as any)?.message ?? "") };
+    }
+  });
+
+  const insertPromise = (() => {
+    if (!insertIntoConversation || !admin || !conversationId) return Promise.resolve([] as any[]);
+    return Promise.allSettled(
+      safeMessages.map((contentText) =>
+        admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: conversationId,
+            sender_role: "bot",
+            content_text: contentText,
+            media_type: "text",
+            status: "entregue",
+            sent_at: new Date().toISOString(),
+            delivered_at: new Date().toISOString(),
+          })
+          .select("*")
+          .maybeSingle(),
+      ),
+    ).then((outs) =>
+      outs
+        .map((o, idx) => {
+          if (o.status !== "fulfilled") return null;
+          const v: any = o.value;
+          return { index: idx, row: (v?.data ?? null) as Record<string, unknown> | null, error: v?.error ?? null };
+        })
+        .filter(Boolean) as Array<{ index: number; row: Record<string, unknown> | null; error: any }>,
+    );
+  })();
+
+  const [results, insertedRows] = await Promise.all([Promise.allSettled(sends).then((out) =>
+    out.map((o) => {
+      if (o.status !== "fulfilled") return { ok: false, message: "", error: String(o.reason ?? "settled_rejected") };
+      return o.value;
+    }),
+  ), insertPromise]);
+
+  return {
+    results,
+    insertedRows,
+  };
+}
+
 export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
   const admin = createSupabaseAdminClient();
   const nowIso = now.toISOString();
