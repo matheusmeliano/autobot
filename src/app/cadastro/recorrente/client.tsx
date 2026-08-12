@@ -62,6 +62,8 @@ export default function CadastroRecorrenteBody() {
   const [senha, setSenha] = useState<string>("");
   const [initialDataLoading, setInitialDataLoading] = useState<boolean>(true);
   const [initialDataError, setInitialDataError] = useState<string>("");
+  const [accessBlocked, setAccessBlocked] = useState<boolean>(false);
+  const [accessBlockedMessage, setAccessBlockedMessage] = useState<string>("");
   const [availLoading, setAvailLoading] = useState<boolean>(false);
   const [availError, setAvailError] = useState<string>("");
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
@@ -86,13 +88,23 @@ export default function CadastroRecorrenteBody() {
         const json = (await res.json().catch(() => null)) as
           | {
               ok?: boolean;
+              blocked?: boolean;
+              error?: string | null;
               lead?: {
                 full_name?: string | null;
                 phone?: string | null;
               } | null;
             }
           | null;
-        if (res.ok && json?.ok && json?.lead) {
+        if (!res.ok || json?.blocked) {
+          setAccessBlocked(true);
+          setAccessBlockedMessage(
+            String(json?.error ?? "").trim() ||
+              "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+          );
+          return;
+        }
+        if (json?.ok && json?.lead) {
           const leadFullName = String(json.lead?.full_name ?? "").trim();
           const leadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
           const normalizedLeadFullName = toNomeESobrenome(leadFullName);
@@ -196,6 +208,7 @@ export default function CadastroRecorrenteBody() {
   }
 
   function canAdvanceFromStep0() {
+    if (accessBlocked) return false;
     const parts = nome.trim().split(/\s+/).filter((s) => s && s.trim());
     return (
       nome.trim().length >= 2 &&
@@ -272,7 +285,17 @@ export default function CadastroRecorrenteBody() {
           leadTime: selectedTimeOpt.leadTime || selectedTimeOpt.displayLabel,
         }),
       });
-      const json = (await res.json().catch(() => null)) as SubmitResponse | null;
+      const json = (await res.json().catch(() => null)) as
+        | (SubmitResponse & { blocked?: boolean })
+        | null;
+      if (res.status === 403 || json?.blocked) {
+        setAccessBlocked(true);
+        setAccessBlockedMessage(
+          String(json?.error ?? "").trim() ||
+            "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+        );
+        throw new Error(String(json?.error ?? "Acesso bloqueado."));
+      }
       if (!res.ok || !json?.ok || !json.scheduled) {
         throw new Error(json?.error || "Falha ao finalizar o cadastro. Tente novamente.");
       }
@@ -283,6 +306,42 @@ export default function CadastroRecorrenteBody() {
     } finally {
       setSubmitLoading(false);
     }
+  }
+
+  if (accessBlocked) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-red-50 via-white to-rose-50 py-10 px-4 sm:px-6 flex items-center justify-center">
+        <div className="mx-auto max-w-lg w-full">
+          <div className="bg-white rounded-3xl shadow-xl shadow-red-100/50 border border-red-100 p-8 sm:p-10 text-center">
+            <div className="mx-auto w-20 h-20 rounded-full bg-red-500/10 text-red-600 flex items-center justify-center mb-6">
+              <svg
+                className="w-10 h-10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 15v2m0 0v2m0-2h2m-2 0h-2m4.243-9.243l1.414-1.414M4.929 19.071l1.414-1.414m0-11.314L4.929 4.929m14.142 14.142l-1.414-1.414M12 3a9 9 0 100 18 9 9 0 000-18z"
+                />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              Acesso bloqueado
+            </h1>
+            <p className="mt-4 text-slate-600 text-base leading-relaxed">
+              {accessBlockedMessage ||
+                "Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp."}
+            </p>
+            <div className="mt-8 pt-7 border-t border-slate-100 text-xs text-slate-500 leading-relaxed">
+              © {new Date().getFullYear()} Lucas Brum Online Music USA. Todos os direitos reservados.
+            </div>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -360,7 +419,8 @@ export default function CadastroRecorrenteBody() {
                     type="text"
                     value={nome}
                     onChange={(e) => setNome(toNomeESobrenome(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                    disabled={accessBlocked || initialDataLoading}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
                     placeholder="Ex: Ana Maria Silva"
                   />
                 </div>

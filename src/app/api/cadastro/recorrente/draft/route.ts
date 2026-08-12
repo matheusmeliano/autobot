@@ -39,7 +39,15 @@ export async function GET(req: NextRequest) {
       .limit(1)
       .maybeSingle();
     if (!data) {
-      return NextResponse.json({ ok: true, lead: null });
+      return NextResponse.json(
+        {
+          ok: false,
+          blocked: true,
+          error:
+            "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+        },
+        { status: 403 },
+      );
     }
     return NextResponse.json({
       ok: true,
@@ -92,8 +100,13 @@ export async function PATCH(req: NextRequest) {
     const lead = await findLeadByPhone({ phone: safePhoneDigits });
     if (!lead?.id) {
       return NextResponse.json(
-        { ok: false, error: "Lead não encontrado para esse telefone." },
-        { status: 404 },
+        {
+          ok: false,
+          blocked: true,
+          error:
+            "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+        },
+        { status: 403 },
       );
     }
 
