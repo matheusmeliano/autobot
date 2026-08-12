@@ -325,7 +325,7 @@ function LeadDetails({
             <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
               <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  Link fixo da aula (todas as recorrentes)
+                  Link fixo das aulas
                 </div>
                 {canOpenRecurringLink ? (
                   <a
@@ -847,7 +847,7 @@ function BookingDetails({
             <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
               <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  Link fixo da aula (todas as recorrentes)
+                  Link fixo das aulas
                 </div>
                 {canOpenSavedRecurringLink ? (
                   <a
