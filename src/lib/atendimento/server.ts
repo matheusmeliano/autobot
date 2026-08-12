@@ -159,6 +159,12 @@ function areBrazilianPhonesEquivalent(aRaw: string | null | undefined, bRaw: str
 }
 
 async function loadAllInstancePhoneBlocklist(): Promise<Set<string>> {
+  const cacheKey = "__autobot_whatsapp_instance_blocklist_cache";
+  const globalAny = globalThis as any;
+  const now = Date.now();
+  if (globalAny[cacheKey] && globalAny[cacheKey].value && (now - globalAny[cacheKey].updatedAtMs) < 30_000) {
+    return globalAny[cacheKey].value as Set<string>;
+  }
   try {
     const admin = createSupabaseAdminClient();
     const { data } = await admin.from("whatsapp_instances").select("phone").limit(50);
@@ -178,6 +184,7 @@ async function loadAllInstancePhoneBlocklist(): Promise<Set<string>> {
       const norm = normalizePhoneDigitsOnly(p);
       if (norm) set.add(norm);
     }
+    globalAny[cacheKey] = { value: set, updatedAtMs: now };
     return set;
   } catch (_e) {
     return new Set();
@@ -767,6 +774,12 @@ async function updateZapiWebhook(params: {
 }
 
 async function getAtendimentoWhatsAppConfig() {
+  const cacheKey = "__autobot_atendimento_wa_config_cache";
+  const globalAny = globalThis as any;
+  const now = Date.now();
+  if (globalAny[cacheKey] && globalAny[cacheKey].value && (now - globalAny[cacheKey].updatedAtMs) < 60_000) {
+    return globalAny[cacheKey].value as Awaited<ReturnType<typeof getAtendimentoWhatsAppConfig>>;
+  }
   const admin = createSupabaseAdminClient();
   const { data: profile } = await admin
     .from("profiles")
@@ -775,7 +788,9 @@ async function getAtendimentoWhatsAppConfig() {
     .maybeSingle();
 
   const userId = String((profile as any)?.user_id ?? "").trim();
-  if (!userId) return null;
+  if (!userId) {
+    return null;
+  }
 
   const { data: wa } = await admin
     .from("whatsapp_instances")
@@ -792,13 +807,20 @@ async function getAtendimentoWhatsAppConfig() {
     return null;
   }
 
-  return {
+  const config = {
     instance_id: String((wa as any).instance_id),
     token: String((wa as any).token),
     client_token: String((wa as any)?.client_token ?? "").trim() || null,
     instance_phone_digits_only: normalizePhoneDigitsOnly(String((wa as any)?.phone ?? "")),
   };
+  globalAny[cacheKey] = { value: config, updatedAtMs: now };
+  return config;
 }
+
+const __autobotWebhookRefreshCache: { lastUrl: string | null; lastAtMs: number } = {
+  lastUrl: null,
+  lastAtMs: 0,
+};
 
 export async function sendAtendimentoWhatsAppText(params: {
   phone: string;
@@ -850,14 +872,14 @@ export async function sendAtendimentoWhatsAppText(params: {
       .maybeSingle();
 
     if (leadRow?.id) {
-      const { data: conversationRow } = await admin
+      const { data: conv } = await admin
         .from("atendimento_conversations")
         .select("id")
         .eq("lead_id", String((leadRow as any).id))
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const conversationId = String((conversationRow as any)?.id ?? "").trim();
+      const conversationId = String((conv as any)?.id ?? "").trim();
 
       if (!conversationId) {
         return {
@@ -921,16 +943,21 @@ export async function sendAtendimentoWhatsAppText(params: {
   }
 
   const baseUrl = String(params.baseUrl ?? "").trim().replace(/\/$/, "");
+  const now = Date.now();
   if (baseUrl) {
     const webhookUrl = buildAuthorizedZapiWebhookUrl(baseUrl);
-    await updateZapiWebhook({
-      instance_id: config.instance_id,
-      token: config.token,
-      client_token: config.client_token,
-      endpoint: "update-every-webhooks",
-      value: webhookUrl,
-      extraBody: { notifySentByMe: true },
-    });
+    if (webhookUrl !== __autobotWebhookRefreshCache.lastUrl || (now - __autobotWebhookRefreshCache.lastAtMs) > 15 * 60_000) {
+      __autobotWebhookRefreshCache.lastUrl = webhookUrl;
+      __autobotWebhookRefreshCache.lastAtMs = now;
+      updateZapiWebhook({
+        instance_id: config.instance_id,
+        token: config.token,
+        client_token: config.client_token,
+        endpoint: "update-every-webhooks",
+        value: webhookUrl,
+        extraBody: { notifySentByMe: true },
+      }).catch(() => {});
+    }
   }
 
   const result = await sendZapiText({

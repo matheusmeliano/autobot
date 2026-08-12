@@ -555,7 +555,7 @@ async function sendSupportFinalAndMarkBlocked(params: {
     actorType: "system",
   });
 
-  await insertWhatsAppBotTextMessage({
+  const __insertSupport = insertWhatsAppBotTextMessage({
     admin: params.admin,
     conversationId: params.conversationId,
     contentText: SUPPORT_FINAL_MESSAGE,
@@ -566,6 +566,7 @@ async function sendSupportFinalAndMarkBlocked(params: {
       message: SUPPORT_FINAL_MESSAGE,
     });
   } catch (_e) {}
+  void __insertSupport.catch(() => {});
 }
 
 function looksLikeWhatsAppDirectLeadFirstMessage(value: string) {
@@ -4216,29 +4217,31 @@ export async function POST(req: Request) {
             "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
           const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;
 
-          await insertWhatsAppBotTextMessage({
+          const __firstInsertPromise = insertWhatsAppBotTextMessage({
             admin,
             conversationId,
             contentText: firstMessage,
           });
-          await insertWhatsAppBotTextMessage({
-            admin,
-            conversationId,
-            contentText: secondMessage,
-          });
-
           try {
             await sendAtendimentoWhatsAppText({
               phone: normalizedPhoneOnly,
               message: firstMessage,
             });
           } catch (_sendErr) {}
+          void __firstInsertPromise.catch(() => {});
+
+          const __secondInsertPromise = insertWhatsAppBotTextMessage({
+            admin,
+            conversationId,
+            contentText: secondMessage,
+          });
           try {
             await sendAtendimentoWhatsAppText({
               phone: normalizedPhoneOnly,
               message: secondMessage,
             });
           } catch (_sendErr) {}
+          void __secondInsertPromise.catch(() => {});
 
           void appendHistoryEvent({
             leadId,
@@ -4271,10 +4274,11 @@ export async function POST(req: Request) {
             nameCandidate.length <= 40;
           if (!isValidName) {
             const msg = "Não consegui identificar seu nome. Responda novamente com seu primeiro e segundo nome.";
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
 
             return Response.json({
               ok: true,
@@ -4315,10 +4319,11 @@ export async function POST(req: Request) {
               ? buildStatePrompt(nameCandidate)
               : CAPTURED_FIELD_PROMPTS.city
             : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
-          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          const __botMsgInsertNext = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
           try {
             await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
           } catch (_e) {}
+          void __botMsgInsertNext.catch(() => {});
 
           return Response.json({
             ok: true,
@@ -4374,10 +4379,11 @@ export async function POST(req: Request) {
             }
 
             const msg = `${LOCATION_STATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
 
             return Response.json({
               ok: true,
@@ -4415,10 +4421,11 @@ export async function POST(req: Request) {
           });
 
           const nextMsg = CAPTURED_FIELD_PROMPTS.city;
-          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          const __botMsgInsertNext = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
           try {
             await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
           } catch (_e) {}
+          void __botMsgInsertNext.catch(() => {});
 
           void appendHistoryEvent({
             leadId,
@@ -4509,10 +4516,11 @@ export async function POST(req: Request) {
             }
 
             const msg = `${LOCATION_CITY_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
 
             return Response.json({
               ok: true,
@@ -4610,10 +4618,11 @@ export async function POST(req: Request) {
             String((lead as any)?.full_name ?? "").trim() || null,
           );
           for (const introMsg of introMsgs) {
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: introMsg });
+            const __botMsgInsertIntro = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: introMsg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: introMsg });
             } catch (_e) {}
+            void __botMsgInsertIntro.catch(() => {});
           }
 
           const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
@@ -4730,10 +4739,11 @@ export async function POST(req: Request) {
             }
 
             const msg = `${EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
             return Response.json({
               ok: true,
               handled: true,
@@ -4895,10 +4905,11 @@ export async function POST(req: Request) {
             }
 
             const msg = `${EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE}\n\nHorários disponíveis para esse dia:\n${pres.slots.map((s: any) => `• ${String(s?.displayLabel ?? "")}`).filter(Boolean).join("\n")}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
             return Response.json({
               ok: true,
               handled: true,
@@ -5118,10 +5129,11 @@ export async function POST(req: Request) {
               actorType: "system",
             });
             const msg = POST_BOOKING_CPF_PROMPT;
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
 
             return Response.json({
               ok: true,
@@ -5135,10 +5147,11 @@ export async function POST(req: Request) {
           if (!cpfCheck.ok) {
             const msg =
               "Não consegui identificar um CPF válido. Responda novamente com os 11 dígitos (ex: 123.456.789-09).";
-            await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
             } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
 
             void appendHistoryEvent({
               leadId,
@@ -5176,10 +5189,11 @@ export async function POST(req: Request) {
           });
 
           const finalMsg = POST_BOOKING_CPF_SUCCESS_MESSAGE;
-          await insertWhatsAppBotTextMessage({ admin, conversationId, contentText: finalMsg });
+          const __botMsgInsertFinal = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: finalMsg });
           try {
             await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: finalMsg });
           } catch (_e) {}
+          void __botMsgInsertFinal.catch(() => {});
 
           try {
             await admin
