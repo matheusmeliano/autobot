@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest) {
       patch.recurring_class_lead_time = safeProfessorTime;
     }
 
-    if (String(nome ?? "").trim() && !String((lead as any)?.full_name ?? "").trim()) {
+    if (String(nome ?? "").trim()) {
       patch.full_name = String(nome ?? "").trim();
     }
 
@@ -86,7 +86,7 @@ export async function PATCH(req: NextRequest) {
       if (/column|does not exist|PGRST204|PGRST205|42703/i.test(msg)) {
         try {
           const fallback: Record<string, unknown> = { updated_at: nowIso };
-          if (String(nome ?? "").trim() && !String((lead as any)?.full_name ?? "").trim()) {
+      if (String(nome ?? "").trim()) {
             fallback.full_name = String(nome ?? "").trim();
           }
           await admin

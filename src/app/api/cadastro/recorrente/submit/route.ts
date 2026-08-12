@@ -67,9 +67,7 @@ export async function POST(req: NextRequest) {
       funnel_stage: "aluno_recorrente_cadastrado",
       status: "matriculado",
       updated_at: nowIso,
-      ...(String(nome ?? "").trim() && !String((lead as any)?.full_name ?? "").trim()
-        ? { full_name: String(nome ?? "").trim() }
-        : {}),
+      ...(String(nome ?? "").trim() ? { full_name: String(nome ?? "").trim() } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
     };
 
@@ -77,9 +75,7 @@ export async function POST(req: NextRequest) {
       funnel_stage: "aluno_recorrente_cadastrado",
       status: "matriculado",
       updated_at: nowIso,
-      ...(String(nome ?? "").trim() && !String((lead as any)?.full_name ?? "").trim()
-        ? { full_name: String(nome ?? "").trim() }
-        : {}),
+      ...(String(nome ?? "").trim() ? { full_name: String(nome ?? "").trim() } : {}),
     };
 
     let appliedPatch: "full" | "minimal" = "minimal";

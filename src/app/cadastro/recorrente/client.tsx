@@ -148,6 +148,21 @@ export default function CadastroRecorrenteBody() {
 
   function handleAdvance0() {
     if (!canAdvanceFromStep0()) return;
+    (async () => {
+      try {
+        const telefone = phoneField.replace(/\D/g, "");
+        if (telefone && telefone.length >= 10) {
+          await fetch("/api/cadastro/recorrente/draft", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              telefone,
+              nome: nome.trim() || null,
+            }),
+          }).catch(() => {});
+        }
+      } catch {}
+    })();
     goStep(1);
   }
 
