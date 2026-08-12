@@ -1648,8 +1648,17 @@ export function AtendimentoSummaryCards({
       Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
       Boolean(String(lead.recurring_class_lead_time ?? "").trim());
     const hasRecurring = hasWeekdayOk && hasTimeOk;
-    if (hasRecurring) {
-      return "Aluno confirmado";
+    const isAlunoOrMatriculado =
+      lead.status === "aluno" ||
+      lead.status === "matriculado" ||
+      (lead as any).funnel_stage === "aluno_recorrente_cadastrado" ||
+      lead.status === "cadastro_recorrente_pendente_plataforma" ||
+      lead.funnel_stage === "cadastro_recorrente_pendente_plataforma";
+    if (isAlunoOrMatriculado) {
+      if (!hasWeekdayOk || !hasTimeOk) {
+        return "Falta dia e horário recorrentes";
+      }
+      return "Falta contrato";
     }
 
     if (activeSection === "agendamentos") {
@@ -1665,6 +1674,17 @@ export function AtendimentoSummaryCards({
         const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
         const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
         return body ? `Aula em: ${body}` : "";
+      }
+      const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+      const recTimeOk =
+        Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+        Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+      const recBothOk = recWeekdayOk && recTimeOk;
+      if (recBothOk || hasRecurring) {
+        return "Falta contrato";
+      }
+      if (!recWeekdayOk || !recTimeOk) {
+        return "Falta dia e horário recorrentes";
       }
       return "";
     }
