@@ -1661,6 +1661,23 @@ export function AtendimentoSummaryCards({
       return "Falta contrato";
     }
 
+    const expDraftDate =
+      String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_date ?? "").trim();
+    const expDraftTime =
+      String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_time ?? "").trim();
+    const expStatusRaw = String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
+    const expStage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+    const hasExpContext =
+      expStatusRaw === "date_selected" ||
+      expStatusRaw === "time_selected" ||
+      ["aula_experimental_convidada", "pre_cadastro_concluido", "aula_experimental_agendada"].includes(expStage) ||
+      Boolean(expDraftDate) ||
+      Boolean(expDraftTime);
+    const hasExpDate = Boolean(expDraftDate);
+    const hasExpTime = Boolean(expDraftTime);
+
     if (activeSection === "agendamentos") {
       const booking = lead.experimental_class_booking;
       const hasBook = Boolean(
@@ -1683,10 +1700,22 @@ export function AtendimentoSummaryCards({
       if (recBothOk || hasRecurring) {
         return "Falta contrato";
       }
-      if (!recWeekdayOk || !recTimeOk) {
+      const isRecorrente =
+        hasWeekdayOk ||
+        hasTimeOk ||
+        Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
+        Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim());
+      if (isRecorrente && (!recWeekdayOk || !recTimeOk)) {
         return "Falta dia e horário recorrentes";
       }
+      if (hasExpContext && (!hasExpDate || !hasExpTime)) {
+        return "Falta dia e horário";
+      }
       return "";
+    }
+
+    if (hasExpContext && !hasExpDate) {
+      return "Falta dia e horário";
     }
 
     const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
