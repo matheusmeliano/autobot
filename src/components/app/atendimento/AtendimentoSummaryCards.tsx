@@ -1796,6 +1796,21 @@ export function AtendimentoSummaryCards({
                           </div>
                         );
                       })()}
+                      {(() => {
+                        const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+                        const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+                        const hasTimeOk =
+                          Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+                          Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+                        const hasRecurringBoth = hasWeekdayOk && hasTimeOk;
+                        if (!hasRecurringBoth) return null;
+                        if (String((lead as any).recurring_class_link ?? "").trim()) return null;
+                        return (
+                          <div className="mt-2 text-[11px] font-semibold text-amber-300">
+                            Adicione link da aula recorrente
+                          </div>
+                        );
+                      })()}
                     </button>
                   );
                 })}
