@@ -857,6 +857,7 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
   conversationId: string;
   phone: string;
   leadTimeZone?: string | null;
+  insertIntoConversation?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -874,12 +875,13 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
     bookedProfessorStartAts: bookedProfessorStarts,
   });
   const messages = buildExperimentalClassDatesMessages(availability.dates);
+  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
   const batch = await sendAtendimentoWhatsAppTextBatch({
     phone: params.phone,
     messages,
     admin: params.admin,
     conversationId: params.conversationId,
-    insertIntoConversation: true,
+    insertIntoConversation: shouldInsert,
   });
   const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
   void appendHistoryEvent({
@@ -894,7 +896,7 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
     },
     actorType: "system",
   });
-  await syncConversationPreview({
+  void syncConversationPreview({
     conversationId: params.conversationId,
     contentText: messages[messages.length - 1] ?? "",
     createdAt: new Date().toISOString(),
@@ -909,6 +911,7 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
   phone: string;
   leadTimeZone?: string | null;
   professorDate: string;
+  insertIntoConversation?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -931,12 +934,13 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
+  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
   const batch = await sendAtendimentoWhatsAppTextBatch({
     phone: params.phone,
     messages,
     admin: params.admin,
     conversationId: params.conversationId,
-    insertIntoConversation: true,
+    insertIntoConversation: shouldInsert,
   });
   const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
   void appendHistoryEvent({
@@ -965,6 +969,7 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
   conversationId: string;
   phone: string;
   leadTimeZone?: string | null;
+  insertIntoConversation?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -982,12 +987,13 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
     bookedProfessorStartAts: bookedProfessorStarts,
   });
   const messages = buildRecurringCalendarDatesMessages(availability.dates);
+  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
   const batch = await sendAtendimentoWhatsAppTextBatch({
     phone: params.phone,
     messages,
     admin: params.admin,
     conversationId: params.conversationId,
-    insertIntoConversation: true,
+    insertIntoConversation: shouldInsert,
   });
   const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
   void appendHistoryEvent({
@@ -1017,6 +1023,7 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
   phone: string;
   leadTimeZone?: string | null;
   professorDate: string;
+  insertIntoConversation?: boolean;
 }) {
   const now = new Date();
   const { data: bookedStartsRaw, error: bErr } = await params.admin
@@ -1039,12 +1046,13 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
+  const shouldInsert = typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true;
   const batch = await sendAtendimentoWhatsAppTextBatch({
     phone: params.phone,
     messages,
     admin: params.admin,
     conversationId: params.conversationId,
-    insertIntoConversation: true,
+    insertIntoConversation: shouldInsert,
   });
   const lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
   void appendHistoryEvent({
@@ -4532,22 +4540,18 @@ export async function POST(req: Request) {
                 (String((lead as any)?.timezone ?? "").trim() ||
                   inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
                   ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
+              insertIntoConversation: false,
             });
             const introBuilder = buildExperimentalClassDatePromptMessages(
               String((lead as any)?.full_name ?? "").trim() || null,
             );
             await sendAtendimentoWhatsAppTextBatch({
               phone: normalizedPhoneOnly,
-              messages: introBuilder,
+              messages: [...introBuilder, ...dateMessages],
               admin,
               conversationId,
               insertIntoConversation: true,
             });
-            void sendAtendimentoWhatsAppTextBatch({
-              phone: normalizedPhoneOnly,
-              messages: dateMessages,
-              insertIntoConversation: false,
-            }).catch(() => {});
 
             return Response.json({
               ok: true,
@@ -4607,26 +4611,21 @@ export async function POST(req: Request) {
           const introMsgs = buildExperimentalClassDatePromptMessages(
             String((lead as any)?.full_name ?? "").trim() || null,
           );
-          await sendAtendimentoWhatsAppTextBatch({
-            phone: normalizedPhoneOnly,
-            messages: introMsgs,
-            admin,
-            conversationId,
-            insertIntoConversation: true,
-          });
-
           const { messages: dateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
             conversationId,
             phone: normalizedPhoneOnly,
             leadTimeZone: resolved.timeZone,
-          });
-          void sendAtendimentoWhatsAppTextBatch({
-            phone: normalizedPhoneOnly,
-            messages: dateMessages,
             insertIntoConversation: false,
-          }).catch(() => {});
+          });
+          await sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: [...introMsgs, ...dateMessages],
+            admin,
+            conversationId,
+            insertIntoConversation: true,
+          });
 
           return Response.json({
             ok: true,
@@ -4664,18 +4663,13 @@ export async function POST(req: Request) {
           }
           const leadTz =
             String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
-          const { messages: fallbackDateMessages } = await presentExperimentalClassDateOptionsWhatsApp({
+          await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
             conversationId,
             phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
           });
-          void sendAtendimentoWhatsAppTextBatch({
-            phone: normalizedPhoneOnly,
-            messages: fallbackDateMessages,
-            insertIntoConversation: false,
-          }).catch(() => {});
           return Response.json({ ok: true, handled: true, flow: "whatsapp_date_presented_fallback" });
         }
 
@@ -4773,7 +4767,7 @@ export async function POST(req: Request) {
             } catch (_e2) {}
           }
 
-          const pres = await presentExperimentalClassTimeOptionsWhatsApp({
+          await presentExperimentalClassTimeOptionsWhatsApp({
             admin,
             leadId,
             conversationId,
@@ -4781,11 +4775,6 @@ export async function POST(req: Request) {
             leadTimeZone: leadTz,
             professorDate: chosen.professorDate,
           });
-          void sendAtendimentoWhatsAppTextBatch({
-            phone: normalizedPhoneOnly,
-            messages: pres.messages,
-            insertIntoConversation: false,
-          }).catch(() => {});
           return Response.json({ ok: true, handled: true, flow: "whatsapp_time_presented" });
         }
 
@@ -4809,18 +4798,13 @@ export async function POST(req: Request) {
             Boolean(String((lead as any)?.experimental_class_professor_date ?? "").trim()) ||
             Boolean(String((lead as any)?.experimental_class_lead_date ?? "").trim());
           if (!hasAnyDateContext) {
-            const fallback = await presentExperimentalClassDateOptionsWhatsApp({
+            await presentExperimentalClassDateOptionsWhatsApp({
               admin,
               leadId,
               conversationId,
               phone: normalizedPhoneOnly,
               leadTimeZone: leadTz,
             });
-            void sendAtendimentoWhatsAppTextBatch({
-              phone: normalizedPhoneOnly,
-              messages: fallback.messages,
-              insertIntoConversation: false,
-            }).catch(() => {});
             return Response.json({ ok: true, handled: true, flow: "whatsapp_date_represented_missing_context" });
           }
           professorDate = professorDate ||
@@ -4836,18 +4820,13 @@ export async function POST(req: Request) {
           });
 
           if (!pres.slots.length) {
-            const fallback = await presentExperimentalClassDateOptionsWhatsApp({
+            await presentExperimentalClassDateOptionsWhatsApp({
               admin,
               leadId,
               conversationId,
               phone: normalizedPhoneOnly,
               leadTimeZone: leadTz,
             });
-            void sendAtendimentoWhatsAppTextBatch({
-              phone: normalizedPhoneOnly,
-              messages: fallback.messages,
-              insertIntoConversation: false,
-            }).catch(() => {});
             return Response.json({ ok: true, handled: true, flow: "whatsapp_no_more_times_returned_dates" });
           }
 
