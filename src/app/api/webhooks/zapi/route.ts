@@ -875,7 +875,8 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
   });
-  const messages = buildExperimentalClassDatesMessages(availability.dates);
+  const messagesRaw = buildExperimentalClassDatesMessages(availability.dates);
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
   const skipSend = Boolean(params.skipWhatsAppSend);
   const shouldInsert = skipSend
     ? false
@@ -938,10 +939,11 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
   });
   const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
   const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
-  const messages = buildExperimentalClassTimesMessages({
+  const messagesRaw = buildExperimentalClassTimesMessages({
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
   const skipSend = Boolean(params.skipWhatsAppSend);
   const shouldInsert = skipSend
     ? false
@@ -1001,7 +1003,8 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
   });
-  const messages = buildRecurringCalendarDatesMessages(availability.dates);
+  const messagesRaw = buildRecurringCalendarDatesMessages(availability.dates);
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
   const skipSend = Boolean(params.skipWhatsAppSend);
   const shouldInsert = skipSend
     ? false
@@ -1064,10 +1067,11 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
   });
   const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
   const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
-  const messages = buildRecurringCalendarTimesMessages({
+  const messagesRaw = buildRecurringCalendarTimesMessages({
     dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
   const skipSend = Boolean(params.skipWhatsAppSend);
   const shouldInsert = skipSend
     ? false
@@ -2778,8 +2782,7 @@ export async function POST(req: Request) {
               }
             } catch (_e) {}
             const replies = [
-              NAO_RECUSA_MSG_1,
-              RESPOSTA_REPESCAGEM_FIXA,
+              [NAO_RECUSA_MSG_1, RESPOSTA_REPESCAGEM_FIXA].filter(Boolean).join("\n\n"),
             ];
             await sendAtendimentoWhatsAppTextBatch({
               phone: normalizedPhoneOnly,
@@ -4260,10 +4263,11 @@ export async function POST(req: Request) {
           const firstMessage =
             "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
           const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;
+          const welcomeSingleMessage = [firstMessage, secondMessage].filter(Boolean).join("\n\n");
 
           await sendAtendimentoWhatsAppTextBatch({
             phone: normalizedPhoneOnly,
-            messages: [firstMessage, secondMessage],
+            messages: [welcomeSingleMessage],
             admin,
             conversationId,
             insertIntoConversation: true,
@@ -4573,7 +4577,7 @@ export async function POST(req: Request) {
             const introBuilder = buildExperimentalClassDatePromptMessages(
               String((lead as any)?.full_name ?? "").trim() || null,
             );
-            const combinedBatch = [...introBuilder, ...dateMessages];
+            const combinedBatch = [[...introBuilder, ...dateMessages].filter(Boolean).join("\n\n")];
             await sendAtendimentoWhatsAppTextBatch({
               phone: normalizedPhoneOnly,
               messages: combinedBatch,
@@ -4663,7 +4667,7 @@ export async function POST(req: Request) {
             leadTimeZone: resolved.timeZone,
             skipWhatsAppSend: true,
           });
-          const combinedBatch = [...introMsgs, ...dateMessages];
+          const combinedBatch = [[...introMsgs, ...dateMessages].filter(Boolean).join("\n\n")];
           await sendAtendimentoWhatsAppTextBatch({
             phone: normalizedPhoneOnly,
             messages: combinedBatch,
@@ -5071,7 +5075,7 @@ export async function POST(req: Request) {
             if (needsPostBookingCpf) {
               const bookingChat = buildExperimentalClassBookingChatMessages(firstName);
               const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-              const combinedBatch = [...bookingChat, ...studentMsgs];
+              const combinedBatch = [[...bookingChat, ...studentMsgs].filter(Boolean).join("\n\n")];
               await sendAtendimentoWhatsAppTextBatch({
                 phone: normalizedPhoneOnly,
                 messages: combinedBatch,
@@ -5104,7 +5108,7 @@ export async function POST(req: Request) {
             } else {
               const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
               const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-              const combinedBatch = [...chatMsgs, ...studentMsgs];
+              const combinedBatch = [[...chatMsgs, ...studentMsgs].filter(Boolean).join("\n\n")];
               await sendAtendimentoWhatsAppTextBatch({
                 phone: normalizedPhoneOnly,
                 messages: combinedBatch,
