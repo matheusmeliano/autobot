@@ -5077,9 +5077,8 @@ export async function POST(req: Request) {
               String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] || "Aluno";
 
             if (needsPostBookingCpf) {
-              const bookingChat = buildExperimentalClassBookingChatMessages(firstName);
               const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-              const combinedBatch = [[...bookingChat, ...studentMsgs].filter(Boolean).join("\n\n")];
+              const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
               await sendAtendimentoWhatsAppTextBatch({
                 phone: normalizedPhoneOnly,
                 messages: combinedBatch,
@@ -5110,9 +5109,8 @@ export async function POST(req: Request) {
               } catch (_e) {}
               void __cpfInsert.catch(() => {});
             } else {
-              const chatMsgs = buildExperimentalClassBookingChatMessages(firstName);
               const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-              const combinedBatch = [[...chatMsgs, ...studentMsgs].filter(Boolean).join("\n\n")];
+              const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
               await sendAtendimentoWhatsAppTextBatch({
                 phone: normalizedPhoneOnly,
                 messages: combinedBatch,
