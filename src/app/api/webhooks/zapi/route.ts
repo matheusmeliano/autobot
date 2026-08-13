@@ -2864,9 +2864,9 @@ export async function POST(req: Request) {
         const isNoNuclear = lenientYesNoNuclear.result === "no";
         const isAmbiguousNuclear = lenientYesNoNuclear.result === "ambiguous";
 
-        const recentBotHasMsgSimNao = recentBotTextsNuclear.some((text) => text === MSG_SIM_NAO_INVALIDA);
+        const recentBotHasMsgSimNao = recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA));
         const ultimaMsgBotPedeSimNao =
-          lastBotTextNuclear === MSG_SIM_NAO_INVALIDA || recentBotHasMsgSimNao;
+          (lastBotTextNuclear && lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA)) || recentBotHasMsgSimNao;
         const bookingAttendanceAttendedByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         const bookingAttendanceNoShowByCol =
