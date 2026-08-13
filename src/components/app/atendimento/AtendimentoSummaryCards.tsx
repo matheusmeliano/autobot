@@ -1086,30 +1086,65 @@ export function AtendimentoSummaryCards({
       }),
     [localLeads],
   );
+function atendimentoContractStatusLabel(contractStatus: string | null | undefined) {
+  const normalized = String(contractStatus ?? "").trim().toLowerCase();
+  if (normalized === "assinado") return "Assinado";
+  if (normalized === "aguardando_aceite") return "Aguardando aceite";
+  if (normalized === "coletando_dados") return "Coletando dados";
+  if (normalized === "rejeitado") return "Rejeitado";
+  return "Não iniciado";
+}
+
   const interessadosItems = useMemo(
     () =>
       localLeads.filter(
-        (lead) =>
-          lead.status !== "matriculado" &&
-          lead.funnel_stage !== "matriculado" &&
-          lead.status !== "aluno" &&
-          (lead as any).funnel_stage !== "aluno_recorrente_cadastrado" &&
-          lead.status !== "cadastro_recorrente_pendente_plataforma" &&
-          lead.funnel_stage !== "cadastro_recorrente_pendente_plataforma",
+        (lead) => {
+          const st = String(lead.status ?? "").trim().toLowerCase();
+          const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
+          if (st === "matriculado" || fs === "matriculado") return false;
+          if (st === "aluno" || fs === "aluno") return false;
+          if (fs === "aluno_recorrente_cadastrado") return false;
+          if (st === "contrato_assinado" || fs === "contrato_assinado") return false;
+          if (st === "cadastro_recorrente_pendente_plataforma" || fs === "cadastro_recorrente_pendente_plataforma") return false;
+          return true;
+        },
       ),
     [localLeads],
   );
   const alunosItems = useMemo(
     () =>
       localLeads.filter(
-        (lead) =>
-          lead.status === "matriculado" ||
-          (lead as any).funnel_stage === "matriculado" ||
-          (lead as any).status === "aluno" ||
-          (lead as any).funnel_stage === "aluno_recorrente_cadastrado" ||
-          lead.status === "cadastro_recorrente_pendente_plataforma" ||
-          lead.funnel_stage === "cadastro_recorrente_pendente_plataforma",
+        (lead) => {
+          const st = String(lead.status ?? "").trim().toLowerCase();
+          const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
+          if (st === "matriculado" || fs === "matriculado") return true;
+          if (st === "aluno") return true;
+          if (fs === "aluno_recorrente_cadastrado") return true;
+          if (st === "cadastro_recorrente_pendente_plataforma" || fs === "cadastro_recorrente_pendente_plataforma") return true;
+          if (st === "contrato_assinado" || fs === "contrato_assinado") return true;
+          return false;
+        },
       ),
+    [localLeads],
+  );
+  const contratosItems = useMemo(
+    () =>
+      localLeads.filter((lead) => {
+        const st = String(lead.status ?? "").trim().toLowerCase();
+        const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
+        const cs = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+        return (
+          st === "contrato_coletando_dados" ||
+          fs === "contrato_coletando_dados" ||
+          st === "contrato_aguardando_aceite" ||
+          fs === "contrato_aguardando_aceite" ||
+          st === "contrato_assinado" ||
+          fs === "contrato_assinado" ||
+          cs === "coletando_dados" ||
+          cs === "aguardando_aceite" ||
+          cs === "assinado"
+        );
+      }),
     [localLeads],
   );
   const sections = useMemo(
@@ -1138,12 +1173,12 @@ export function AtendimentoSummaryCards({
       {
         id: "contratos" as const,
         label: "Contratos",
-        value: 0,
+        value: contratosItems.length,
         emptyMessage: "Nenhum contrato disponível no momento.",
-        items: [],
+        items: contratosItems,
       },
     ],
-    [agendamentoItems, interessadosItems, alunosItems],
+    [agendamentoItems, interessadosItems, alunosItems, contratosItems],
   );
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
