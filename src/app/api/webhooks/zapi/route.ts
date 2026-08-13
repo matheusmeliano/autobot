@@ -152,6 +152,9 @@ function isAuthorized(req: Request) {
   return q === secret || bearer === secret;
 }
 
+const CANCELLED_BOOKING_AUTO_REPLY_MSG =
+  "Seu agendamento foi cancelado. Estamos analisando seu caso e, em breve, nossa equipe entrará em contato.";
+
 function extractString(v: unknown) {
   if (typeof v === "string") return v;
   if (typeof v === "number") return String(v);
@@ -2026,10 +2029,25 @@ export async function POST(req: Request) {
       leadId: String(leadRecord.id),
     });
     if (blockedByCancel) {
+      try {
+        await insertWhatsAppBotTextMessage({
+          admin,
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+        });
+      } catch (_e) {}
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: pendingPhone,
+          message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+        });
+      } catch (_e) {}
       return Response.json({
         ok: true,
-        ignored: true,
-        reason: "blocked_previous_experimental_class_booking_cancelled",
+        ignored: false,
+        replied: true,
+        reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+        reason: "cancelled_booking_auto_reply_sent",
       });
     }
 
@@ -2549,10 +2567,58 @@ export async function POST(req: Request) {
           } catch (_e) {}
         }
         if (earlyLeadBlockedByCancelledBooking) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
           return Response.json({
             ok: true,
-            ignored: true,
-            reason: "blocked_previous_experimental_class_booking_cancelled",
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent",
           });
         }
 
@@ -3972,10 +4038,58 @@ export async function POST(req: Request) {
           leadId,
         });
         if (leadHasCancelledBooking) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
           return Response.json({
             ok: true,
-            ignored: true,
-            reason: "blocked_previous_experimental_class_booking_cancelled",
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent",
           });
         }
 
@@ -4030,36 +4144,45 @@ export async function POST(req: Request) {
                 return null;
               }
             })();
-            const scheduledDates = events.filter((e) => e.event_type === "experimental_class_scheduled");
-            const scheduledOlderThanCancel = scheduledDates.some((ev) => {
-              if (!ev?.created_at) return false;
-              if (!latestCancelledBookingCreatedAt) return false;
-              return new Date(ev.created_at).getTime() <= new Date(latestCancelledBookingCreatedAt).getTime();
-            });
-            const safeHasScheduled = events.some(
-              (e) =>
-                e.event_type === "experimental_class_scheduled" ||
-                e.event_type === "whatsapp_flow_concluded_bot_disabled",
-            ) && !scheduledOlderThanCancel && !latestCancelledBookingCreatedAt;
-            const hasScheduled = safeHasScheduled;
-            const hasBlockedMaxAttempts = events.some(
-              (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
+            const anyActiveBookingCancelled = Boolean(
+              String(currentBooking?.status ?? "").trim().toLowerCase() === "cancelled" ||
+                latestCancelledBookingCreatedAt,
             );
-            if (hasScheduled && !handledByPosAttendanceFlow && effectiveWaitMessage) {
-              finalReason = "conversation_blocked_echo_scheduled_by_history";
-              responseMessage = effectiveWaitMessage;
-            } else if (hasBlockedMaxAttempts) {
-              const lastBotMsg = await getLastBotMessage({ admin, conversationId });
-              const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
-              finalReason = "conversation_blocked_support_max_attempts";
-              if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
-                responseMessage = SUPPORT_FINAL_MESSAGE;
-              }
+            if (anyActiveBookingCancelled) {
+              finalReason = "conversation_blocked_cancelled_booking";
+              responseMessage = CANCELLED_BOOKING_AUTO_REPLY_MSG;
             } else {
-              const lastBotMsg = await getLastBotMessage({ admin, conversationId });
-              const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
-              if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
-                responseMessage = SUPPORT_FINAL_MESSAGE;
+              const scheduledDates = events.filter((e) => e.event_type === "experimental_class_scheduled");
+              const scheduledOlderThanCancel = scheduledDates.some((ev) => {
+                if (!ev?.created_at) return false;
+                if (!latestCancelledBookingCreatedAt) return false;
+                return new Date(ev.created_at).getTime() <= new Date(latestCancelledBookingCreatedAt).getTime();
+              });
+              const safeHasScheduled = events.some(
+                (e) =>
+                  e.event_type === "experimental_class_scheduled" ||
+                  e.event_type === "whatsapp_flow_concluded_bot_disabled",
+              ) && !scheduledOlderThanCancel && !latestCancelledBookingCreatedAt;
+              const hasScheduled = safeHasScheduled;
+              const hasBlockedMaxAttempts = events.some(
+                (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
+              );
+              if (hasScheduled && !handledByPosAttendanceFlow && effectiveWaitMessage) {
+                finalReason = "conversation_blocked_echo_scheduled_by_history";
+                responseMessage = effectiveWaitMessage;
+              } else if (hasBlockedMaxAttempts) {
+                const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+                const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+                finalReason = "conversation_blocked_support_max_attempts";
+                if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+                  responseMessage = SUPPORT_FINAL_MESSAGE;
+                }
+              } else {
+                const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+                const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+                if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+                  responseMessage = SUPPORT_FINAL_MESSAGE;
+                }
               }
             }
           }
@@ -4154,9 +4277,67 @@ export async function POST(req: Request) {
           currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() !== "cancelled"
             ? currentBooking
             : null;
+        const existingBookingIsCancelled =
+          currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() === "cancelled";
+        const existingBookingCancelledHelper = await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId });
         const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
         const bookingAttendanceFullyResolvedEcho =
           bookingAttendanceAttendedByCol || bookingAttendanceNoShowByCol;
+        if (existingBookingIsCancelled || existingBookingCancelledHelper) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent_existing_booking_cancelled_or_blocked",
+          });
+        }
         if (
           existingScheduledBookingId &&
           !isBookingWaitingAttendance &&
@@ -4261,6 +4442,61 @@ export async function POST(req: Request) {
         const recentIsMaxAttemptsBlocked = eventsFlowRecent.some(
           (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
         );
+        if (flowBlockedByPrevCancel || scheduledFlowOlderThanCancel) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent_hist_flow",
+          });
+        }
         if (
           recentFlowConclusion &&
           conversation.bot_enabled !== false &&
