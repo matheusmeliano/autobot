@@ -1648,47 +1648,44 @@ export function AtendimentoSummaryCards({
     const hasExpDate = Boolean(expDraftDate);
     const hasExpTime = Boolean(expDraftTime);
 
-    if (activeSection === "agendamentos") {
-      const hasBook = Boolean(
-        booking &&
-          bookingHasId &&
-          bookingIsNotDraft &&
-          bookingStatus !== "cancelled",
-      );
-      if (hasBook) {
-        const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
-        const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
-        const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-        return body ? `Aula em: ${body}` : "";
-      }
-      const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
-      const recTimeOk =
-        Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-        Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-      const recBothOk = recWeekdayOk && recTimeOk;
-      if (recBothOk || hasRecurring) {
-        return "Falta contrato";
-      }
-      const isRecorrente =
-        hasWeekdayOk ||
-        hasTimeOk ||
-        Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
-        Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim());
-      if (isRecorrente && (!recWeekdayOk || !recTimeOk)) {
-        return "Falta dia e horário recorrentes";
-      }
-      if (hasExpContext && (!hasExpDate || !hasExpTime)) {
-        return "Falta dia e horário";
-      }
-      return "";
+    if (activeSection !== "agendamentos") {
+      const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
+      return rawDt ? `Criado em: ${rawDt}` : "";
     }
 
-    if (hasExpContext && !hasExpDate) {
+    const hasBook = Boolean(
+      booking &&
+        bookingHasId &&
+        bookingIsNotDraft &&
+        bookingStatus !== "cancelled",
+    );
+    if (hasBook) {
+      const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
+      const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
+      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
+      return body ? `Aula em: ${body}` : "";
+    }
+    const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+    const recTimeOk =
+      Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+      Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+    const recBothOk = recWeekdayOk && recTimeOk;
+    if (recBothOk || hasRecurring) {
+      return "Falta contrato";
+    }
+    const isRecorrente =
+      hasWeekdayOk ||
+      hasTimeOk ||
+      Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
+      Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim());
+    if (isRecorrente && (!recWeekdayOk || !recTimeOk)) {
+      return "Falta dia e horário recorrentes";
+    }
+    if (hasExpContext && (!hasExpDate || !hasExpTime)) {
       return "Falta dia e horário";
     }
-
-    const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
-    return rawDt ? `Criado em: ${rawDt}` : "";
+    const rawDtAgend = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
+    return rawDtAgend ? `Criado em: ${rawDtAgend}` : "";
   }
 
   return (
