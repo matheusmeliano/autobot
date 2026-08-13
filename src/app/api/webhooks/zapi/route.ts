@@ -4814,7 +4814,7 @@ export async function POST(req: Request) {
                   } catch (_e) {}
                 }
 
-                const firstName = String((lead as any)?.full_name ?? "").trim().split(" ")[0] || null;
+                const firstName = String((lead as any)?.full_name ?? "").trim().split(" ")[0] || "Aluno";
                 const needsPostBookingCpf = !Boolean(String((lead as any)?.cpf ?? "").trim());
 
                 if (needsPostBookingCpf) {
