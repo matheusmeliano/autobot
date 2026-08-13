@@ -473,10 +473,15 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
       body?.event,
       body?.eventType,
       body?.message?.type,
+      body?.message?.mimetype,
+      body?.message?.mimeType,
       body?.data?.type,
       body?.data?.event,
       body?.data?.message?.type,
+      body?.data?.message?.mimetype,
+      body?.data?.message?.mimeType,
       Array.isArray(body?.messages) ? body?.messages?.[0]?.type : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.mimetype : "",
     ),
   );
   const getUrl = (...paths: Array<any>): string => {
@@ -486,7 +491,7 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
         const s = p.trim();
         if (s && s.length > 4) return s;
       } else if (typeof p === "object") {
-        for (const k of ["url", "mediaUrl", "link", "media", "imageUrl", "fileUrl", "downloadUrl"]) {
+        for (const k of ["url", "mediaUrl", "link", "media", "imageUrl", "fileUrl", "downloadUrl", "download_link", "media_link", "direct_path"]) {
           const v = p?.[k];
           if (typeof v === "string") {
             const s = v.trim();
@@ -497,35 +502,67 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
     }
     return "";
   };
+  const unifiedMediaUrl = getUrl(
+    body?.message?.mediaUrl,
+    body?.message?.media,
+    body?.mediaUrl,
+    body?.media?.url,
+    body?.data?.message?.mediaUrl,
+    body?.data?.message?.media,
+    body?.data?.mediaUrl,
+    body?.data?.media?.url,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.mediaUrl : "",
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.media : "",
+  );
   const imgUrl = getUrl(
     body?.image, body?.imageUrl, body?.message?.image, body?.data?.image, body?.data?.message?.image,
     Array.isArray(body?.messages) ? body?.messages?.[0]?.image : "",
+    (typeSource.includes("image") || typeSource.includes("imagem")) ? unifiedMediaUrl : "",
   );
   const docUrl = getUrl(
     body?.document, body?.file, body?.message?.document, body?.message?.file,
     body?.data?.document, body?.data?.file, body?.data?.message?.document, body?.data?.message?.file,
     Array.isArray(body?.messages) ? body?.messages?.[0]?.document : "",
     Array.isArray(body?.messages) ? body?.messages?.[0]?.file : "",
+    (typeSource.includes("document") || typeSource.includes("arquivo") || typeSource.includes("application/")) ? unifiedMediaUrl : "",
   );
   const videoUrl = getUrl(
     body?.video, body?.message?.video, body?.data?.video, body?.data?.message?.video,
     Array.isArray(body?.messages) ? body?.messages?.[0]?.video : "",
+    typeSource.includes("video") ? unifiedMediaUrl : "",
   );
+  const isVoiceFlag = (() => {
+    const candidates: Array<any> = [body, body?.message, body?.data, body?.data?.message, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      for (const k of ["isVoice", "is_voice", "isAudio", "is_audio", "voice", "audio"]) {
+        const raw = (c as any)[k];
+        if (raw == null) continue;
+        const s = String(raw).trim().toLowerCase();
+        if (s === "true" || s === "1" || s === "yes" || s === "on") return true;
+        if (typeof raw === "boolean" && raw) return true;
+      }
+    }
+    return false;
+  })();
+  const audioMimeOrType = typeSource.includes("audio") || typeSource.includes("voice") || typeSource.includes("voz") || typeSource.includes("ogg") || typeSource.includes("opus") || typeSource.includes("mpeg");
   const audioUrl = getUrl(
     body?.audio, body?.voice, body?.message?.audio, body?.message?.voice,
     body?.data?.audio, body?.data?.voice, body?.data?.message?.audio,
     Array.isArray(body?.messages) ? body?.messages?.[0]?.audio : "",
     Array.isArray(body?.messages) ? body?.messages?.[0]?.voice : "",
+    (isVoiceFlag || audioMimeOrType) ? unifiedMediaUrl : "",
   );
   const stickerUrl = getUrl(
     body?.sticker, body?.message?.sticker, body?.data?.sticker, body?.data?.message?.sticker,
     Array.isArray(body?.messages) ? body?.messages?.[0]?.sticker : "",
+    typeSource.includes("sticker") ? unifiedMediaUrl : "",
   );
   const hasGif =
-    (typeSource.includes("gif") || typeSource.includes("animated")) &&
+    (typeSource.includes("gif") || typeSource.includes("animated") || typeSource.includes("animado")) &&
     Boolean(getUrl(
       body?.media, body?.message?.media, body?.data?.media, body?.data?.message?.media,
-      body?.image, body?.sticker, body?.video,
+      body?.image, body?.sticker, body?.video, unifiedMediaUrl,
     ));
   const getNum = (v: any): number => {
     if (v == null) return NaN;
@@ -548,48 +585,6 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
     return { has: false as const };
   })();
   const hasLocation = locRaw.has || typeSource.includes("location") || typeSource.includes("localizacao") || typeSource.includes("localização");
-  const hasCall = (() => {
-    if (typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") || typeSource.includes("missed") || typeSource.includes("perdida")) {
-      const candidates = [body, body?.data, body?.call, body?.message, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
-      for (const c of candidates) {
-        if (!c || typeof c !== "object") continue;
-        if (String(getFirstNonEmpty(c?.callId, c?.call_id, c?.id) || "").trim()) return true;
-        if (String(getFirstNonEmpty(c?.duration, c?.Duration, c?.seconds) || "").trim()) return true;
-        const status = normalizeText(getFirstNonEmpty(c?.status, c?.callStatus, c?.state) || "");
-        if (status && ["missed", "perdida", "incoming", "outgoing", "ended", "busy", "declined"].some((s) => status.includes(s))) return true;
-      }
-      return false;
-    }
-    return false;
-  })();
-  const hasContact = (() => {
-    const t = typeSource.includes("contact") || typeSource.includes("contato") || typeSource.includes("vcard");
-    const candidates: Array<any> = [
-      body, body?.message, body?.data, body?.data?.message,
-      Array.isArray(body?.messages) ? body?.messages?.[0] : null,
-    ];
-    for (const c of candidates) {
-      if (!c || typeof c !== "object") continue;
-      for (const k of ["contact", "contacts", "vcard", "vCard"]) {
-        const arrOrObj = c?.[k];
-        if (!arrOrObj) continue;
-        const arr = Array.isArray(arrOrObj) ? arrOrObj : [arrOrObj];
-        for (const entry of arr) {
-          if (!entry || typeof entry !== "object") continue;
-          if (String(getFirstNonEmpty(entry?.name, entry?.displayName, entry?.formattedName) || "").trim()) return true;
-          const phones = Array.isArray(entry?.phones) ? entry?.phones : (entry?.phone ? [entry?.phone] : []);
-          if (phones.length > 0 && phones.some((p: any) => String(getFirstNonEmpty(p?.number, p?.phone, p?.value, p) || "").trim())) return true;
-        }
-      }
-    }
-    return t;
-  })();
-  const anyMediaUrl =
-    Boolean(imgUrl) || Boolean(docUrl) || Boolean(videoUrl) || Boolean(audioUrl) || Boolean(stickerUrl) ||
-    Boolean(getUrl(
-      body?.media, body?.message?.media, body?.data?.media, body?.data?.message?.media,
-      Array.isArray(body?.messages) ? body?.messages?.[0]?.media : "",
-    ));
   const messageTextAny = getFirstNonEmpty(
     (body as any).text?.message,
     (body as any).text?.body,
@@ -605,10 +600,61 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
     (body as any).data?.message,
     (body as any).data?.body,
   );
+  const hasCall = (() => {
+    const typeMatch =
+      typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") ||
+      typeSource.includes("missed") || typeSource.includes("perdida") || typeSource.includes("voice_call") ||
+      typeSource.includes("phone_call") || typeSource.includes("incoming") || typeSource.includes("chamada");
+    const candidates: Array<any> = [body, body?.data, body?.call, body?.message, body?.callInfo, body?.call_info, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    let hasStructural = false;
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      if (String(getFirstNonEmpty(c?.callId, c?.call_id, c?.id, c?.CallId) || "").trim()) { hasStructural = true; break; }
+      if (String(getFirstNonEmpty(c?.duration, c?.Duration, c?.seconds, c?.callDuration) || "").trim()) { hasStructural = true; break; }
+      const status = normalizeText(getFirstNonEmpty(c?.status, c?.callStatus, c?.state, c?.result) || "");
+      if (status && ["missed", "perdida", "incoming", "outgoing", "ended", "busy", "declined", "not_answered", "nao_atendida", "não_atendida"].some((s) => status.includes(s))) { hasStructural = true; break; }
+      for (const k of ["fromMe", "from_me", "isFromMe"]) {
+        const raw = (c as any)[k];
+        if (typeof raw === "boolean") { hasStructural = true; break; }
+      }
+      if (hasStructural) break;
+    }
+    if (typeMatch && hasStructural) return true;
+    if (typeMatch && !messageTextAny) return true;
+    return false;
+  })();
+  const hasContact = (() => {
+    const t = typeSource.includes("contact") || typeSource.includes("contato") || typeSource.includes("vcard") || typeSource.includes("vcards");
+    const candidates: Array<any> = [
+      body, body?.message, body?.data, body?.data?.message,
+      Array.isArray(body?.messages) ? body?.messages?.[0] : null,
+    ];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      for (const k of ["contact", "contacts", "vcard", "vCard", "vCards"]) {
+        const arrOrObj = c?.[k];
+        if (!arrOrObj) continue;
+        const arr = Array.isArray(arrOrObj) ? arrOrObj : [arrOrObj];
+        for (const entry of arr) {
+          if (!entry || typeof entry !== "object") continue;
+          if (String(getFirstNonEmpty(entry?.name, entry?.displayName, entry?.formattedName, entry?.Name) || "").trim()) return true;
+          const phones = Array.isArray(entry?.phones) ? entry?.phones : (entry?.phone ? [entry?.phone] : []);
+          if (phones.length > 0 && phones.some((p: any) => String(getFirstNonEmpty(p?.number, p?.phone, p?.value, p) || "").trim())) return true;
+        }
+      }
+    }
+    return t;
+  })();
+  const anyMediaUrl =
+    Boolean(imgUrl) || Boolean(docUrl) || Boolean(videoUrl) || Boolean(audioUrl) || Boolean(stickerUrl) || Boolean(unifiedMediaUrl) ||
+    Boolean(getUrl(
+      body?.media, body?.message?.media, body?.data?.media, body?.data?.message?.media,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.media : "",
+    ));
   if (hasCall) return { isUnrecognized: true, detectedType: "call" };
   if (hasLocation) return { isUnrecognized: true, detectedType: "location" };
   if (hasContact) return { isUnrecognized: true, detectedType: "contact" };
-  if (audioUrl) return { isUnrecognized: true, detectedType: "audio" };
+  if (audioUrl || isVoiceFlag || audioMimeOrType && (anyMediaUrl || !messageTextAny)) return { isUnrecognized: true, detectedType: "audio" };
   if (videoUrl) return { isUnrecognized: true, detectedType: "video" };
   if (stickerUrl) return { isUnrecognized: true, detectedType: "sticker" };
   if (hasGif) return { isUnrecognized: true, detectedType: "gif" };
@@ -616,7 +662,7 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
   if (docUrl) return { isUnrecognized: true, detectedType: "document" };
   const nonTextTypes = ["audio", "image", "video", "document", "sticker", "gif", "location", "contact", "call", "media", "reaction", "order"];
   const typeMatchNonText = nonTextTypes.some((ty) => typeSource.includes(ty));
-  if (typeMatchNonText && !messageTextAny && anyMediaUrl) return { isUnrecognized: true, detectedType: "non_text_type" };
+  if (typeMatchNonText && !messageTextAny) return { isUnrecognized: true, detectedType: "non_text_type" };
   if (anyMediaUrl && !messageTextAny) return { isUnrecognized: true, detectedType: "media_attachment" };
   return { isUnrecognized: false, detectedType: "text_or_unknown" };
 }
@@ -5188,7 +5234,10 @@ export async function POST(req: Request) {
         const leadFullName = String((lead as any)?.full_name ?? "").trim();
         if (wantsNameStage && !leadFullName) {
           const nameCandidate = firstTwoNamesFromFullName(inboundContent || "");
+          const alphaMatches = nameCandidate.match(/[A-Za-zÀ-ÿ]/g);
+          const letterCount = Array.isArray(alphaMatches) ? alphaMatches.length : 0;
           const isValidName =
+            letterCount >= 2 &&
             nameCandidate.length >= 2 &&
             !/\d/.test(nameCandidate) &&
             !/[/:@\\{}[\]]/.test(nameCandidate) &&
