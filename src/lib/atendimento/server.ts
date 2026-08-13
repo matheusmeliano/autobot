@@ -2740,6 +2740,42 @@ export async function ensureWhatsAppLeadAndConversation(params: {
   let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });
 
   if (!lead?.id) {
+    let anyEquivalentPhoneHasCancelledBooking = false;
+    try {
+      const norm10 = normalizedPhone.slice(-10);
+      const { data: widePhoneRows } = await admin
+        .from("atendimento_leads")
+        .select("id, phone, latest_experimental_class_cancelled_at")
+        .order("created_at", { ascending: false })
+        .limit(800);
+      const wideRows = (widePhoneRows ?? []) as any[];
+      for (const wrow of wideRows) {
+        if (!wrow?.phone) continue;
+        if (!phoneMatches(String(wrow.phone), normalizedPhone)) continue;
+        const cancelledAtRaw = String(wrow?.latest_experimental_class_cancelled_at ?? "").trim();
+        if (cancelledAtRaw && cancelledAtRaw !== "null") {
+          anyEquivalentPhoneHasCancelledBooking = true;
+          break;
+        }
+        try {
+          const { data: bookingMaybe } = await admin
+            .from("atendimento_experimental_class_bookings")
+            .select("id")
+            .eq("lead_id", String(wrow.id))
+            .eq("status", "cancelled")
+            .limit(1)
+            .maybeSingle();
+          if ((bookingMaybe as any)?.id) {
+            anyEquivalentPhoneHasCancelledBooking = true;
+            break;
+          }
+        } catch (_eIn) {}
+      }
+    } catch (_e) {}
+    if (anyEquivalentPhoneHasCancelledBooking) {
+      return null;
+    }
+
     const nameRaw = String(params.firstNameFromMessage ?? "").trim() || null;
     const initialState = params.initialState ? String(params.initialState).trim() : null;
     const initialCountry = params.initialCountry ? String(params.initialCountry).trim() : null;

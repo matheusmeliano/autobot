@@ -2487,6 +2487,30 @@ export async function POST(req: Request) {
         const leadFullNameRaw = String((lead as any)?.full_name ?? "").trim();
         const leadFirstName = leadFullNameRaw ? leadFullNameRaw.split(/\s+/)[0] || "" : "";
 
+        const rawCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
+        let leadHasCancelledBooking = Boolean(rawCancelledAt && rawCancelledAt !== "null");
+        if (!leadHasCancelledBooking) {
+          try {
+            const { data: anyCancelledBooking } = await admin
+              .from("atendimento_experimental_class_bookings")
+              .select("id")
+              .eq("lead_id", leadId)
+              .eq("status", "cancelled")
+              .limit(1)
+              .maybeSingle();
+            if ((anyCancelledBooking as any)?.id) {
+              leadHasCancelledBooking = true;
+            }
+          } catch (_e) {}
+        }
+        if (leadHasCancelledBooking) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "blocked_previous_experimental_class_booking_cancelled",
+          });
+        }
+
         const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
         const currentBookingId = currentBooking?.id ? String(currentBooking.id) : "";
         const funnelStageRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
