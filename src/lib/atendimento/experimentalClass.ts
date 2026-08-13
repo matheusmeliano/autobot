@@ -467,9 +467,11 @@ export function buildExperimentalClassNoShowRepescagemWhatsAppMessages(name?: st
     ? `${safeFirst}, notamos que você não compareceu à aula experimental.`
     : "Notamos que você não compareceu à aula experimental.";
   return [
-    line1,
-    `Mas não se preocupe, novas oportunidades estarão disponíveis.`,
-    `Em breve nossa equipe entrará em contato.`,
+    [
+      line1,
+      `Mas não se preocupe, novas oportunidades estarão disponíveis.`,
+      `Em breve nossa equipe entrará em contato.`,
+    ].join("\n\n"),
   ];
 }
 
