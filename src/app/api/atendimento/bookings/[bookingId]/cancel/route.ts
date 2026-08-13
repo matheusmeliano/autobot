@@ -138,16 +138,9 @@ export async function POST(
     const leadIdAfterCancel = String((updatedBooking as any).lead_id ?? "");
     const conversationIdAfterCancel = String((updatedBooking as any).conversation_id ?? "");
 
-    const leadResetPreservingNamePhone = {
-      funnel_stage: "novo_lead",
-      status: "novo_lead",
-      experimental_class_status: "",
-      experimental_class_lead_date: "",
-      experimental_class_lead_time: "",
-      experimental_class_lead_start_at: "" as any,
-      experimental_class_professor_date: "",
-      experimental_class_professor_time: "",
-      experimental_class_professor_start_at: "" as any,
+    const leadAfterCancelUpdate = {
+      latest_experimental_class_cancelled_at: nowIsoAfterCancel,
+      experimental_class_status: "cancelled",
       updated_at: nowIsoAfterCancel,
     };
 
@@ -155,7 +148,7 @@ export async function POST(
       try {
         await admin
           .from("atendimento_leads")
-          .update(leadResetPreservingNamePhone)
+          .update(leadAfterCancelUpdate)
           .eq("id", leadIdAfterCancel);
       } catch (_eLeadReset) {}
     }
@@ -209,16 +202,9 @@ export async function POST(
   const fallbackLeadId = String(payload.leadId ?? "");
   const fallbackConversationId = String(payload.conversationId ?? "");
 
-  const leadResetPreservingNamePhoneFallback = {
-    funnel_stage: "novo_lead",
-    status: "novo_lead",
-    experimental_class_status: "",
-    experimental_class_lead_date: "",
-    experimental_class_lead_time: "",
-    experimental_class_lead_start_at: "" as any,
-    experimental_class_professor_date: "",
-    experimental_class_professor_time: "",
-    experimental_class_professor_start_at: "" as any,
+  const leadAfterCancelUpdateFallback = {
+    latest_experimental_class_cancelled_at: nowIsoFallback,
+    experimental_class_status: "cancelled",
     updated_at: nowIsoFallback,
   };
 
@@ -226,7 +212,7 @@ export async function POST(
     try {
       await admin
         .from("atendimento_leads")
-        .update(leadResetPreservingNamePhoneFallback)
+        .update(leadAfterCancelUpdateFallback)
         .eq("id", fallbackLeadId);
     } catch (_eLeadFallback) {}
   }
