@@ -4743,6 +4743,7 @@ export async function POST(req: Request) {
             conversationId,
             phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
+            skipWhatsAppSend: true,
           });
           const chosen = findExperimentalClassDateOption(inboundContent, availability.dates);
           if (!chosen) {
@@ -4782,7 +4783,9 @@ export async function POST(req: Request) {
               });
             }
 
-            const msg = `${EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+            const messagesRaw = buildExperimentalClassDatesMessages(availability.dates);
+            const datesBlock = messagesRaw.filter(Boolean).join("\n\n");
+            const msg = `${EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE}\n\n${datesBlock}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
             const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
             try {
               await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
@@ -4878,6 +4881,7 @@ export async function POST(req: Request) {
             phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
             professorDate,
+            skipWhatsAppSend: true,
           });
 
           if (!pres.slots.length) {
