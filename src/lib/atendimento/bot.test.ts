@@ -163,7 +163,115 @@ test("resolveTimeZoneFromStateInput identifica Mato Grosso automaticamente", () 
   assert.equal(resolution?.country, "BR");
 });
 
-test("resolveTimeZoneFromCityInput aceita cidade brasileira com fallback pelo estado validado", () => {
+test("resolveTimeZoneFromStateInput reconhece estados US por nome completo (ex: Florida)", () => {
+  const resolution = resolveTimeZoneFromStateInput({
+    state: "Florida",
+    phone: "+1 321 555 9988",
+  });
+
+  assert.equal(resolution?.state, "Florida");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromStateInput reconhece estados US por sigla maiuscula (FL)", () => {
+  const resolution = resolveTimeZoneFromStateInput({
+    state: "FL",
+    phone: "+1 321 555 9988",
+  });
+
+  assert.equal(resolution?.state, "Florida");
+  assert.equal(resolution?.normalizedState, "florida");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromStateInput reconhece estados US por sigla minuscula (fl)", () => {
+  const resolution = resolveTimeZoneFromStateInput({
+    state: "fl",
+    phone: "+1 321 555 9988",
+  });
+
+  assert.equal(resolution?.state, "Florida");
+  assert.equal(resolution?.normalizedState, "florida");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromStateInput reconhece estado US com prefixo em frase 'Moro em CA'", () => {
+  const resolution = resolveTimeZoneFromStateInput({
+    state: "Moro em CA",
+    phone: "+1 213 555 9988",
+  });
+
+  assert.equal(resolution?.state, "California");
+  assert.equal(resolution?.timeZone, "America/Los_Angeles");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromStateInput reconhece Texas TX com cidade depois, nome ou sigla", () => {
+  const byAbbr = resolveTimeZoneFromStateInput({ state: "TX", phone: "+1 512 555 9988" });
+  assert.equal(byAbbr?.state, "Texas");
+  assert.equal(byAbbr?.timeZone, "America/Chicago");
+  assert.equal(byAbbr?.country, "US");
+
+  const byFull = resolveTimeZoneFromStateInput({ state: "Texas", phone: "+1 512 555 9988" });
+  assert.equal(byFull?.state, "Texas");
+  assert.equal(byFull?.timeZone, "America/Chicago");
+  assert.equal(byFull?.country, "US");
+});
+
+test("resolveTimeZoneFromStateInput reconhece MA = Massachusetts (nao Maine)", () => {
+  const resolution = resolveTimeZoneFromStateInput({
+    state: "MA",
+    phone: "+1 617 555 9988",
+  });
+  assert.equal(resolution?.state, "Massachusetts");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromStateInput reconhece NY e Washington WA = Washington state", () => {
+  const ny = resolveTimeZoneFromStateInput({ state: "NY", phone: "+1 212 555 9988" });
+  assert.equal(ny?.state, "New York");
+  assert.equal(ny?.timeZone, "America/New_York");
+
+  const wa = resolveTimeZoneFromStateInput({ state: "WA", phone: "+1 206 555 9988" });
+  assert.equal(wa?.state, "Washington");
+  assert.equal(wa?.timeZone, "America/Los_Angeles");
+});
+
+test("resolveTimeZoneFromCityInput aceita estado US por sigla (Orlando FL)", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "FL",
+    city: "Orlando",
+    phone: "+1 321 555 9988",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.equal(resolution?.state, "Florida");
+  assert.equal(resolution?.normalizedState, "florida");
+  assert.equal(resolution?.city, "orlando");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromCityInput reconhece estado cidade inexistente mas estado CA por sigla => state_match fallback", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "CA",
+    city: "Cidade Californiana Inexistente",
+    phone: "+1 213 555 9988",
+    allowPhoneCountryFallback: true,
+  });
+
+  assert.equal(resolution?.source, "state_match");
+  assert.equal(resolution?.state, "California");
+  assert.equal(resolution?.normalizedState, "california");
+  assert.equal(resolution?.timeZone, "America/Los_Angeles");
+  assert.equal(resolution?.country, "US");
+});
+
+test("resolveTimeZoneFromCityInput aceita cidade brasileira com estado validado (match direto cidade+estado)", () => {
   const resolution = resolveTimeZoneFromCityInput({
     state: "Mato Grosso",
     city: "Primavera do Leste",
@@ -173,7 +281,11 @@ test("resolveTimeZoneFromCityInput aceita cidade brasileira com fallback pelo es
 
   assert.equal(resolution?.timeZone, "America/Cuiaba");
   assert.equal(resolution?.country, "BR");
-  assert.equal(resolution?.source, "state_match");
+  assert.equal(resolution?.source, "city_match");
+  assert.equal(resolution?.city, "primavera do leste");
+  assert.equal(resolution?.normalizedCity, "primavera do leste");
+  assert.equal(resolution?.state, "mato grosso");
+  assert.equal(resolution?.normalizedState, "mato grosso");
 });
 
 test("resolveTimeZoneFromCityInput falha sem fallback quando a cidade nao for reconhecida", () => {

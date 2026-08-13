@@ -816,6 +816,86 @@ export function inferTimeZoneFromPhoneCountryCode(phone: string | null | undefin
   return null;
 }
 
+const US_STATE_CANONICAL_MAP: Record<string, { fullName: string; abbreviation: string; timeZone: string }> = {
+  alabama: { fullName: "Alabama", abbreviation: "AL", timeZone: "America/Chicago" },
+  alaska: { fullName: "Alaska", abbreviation: "AK", timeZone: "America/Anchorage" },
+  arizona: { fullName: "Arizona", abbreviation: "AZ", timeZone: "America/Phoenix" },
+  arkansas: { fullName: "Arkansas", abbreviation: "AR", timeZone: "America/Chicago" },
+  california: { fullName: "California", abbreviation: "CA", timeZone: "America/Los_Angeles" },
+  colorado: { fullName: "Colorado", abbreviation: "CO", timeZone: "America/Denver" },
+  connecticut: { fullName: "Connecticut", abbreviation: "CT", timeZone: "America/New_York" },
+  delaware: { fullName: "Delaware", abbreviation: "DE", timeZone: "America/New_York" },
+  florida: { fullName: "Florida", abbreviation: "FL", timeZone: "America/New_York" },
+  georgia: { fullName: "Georgia", abbreviation: "GA", timeZone: "America/New_York" },
+  hawaii: { fullName: "Hawaii", abbreviation: "HI", timeZone: "Pacific/Honolulu" },
+  idaho: { fullName: "Idaho", abbreviation: "ID", timeZone: "America/Denver" },
+  illinois: { fullName: "Illinois", abbreviation: "IL", timeZone: "America/Chicago" },
+  indiana: { fullName: "Indiana", abbreviation: "IN", timeZone: "America/New_York" },
+  iowa: { fullName: "Iowa", abbreviation: "IA", timeZone: "America/Chicago" },
+  kansas: { fullName: "Kansas", abbreviation: "KS", timeZone: "America/Chicago" },
+  kentucky: { fullName: "Kentucky", abbreviation: "KY", timeZone: "America/New_York" },
+  louisiana: { fullName: "Louisiana", abbreviation: "LA", timeZone: "America/Chicago" },
+  maine: { fullName: "Maine", abbreviation: "ME", timeZone: "America/New_York" },
+  maryland: { fullName: "Maryland", abbreviation: "MD", timeZone: "America/New_York" },
+  massachusetts: { fullName: "Massachusetts", abbreviation: "MA", timeZone: "America/New_York" },
+  michigan: { fullName: "Michigan", abbreviation: "MI", timeZone: "America/New_York" },
+  minnesota: { fullName: "Minnesota", abbreviation: "MN", timeZone: "America/Chicago" },
+  mississippi: { fullName: "Mississippi", abbreviation: "MS", timeZone: "America/Chicago" },
+  missouri: { fullName: "Missouri", abbreviation: "MO", timeZone: "America/Chicago" },
+  montana: { fullName: "Montana", abbreviation: "MT", timeZone: "America/Denver" },
+  nebraska: { fullName: "Nebraska", abbreviation: "NE", timeZone: "America/Chicago" },
+  nevada: { fullName: "Nevada", abbreviation: "NV", timeZone: "America/Los_Angeles" },
+  "new hampshire": { fullName: "New Hampshire", abbreviation: "NH", timeZone: "America/New_York" },
+  "new jersey": { fullName: "New Jersey", abbreviation: "NJ", timeZone: "America/New_York" },
+  "new mexico": { fullName: "New Mexico", abbreviation: "NM", timeZone: "America/Denver" },
+  "new york": { fullName: "New York", abbreviation: "NY", timeZone: "America/New_York" },
+  "north carolina": { fullName: "North Carolina", abbreviation: "NC", timeZone: "America/New_York" },
+  "north dakota": { fullName: "North Dakota", abbreviation: "ND", timeZone: "America/Chicago" },
+  ohio: { fullName: "Ohio", abbreviation: "OH", timeZone: "America/New_York" },
+  oklahoma: { fullName: "Oklahoma", abbreviation: "OK", timeZone: "America/Chicago" },
+  oregon: { fullName: "Oregon", abbreviation: "OR", timeZone: "America/Los_Angeles" },
+  pennsylvania: { fullName: "Pennsylvania", abbreviation: "PA", timeZone: "America/New_York" },
+  "rhode island": { fullName: "Rhode Island", abbreviation: "RI", timeZone: "America/New_York" },
+  "south carolina": { fullName: "South Carolina", abbreviation: "SC", timeZone: "America/New_York" },
+  "south dakota": { fullName: "South Dakota", abbreviation: "SD", timeZone: "America/Chicago" },
+  tennessee: { fullName: "Tennessee", abbreviation: "TN", timeZone: "America/Chicago" },
+  texas: { fullName: "Texas", abbreviation: "TX", timeZone: "America/Chicago" },
+  utah: { fullName: "Utah", abbreviation: "UT", timeZone: "America/Denver" },
+  vermont: { fullName: "Vermont", abbreviation: "VT", timeZone: "America/New_York" },
+  virginia: { fullName: "Virginia", abbreviation: "VA", timeZone: "America/New_York" },
+  washington: { fullName: "Washington", abbreviation: "WA", timeZone: "America/Los_Angeles" },
+  "west virginia": { fullName: "West Virginia", abbreviation: "WV", timeZone: "America/New_York" },
+  wisconsin: { fullName: "Wisconsin", abbreviation: "WI", timeZone: "America/Chicago" },
+  wyoming: { fullName: "Wyoming", abbreviation: "WY", timeZone: "America/Denver" },
+  "district of columbia": { fullName: "District of Columbia", abbreviation: "DC", timeZone: "America/New_York" },
+};
+
+const US_STATE_ABBR_LOWER_TO_KEY: Record<string, string> = (() => {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(US_STATE_CANONICAL_MAP)) {
+    result[value.abbreviation.toLowerCase()] = key;
+  }
+  return result;
+})();
+
+function lookupUsStateByCandidate(candidate: string): { fullName: string; abbreviation: string; timeZone: string } | null {
+  const trimmed = String(candidate ?? "").trim();
+  if (!trimmed) return null;
+  const abbrOnly = trimmed.replace(/\s+/g, "").toLowerCase();
+  if (abbrOnly.length === 2) {
+    const key = US_STATE_ABBR_LOWER_TO_KEY[abbrOnly];
+    if (key && US_STATE_CANONICAL_MAP[key]) return US_STATE_CANONICAL_MAP[key];
+  }
+  const normalized = normalizeLocationText(trimmed);
+  if (!normalized) return null;
+  if (US_STATE_CANONICAL_MAP[normalized]) return US_STATE_CANONICAL_MAP[normalized];
+  for (const [key, value] of Object.entries(US_STATE_CANONICAL_MAP)) {
+    if (key === normalized) return value;
+    if (value.abbreviation.toLowerCase() === abbrOnly) return value;
+  }
+  return null;
+}
+
 export function resolveTimeZoneFromStateInput(params: {
   state: string;
   phone?: string | null;
@@ -830,6 +910,20 @@ export function resolveTimeZoneFromStateInput(params: {
   if (!candidates.length) return null;
 
   const phoneCountry = inferTimeZoneFromPhoneCountryCode(params.phone)?.country ?? null;
+
+  for (const candidate of candidates) {
+    const usLookup = lookupUsStateByCandidate(candidate);
+    if (usLookup) {
+      if (phoneCountry && phoneCountry !== "US") continue;
+      return {
+        state: usLookup.fullName,
+        normalizedState: normalizeLocationText(usLookup.fullName),
+        timeZone: usLookup.timeZone,
+        country: "US" as const,
+      } satisfies StateTimeZoneResolution;
+    }
+  }
+
   const matchingRules = CITY_TIME_ZONE_RULES.filter((rule) =>
     rule.stateKeywords?.some((keyword) => candidateMatchesKeyword(candidates, keyword)),
   );
@@ -851,6 +945,18 @@ export function resolveTimeZoneFromStateInput(params: {
       }
     }
     if (matchedKeywordLabel) break;
+  }
+
+  if (selectedRule.country === "US" && matchedKeywordLabel) {
+    const usCanonical = lookupUsStateByCandidate(matchedKeywordLabel);
+    if (usCanonical) {
+      return {
+        state: usCanonical.fullName,
+        normalizedState: normalizeLocationText(usCanonical.fullName),
+        timeZone: selectedRule.timeZone,
+        country: "US" as const,
+      } satisfies StateTimeZoneResolution;
+    }
   }
 
   return {
@@ -878,14 +984,17 @@ export function resolveTimeZoneFromCityInput(params: {
   const stateCandidates = rawState ? extractLocationCandidates(rawState) : [];
   if (!cityCandidates.length) return null;
 
+  const usStateFromRaw = rawState ? lookupUsStateByCandidate(rawState) : null;
+
   for (const rule of CITY_TIME_ZONE_RULES) {
     const matchesCity = rule.keywords.some((keyword) => candidateMatchesKeyword(cityCandidates, keyword));
     const matchesState =
       !stateCandidates.length || !rule.stateKeywords?.length
         ? true
         : rule.stateKeywords.some((keyword) => candidateMatchesKeyword(stateCandidates, keyword));
+    const matchesStateUsCanonical = usStateFromRaw && rule.country === "US" && rule.timeZone === usStateFromRaw.timeZone ? true : false;
 
-    if (matchesCity && matchesState) {
+    if (matchesCity && (matchesState || matchesStateUsCanonical)) {
       let matchedCityLabel = "";
       for (const keyword of rule.keywords) {
         if (candidateMatchesKeyword(cityCandidates, keyword)) {
@@ -902,13 +1011,20 @@ export function resolveTimeZoneFromCityInput(params: {
           }
         }
       }
+      const finalStateUs = usStateFromRaw ?? (matchedStateLabel ? lookupUsStateByCandidate(matchedStateLabel) : null);
+      const finalState = finalStateUs
+        ? finalStateUs.fullName
+        : (matchedStateLabel || rawState).replace(/\s+/g, " ").trim() || null;
+      const finalNormalizedState = finalStateUs
+        ? normalizeLocationText(finalStateUs.fullName)
+        : matchedStateLabel
+          ? normalizeLocationText(matchedStateLabel)
+          : stateCandidates[0] ?? null;
       return {
         city: (matchedCityLabel || rawCity).replace(/\s+/g, " ").trim(),
-        state: (matchedStateLabel || rawState).replace(/\s+/g, " ").trim() || null,
+        state: finalState,
         normalizedCity: matchedCityLabel ? normalizeLocationText(matchedCityLabel) : cityCandidates[0] ?? "",
-        normalizedState: matchedStateLabel
-          ? normalizeLocationText(matchedStateLabel)
-          : stateCandidates[0] ?? null,
+        normalizedState: finalNormalizedState,
         timeZone: rule.timeZone,
         teacherTimeZone: PROFESSOR_TIME_ZONE,
         country: rule.country,
@@ -933,11 +1049,14 @@ export function resolveTimeZoneFromCityInput(params: {
       })
     : null;
   if (stateResolution) {
+    const resolvedStateUs = stateResolution.country === "US" ? lookupUsStateByCandidate(stateResolution.state) : null;
     return {
       city: rawCity?.replace(/\s+/g, " ").trim() || null,
-      state: stateResolution.state,
+      state: resolvedStateUs ? resolvedStateUs.fullName : stateResolution.state,
       normalizedCity: cityCandidates[0] ?? null,
-      normalizedState: stateResolution.normalizedState,
+      normalizedState: resolvedStateUs
+        ? normalizeLocationText(resolvedStateUs.fullName)
+        : stateResolution.normalizedState,
       timeZone: stateResolution.timeZone,
       teacherTimeZone: PROFESSOR_TIME_ZONE,
       country: stateResolution.country,
@@ -946,11 +1065,19 @@ export function resolveTimeZoneFromCityInput(params: {
   }
   if (!phoneFallback) return null;
 
+  const finalStateFromRawUs = rawState ? lookupUsStateByCandidate(rawState) : null;
+  const finalPhoneFallbackState = finalStateFromRawUs
+    ? finalStateFromRawUs.fullName
+    : rawState?.replace(/\s+/g, " ").trim() || null;
+  const finalPhoneFallbackNormalizedState = finalStateFromRawUs
+    ? normalizeLocationText(finalStateFromRawUs.fullName)
+    : stateCandidates[0] ?? null;
+
   return {
     city: null,
-    state: rawState?.replace(/\s+/g, " ").trim() || null,
+    state: finalPhoneFallbackState,
     normalizedCity: null,
-    normalizedState: stateCandidates[0] ?? null,
+    normalizedState: finalPhoneFallbackNormalizedState,
     timeZone: phoneFallback.timeZone,
     teacherTimeZone: PROFESSOR_TIME_ZONE,
     country: phoneFallback.country,
