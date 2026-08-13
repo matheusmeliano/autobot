@@ -10,6 +10,13 @@ import {
 } from "@/lib/atendimento/files";
 import { initialBotMessages } from "@/lib/atendimento/bot";
 import {
+  buildContractData,
+  buildContractHtml,
+  buildContractPdfBytes,
+  buildContractFileName,
+  formatLocalizedDateSigned,
+} from "@/lib/atendimento/contract";
+import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildRecurringClassAttendantStartReminderWhatsAppMessage,
@@ -2877,4 +2884,118 @@ export async function hasAnyBotMessage(params: { conversationId: string }) {
     throw new Error(error.message || "Falha ao verificar mensagens do bot.");
   }
   return Number(count ?? 0) > 0;
+}
+
+export async function formalizeAndPersistContract(params: {
+  admin?: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId?: string | null;
+}) {
+  const admin = params.admin ?? createSupabaseAdminClient();
+  const leadId = String(params.leadId ?? "").trim();
+  const conversationId = params.conversationId
+    ? String(params.conversationId).trim() || null
+    : null;
+
+  const { data: lead, error: leadErr } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("id", leadId)
+    .limit(1)
+    .maybeSingle();
+  if (leadErr) return { ok: false, error: leadErr.message };
+  if (!lead) return { ok: false, error: "Lead não encontrado." };
+
+  const signedAt = new Date().toISOString();
+  const contractData = buildContractData({
+    lead: lead as any,
+    overrideSignedAtIso: signedAt,
+  });
+  const htmlSnapshot = buildContractHtml(contractData);
+  const pdfBytes = await buildContractPdfBytes(contractData);
+  const fileName = buildContractFileName(lead as any);
+  const storagePath = `atendimento/contratos/${String((lead as any).id ?? leadId).slice(0, 12)}_${fileName}`;
+
+  const { data: uploadData, error: uploadErr } = await admin.storage
+    .from(ATENDIMENTO_FILES_BUCKET)
+    .upload(storagePath, Buffer.from(pdfBytes), {
+      contentType: "application/pdf",
+      upsert: true,
+    });
+  if (uploadErr) return { ok: false, error: uploadErr.message };
+
+  const { data: publicUrlData } = admin.storage
+    .from(ATENDIMENTO_FILES_BUCKET)
+    .getPublicUrl(String(uploadData?.path ?? storagePath));
+  const publicUrl = String(publicUrlData?.publicUrl ?? "").trim() || null;
+
+  const leadPatch: Record<string, unknown> = {
+    contract_status: "assinado",
+    contract_signed_at: signedAt,
+    contract_pdf_url: publicUrl,
+    contract_html_snapshot: htmlSnapshot,
+    updated_at: signedAt,
+  };
+
+  const funnel = String((lead as any).funnel_stage ?? "").trim();
+  if (funnel !== "contrato_assinado" && funnel !== "matriculado" && funnel !== "encerrado") {
+    leadPatch.funnel_stage = "contrato_assinado";
+  }
+  const status = String((lead as any).status ?? "").trim();
+  if (status !== "contrato_assinado" && status !== "matriculado" && status !== "encerrado") {
+    leadPatch.status = "contrato_assinado";
+  }
+
+  const { error: updateErr } = await admin
+    .from("atendimento_leads")
+    .update(leadPatch)
+    .eq("id", leadId);
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  try {
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "contrato_assinado",
+      title: "Contrato formalizado e PDF gerado",
+      details: {
+        contract_pdf_url: publicUrl,
+        contract_signed_at: signedAt,
+        local_assinatura: formatLocalizedDateSigned(signedAt),
+        aluno: contractData.studentFullName,
+        aluno_cpf: contractData.studentCPF,
+        responsavel: contractData.legalResponsibleName,
+        responsavel_cpf: contractData.legalResponsibleCPF,
+        assinante: contractData.signedByLabel,
+        assinante_cpf: contractData.signedByCPF,
+        storage_path: storagePath,
+      },
+      actorType: "system",
+    });
+  } catch (_e) {}
+
+  try {
+    await admin
+      .from("atendimento_files")
+      .insert({
+        lead_id: leadId,
+        conversation_id: conversationId,
+        sender_role: "system",
+        content_text:
+          "Contrato de prestação de serviços educacionais – PDF gerado após formalização.",
+        media_type: "document",
+        media_url: publicUrl,
+        mime_type: "application/pdf",
+        file_name: fileName,
+        file_size_bytes: Number(pdfBytes?.byteLength ?? 0) || null,
+      });
+  } catch (_e) {}
+
+  return {
+    ok: true,
+    signed: true,
+    contract_signed_at: signedAt,
+    contract_pdf_url: publicUrl,
+    contract_html_snapshot: htmlSnapshot,
+  };
 }

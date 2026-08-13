@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clapperboard, FileText, ImageIcon, Maximize2, Minimize2, Paperclip, Play, Send, X } from "lucide-react";
+import { Clapperboard, Download, FileText, ImageIcon, Maximize2, Minimize2, Paperclip, Play, Send, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { AtendimentoPresenceBadge } from "@/components/app/atendimento/AtendimentoPresenceBadge";
 import {
@@ -49,6 +49,9 @@ export function AtendimentoConversationPanel({
   leadOnline = false,
   onSendMessage,
   compact,
+  contractPdfUrl,
+  leadFullName,
+  contractStatus,
 }: {
   conversation: AtendimentoConversation | null;
   messages: AtendimentoMessage[];
@@ -64,7 +67,13 @@ export function AtendimentoConversationPanel({
     file_size_bytes?: number | null;
   }) => Promise<void>;
   compact?: boolean;
+  contractPdfUrl?: string | null;
+  leadFullName?: string | null;
+  contractStatus?: string | null;
 }) {
+  const contractDownloadHref = contractPdfUrl
+    ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(leadFullName ?? "aluno").replace(/\s+/g, "_")}.pdf`)}`
+    : "";
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [draft, setDraft] = useState("");
   const [desktopExpanded, setDesktopExpanded] = useState(false);
@@ -323,19 +332,33 @@ export function AtendimentoConversationPanel({
       {!compact ? (
         <div
           className={[
-            "flex items-center justify-start gap-3 border-b border-[var(--app-border)] px-4 py-4",
+            "flex items-center justify-start gap-3 border-b border-[var(--app-border)] px-4 py-4 min-[1176px]:justify-between",
             desktopExpanded ? "bg-[var(--app-bg)]" : "",
           ].join(" ")}
         >
-          <button
-            type="button"
-            onClick={() => setDesktopExpanded((current) => !current)}
-            className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] lg:inline-flex"
-            aria-label={desktopExpanded ? "Sair da tela cheia" : "Expandir conversa"}
-          >
-            {desktopExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </button>
-          {conversation?.id ? <AtendimentoPresenceBadge online={leadOnline} /> : null}
+          <div className="flex items-center justify-start gap-3">
+            <button
+              type="button"
+              onClick={() => setDesktopExpanded((current) => !current)}
+              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] lg:inline-flex"
+              aria-label={desktopExpanded ? "Sair da tela cheia" : "Expandir conversa"}
+            >
+              {desktopExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+            {conversation?.id ? <AtendimentoPresenceBadge online={leadOnline} /> : null}
+          </div>
+          {contractPdfUrl ? (
+            <a
+              href={contractDownloadHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden min-[1176px]:inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
+              title="Baixar contrato em PDF"
+            >
+              <Download className="h-4 w-4 shrink-0" />
+              Baixar contrato em PDF
+            </a>
+          ) : null}
         </div>
       ) : null}
 

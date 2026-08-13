@@ -38,6 +38,12 @@ export type AtendimentoLead = {
   recurring_class_lead_time?: string | null;
   recurring_class_created_at?: string | null;
   signup_password_raw_temp?: string | null;
+  legal_responsible_name?: string | null;
+  legal_responsible_cpf?: string | null;
+  contract_status?: "nao_iniciado" | "coletando_dados" | "aguardando_aceite" | "assinado" | "rejeitado" | string | null;
+  contract_signed_at?: string | null;
+  contract_pdf_url?: string | null;
+  contract_html_snapshot?: string | null;
 };
 
 export type AtendimentoConversation = {

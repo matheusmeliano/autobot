@@ -5,9 +5,14 @@ import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions"
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import {
   botReplyForLead,
+  buildContractFieldPrompt,
+  detectContractYesConfirmation,
   firstTwoNamesFromFullName,
+  getNextContractField,
   getNextMissingField,
   isValidCPF,
+  validateContractFieldValue,
+  type ContractFieldName,
 } from "@/lib/atendimento/bot";
 import {
   ACTIVE_CAPTURED_FIELD_ORDER,
@@ -16,6 +21,9 @@ import {
   buildExperimentalClassDatePromptMessages,
   buildStatePrompt,
   CAPTURED_FIELD_PROMPTS,
+  CONTRACT_ACEITE_PROMPT_FIRST,
+  CONTRACT_ACEITE_PROMPT_RETRY,
+  CONTRACT_SIGNED_SUCCESS_MESSAGE,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
   EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE,
   EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE,
@@ -55,6 +63,7 @@ import {
   appendHistoryEvent,
   ensureWhatsAppLeadAndConversation,
   findLeadByPhone,
+  formalizeAndPersistContract,
   hasAnyBotMessage,
   sendAtendimentoWhatsAppText,
   sendAtendimentoWhatsAppTextBatch,
@@ -2776,6 +2785,382 @@ export async function POST(req: Request) {
           });
         }
 
+        const currentFunnelStage = String((lead as any).funnel_stage ?? "").trim();
+        const currentStatus = String((lead as any).status ?? "").trim();
+        const isContractRelatedStage =
+          currentFunnelStage === "contrato_coletando_dados" ||
+          currentFunnelStage === "contrato_aguardando_aceite" ||
+          currentFunnelStage === "contrato_assinado" ||
+          currentStatus === "contrato_coletando_dados" ||
+          currentStatus === "contrato_aguardando_aceite" ||
+          currentStatus === "contrato_assinado";
+        const shouldStartContractNow =
+          !isContractRelatedStage &&
+          (currentFunnelStage === "pre_cadastro_concluido" ||
+            currentFunnelStage === "matricula_pendente" ||
+            currentStatus === "matricula_pendente");
+
+        const inboundContentRaw = String(messageText ?? "").trim();
+
+        if (isContractRelatedStage || shouldStartContractNow) {
+          const contractStatus = String((lead as any).contract_status ?? "nao_iniciado").trim();
+          let lastBotMsgRaw: { content_text: string | null } | null = null;
+          try {
+            const res = await admin
+              .from("atendimento_messages")
+              .select("content_text")
+              .eq("conversation_id", conversationId)
+              .eq("sender_role", "bot")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            lastBotMsgRaw = res.data as any;
+          } catch (_e) { lastBotMsgRaw = null; }
+          const lastContractPromptRaw = String((lastBotMsgRaw as any)?.content_text ?? "").trim();
+
+          try {
+            const inboundMediaType = mediaInfo.hasPaymentMedia
+              ? mediaInfo.mediaUrl
+                ? "document"
+                : "text"
+              : "text";
+            await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContentRaw || null,
+                media_type: inboundMediaType,
+                media_url: mediaInfo.mediaUrl || null,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          try {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "message_received",
+              title: "Mensagem WhatsApp recebida do lead",
+              details: { content_text: inboundContentRaw || null, source: "whatsapp_zapi" },
+              actorType: "lead",
+            });
+          } catch (_e) {}
+
+          let pipelineStage: "coletando_dados" | "aguardando_aceite" | "assinado" | "iniciar";
+          if (
+            currentFunnelStage === "contrato_assinado" ||
+            currentStatus === "contrato_assinado" ||
+            contractStatus === "assinado"
+          ) {
+            pipelineStage = "assinado";
+          } else if (
+            currentFunnelStage === "contrato_aguardando_aceite" ||
+            currentStatus === "contrato_aguardando_aceite" ||
+            contractStatus === "aguardando_aceite" ||
+            lastContractPromptRaw.startsWith(CONTRACT_ACEITE_PROMPT_FIRST.split("\n")[0] ?? "") ||
+            lastContractPromptRaw.startsWith("Perfeito! Agora vamos formalizar o contrato")
+          ) {
+            pipelineStage = "aguardando_aceite";
+          } else if (
+            currentFunnelStage === "contrato_coletando_dados" ||
+            currentStatus === "contrato_coletando_dados" ||
+            contractStatus === "coletando_dados" ||
+            shouldStartContractNow
+          ) {
+            pipelineStage = shouldStartContractNow ? "iniciar" : "coletando_dados";
+          } else {
+            pipelineStage = "iniciar";
+          }
+
+          function normalizeDecisionTextZapi(value: string) {
+            return String(value ?? "")
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/[^\p{L}\p{N}\s]/gu, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+          }
+
+          let replyText: string | null = null;
+          let replied = false;
+
+          if (pipelineStage === "assinado") {
+            const signedPdfUrl = String((lead as any).contract_pdf_url ?? "").trim() || null;
+            if (signedPdfUrl) {
+              replyText =
+                CONTRACT_SIGNED_SUCCESS_MESSAGE + `\n\nLink para baixar: ${signedPdfUrl}`;
+            }
+          } else if (pipelineStage === "aguardando_aceite") {
+            const normalizedResp = normalizeDecisionTextZapi(inboundContentRaw);
+            const isYes =
+              detectContractYesConfirmation(inboundContentRaw) ||
+              /\b(sim|confirmo|de acordo|concordo|aceito|li e concordo|esta tudo bem)\b/.test(
+                normalizedResp,
+              );
+            const isNo =
+              /\b(nao|não|revisar|rever|corrigir|nao concordo|não concordo)\b/.test(
+                normalizedResp,
+              );
+
+            if (isYes) {
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update({
+                    contract_status: "aguardando_aceite",
+                    funnel_stage: "contrato_aguardando_aceite",
+                    status: "contrato_aguardando_aceite",
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              const formalizado = await formalizeAndPersistContract({
+                admin,
+                leadId,
+                conversationId,
+              });
+              if (formalizado.ok) {
+                const pdfLink = String(formalizado.contract_pdf_url ?? "").trim();
+                replyText = pdfLink
+                  ? `${CONTRACT_SIGNED_SUCCESS_MESSAGE}\n\n🔗 Baixar contrato em PDF: ${pdfLink}`
+                  : CONTRACT_SIGNED_SUCCESS_MESSAGE;
+              } else {
+                replyText = `Ops! Não foi possível gerar o contrato agora. Tente novamente em alguns instantes, ou entre em contato com o suporte.\nErro: ${String(
+                  formalizado.error ?? "erro interno",
+                )}`;
+              }
+            } else if (isNo) {
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update({
+                    legal_responsible_name: null,
+                    legal_responsible_cpf: null,
+                    contract_status: "coletando_dados",
+                    funnel_stage: "contrato_coletando_dados",
+                    status: "contrato_coletando_dados",
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              const refreshedLead: any = {
+                ...lead,
+                legal_responsible_name: null,
+                legal_responsible_cpf: null,
+              };
+              const firstField =
+                getNextContractField(refreshedLead as any) ??
+                ("full_name" as ContractFieldName);
+              const firstPrompt = buildContractFieldPrompt(
+                refreshedLead as any,
+                firstField as ContractFieldName,
+              );
+              replyText = `Sem problema! Vamos revisar os dados.\n\n${firstPrompt}`;
+            } else {
+              replyText = CONTRACT_ACEITE_PROMPT_RETRY;
+            }
+          } else if (pipelineStage === "iniciar" || pipelineStage === "coletando_dados") {
+            const nextField =
+              getNextContractField(lead as any) ??
+              (pipelineStage === "iniciar" ? ("full_name" as ContractFieldName) : null);
+
+            if (!nextField) {
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update({
+                    contract_status: "aguardando_aceite",
+                    funnel_stage: "contrato_aguardando_aceite",
+                    status: "contrato_aguardando_aceite",
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              replyText = CONTRACT_ACEITE_PROMPT_FIRST;
+            } else {
+              const isInitialStart = pipelineStage === "iniciar";
+              if (isInitialStart) {
+                try {
+                  await admin
+                    .from("atendimento_leads")
+                    .update({
+                      contract_status: "coletando_dados",
+                      funnel_stage: "contrato_coletando_dados",
+                      status: "contrato_coletando_dados",
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {}
+                const promptMsg = buildContractFieldPrompt(lead as any, nextField);
+                replyText =
+                  `Perfeito! Agora vamos formalizar o contrato de prestação de serviços.\n\n` +
+                  `Vou solicitar alguns dados um por vez.\n\n${promptMsg}`;
+              } else {
+                const existingValueForField = (() => {
+                  const raw = String((lead as Record<string, unknown>)[nextField] ?? "").trim();
+                  return raw || null;
+                })();
+                const isExpectingConfirmation =
+                  existingValueForField !== null &&
+                  (nextField === "full_name" ||
+                    nextField === "phone" ||
+                    nextField === "cpf");
+
+                const isYesConfirm =
+                  isExpectingConfirmation && detectContractYesConfirmation(inboundContentRaw);
+                if (isYesConfirm) {
+                  const afterPatch: any = { ...lead };
+                  const updatedNext = getNextContractField(afterPatch) ?? null;
+                  if (!updatedNext) {
+                    try {
+                      await admin
+                        .from("atendimento_leads")
+                        .update({
+                          contract_status: "aguardando_aceite",
+                          funnel_stage: "contrato_aguardando_aceite",
+                          status: "contrato_aguardando_aceite",
+                          updated_at: nowIso,
+                        })
+                        .eq("id", leadId);
+                    } catch (_e) {}
+                    replyText = CONTRACT_ACEITE_PROMPT_FIRST;
+                  } else {
+                    replyText = buildContractFieldPrompt(afterPatch, updatedNext);
+                  }
+                } else {
+                  const validated = validateContractFieldValue(nextField, inboundContentRaw);
+                  if (!validated.ok) {
+                    replyText = `${validated.reason}\n\n${buildContractFieldPrompt(
+                      lead as any,
+                      nextField,
+                    )}`;
+                    try {
+                      void appendHistoryEvent({
+                        leadId,
+                        conversationId,
+                        eventType: "contract_field_validation_failed",
+                        title: "Falha ao validar campo do contrato (WhatsApp)",
+                        details: {
+                          field: nextField,
+                          content_text: inboundContentRaw || null,
+                          error: validated.reason,
+                          source: "whatsapp_zapi",
+                        },
+                        actorType: "system",
+                      });
+                    } catch (_e) {}
+                  } else if ((validated as any).skipped) {
+                    const patch: Record<string, unknown> = { [nextField]: null, updated_at: nowIso };
+                    const afterPatch: any = { ...lead, ...patch };
+                    const updatedNext = getNextContractField(afterPatch) ?? null;
+                    if (!updatedNext) {
+                      patch.contract_status = "aguardando_aceite";
+                      patch.funnel_stage = "contrato_aguardando_aceite";
+                      patch.status = "contrato_aguardando_aceite";
+                      replyText = CONTRACT_ACEITE_PROMPT_FIRST;
+                    } else {
+                      replyText = buildContractFieldPrompt(afterPatch, updatedNext);
+                    }
+                    try {
+                      await admin.from("atendimento_leads").update(patch).eq("id", leadId);
+                      void appendHistoryEvent({
+                        leadId,
+                        conversationId,
+                        eventType: "contract_field_updated",
+                        title: "Campo do contrato atualizado (WhatsApp)",
+                        details: {
+                          field: nextField,
+                          skipped: true,
+                          source: "whatsapp_zapi",
+                        },
+                        actorType: "system",
+                      });
+                    } catch (_e) {}
+                  } else {
+                    const rawValue = (validated as { value: string }).value;
+                    const patch: Record<string, unknown> = {
+                      [nextField]: rawValue,
+                      updated_at: nowIso,
+                    };
+                    const afterPatch: any = { ...lead, ...patch };
+                    const updatedNext = getNextContractField(afterPatch) ?? null;
+                    if (!updatedNext) {
+                      patch.contract_status = "aguardando_aceite";
+                      patch.funnel_stage = "contrato_aguardando_aceite";
+                      patch.status = "contrato_aguardando_aceite";
+                      replyText = CONTRACT_ACEITE_PROMPT_FIRST;
+                    } else {
+                      replyText = buildContractFieldPrompt(afterPatch, updatedNext);
+                    }
+                    try {
+                      await admin.from("atendimento_leads").update(patch).eq("id", leadId);
+                      void appendHistoryEvent({
+                        leadId,
+                        conversationId,
+                        eventType: "contract_field_updated",
+                        title: "Campo do contrato atualizado (WhatsApp)",
+                        details: {
+                          field: nextField,
+                          patch_keys: Object.keys(patch),
+                          source: "whatsapp_zapi",
+                        },
+                        actorType: "system",
+                      });
+                    } catch (_e) {}
+                  }
+                }
+              }
+            }
+          }
+
+          if (replyText) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: replyText,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: replyText,
+              });
+              replied = true;
+            } catch (_e) {}
+            try {
+              void syncConversationPreview({
+                conversationId,
+                contentText: replyText,
+                createdAt: new Date().toISOString(),
+              });
+            } catch (_e) {}
+          }
+
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: replied,
+            reply: replyText,
+            flow: "zapi_contract_pipeline",
+            pipelineStage,
+          });
+        }
+
         const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
         const currentBookingId = currentBooking?.id ? String(currentBooking.id) : "";
         const funnelStageRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
@@ -2852,7 +3237,6 @@ export async function POST(req: Request) {
           : "Tudo bem, entendemos que talvez ainda não seja o momento.";
         const NAO_RECUSA_MSG_1 = NAO_RECUSA_MSG_1_PREFIX;
 
-        const inboundContentRaw = String(messageText ?? "").trim();
         const inboundNormalizedNuclear = inboundContentRaw
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "")

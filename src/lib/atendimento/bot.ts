@@ -2,9 +2,19 @@ import {
   ACTIVE_CAPTURED_FIELD_ORDER,
   CAPTURED_FIELD_ORDER,
   CAPTURED_FIELD_PROMPTS,
+  CONTRACT_FIELD_ORDER,
+  CONTRACT_FIELD_PROMPTS,
+  CONTRACT_FIELD_SKIP_WORDS,
+  CONTRACT_OPTIONAL_FIELDS,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
 } from "./constants.ts";
 import type { AtendimentoLead, AtendimentoStage, AtendimentoStatus, CapturedFieldName } from "./types.ts";
+
+export type ContractFieldName = (typeof CONTRACT_FIELD_ORDER)[number];
+export type ContractStageDecision =
+  | { kind: "field"; field: ContractFieldName; prompt: string }
+  | { kind: "awaiting_aceite"; prompt: string }
+  | { kind: "signed" };
 
 type CapturedData = Partial<Record<CapturedFieldName, string>>;
 
@@ -157,6 +167,9 @@ export function inferNextStage(params: {
 export function inferStatusFromStage(stage: AtendimentoStage): AtendimentoStatus {
   if (stage === "matriculado") return "matriculado";
   if (stage === "encerrado") return "encerrado";
+  if (stage === "contrato_coletando_dados") return "contrato_coletando_dados";
+  if (stage === "contrato_aguardando_aceite") return "contrato_aguardando_aceite";
+  if (stage === "contrato_assinado") return "contrato_assinado";
   if (stage === "pre_cadastro_concluido" || stage === "matricula_pendente") {
     return "matricula_pendente";
   }
@@ -187,4 +200,172 @@ export function botReplyForLead(params: {
     status: inferStatusFromStage(nextStage),
     message: CAPTURED_FIELD_PROMPTS[nextField],
   };
+}
+
+function contractFieldValueOrNull(
+  lead: Partial<AtendimentoLead>,
+  field: ContractFieldName,
+): string | null {
+  const raw = String((lead as Record<string, unknown>)[field] ?? "").trim();
+  return raw || null;
+}
+
+export function getNextContractField(
+  lead: Partial<AtendimentoLead>,
+  overrideValues?: Partial<Record<ContractFieldName, string | null>>,
+): ContractFieldName | null {
+  const overrides = overrideValues ?? {};
+  return (
+    CONTRACT_FIELD_ORDER.find((field) => {
+      const raw =
+        typeof overrides[field] !== "undefined"
+          ? String(overrides[field] ?? "").trim()
+          : contractFieldValueOrNull(lead, field) ?? "";
+      const hasValue = Boolean(raw);
+      if (hasValue) return false;
+      if (CONTRACT_OPTIONAL_FIELDS.has(field as typeof CONTRACT_OPTIONAL_FIELDS extends Set<infer T> ? T : never)) return true;
+      return true;
+    }) ?? null
+  );
+}
+
+export function normalizeContractFieldSkip(raw: string): boolean {
+  const text = String(raw ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?,;:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return false;
+  return CONTRACT_FIELD_SKIP_WORDS.some((w) => {
+    const wNorm = String(w ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+    if (!wNorm) return false;
+    return text === wNorm || text.includes(wNorm);
+  });
+}
+
+export type ContractFieldValidationResult =
+  | { ok: true; value: string }
+  | { ok: true; skipped: true; value: null }
+  | { ok: false; reason: string };
+
+function looksLikePhoneInternational(raw: string): boolean {
+  const digits = String(raw ?? "").replace(/\D+/g, "").slice(0, 16);
+  if (digits.length < 11) return false;
+  if (!digits.startsWith("55") && !digits.startsWith("1")) return false;
+  return true;
+}
+
+export function validateContractFieldValue(
+  field: ContractFieldName,
+  raw: string | null | undefined,
+): ContractFieldValidationResult {
+  const text = String(raw ?? "").trim();
+
+  if (
+    CONTRACT_OPTIONAL_FIELDS.has(field as typeof CONTRACT_OPTIONAL_FIELDS extends Set<infer T> ? T : never) &&
+    normalizeContractFieldSkip(text)
+  ) {
+    return { ok: true, skipped: true, value: null };
+  }
+
+  if (!text) {
+    return { ok: false, reason: "Campo obrigatório não preenchido." };
+  }
+
+  if (field === "full_name") {
+    if (!looksLikeFullName(text)) {
+      return {
+        ok: false,
+        reason:
+          "Informe nome e sobrenome válidos (somente letras, sem números ou símbolos).",
+      };
+    }
+    return { ok: true, value: text.replace(/\s+/g, " ").trim() };
+  }
+
+  if (field === "legal_responsible_name") {
+    if (!looksLikeFullName(text)) {
+      return {
+        ok: false,
+        reason:
+          "Informe nome e sobrenome válidos do responsável, ou responda “pular” se não se aplicar.",
+      };
+    }
+    return { ok: true, value: text.replace(/\s+/g, " ").trim() };
+  }
+
+  if (field === "cpf" || field === "legal_responsible_cpf") {
+    const validation = isValidCPF(text);
+    if (!validation.ok) {
+      if (field === "legal_responsible_cpf") {
+        return {
+          ok: false,
+          reason:
+            "CPF do responsável inválido. Verifique e tente novamente (11 dígitos), ou responda “pular” se não se aplicar.",
+        };
+      }
+      return {
+        ok: false,
+        reason:
+          "CPF inválido. Verifique e tente novamente (11 dígitos, com ou sem pontos e traço).",
+      };
+    }
+    return { ok: true, value: validation.digits };
+  }
+
+  if (field === "phone") {
+    if (!looksLikePhoneInternational(text)) {
+      return {
+        ok: false,
+        reason:
+          "Informe um WhatsApp válido com código do país (+55 para Brasil ou +1 para Estados Unidos).",
+      };
+    }
+    const digits = String(text ?? "").replace(/\D+/g, "").slice(0, 16);
+    return { ok: true, value: digits.startsWith("+") ? digits : `+${digits}` };
+  }
+
+  return { ok: true, value: text };
+}
+
+export function buildContractFieldPrompt(
+  lead: Partial<AtendimentoLead>,
+  nextField: ContractFieldName,
+): string {
+  const existing = contractFieldValueOrNull(lead, nextField);
+  if (nextField === "full_name" && existing) {
+    return `Confirme se seu nome completo está correto:\n\n${existing}\n\nSe estiver correto, basta responder “sim”. Se precisar corrigir, envie o nome completo correto.`;
+  }
+  if (nextField === "phone" && existing) {
+    return `Confirme se seu WhatsApp está correto para o contrato:\n\n${existing}\n\nSe estiver correto, basta responder “sim”. Se precisar corrigir, envie o número completo com código do país.`;
+  }
+  if (nextField === "cpf" && existing) {
+    const validation = isValidCPF(existing);
+    const formatted = validation.ok ? validation.formatted : existing;
+    return `Confirme seu CPF para o contrato:\n\n${formatted}\n\nSe estiver correto, basta responder “sim”. Se precisar corrigir, envie o CPF correto (11 dígitos).`;
+  }
+  return CONTRACT_FIELD_PROMPTS[nextField];
+}
+
+export function detectContractYesConfirmation(rawMessage: string): boolean {
+  const normalized = String(rawMessage ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?,;:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return false;
+  if (normalized === "sim" || normalized === "s") return true;
+  return /\b(sim|confirmo|confirmado|esta correto|esta certo|correto|certo|ok|de acordo|concordo|esta tudo certo)\b/.test(
+    normalized,
+  );
 }

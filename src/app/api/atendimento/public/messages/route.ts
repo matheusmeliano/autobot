@@ -1,14 +1,25 @@
 import {
   botReplyForLead,
+  buildContractFieldPrompt,
+  detectContractYesConfirmation,
   extractLeadDataFromMessage,
   fieldFromBotPrompt,
   filterCapturedDataForLead,
+  getNextContractField,
   getNextMissingField,
+  isValidCPF,
+  looksLikeFullName,
+  type ContractFieldName,
+  validateContractFieldValue,
 } from "@/lib/atendimento/bot";
 import {
   ATENDIMENTO_BLOCKED_FINAL_MESSAGE,
   ATENDIMENTO_PROFESSOR_TIME_ZONE,
   buildExperimentalClassDatePromptMessages,
+  CONTRACT_ACEITE_PROMPT_FIRST,
+  CONTRACT_ACEITE_PROMPT_RETRY,
+  CONTRACT_FIELD_PROMPTS,
+  CONTRACT_SIGNED_SUCCESS_MESSAGE,
   EXPERIMENTAL_CLASS_DATE_BLOCKED_FINAL_MESSAGE,
   EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
@@ -36,6 +47,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   appendHistoryEvent,
   ensureInitialBotConversationFlow,
+  formalizeAndPersistContract,
   getAuthenticatedAtendimentoConversationAccess,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
@@ -1005,6 +1017,511 @@ export async function POST(req: Request) {
         bot_enabled: true,
       },
     });
+  }
+
+  const currentFunnelStage = String((lead as any).funnel_stage ?? "").trim();
+  const currentStatus = String((lead as any).status ?? "").trim();
+  const isContractRelatedStage =
+    currentFunnelStage === "contrato_coletando_dados" ||
+    currentFunnelStage === "contrato_aguardando_aceite" ||
+    currentFunnelStage === "contrato_assinado" ||
+    currentStatus === "contrato_coletando_dados" ||
+    currentStatus === "contrato_aguardando_aceite" ||
+    currentStatus === "contrato_assinado";
+  const shouldStartContractNow =
+    !isContractRelatedStage &&
+    (currentFunnelStage === "pre_cadastro_concluido" ||
+      currentFunnelStage === "matricula_pendente" ||
+      currentStatus === "matricula_pendente");
+
+  if (isContractRelatedStage || shouldStartContractNow) {
+    const contractStatus = String((lead as any).contract_status ?? "nao_iniciado").trim();
+    const lastContractPromptRaw = String(lastBotMessage?.content_text ?? "").trim();
+
+    let pipelineStage: "coletando_dados" | "aguardando_aceite" | "assinado" | "iniciar";
+    if (
+      currentFunnelStage === "contrato_assinado" ||
+      currentStatus === "contrato_assinado" ||
+      contractStatus === "assinado"
+    ) {
+      pipelineStage = "assinado";
+    } else if (
+      currentFunnelStage === "contrato_aguardando_aceite" ||
+      currentStatus === "contrato_aguardando_aceite" ||
+      contractStatus === "aguardando_aceite" ||
+      lastContractPromptRaw.startsWith(CONTRACT_ACEITE_PROMPT_FIRST.split("\n")[0] ?? "") ||
+      lastContractPromptRaw.startsWith("Perfeito! Agora vamos formalizar o contrato")
+    ) {
+      pipelineStage = "aguardando_aceite";
+    } else if (
+      currentFunnelStage === "contrato_coletando_dados" ||
+      currentStatus === "contrato_coletando_dados" ||
+      contractStatus === "coletando_dados" ||
+      shouldStartContractNow
+    ) {
+      pipelineStage = shouldStartContractNow ? "iniciar" : "coletando_dados";
+    } else {
+      pipelineStage = "iniciar";
+    }
+
+    if (pipelineStage === "assinado") {
+      const signedPdfUrl = String((lead as any).contract_pdf_url ?? "").trim() || null;
+      if (signedPdfUrl) {
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const signedMsg =
+          CONTRACT_SIGNED_SUCCESS_MESSAGE +
+          `\n\nLink para baixar: ${signedPdfUrl}`;
+        const { data: outbound, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String(conversation.id),
+            sender_role: "bot",
+            content_text: signedMsg,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+        if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+        await syncConversationPreview({
+          conversationId: String(conversation.id),
+          contentText: signedMsg,
+          createdAt: botNowIso,
+        });
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: outboundError ? null : outbound,
+          blocked: false,
+          conversation: {
+            id: String(conversation.id),
+            bot_enabled: true,
+          },
+        });
+      }
+    }
+
+    if (pipelineStage === "aguardando_aceite") {
+      const normalizedResp = normalizeDecisionText(contentText);
+      const isYes =
+        detectContractYesConfirmation(contentText) ||
+        /\b(sim|confirmo|de acordo|concordo|aceito|li e concordo|esta tudo bem)\b/.test(normalizedResp);
+      const isNo =
+        /\b(nao|não|revisar|rever|corrigir|nao concordo|não concordo)\b/.test(normalizedResp);
+
+      if (isYes) {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            contract_status: "aguardando_aceite",
+            funnel_stage: "contrato_aguardando_aceite",
+            status: "contrato_aguardando_aceite",
+            updated_at: nowIso,
+          })
+          .eq("id", String(lead.id));
+
+        const formalizado = await formalizeAndPersistContract({
+          admin,
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+        });
+
+        if (!formalizado.ok) {
+          await sleep(POST_LEAD_REPLY_DELAY_MS);
+          const botNowIso = new Date().toISOString();
+          const failMsg = `Ops! Não foi possível gerar o contrato agora. Tente novamente em alguns instantes, ou entre em contato com o suporte.\nErro: ${String(
+            formalizado.error ?? "erro interno",
+          )}`;
+          const { data: outbound, error: outboundError } = await admin
+            .from("atendimento_messages")
+            .insert({
+              conversation_id: String(conversation.id),
+              sender_role: "bot",
+              content_text: failMsg,
+              media_type: "text",
+              status: "entregue",
+              sent_at: botNowIso,
+              delivered_at: botNowIso,
+            })
+            .select("*")
+            .maybeSingle();
+          if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+            return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+          }
+          return Response.json({
+            ok: true,
+            inbound,
+            outbound: outboundError ? null : outbound,
+            blocked: false,
+            conversation: { id: String(conversation.id), bot_enabled: true },
+          });
+        }
+
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const pdfLink = String(formalizado.contract_pdf_url ?? "").trim();
+        const successMsg = pdfLink
+          ? `${CONTRACT_SIGNED_SUCCESS_MESSAGE}\n\n🔗 Baixar contrato em PDF: ${pdfLink}`
+          : CONTRACT_SIGNED_SUCCESS_MESSAGE;
+        const { data: outbound, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String(conversation.id),
+            sender_role: "bot",
+            content_text: successMsg,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+        if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+        await syncConversationPreview({
+          conversationId: String(conversation.id),
+          contentText: successMsg,
+          createdAt: botNowIso,
+        });
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: outboundError ? null : outbound,
+          blocked: false,
+          conversation: { id: String(conversation.id), bot_enabled: true },
+        });
+      }
+
+      if (isNo) {
+        const clearedPatch: Record<string, unknown> = {
+          legal_responsible_name: null,
+          legal_responsible_cpf: null,
+          contract_status: "coletando_dados",
+          funnel_stage: "contrato_coletando_dados",
+          status: "contrato_coletando_dados",
+          updated_at: nowIso,
+        };
+        await admin
+          .from("atendimento_leads")
+          .update(clearedPatch)
+          .eq("id", String(lead.id));
+
+        const refreshedLead: any = {
+          ...lead,
+          legal_responsible_name: null,
+          legal_responsible_cpf: null,
+          contract_status: "coletando_dados",
+          funnel_stage: "contrato_coletando_dados",
+        };
+        const firstField =
+          getNextContractField(refreshedLead as any) ?? ("full_name" as ContractFieldName);
+        const firstPrompt = buildContractFieldPrompt(
+          refreshedLead as any,
+          firstField as ContractFieldName,
+        );
+
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const retryMsg = `Sem problema! Vamos revisar os dados.\n\n${firstPrompt}`;
+        const { data: outbound, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String(conversation.id),
+            sender_role: "bot",
+            content_text: retryMsg,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+        if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+        await syncConversationPreview({
+          conversationId: String(conversation.id),
+          contentText: retryMsg,
+          createdAt: botNowIso,
+        });
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: outboundError ? null : outbound,
+          blocked: false,
+          conversation: { id: String(conversation.id), bot_enabled: true },
+        });
+      }
+
+      await sleep(POST_LEAD_REPLY_DELAY_MS);
+      const botNowIso = new Date().toISOString();
+      const { data: outbound, error: outboundError } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String(conversation.id),
+          sender_role: "bot",
+          content_text: CONTRACT_ACEITE_PROMPT_RETRY,
+          media_type: "text",
+          status: "entregue",
+          sent_at: botNowIso,
+          delivered_at: botNowIso,
+        })
+        .select("*")
+        .maybeSingle();
+      if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+        return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+      }
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: outboundError ? null : outbound,
+        blocked: false,
+        conversation: { id: String(conversation.id), bot_enabled: true },
+      });
+    }
+
+    if (pipelineStage === "iniciar" || pipelineStage === "coletando_dados") {
+      const nextField =
+        getNextContractField(lead as any) ??
+        (pipelineStage === "iniciar" ? ("full_name" as ContractFieldName) : null);
+
+      if (!nextField) {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            contract_status: "aguardando_aceite",
+            funnel_stage: "contrato_aguardando_aceite",
+            status: "contrato_aguardando_aceite",
+            updated_at: nowIso,
+          })
+          .eq("id", String(lead.id));
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const { data: outbound, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String(conversation.id),
+            sender_role: "bot",
+            content_text: CONTRACT_ACEITE_PROMPT_FIRST,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+        if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+        await syncConversationPreview({
+          conversationId: String(conversation.id),
+          contentText: CONTRACT_ACEITE_PROMPT_FIRST,
+          createdAt: botNowIso,
+        });
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: outboundError ? null : outbound,
+          blocked: false,
+          conversation: { id: String(conversation.id), bot_enabled: true },
+        });
+      }
+
+      const isInitialStart = pipelineStage === "iniciar";
+      if (isInitialStart) {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            contract_status: "coletando_dados",
+            funnel_stage: "contrato_coletando_dados",
+            status: "contrato_coletando_dados",
+            updated_at: nowIso,
+          })
+          .eq("id", String(lead.id));
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const promptMsg = buildContractFieldPrompt(lead as any, nextField);
+        const introMsg =
+          `Perfeito! Agora vamos formalizar o contrato de prestação de serviços.\n\n` +
+          `Vou solicitar alguns dados um por vez.\n\n${promptMsg}`;
+        const { data: outbound, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String(conversation.id),
+            sender_role: "bot",
+            content_text: introMsg,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+        if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+        await syncConversationPreview({
+          conversationId: String(conversation.id),
+          contentText: introMsg,
+          createdAt: botNowIso,
+        });
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: outboundError ? null : outbound,
+          blocked: false,
+          conversation: { id: String(conversation.id), bot_enabled: true },
+        });
+      }
+
+      const lastPromptFieldDetect = buildContractFieldPrompt(lead as any, nextField);
+      const existingValueForField = (() => {
+        const raw = String((lead as Record<string, unknown>)[nextField] ?? "").trim();
+        return raw || null;
+      })();
+      const isExpectingConfirmation =
+        existingValueForField !== null &&
+        (nextField === "full_name" || nextField === "phone" || nextField === "cpf");
+
+      let replyMessage: string | null = null;
+      let leadPatch: Record<string, unknown> | null = null;
+      let validationErrorReason: string | null = null;
+
+      const isYesConfirm =
+        isExpectingConfirmation && detectContractYesConfirmation(contentText);
+      if (isYesConfirm) {
+        replyMessage = null;
+        const afterPatch: any = { ...lead };
+        const updatedNext = getNextContractField(afterPatch) ?? null;
+        if (!updatedNext) {
+          leadPatch = {
+            contract_status: "aguardando_aceite",
+            funnel_stage: "contrato_aguardando_aceite",
+            status: "contrato_aguardando_aceite",
+            updated_at: nowIso,
+          };
+          replyMessage = CONTRACT_ACEITE_PROMPT_FIRST;
+        } else {
+          leadPatch = { updated_at: nowIso };
+          replyMessage = buildContractFieldPrompt(afterPatch, updatedNext);
+        }
+      } else {
+        const validated = validateContractFieldValue(nextField, contentText);
+        if (!validated.ok) {
+          validationErrorReason = validated.reason;
+          replyMessage = `${validated.reason}\n\n${buildContractFieldPrompt(
+            lead as any,
+            nextField,
+          )}`;
+        } else if ((validated as any).skipped) {
+          const patch: Record<string, unknown> = {
+            [nextField]: null,
+            updated_at: nowIso,
+          };
+          const afterPatch: any = { ...lead, ...patch };
+          const updatedNext = getNextContractField(afterPatch) ?? null;
+          if (!updatedNext) {
+            patch.contract_status = "aguardando_aceite";
+            patch.funnel_stage = "contrato_aguardando_aceite";
+            patch.status = "contrato_aguardando_aceite";
+            leadPatch = patch;
+            replyMessage = CONTRACT_ACEITE_PROMPT_FIRST;
+          } else {
+            leadPatch = patch;
+            replyMessage = buildContractFieldPrompt(afterPatch, updatedNext);
+          }
+        } else {
+          const rawValue = (validated as { value: string }).value;
+          const patch: Record<string, unknown> = {
+            [nextField]: rawValue,
+            updated_at: nowIso,
+          };
+          const afterPatch: any = { ...lead, ...patch };
+          const updatedNext = getNextContractField(afterPatch) ?? null;
+          if (!updatedNext) {
+            patch.contract_status = "aguardando_aceite";
+            patch.funnel_stage = "contrato_aguardando_aceite";
+            patch.status = "contrato_aguardando_aceite";
+            leadPatch = patch;
+            replyMessage = CONTRACT_ACEITE_PROMPT_FIRST;
+          } else {
+            leadPatch = patch;
+            replyMessage = buildContractFieldPrompt(afterPatch, updatedNext);
+          }
+        }
+      }
+
+      if (leadPatch) {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            ...leadPatch,
+            contract_status:
+              (leadPatch as any).contract_status ?? "coletando_dados",
+            funnel_stage:
+              (leadPatch as any).funnel_stage ?? "contrato_coletando_dados",
+            status: (leadPatch as any).status ?? "contrato_coletando_dados",
+          })
+          .eq("id", String(lead.id));
+      }
+
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: validationErrorReason
+          ? "contract_field_validation_failed"
+          : "contract_field_updated",
+        title: validationErrorReason
+          ? "Falha ao validar campo do contrato"
+          : "Campo do contrato atualizado",
+        details: {
+          field: nextField,
+          content_text: contentText || null,
+          error: validationErrorReason,
+          patch_keys: leadPatch ? Object.keys(leadPatch) : null,
+        },
+        actorType: "system",
+      });
+
+      if (replyMessage) {
+        await sleep(POST_LEAD_REPLY_DELAY_MS);
+        const botNowIso = new Date().toISOString();
+        const { data: outbound, error: outboundError } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String(conversation.id),
+            sender_role: "bot",
+            content_text: replyMessage,
+            media_type: "text",
+            status: "entregue",
+            sent_at: botNowIso,
+            delivered_at: botNowIso,
+          })
+          .select("*")
+          .maybeSingle();
+        if (outboundError && String((outboundError as any)?.code ?? "") !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+        await syncConversationPreview({
+          conversationId: String(conversation.id),
+          contentText: replyMessage,
+          createdAt: botNowIso,
+        });
+        return Response.json({
+          ok: true,
+          inbound,
+          outbound: outboundError ? null : outbound,
+          blocked: false,
+          conversation: { id: String(conversation.id), bot_enabled: true },
+        });
+      }
+    }
   }
 
   if (isAwaitingPhoneConfirmation) {

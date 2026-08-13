@@ -31,10 +31,13 @@ export const ATENDIMENTO_STAGE_ORDER = [
   "aula_experimental_agendada",
   "pre_cadastro_concluido",
   "matricula_pendente",
-  "matriculado",
   "matricula_pendente_recusada",
   "cadastro_recorrente_pendente_plataforma",
+  "contrato_coletando_dados",
+  "contrato_aguardando_aceite",
+  "contrato_assinado",
   "aluno_recorrente_cadastrado",
+  "matriculado",
   "encerrado",
 ] as const;
 
@@ -42,9 +45,12 @@ export const ATENDIMENTO_STATUS_ORDER = [
   "novo_lead",
   "em_atendimento",
   "matricula_pendente",
-  "matriculado",
   "matricula_pendente_recusada",
   "cadastro_recorrente_pendente_plataforma",
+  "contrato_coletando_dados",
+  "contrato_aguardando_aceite",
+  "contrato_assinado",
+  "matriculado",
   "aluno",
   "encerrado",
 ] as const;
@@ -66,7 +72,61 @@ export const ACTIVE_CAPTURED_FIELD_ORDER = [
 export const NUMERIC_ONLY_FIELDS = [
   "phone",
   "cpf",
+  "legal_responsible_cpf",
 ] as const;
+
+export const CONTRACT_FIELD_ORDER = [
+  "full_name",
+  "cpf",
+  "phone",
+  "legal_responsible_name",
+  "legal_responsible_cpf",
+] as const;
+
+export const CONTRACT_OPTIONAL_FIELDS = new Set([
+  "legal_responsible_name",
+  "legal_responsible_cpf",
+] as const);
+
+export const CONTRACT_FIELD_PROMPTS: Record<(typeof CONTRACT_FIELD_ORDER)[number], string> = {
+  full_name: "Para formalizarmos o contrato, confirme seu nome completo.",
+  cpf: "Informe seu CPF.\n\nVocê pode informar com ou sem pontos e traço.\nExemplo: 123.456.789-09",
+  phone:
+    "Confirme o número do seu WhatsApp para o contrato.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\n\nImportante: inclua o código do país no início do número.",
+  legal_responsible_name:
+    "Se você for menor de idade ou precisar de responsável legal, informe o nome completo do responsável.\n\nCaso não se aplique, responda apenas “pular”.",
+  legal_responsible_cpf:
+    "Informe o CPF do responsável legal.\n\nCaso não se aplique, responda apenas “pular”.",
+};
+
+export const CONTRACT_FIELD_SKIP_WORDS = [
+  "pular",
+  "pulado",
+  "pula",
+  "nao",
+  "não",
+  "nao se aplica",
+  "não se aplica",
+  "nao tem",
+  "não tem",
+  "nenhum",
+  "ninguem",
+  "ninguém",
+  "sem responsavel",
+  "sem responsável",
+] as const;
+
+export const CONTRACT_ACEITE_PROMPT_FIRST =
+  "Perfeito! Agora vamos formalizar o contrato de prestação de serviços. Em seguida você poderá visualizar e baixar o contrato completo em PDF.\n\nResponda “sim” para declarar que leu, compreendeu e concorda com as condições, ou “não” para revisar os dados novamente.";
+
+export const CONTRACT_ACEITE_PROMPT_RETRY =
+  "Responda apenas “sim” para declarar que leu, compreendeu e concorda com o contrato, ou “não” para revisar os dados novamente.";
+
+export const CONTRACT_SIGNED_SUCCESS_MESSAGE =
+  "Contrato formalizado com sucesso! O PDF com todas as informações e assinaturas foi gerado e está disponível para download.\n\nVocê também pode baixá-lo novamente a qualquer momento no painel do aluno ou entrando em contato com a nossa equipe.";
+
+export const CONTRACT_INVALID_MESSAGE = (fieldLabel: string): string =>
+  `Não foi possível validar ${fieldLabel} informado. Responda novamente com os dados corretos.`;
 
 export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number], string> = {
   full_name: "Qual é o seu nome e sobrenome?",
@@ -128,6 +188,11 @@ export const STAGE_LABELS: Record<string, string> = {
   aula_experimental_agendada: "Aula Experimental Agendada",
   pre_cadastro_concluido: "Pré-Cadastro Concluído",
   matricula_pendente: "Matrícula Pendente",
+  matricula_pendente_recusada: "Matrícula Pendente (Recusada)",
+  cadastro_recorrente_pendente_plataforma: "Cadastro Recorrente Pendente",
+  contrato_coletando_dados: "Contrato: Coletando Dados",
+  contrato_aguardando_aceite: "Contrato: Aguardando Aceite",
+  contrato_assinado: "Contrato Assinado",
   matriculado: "Matriculado",
   encerrado: "Encerrado",
 };
@@ -136,6 +201,11 @@ export const STATUS_LABELS: Record<string, string> = {
   novo_lead: "Novo Lead",
   em_atendimento: "Em Atendimento",
   matricula_pendente: "Matrícula Pendente",
+  matricula_pendente_recusada: "Matrícula Pendente (Recusada)",
+  cadastro_recorrente_pendente_plataforma: "Cadastro Recorrente Pendente",
+  contrato_coletando_dados: "Contrato: Coletando Dados",
+  contrato_aguardando_aceite: "Contrato: Aguardando Aceite",
+  contrato_assinado: "Contrato Assinado",
   matriculado: "Matriculado",
   encerrado: "Encerrado",
 };

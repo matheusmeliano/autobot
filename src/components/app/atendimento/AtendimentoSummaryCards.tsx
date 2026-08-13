@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertTriangle, Check, Copy, ExternalLink, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
+import { AlertTriangle, Check, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -218,6 +218,42 @@ function LeadDetails({
     }
   })();
 
+  const contractStatusRaw = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+  const contractPdfUrl = String((lead as any)?.contract_pdf_url ?? "").trim();
+  const contractSignedAt = String((lead as any)?.contract_signed_at ?? "").trim();
+  const legalRespName = String((lead as any)?.legal_responsible_name ?? "").trim();
+  const legalRespCpf = String((lead as any)?.legal_responsible_cpf ?? "").trim();
+  const hasContractSection = Boolean(
+    contractStatusRaw && contractStatusRaw !== "nao_iniciado" ||
+    contractPdfUrl ||
+    legalRespName ||
+    legalRespCpf,
+  );
+
+  const contractStatusLabel = (() => {
+    switch (contractStatusRaw) {
+      case "coletando_dados": return "Coletando dados";
+      case "aguardando_aceite": return "Aguardando aceite";
+      case "assinado": return "Assinado";
+      case "rejeitado": return "Rejeitado";
+      case "nao_iniciado": return "";
+      default:
+        return contractStatusRaw
+          ? contractStatusRaw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+          : "";
+    }
+  })();
+  const contractStatusBadgeTone = (() => {
+    if (contractStatusRaw === "assinado") return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
+    if (contractStatusRaw === "aguardando_aceite") return "bg-amber-400/15 text-amber-100 border-amber-500/30";
+    if (contractStatusRaw === "rejeitado") return "bg-red-500/15 text-red-200 border-red-500/30";
+    if (contractStatusRaw === "coletando_dados") return "bg-sky-500/15 text-sky-200 border-sky-500/30";
+    return "bg-[var(--app-card)] text-[var(--app-text-70)] border-[var(--app-border)]";
+  })();
+  const contractDownloadHref = contractPdfUrl
+    ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(lead.full_name ?? lead.phone ?? lead.id).replace(/\s+/g, "_")}.pdf`)}`
+    : "";
+
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
@@ -424,6 +460,61 @@ function LeadDetails({
                   )
                 }
               />
+            </div>
+          </div>
+        ) : null}
+
+        {hasContractSection ? (
+          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Contrato de prestação de serviços
+                </div>
+                {contractStatusLabel ? (
+                  <div className="mt-2.5">
+                    <span className={["inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]", contractStatusBadgeTone].join(" ")}>
+                      {contractStatusRaw === "assinado" ? <Check className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+                      {contractStatusLabel}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+              {contractPdfUrl ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 min-[600px]:mt-0">
+                  <a
+                    href={contractDownloadHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
+                    title="Baixar contrato em PDF"
+                  >
+                    <Download className="h-4 w-4 shrink-0" />
+                    Baixar contrato em PDF
+                  </a>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field
+                label="Data da formalização"
+                value={contractSignedAt ? formatAtendimentoDateTime(contractSignedAt) : null}
+              />
+              {legalRespName ? (
+                <Field
+                  label="Responsável legal"
+                  value={legalRespName}
+                  copyable
+                />
+              ) : null}
+              {legalRespCpf ? (
+                <Field
+                  label="CPF do responsável"
+                  value={legalRespCpf}
+                  copyable
+                />
+              ) : null}
             </div>
           </div>
         ) : null}
