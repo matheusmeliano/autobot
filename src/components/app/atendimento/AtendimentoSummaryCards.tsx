@@ -1227,47 +1227,20 @@ export function AtendimentoSummaryCards({
         | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
         | null;
 
-      if (!response.ok || !payload?.ok || !payload.booking) {
+      if (!response.ok || !payload?.ok) {
         modalToast.error(payload?.error ?? "Falha ao cancelar agendamento.");
         return;
       }
 
-      const updatedLead: AtendimentoLeadListItem = {
-        ...lead,
-        experimental_class_booking: {
-          ...(lead.experimental_class_booking ?? {
-            id: bookingId,
-            source: "table" as const,
-            created_at: lead.updated_at,
-            lesson_link: null,
-            student_start_notification_sent_at: null,
-            attendant_start_notification_sent_at: null,
-            attendance_status: null,
-            attendance_checked_at: null,
-            professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-            lead_timezone: null,
-            professor_date: null,
-            professor_time: null,
-            professor_start_at: null,
-            lead_date: null,
-            lead_time: null,
-            lead_start_at: null,
-            status: "cancelled",
-          }),
-          ...(payload.booking as Partial<AtendimentoLeadListItem["experimental_class_booking"]>),
-          source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
-          lesson_link:
-            String((payload.booking as any)?.lesson_link ?? lead.experimental_class_booking?.lesson_link ?? "").trim() || null,
-          status: "cancelled",
-        },
-      };
-
-      setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
+      setLocalLeads((current) => current.filter((item) => item.id !== lead.id));
       setLocalSummary((current) => ({
         ...current,
         aulasExperimentaisAgendadas: Math.max(0, current.aulasExperimentaisAgendadas - 1),
+        totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1),
       }));
-      modalToast.success("Agendamento cancelado.");
+      setSelectedLeadId((current) => (current === lead.id ? null : current));
+      setMobileDetailsOpen((current) => (selectedLeadId === lead.id ? false : current));
+      modalToast.success("Agendamento cancelado e interessado removido.");
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao cancelar agendamento.");
     } finally {

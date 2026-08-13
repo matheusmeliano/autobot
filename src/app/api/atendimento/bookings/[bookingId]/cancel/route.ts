@@ -1,5 +1,6 @@
-import { appendHistoryEvent, requireAtendimentoUser } from "@/lib/atendimento/server";
+import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -8,7 +9,9 @@ function isExperimentalClassBookingsTableUnavailable(error: unknown) {
     code === "42P01" ||
     code === "PGRST205" ||
     /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
-    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(message)
+    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(
+      message,
+    )
   );
 }
 
@@ -44,7 +47,9 @@ export async function POST(
   const admin = createSupabaseAdminClient();
   const { data: booking, error: bookingError } = await admin
     .from("atendimento_experimental_class_bookings")
-    .select("id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone")
+    .select(
+      "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone",
+    )
     .eq("id", normalizedBookingId)
     .maybeSingle();
 
@@ -58,7 +63,9 @@ export async function POST(
   if (!resolvedBooking && !tableUnavailable && payload?.leadId) {
     const query = admin
       .from("atendimento_experimental_class_bookings")
-      .select("id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, lead_timezone, professor_timezone, created_at")
+      .select(
+        "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, lead_timezone, professor_timezone, created_at",
+      )
       .eq("lead_id", String(payload.leadId))
       .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false })
@@ -73,10 +80,12 @@ export async function POST(
       ((leadBookings ?? []) as Record<string, unknown>[]).find((row) => {
         const sameProfessorStartAt =
           String(row?.professor_start_at ?? "").trim() &&
-          String(row?.professor_start_at ?? "").trim() === String(payload.professorStartAt ?? "").trim();
+          String(row?.professor_start_at ?? "").trim() ===
+            String(payload.professorStartAt ?? "").trim();
         const sameConversation =
           String(row?.conversation_id ?? "").trim() &&
-          String(row?.conversation_id ?? "").trim() === String(payload.conversationId ?? "").trim();
+          String(row?.conversation_id ?? "").trim() ===
+            String(payload.conversationId ?? "").trim();
         return sameProfessorStartAt || sameConversation;
       }) ?? null;
   }
@@ -93,158 +102,128 @@ export async function POST(
         { status: 409 },
       );
     }
-
-    const { data: updatedBooking, error: updateError } = await admin
-      .from("atendimento_experimental_class_bookings")
-      .update({
-        status: "cancelled",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", String((resolvedBooking as any).id ?? ""))
-      .eq("status", "scheduled")
-      .select("id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at")
-      .maybeSingle();
-
-    if (updateError) {
-      return Response.json({ ok: false, error: updateError.message }, { status: 500 });
-    }
-
-    if (!updatedBooking) {
-      return Response.json({ ok: false, error: "booking_not_cancelled" }, { status: 409 });
-    }
-
-    await appendHistoryEvent({
-      leadId: String((updatedBooking as any).lead_id ?? ""),
-      conversationId: String((updatedBooking as any).conversation_id ?? ""),
-      eventType: "experimental_class_cancelled",
-      title: "Agendamento cancelado manualmente",
-      details: {
-        booking_id: String((updatedBooking as any).id ?? ""),
-        status: "cancelled",
-        professor_timezone: String((updatedBooking as any).professor_timezone ?? ""),
-        lead_timezone: String((updatedBooking as any).lead_timezone ?? ""),
-        professor_date: String((updatedBooking as any).professor_date ?? ""),
-        professor_time: String((updatedBooking as any).professor_time ?? ""),
-        professor_start_at: String((updatedBooking as any).professor_start_at ?? ""),
-        lead_date: String((updatedBooking as any).lead_date ?? ""),
-        lead_time: String((updatedBooking as any).lead_time ?? ""),
-        lead_start_at: String((updatedBooking as any).lead_start_at ?? ""),
-      },
-      actorType: "attendant",
-      actorEmail: auth.user.email,
-    });
-
-    const nowIsoAfterCancel = new Date().toISOString();
-    const leadIdAfterCancel = String((updatedBooking as any).lead_id ?? "");
-    const conversationIdAfterCancel = String((updatedBooking as any).conversation_id ?? "");
-
-    const leadAfterCancelUpdate = {
-      latest_experimental_class_cancelled_at: nowIsoAfterCancel,
-      experimental_class_status: "cancelled",
-      updated_at: nowIsoAfterCancel,
-    };
-
-    if (leadIdAfterCancel) {
-      try {
-        await admin
-          .from("atendimento_leads")
-          .update(leadAfterCancelUpdate)
-          .eq("id", leadIdAfterCancel);
-      } catch (_eLeadReset) {}
-    }
-    if (conversationIdAfterCancel) {
-      try {
-        await admin
-          .from("atendimento_conversations")
-          .update({
-            bot_enabled: false,
-            updated_at: nowIsoAfterCancel,
-          })
-          .eq("id", conversationIdAfterCancel);
-      } catch (_eConvReset) {}
-    }
-
-    return Response.json({
-      ok: true,
-      booking: {
-        ...(updatedBooking as Record<string, unknown>),
-        source: "table",
-      },
-    });
   }
 
-  if (!payload?.leadId) {
+  const resolvedLeadId = String(
+    (resolvedBooking as any)?.lead_id ?? payload?.leadId ?? "",
+  ).trim();
+  if (!resolvedLeadId) {
+    return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
+  }
+
+  const { data: lead, error: leadError } = await admin
+    .from("atendimento_leads")
+    .select("id, auth_user_id")
+    .eq("id", resolvedLeadId)
+    .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+    .maybeSingle();
+
+  if (leadError) {
+    return Response.json({ ok: false, error: leadError.message }, { status: 500 });
+  }
+
+  if (!lead?.id) {
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
   }
 
-  await appendHistoryEvent({
-    leadId: String(payload.leadId ?? ""),
-    conversationId: String(payload.conversationId ?? ""),
-    eventType: "experimental_class_cancelled",
-    title: "Agendamento cancelado manualmente",
-    details: {
-      booking_id: normalizedBookingId,
-      status: "cancelled",
-      professor_timezone: String(payload.professorTimeZone ?? ""),
-      lead_timezone: String(payload.leadTimeZone ?? ""),
-      professor_date: String(payload.professorDate ?? ""),
-      professor_time: String(payload.professorTime ?? ""),
-      professor_start_at: String(payload.professorStartAt ?? ""),
-      lead_date: String(payload.leadDate ?? ""),
-      lead_time: String(payload.leadTime ?? ""),
-      lead_start_at: String(payload.professorStartAt ?? ""),
-    },
-    actorType: "attendant",
-    actorEmail: auth.user.email,
-  });
+  const authUserId = String((lead as { auth_user_id?: string | null }).auth_user_id ?? "").trim();
+  const [{ data: conversations, error: conversationsError }, profileResult] = await Promise.all([
+    admin.from("atendimento_conversations").select("id").eq("lead_id", resolvedLeadId),
+    authUserId
+      ? admin
+          .from("profiles")
+          .select("access_scope")
+          .eq("user_id", authUserId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
 
-  const nowIsoFallback = new Date().toISOString();
-  const fallbackLeadId = String(payload.leadId ?? "");
-  const fallbackConversationId = String(payload.conversationId ?? "");
-
-  const leadAfterCancelUpdateFallback = {
-    latest_experimental_class_cancelled_at: nowIsoFallback,
-    experimental_class_status: "cancelled",
-    updated_at: nowIsoFallback,
-  };
-
-  if (fallbackLeadId) {
-    try {
-      await admin
-        .from("atendimento_leads")
-        .update(leadAfterCancelUpdateFallback)
-        .eq("id", fallbackLeadId);
-    } catch (_eLeadFallback) {}
+  if (conversationsError) {
+    return Response.json({ ok: false, error: conversationsError.message }, { status: 500 });
   }
-  if (fallbackConversationId) {
-    try {
-      await admin
-        .from("atendimento_conversations")
-        .update({
-          bot_enabled: false,
-          updated_at: nowIsoFallback,
-        })
-        .eq("id", fallbackConversationId);
-    } catch (_eConvFallback) {}
+  if (profileResult.error) {
+    return Response.json({ ok: false, error: profileResult.error.message }, { status: 500 });
+  }
+
+  const conversationIds = (conversations ?? [])
+    .map((row) => String((row as { id?: string | null }).id ?? "").trim())
+    .filter(Boolean);
+
+  const deleteMessagesPromise =
+    conversationIds.length > 0
+      ? admin
+          .from("atendimento_messages")
+          .delete()
+          .in("conversation_id", conversationIds)
+      : Promise.resolve({ error: null });
+  const [messagesResult, eventsResult, capturedFieldsResult] = await Promise.all([
+    deleteMessagesPromise,
+    admin.from("atendimento_history_events").delete().eq("lead_id", resolvedLeadId),
+    admin.from("atendimento_captured_fields").delete().eq("lead_id", resolvedLeadId),
+  ]);
+
+  if (messagesResult.error) {
+    return Response.json({ ok: false, error: messagesResult.error.message }, { status: 500 });
+  }
+  const { error: eventsError } = eventsResult;
+  if (eventsError) {
+    return Response.json({ ok: false, error: eventsError.message }, { status: 500 });
+  }
+  const { error: capturedFieldsError } = capturedFieldsResult;
+  if (capturedFieldsError) {
+    return Response.json({ ok: false, error: capturedFieldsError.message }, { status: 500 });
+  }
+
+  {
+    const bookingsDelete = await admin
+      .from("atendimento_experimental_class_bookings")
+      .delete()
+      .eq("lead_id", resolvedLeadId);
+    if (
+      bookingsDelete.error &&
+      !isExperimentalClassBookingsTableUnavailable(bookingsDelete.error)
+    ) {
+      return Response.json({ ok: false, error: bookingsDelete.error.message }, { status: 500 });
+    }
+  }
+
+  const { error: conversationsDeleteError } = await admin
+    .from("atendimento_conversations")
+    .delete()
+    .eq("lead_id", resolvedLeadId);
+  if (conversationsDeleteError) {
+    return Response.json(
+      { ok: false, error: conversationsDeleteError.message },
+      { status: 500 },
+    );
+  }
+
+  const { error: leadDeleteError } = await admin
+    .from("atendimento_leads")
+    .delete()
+    .eq("id", resolvedLeadId);
+  if (leadDeleteError) {
+    return Response.json({ ok: false, error: leadDeleteError.message }, { status: 500 });
+  }
+
+  if (
+    authUserId &&
+    isAtendimentoOnlyAccessScope(normalizeAccessScope((profileResult.data as any)?.access_scope))
+  ) {
+    const { error: deleteAuthUserError } = await admin.auth.admin.deleteUser(authUserId);
+    if (deleteAuthUserError) {
+      return Response.json({ ok: false, error: deleteAuthUserError.message }, { status: 500 });
+    }
   }
 
   return Response.json({
     ok: true,
+    deleted_lead: true,
+    lead_id: resolvedLeadId,
     booking: {
       id: normalizedBookingId,
-      lead_id: String(payload.leadId ?? ""),
-      conversation_id: String(payload.conversationId ?? ""),
       status: "cancelled",
-      professor_timezone: String(payload.professorTimeZone ?? ""),
-      lead_timezone: String(payload.leadTimeZone ?? ""),
-      professor_date: String(payload.professorDate ?? ""),
-      professor_time: String(payload.professorTime ?? ""),
-      professor_start_at: String(payload.professorStartAt ?? ""),
-      lead_date: String(payload.leadDate ?? ""),
-      lead_time: String(payload.leadTime ?? ""),
-      lead_start_at: String(payload.professorStartAt ?? ""),
-      created_at: new Date().toISOString(),
-      source: "history",
+      lead_id: resolvedLeadId,
     },
   });
 }
