@@ -1624,7 +1624,12 @@ export function AtendimentoSummaryCards({
     const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
     const bookingHasId = Boolean(String(booking?.id ?? "").trim());
     const bookingIsNotDraft = bookingHasId && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
-    if (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled") {
+    const latestCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
+    const hasLatestCancelledMarker = Boolean(latestCancelledAt && latestCancelledAt !== "null");
+    if (
+      (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled") ||
+      hasLatestCancelledMarker
+    ) {
       return "Agendamento cancelado";
     }
 
@@ -1647,14 +1652,20 @@ export function AtendimentoSummaryCards({
       return "Falta contrato";
     }
 
-    const expDraftDate =
-      String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
-      String((lead as any)?.experimental_class_professor_date ?? "").trim();
-    const expDraftTime =
-      String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
-      String((lead as any)?.experimental_class_professor_time ?? "").trim();
-    const expStatusRaw = String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
-    const expStage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+    const expDraftDate = hasLatestCancelledMarker
+      ? ""
+      : String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+        String((lead as any)?.experimental_class_professor_date ?? "").trim();
+    const expDraftTime = hasLatestCancelledMarker
+      ? ""
+      : String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+        String((lead as any)?.experimental_class_professor_time ?? "").trim();
+    const expStatusRaw = hasLatestCancelledMarker
+      ? ""
+      : String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
+    const expStage = hasLatestCancelledMarker
+      ? ""
+      : String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
     const hasExpContext =
       expStatusRaw === "date_selected" ||
       expStatusRaw === "time_selected" ||
