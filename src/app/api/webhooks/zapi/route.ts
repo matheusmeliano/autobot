@@ -2550,22 +2550,11 @@ export async function POST(req: Request) {
         const leadFullNameRaw = String((lead as any)?.full_name ?? "").trim();
         const leadFirstName = leadFullNameRaw ? leadFullNameRaw.split(/\s+/)[0] || "" : "";
 
-        const rawCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
-        let earlyLeadBlockedByCancelledBooking = Boolean(rawCancelledAt && rawCancelledAt !== "null");
-        if (!earlyLeadBlockedByCancelledBooking) {
-          try {
-            const { data: anyCancelledBooking } = await admin
-              .from("atendimento_experimental_class_bookings")
-              .select("id")
-              .eq("lead_id", leadId)
-              .eq("status", "cancelled")
-              .limit(1)
-              .maybeSingle();
-            if ((anyCancelledBooking as any)?.id) {
-              earlyLeadBlockedByCancelledBooking = true;
-            }
-          } catch (_e) {}
-        }
+        const earlyLeadBlockedByCancelledBooking = await isLeadBlockedByPreviousCancelledBooking({
+          admin,
+          lead,
+          leadId,
+        });
         if (earlyLeadBlockedByCancelledBooking) {
           try {
             await insertWhatsAppBotTextMessage({
@@ -5190,6 +5179,64 @@ export async function POST(req: Request) {
                 }
 
                 const firstName = String((lead as any)?.full_name ?? "").trim().split(" ")[0] || "Aluno";
+                const alreadyBookingCancelled =
+                  (already && String((already as any).status) === "cancelled") ||
+                  (await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId }));
+                if (alreadyBookingCancelled) {
+                  try {
+                    await insertWhatsAppBotTextMessage({
+                      admin,
+                      conversationId,
+                      contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: normalizedPhoneOnly,
+                      message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_conversations")
+                      .update({ updated_at: nowIso })
+                      .eq("id", conversationId);
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({
+                        unread_count: Number(lead.unread_count ?? 0) + 1,
+                        is_new_for_attendant: true,
+                        last_interaction_at: nowIso,
+                        updated_at: nowIso,
+                      })
+                      .eq("id", leadId);
+                  } catch (_e) {}
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    createdAt: nowIso,
+                  });
+                  void appendHistoryEvent({
+                    leadId,
+                    conversationId,
+                    eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+                    title: "Mensagem automática de cancelamento enviada ao lead",
+                    details: {
+                      content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                      source: "whatsapp_zapi",
+                    },
+                    actorType: "bot",
+                  });
+                  return Response.json({
+                    ok: true,
+                    ignored: false,
+                    replied: true,
+                    reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    reason: "cancelled_booking_auto_reply_sent_booking_success_blocked_fallback",
+                  });
+                }
                 const needsPostBookingCpf = !Boolean(String((lead as any)?.cpf ?? "").trim());
 
                 if (needsPostBookingCpf) {
@@ -5634,6 +5681,65 @@ export async function POST(req: Request) {
 
             const firstName =
               String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] || "Aluno";
+
+            const alreadyBookingCancelled2 =
+              (already && String((already as any).status) === "cancelled") ||
+              (await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId }));
+            if (alreadyBookingCancelled2) {
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                });
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_conversations")
+                  .update({ updated_at: nowIso })
+                  .eq("id", conversationId);
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              void syncConversationPreview({
+                conversationId,
+                contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                createdAt: nowIso,
+              });
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+                title: "Mensagem automática de cancelamento enviada ao lead",
+                details: {
+                  content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                  source: "whatsapp_zapi",
+                },
+                actorType: "bot",
+              });
+              return Response.json({
+                ok: true,
+                ignored: false,
+                replied: true,
+                reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                reason: "cancelled_booking_auto_reply_sent_booking_success_blocked_main",
+              });
+            }
 
             if (needsPostBookingCpf) {
               const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
