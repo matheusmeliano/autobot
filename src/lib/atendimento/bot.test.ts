@@ -125,10 +125,10 @@ test("botReplyForLead encerra o pre-cadastro pedindo a data da aula experimental
 
 test("buildExperimentalClassDatePromptMessages monta a nova sequencia com o nome do lead", () => {
   assert.deepEqual(buildExperimentalClassDatePromptMessages("Ana Maria"), [
-    "Ana, agora é só escolher o melhor dia e horário para sua aula experimental.",
+    "Ana, agora é só escolher o melhor dia e horário para sua aula experimental, com base no horário da sua cidade.",
   ]);
   assert.deepEqual(buildExperimentalClassDatePromptMessages(null), [
-    "Agora é só escolher o melhor dia e horário para sua aula experimental.",
+    "Agora é só escolher o melhor dia e horário para sua aula experimental, com base no horário da sua cidade.",
   ]);
 });
 
