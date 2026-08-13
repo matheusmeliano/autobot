@@ -166,17 +166,19 @@ test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso 
   );
 });
 
-test("buildExperimentalClassPostAttendanceWhatsAppMessages envia 4 mensagens SEPARADAS apos comparecimento, com primeiro nome", () => {
+test("buildExperimentalClassPostAttendanceWhatsAppMessages envia 1 mensagem UNICA (4 blocos juntos com \\n\\n) apos comparecimento, com primeiro nome", () => {
   const messages = buildExperimentalClassPostAttendanceWhatsAppMessages("Pedro Henrique");
   assert.equal(Array.isArray(messages), true);
-  assert.equal(messages.length, 4);
+  assert.equal(messages.length, 1);
   assert.equal(
     messages[0],
-    "Pedro, ficamos felizes pela sua participação na aula experimental!",
+    [
+      "Pedro, ficamos felizes pela sua participação na aula experimental!",
+      "Agora é hora do próximo passo.",
+      "Vamos confirmar sua matrícula e iniciar suas aulas?",
+      "Responda com sim ou não.",
+    ].join("\n\n"),
   );
-  assert.equal(messages[1], "Agora é hora do próximo passo.");
-  assert.equal(messages[2], "Vamos confirmar sua matrícula e iniciar suas aulas?");
-  assert.equal(messages[3], "Responda com sim ou não.");
 });
 
 test("buildExperimentalClassNoShowRepescagemWhatsAppMessages prefixa o primeiro nome na 1a mensagem", () => {

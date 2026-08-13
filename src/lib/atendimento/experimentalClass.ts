@@ -451,10 +451,12 @@ export function buildExperimentalClassPostAttendanceWhatsAppMessages(name?: stri
     ? `${safeFirst}, ficamos felizes pela sua participação na aula experimental!`
     : "Ficamos felizes pela sua participação na aula experimental!";
   return [
-    line1,
-    "Agora é hora do próximo passo.",
-    "Vamos confirmar sua matrícula e iniciar suas aulas?",
-    "Responda com sim ou não.",
+    [
+      line1,
+      "Agora é hora do próximo passo.",
+      "Vamos confirmar sua matrícula e iniciar suas aulas?",
+      "Responda com sim ou não.",
+    ].join("\n\n"),
   ];
 }
 
