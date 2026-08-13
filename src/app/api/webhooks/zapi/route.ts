@@ -2533,8 +2533,8 @@ export async function POST(req: Request) {
         const leadFirstName = leadFullNameRaw ? leadFullNameRaw.split(/\s+/)[0] || "" : "";
 
         const rawCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
-        let leadHasCancelledBooking = Boolean(rawCancelledAt && rawCancelledAt !== "null");
-        if (!leadHasCancelledBooking) {
+        let earlyLeadBlockedByCancelledBooking = Boolean(rawCancelledAt && rawCancelledAt !== "null");
+        if (!earlyLeadBlockedByCancelledBooking) {
           try {
             const { data: anyCancelledBooking } = await admin
               .from("atendimento_experimental_class_bookings")
@@ -2544,11 +2544,11 @@ export async function POST(req: Request) {
               .limit(1)
               .maybeSingle();
             if ((anyCancelledBooking as any)?.id) {
-              leadHasCancelledBooking = true;
+              earlyLeadBlockedByCancelledBooking = true;
             }
           } catch (_e) {}
         }
-        if (leadHasCancelledBooking) {
+        if (earlyLeadBlockedByCancelledBooking) {
           return Response.json({
             ok: true,
             ignored: true,
