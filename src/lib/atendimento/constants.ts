@@ -92,18 +92,13 @@ export const POST_BOOKING_CPF_SUCCESS_MESSAGE =
 export const ATENDIMENTO_PROFESSOR_TIME_ZONE = "America/Cuiaba";
 export const WHATSAPP_REGISTERED_SUCCESS_MESSAGE = "WhatsApp registrado com sucesso.";
 export const EXPERIMENTAL_CLASS_DATE_INTRO_MESSAGE =
-  "Agora é só escolher o melhor dia e horário para sua aula experimental, com base no horário da sua cidade.";
+  "Agora é só escolher o melhor dia e horário para sua aula experimental, COM BASE NO HORÁRIO DA SUA CIDADE.";
 export const EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE = "Para começarmos, qual dia você prefere?";
 export function buildExperimentalClassDatePromptMessages(name?: string | null) {
   const safeFull = String(name ?? "").trim();
-  const safeFirst = safeFull.split(/\s+/)[0] || "";
-  if (safeFirst) {
-    return [
-      `${safeFirst}, agora é só escolher o melhor dia e horário para sua aula experimental, com base no horário da sua cidade.`,
-    ];
-  }
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
   return [
-    `Agora é só escolher o melhor dia e horário para sua aula experimental, com base no horário da sua cidade.`,
+    `${safeFirst}, agora é só escolher o melhor dia e horário para sua aula experimental, COM BASE NO HORÁRIO DA SUA CIDADE.`,
   ];
 }
 export const LOCATION_STATE_INVALID_MESSAGE =
