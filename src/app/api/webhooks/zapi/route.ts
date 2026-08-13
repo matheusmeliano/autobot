@@ -604,7 +604,8 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
     const typeMatch =
       typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") ||
       typeSource.includes("missed") || typeSource.includes("perdida") || typeSource.includes("voice_call") ||
-      typeSource.includes("phone_call") || typeSource.includes("incoming") || typeSource.includes("chamada");
+      typeSource.includes("phone_call") || typeSource.includes("chamada") ||
+      typeSource.includes("incoming_call") || typeSource.includes("incoming_missed");
     const candidates: Array<any> = [body, body?.data, body?.call, body?.message, body?.callInfo, body?.call_info, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
     let hasStructural = false;
     for (const c of candidates) {
@@ -612,10 +613,14 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
       if (String(getFirstNonEmpty(c?.callId, c?.call_id, c?.id, c?.CallId) || "").trim()) { hasStructural = true; break; }
       if (String(getFirstNonEmpty(c?.duration, c?.Duration, c?.seconds, c?.callDuration) || "").trim()) { hasStructural = true; break; }
       const status = normalizeText(getFirstNonEmpty(c?.status, c?.callStatus, c?.state, c?.result) || "");
-      if (status && ["missed", "perdida", "incoming", "outgoing", "ended", "busy", "declined", "not_answered", "nao_atendida", "não_atendida"].some((s) => status.includes(s))) { hasStructural = true; break; }
+      if (status && ["missed", "perdida", "incoming_call", "outgoing", "ended", "busy", "declined", "not_answered", "nao_atendida", "não_atendida"].some((s) => status.includes(s))) { hasStructural = true; break; }
       for (const k of ["fromMe", "from_me", "isFromMe"]) {
         const raw = (c as any)[k];
-        if (typeof raw === "boolean") { hasStructural = true; break; }
+        if (raw === true) { hasStructural = true; break; }
+        if (typeof raw === "string") {
+          const s = raw.trim().toLowerCase();
+          if (s === "true" || s === "1" || s === "yes") { hasStructural = true; break; }
+        }
       }
       if (hasStructural) break;
     }
