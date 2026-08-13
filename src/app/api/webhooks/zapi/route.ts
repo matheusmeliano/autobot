@@ -479,26 +479,117 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
       Array.isArray(body?.messages) ? body?.messages?.[0]?.type : "",
     ),
   );
-  const hasImage = Boolean(body?.image || body?.message?.image || body?.data?.image || body?.data?.message?.image);
-  const hasDocument = Boolean(body?.document || body?.message?.document || body?.data?.document || body?.data?.message?.document || body?.file || body?.message?.file || body?.data?.file);
-  const hasVideo = Boolean(body?.video || body?.message?.video || body?.data?.video || body?.data?.message?.video);
-  const hasAudio = Boolean(body?.audio || body?.message?.audio || body?.data?.audio || body?.data?.message?.audio || body?.voice || body?.message?.voice || body?.data?.voice);
-  const hasSticker = Boolean(body?.sticker || body?.message?.sticker || body?.data?.sticker || body?.data?.message?.sticker);
-  const hasGif = typeSource.includes("gif") || typeSource.includes("animated");
-  const hasLocation = Boolean(body?.location || body?.message?.location || body?.data?.location || body?.data?.message?.location) || typeSource.includes("location") || typeSource.includes("localizacao") || typeSource.includes("localização");
-  const hasCall = typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") || typeSource.includes("missed") || typeSource.includes("perdida");
-  const hasContact = Boolean(body?.contact || body?.contacts || body?.message?.contact || body?.data?.contact) || typeSource.includes("contact") || typeSource.includes("contato") || typeSource.includes("vcard");
-  const hasMediaUrlRaw = Boolean(
-    getFirstNonEmpty(
-      body?.image?.url, body?.imageUrl, body?.media?.url, body?.file?.url, body?.document?.url,
-      body?.message?.image?.url, body?.message?.document?.url, body?.message?.file?.url,
-      body?.video?.url, body?.audio?.url, body?.voice?.url, body?.sticker?.url,
-      body?.data?.image?.url, body?.data?.media?.url, body?.data?.file?.url,
-      Array.isArray(body?.messages) ? body?.messages?.[0]?.image?.url : "",
-      Array.isArray(body?.messages) ? body?.messages?.[0]?.video?.url : "",
-      Array.isArray(body?.messages) ? body?.messages?.[0]?.audio?.url : "",
-    ),
+  const getUrl = (...paths: Array<any>): string => {
+    for (const p of paths) {
+      if (!p) continue;
+      if (typeof p === "string") {
+        const s = p.trim();
+        if (s && s.length > 4) return s;
+      } else if (typeof p === "object") {
+        for (const k of ["url", "mediaUrl", "link", "media", "imageUrl", "fileUrl", "downloadUrl"]) {
+          const v = p?.[k];
+          if (typeof v === "string") {
+            const s = v.trim();
+            if (s && s.length > 4) return s;
+          }
+        }
+      }
+    }
+    return "";
+  };
+  const imgUrl = getUrl(
+    body?.image, body?.imageUrl, body?.message?.image, body?.data?.image, body?.data?.message?.image,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.image : "",
   );
+  const docUrl = getUrl(
+    body?.document, body?.file, body?.message?.document, body?.message?.file,
+    body?.data?.document, body?.data?.file, body?.data?.message?.document, body?.data?.message?.file,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.document : "",
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.file : "",
+  );
+  const videoUrl = getUrl(
+    body?.video, body?.message?.video, body?.data?.video, body?.data?.message?.video,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.video : "",
+  );
+  const audioUrl = getUrl(
+    body?.audio, body?.voice, body?.message?.audio, body?.message?.voice,
+    body?.data?.audio, body?.data?.voice, body?.data?.message?.audio,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.audio : "",
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.voice : "",
+  );
+  const stickerUrl = getUrl(
+    body?.sticker, body?.message?.sticker, body?.data?.sticker, body?.data?.message?.sticker,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.sticker : "",
+  );
+  const hasGif =
+    (typeSource.includes("gif") || typeSource.includes("animated")) &&
+    Boolean(getUrl(
+      body?.media, body?.message?.media, body?.data?.media, body?.data?.message?.media,
+      body?.image, body?.sticker, body?.video,
+    ));
+  const getNum = (v: any): number => {
+    if (v == null) return NaN;
+    const n = typeof v === "number" ? v : Number(String(v).trim());
+    return Number.isFinite(n) ? n : NaN;
+  };
+  const locRaw = (() => {
+    const candidates: Array<any> = [
+      body?.location, body?.message?.location, body?.data?.location, body?.data?.message?.location,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.location : null,
+    ];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      const lat = getNum(getFirstNonEmpty(c?.latitude, c?.lat, c?.lati, c["Latitude"], c["Lat"]));
+      const lng = getNum(getFirstNonEmpty(c?.longitude, c?.lng, c?.longi, c?.lon, c["Longitude"], c["Lng"]));
+      const addr = String(getFirstNonEmpty(c?.address, c?.Address, c?.label, c?.Label, c?.placeName, c?.place) || "").trim();
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { has: true as const };
+      if (addr.length >= 2) return { has: true as const };
+    }
+    return { has: false as const };
+  })();
+  const hasLocation = locRaw.has || typeSource.includes("location") || typeSource.includes("localizacao") || typeSource.includes("localização");
+  const hasCall = (() => {
+    if (typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") || typeSource.includes("missed") || typeSource.includes("perdida")) {
+      const candidates = [body, body?.data, body?.call, body?.message, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+      for (const c of candidates) {
+        if (!c || typeof c !== "object") continue;
+        if (String(getFirstNonEmpty(c?.callId, c?.call_id, c?.id) || "").trim()) return true;
+        if (String(getFirstNonEmpty(c?.duration, c?.Duration, c?.seconds) || "").trim()) return true;
+        const status = normalizeText(getFirstNonEmpty(c?.status, c?.callStatus, c?.state) || "");
+        if (status && ["missed", "perdida", "incoming", "outgoing", "ended", "busy", "declined"].some((s) => status.includes(s))) return true;
+      }
+      return false;
+    }
+    return false;
+  })();
+  const hasContact = (() => {
+    const t = typeSource.includes("contact") || typeSource.includes("contato") || typeSource.includes("vcard");
+    const candidates: Array<any> = [
+      body, body?.message, body?.data, body?.data?.message,
+      Array.isArray(body?.messages) ? body?.messages?.[0] : null,
+    ];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      for (const k of ["contact", "contacts", "vcard", "vCard"]) {
+        const arrOrObj = c?.[k];
+        if (!arrOrObj) continue;
+        const arr = Array.isArray(arrOrObj) ? arrOrObj : [arrOrObj];
+        for (const entry of arr) {
+          if (!entry || typeof entry !== "object") continue;
+          if (String(getFirstNonEmpty(entry?.name, entry?.displayName, entry?.formattedName) || "").trim()) return true;
+          const phones = Array.isArray(entry?.phones) ? entry?.phones : (entry?.phone ? [entry?.phone] : []);
+          if (phones.length > 0 && phones.some((p: any) => String(getFirstNonEmpty(p?.number, p?.phone, p?.value, p) || "").trim())) return true;
+        }
+      }
+    }
+    return t;
+  })();
+  const anyMediaUrl =
+    Boolean(imgUrl) || Boolean(docUrl) || Boolean(videoUrl) || Boolean(audioUrl) || Boolean(stickerUrl) ||
+    Boolean(getUrl(
+      body?.media, body?.message?.media, body?.data?.media, body?.data?.message?.media,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.media : "",
+    ));
   const messageTextAny = getFirstNonEmpty(
     (body as any).text?.message,
     (body as any).text?.body,
@@ -514,29 +605,19 @@ function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detected
     (body as any).data?.message,
     (body as any).data?.body,
   );
-  const detected: Array<string> = [];
-  if (hasImage) detected.push("image");
-  if (hasDocument) detected.push("document");
-  if (hasVideo) detected.push("video");
-  if (hasAudio) detected.push("audio");
-  if (hasSticker) detected.push("sticker");
-  if (hasGif) detected.push("gif");
-  if (hasLocation) detected.push("location");
-  if (hasCall) detected.push("call");
-  if (hasContact) detected.push("contact");
-  const nonTextTypes = ["audio", "image", "video", "document", "sticker", "gif", "location", "contact", "call", "media", "reaction", "order"];
-  const typeMatchNonText = nonTextTypes.some((t) => typeSource.includes(t)) || detected.length > 0;
   if (hasCall) return { isUnrecognized: true, detectedType: "call" };
   if (hasLocation) return { isUnrecognized: true, detectedType: "location" };
   if (hasContact) return { isUnrecognized: true, detectedType: "contact" };
-  if (hasAudio) return { isUnrecognized: true, detectedType: "audio" };
-  if (hasVideo) return { isUnrecognized: true, detectedType: "video" };
-  if (hasSticker) return { isUnrecognized: true, detectedType: "sticker" };
+  if (audioUrl) return { isUnrecognized: true, detectedType: "audio" };
+  if (videoUrl) return { isUnrecognized: true, detectedType: "video" };
+  if (stickerUrl) return { isUnrecognized: true, detectedType: "sticker" };
   if (hasGif) return { isUnrecognized: true, detectedType: "gif" };
-  if (hasImage) return { isUnrecognized: true, detectedType: "image" };
-  if (hasDocument) return { isUnrecognized: true, detectedType: "document" };
-  if (typeMatchNonText && !messageTextAny) return { isUnrecognized: true, detectedType: "non_text_type" };
-  if (hasMediaUrlRaw && !messageTextAny) return { isUnrecognized: true, detectedType: "media_attachment" };
+  if (imgUrl) return { isUnrecognized: true, detectedType: "image" };
+  if (docUrl) return { isUnrecognized: true, detectedType: "document" };
+  const nonTextTypes = ["audio", "image", "video", "document", "sticker", "gif", "location", "contact", "call", "media", "reaction", "order"];
+  const typeMatchNonText = nonTextTypes.some((ty) => typeSource.includes(ty));
+  if (typeMatchNonText && !messageTextAny && anyMediaUrl) return { isUnrecognized: true, detectedType: "non_text_type" };
+  if (anyMediaUrl && !messageTextAny) return { isUnrecognized: true, detectedType: "media_attachment" };
   return { isUnrecognized: false, detectedType: "text_or_unknown" };
 }
 
