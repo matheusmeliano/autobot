@@ -771,6 +771,31 @@ export function findExperimentalClassTimeOption(
     }
   }
 
+  if (digitsMatches && digitsMatches.length === 1) {
+    const pureHour = Number(digitsMatches[0]);
+    if (Number.isFinite(pureHour) && pureHour >= 0 && pureHour <= 23) {
+      for (const hPad of [String(pureHour).padStart(2, "0"), String(pureHour)]) {
+        const wantedExactZero = `${hPad}:00`;
+        const wantedNoZero = `${hPad}:00`;
+        for (const option of options) {
+          if (normalizeSelectionText(option.displayLabel) === wantedExactZero) return option;
+          if (normalizeSelectionText(option.leadTime) === wantedExactZero) return option;
+          if (normalizeSelectionText(option.displayLabel) === wantedNoZero) return option;
+          if (normalizeSelectionText(option.leadTime) === wantedNoZero) return option;
+        }
+      }
+      const candidates = options.filter((o) => {
+        const raw = normalizeSelectionText(o.displayLabel) || normalizeSelectionText(o.leadTime);
+        if (!raw) return false;
+        const hMatch = raw.match(/^(\d{1,2}):(\d{2})$/);
+        if (!hMatch) return false;
+        const hh = Number(hMatch[1]);
+        return hh === pureHour;
+      });
+      if (candidates.length === 1) return candidates[0] as ExperimentalClassTimeOption;
+    }
+  }
+
   return null;
 }
 

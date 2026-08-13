@@ -4724,6 +4724,190 @@ export async function POST(req: Request) {
           }
           const leadTz =
             String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const alreadyHasProfessorDate = String(
+            (lead as any)?.experimental_class_professor_date ?? "",
+          ).trim();
+          if (alreadyHasProfessorDate && /^\d{4}-\d{2}-\d{2}$/.test(alreadyHasProfessorDate)) {
+            const pres = await presentExperimentalClassTimeOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              phone: normalizedPhoneOnly,
+              leadTimeZone: leadTz,
+              professorDate: alreadyHasProfessorDate,
+              skipWhatsAppSend: true,
+            });
+            if (pres.slots && pres.slots.length) {
+              const chosenNow = findExperimentalClassTimeOption(inboundContent, pres.slots);
+              if (chosenNow) {
+                const professorDate = alreadyHasProfessorDate;
+
+                void appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "experimental_class_time_selected",
+                  title: "Horário da aula experimental selecionado via WhatsApp (fallback)",
+                  details: {
+                    professor_date: chosenNow.professorDate,
+                    professor_time: chosenNow.professorTime,
+                    professor_start_at: chosenNow.professorStartAt,
+                    lead_date: chosenNow.leadDate,
+                    lead_time: chosenNow.leadTime,
+                    label: chosenNow.displayLabel,
+                  },
+                  actorType: "system",
+                });
+
+                try {
+                  await admin
+                    .from("atendimento_leads")
+                    .update({
+                      experimental_class_professor_date: chosenNow.professorDate,
+                      experimental_class_lead_date: chosenNow.leadDate,
+                      experimental_class_professor_time: chosenNow.professorTime,
+                      experimental_class_lead_time: chosenNow.leadTime,
+                      experimental_class_professor_start_at: chosenNow.professorStartAt,
+                      experimental_class_lead_start_at: chosenNow.professorStartAt,
+                      experimental_class_status: "time_selected",
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({ updated_at: nowIso })
+                      .eq("id", leadId);
+                  } catch (_e2) {}
+                }
+
+                const already = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+                if (!already?.id) {
+                  const { data: booking } = await admin
+                    .from("atendimento_experimental_class_bookings")
+                    .insert({
+                      lead_id: leadId,
+                      conversation_id: conversationId,
+                      professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                      lead_timezone: leadTz,
+                      professor_date: chosenNow.professorDate,
+                      professor_time: chosenNow.professorTime,
+                      professor_start_at: chosenNow.professorStartAt,
+                      lead_date: chosenNow.leadDate,
+                      lead_time: chosenNow.leadTime,
+                      lead_start_at: chosenNow.professorStartAt,
+                      status: "scheduled",
+                    })
+                    .select("*")
+                    .maybeSingle();
+
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({
+                        experimental_class_booking_id: booking?.id ?? null,
+                        experimental_class_status: "booked",
+                        funnel_stage: "aula_experimental_agendada",
+                        updated_at: nowIso,
+                      })
+                      .eq("id", leadId);
+                  } catch (_e) {}
+                }
+
+                const firstName = String((lead as any)?.full_name ?? "").trim().split(" ")[0] || null;
+                const needsPostBookingCpf = !Boolean(String((lead as any)?.cpf ?? "").trim());
+
+                if (needsPostBookingCpf) {
+                  const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
+                  const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
+                  await sendAtendimentoWhatsAppTextBatch({
+                    phone: normalizedPhoneOnly,
+                    messages: combinedBatch,
+                    admin,
+                    conversationId,
+                    insertIntoConversation: true,
+                  });
+
+                  void appendHistoryEvent({
+                    leadId,
+                    conversationId,
+                    eventType: "cpf_prompt_presented",
+                    title: "Prompt pós-agendamento de CPF apresentado ao lead via WhatsApp (fallback)",
+                    details: { phone: normalizedPhoneOnly, stage: "immediately_after_booking" },
+                    actorType: "system",
+                  });
+
+                  const __cpfInsert = insertWhatsAppBotTextMessage({
+                    admin,
+                    conversationId,
+                    contentText: POST_BOOKING_CPF_PROMPT,
+                  });
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: normalizedPhoneOnly,
+                      message: POST_BOOKING_CPF_PROMPT,
+                    });
+                  } catch (_e) {}
+                  void __cpfInsert.catch(() => {});
+                } else {
+                  const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
+                  const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
+                  await sendAtendimentoWhatsAppTextBatch({
+                    phone: normalizedPhoneOnly,
+                    messages: combinedBatch,
+                    admin,
+                    conversationId,
+                    insertIntoConversation: true,
+                  });
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+                      message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
+                    });
+                  } catch (_e) {}
+                }
+
+                return Response.json({
+                  ok: true,
+                  handled: true,
+                  flow: "whatsapp_fallback_date_present_then_booked",
+                });
+              }
+              const msgsRaw = buildExperimentalClassTimesMessages({
+                dayLabel: alreadyHasProfessorDate.slice(8, 10),
+                options: pres.slots,
+              });
+              const msgBatch = [msgsRaw.filter(Boolean).join("\n\n")];
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: msgBatch,
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+              });
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "experimental_class_time_options_presented",
+                title: "Horários disponíveis da aula experimental apresentados (fallback)",
+                details: {
+                  teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                  lead_timezone: leadTz,
+                  professor_date: alreadyHasProfessorDate,
+                  options: pres.slots.map((s: any) => ({
+                    label: s?.displayLabel ?? "",
+                    professor_time: s?.professorTime ?? "",
+                  })),
+                },
+                actorType: "system",
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_time_presented_fallback_already_has_date",
+              });
+            }
+          }
           await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
