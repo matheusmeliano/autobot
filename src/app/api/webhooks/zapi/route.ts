@@ -4789,10 +4789,11 @@ export async function POST(req: Request) {
         }
 
         if (isFirstBotInteraction) {
+          const zeroMessage = "POR FAVOR, ENVIE SUA RESPOSTA SOMENTE EM TEXTO.";
           const firstMessage =
             "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
           const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;
-          const welcomeSingleMessage = [firstMessage, secondMessage].filter(Boolean).join("\n\n");
+          const welcomeSingleMessage = [zeroMessage, firstMessage, secondMessage].filter(Boolean).join("\n\n");
 
           await sendAtendimentoWhatsAppTextBatch({
             phone: normalizedPhoneOnly,
