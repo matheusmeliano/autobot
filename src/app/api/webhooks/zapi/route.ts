@@ -464,6 +464,171 @@ function extractMediaInfo(body: any) {
   };
 }
 
+function isInboundMessagePureNonTextAtNameStage(body: any): boolean {
+  if (!body || typeof body !== "object") return false;
+  const typeSource = normalizeText(
+    getFirstNonEmpty(
+      body?.type,
+      body?.event,
+      body?.eventType,
+      body?.message?.type,
+      body?.message?.mimetype,
+      body?.message?.mimeType,
+      body?.data?.type,
+      body?.data?.event,
+      body?.data?.message?.type,
+      body?.data?.message?.mimetype,
+      body?.data?.message?.mimeType,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.type : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.mimetype : "",
+    ),
+  );
+  const msgText = String(
+    getFirstNonEmpty(
+      (body as any).text?.message,
+      (body as any).text?.body,
+      (body as any).message,
+      (body as any).body,
+      (body as any).message?.text,
+      (body as any).message?.body,
+      (body as any).data?.message?.text,
+      (body as any).data?.message?.body,
+      Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.text : "",
+      Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.body : "",
+      (body as any).data?.text?.message,
+      (body as any).data?.message,
+      (body as any).data?.body,
+    ) || "",
+  ).trim();
+  if (msgText.length > 0) return false;
+  const has = (candidates: Array<any>): boolean => {
+    for (const c of candidates) {
+      if (!c) continue;
+      if (typeof c === "string") {
+        if (c.trim().length > 0) return true;
+      } else if (typeof c === "object") {
+        for (const k of Object.keys(c)) {
+          const v = (c as any)[k];
+          if (v == null) continue;
+          if (typeof v === "string" && v.trim().length > 0) return true;
+          if (typeof v === "number" && Number.isFinite(v)) return true;
+          if (typeof v === "boolean") return true;
+          if (Array.isArray(v) && v.length > 0) return true;
+          if (typeof v === "object") return true;
+        }
+        return Object.keys(c).length > 0;
+      }
+    }
+    return false;
+  };
+  const unifiedMediaUrl = (() => {
+    const candidates: Array<any> = [
+      body?.message?.mediaUrl, body?.message?.media, body?.mediaUrl, body?.media?.url,
+      body?.data?.message?.mediaUrl, body?.data?.message?.media, body?.data?.mediaUrl, body?.data?.media?.url,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.mediaUrl : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.media : "",
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 4) return true;
+      if (c && typeof c === "object") {
+        for (const k of ["url", "mediaUrl", "link", "media", "imageUrl", "fileUrl", "downloadUrl", "download_link", "media_link", "direct_path"]) {
+          const v = (c as any)[k];
+          if (typeof v === "string" && v.trim().length > 4) return true;
+        }
+      }
+    }
+    return false;
+  })();
+  const isVoice = (() => {
+    const candidates: Array<any> = [body, body?.message, body?.data, body?.data?.message, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      for (const k of ["isVoice", "is_voice", "isAudio", "is_audio", "voice", "audio"]) {
+        const raw = (c as any)[k];
+        if (raw == null) continue;
+        if (typeof raw === "boolean" && raw) return true;
+        const s = String(raw).trim().toLowerCase();
+        if (s === "true" || s === "1" || s === "yes" || s === "on") return true;
+      }
+    }
+    return false;
+  })();
+  const hasImage = has([body?.image, body?.imageUrl, body?.message?.image, body?.data?.image, body?.data?.message?.image, Array.isArray(body?.messages) ? body?.messages?.[0]?.image : ""]);
+  const hasDocument = has([body?.document, body?.file, body?.message?.document, body?.message?.file, body?.data?.document, body?.data?.file, body?.data?.message?.document, body?.data?.message?.file, Array.isArray(body?.messages) ? body?.messages?.[0]?.document : "", Array.isArray(body?.messages) ? body?.messages?.[0]?.file : ""]);
+  const hasVideo = has([body?.video, body?.message?.video, body?.data?.video, body?.data?.message?.video, Array.isArray(body?.messages) ? body?.messages?.[0]?.video : ""]);
+  const hasAudio = has([body?.audio, body?.voice, body?.message?.audio, body?.message?.voice, body?.data?.audio, body?.data?.voice, body?.data?.message?.audio, Array.isArray(body?.messages) ? body?.messages?.[0]?.audio : "", Array.isArray(body?.messages) ? body?.messages?.[0]?.voice : ""]) || isVoice;
+  const hasSticker = has([body?.sticker, body?.message?.sticker, body?.data?.sticker, body?.data?.message?.sticker, Array.isArray(body?.messages) ? body?.messages?.[0]?.sticker : ""]);
+  const hasLocation = (() => {
+    const candidates: Array<any> = [body?.location, body?.message?.location, body?.data?.location, body?.data?.message?.location, Array.isArray(body?.messages) ? body?.messages?.[0]?.location : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      const lat = Number(getFirstNonEmpty(c?.latitude, c?.lat, c?.lati) || NaN);
+      const lng = Number(getFirstNonEmpty(c?.longitude, c?.lng, c?.longi, c?.lon) || NaN);
+      const addr = String(getFirstNonEmpty(c?.address, c?.label, c?.placeName, c?.place) || "").trim();
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return true;
+      if (addr.length >= 2) return true;
+    }
+    return false;
+  })();
+  const hasCall = (() => {
+    const typeMatch =
+      typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") ||
+      typeSource.includes("missed") || typeSource.includes("perdida") || typeSource.includes("voice_call") ||
+      typeSource.includes("phone_call") || typeSource.includes("chamada") ||
+      typeSource.includes("incoming_call") || typeSource.includes("incoming_missed");
+    if (!typeMatch) return false;
+    const candidates: Array<any> = [body, body?.data, body?.call, body?.message, body?.callInfo, body?.call_info, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      if (String(getFirstNonEmpty(c?.callId, c?.call_id, c?.id, c?.CallId) || "").trim()) return true;
+      if (String(getFirstNonEmpty(c?.duration, c?.Duration, c?.seconds, c?.callDuration) || "").trim()) return true;
+      const status = normalizeText(getFirstNonEmpty(c?.status, c?.callStatus, c?.state, c?.result) || "");
+      if (status && ["missed", "perdida", "incoming_call", "outgoing", "ended", "busy", "declined", "not_answered", "nao_atendida", "não_atendida"].some((s) => status.includes(s))) return true;
+      for (const k of ["fromMe", "from_me", "isFromMe"]) {
+        const raw = (c as any)[k];
+        if (raw === true) return true;
+      }
+    }
+    return true;
+  })();
+  const hasContact = (() => {
+    if (typeSource.includes("contact") || typeSource.includes("contato") || typeSource.includes("vcard")) return true;
+    const candidates: Array<any> = [body, body?.message, body?.data, body?.data?.message, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      for (const k of ["contact", "contacts", "vcard", "vCard", "vCards"]) {
+        const arrOrObj = (c as any)[k];
+        if (!arrOrObj) continue;
+        const arr = Array.isArray(arrOrObj) ? arrOrObj : [arrOrObj];
+        for (const entry of arr) {
+          if (!entry || typeof entry !== "object") continue;
+          if (String(getFirstNonEmpty(entry?.name, entry?.displayName, entry?.formattedName, entry?.Name) || "").trim()) return true;
+          const phones = Array.isArray(entry?.phones) ? entry?.phones : (entry?.phone ? [entry?.phone] : []);
+          if (phones.length > 0 && phones.some((p: any) => String(getFirstNonEmpty(p?.number, p?.phone, p?.value, p) || "").trim())) return true;
+        }
+      }
+    }
+    return false;
+  })();
+  const hasGif =
+    (typeSource.includes("gif") || typeSource.includes("animated") || typeSource.includes("animado")) &&
+    (hasImage || hasSticker || hasVideo || unifiedMediaUrl);
+  const audioMimeOrType = typeSource.includes("audio") || typeSource.includes("voice") || typeSource.includes("voz") || typeSource.includes("ogg") || typeSource.includes("opus") || typeSource.includes("mpeg");
+  if (hasCall) return true;
+  if (hasLocation) return true;
+  if (hasContact) return true;
+  if (hasAudio || (audioMimeOrType && unifiedMediaUrl)) return true;
+  if (hasVideo) return true;
+  if (hasSticker) return true;
+  if (hasGif) return true;
+  if (hasImage) return true;
+  if (hasDocument) return true;
+  if (unifiedMediaUrl) return true;
+  const nonTextTypeMatch = ["audio", "image", "video", "document", "sticker", "gif", "location", "contact", "call", "media", "reaction", "order"].some((ty) => typeSource.includes(ty));
+  if (nonTextTypeMatch) return true;
+  return false;
+}
+
 function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null; hasPaymentMedia?: boolean }) {
   const t = normalizeText(params.text || "");
   const hasMedia = Boolean(params.hasPaymentMedia || (params.mediaUrl || "").trim());
@@ -4660,6 +4825,37 @@ export async function POST(req: Request) {
         const wantsNameStage = expectedField === "full_name" || (!expectedField && nextMissingField === "full_name");
         const leadFullName = String((lead as any)?.full_name ?? "").trim();
         if (wantsNameStage && !leadFullName) {
+          if (isInboundMessagePureNonTextAtNameStage(body)) {
+            const msg =
+              "Nessa etapa do atendimento, aceitamos apenas mensagens de texto. Por favor, digite seu primeiro e segundo nome.";
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+            try {
+              await admin
+                .from("atendimento_conversations").update({ updated_at: nowIso }).eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  unread_count: Number(lead.unread_count ?? 0) + 1,
+                  is_new_for_attendant: true,
+                  last_interaction_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            void syncConversationPreview({ conversationId, contentText: msg, createdAt: nowIso });
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_name_rejected_non_text",
+              blocked: false,
+            });
+          }
           const nameCandidate = firstTwoNamesFromFullName(inboundContent || "");
           const alphaMatches = nameCandidate.match(/[A-Za-zÀ-ÿ]/g);
           const letterCount = Array.isArray(alphaMatches) ? alphaMatches.length : 0;
