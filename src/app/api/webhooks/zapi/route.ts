@@ -740,6 +740,38 @@ async function countWhatsAppScheduleFailures(params: {
   return Number(count ?? 0);
 }
 
+async function isLeadBlockedByPreviousCancelledBooking(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  lead: any;
+  leadId: string;
+}) {
+  const rawCancelledAt = String(params?.lead?.latest_experimental_class_cancelled_at ?? "").trim();
+  if (rawCancelledAt && rawCancelledAt !== "null") return true;
+  const statusRaw = String(params?.lead?.experimental_class_booking?.status ?? params?.lead?.booking?.status ?? "").trim().toLowerCase();
+  if (statusRaw === "cancelled") return true;
+  try {
+    const { data: row } = await params.admin
+      .from("atendimento_experimental_class_bookings")
+      .select("id")
+      .eq("lead_id", params.leadId)
+      .eq("status", "cancelled")
+      .limit(1)
+      .maybeSingle();
+    if ((row as any)?.id) return true;
+  } catch (_e) {}
+  try {
+    const { data: leadRowFull } = await params.admin
+      .from("atendimento_leads")
+      .select("latest_experimental_class_cancelled_at")
+      .eq("id", params.leadId)
+      .limit(1)
+      .maybeSingle();
+    const fullRaw = String((leadRowFull as any)?.latest_experimental_class_cancelled_at ?? "").trim();
+    if (fullRaw && fullRaw !== "null") return true;
+  } catch (_e) {}
+  return false;
+}
+
 async function detectExpectedWhatsAppFieldFromHistory(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -1986,6 +2018,19 @@ export async function POST(req: Request) {
 
     if (!leadRecord?.id || !pendingPhone) {
       return Response.json({ ok: true, ignored: true, reason: "missing_pending_lead_or_phone" });
+    }
+
+    const blockedByCancel = await isLeadBlockedByPreviousCancelledBooking({
+      admin,
+      lead: leadRecord,
+      leadId: String(leadRecord.id),
+    });
+    if (blockedByCancel) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "blocked_previous_experimental_class_booking_cancelled",
+      });
     }
 
     const resolvedLeadLocation = String((leadRecord as any)?.city ?? "").trim()
@@ -3921,6 +3966,19 @@ export async function POST(req: Request) {
           });
         }
 
+        const leadHasCancelledBooking = await isLeadBlockedByPreviousCancelledBooking({
+          admin,
+          lead,
+          leadId,
+        });
+        if (leadHasCancelledBooking) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "blocked_previous_experimental_class_booking_cancelled",
+          });
+        }
+
         if (!conversation.bot_enabled) {
           if (isBookingWaitingAttendance || handledByPosAttendanceFlow) {
             return Response.json({
@@ -3934,14 +3992,17 @@ export async function POST(req: Request) {
           }
           let finalReason = "conversation_blocked";
           let responseMessage: string | null = null;
-          const hasBooking = currentBookingId ? currentBooking : null;
+          const hasBooking =
+            currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() !== "cancelled"
+              ? currentBooking
+              : null;
           if (hasBooking?.id && !handledByPosAttendanceFlow && effectiveWaitMessage) {
             finalReason = "conversation_blocked_echo_booking_scheduled";
             responseMessage = effectiveWaitMessage;
           } else {
             const histFinal = await admin
               .from("atendimento_history_events")
-              .select("event_type")
+              .select("event_type, created_at")
               .eq("lead_id", leadId)
               .eq("conversation_id", conversationId)
               .in("event_type", [
@@ -3950,13 +4011,37 @@ export async function POST(req: Request) {
                 "whatsapp_flow_blocked_max_attempts",
               ])
               .order("created_at", { ascending: false })
-              .limit(3);
-            const events = (histFinal.data ?? []) as Array<{ event_type: string }>;
-            const hasScheduled = events.some(
+              .limit(5);
+            const events = (histFinal.data ?? []) as Array<{ event_type: string; created_at?: string | null }>;
+            const latestCancelledBookingCreatedAt = await (async () => {
+              try {
+                const { data: cancelledBooking } = await admin
+                  .from("atendimento_experimental_class_bookings")
+                  .select("updated_at, created_at")
+                  .eq("lead_id", leadId)
+                  .eq("status", "cancelled")
+                  .order("updated_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                if ((cancelledBooking as any)?.updated_at) return (cancelledBooking as any).updated_at;
+                if ((cancelledBooking as any)?.created_at) return (cancelledBooking as any).created_at;
+                return null;
+              } catch (_e) {
+                return null;
+              }
+            })();
+            const scheduledDates = events.filter((e) => e.event_type === "experimental_class_scheduled");
+            const scheduledOlderThanCancel = scheduledDates.some((ev) => {
+              if (!ev?.created_at) return false;
+              if (!latestCancelledBookingCreatedAt) return false;
+              return new Date(ev.created_at).getTime() <= new Date(latestCancelledBookingCreatedAt).getTime();
+            });
+            const safeHasScheduled = events.some(
               (e) =>
                 e.event_type === "experimental_class_scheduled" ||
                 e.event_type === "whatsapp_flow_concluded_bot_disabled",
-            );
+            ) && !scheduledOlderThanCancel && !latestCancelledBookingCreatedAt;
+            const hasScheduled = safeHasScheduled;
             const hasBlockedMaxAttempts = events.some(
               (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
             );
@@ -4065,7 +4150,10 @@ export async function POST(req: Request) {
         let expectedField = expectedFieldByText ?? expectedFieldByHistory;
         const nextMissingField = getWhatsAppNextMissingField(lead);
 
-        const existingBooking = currentBookingId ? currentBooking : null;
+        const existingBooking =
+          currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() !== "cancelled"
+            ? currentBooking
+            : null;
         const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
         const bookingAttendanceFullyResolvedEcho =
           bookingAttendanceAttendedByCol || bookingAttendanceNoShowByCol;
@@ -4135,14 +4223,41 @@ export async function POST(req: Request) {
             "whatsapp_flow_blocked_max_attempts",
           ])
           .order("created_at", { ascending: false })
-          .limit(3);
-        const eventsFlowRecent = (histFlowRecent.data ?? []) as Array<{ event_type: string }>;
-        const recentFlowConclusion = eventsFlowRecent.length > 0;
-        const recentIsScheduled = eventsFlowRecent.some(
-          (e) =>
-            e.event_type === "experimental_class_scheduled" ||
-            e.event_type === "whatsapp_flow_concluded_bot_disabled",
-        );
+          .limit(5);
+        const eventsFlowRecent = (histFlowRecent.data ?? []) as Array<{ event_type: string; created_at?: string | null }>;
+        const flowBlockedByPrevCancel = await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId });
+        const cancelledBookingForFlowCreatedAt = flowBlockedByPrevCancel
+          ? await (async () => {
+              try {
+                const { data: cancelledRow } = await admin
+                  .from("atendimento_experimental_class_bookings")
+                  .select("updated_at, created_at")
+                  .eq("lead_id", leadId)
+                  .eq("status", "cancelled")
+                  .order("updated_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                if ((cancelledRow as any)?.updated_at) return (cancelledRow as any).updated_at;
+                if ((cancelledRow as any)?.created_at) return (cancelledRow as any).created_at;
+                return null;
+              } catch (_e) {
+                return null;
+              }
+            })()
+          : null;
+        const scheduledFlowEvents = eventsFlowRecent.filter((ev) => ev.event_type === "experimental_class_scheduled");
+        const scheduledFlowOlderThanCancel = scheduledFlowEvents.some((ev) => {
+          if (!cancelledBookingForFlowCreatedAt || !ev?.created_at) return false;
+          return new Date(ev.created_at).getTime() <= new Date(cancelledBookingForFlowCreatedAt).getTime();
+        });
+        const eventsFlowRecentAny = eventsFlowRecent.length > 0 && !scheduledFlowOlderThanCancel;
+        const recentFlowConclusion = eventsFlowRecentAny && !flowBlockedByPrevCancel;
+        const recentIsScheduled =
+          eventsFlowRecent.some(
+            (e) =>
+              e.event_type === "experimental_class_scheduled" ||
+              e.event_type === "whatsapp_flow_concluded_bot_disabled",
+          ) && !scheduledFlowOlderThanCancel && !flowBlockedByPrevCancel;
         const recentIsMaxAttemptsBlocked = eventsFlowRecent.some(
           (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
         );
