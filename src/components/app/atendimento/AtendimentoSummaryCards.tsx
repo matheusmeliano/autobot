@@ -252,6 +252,22 @@ function LeadDetails({
             </div>
           ) : null}
 
+          {(() => {
+            const lockedAtRaw = String((lead as any)?.unrecognized_input_support_locked_at ?? "").trim();
+            const flagRaw = String((lead as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+            const convFlagRaw = String(((lead as any)?.conversation as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+            const isLocked =
+              Boolean(lockedAtRaw && lockedAtRaw !== "null") ||
+              flagRaw === "true" || flagRaw === "1" || flagRaw === "yes" ||
+              convFlagRaw === "true" || convFlagRaw === "1" || convFlagRaw === "yes";
+            if (!isLocked) return null;
+            return (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-semibold text-red-200">
+                Atendimento não reconhecido
+              </div>
+            );
+          })()}
+
           {null /* Banner link da aula recorrente: REMOVIDO solicitacao usuario */}
 
           {null /* Aviso link da aula recorrente: REMOVIDO do painel lateral solicitacao usuario */}
@@ -589,6 +605,22 @@ function BookingDetails({
               Copiar
             </button>
           </div>
+
+          {(() => {
+            const lockedAtRaw = String((lead as any)?.unrecognized_input_support_locked_at ?? "").trim();
+            const flagRaw = String((lead as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+            const convFlagRaw = String(((lead as any)?.conversation as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+            const isLocked =
+              Boolean(lockedAtRaw && lockedAtRaw !== "null") ||
+              flagRaw === "true" || flagRaw === "1" || flagRaw === "yes" ||
+              convFlagRaw === "true" || convFlagRaw === "1" || convFlagRaw === "yes";
+            if (!isLocked) return null;
+            return (
+              <div className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-semibold text-red-200">
+                Atendimento não reconhecido
+              </div>
+            );
+          })()}
 
           {null /* Banner link da aula recorrente: REMOVIDO solicitacao usuario */}
 
@@ -1756,6 +1788,21 @@ export function AtendimentoSummaryCards({
                         {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
                       </div>
                       {(() => {
+                        const lockedAtRaw = String((lead as any)?.unrecognized_input_support_locked_at ?? "").trim();
+                        const flagRaw = String((lead as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+                        const convFlagRaw = String(((lead as any)?.conversation as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+                        const isLocked =
+                          Boolean(lockedAtRaw && lockedAtRaw !== "null") ||
+                          flagRaw === "true" || flagRaw === "1" || flagRaw === "yes" ||
+                          convFlagRaw === "true" || convFlagRaw === "1" || convFlagRaw === "yes";
+                        if (!isLocked) return null;
+                        return (
+                          <div className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-200">
+                            Atendimento não reconhecido
+                          </div>
+                        );
+                      })()}
+                      {(() => {
                         const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
                         const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
                         const hasTimeOk =
@@ -1885,6 +1932,21 @@ export function AtendimentoSummaryCards({
                     >
                       {String(selectedLead.full_name ?? "").trim() || selectedLead.phone || "Interessado sem telefone"}
                     </div>
+                    {(() => {
+                      const lockedAtRaw = String((selectedLead as any)?.unrecognized_input_support_locked_at ?? "").trim();
+                      const flagRaw = String((selectedLead as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+                      const convFlagRaw = String(((selectedLead as any)?.conversation as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+                      const isLocked =
+                        Boolean(lockedAtRaw && lockedAtRaw !== "null") ||
+                        flagRaw === "true" || flagRaw === "1" || flagRaw === "yes" ||
+                        convFlagRaw === "true" || convFlagRaw === "1" || convFlagRaw === "yes";
+                      if (!isLocked) return null;
+                      return (
+                        <div className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-200">
+                          Atendimento não reconhecido
+                        </div>
+                      );
+                    })()}
                     {(() => {
                       const recurringWeekdayRaw = String(selectedLead.recurring_class_weekday ?? "").trim().toLowerCase();
                       const recurringStatus = String(selectedLead.recurring_class_status ?? "").trim();

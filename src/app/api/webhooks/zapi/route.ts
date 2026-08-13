@@ -154,6 +154,8 @@ function isAuthorized(req: Request) {
 
 const CANCELLED_BOOKING_AUTO_REPLY_MSG =
   "Seu agendamento foi cancelado. Estamos analisando seu caso e, em breve, nossa equipe entrará em contato.";
+const UNRECOGNIZED_INPUT_LOCK_MSG =
+  "Neste atendimento, aceitamos apenas respostas em texto. Como foi realizada uma ação não prevista, nosso suporte entrará em contato em breve para ajudar.";
 
 function extractString(v: unknown) {
   if (typeof v === "string") return v;
@@ -464,6 +466,80 @@ function extractMediaInfo(body: any) {
   };
 }
 
+function detectUnrecognizedInput(body: any): { isUnrecognized: boolean; detectedType: string } {
+  const typeSource = normalizeText(
+    getFirstNonEmpty(
+      body?.type,
+      body?.event,
+      body?.eventType,
+      body?.message?.type,
+      body?.data?.type,
+      body?.data?.event,
+      body?.data?.message?.type,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.type : "",
+    ),
+  );
+  const hasImage = Boolean(body?.image || body?.message?.image || body?.data?.image || body?.data?.message?.image);
+  const hasDocument = Boolean(body?.document || body?.message?.document || body?.data?.document || body?.data?.message?.document || body?.file || body?.message?.file || body?.data?.file);
+  const hasVideo = Boolean(body?.video || body?.message?.video || body?.data?.video || body?.data?.message?.video);
+  const hasAudio = Boolean(body?.audio || body?.message?.audio || body?.data?.audio || body?.data?.message?.audio || body?.voice || body?.message?.voice || body?.data?.voice);
+  const hasSticker = Boolean(body?.sticker || body?.message?.sticker || body?.data?.sticker || body?.data?.message?.sticker);
+  const hasGif = typeSource.includes("gif") || typeSource.includes("animated");
+  const hasLocation = Boolean(body?.location || body?.message?.location || body?.data?.location || body?.data?.message?.location) || typeSource.includes("location") || typeSource.includes("localizacao") || typeSource.includes("localização");
+  const hasCall = typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") || typeSource.includes("missed") || typeSource.includes("perdida");
+  const hasContact = Boolean(body?.contact || body?.contacts || body?.message?.contact || body?.data?.contact) || typeSource.includes("contact") || typeSource.includes("contato") || typeSource.includes("vcard");
+  const hasMediaUrlRaw = Boolean(
+    getFirstNonEmpty(
+      body?.image?.url, body?.imageUrl, body?.media?.url, body?.file?.url, body?.document?.url,
+      body?.message?.image?.url, body?.message?.document?.url, body?.message?.file?.url,
+      body?.video?.url, body?.audio?.url, body?.voice?.url, body?.sticker?.url,
+      body?.data?.image?.url, body?.data?.media?.url, body?.data?.file?.url,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.image?.url : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.video?.url : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.audio?.url : "",
+    ),
+  );
+  const messageTextAny = getFirstNonEmpty(
+    (body as any).text?.message,
+    (body as any).text?.body,
+    (body as any).message,
+    (body as any).body,
+    (body as any).message?.text,
+    (body as any).message?.body,
+    (body as any).data?.message?.text,
+    (body as any).data?.message?.body,
+    Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.text : "",
+    Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.body : "",
+    (body as any).data?.text?.message,
+    (body as any).data?.message,
+    (body as any).data?.body,
+  );
+  const detected: Array<string> = [];
+  if (hasImage) detected.push("image");
+  if (hasDocument) detected.push("document");
+  if (hasVideo) detected.push("video");
+  if (hasAudio) detected.push("audio");
+  if (hasSticker) detected.push("sticker");
+  if (hasGif) detected.push("gif");
+  if (hasLocation) detected.push("location");
+  if (hasCall) detected.push("call");
+  if (hasContact) detected.push("contact");
+  const nonTextTypes = ["audio", "image", "video", "document", "sticker", "gif", "location", "contact", "call", "media", "reaction", "order"];
+  const typeMatchNonText = nonTextTypes.some((t) => typeSource.includes(t)) || detected.length > 0;
+  if (hasCall) return { isUnrecognized: true, detectedType: "call" };
+  if (hasLocation) return { isUnrecognized: true, detectedType: "location" };
+  if (hasContact) return { isUnrecognized: true, detectedType: "contact" };
+  if (hasAudio) return { isUnrecognized: true, detectedType: "audio" };
+  if (hasVideo) return { isUnrecognized: true, detectedType: "video" };
+  if (hasSticker) return { isUnrecognized: true, detectedType: "sticker" };
+  if (hasGif) return { isUnrecognized: true, detectedType: "gif" };
+  if (hasImage) return { isUnrecognized: true, detectedType: "image" };
+  if (hasDocument) return { isUnrecognized: true, detectedType: "document" };
+  if (typeMatchNonText && !messageTextAny) return { isUnrecognized: true, detectedType: "non_text_type" };
+  if (hasMediaUrlRaw && !messageTextAny) return { isUnrecognized: true, detectedType: "media_attachment" };
+  return { isUnrecognized: false, detectedType: "text_or_unknown" };
+}
+
 function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null; hasPaymentMedia?: boolean }) {
   const t = normalizeText(params.text || "");
   const hasMedia = Boolean(params.hasPaymentMedia || (params.mediaUrl || "").trim());
@@ -771,6 +847,43 @@ async function isLeadBlockedByPreviousCancelledBooking(params: {
       .maybeSingle();
     const fullRaw = String((leadRowFull as any)?.latest_experimental_class_cancelled_at ?? "").trim();
     if (fullRaw && fullRaw !== "null") return true;
+  } catch (_e) {}
+  return false;
+}
+
+async function isLeadLockedByUnrecognizedInput(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  lead: any;
+  conversation: any;
+  leadId: string;
+  conversationId: string;
+}) {
+  if (params?.lead?.unrecognized_input_support_locked_at) return true;
+  const leadFlagRaw = String(params?.lead?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+  if (leadFlagRaw === "true" || leadFlagRaw === "1" || leadFlagRaw === "yes") return true;
+  const convFlagRaw = String(params?.conversation?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+  if (convFlagRaw === "true" || convFlagRaw === "1" || convFlagRaw === "yes") return true;
+  try {
+    const { data: leadRow } = await params.admin
+      .from("atendimento_leads")
+      .select("unrecognized_input_support_locked_at, needs_unrecognized_support_lock")
+      .eq("id", params.leadId)
+      .limit(1)
+      .maybeSingle();
+    const rawLocked = (leadRow as any)?.unrecognized_input_support_locked_at;
+    if (rawLocked && String(rawLocked).trim() !== "null") return true;
+    const leadRowFlagRaw = String((leadRow as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+    if (leadRowFlagRaw === "true" || leadRowFlagRaw === "1" || leadRowFlagRaw === "yes") return true;
+  } catch (_e) {}
+  try {
+    const { data: convRow } = await params.admin
+      .from("atendimento_conversations")
+      .select("needs_unrecognized_support_lock")
+      .eq("id", params.conversationId)
+      .limit(1)
+      .maybeSingle();
+    const convRowFlagRaw = String((convRow as any)?.needs_unrecognized_support_lock ?? "").trim().toLowerCase();
+    if (convRowFlagRaw === "true" || convRowFlagRaw === "1" || convRowFlagRaw === "yes") return true;
   } catch (_e) {}
   return false;
 }
@@ -2051,6 +2164,36 @@ export async function POST(req: Request) {
       });
     }
 
+    const blockedByUnrec = await isLeadLockedByUnrecognizedInput({
+      admin,
+      lead: leadRecord,
+      conversation: null as any,
+      leadId: String(leadRecord.id),
+      conversationId: String((pendingEvent as any).conversation_id ?? ""),
+    });
+    if (blockedByUnrec) {
+      try {
+        await insertWhatsAppBotTextMessage({
+          admin,
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+        });
+      } catch (_e) {}
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: pendingPhone,
+          message: UNRECOGNIZED_INPUT_LOCK_MSG,
+        });
+      } catch (_e) {}
+      return Response.json({
+        ok: true,
+        ignored: false,
+        replied: true,
+        reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+        reason: "unrecognized_input_lock_auto_reply_sent",
+      });
+    }
+
     const resolvedLeadLocation = String((leadRecord as any)?.city ?? "").trim()
       ? resolveTimeZoneFromCityInput({
           city: String((leadRecord as any)?.city ?? ""),
@@ -2608,6 +2751,134 @@ export async function POST(req: Request) {
             replied: true,
             reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
             reason: "cancelled_booking_auto_reply_sent",
+          });
+        }
+
+        const earlyLeadLockedByUnrecognized = await isLeadLockedByUnrecognizedInput({
+          admin,
+          lead,
+          conversation,
+          leadId,
+          conversationId,
+        });
+        if (earlyLeadLockedByUnrecognized) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_unrecognized_input_lock_auto_reply",
+            title: "Mensagem automática enviada após entrada não reconhecida",
+            details: {
+              content_text: UNRECOGNIZED_INPUT_LOCK_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+            reason: "unrecognized_input_lock_auto_reply_sent",
+          });
+        }
+
+        const detectedUnrec = detectUnrecognizedInput(body);
+        if (detectedUnrec.isUnrecognized) {
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                needs_unrecognized_support_lock: true,
+                unrecognized_input_support_locked_at: nowIso,
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({
+                needs_unrecognized_support_lock: true,
+                updated_at: nowIso,
+                bot_enabled: false,
+              })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "unrecognized_input_support_lock_activated",
+            title: "Atendimento travado por entrada não reconhecida",
+            details: {
+              detected_type: detectedUnrec.detectedType,
+              content_text: UNRECOGNIZED_INPUT_LOCK_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+            reason: "unrecognized_input_lock_activated",
+            detected_type: detectedUnrec.detectedType,
           });
         }
 
@@ -4082,6 +4353,69 @@ export async function POST(req: Request) {
           });
         }
 
+        const leadLockedUnrecognized = await isLeadLockedByUnrecognizedInput({
+          admin,
+          lead,
+          conversation,
+          leadId,
+          conversationId,
+        });
+        if (leadLockedUnrecognized) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_unrecognized_input_lock_auto_reply",
+            title: "Mensagem automática enviada após entrada não reconhecida",
+            details: {
+              content_text: UNRECOGNIZED_INPUT_LOCK_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+            reason: "unrecognized_input_lock_auto_reply_sent",
+          });
+        }
+
         if (!conversation.bot_enabled) {
           if (isBookingWaitingAttendance || handledByPosAttendanceFlow) {
             return Response.json({
@@ -4269,9 +4603,65 @@ export async function POST(req: Request) {
         const existingBookingIsCancelled =
           currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() === "cancelled";
         const existingBookingCancelledHelper = await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId });
+        const existingBookingUnrecLocked = await isLeadLockedByUnrecognizedInput({ admin, lead, conversation, leadId, conversationId });
         const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
         const bookingAttendanceFullyResolvedEcho =
           bookingAttendanceAttendedByCol || bookingAttendanceNoShowByCol;
+        if (existingBookingUnrecLocked) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_unrecognized_input_lock_auto_reply",
+            title: "Mensagem automática enviada após entrada não reconhecida",
+            details: {
+              content_text: UNRECOGNIZED_INPUT_LOCK_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+            reason: "unrecognized_input_lock_auto_reply_sent_existing_scheduled_check",
+          });
+        }
         if (existingBookingIsCancelled || existingBookingCancelledHelper) {
           try {
             await insertWhatsAppBotTextMessage({
@@ -4396,6 +4786,62 @@ export async function POST(req: Request) {
           .limit(5);
         const eventsFlowRecent = (histFlowRecent.data ?? []) as Array<{ event_type: string; created_at?: string | null }>;
         const flowBlockedByPrevCancel = await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId });
+        const flowUnrecLocked = await isLeadLockedByUnrecognizedInput({ admin, lead, conversation, leadId, conversationId });
+        if (flowUnrecLocked) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: UNRECOGNIZED_INPUT_LOCK_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_unrecognized_input_lock_auto_reply",
+            title: "Mensagem automática enviada após entrada não reconhecida",
+            details: {
+              content_text: UNRECOGNIZED_INPUT_LOCK_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+            reason: "unrecognized_input_lock_auto_reply_sent_hist_flow_recent",
+          });
+        }
         const cancelledBookingForFlowCreatedAt = flowBlockedByPrevCancel
           ? await (async () => {
               try {
@@ -5237,6 +5683,68 @@ export async function POST(req: Request) {
                     reason: "cancelled_booking_auto_reply_sent_booking_success_blocked_fallback",
                   });
                 }
+                const alreadyBookingUnrecLocked = await isLeadLockedByUnrecognizedInput({
+                  admin,
+                  lead,
+                  conversation,
+                  leadId,
+                  conversationId,
+                });
+                if (alreadyBookingUnrecLocked) {
+                  try {
+                    await insertWhatsAppBotTextMessage({
+                      admin,
+                      conversationId,
+                      contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: normalizedPhoneOnly,
+                      message: UNRECOGNIZED_INPUT_LOCK_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_conversations")
+                      .update({ updated_at: nowIso })
+                      .eq("id", conversationId);
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({
+                        unread_count: Number(lead.unread_count ?? 0) + 1,
+                        is_new_for_attendant: true,
+                        last_interaction_at: nowIso,
+                        updated_at: nowIso,
+                      })
+                      .eq("id", leadId);
+                  } catch (_e) {}
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+                    createdAt: nowIso,
+                  });
+                  void appendHistoryEvent({
+                    leadId,
+                    conversationId,
+                    eventType: "whatsapp_message_sent_unrecognized_input_lock_auto_reply",
+                    title: "Mensagem automática enviada após entrada não reconhecida",
+                    details: {
+                      content_text: UNRECOGNIZED_INPUT_LOCK_MSG,
+                      source: "whatsapp_zapi",
+                    },
+                    actorType: "bot",
+                  });
+                  return Response.json({
+                    ok: true,
+                    ignored: false,
+                    replied: true,
+                    reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+                    reason: "unrecognized_input_lock_auto_reply_sent_booking_success_fallback",
+                  });
+                }
                 const needsPostBookingCpf = !Boolean(String((lead as any)?.cpf ?? "").trim());
 
                 if (needsPostBookingCpf) {
@@ -5738,6 +6246,68 @@ export async function POST(req: Request) {
                 replied: true,
                 reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
                 reason: "cancelled_booking_auto_reply_sent_booking_success_blocked_main",
+              });
+            }
+            const alreadyBookingUnrecLocked2 = await isLeadLockedByUnrecognizedInput({
+              admin,
+              lead,
+              conversation,
+              leadId,
+              conversationId,
+            });
+            if (alreadyBookingUnrecLocked2) {
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: UNRECOGNIZED_INPUT_LOCK_MSG,
+                });
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_conversations")
+                  .update({ updated_at: nowIso })
+                  .eq("id", conversationId);
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              void syncConversationPreview({
+                conversationId,
+                contentText: UNRECOGNIZED_INPUT_LOCK_MSG,
+                createdAt: nowIso,
+              });
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_message_sent_unrecognized_input_lock_auto_reply",
+                title: "Mensagem automática enviada após entrada não reconhecida",
+                details: {
+                  content_text: UNRECOGNIZED_INPUT_LOCK_MSG,
+                  source: "whatsapp_zapi",
+                },
+                actorType: "bot",
+              });
+              return Response.json({
+                ok: true,
+                ignored: false,
+                replied: true,
+                reply: UNRECOGNIZED_INPUT_LOCK_MSG,
+                reason: "unrecognized_input_lock_auto_reply_sent_booking_success",
               });
             }
 
