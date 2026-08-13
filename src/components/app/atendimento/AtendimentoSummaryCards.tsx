@@ -1620,6 +1620,14 @@ export function AtendimentoSummaryCards({
   }
 
   function buildItemMeta(lead: AtendimentoLeadListItem) {
+    const booking = lead.experimental_class_booking;
+    const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+    const bookingHasId = Boolean(String(booking?.id ?? "").trim());
+    const bookingIsNotDraft = bookingHasId && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
+    if (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled") {
+      return "Agendamento cancelado";
+    }
+
     const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
     const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
     const hasTimeOk =
@@ -1657,12 +1665,11 @@ export function AtendimentoSummaryCards({
     const hasExpTime = Boolean(expDraftTime);
 
     if (activeSection === "agendamentos") {
-      const booking = lead.experimental_class_booking;
       const hasBook = Boolean(
         booking &&
-          String(booking.id ?? "").trim() &&
-          String(booking?.source ?? "draft").trim().toLowerCase() !== "draft" &&
-          String(booking?.status ?? "").trim().toLowerCase() !== "cancelled",
+          bookingHasId &&
+          bookingIsNotDraft &&
+          bookingStatus !== "cancelled",
       );
       if (hasBook) {
         const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
