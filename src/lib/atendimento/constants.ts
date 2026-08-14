@@ -83,6 +83,14 @@ export const CONTRACT_FIELD_ORDER = [
   "legal_responsible_cpf",
 ] as const;
 
+export const CONTRACT_FIELD_LABELS: Record<(typeof CONTRACT_FIELD_ORDER)[number], string> = {
+  full_name: "Nome completo",
+  cpf: "CPF",
+  phone: "Telefone/WhatsApp",
+  legal_responsible_name: "Nome completo do responsável legal",
+  legal_responsible_cpf: "CPF do responsável legal",
+};
+
 export const CONTRACT_OPTIONAL_FIELDS = new Set([
   "legal_responsible_name",
   "legal_responsible_cpf",

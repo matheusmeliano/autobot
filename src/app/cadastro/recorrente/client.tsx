@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
@@ -44,13 +44,12 @@ type SubmitResponse = {
   error?: string;
 };
 
-type ChatMessage = {
-  id: string;
-  sender_role: "bot" | "lead" | "attendant";
-  content_text?: string | null;
-  created_at?: string | null;
-  media_type?: string | null;
-  media_url?: string | null;
+type ContractFieldMeta = {
+  name: "full_name" | "cpf" | "phone" | "legal_responsible_name" | "legal_responsible_cpf";
+  label: string;
+  optional: boolean;
+  alreadyFilled: boolean;
+  currentValue: string | null;
 };
 
 export default function CadastroRecorrenteBody() {
@@ -66,7 +65,7 @@ export default function CadastroRecorrenteBody() {
     return `${parts[0]} ${parts[parts.length - 1]}`;
   }
 
-  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9>(0);
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>("");
@@ -82,115 +81,184 @@ export default function CadastroRecorrenteBody() {
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [submitResult, setSubmitResult] = useState<SubmitResponse["scheduled"] | null>(null);
-  const [submitRedirect, setSubmitRedirect] = useState<string | null>(null);
-  const [chatSessionId, setChatSessionId] = useState<{
-    conversation_id: string;
-    public_slug: string;
-    telefone: string;
-  } | null>(null);
-  const [chatLoading, setChatLoading] = useState<boolean>(false);
-  const [chatError, setChatError] = useState<string>("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatDraft, setChatDraft] = useState<string>("");
-  const [chatSending, setChatSending] = useState<boolean>(false);
-  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const [submitLeadId, setSubmitLeadId] = useState<string>("");
   const [draftSaving, setDraftSaving] = useState<"weekday" | "time" | null>(null);
+
+  const [contractInitLoading, setContractInitLoading] = useState<boolean>(false);
+  const [contractInitError, setContractInitError] = useState<string>("");
+  const [contractLeadId, setContractLeadId] = useState<string>("");
+  const [contractSnapshot, setContractSnapshot] = useState<Record<ContractFieldMeta["name"], string | null>>({
+    full_name: null,
+    cpf: null,
+    phone: null,
+    legal_responsible_name: null,
+    legal_responsible_cpf: null,
+  });
+  const [contractAllFields, setContractAllFields] = useState<ContractFieldMeta[]>([]);
+  const [contractCurrentFieldIdx, setContractCurrentFieldIdx] = useState<number>(0);
+  const [contractCurrentValue, setContractCurrentValue] = useState<string>("");
+  const [contractFieldError, setContractFieldError] = useState<string>("");
+  const [contractFieldSaving, setContractFieldSaving] = useState<boolean>(false);
+  const [contractFinalizing, setContractFinalizing] = useState<boolean>(false);
+  const [contractFinalError, setContractFinalError] = useState<string>("");
+  const [contractPdfUrl, setContractPdfUrl] = useState<string>("");
+  const [contractSignedAt, setContractSignedAt] = useState<string>("");
 
   useEffect(() => {
     if (step !== 3 || !submitResult) return;
     const tel = phoneField.replace(/\D/g, "").trim();
     if (!tel || tel.length < 10) return;
     void (async () => {
-      setChatLoading(true);
-      setChatError("");
+      setContractInitLoading(true);
+      setContractInitError("");
       try {
-        const res = await fetch("/api/atendimento/public/session", {
+        const res = await fetch("/api/cadastro/recorrente/contract-init", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            slug: "lucas-brum-online-music-usa",
             telefone: tel,
+            leadId: submitLeadId || undefined,
           }),
         });
         const json = (await res.json().catch(() => null)) as
-          | { ok?: boolean; session?: { conversation?: { id?: string; public_slug?: string }; messages?: ChatMessage[]; lead?: any }; error?: string }
+          | {
+              ok?: boolean;
+              error?: string;
+              leadId?: string;
+              snapshot?: Record<ContractFieldMeta["name"], string | null>;
+              allFields?: ContractFieldMeta[];
+              nextField?: ContractFieldMeta["name"] | null;
+            }
           | null;
-        if (!res.ok || !json?.ok || !json.session?.conversation?.id) {
-          throw new Error(json?.error || "Falha ao iniciar a conversa do contrato. Tente novamente.");
+        if (!res.ok || !json?.ok || !Array.isArray(json?.allFields)) {
+          throw new Error(json?.error || "Falha ao carregar os dados do contrato.");
         }
-        setChatSessionId({
-          conversation_id: String(json.session.conversation.id),
-          public_slug: String(json.session.conversation.public_slug ?? ""),
-          telefone: tel,
-        });
-        const msgs = Array.isArray(json.session.messages) ? (json.session.messages as ChatMessage[]) : [];
-        if (msgs.length === 0) {
-          const poll = await fetch(
-            `/api/atendimento/public/messages?conversation_id=${encodeURIComponent(String(json.session.conversation.id))}&telefone=${encodeURIComponent(tel)}`,
-            { method: "GET" },
-          );
-          const pollJson = (await poll.json().catch(() => null)) as { ok?: boolean; messages?: ChatMessage[] } | null;
-          setChatMessages(Array.isArray(pollJson?.messages) ? (pollJson.messages as ChatMessage[]) : []);
-        } else {
-          setChatMessages(msgs);
-        }
+        setContractLeadId(String(json.leadId || submitLeadId || ""));
+        setContractSnapshot(json.snapshot || contractSnapshot);
+        setContractAllFields(json.allFields || []);
+        const firstPendingIdx = json.allFields.findIndex((f) => !f.alreadyFilled);
+        const idx = firstPendingIdx < 0 ? 0 : firstPendingIdx;
+        setContractCurrentFieldIdx(idx);
+        setContractCurrentValue(json.allFields[idx]?.currentValue || "");
       } catch (e) {
-        setChatError(e instanceof Error ? e.message : String(e ?? "Erro ao carregar."));
+        setContractInitError(e instanceof Error ? e.message : String(e ?? "Erro ao carregar."));
       } finally {
-        setChatLoading(false);
+        setContractInitLoading(false);
       }
     })();
-  }, [step, submitResult, phoneField]);
+  }, [step, submitResult, phoneField, submitLeadId]);
 
-  useEffect(() => {
-    if (!chatScrollRef.current) return;
-    chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-  }, [chatMessages]);
-
-  async function reloadChatMessages() {
-    if (!chatSessionId) return;
-    try {
-      const res = await fetch(
-        `/api/atendimento/public/messages?conversation_id=${encodeURIComponent(chatSessionId.conversation_id)}&telefone=${encodeURIComponent(chatSessionId.telefone)}`,
-        { method: "GET" },
-      );
-      const json = (await res.json().catch(() => null)) as { ok?: boolean; messages?: ChatMessage[] } | null;
-      if (json?.ok && Array.isArray(json.messages)) setChatMessages(json.messages as ChatMessage[]);
-    } catch {}
+  function contractFieldForStep(
+    s: 3 | 4 | 5 | 6 | 7,
+  ): { stepLabel: string; stepIdx: number } {
+    const map: Record<3 | 4 | 5 | 6 | 7, { stepLabel: string; stepIdx: number }> = {
+      3: { stepLabel: "Nome completo", stepIdx: 0 },
+      4: { stepLabel: "CPF", stepIdx: 1 },
+      5: { stepLabel: "Telefone/WhatsApp", stepIdx: 2 },
+      6: { stepLabel: "Responsável (opcional)", stepIdx: 3 },
+      7: { stepLabel: "CPF resp. legal (opcional)", stepIdx: 4 },
+    };
+    return map[s];
   }
 
-  useEffect(() => {
-    if (step !== 3 || !chatSessionId) return;
-    const interval = window.setInterval(() => void reloadChatMessages(), 3500);
-    return () => window.clearInterval(interval);
-  }, [step, chatSessionId]);
-
-  async function handleChatSend(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const text = chatDraft.trim();
-    if (!text || chatSending || !chatSessionId) return;
-    setChatSending(true);
+  async function contractAdvanceField(skip = false) {
+    const tel = phoneField.replace(/\D/g, "").trim();
+    if (contractFieldSaving) return;
+    const currentMeta = contractAllFields[contractCurrentFieldIdx];
+    if (!currentMeta) return;
+    if (!skip && !contractCurrentValue.trim() && !currentMeta.optional) {
+      setContractFieldError("Campo obrigatório.");
+      return;
+    }
+    setContractFieldSaving(true);
+    setContractFieldError("");
     try {
-      const res = await fetch("/api/atendimento/public/messages", {
+      const res = await fetch("/api/cadastro/recorrente/contract-field-submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          conversation_id: chatSessionId.conversation_id,
-          telefone: chatSessionId.telefone,
-          content_text: text,
-          media_type: "text",
+          telefone: tel,
+          leadId: contractLeadId || submitLeadId || undefined,
+          field: currentMeta.name,
+          value: skip ? "" : contractCurrentValue.trim(),
+          skip,
         }),
       });
-      const json = (await res.json().catch(() => null)) as any;
-      if (res.ok && json?.ok) {
-        setChatDraft("");
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            code?: string;
+            snapshot?: Record<ContractFieldMeta["name"], string | null>;
+            nextField?: ContractFieldMeta["name"] | null;
+            allFields?: ContractFieldMeta[];
+            skipped?: boolean;
+          }
+        | null;
+      if (!res.ok || !json?.ok) {
+        setContractFieldError(json?.error || "Falha ao salvar. Tente novamente.");
+        return;
+      }
+      setContractSnapshot(json.snapshot || contractSnapshot);
+      setContractAllFields(json.allFields || contractAllFields);
+      const nextIdx = contractCurrentFieldIdx + 1;
+      if (nextIdx >= contractAllFields.length) {
+        goStep(8);
+        return;
+      }
+      setContractCurrentFieldIdx(nextIdx);
+      setContractCurrentValue(json.allFields?.[nextIdx]?.currentValue || "");
+      if (nextIdx + 3 > 9) {
+        goStep(8);
+      } else {
+        goStep((nextIdx + 3) as 4 | 5 | 6 | 7 | 8);
       }
     } finally {
-      setChatSending(false);
-      setTimeout(() => void reloadChatMessages(), 200);
-      setTimeout(() => void reloadChatMessages(), 1500);
-      setTimeout(() => void reloadChatMessages(), 3200);
+      setContractFieldSaving(false);
     }
+  }
+
+  async function handleContractFinalize() {
+    if (contractFinalizing) return;
+    const tel = phoneField.replace(/\D/g, "").trim();
+    setContractFinalizing(true);
+    setContractFinalError("");
+    try {
+      const res = await fetch("/api/cadastro/recorrente/contract-finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefone: tel,
+          leadId: contractLeadId || submitLeadId || undefined,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            contract_pdf_url?: string | null;
+            contract_signed_at?: string | null;
+            leadId?: string;
+          }
+        | null;
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Falha ao gerar o contrato. Tente novamente.");
+      }
+      setContractPdfUrl(String(json.contract_pdf_url || ""));
+      setContractSignedAt(String(json.contract_signed_at || new Date().toISOString()));
+      goStep(9);
+    } catch (e) {
+      setContractFinalError(e instanceof Error ? e.message : String(e ?? "Erro ao gerar o contrato."));
+    } finally {
+      setContractFinalizing(false);
+    }
+  }
+
+  function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+    setStep(n);
+    setSubmitError("");
+    setContractFieldError("");
+    setContractFinalError("");
   }
 
   useEffect(() => {
@@ -320,12 +388,6 @@ export default function CadastroRecorrenteBody() {
     }
   }, [step]);
 
-  function goStep(next: 0 | 1 | 2 | 3) {
-    setSubmitError("");
-    setAvailError("");
-    setStep(next);
-  }
-
   function canAdvanceFromStep0() {
     if (accessBlocked) return false;
     const parts = nome.trim().split(/\s+/).filter((s) => s && s.trim());
@@ -418,8 +480,8 @@ export default function CadastroRecorrenteBody() {
       if (!res.ok || !json?.ok || !json.scheduled) {
         throw new Error(json?.error || "Falha ao finalizar o cadastro. Tente novamente.");
       }
+      setSubmitLeadId(String(json.leadId || ""));
       setSubmitResult(json.scheduled);
-      setSubmitRedirect(json.redirect_to || "/atendimento?slug=lucas-brum-online-music-usa");
       goStep(3);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : String(e ?? "Erro desconhecido."));
@@ -483,12 +545,18 @@ export default function CadastroRecorrenteBody() {
                 { key: 0, label: "Conta" },
                 { key: 1, label: "Dia" },
                 { key: 2, label: "Horário" },
-                { key: 3, label: "Concluído" },
+                { key: 3, label: "Nome" },
+                { key: 4, label: "CPF" },
+                { key: 5, label: "Telefone" },
+                { key: 6, label: "Resp. Legal" },
+                { key: 7, label: "CPF Resp." },
+                { key: 8, label: "Revisão" },
+                { key: 9, label: "Concluído" },
               ].map((st) => {
                 const active = step === st.key;
                 const done = step > st.key;
                 return (
-                  <div key={st.key} className="flex items-center gap-2 flex-1">
+                  <div key={st.key} className="flex items-center gap-2 flex-1 min-w-0">
                     <div
                       className={
                         "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 " +
@@ -503,7 +571,7 @@ export default function CadastroRecorrenteBody() {
                     </div>
                     <span
                       className={
-                        "hidden sm:block " +
+                        "hidden sm:block truncate " +
                         (done || active ? "text-slate-900 font-semibold" : "text-slate-400")
                       }
                     >
@@ -516,7 +584,9 @@ export default function CadastroRecorrenteBody() {
             <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-indigo-500 to-sky-500 transition-all duration-300"
-                style={{ width: `${step === 0 ? 25 : step === 1 ? 50 : step === 2 ? 75 : 100}%` }}
+                style={{
+                  width: `${step === 0 ? 10 : step === 1 ? 20 : step === 2 ? 30 : step === 3 ? 40 : step === 4 ? 50 : step === 5 ? 60 : step === 6 ? 70 : step === 7 ? 80 : step === 8 ? 90 : 100}%`,
+                }}
               />
             </div>
           </div>
@@ -743,8 +813,8 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 3 && submitResult && (
-            <section className="space-y-6">
+          {step >= 3 && step <= 7 && submitResult && contractAllFields.length > 0 && (
+            <section className="space-y-7">
               <div className="text-center">
                 <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                   <svg
@@ -759,9 +829,7 @@ export default function CadastroRecorrenteBody() {
                 </div>
                 <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Tudo certo, {firstName}! 🎉</h2>
                 <p className="mt-3 text-lg text-slate-600">Sua aula recorrente foi reservada.</p>
-                <p className="mt-2 text-base text-slate-500">
-                  Agora vamos formalizar o contrato abaixo. Basta responder as perguntas.
-                </p>
+                <p className="mt-2 text-base text-slate-500">Agora vamos formalizar o contrato. Responda uma pergunta por vez.</p>
               </div>
 
               <div className="rounded-3xl bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-100 p-6 max-w-2xl mx-auto">
@@ -784,97 +852,217 @@ export default function CadastroRecorrenteBody() {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden max-w-2xl mx-auto">
-                <div className="border-b border-slate-100 px-5 py-4 flex items-center justify-between bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white flex items-center justify-center font-bold shadow-md">
-                      {firstName.slice(0, 1).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Formalização do contrato</div>
-                      <div className="text-xs text-slate-500">Responda as perguntas para prosseguir</div>
-                    </div>
-                  </div>
-                </div>
+              {contractInitLoading && (
+                <div className="py-14 text-center text-slate-500">Preparando suas informações…</div>
+              )}
+              {contractInitError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{contractInitError}</div>
+              )}
 
-                <div
-                  ref={chatScrollRef}
-                  className="h-[440px] overflow-y-auto px-4 py-5 space-y-4 bg-gradient-to-b from-slate-50 to-white"
-                >
-                  {chatLoading && chatMessages.length === 0 && (
-                    <div className="text-center text-slate-500 text-sm py-10">Preparando as perguntas do contrato…</div>
-                  )}
-                  {chatError && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                      {chatError}
-                    </div>
-                  )}
-                  {chatMessages.map((msg) => {
-                    const isUser = msg.sender_role === "lead";
-                    const content = String(msg.content_text ?? "").trim();
-                    const isLinkPdf = content.startsWith("http") && /\.pdf/i.test(content);
-                    if (!content) return null;
+              {!contractInitLoading && !contractInitError && contractCurrentFieldIdx >= 0 && (
+                <div className="max-w-2xl mx-auto space-y-6">
+                  {(() => {
+                    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
+                    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+                    const meta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
+                    if (!meta) return null;
+                    const hasExisting = Boolean(meta.currentValue);
                     return (
-                      <div key={msg.id} className={"flex " + (isUser ? "justify-end" : "justify-start")}>
-                        <div
-                          className={
-                            "max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm " +
-                            (isUser
-                              ? "bg-indigo-600 text-white rounded-br-sm"
-                              : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm")
-                          }
-                        >
-                          {isLinkPdf ? (
-                            <a
-                              href={content}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={
-                                isUser
-                                  ? "font-semibold underline text-white hover:text-indigo-50"
-                                  : "font-semibold text-indigo-600 hover:text-indigo-700 underline"
-                              }
-                            >
-                              📄 Baixar contrato em PDF
-                            </a>
-                          ) : (
-                            content
+                      <div className="space-y-7">
+                        <div>
+                          <h2 className="text-2xl font-bold text-slate-900">
+                            {hasExisting ? "Confirme seu " + meta.label.toLowerCase() : "Informe seu " + meta.label.toLowerCase()}
+                          </h2>
+                          <p className="mt-1 text-slate-600">
+                            {meta.optional ? "Campo opcional. Você pode pular se preferir." : "Campo obrigatório."}
+                          </p>
+                          {hasExisting && (
+                            <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-sm text-indigo-900">
+                              Já temos o valor abaixo cadastrado. Se estiver correto, basta clicar em <strong>Confirmar e avançar</strong>. Se precisar, edite o campo.
+                              <div className="mt-2 font-bold text-base">{String(meta.currentValue || "")}</div>
+                            </div>
                           )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-800 mb-2">
+                            {meta.label}
+                            {meta.optional ? " (opcional)" : ""}
+                          </label>
+                          <input
+                            type="text"
+                            value={contractCurrentValue}
+                            onChange={(e) => setContractCurrentValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void contractAdvanceField(false);
+                              }
+                            }}
+                            disabled={contractFieldSaving}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition disabled:opacity-60 disabled:cursor-not-allowed text-base"
+                            placeholder={
+                              meta.name === "full_name"
+                                ? "Ex: Ana Maria Silva"
+                                : meta.name === "cpf"
+                                ? "Ex: 123.456.789-09"
+                                : meta.name === "phone"
+                                ? "Ex: (65) 99999-9999"
+                                : meta.name === "legal_responsible_name"
+                                ? "Ex: José Carlos Silva (opcional)"
+                                : "Ex: 123.456.789-09 (opcional)"
+                            }
+                          />
+                          {contractFieldError && (
+                            <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{contractFieldError}</div>
+                          )}
+                        </div>
+                        <div className="flex justify-between pt-2 gap-3 flex-wrap">
+                          <button
+                            onClick={() => goStep((Math.max(3, (step as number) - 1)) as any)}
+                            disabled={contractFieldSaving}
+                            className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition order-2 sm:order-1"
+                          >
+                            ← Voltar
+                          </button>
+                          <div className="flex gap-3 order-1 sm:order-2 flex-wrap justify-end">
+                            {meta.optional && (
+                              <button
+                                onClick={() => void contractAdvanceField(true)}
+                                disabled={contractFieldSaving}
+                                className="rounded-2xl px-6 py-3 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                              >
+                                Pular →
+                              </button>
+                            )}
+                            <button
+                              onClick={() => void contractAdvanceField(false)}
+                              disabled={contractFieldSaving}
+                              className="rounded-2xl px-7 py-3 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                              {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
-                  })}
+                  })()}
                 </div>
+              )}
+            </section>
+          )}
 
-                <form onSubmit={handleChatSend} className="border-t border-slate-100 p-4 flex items-end gap-3 bg-white">
-                  <textarea
-                    rows={2}
-                    value={chatDraft}
-                    onChange={(e) => setChatDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleChatSend(e as any);
-                      }
-                    }}
-                    disabled={chatLoading || !chatSessionId || chatSending}
-                    placeholder={
-                      chatLoading
-                        ? "Carregando conversa…"
-                        : !chatSessionId
-                        ? "Aguarde a inicialização…"
-                        : "Digite sua resposta aqui (Enter para enviar)"
-                    }
-                    className="flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!chatDraft.trim() || chatSending || !chatSessionId || chatLoading}
-                    className="rounded-2xl px-5 py-3 bg-indigo-600 text-white text-sm font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          {step === 8 && submitResult && (
+            <section className="space-y-7">
+              <div className="text-center">
+                <div className="mx-auto w-20 h-20 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                  <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Revise seus dados</h2>
+                <p className="mt-3 text-lg text-slate-600">
+                  Confirme se as informações abaixo estão corretas para formalizar o contrato.
+                </p>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white max-w-2xl mx-auto divide-y divide-slate-100">
+                {contractAllFields.map((f, idx) => {
+                  const val = contractSnapshot[f.name] ?? f.currentValue;
+                  if (!val && f.optional) return null;
+                  return (
+                    <div key={idx} className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 items-start">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right">
+                        {f.label}
+                        {f.optional ? " (opcional)" : ""}
+                      </div>
+                      <div className="sm:col-span-2 text-base font-semibold text-slate-900 break-words">
+                        {val || "— não informado —"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-3xl bg-slate-50 border border-slate-200 p-6 max-w-2xl mx-auto text-sm text-slate-700 leading-relaxed space-y-2">
+                <p className="font-semibold text-slate-900 text-base">Declaração de aceite</p>
+                <p>
+                  Declaro que li, compreendi e concordo com as condições do contrato de prestação de serviços educacionais (aulas online de música) da Lucas Brum Online Music USA,
+                  incluindo plano, valor, pagamentos, agenda, faltas, reposições, cancelamento, responsabilidades, material didático, uso de imagem e vigência.
+                </p>
+              </div>
+
+              {contractFinalError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 max-w-2xl mx-auto">{contractFinalError}</div>
+              )}
+
+              <div className="flex justify-between pt-2 gap-3 max-w-2xl mx-auto flex-wrap">
+                <button
+                  onClick={() => goStep(7)}
+                  disabled={contractFinalizing}
+                  className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition order-2 sm:order-1"
+                >
+                  ← Voltar para revisar
+                </button>
+                <button
+                  onClick={() => void handleContractFinalize()}
+                  disabled={contractFinalizing}
+                  className="rounded-2xl px-7 py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-base order-1 sm:order-2"
+                >
+                  {contractFinalizing ? "Gerando contrato…" : "✓ Sim, formalizar contrato agora"}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {step === 9 && submitResult && (
+            <section className="space-y-7 text-center">
+              <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-3xl font-extrabold text-slate-900">Matrícula concluída, {firstName}! 🎉</h2>
+                <p className="mt-3 text-lg text-slate-600">Seu contrato foi formalizado com sucesso.</p>
+                <p className="mt-2 text-base text-slate-500">
+                  Aulas todas as <strong>{submitResult.weekdayLabel}</strong> às <strong>{submitResult.leadTime}</strong>.
+                </p>
+                {contractSignedAt && (
+                  <p className="mt-2 text-sm text-slate-500">
+                    Formalizado em: {new Date(contractSignedAt).toLocaleString("pt-BR")}
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 border border-emerald-100 p-8 max-w-2xl mx-auto space-y-5">
+                <div className="text-left">
+                  <div className="text-2xl font-bold text-slate-900">📄 Contrato de prestação de serviços</div>
+                  <p className="mt-1 text-slate-600">
+                    Clique abaixo para baixar seu contrato completo em PDF.
+                  </p>
+                </div>
+                {contractPdfUrl ? (
+                  <a
+                    href={contractPdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-4 bg-emerald-600 text-white font-bold text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition w-full"
                   >
-                    {chatSending ? "Enviando…" : "Enviar"}
-                  </button>
-                </form>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Baixar contrato em PDF
+                  </a>
+                ) : (
+                  <div className="rounded-2xl bg-white border border-slate-200 p-5 text-slate-600">
+                    Link do PDF sendo preparado… Se não aparecer, recarregue a página.
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 max-w-2xl mx-auto text-left text-sm text-slate-500 space-y-1">
+                <p className="font-semibold text-slate-700">Próximos passos:</p>
+                <p>• Em breve você receberá a confirmação do pagamento da primeira mensalidade.</p>
+                <p>• Qualquer dúvida, entre em contato pelo WhatsApp.</p>
               </div>
             </section>
           )}
