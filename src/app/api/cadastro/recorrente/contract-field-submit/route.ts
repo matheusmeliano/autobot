@@ -78,11 +78,11 @@ export async function POST(req: Request) {
 
     let patch: any = {};
     if (fieldName === "full_name") {
-      patch = { full_name: valueToSave, nome_completo: valueToSave, nome: valueToSave };
+      patch = { full_name: valueToSave };
     } else if (fieldName === "cpf") {
       patch = { cpf: valueToSave };
     } else if (fieldName === "phone") {
-      patch = { phone_digits: valueToSave, telefone: valueToSave };
+      patch = { phone: valueToSave };
     } else if (fieldName === "legal_responsible_name") {
       patch = { legal_responsible_name: valueToSave };
     } else if (fieldName === "legal_responsible_cpf") {
@@ -126,13 +126,7 @@ export async function POST(req: Request) {
       const src = updated && typeof updated === "object" ? updated : old;
       const obj = { ...(old ?? {}), ...(src ?? {}) };
       if (name === "full_name") {
-        const v =
-          (src ?? {}).full_name ??
-          (src ?? {}).nome_completo ??
-          (src ?? {}).nome ??
-          obj.full_name ??
-          obj.nome_completo ??
-          obj.nome;
+        const v = (src ?? {}).full_name ?? obj.full_name;
         if (v === "") return "";
         return String(v ?? "").trim() || null;
       }
@@ -142,15 +136,7 @@ export async function POST(req: Request) {
         return String(v ?? "").replace(/\D/g, "").trim() || null;
       }
       if (name === "phone") {
-        const v =
-          (src ?? {}).phone_digits ??
-          (src ?? {}).telefone ??
-          (src ?? {}).whatsapp ??
-          (src ?? {}).phone ??
-          obj.phone_digits ??
-          obj.telefone ??
-          obj.whatsapp ??
-          obj.phone;
+        const v = (src ?? {}).phone ?? obj.phone;
         if (v === "") return "";
         const p = String(v ?? "").replace(/\D/g, "").trim();
         return p || null;

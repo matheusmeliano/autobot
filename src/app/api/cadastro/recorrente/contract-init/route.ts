@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     function getRawFieldValue(name: ContractFieldName): string | null {
       if (name === "full_name") {
-        const v = lead.full_name ?? lead.nome_completo ?? lead.nome;
+        const v = lead.full_name;
         if (v === "") return "";
         return String(v ?? "").trim() || null;
       }
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         return String(v ?? "").replace(/\D/g, "").trim() || null;
       }
       if (name === "phone") {
-        const v = lead.phone_digits ?? lead.telefone ?? lead.whatsapp ?? lead.phone;
+        const v = lead.phone;
         if (v === "") return "";
         const p = String(v ?? "").replace(/\D/g, "").trim();
         return p || null;
