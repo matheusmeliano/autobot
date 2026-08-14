@@ -570,23 +570,23 @@ export default function CadastroRecorrenteBody() {
               const display = buildDisplayOrder(step);
               const currentLabel = allSteps[step].label;
               return (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">
+                <div className="space-y-2.5 sm:space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                    <div className="text-[10px] sm:text-[11px] sm:text-xs font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-indigo-600">
                       Passo {step + 1} de {N}
                     </div>
-                    <div className="text-xs sm:text-sm font-semibold text-slate-700">
+                    <div className="text-[13px] sm:text-xs sm:text-sm font-semibold text-slate-700 truncate max-w-[70%]">
                       {currentLabel}
                     </div>
                   </div>
-                  <div className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
+                  <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible pb-0.5 sm:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0">
                     {display.map((item, pos) => {
                       if (item.kind === "ellipsis") {
                         return (
-                          <div key={`e-${pos}`} className="flex items-center gap-1.5 text-slate-400 select-none">
-                            <div className="hidden sm:block h-px w-6 bg-slate-200" />
-                            <div className="text-lg font-bold leading-none tracking-widest text-slate-300">···</div>
-                            <div className="hidden sm:block h-px w-6 bg-slate-200" />
+                          <div key={`e-${pos}`} className="flex items-center gap-1 sm:gap-1.5 text-slate-400 select-none flex-shrink-0">
+                            <div className="hidden sm:block h-px w-4 sm:w-6 bg-slate-200" />
+                            <div className="text-sm sm:text-lg font-bold leading-none tracking-widest text-slate-300">···</div>
+                            <div className="hidden sm:block h-px w-4 sm:w-6 bg-slate-200" />
                           </div>
                         );
                       }
@@ -597,9 +597,9 @@ export default function CadastroRecorrenteBody() {
                       const isFirst = idx === 0;
                       const isLast = idx === N - 1;
                       return (
-                        <div key={st.key} className="flex items-center gap-1.5 sm:gap-2">
+                        <div key={st.key} className="flex items-center gap-1 sm:gap-1.5 sm:gap-2 flex-shrink-0">
                           {!isFirst && (
-                            <div className="hidden sm:block h-px w-6 sm:w-8 bg-slate-200">
+                            <div className="hidden sm:block h-px w-4 sm:w-6 sm:w-8 bg-slate-200">
                               <div
                                 className={
                                   "h-px w-full transition-all duration-300 " +
@@ -608,14 +608,14 @@ export default function CadastroRecorrenteBody() {
                               />
                             </div>
                           )}
-                          <div className="flex flex-col items-center gap-1.5">
+                          <div className="flex flex-col items-center gap-1 sm:gap-1.5">
                             <div
                               className={
-                                "w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[13px] sm:text-sm font-extrabold flex-shrink-0 transition-all duration-200 " +
+                                "w-7 h-7 sm:w-8.5 sm:h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[12px] sm:text-[13px] sm:text-sm font-extrabold flex-shrink-0 transition-all duration-200 " +
                                 (done
-                                  ? "bg-emerald-500 text-white shadow-md shadow-emerald-200"
+                                  ? "bg-emerald-500 text-white shadow-sm sm:shadow-md shadow-emerald-200"
                                   : active
-                                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 ring-4 ring-indigo-100"
+                                  ? "bg-indigo-600 text-white shadow-md sm:shadow-lg shadow-indigo-200 ring-2 sm:ring-4 ring-indigo-100"
                                   : "bg-white border border-slate-200 text-slate-400 hover:border-slate-300")
                               }
                             >
@@ -623,7 +623,7 @@ export default function CadastroRecorrenteBody() {
                             </div>
                             <span
                               className={
-                                "hidden sm:block text-[11px] font-bold uppercase tracking-wider whitespace-nowrap " +
+                                "hidden sm:block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap " +
                                 (active
                                   ? "text-indigo-700"
                                   : done
