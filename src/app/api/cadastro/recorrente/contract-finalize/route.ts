@@ -1,5 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { appendHistoryEvent, findLeadByPhone, formalizeAndPersistContract, syncConversationPreview } from "@/lib/atendimento/server";
+import { findLeadByPhone, formalizeAndPersistContract, syncConversationPreview } from "@/lib/atendimento/server";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);

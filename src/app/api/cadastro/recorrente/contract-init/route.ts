@@ -54,11 +54,11 @@ export async function POST(req: Request) {
       ok: true,
       leadId: String(lead.id),
       snapshot,
-      allFieldOrder: CONTRACT_FIELD_ORDER as ContractFieldName[],
-      optionalFields: Array.from(CONTRACT_OPTIONAL_FIELDS) as ContractFieldName[],
+      allFieldOrder: CONTRACT_FIELD_ORDER as unknown as ContractFieldName[],
+      optionalFields: Array.from(CONTRACT_OPTIONAL_FIELDS) as unknown as ContractFieldName[],
       fieldLabels: CONTRACT_FIELD_LABELS,
       nextField: next,
-      allFields: (CONTRACT_FIELD_ORDER as ContractFieldName[]).map((name) => ({
+      allFields: (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).map((name) => ({
         name,
         optional: CONTRACT_OPTIONAL_FIELDS.has(name as any),
         label: CONTRACT_FIELD_LABELS[name],

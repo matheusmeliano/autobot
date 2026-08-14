@@ -103,12 +103,14 @@ export async function POST(req: Request) {
     }
 
     try {
-      await appendHistoryEvent(String(lead.id), {
-        type: "contract_field_updated" as any,
-        summary: skipped
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        eventType: "contract_field_updated",
+        title: skipped
           ? `[Contrato] Campo ${CONTRACT_FIELD_LABELS[fieldName as ContractFieldName] ?? fieldName}: pulado (opcional)`
           : `[Contrato] Campo ${CONTRACT_FIELD_LABELS[fieldName as ContractFieldName] ?? fieldName}: atualizado`,
         details: { field: fieldName, value: valueToSave, skipped },
+        actorType: "system",
       } as any);
     } catch {}
 
@@ -133,7 +135,7 @@ export async function POST(req: Request) {
       legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf", updatedLead),
     };
 
-    const pending: ContractFieldName[] = (CONTRACT_FIELD_ORDER as ContractFieldName[]).filter((name) => !snapshot[name]);
+    const pending: ContractFieldName[] = (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).filter((name) => !snapshot[name]);
     const nextField: ContractFieldName | null = pending[0] ?? null;
 
     return Response.json({
@@ -143,7 +145,7 @@ export async function POST(req: Request) {
       skipped,
       snapshot,
       nextField,
-      allFields: (CONTRACT_FIELD_ORDER as ContractFieldName[]).map((name) => ({
+      allFields: (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).map((name) => ({
         name,
         optional: CONTRACT_OPTIONAL_FIELDS.has(name as any),
         label: CONTRACT_FIELD_LABELS[name],
