@@ -136,10 +136,16 @@ export default function CadastroRecorrenteBody() {
         setContractLeadId(String(json.leadId || submitLeadId || ""));
         setContractSnapshot(json.snapshot || contractSnapshot);
         setContractAllFields(json.allFields || []);
-        const firstPendingIdx = json.allFields.findIndex((f) => !f.alreadyFilled);
+        const firstPendingIdx = (json.allFields || []).findIndex((f) => !f.alreadyFilled);
         const idx = firstPendingIdx < 0 ? 0 : firstPendingIdx;
         setContractCurrentFieldIdx(idx);
-        setContractCurrentValue(json.allFields[idx]?.currentValue || "");
+        setContractCurrentValue((json.allFields || [])[idx]?.currentValue || "");
+        if (firstPendingIdx < 0) {
+          goStep(8);
+        } else {
+          const targetStep = (firstPendingIdx + 3) as 3 | 4 | 5 | 6 | 7;
+          goStep(targetStep);
+        }
       } catch (e) {
         setContractInitError(e instanceof Error ? e.message : String(e ?? "Erro ao carregar."));
       } finally {
@@ -162,9 +168,12 @@ export default function CadastroRecorrenteBody() {
   }
 
   async function contractAdvanceField(skip = false) {
+    if (step < 3 || step > 7) return;
     const tel = phoneField.replace(/\D/g, "").trim();
     if (contractFieldSaving) return;
-    const currentMeta = contractAllFields[contractCurrentFieldIdx];
+    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
+    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    const currentMeta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
     if (!currentMeta) return;
     if (!skip && !contractCurrentValue.trim() && !currentMeta.optional) {
       setContractFieldError("Campo obrigatório.");
@@ -201,18 +210,16 @@ export default function CadastroRecorrenteBody() {
       }
       setContractSnapshot(json.snapshot || contractSnapshot);
       setContractAllFields(json.allFields || contractAllFields);
-      const nextIdx = contractCurrentFieldIdx + 1;
-      if (nextIdx >= contractAllFields.length) {
+      const nextPendingIdx = (json.allFields || []).findIndex((f) => !f.alreadyFilled);
+      const nextIdx = nextPendingIdx < 0 ? contractAllFields.length : nextPendingIdx;
+      setContractCurrentFieldIdx(nextIdx);
+      if (nextIdx >= contractAllFields.length || nextPendingIdx < 0) {
+        setContractCurrentValue("");
         goStep(8);
         return;
       }
-      setContractCurrentFieldIdx(nextIdx);
-      setContractCurrentValue(json.allFields?.[nextIdx]?.currentValue || "");
-      if (nextIdx + 3 > 9) {
-        goStep(8);
-      } else {
-        goStep((nextIdx + 3) as 4 | 5 | 6 | 7 | 8);
-      }
+      setContractCurrentValue((json.allFields || contractAllFields)[nextIdx]?.currentValue || "");
+      goStep((nextIdx + 3) as 4 | 5 | 6 | 7 | 8);
     } finally {
       setContractFieldSaving(false);
     }
@@ -260,6 +267,18 @@ export default function CadastroRecorrenteBody() {
     setContractFieldError("");
     setContractFinalError("");
   }
+
+  useEffect(() => {
+    if (step < 3 || step > 7) return;
+    if (!contractAllFields.length) return;
+    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
+    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    const target = contractAllFields[expectedIdx];
+    if (!target) return;
+    if (contractCurrentValue !== String(target.currentValue || "")) {
+      setContractCurrentValue(String(target.currentValue || ""));
+    }
+  }, [step, contractAllFields]);
 
   useEffect(() => {
     void (async () => {
