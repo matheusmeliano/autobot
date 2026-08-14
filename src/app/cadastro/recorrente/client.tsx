@@ -403,10 +403,7 @@ export default function CadastroRecorrenteBody() {
 
   function canAdvanceFromStep0() {
     if (accessBlocked) return false;
-    const parts = nome.trim().split(/\s+/).filter((s) => s && s.trim());
     return (
-      nome.trim().length >= 2 &&
-      parts.length >= 2 &&
       phoneField.replace(/\D/g, "").length >= 10 &&
       senha.trim().length >= 4
     );
@@ -414,21 +411,6 @@ export default function CadastroRecorrenteBody() {
 
   function handleAdvance0() {
     if (!canAdvanceFromStep0()) return;
-    (async () => {
-      try {
-        const telefone = phoneField.replace(/\D/g, "");
-        if (telefone && telefone.length >= 10) {
-          await fetch("/api/cadastro/recorrente/draft", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              telefone,
-              nome: nome.trim() || null,
-            }),
-          }).catch(() => {});
-        }
-      } catch {}
-    })();
     goStep(1);
   }
 
@@ -681,19 +663,6 @@ export default function CadastroRecorrenteBody() {
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-slate-800 mb-2">
-                    Nome e sobrenome
-                  </label>
-                  <input
-                    type="text"
-                    value={nome}
-                    onChange={(e) => setNome(toNomeESobrenome(e.target.value))}
-                    disabled={accessBlocked || initialDataLoading}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                    placeholder="Ex: Ana Maria Silva"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-2">
                     E-mail (identificador: seu WhatsApp)
                   </label>
                   <input
@@ -720,11 +689,11 @@ export default function CadastroRecorrenteBody() {
                   />
                 </div>
               </div>
-              <div className="flex justify-end pt-2">
+              <div className="grid grid-cols-1 gap-3 pt-2 w-full">
                 <button
                   onClick={handleAdvance0}
                   disabled={!canAdvanceFromStep0()}
-                  className="rounded-2xl px-7 py-3 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="w-full sm:w-auto sm:ml-auto rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
                 >
                   Avançar →
                 </button>
