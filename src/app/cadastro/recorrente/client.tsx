@@ -1082,16 +1082,29 @@ export default function CadastroRecorrenteBody() {
                 {contractAllFields.map((f, idx) => {
                   const raw =
                     lastSavedFieldValues[f.name] ?? f.currentValue ?? contractSnapshot[f.name] ?? null;
-                  const val = typeof raw === "string" ? raw.trim() : raw;
-                  if ((!val || val === "") && f.optional) return null;
+                  const rawVal = typeof raw === "string" ? raw.trim() : raw;
+                  if ((!rawVal || rawVal === "") && f.optional) return null;
+                  const digits = String(rawVal ?? "").replace(/\D/g, "");
+                  let displayVal = rawVal ?? "— não informado —";
+                  if (f.name === "cpf" && digits.length >= 11) {
+                    displayVal = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+                  } else if (f.name === "phone") {
+                    if (digits.length >= 13) {
+                      displayVal = `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
+                    } else if (digits.length === 11) {
+                      displayVal = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+                    } else if (digits.length === 10) {
+                      displayVal = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+                    }
+                  }
                   return (
-                    <div key={idx} className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 items-start">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right">
+                    <div key={idx} className="px-6 py-4 grid grid-cols-1 sm:grid-cols-[minmax(140px,180px)_1fr] gap-3 sm:gap-5 items-start">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right sm:pt-1">
                         {f.label}
                         {f.optional ? " (opcional)" : ""}
                       </div>
-                      <div className="sm:col-span-2 text-base font-semibold text-slate-900 break-words">
-                        {val && val !== "" ? val : "— não informado —"}
+                      <div className="text-base font-semibold text-slate-900 break-words">
+                        {displayVal}
                       </div>
                     </div>
                   );
