@@ -7,7 +7,7 @@ import {
 } from "@/lib/atendimento/server";
 import { ATENDIMENTO_PUBLIC_LINK_SLUG } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { initialBotMessages, makeConversationSessionSlug } from "@/lib/atendimento/bot";
+import { initialBotMessages } from "@/lib/atendimento/bot";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -61,7 +61,10 @@ export async function POST(req: Request) {
             lead_id: String(lead.id),
             public_link_id: String(publicLink.id ?? ""),
             channel: "web",
-            public_slug: makeConversationSessionSlug(),
+            public_slug:
+              typeof globalThis !== "undefined" && "crypto" in globalThis && typeof crypto.randomUUID === "function"
+                ? crypto.randomUUID().replace(/-/g, "").slice(0, 32)
+                : Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
             bot_enabled: true,
           })
           .select("*")
