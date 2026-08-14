@@ -79,16 +79,20 @@ export async function POST(req: NextRequest) {
       recurring_class_professor_time: String(professorTime ?? "").trim(),
       recurring_class_lead_time: String(leadTime ?? String(professorTime ?? "")).trim(),
       recurring_class_created_at: nowIso,
-      funnel_stage: "aluno_recorrente_cadastrado",
-      status: "matriculado",
+      funnel_stage: "contrato_coletando_dados",
+      status: "contrato_coletando_dados",
+      contract_status: "coletando_dados",
       updated_at: nowIso,
       ...(safeNome ? { full_name: safeNome } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
     };
 
     const patchMinimalGuaranteed: Record<string, unknown> = {
-      funnel_stage: "aluno_recorrente_cadastrado",
-      status: "matriculado",
+      recurring_class_status: "confirmado",
+      recurring_class_weekday: weekday,
+      funnel_stage: "contrato_coletando_dados",
+      status: "contrato_coletando_dados",
+      contract_status: "coletando_dados",
       updated_at: nowIso,
       ...(safeNome ? { full_name: safeNome } : {}),
     };
@@ -163,6 +167,7 @@ export async function POST(req: NextRequest) {
         professorTime: String(professorTime ?? "").trim(),
         leadTime: String(leadTime ?? String(professorTime ?? "")).trim(),
       },
+      redirect_to: "/atendimento?slug=lucas-brum-online-music-usa",
     });
   } catch (err) {
     return NextResponse.json(

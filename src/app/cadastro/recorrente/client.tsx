@@ -40,6 +40,7 @@ type SubmitResponse = {
     professorTime: string;
     leadTime: string;
   };
+  redirect_to?: string;
   error?: string;
 };
 
@@ -72,7 +73,23 @@ export default function CadastroRecorrenteBody() {
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [submitResult, setSubmitResult] = useState<SubmitResponse["scheduled"] | null>(null);
+  const [submitRedirect, setSubmitRedirect] = useState<string | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [draftSaving, setDraftSaving] = useState<"weekday" | "time" | null>(null);
+
+  useEffect(() => {
+    if (!submitRedirect || redirectCountdown === null) return;
+    if (redirectCountdown <= 0) {
+      try {
+        window.location.assign(submitRedirect);
+      } catch {
+        window.location.href = submitRedirect;
+      }
+      return;
+    }
+    const timer = window.setTimeout(() => setRedirectCountdown((c) => (c === null ? null : Math.max(0, c - 1))), 1000);
+    return () => window.clearTimeout(timer);
+  }, [submitRedirect, redirectCountdown]);
 
   useEffect(() => {
     void (async () => {
@@ -300,6 +317,8 @@ export default function CadastroRecorrenteBody() {
         throw new Error(json?.error || "Falha ao finalizar o cadastro. Tente novamente.");
       }
       setSubmitResult(json.scheduled);
+      setSubmitRedirect(json.redirect_to || "/atendimento?slug=lucas-brum-online-music-usa");
+      setRedirectCountdown(2);
       goStep(3);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : String(e ?? "Erro desconhecido."));
@@ -638,7 +657,12 @@ export default function CadastroRecorrenteBody() {
               </div>
               <div>
                 <h2 className="text-3xl font-extrabold text-slate-900">Tudo certo, {firstName}! 🎉</h2>
-                <p className="mt-3 text-lg text-slate-600">Sua aula recorrente foi reservada.</p>
+                <p className="mt-3 text-lg text-slate-600">
+                  Sua aula recorrente foi reservada.
+                </p>
+                <p className="mt-2 text-base text-slate-500">
+                  Em seguida, vamos formalizar o contrato de prestação de serviços.
+                </p>
               </div>
               <div className="rounded-3xl bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-100 p-7 text-left max-w-lg mx-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -653,25 +677,56 @@ export default function CadastroRecorrenteBody() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-6 pt-6 border-t border-indigo-100 text-sm text-slate-600 leading-relaxed">
-                  Essas informações já foram registradas automaticamente na seção Alunos do
-                  painel, vinculadas ao seu cadastro. Em breve nossa equipe entrará em contato
-                  com os próximos passos.
+                <div className="mt-6 pt-6 border-t border-indigo-100 text-sm text-slate-700 leading-relaxed space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-bold mt-0.5">✓</span>
+                    <span>Dia e horário fixos registrados com sucesso no seu cadastro.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-sky-600 font-bold mt-0.5">→</span>
+                    <span>
+                      Você está sendo redirecionado(a) para o link de matrícula, onde vamos formalizar o contrato
+                      automaticamente com seus dados já cadastrados.
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-5 pt-5 border-t border-indigo-100 text-center">
+                  {redirectCountdown === null || redirectCountdown === 0 ? (
+                    <div className="text-slate-500 text-sm">Redirecionando…</div>
+                  ) : (
+                    <div className="text-slate-600 text-sm">
+                      Redirecionando em{" "}
+                      <span className="font-bold text-slate-900 tabular-nums">{redirectCountdown}s</span>…
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="pt-2">
-                <button
-                  onClick={() => {
-                    setSelectedWeekday(null);
-                    setSelectedTimeOpt(null);
-                    setSubmitResult(null);
-                    setStep(0);
-                    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition"
+              <div className="pt-2 space-y-3">
+                <a
+                  href={submitRedirect || "/atendimento?slug=lucas-brum-online-music-usa"}
+                  className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition"
                 >
-                  ← Voltar ao início
-                </button>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Formalizar contrato agora
+                </a>
+                <div>
+                  <button
+                    onClick={() => {
+                      if (submitRedirect) {
+                        try {
+                          window.location.assign(submitRedirect);
+                        } catch {
+                          window.location.href = submitRedirect;
+                        }
+                      }
+                    }}
+                    className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition"
+                  >
+                    Ir agora para o link de matrícula
+                  </button>
+                </div>
               </div>
             </section>
           )}
