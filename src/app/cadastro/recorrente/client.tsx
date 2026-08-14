@@ -74,22 +74,7 @@ export default function CadastroRecorrenteBody() {
   const [submitError, setSubmitError] = useState<string>("");
   const [submitResult, setSubmitResult] = useState<SubmitResponse["scheduled"] | null>(null);
   const [submitRedirect, setSubmitRedirect] = useState<string | null>(null);
-  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [draftSaving, setDraftSaving] = useState<"weekday" | "time" | null>(null);
-
-  useEffect(() => {
-    if (!submitRedirect || redirectCountdown === null) return;
-    if (redirectCountdown <= 0) {
-      try {
-        window.location.assign(submitRedirect);
-      } catch {
-        window.location.href = submitRedirect;
-      }
-      return;
-    }
-    const timer = window.setTimeout(() => setRedirectCountdown((c) => (c === null ? null : Math.max(0, c - 1))), 1000);
-    return () => window.clearTimeout(timer);
-  }, [submitRedirect, redirectCountdown]);
 
   useEffect(() => {
     void (async () => {
@@ -318,7 +303,6 @@ export default function CadastroRecorrenteBody() {
       }
       setSubmitResult(json.scheduled);
       setSubmitRedirect(json.redirect_to || "/atendimento?slug=lucas-brum-online-music-usa");
-      setRedirectCountdown(2);
       goStep(3);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : String(e ?? "Erro desconhecido."));
@@ -685,20 +669,10 @@ export default function CadastroRecorrenteBody() {
                   <div className="flex items-start gap-2">
                     <span className="text-sky-600 font-bold mt-0.5">→</span>
                     <span>
-                      Você está sendo redirecionado(a) para o link de matrícula, onde vamos formalizar o contrato
+                      Agora clique no botão abaixo para ir ao link de matrícula e formalizar o contrato
                       automaticamente com seus dados já cadastrados.
                     </span>
                   </div>
-                </div>
-                <div className="mt-5 pt-5 border-t border-indigo-100 text-center">
-                  {redirectCountdown === null || redirectCountdown === 0 ? (
-                    <div className="text-slate-500 text-sm">Redirecionando…</div>
-                  ) : (
-                    <div className="text-slate-600 text-sm">
-                      Redirecionando em{" "}
-                      <span className="font-bold text-slate-900 tabular-nums">{redirectCountdown}s</span>…
-                    </div>
-                  )}
                 </div>
               </div>
               <div className="pt-2 space-y-3">
