@@ -934,11 +934,7 @@ export default function CadastroRecorrenteBody() {
                       </div>
                       <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
                         <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500">Situação</div>
-                        <div className="mt-2 inline-flex items-center gap-2 sm:gap-2.5 flex-wrap">
-                          <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                          </span>
+                        <div className="mt-2 inline-flex items-center flex-wrap">
                           <span className="text-[17px] sm:text-[19px] font-extrabold text-emerald-700 leading-snug break-words">Contrato em andamento</span>
                         </div>
                       </div>
