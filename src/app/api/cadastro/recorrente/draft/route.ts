@@ -251,12 +251,6 @@ export async function PATCH(req: NextRequest) {
           if (safeNome) {
             fallback.full_name = safeNome;
           }
-          if (safeStepRaw !== null) {
-            fallback.recurring_registration_step = safeStepRaw;
-          }
-          if (safePassword) {
-            fallback.recurring_registration_password = safePassword;
-          }
           await admin
             .from("atendimento_leads")
             .update(fallback as any)
