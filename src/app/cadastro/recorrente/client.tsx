@@ -1002,7 +1002,7 @@ export default function CadastroRecorrenteBody() {
                           )}
                         </div>
                         <div className="grid grid-cols-2 gap-3 pt-2 w-full">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 col-span-2 sm:col-span-1 order-1 sm:order-2 sm:justify-self-end sm:w-auto">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 col-span-2 sm:col-span-1 order-1 sm:order-2 sm:w-full">
                             {meta.optional && (
                               <button
                                 onClick={() => void contractAdvanceField(true)}
