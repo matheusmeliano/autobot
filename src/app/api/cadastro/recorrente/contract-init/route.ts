@@ -28,14 +28,32 @@ export async function POST(req: Request) {
     }
 
     function getRawFieldValue(name: ContractFieldName): string | null {
-      if (name === "full_name") return String(lead.full_name ?? lead.nome_completo ?? lead.nome ?? "").trim() || null;
-      if (name === "cpf") return String(lead.cpf ?? "").replace(/\D/g, "").trim() || null;
+      if (name === "full_name") {
+        const v = lead.full_name ?? lead.nome_completo ?? lead.nome;
+        if (v === "") return "";
+        return String(v ?? "").trim() || null;
+      }
+      if (name === "cpf") {
+        const v = lead.cpf;
+        if (v === "") return "";
+        return String(v ?? "").replace(/\D/g, "").trim() || null;
+      }
       if (name === "phone") {
-        const p = String(lead.phone_digits ?? lead.telefone ?? lead.whatsapp ?? lead.phone ?? "").replace(/\D/g, "").trim();
+        const v = lead.phone_digits ?? lead.telefone ?? lead.whatsapp ?? lead.phone;
+        if (v === "") return "";
+        const p = String(v ?? "").replace(/\D/g, "").trim();
         return p || null;
       }
-      if (name === "legal_responsible_name") return String(lead.legal_responsible_name ?? "").trim() || null;
-      if (name === "legal_responsible_cpf") return String(lead.legal_responsible_cpf ?? "").replace(/\D/g, "").trim() || null;
+      if (name === "legal_responsible_name") {
+        const v = lead.legal_responsible_name;
+        if (v === "") return "";
+        return String(v ?? "").trim() || null;
+      }
+      if (name === "legal_responsible_cpf") {
+        const v = lead.legal_responsible_cpf;
+        if (v === "") return "";
+        return String(v ?? "").replace(/\D/g, "").trim() || null;
+      }
       return null;
     }
 
@@ -47,7 +65,9 @@ export async function POST(req: Request) {
       legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf"),
     };
 
-    const pending: ContractFieldName[] = CONTRACT_FIELD_ORDER.filter((name) => !snapshot[name]);
+    const pending: ContractFieldName[] = CONTRACT_FIELD_ORDER.filter(
+      (name) => snapshot[name] === null,
+    ) as unknown as ContractFieldName[];
     const next: ContractFieldName | null = pending[0] ?? null;
 
     return Response.json({
@@ -62,8 +82,8 @@ export async function POST(req: Request) {
         name,
         optional: CONTRACT_OPTIONAL_FIELDS.has(name as any),
         label: CONTRACT_FIELD_LABELS[name],
-        currentValue: snapshot[name],
-        alreadyFilled: Boolean(snapshot[name]),
+        currentValue: snapshot[name] === "" ? null : snapshot[name],
+        alreadyFilled: snapshot[name] !== null,
       })),
     });
   } catch (e: any) {

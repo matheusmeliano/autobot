@@ -136,16 +136,9 @@ export default function CadastroRecorrenteBody() {
         setContractLeadId(String(json.leadId || submitLeadId || ""));
         setContractSnapshot(json.snapshot || contractSnapshot);
         setContractAllFields(json.allFields || []);
-        const firstPendingIdx = (json.allFields || []).findIndex((f) => !f.alreadyFilled);
-        const idx = firstPendingIdx < 0 ? 0 : firstPendingIdx;
-        setContractCurrentFieldIdx(idx);
-        setContractCurrentValue((json.allFields || [])[idx]?.currentValue || "");
-        if (firstPendingIdx < 0) {
-          goStep(8);
-        } else {
-          const targetStep = (firstPendingIdx + 3) as 3 | 4 | 5 | 6 | 7;
-          goStep(targetStep);
-        }
+        setContractCurrentFieldIdx(0);
+        setContractCurrentValue((json.allFields || [])[0]?.currentValue || "");
+        goStep(3);
       } catch (e) {
         setContractInitError(e instanceof Error ? e.message : String(e ?? "Erro ao carregar."));
       } finally {
@@ -210,16 +203,17 @@ export default function CadastroRecorrenteBody() {
       }
       setContractSnapshot(json.snapshot || contractSnapshot);
       setContractAllFields(json.allFields || contractAllFields);
-      const nextPendingIdx = (json.allFields || []).findIndex((f) => !f.alreadyFilled);
-      const nextIdx = nextPendingIdx < 0 ? contractAllFields.length : nextPendingIdx;
-      setContractCurrentFieldIdx(nextIdx);
-      if (nextIdx >= contractAllFields.length || nextPendingIdx < 0) {
+      const nextStep: 4 | 5 | 6 | 7 | 8 =
+        step === 3 ? 4 : step === 4 ? 5 : step === 5 ? 6 : step === 6 ? 7 : 8;
+      if (nextStep === 8) {
         setContractCurrentValue("");
         goStep(8);
         return;
       }
-      setContractCurrentValue((json.allFields || contractAllFields)[nextIdx]?.currentValue || "");
-      goStep((nextIdx + 3) as 4 | 5 | 6 | 7 | 8);
+      const nextFieldIdx = nextStep - 3;
+      setContractCurrentFieldIdx(nextFieldIdx);
+      setContractCurrentValue((json.allFields || contractAllFields)[nextFieldIdx]?.currentValue || "");
+      goStep(nextStep);
     } finally {
       setContractFieldSaving(false);
     }

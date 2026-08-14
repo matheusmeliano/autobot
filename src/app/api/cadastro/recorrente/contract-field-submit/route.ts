@@ -50,7 +50,7 @@ export async function POST(req: Request) {
         }, { status: 400 });
       }
       skipped = true;
-      valueToSave = null;
+      valueToSave = "";
     } else {
       const validation: { ok: true; value: string | null; skipped?: boolean } | { ok: false; reason?: string } =
         validateContractFieldValue(fieldName as any, rawValue) as any;
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
           }, { status: 400 });
         }
         skipped = true;
-        valueToSave = null;
+        valueToSave = "";
       } else {
         valueToSave = (validation as any).value ?? null;
       }
@@ -116,14 +116,32 @@ export async function POST(req: Request) {
 
     function getRawFieldValue(name: ContractFieldName, src: any): string | null {
       const obj = { ...lead, ...(src ?? {}) };
-      if (name === "full_name") return String(obj.full_name ?? obj.nome_completo ?? obj.nome ?? "").trim() || null;
-      if (name === "cpf") return String(obj.cpf ?? "").replace(/\D/g, "").trim() || null;
+      if (name === "full_name") {
+        const v = obj.full_name ?? obj.nome_completo ?? obj.nome;
+        if (v === "") return "";
+        return String(v ?? "").trim() || null;
+      }
+      if (name === "cpf") {
+        const v = obj.cpf;
+        if (v === "") return "";
+        return String(v ?? "").replace(/\D/g, "").trim() || null;
+      }
       if (name === "phone") {
-        const p = String(obj.phone_digits ?? obj.telefone ?? obj.whatsapp ?? obj.phone ?? "").replace(/\D/g, "").trim();
+        const v = obj.phone_digits ?? obj.telefone ?? obj.whatsapp ?? obj.phone;
+        if (v === "") return "";
+        const p = String(v ?? "").replace(/\D/g, "").trim();
         return p || null;
       }
-      if (name === "legal_responsible_name") return String(obj.legal_responsible_name ?? "").trim() || null;
-      if (name === "legal_responsible_cpf") return String(obj.legal_responsible_cpf ?? "").replace(/\D/g, "").trim() || null;
+      if (name === "legal_responsible_name") {
+        const v = obj.legal_responsible_name;
+        if (v === "") return "";
+        return String(v ?? "").trim() || null;
+      }
+      if (name === "legal_responsible_cpf") {
+        const v = obj.legal_responsible_cpf;
+        if (v === "") return "";
+        return String(v ?? "").replace(/\D/g, "").trim() || null;
+      }
       return null;
     }
 
@@ -135,7 +153,9 @@ export async function POST(req: Request) {
       legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf", updatedLead),
     };
 
-    const pending: ContractFieldName[] = (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).filter((name) => !snapshot[name]);
+    const pending: ContractFieldName[] = (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).filter(
+      (name) => snapshot[name] === null,
+    );
     const nextField: ContractFieldName | null = pending[0] ?? null;
 
     return Response.json({
