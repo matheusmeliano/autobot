@@ -1001,31 +1001,29 @@ export default function CadastroRecorrenteBody() {
                             <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{contractFieldError}</div>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-3 pt-2 w-full">
-                          <div className="grid grid-cols-1 sm:flex sm:flex-row sm:gap-3 sm:justify-end col-span-2 sm:col-span-1 order-1 sm:order-2 sm:w-auto sm:justify-self-end">
-                            {meta.optional && (
-                              <button
-                                onClick={() => void contractAdvanceField(true)}
-                                disabled={contractFieldSaving}
-                                className="w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
-                              >
-                                Pular →
-                              </button>
-                            )}
+                        <div className="grid grid-cols-1 sm:flex sm:flex-row sm:justify-between sm:items-start gap-3 pt-2 w-full">
+                          {meta.optional && (
                             <button
-                              onClick={() => void contractAdvanceField(false)}
+                              onClick={() => void contractAdvanceField(true)}
                               disabled={contractFieldSaving}
-                              className="w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-12 sm:min-w-[300px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                              className="order-1 sm:order-2 w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                             >
-                              {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
+                              Pular →
                             </button>
-                          </div>
+                          )}
                           <button
                             onClick={() => goStep((Math.max(0, (step as number) - 1)) as any)}
                             disabled={contractFieldSaving}
-                            className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap col-span-2 sm:col-span-1 order-2 sm:order-1 rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
+                            className="order-2 sm:order-1 w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                           >
                             ← Voltar
+                          </button>
+                          <button
+                            onClick={() => void contractAdvanceField(false)}
+                            disabled={contractFieldSaving}
+                            className="order-3 sm:order-3 w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-12 sm:min-w-[300px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                          >
+                            {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
                           </button>
                         </div>
                       </div>
