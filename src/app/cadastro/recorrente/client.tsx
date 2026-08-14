@@ -904,38 +904,38 @@ export default function CadastroRecorrenteBody() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 divide-y divide-slate-100 sm:divide-y-0 sm:divide-x sm:divide-slate-100">
-                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-4 sm:gap-4.5">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5.5 h-5.5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-3 sm:gap-4 sm:gap-4.5">
+                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                         </svg>
                       </div>
                       <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
-                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500">Dia da aula</div>
-                        <div className="mt-2 text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-tight break-words">{submitResult.weekdayLabel}</div>
+                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500 whitespace-nowrap truncate">Dia da aula</div>
+                        <div className="mt-2 text-[clamp(18px,4.4vw,26px)] sm:text-[26px] font-extrabold text-slate-900 leading-none whitespace-nowrap truncate">{submitResult.weekdayLabel}</div>
                       </div>
                     </div>
-                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-4 sm:gap-4.5">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5.5 h-5.5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-3 sm:gap-4 sm:gap-4.5">
+                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
-                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500">Horário fixo</div>
-                        <div className="mt-2 text-2xl sm:text-[26px] font-extrabold text-slate-900 tabular-nums leading-tight break-words">{submitResult.leadTime}</div>
+                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500 whitespace-nowrap truncate">Horário fixo</div>
+                        <div className="mt-2 text-[clamp(18px,4.4vw,26px)] sm:text-[26px] font-extrabold text-slate-900 tabular-nums leading-none whitespace-nowrap truncate">{submitResult.leadTime}</div>
                       </div>
                     </div>
-                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-4 sm:gap-4.5">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5.5 h-5.5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24">
+                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-3 sm:gap-4 sm:gap-4.5">
+                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
-                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500">Situação</div>
-                        <div className="mt-2 inline-flex items-center flex-wrap">
-                          <span className="text-[17px] sm:text-[19px] font-extrabold text-emerald-700 leading-snug break-words">Contrato em andamento</span>
+                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500 whitespace-nowrap truncate">Situação</div>
+                        <div className="mt-2 inline-flex items-center w-full max-w-full">
+                          <span className="text-[clamp(14px,3.4vw,19px)] sm:text-[19px] font-extrabold text-emerald-700 leading-none whitespace-nowrap truncate max-w-full">Contrato em andamento</span>
                         </div>
                       </div>
                     </div>
