@@ -260,6 +260,15 @@ export default function CadastroRecorrenteBody() {
     setSubmitError("");
     setContractFieldError("");
     setContractFinalError("");
+    if (typeof window !== "undefined") {
+      setTimeout(() => {
+        try {
+          window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+        } catch {
+          window.scrollTo(0, 0);
+        }
+      }, 0);
+    }
   }
 
   useEffect(() => {
@@ -766,19 +775,19 @@ export default function CadastroRecorrenteBody() {
                   })}
                 </div>
               )}
-              <div className="flex justify-between pt-2">
-                <button
-                  onClick={() => goStep(0)}
-                  className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition"
-                >
-                  ← Voltar
-                </button>
+              <div className="grid grid-cols-1 gap-3 pt-2 w-full">
                 <button
                   onClick={handleAdvance1}
                   disabled={!selectedWeekday}
-                  className="rounded-2xl px-7 py-3 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="w-full sm:w-auto sm:ml-auto order-1 sm:order-2 rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
                 >
                   Avançar →
+                </button>
+                <button
+                  onClick={() => goStep(0)}
+                  className="w-full sm:w-auto order-2 sm:order-1 rounded-2xl px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-base"
+                >
+                  ← Voltar
                 </button>
               </div>
             </section>
@@ -842,19 +851,19 @@ export default function CadastroRecorrenteBody() {
               {submitError && (
                 <div className="rounded-2xl bg-red-50 border border-red-200 p-5 text-red-700">{submitError}</div>
               )}
-              <div className="flex justify-between pt-2">
-                <button
-                  onClick={() => goStep(1)}
-                  className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition"
-                >
-                  ← Voltar
-                </button>
+              <div className="grid grid-cols-1 gap-3 pt-2 w-full">
                 <button
                   onClick={() => void handleSubmitFinal()}
                   disabled={!selectedTimeOpt || submitLoading}
-                  className="rounded-2xl px-7 py-3 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="w-full sm:w-auto sm:ml-auto order-1 sm:order-2 rounded-2xl px-7 py-3.5 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
                 >
                   {submitLoading ? "Finalizando..." : "Finalizar cadastro ✓"}
+                </button>
+                <button
+                  onClick={() => goStep(1)}
+                  className="w-full sm:w-auto order-2 sm:order-1 rounded-2xl px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-base"
+                >
+                  ← Voltar
                 </button>
               </div>
             </section>
