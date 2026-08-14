@@ -1025,20 +1025,13 @@ export default function CadastroRecorrenteBody() {
                             <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{contractFieldError}</div>
                           )}
                         </div>
-                        <div className="flex justify-between pt-2 gap-3 flex-wrap">
-                          <button
-                            onClick={() => goStep((Math.max(3, (step as number) - 1)) as any)}
-                            disabled={contractFieldSaving}
-                            className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition order-2 sm:order-1"
-                          >
-                            ← Voltar
-                          </button>
-                          <div className="flex gap-3 order-1 sm:order-2 flex-wrap justify-end">
+                        <div className="grid grid-cols-1 gap-3 pt-2 w-full">
+                          <div className="grid grid-cols-1 sm:grid-cols-[auto_auto] gap-3 sm:justify-end order-1 sm:order-2 w-full">
                             {meta.optional && (
                               <button
                                 onClick={() => void contractAdvanceField(true)}
                                 disabled={contractFieldSaving}
-                                className="rounded-2xl px-6 py-3 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                className="w-full sm:w-auto rounded-2xl px-6 py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
                               >
                                 Pular →
                               </button>
@@ -1046,11 +1039,18 @@ export default function CadastroRecorrenteBody() {
                             <button
                               onClick={() => void contractAdvanceField(false)}
                               disabled={contractFieldSaving}
-                              className="rounded-2xl px-7 py-3 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                              className="w-full sm:w-auto rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
                             >
                               {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
                             </button>
                           </div>
+                          <button
+                            onClick={() => goStep((Math.max(3, (step as number) - 1)) as any)}
+                            disabled={contractFieldSaving}
+                            className="w-full sm:w-auto sm:order-1 order-2 rounded-2xl px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
+                          >
+                            ← Voltar
+                          </button>
                         </div>
                       </div>
                     );
@@ -1103,20 +1103,20 @@ export default function CadastroRecorrenteBody() {
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 max-w-2xl mx-auto">{contractFinalError}</div>
               )}
 
-              <div className="flex justify-between pt-2 gap-3 max-w-2xl mx-auto flex-wrap">
-                <button
-                  onClick={() => goStep(7)}
-                  disabled={contractFinalizing}
-                  className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition order-2 sm:order-1"
-                >
-                  ← Voltar para revisar
-                </button>
+              <div className="grid grid-cols-1 gap-3 pt-2 max-w-2xl mx-auto w-full">
                 <button
                   onClick={() => void handleContractFinalize()}
                   disabled={contractFinalizing}
-                  className="rounded-2xl px-7 py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-base order-1 sm:order-2"
+                  className="w-full sm:w-auto sm:order-1 order-1 sm:ml-auto rounded-2xl px-7 py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-base justify-center flex items-center sm:justify-self-end"
                 >
                   {contractFinalizing ? "Gerando contrato…" : "✓ Sim, formalizar contrato agora"}
+                </button>
+                <button
+                  onClick={() => goStep(7)}
+                  disabled={contractFinalizing}
+                  className="w-full sm:w-auto sm:order-2 order-2 rounded-2xl px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
+                >
+                  ← Voltar para revisar
                 </button>
               </div>
             </section>
