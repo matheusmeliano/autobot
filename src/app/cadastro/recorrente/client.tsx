@@ -553,55 +553,120 @@ export default function CadastroRecorrenteBody() {
 
         <div className="bg-white rounded-3xl shadow-xl shadow-indigo-100/50 border border-slate-100 p-6 sm:p-10">
           <div className="mb-8">
-            <div className="flex items-center justify-between text-xs sm:text-sm font-medium text-slate-500">
-              {[
-                { key: 0, label: "Conta" },
-                { key: 1, label: "Dia" },
-                { key: 2, label: "Horário" },
-                { key: 3, label: "Nome" },
-                { key: 4, label: "CPF" },
-                { key: 5, label: "Telefone" },
-                { key: 6, label: "Resp. Legal" },
-                { key: 7, label: "CPF Resp." },
-                { key: 8, label: "Revisão" },
-                { key: 9, label: "Concluído" },
-              ].map((st) => {
-                const active = step === st.key;
-                const done = step > st.key;
-                return (
-                  <div key={st.key} className="flex items-center gap-2 flex-1 min-w-0">
-                    <div
-                      className={
-                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 " +
-                        (done
-                          ? "bg-emerald-500 text-white"
-                          : active
-                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                          : "bg-slate-100 text-slate-400")
-                      }
-                    >
-                      {done ? "✓" : String(st.key + 1)}
+            {(() => {
+              const allSteps = [
+                { key: 0, label: "Conta", shortLabel: "Conta" },
+                { key: 1, label: "Dia", shortLabel: "Dia" },
+                { key: 2, label: "Horário", shortLabel: "Hora" },
+                { key: 3, label: "Nome", shortLabel: "Nome" },
+                { key: 4, label: "CPF", shortLabel: "CPF" },
+                { key: 5, label: "Telefone", shortLabel: "Tel" },
+                { key: 6, label: "Resp. Legal", shortLabel: "Resp" },
+                { key: 7, label: "CPF Resp.", shortLabel: "CPF-R" },
+                { key: 8, label: "Revisão", shortLabel: "Rev" },
+                { key: 9, label: "Concluído", shortLabel: "Fim" },
+              ];
+              const N = allSteps.length;
+              const buildDisplayOrder = (current: number): Array<{ kind: "step"; idx: number } | { kind: "ellipsis" }> => {
+                const out: Array<{ kind: "step"; idx: number } | { kind: "ellipsis" }> = [];
+                const window = 1;
+                const keep = new Set<number>();
+                keep.add(0);
+                keep.add(N - 1);
+                for (let i = current - window; i <= current + window; i++) {
+                  if (i >= 0 && i < N) keep.add(i);
+                }
+                let prevIdx = -2;
+                for (let i = 0; i < N; i++) {
+                  if (!keep.has(i)) continue;
+                  if (prevIdx >= 0 && i - prevIdx > 1) out.push({ kind: "ellipsis" });
+                  out.push({ kind: "step", idx: i });
+                  prevIdx = i;
+                }
+                return out;
+              };
+              const display = buildDisplayOrder(step);
+              const currentLabel = allSteps[step].label;
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">
+                      Passo {step + 1} de {N}
                     </div>
-                    <span
-                      className={
-                        "hidden sm:block truncate " +
-                        (done || active ? "text-slate-900 font-semibold" : "text-slate-400")
-                      }
-                    >
-                      {st.label}
-                    </span>
+                    <div className="text-xs sm:text-sm font-semibold text-slate-700">
+                      {currentLabel}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-            <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-sky-500 transition-all duration-300"
-                style={{
-                  width: `${step === 0 ? 10 : step === 1 ? 20 : step === 2 ? 30 : step === 3 ? 40 : step === 4 ? 50 : step === 5 ? 60 : step === 6 ? 70 : step === 7 ? 80 : step === 8 ? 90 : 100}%`,
-                }}
-              />
-            </div>
+                  <div className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
+                    {display.map((item, pos) => {
+                      if (item.kind === "ellipsis") {
+                        return (
+                          <div key={`e-${pos}`} className="flex items-center gap-1.5 text-slate-400 select-none">
+                            <div className="hidden sm:block h-px w-6 bg-slate-200" />
+                            <div className="text-lg font-bold leading-none tracking-widest text-slate-300">···</div>
+                            <div className="hidden sm:block h-px w-6 bg-slate-200" />
+                          </div>
+                        );
+                      }
+                      const idx = item.idx;
+                      const st = allSteps[idx];
+                      const active = step === idx;
+                      const done = step > idx;
+                      const isFirst = idx === 0;
+                      const isLast = idx === N - 1;
+                      return (
+                        <div key={st.key} className="flex items-center gap-1.5 sm:gap-2">
+                          {!isFirst && (
+                            <div className="hidden sm:block h-px w-6 sm:w-8 bg-slate-200">
+                              <div
+                                className={
+                                  "h-px w-full transition-all duration-300 " +
+                                  (done ? "bg-gradient-to-r from-indigo-500 to-sky-500" : "bg-slate-200")
+                                }
+                              />
+                            </div>
+                          )}
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div
+                              className={
+                                "w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[13px] sm:text-sm font-extrabold flex-shrink-0 transition-all duration-200 " +
+                                (done
+                                  ? "bg-emerald-500 text-white shadow-md shadow-emerald-200"
+                                  : active
+                                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 ring-4 ring-indigo-100"
+                                  : "bg-white border border-slate-200 text-slate-400 hover:border-slate-300")
+                              }
+                            >
+                              {done ? "✓" : String(st.key + 1)}
+                            </div>
+                            <span
+                              className={
+                                "hidden sm:block text-[11px] font-bold uppercase tracking-wider whitespace-nowrap " +
+                                (active
+                                  ? "text-indigo-700"
+                                  : done
+                                  ? "text-slate-700"
+                                  : "text-slate-400")
+                              }
+                            >
+                              {st.shortLabel}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-sky-500 transition-all duration-500 ease-out"
+                      style={{
+                        width: `${step === 0 ? 10 : step === 1 ? 20 : step === 2 ? 30 : step === 3 ? 40 : step === 4 ? 50 : step === 5 ? 60 : step === 6 ? 70 : step === 7 ? 80 : step === 8 ? 90 : 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {step === 0 && (
