@@ -57,6 +57,31 @@ export default function CadastroRecorrenteBody() {
   const initialNameParam = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
   const initialPhoneParam = decodeURIComponent(String(sp.get("telefone") ?? "").trim()) || "";
 
+  function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
+    if (raw === null || raw === undefined) return fallback;
+    if (typeof raw === "string") {
+      const s = raw.trim();
+      return s || fallback;
+    }
+    if (raw instanceof Error) {
+      const m = raw.message?.trim();
+      return m || fallback;
+    }
+    if (typeof raw === "object") {
+      const any = raw as Record<string, unknown>;
+      const candidates = [any.message, any.error, any.error_message, any.msg, any.detail];
+      for (const c of candidates) {
+        if (typeof c === "string" && c.trim()) return c.trim();
+      }
+      try {
+        return JSON.stringify(raw);
+      } catch {
+        return String(raw) || fallback;
+      }
+    }
+    return String(raw) || fallback;
+  }
+
   function toNomeESobrenome(raw: string | null | undefined): string {
     const clean = String(raw ?? "").trim();
     if (!clean) return "";
@@ -139,7 +164,7 @@ export default function CadastroRecorrenteBody() {
             }
           | null;
         if (!res.ok || !json?.ok || !Array.isArray(json?.allFields)) {
-          throw new Error(json?.error || "Falha ao carregar os dados do contrato.");
+          throw new Error(toErrorMessage(json?.error, "Falha ao carregar os dados do contrato."));
         }
         setContractLeadId(String(json.leadId || submitLeadId || ""));
         setContractSnapshot(json.snapshot || contractSnapshot);
@@ -149,7 +174,7 @@ export default function CadastroRecorrenteBody() {
         setContractCurrentValue((json.allFields || [])[0]?.currentValue || "");
         goStep(3);
       } catch (e) {
-        setContractInitError(e instanceof Error ? e.message : String(e ?? "Erro ao carregar."));
+        setContractInitError(toErrorMessage(e, "Erro ao carregar."));
       } finally {
         setContractInitLoading(false);
       }
@@ -209,7 +234,7 @@ export default function CadastroRecorrenteBody() {
           }
         | null;
       if (!res.ok || !json?.ok) {
-        setContractFieldError(json?.error || "Falha ao salvar. Tente novamente.");
+        setContractFieldError(toErrorMessage(json?.error, "Falha ao salvar. Tente novamente."));
         return;
       }
       setContractSnapshot(json.snapshot || contractSnapshot);
@@ -297,13 +322,13 @@ export default function CadastroRecorrenteBody() {
           }
         | null;
       if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "Falha ao gerar o contrato. Tente novamente.");
+        throw new Error(toErrorMessage(json?.error, "Falha ao gerar o contrato. Tente novamente."));
       }
       setContractPdfUrl(String(json.contract_pdf_url || ""));
       setContractSignedAt(String(json.contract_signed_at || new Date().toISOString()));
       goStep(9);
     } catch (e) {
-      setContractFinalError(e instanceof Error ? e.message : String(e ?? "Erro ao gerar o contrato."));
+      setContractFinalError(toErrorMessage(e, "Erro ao gerar o contrato."));
     } finally {
       setContractFinalizing(false);
     }
@@ -533,7 +558,7 @@ export default function CadastroRecorrenteBody() {
           }
         }
       } catch (e) {
-        setInitialDataError(e instanceof Error ? e.message : "");
+        setInitialDataError(toErrorMessage(e, ""));
       } finally {
         setInitialDataLoading(false);
       }
@@ -618,11 +643,11 @@ export default function CadastroRecorrenteBody() {
       const res = await fetch(url, { method: "GET" });
       const json = (await res.json().catch(() => null)) as AvailabilityResponse | null;
       if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "Falha ao carregar disponibilidade.");
+        throw new Error(toErrorMessage(json?.error, "Falha ao carregar disponibilidade."));
       }
       setAvailability(json);
     } catch (e) {
-      setAvailError(e instanceof Error ? e.message : String(e ?? "Erro ao carregar disponibilidade."));
+      setAvailError(toErrorMessage(e, "Erro ao carregar disponibilidade."));
     } finally {
       setAvailLoading(false);
     }
@@ -700,19 +725,19 @@ export default function CadastroRecorrenteBody() {
       if (res.status === 403 || json?.blocked) {
         setAccessBlocked(true);
         setAccessBlockedMessage(
-          String(json?.error ?? "").trim() ||
+          toErrorMessage(json?.error, "") ||
             "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
         );
-        throw new Error(String(json?.error ?? "Acesso bloqueado."));
+        throw new Error(toErrorMessage(json?.error, "Acesso bloqueado."));
       }
       if (!res.ok || !json?.ok || !json.scheduled) {
-        throw new Error(json?.error || "Falha ao finalizar o cadastro. Tente novamente.");
+        throw new Error(toErrorMessage(json?.error, "Falha ao finalizar o cadastro. Tente novamente."));
       }
       setSubmitLeadId(String(json.leadId || ""));
       setSubmitResult(json.scheduled);
       goStep(3);
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : String(e ?? "Erro desconhecido."));
+      setSubmitError(toErrorMessage(e, "Erro desconhecido."));
     } finally {
       setSubmitLoading(false);
     }
