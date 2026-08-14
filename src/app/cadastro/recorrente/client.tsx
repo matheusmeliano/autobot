@@ -1041,7 +1041,7 @@ export default function CadastroRecorrenteBody() {
                             <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{contractFieldError}</div>
                           )}
                         </div>
-                        <div className="grid grid-cols-1 sm:flex sm:flex-row sm:justify-between sm:items-start gap-3 pt-2 w-full">
+                        <div className="grid grid-cols-1 sm:flex sm:flex-row sm:justify-end sm:items-start gap-3 pt-2 w-full">
                           {meta.optional && (
                             <button
                               onClick={() => void contractAdvanceField(true)}
