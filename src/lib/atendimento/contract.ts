@@ -282,7 +282,10 @@ export async function buildContractPdfBytes(data: ContractData): Promise<Uint8Ar
     doc.setFontSize(size);
     const lines = doc.splitTextToSize(safeText(text), contentWidth);
     newPageIfNeeded(lines.length + 1);
-    doc.text(lines, marginLeft, yState.y, { align, maxWidth: contentWidth });
+    const textX = align === "center" ? marginLeft + contentWidth / 2 : marginLeft;
+    for (let i = 0; i < lines.length; i++) {
+      doc.text(lines[i], textX, yState.y + i * lineHeight, { align, maxWidth: contentWidth });
+    }
     yState.y += lines.length * lineHeight;
     const skipAfter = typeof opts?.skipAfter === "number" ? opts.skipAfter : 6;
     yState.y += skipAfter;
