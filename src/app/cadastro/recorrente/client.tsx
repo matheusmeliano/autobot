@@ -775,19 +775,19 @@ export default function CadastroRecorrenteBody() {
                   })}
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-3 pt-2 w-full">
-                <button
-                  onClick={() => goStep(0)}
-                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
-                >
-                  ← Voltar
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full">
                 <button
                   onClick={handleAdvance1}
                   disabled={!selectedWeekday}
                   className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
                 >
                   Avançar →
+                </button>
+                <button
+                  onClick={() => goStep(0)}
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
+                >
+                  ← Voltar
                 </button>
               </div>
             </section>
@@ -851,19 +851,19 @@ export default function CadastroRecorrenteBody() {
               {submitError && (
                 <div className="rounded-2xl bg-red-50 border border-red-200 p-5 text-red-700">{submitError}</div>
               )}
-              <div className="grid grid-cols-2 gap-3 pt-2 w-full">
-                <button
-                  onClick={() => goStep(1)}
-                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
-                >
-                  ← Voltar
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full">
                 <button
                   onClick={() => void handleSubmitFinal()}
                   disabled={!selectedTimeOpt || submitLoading}
                   className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
                 >
                   {submitLoading ? "Finalizando..." : "Finalizar cadastro ✓"}
+                </button>
+                <button
+                  onClick={() => goStep(1)}
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
+                >
+                  ← Voltar
                 </button>
               </div>
             </section>
@@ -1079,20 +1079,20 @@ export default function CadastroRecorrenteBody() {
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 max-w-2xl mx-auto">{contractFinalError}</div>
               )}
 
-              <div className="grid grid-cols-2 gap-3 pt-2 max-w-2xl mx-auto w-full">
-                <button
-                  onClick={() => goStep(7)}
-                  disabled={contractFinalizing}
-                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
-                >
-                  ← Voltar para revisar
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 max-w-2xl mx-auto w-full">
                 <button
                   onClick={() => void handleContractFinalize()}
                   disabled={contractFinalizing}
                   className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate sm:order-2 sm:justify-self-end"
                 >
                   {contractFinalizing ? "Gerando contrato…" : "✓ Sim, formalizar contrato agora"}
+                </button>
+                <button
+                  onClick={() => goStep(7)}
+                  disabled={contractFinalizing}
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
+                >
+                  ← Voltar para revisar
                 </button>
               </div>
             </section>
