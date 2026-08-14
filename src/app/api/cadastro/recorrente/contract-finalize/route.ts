@@ -1,6 +1,31 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findLeadByPhone, formalizeAndPersistContract, syncConversationPreview } from "@/lib/atendimento/server";
 
+function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
+  if (raw === null || raw === undefined) return fallback;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    return s || fallback;
+  }
+  if (raw instanceof Error) {
+    const m = raw.message?.trim();
+    return m || fallback;
+  }
+  if (typeof raw === "object") {
+    const any = raw as Record<string, unknown>;
+    const candidates = [any.message, any.error, any.error_message, any.msg, any.detail];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim()) return c.trim();
+    }
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return String(raw) || fallback;
+    }
+  }
+  return String(raw) || fallback;
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const telefone = String(body?.telefone ?? "").replace(/\D/g, "").trim();
@@ -59,6 +84,6 @@ export async function POST(req: Request) {
       leadId: String(lead.id),
     });
   } catch (e: any) {
-    return Response.json({ ok: false, error: String(e?.message ?? "Falha ao gerar o contrato.") }, { status: 500 });
+    return Response.json({ ok: false, error: toErrorMessage(e, "Falha ao gerar o contrato.") }, { status: 500 });
   }
 }

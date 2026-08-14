@@ -3,6 +3,31 @@ import type { CONTRACT_FIELD_ORDER as CFO } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findLeadByPhone } from "@/lib/atendimento/server";
 
+function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
+  if (raw === null || raw === undefined) return fallback;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    return s || fallback;
+  }
+  if (raw instanceof Error) {
+    const m = raw.message?.trim();
+    return m || fallback;
+  }
+  if (typeof raw === "object") {
+    const any = raw as Record<string, unknown>;
+    const candidates = [any.message, any.error, any.error_message, any.msg, any.detail];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim()) return c.trim();
+    }
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return String(raw) || fallback;
+    }
+  }
+  return String(raw) || fallback;
+}
+
 type ContractFieldName = (typeof CFO)[number];
 
 export async function POST(req: Request) {
@@ -87,6 +112,6 @@ export async function POST(req: Request) {
       })),
     });
   } catch (e: any) {
-    return Response.json({ ok: false, error: String(e?.message ?? "Falha ao carregar dados do contrato.") }, { status: 500 });
+    return Response.json({ ok: false, error: toErrorMessage(e, "Falha ao carregar dados do contrato.") }, { status: 500 });
   }
 }

@@ -7,6 +7,31 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { appendHistoryEvent, findLeadByPhone } from "@/lib/atendimento/server";
 
+function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
+  if (raw === null || raw === undefined) return fallback;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    return s || fallback;
+  }
+  if (raw instanceof Error) {
+    const m = raw.message?.trim();
+    return m || fallback;
+  }
+  if (typeof raw === "object") {
+    const any = raw as Record<string, unknown>;
+    const candidates = [any.message, any.error, any.error_message, any.msg, any.detail];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim()) return c.trim();
+    }
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return String(raw) || fallback;
+    }
+  }
+  return String(raw) || fallback;
+}
+
 type ContractFieldName = (typeof CFO)[number];
 
 export async function POST(req: Request) {
@@ -106,8 +131,8 @@ export async function POST(req: Request) {
       }
       updatedLead = data;
     } catch (e: any) {
-      console.error("update lead contract field exception error:", e?.message || e);
-      return Response.json({ ok: false, error: String(e?.message || "Falha ao salvar o campo (exceção).") }, { status: 500 });
+      console.error("update lead contract field exception error:", toErrorMessage(e, ""));
+      return Response.json({ ok: false, error: toErrorMessage(e, "Falha ao salvar o campo (exceção).") }, { status: 500 });
     }
 
     try {
@@ -183,6 +208,6 @@ export async function POST(req: Request) {
       })),
     });
   } catch (e: any) {
-    return Response.json({ ok: false, error: String(e?.message ?? "Falha ao salvar o campo.") }, { status: 500 });
+    return Response.json({ ok: false, error: toErrorMessage(e, "Falha ao salvar o campo.") }, { status: 500 });
   }
 }

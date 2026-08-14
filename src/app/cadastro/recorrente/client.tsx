@@ -973,7 +973,7 @@ export default function CadastroRecorrenteBody() {
               {!availLoading && availError && (
                 <div className="rounded-2xl bg-red-50 border border-red-200 p-5 text-red-700">
                   <strong>Falha ao carregar disponibilidade:</strong>
-                  <div className="mt-1">{availError}</div>
+                  <div className="mt-1">{toErrorMessage(availError, "Erro desconhecido.")}</div>
                   <button
                     onClick={() => void loadAvailability()}
                     className="mt-4 rounded-xl bg-red-600 text-white px-4 py-2 font-medium hover:bg-red-700"
@@ -1098,7 +1098,7 @@ export default function CadastroRecorrenteBody() {
                 </div>
               )}
               {submitError && (
-                <div className="rounded-2xl bg-red-50 border border-red-200 p-5 text-red-700">{submitError}</div>
+                <div className="rounded-2xl bg-red-50 border border-red-200 p-5 text-red-700">{toErrorMessage(submitError, "Erro desconhecido.")}</div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full">
                 <button
@@ -1185,7 +1185,7 @@ export default function CadastroRecorrenteBody() {
                 <div className="py-14 text-center text-slate-500">Preparando suas informações…</div>
               )}
               {contractInitError && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{contractInitError}</div>
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{toErrorMessage(contractInitError, "Erro desconhecido.")}</div>
               )}
 
               {!contractInitLoading && !contractInitError && contractCurrentFieldIdx >= 0 && (
@@ -1249,7 +1249,7 @@ export default function CadastroRecorrenteBody() {
                             }
                           />
                           {contractFieldError && (
-                            <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{contractFieldError}</div>
+                            <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{toErrorMessage(contractFieldError, "Erro desconhecido.")}</div>
                           )}
                         </div>
                         <div className="grid grid-cols-1 sm:flex sm:flex-row sm:items-start gap-3 pt-2 w-full">
@@ -1528,7 +1528,7 @@ export default function CadastroRecorrenteBody() {
               </div>
 
               {contractFinalError && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 max-w-2xl mx-auto">{contractFinalError}</div>
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 max-w-2xl mx-auto">{toErrorMessage(contractFinalError, "Erro desconhecido.")}</div>
               )}
 
               <div className="grid grid-cols-1 sm:flex sm:flex-row sm:items-start gap-3 pt-2 max-w-2xl mx-auto w-full">

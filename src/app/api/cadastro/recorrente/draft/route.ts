@@ -3,6 +3,31 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findLeadByPhone } from "@/lib/atendimento/server";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
 
+function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
+  if (raw === null || raw === undefined) return fallback;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    return s || fallback;
+  }
+  if (raw instanceof Error) {
+    const m = raw.message?.trim();
+    return m || fallback;
+  }
+  if (typeof raw === "object") {
+    const any = raw as Record<string, unknown>;
+    const candidates = [any.message, any.error, any.error_message, any.msg, any.detail];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim()) return c.trim();
+    }
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return String(raw) || fallback;
+    }
+  }
+  return String(raw) || fallback;
+}
+
 function toNomeESobrenome(raw: string | null | undefined): string {
   const clean = String(raw ?? "").trim();
   if (!clean) return "";
@@ -286,7 +311,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: err instanceof Error ? err.message : String(err ?? ""),
+        error: toErrorMessage(err, ""),
       },
       { status: 500 },
     );
