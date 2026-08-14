@@ -87,7 +87,7 @@ export const CONTRACT_FIELD_LABELS: Record<(typeof CONTRACT_FIELD_ORDER)[number]
   full_name: "Nome completo",
   cpf: "CPF",
   phone: "Telefone/WhatsApp",
-  legal_responsible_name: "Nome completo do responsável legal",
+  legal_responsible_name: "Nome completo do responsável",
   legal_responsible_cpf: "CPF do responsável legal",
 };
 
