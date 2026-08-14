@@ -1007,7 +1007,7 @@ export default function CadastroRecorrenteBody() {
                               <button
                                 onClick={() => void contractAdvanceField(true)}
                                 disabled={contractFieldSaving}
-                                className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-6 py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                                className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                               >
                                 Pular →
                               </button>
@@ -1015,7 +1015,7 @@ export default function CadastroRecorrenteBody() {
                             <button
                               onClick={() => void contractAdvanceField(false)}
                               disabled={contractFieldSaving}
-                              className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                              className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                             >
                               {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
                             </button>
@@ -1023,7 +1023,7 @@ export default function CadastroRecorrenteBody() {
                           <button
                             onClick={() => goStep((Math.max(0, (step as number) - 1)) as any)}
                             disabled={contractFieldSaving}
-                            className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap col-span-2 sm:col-span-1 order-2 sm:order-1 rounded-2xl px-5 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
+                            className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap col-span-2 sm:col-span-1 order-2 sm:order-1 rounded-2xl px-5 sm:px-7 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
                           >
                             ← Voltar
                           </button>
