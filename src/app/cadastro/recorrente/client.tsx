@@ -94,6 +94,13 @@ export default function CadastroRecorrenteBody() {
     legal_responsible_name: null,
     legal_responsible_cpf: null,
   });
+  const [lastSavedFieldValues, setLastSavedFieldValues] = useState<Record<ContractFieldMeta["name"], string | null>>({
+    full_name: null,
+    cpf: null,
+    phone: null,
+    legal_responsible_name: null,
+    legal_responsible_cpf: null,
+  });
   const [contractAllFields, setContractAllFields] = useState<ContractFieldMeta[]>([]);
   const [contractCurrentFieldIdx, setContractCurrentFieldIdx] = useState<number>(0);
   const [contractCurrentValue, setContractCurrentValue] = useState<string>("");
@@ -135,6 +142,7 @@ export default function CadastroRecorrenteBody() {
         }
         setContractLeadId(String(json.leadId || submitLeadId || ""));
         setContractSnapshot(json.snapshot || contractSnapshot);
+        setLastSavedFieldValues(json.snapshot || lastSavedFieldValues);
         setContractAllFields(json.allFields || []);
         setContractCurrentFieldIdx(0);
         setContractCurrentValue((json.allFields || [])[0]?.currentValue || "");
@@ -195,6 +203,8 @@ export default function CadastroRecorrenteBody() {
             nextField?: ContractFieldMeta["name"] | null;
             allFields?: ContractFieldMeta[];
             skipped?: boolean;
+            savedField?: ContractFieldMeta["name"];
+            savedValue?: string | null;
           }
         | null;
       if (!res.ok || !json?.ok) {
@@ -202,6 +212,10 @@ export default function CadastroRecorrenteBody() {
         return;
       }
       setContractSnapshot(json.snapshot || contractSnapshot);
+      setLastSavedFieldValues((prev) => ({
+        ...prev,
+        [currentMeta.name]: json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name],
+      }));
       setContractAllFields(json.allFields || contractAllFields);
       const nextStep: 4 | 5 | 6 | 7 | 8 =
         step === 3 ? 4 : step === 4 ? 5 : step === 5 ? 6 : step === 6 ? 7 : 8;
@@ -212,7 +226,17 @@ export default function CadastroRecorrenteBody() {
       }
       const nextFieldIdx = nextStep - 3;
       setContractCurrentFieldIdx(nextFieldIdx);
-      setContractCurrentValue((json.allFields || contractAllFields)[nextFieldIdx]?.currentValue || "");
+      const nextMeta = (json.allFields || contractAllFields)[nextFieldIdx];
+      if (nextMeta) {
+        const pre =
+          (json.snapshot || contractSnapshot)[nextMeta.name] ??
+          nextMeta.currentValue ??
+          lastSavedFieldValues[nextMeta.name] ??
+          "";
+        setContractCurrentValue(typeof pre === "string" ? pre.trim() : "");
+      } else {
+        setContractCurrentValue("");
+      }
       goStep(nextStep);
     } finally {
       setContractFieldSaving(false);
@@ -278,10 +302,13 @@ export default function CadastroRecorrenteBody() {
     const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
     const target = contractAllFields[expectedIdx];
     if (!target) return;
-    if (contractCurrentValue !== String(target.currentValue || "")) {
-      setContractCurrentValue(String(target.currentValue || ""));
+    const preferred =
+      lastSavedFieldValues[target.name] ?? target.currentValue ?? contractSnapshot[target.name] ?? "";
+    const next = typeof preferred === "string" ? preferred.trim() : "";
+    if (contractCurrentValue !== String(next || "")) {
+      setContractCurrentValue(String(next || ""));
     }
-  }, [step, contractAllFields]);
+  }, [step, contractAllFields, lastSavedFieldValues, contractSnapshot, contractCurrentValue]);
 
   useEffect(() => {
     void (async () => {
@@ -1062,8 +1089,10 @@ export default function CadastroRecorrenteBody() {
               </div>
               <div className="rounded-3xl border border-slate-200 bg-white max-w-2xl mx-auto divide-y divide-slate-100">
                 {contractAllFields.map((f, idx) => {
-                  const val = contractSnapshot[f.name] ?? f.currentValue;
-                  if (!val && f.optional) return null;
+                  const raw =
+                    lastSavedFieldValues[f.name] ?? f.currentValue ?? contractSnapshot[f.name] ?? null;
+                  const val = typeof raw === "string" ? raw.trim() : raw;
+                  if ((!val || val === "") && f.optional) return null;
                   return (
                     <div key={idx} className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 items-start">
                       <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right">
@@ -1071,7 +1100,7 @@ export default function CadastroRecorrenteBody() {
                         {f.optional ? " (opcional)" : ""}
                       </div>
                       <div className="sm:col-span-2 text-base font-semibold text-slate-900 break-words">
-                        {val || "— não informado —"}
+                        {val && val !== "" ? val : "— não informado —"}
                       </div>
                     </div>
                   );

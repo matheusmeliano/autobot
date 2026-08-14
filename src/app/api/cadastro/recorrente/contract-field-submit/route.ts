@@ -89,17 +89,25 @@ export async function POST(req: Request) {
       patch = { legal_responsible_cpf: valueToSave };
     }
 
-    let updatedLead = lead;
+    let updatedLead: any = null;
     try {
-      const { data } = await admin
+      const { data, error } = await admin
         .from("atendimento_leads")
         .update(patch)
         .eq("id", String(lead.id))
         .select("*")
         .maybeSingle();
-      if (data) updatedLead = data;
+      if (error) {
+        console.error("update lead contract field supabase error:", error?.message || error);
+        return Response.json({ ok: false, error: "Falha ao salvar no banco. Tente novamente." }, { status: 500 });
+      }
+      if (!data) {
+        return Response.json({ ok: false, error: "Cadastro não encontrado após salvar." }, { status: 404 });
+      }
+      updatedLead = data;
     } catch (e: any) {
-      console.error("update lead contract field error:", e?.message || e);
+      console.error("update lead contract field exception error:", e?.message || e);
+      return Response.json({ ok: false, error: String(e?.message || "Falha ao salvar o campo (exceção).") }, { status: 500 });
     }
 
     try {
@@ -114,31 +122,46 @@ export async function POST(req: Request) {
       } as any);
     } catch {}
 
-    function getRawFieldValue(name: ContractFieldName, src: any): string | null {
-      const obj = { ...lead, ...(src ?? {}) };
+    function getRawFieldValue(name: ContractFieldName, updated: any, old: any): string | null {
+      const src = updated && typeof updated === "object" ? updated : old;
+      const obj = { ...(old ?? {}), ...(src ?? {}) };
       if (name === "full_name") {
-        const v = obj.full_name ?? obj.nome_completo ?? obj.nome;
+        const v =
+          (src ?? {}).full_name ??
+          (src ?? {}).nome_completo ??
+          (src ?? {}).nome ??
+          obj.full_name ??
+          obj.nome_completo ??
+          obj.nome;
         if (v === "") return "";
         return String(v ?? "").trim() || null;
       }
       if (name === "cpf") {
-        const v = obj.cpf;
+        const v = (src ?? {}).cpf ?? obj.cpf;
         if (v === "") return "";
         return String(v ?? "").replace(/\D/g, "").trim() || null;
       }
       if (name === "phone") {
-        const v = obj.phone_digits ?? obj.telefone ?? obj.whatsapp ?? obj.phone;
+        const v =
+          (src ?? {}).phone_digits ??
+          (src ?? {}).telefone ??
+          (src ?? {}).whatsapp ??
+          (src ?? {}).phone ??
+          obj.phone_digits ??
+          obj.telefone ??
+          obj.whatsapp ??
+          obj.phone;
         if (v === "") return "";
         const p = String(v ?? "").replace(/\D/g, "").trim();
         return p || null;
       }
       if (name === "legal_responsible_name") {
-        const v = obj.legal_responsible_name;
+        const v = (src ?? {}).legal_responsible_name ?? obj.legal_responsible_name;
         if (v === "") return "";
         return String(v ?? "").trim() || null;
       }
       if (name === "legal_responsible_cpf") {
-        const v = obj.legal_responsible_cpf;
+        const v = (src ?? {}).legal_responsible_cpf ?? obj.legal_responsible_cpf;
         if (v === "") return "";
         return String(v ?? "").replace(/\D/g, "").trim() || null;
       }
@@ -146,11 +169,11 @@ export async function POST(req: Request) {
     }
 
     const snapshot: Record<ContractFieldName, string | null> = {
-      full_name: getRawFieldValue("full_name", updatedLead),
-      cpf: getRawFieldValue("cpf", updatedLead),
-      phone: getRawFieldValue("phone", updatedLead),
-      legal_responsible_name: getRawFieldValue("legal_responsible_name", updatedLead),
-      legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf", updatedLead),
+      full_name: getRawFieldValue("full_name", updatedLead, lead),
+      cpf: getRawFieldValue("cpf", updatedLead, lead),
+      phone: getRawFieldValue("phone", updatedLead, lead),
+      legal_responsible_name: getRawFieldValue("legal_responsible_name", updatedLead, lead),
+      legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf", updatedLead, lead),
     };
 
     const pending: ContractFieldName[] = (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).filter(
