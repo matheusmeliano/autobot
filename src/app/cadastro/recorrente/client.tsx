@@ -841,60 +841,60 @@ export default function CadastroRecorrenteBody() {
                   </svg>
                 </div>
                 <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Tudo certo, {firstName}! 🎉</h2>
-                <p className="mt-3 text-lg text-slate-600">Sua aula recorrente foi reservada.</p>
-                <p className="mt-2 text-base text-slate-500">Agora vamos formalizar o contrato. Responda uma pergunta por vez.</p>
+                <p className="mt-3 text-lg text-slate-600 leading-snug">Sua aula recorrente foi reservada.</p>
+                <p className="mt-2.5 text-base text-slate-500 leading-relaxed">Agora vamos <strong className="font-bold text-slate-700">formalizar o contrato</strong>. Responda uma pergunta por vez.</p>
               </div>
 
               <div className="max-w-2xl mx-auto">
                 <div className="rounded-3xl bg-white border border-slate-200/70 shadow-[0_10px_40px_-12px_rgba(79,70,229,0.18)] overflow-hidden">
-                  <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 px-7 py-4.5 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center text-white">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                  <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 px-7.5 py-5 flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center text-white flex-shrink-0">
+                      <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </div>
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">Agendamento confirmado</div>
-                      <div className="text-white text-base font-bold leading-tight">Sua vaga está garantida ✨</div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/80">Agendamento confirmado</div>
+                      <div className="text-white text-[17px] font-extrabold leading-tight mt-0.5">Sua vaga está garantida ✨</div>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 divide-y divide-slate-100 sm:divide-y-0 sm:divide-x sm:divide-slate-100">
-                    <div className="px-7 py-6 flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                    <div className="px-7.5 py-6.5 flex items-center gap-4.5">
+                      <div className="w-12.5 h-12.5 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <svg className="w-6.5 h-6.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm4.5-3h.008v.008h-.008V12zm0 3h.008v.008h-.008V15zM7.5 12h.008v.008H7.5V12zm0 3h.008v.008H7.5V15z" />
                         </svg>
                       </div>
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Dia da aula</div>
-                        <div className="mt-1 text-2xl font-extrabold text-slate-900 leading-none">{submitResult.weekdayLabel}</div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Dia da aula</div>
+                        <div className="mt-2 text-2xl font-extrabold text-slate-900 leading-none">{submitResult.weekdayLabel}</div>
                       </div>
                     </div>
-                    <div className="px-7 py-6 flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                    <div className="px-7.5 py-6.5 flex items-center gap-4.5">
+                      <div className="w-12.5 h-12.5 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <svg className="w-6.5 h-6.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Horário fixo</div>
-                        <div className="mt-1 text-2xl font-extrabold text-slate-900 tabular-nums leading-none">{submitResult.leadTime}</div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Horário fixo</div>
+                        <div className="mt-2 text-2xl font-extrabold text-slate-900 tabular-nums leading-none">{submitResult.leadTime}</div>
                       </div>
                     </div>
-                    <div className="px-7 py-6 flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24">
+                    <div className="px-7.5 py-6.5 flex items-center gap-4.5">
+                      <div className="w-12.5 h-12.5 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <svg className="w-6.5 h-6.5" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Situação</div>
-                        <div className="mt-1 inline-flex items-center gap-2">
-                          <span className="relative flex h-2.5 w-2.5">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Situação</div>
+                        <div className="mt-2 inline-flex items-center gap-2.5">
+                          <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                           </span>
-                          <span className="text-lg font-extrabold text-emerald-700 leading-none">Contrato em andamento</span>
+                          <span className="text-[17px] font-extrabold text-emerald-700 leading-none">Contrato em andamento</span>
                         </div>
                       </div>
                     </div>
