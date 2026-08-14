@@ -1037,6 +1037,14 @@ export async function POST(req: Request) {
   if (isContractRelatedStage || shouldStartContractNow) {
     const contractStatus = String((lead as any).contract_status ?? "nao_iniciado").trim();
     const lastContractPromptRaw = String(lastBotMessage?.content_text ?? "").trim();
+    const anyContractPromptSent =
+      lastContractPromptRaw.startsWith("Perfeito! Agora vamos formalizar o contrato") ||
+      lastContractPromptRaw.startsWith(CONTRACT_ACEITE_PROMPT_FIRST.split("\n")[0] ?? "") ||
+      lastContractPromptRaw.startsWith("Confirme se seu ") ||
+      lastContractPromptRaw.startsWith("Seu nome completo:") ||
+      lastContractPromptRaw.startsWith("Sem problema! Vamos revisar") ||
+      lastContractPromptRaw.startsWith(CONTRACT_SIGNED_SUCCESS_MESSAGE.split("\n")[0] ?? "") ||
+      lastContractPromptRaw.startsWith("Por favor, responda apenas");
 
     let pipelineStage: "coletando_dados" | "aguardando_aceite" | "assinado" | "iniciar";
     if (
@@ -1049,7 +1057,7 @@ export async function POST(req: Request) {
       currentFunnelStage === "contrato_aguardando_aceite" ||
       currentStatus === "contrato_aguardando_aceite" ||
       contractStatus === "aguardando_aceite" ||
-      lastContractPromptRaw.startsWith(CONTRACT_ACEITE_PROMPT_FIRST.split("\n")[0] ?? "") ||
+      (lastContractPromptRaw.startsWith(CONTRACT_ACEITE_PROMPT_FIRST.split("\n")[0] ?? "") && anyContractPromptSent) ||
       lastContractPromptRaw.startsWith("Perfeito! Agora vamos formalizar o contrato")
     ) {
       pipelineStage = "aguardando_aceite";
@@ -1059,7 +1067,11 @@ export async function POST(req: Request) {
       contractStatus === "coletando_dados" ||
       shouldStartContractNow
     ) {
-      pipelineStage = shouldStartContractNow ? "iniciar" : "coletando_dados";
+      if (shouldStartContractNow || !anyContractPromptSent) {
+        pipelineStage = "iniciar";
+      } else {
+        pipelineStage = "coletando_dados";
+      }
     } else {
       pipelineStage = "iniciar";
     }
