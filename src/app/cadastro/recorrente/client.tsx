@@ -1596,10 +1596,8 @@ export default function CadastroRecorrenteBody() {
                 )}
               </div>
 
-              <div className="pt-2 max-w-2xl mx-auto text-left text-sm text-slate-500 space-y-1">
-                <p className="font-semibold text-slate-700">Próximos passos:</p>
-                <p>• Em breve você receberá a confirmação do pagamento da primeira mensalidade.</p>
-                <p>• Qualquer dúvida, entre em contato pelo WhatsApp.</p>
+              <div className="pt-2 max-w-2xl mx-auto text-center text-sm text-slate-500">
+                <p>Qualquer dúvida, entre em contato pelo WhatsApp <span className="font-semibold text-slate-700">(65) 9 9693-3336</span>.</p>
               </div>
             </section>
           )}
