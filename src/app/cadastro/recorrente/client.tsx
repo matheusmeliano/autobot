@@ -1111,6 +1111,194 @@ export default function CadastroRecorrenteBody() {
                 })}
               </div>
 
+              {(() => {
+                function fmtCPF(v: string | null): string {
+                  const d = String(v ?? "").replace(/\D/g, "");
+                  if (d.length < 11) return String(v ?? "___.___.___-__").trim() || "___.___.___-__";
+                  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9, 11)}`;
+                }
+                function fmtPhone(v: string | null): string {
+                  const d = String(v ?? "").replace(/\D/g, "");
+                  if (d.length >= 13) return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9, 13)}`;
+                  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
+                  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6, 10)}`;
+                  return String(v ?? "(  ) _________").trim() || "(  ) _________";
+                }
+                function fmtCity(v: string | null): string | null {
+                  const s = String(v ?? "").trim();
+                  return s ? s : null;
+                }
+                function fmtSignedDate(iso: string): string {
+                  const d = new Date(iso);
+                  if (Number.isNaN(d.getTime())) return fmtSignedDate(new Date().toISOString());
+                  const dia = String(d.getDate()).padStart(2, "0");
+                  const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+                  return `${dia} de ${meses[d.getMonth()] ?? ""} de ${String(d.getFullYear())}`;
+                }
+                const CONTRATADA_NOME = "INNOVALAND DESENVOLVIMENTO E PARTICIPAÇÕES LTDA";
+                const CONTRATADA_CNPJ = "63.088.381/0001-22";
+                const PROFESSOR_NOME = "Lucas Brum de Castro";
+
+                const getFieldRaw = (name: "full_name" | "cpf" | "phone" | "legal_responsible_name" | "legal_responsible_cpf") => {
+                  const f = contractAllFields.find((x) => x.name === name);
+                  return (
+                    lastSavedFieldValues[name] ??
+                    f?.currentValue ??
+                    contractSnapshot[name] ??
+                    null
+                  );
+                };
+
+                const studentFullName = String(getFieldRaw("full_name") ?? "ALUNO(A)").trim() || "ALUNO(A)";
+                const studentCPF = fmtCPF(getFieldRaw("cpf"));
+                const studentPhone = fmtPhone(getFieldRaw("phone"));
+                const studentCity = fmtCity((contractSnapshot as any)?.city ?? null);
+                const legalResponsibleNameRaw = String(getFieldRaw("legal_responsible_name") ?? "").trim() || null;
+                const legalResponsibleCPFRaw = String(getFieldRaw("legal_responsible_cpf") ?? "").trim() || null;
+                const hasLegalResponsible = Boolean(legalResponsibleNameRaw && legalResponsibleCPFRaw);
+                const legalResponsibleName = hasLegalResponsible ? legalResponsibleNameRaw : null;
+                const legalResponsibleCPF = hasLegalResponsible ? fmtCPF(legalResponsibleCPFRaw) : null;
+                const signedAtIso = new Date().toISOString();
+                const signedByLabel = hasLegalResponsible ? legalResponsibleName! : studentFullName;
+                const signedByCPF = hasLegalResponsible ? fmtCPF(legalResponsibleCPFRaw) : fmtCPF(getFieldRaw("cpf"));
+                const dataLocal = studentCity ? `${studentCity}, ${fmtSignedDate(signedAtIso)}.` : `${fmtSignedDate(signedAtIso)}.`;
+
+                const p = "text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90";
+                const h2 = "text-[15px] font-bold mb-2 mt-5 text-black";
+                return (
+                  <section className="max-w-2xl mx-auto mb-8">
+                    <div className="text-center mb-6">
+                      <h3 className="text-base sm:text-lg font-bold uppercase tracking-wide text-slate-800">
+                        Prévia completa do contrato
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                        Revise todo o conteúdo abaixo antes de formalizar. Este é o mesmo texto do PDF gerado após o aceite.
+                      </p>
+                    </div>
+                    <article className="rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_-16px_rgba(15,23,42,0.18)] p-6 sm:p-10 font-serif text-slate-900">
+                      <h1 className="text-center text-[16px] sm:text-[18px] font-bold mb-5 leading-snug">
+                        CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS
+                        <br />
+                        AULAS ONLINE DE MÚSICA
+                      </h1>
+
+                      <p className={p}>
+                        <strong>CONTRATADA:</strong> {CONTRATADA_NOME}, inscrita no CNPJ nº {CONTRATADA_CNPJ}, responsável pela marca
+                        Lucas Brum Online Music USA, representada pelo professor {PROFESSOR_NOME}.
+                      </p>
+                      <p className={p}><strong>Aluno(a):</strong> {studentFullName}</p>
+                      <p className={p}><strong>CPF:</strong> {studentCPF}</p>
+                      <p className={p}><strong>Telefone/WhatsApp:</strong> {studentPhone}</p>
+                      {legalResponsibleName && (
+                        <p className={p}><strong>Responsável legal, se menor:</strong> {legalResponsibleName}</p>
+                      )}
+                      {legalResponsibleCPF && (
+                        <p className={p}><strong>CPF do responsável:</strong> {legalResponsibleCPF}</p>
+                      )}
+
+                      <h2 className={h2}>1. OBJETO</h2>
+                      <p className={p}>
+                        A CONTRATADA prestará ao(à) aluno(a) aulas individuais, online e ao vivo de música, em português,
+                        ministradas pelo professor {PROFESSOR_NOME}, com conteúdo adequado ao nível, ao instrumento escolhido
+                        e aos objetivos do(a) aluno(a).
+                      </p>
+
+                      <h2 className={h2}>2. PLANO, VALOR E PAGAMENTO</h2>
+                      <p className={p}>
+                        O plano compreende 1 (uma) aula por semana, com duração de 40 (quarenta) minutos, pelo valor mensal
+                        de US$ 119,00 (cento e dezenove dólares). O pagamento será mensal e antecipado, por Stripe, Wise,
+                        Pix, transferência ou outro meio informado pela CONTRATADA.
+                      </p>
+
+                      <h2 className={h2}>3. AGENDA, FALTAS E REPOSIÇÕES</h2>
+                      <p className={p}>
+                        As aulas ocorrerão em horário previamente combinado. A remarcação deverá ser solicitada com, no
+                        mínimo, 24 (vinte e quatro) horas de antecedência. Faltas sem aviso prévio não geram reposição.
+                        Problemas técnicos ou de internet que impeçam a aula poderão resultar em reagendamento, mediante
+                        acordo entre as partes.
+                      </p>
+
+                      <h2 className={h2}>4. CANCELAMENTO</h2>
+                      <p className={p}>
+                        O contrato poderá ser cancelado a qualquer momento, sem multa. Os valores já pagos não serão
+                        devolvidos proporcionalmente, pois o horário permanecerá reservado ao(à) aluno(a) durante o
+                        respectivo ciclo mensal.
+                      </p>
+
+                      <h2 className={h2}>5. RESPONSABILIDADES DO(A) ALUNO(A)</h2>
+                      <p className={p}>
+                        O(A) aluno(a) deverá possuir o instrumento musical necessário às aulas, acesso à internet,
+                        câmera, microfone e ambiente adequado. O desenvolvimento dependerá da frequência, dedicação
+                        e prática individual, não havendo garantia de resultado específico.
+                      </p>
+
+                      <h2 className={h2}>6. MATERIAL DIDÁTICO</h2>
+                      <p className={p}>
+                        Os materiais fornecidos são de uso pessoal do(a) aluno(a) e não poderão ser vendidos,
+                        publicados ou compartilhados sem autorização da CONTRATADA.
+                      </p>
+
+                      <h2 className={h2}>7. USO DE IMAGEM</h2>
+                      <p className={p}>
+                        O(A) aluno(a), ou seu responsável legal, autoriza gratuitamente o uso de imagens, vídeos e
+                        trechos das aulas em que apareça para divulgação da Lucas Brum Online Music USA em redes
+                        sociais, site e materiais institucionais. Caso não concorde, deverá informar a CONTRATADA
+                        antes do início das aulas, e esta cláusula será retirada do contrato.
+                      </p>
+
+                      <h2 className={h2}>8. VIGÊNCIA E ACEITE</h2>
+                      <p className={p}>
+                        O contrato terá vigência inicial de 6 (seis) meses, com renovação automática, podendo ser
+                        cancelado conforme a Cláusula 4. A assinatura eletrônica, o aceite por WhatsApp, formulário,
+                        e-mail ou o primeiro pagamento confirmam a concordância com este contrato.
+                      </p>
+
+                      <h2 className={h2}>9. DISPOSIÇÕES FINAIS</h2>
+                      <p className={p}>
+                        Este contrato não gera vínculo empregatício. Eventuais alterações deverão ser acordadas entre
+                        as partes. Fica eleito o foro da comarca de Campo Novo do Parecis/MT para resolver controvérsias,
+                        ressalvadas as hipóteses legais de foro obrigatório.
+                      </p>
+
+                      <p className="mt-6 text-[13px] sm:text-[14px] leading-[1.6] mb-2">
+                        Declaro que li, compreendi e concordo com as condições deste contrato.
+                      </p>
+
+                      <p className="mt-6 text-[13px] sm:text-[14px] leading-[1.6] text-left mb-2">{dataLocal}</p>
+
+                      <div className="mt-14">
+                        <div className="border-t border-black/80 w-[80%] mx-auto mb-2" />
+                        <p className="text-center text-[12px] leading-snug">
+                          <strong>CONTRATADA – Lucas Brum de Castro (professor representante)</strong>
+                        </p>
+                        <p className="text-center text-[12px] leading-snug mt-0.5">
+                          {CONTRATADA_NOME} – CNPJ {CONTRATADA_CNPJ}
+                        </p>
+                      </div>
+
+                      <div className="mt-10">
+                        <div className="border-t border-black/80 w-[80%] mx-auto mb-2" />
+                        {hasLegalResponsible ? (
+                          <>
+                            <p className="text-center text-[12px] leading-snug">
+                              <strong>Responsável legal / Assinatura do(a) aluno(a):</strong> {signedByLabel}
+                            </p>
+                            <p className="text-center text-[12px] leading-snug mt-0.5">CPF: {signedByCPF}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-center text-[12px] leading-snug">
+                              <strong>Aluno(a):</strong> {signedByLabel}
+                            </p>
+                            <p className="text-center text-[12px] leading-snug mt-0.5">CPF: {signedByCPF}</p>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  </section>
+                );
+              })()}
+
               <div className="rounded-3xl bg-slate-50 border border-slate-200 p-6 max-w-2xl mx-auto text-sm text-slate-700 leading-relaxed space-y-2">
                 <p className="font-semibold text-slate-900 text-base">Declaração de aceite</p>
                 <p>
@@ -1129,7 +1317,7 @@ export default function CadastroRecorrenteBody() {
                   disabled={contractFinalizing}
                   className="order-2 sm:order-1 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                 >
-                  ← Voltar para revisar
+                  Voltar para editar
                 </button>
                 <button
                   onClick={() => void handleContractFinalize()}
