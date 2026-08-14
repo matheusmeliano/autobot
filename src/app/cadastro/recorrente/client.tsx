@@ -779,13 +779,13 @@ export default function CadastroRecorrenteBody() {
                 <button
                   onClick={handleAdvance1}
                   disabled={!selectedWeekday}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
                 >
                   Avançar →
                 </button>
                 <button
                   onClick={() => goStep(0)}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate"
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
                 >
                   ← Voltar
                 </button>
@@ -855,13 +855,13 @@ export default function CadastroRecorrenteBody() {
                 <button
                   onClick={() => void handleSubmitFinal()}
                   disabled={!selectedTimeOpt || submitLoading}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
                 >
                   {submitLoading ? "Finalizando..." : "Finalizar cadastro ✓"}
                 </button>
                 <button
                   onClick={() => goStep(1)}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate"
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
                 >
                   ← Voltar
                 </button>
@@ -1002,12 +1002,12 @@ export default function CadastroRecorrenteBody() {
                           )}
                         </div>
                         <div className="grid grid-cols-2 gap-3 pt-2 w-full">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 col-span-2 sm:col-span-1 order-1 sm:order-2 sm:justify-self-end sm:w-auto">
+                          <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 col-span-2 sm:col-span-1 order-1 sm:order-2 sm:justify-self-end sm:w-auto">
                             {meta.optional && (
                               <button
                                 onClick={() => void contractAdvanceField(true)}
                                 disabled={contractFieldSaving}
-                                className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-3 sm:px-6 py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                                className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-3 sm:px-6 py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                               >
                                 Pular →
                               </button>
@@ -1015,7 +1015,7 @@ export default function CadastroRecorrenteBody() {
                             <button
                               onClick={() => void contractAdvanceField(false)}
                               disabled={contractFieldSaving}
-                              className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                              className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                             >
                               {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
                             </button>
@@ -1023,7 +1023,7 @@ export default function CadastroRecorrenteBody() {
                           <button
                             onClick={() => goStep((Math.max(3, (step as number) - 1)) as any)}
                             disabled={contractFieldSaving}
-                            className="w-full shrink-0 min-w-0 whitespace-nowrap col-span-2 sm:col-span-1 order-2 sm:order-1 rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                            className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap col-span-2 sm:col-span-1 order-2 sm:order-1 rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
                           >
                             ← Voltar
                           </button>
@@ -1083,14 +1083,14 @@ export default function CadastroRecorrenteBody() {
                 <button
                   onClick={() => void handleContractFinalize()}
                   disabled={contractFinalizing}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate"
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-7 py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate sm:order-2 sm:justify-self-end"
                 >
                   {contractFinalizing ? "Gerando contrato…" : "✓ Sim, formalizar contrato agora"}
                 </button>
                 <button
                   onClick={() => goStep(7)}
                   disabled={contractFinalizing}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                  className="w-full sm:w-auto shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-4 sm:px-6 py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
                 >
                   ← Voltar para revisar
                 </button>
