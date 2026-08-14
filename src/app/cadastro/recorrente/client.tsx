@@ -961,13 +961,21 @@ export default function CadastroRecorrenteBody() {
                     return (
                       <div className="space-y-7">
                         <div className="space-y-1">
-                        <h2 className="text-2xl font-bold text-slate-900">
-                          {hasExisting ? "Confirme seu " + meta.label.toLowerCase() : "Informe seu " + meta.label.toLowerCase()}
-                        </h2>
-                        <p className="text-slate-600">
-                          {meta.optional ? "Campo opcional. Você pode pular se preferir." : "Campo obrigatório."}
-                        </p>
-                      </div>
+                          <h2 className="text-2xl font-bold text-slate-900">
+                            {hasExisting
+                              ? (meta.name === "legal_responsible_name" ? "Confirme o " : "Confirme seu ") + meta.label.toLowerCase()
+                              : (meta.name === "legal_responsible_name" ? "Informe o " : "Informe seu ") + meta.label.toLowerCase()}
+                          </h2>
+                          <p className="text-slate-600">
+                            {meta.optional ? (
+                              <>
+                                <strong>Campo opcional</strong>. Você pode pular se preferir.
+                              </>
+                            ) : (
+                              "Campo obrigatório."
+                            )}
+                          </p>
+                        </div>
                         <div>
                           <label className="block text-sm font-semibold text-slate-800 mb-2">
                             {meta.label}
