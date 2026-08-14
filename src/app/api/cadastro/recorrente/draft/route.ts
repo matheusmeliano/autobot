@@ -20,6 +20,8 @@ type DraftPayload = {
   weekdayLabel?: string | null;
   professorTime?: string | null;
   leadTime?: string | null;
+  step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null;
+  password?: string | null;
 };
 
 export async function GET(req: NextRequest) {
@@ -32,29 +34,80 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "telefone obrigatório" }, { status: 400 });
     }
     const normalizedPhone = safePhoneDigits;
-    const { data } = await admin
-      .from("atendimento_leads")
-      .select("id, phone, full_name")
-      .eq("phone", normalizedPhone)
-      .limit(1)
-      .maybeSingle();
+    let data: any = null;
+    try {
+      const sel = await admin
+        .from("atendimento_leads")
+        .select(
+          "id, phone, full_name, cpf, recurring_registration_step, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, legal_responsible_name, legal_responsible_cpf",
+        )
+        .eq("phone", normalizedPhone)
+        .limit(1)
+        .maybeSingle();
+      if (sel?.error) {
+        if (/column.*does not exist|PGRST204|42703/i.test(String(sel.error?.message ?? ""))) {
+          const fallback = await admin
+            .from("atendimento_leads")
+            .select("id, phone, full_name, cpf")
+            .eq("phone", normalizedPhone)
+            .limit(1)
+            .maybeSingle();
+          data = fallback?.data ?? null;
+        } else {
+          throw sel.error;
+        }
+      } else {
+        data = sel?.data ?? null;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e ?? "");
+      if (/column.*does not exist|PGRST204|42703/i.test(msg)) {
+        const fallback = await admin
+          .from("atendimento_leads")
+          .select("id, phone, full_name, cpf")
+          .eq("phone", normalizedPhone)
+          .limit(1)
+          .maybeSingle();
+        data = fallback?.data ?? null;
+      } else {
+        throw e;
+      }
+    }
     if (!data) {
       return NextResponse.json(
         {
-          ok: false,
-          blocked: true,
-          error:
-            "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+          ok: true,
+          progress: null,
+          lead: null,
         },
-        { status: 403 },
+        { status: 200 },
       );
     }
+    const stepRaw = (data as any)?.recurring_registration_step;
+    const parsedStep =
+      typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 9
+        ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9)
+        : 0;
     return NextResponse.json({
       ok: true,
       lead: {
         id: (data as any).id,
         phone: String((data as any).phone ?? ""),
         full_name: String((data as any).full_name ?? "").trim() || null,
+        cpf: String((data as any).cpf ?? "").trim() || null,
+        legal_responsible_name: String((data as any).legal_responsible_name ?? "").trim() || null,
+        legal_responsible_cpf: String((data as any).legal_responsible_cpf ?? "").trim() || null,
+      },
+      progress: {
+        step: parsedStep,
+        has_password: Boolean(String((data as any).recurring_registration_password ?? "").trim()),
+        recurring_class_weekday: String((data as any).recurring_class_weekday ?? "").trim() || null,
+        recurring_class_weekday_label:
+          String((data as any).recurring_class_weekday_label ?? "").trim() || null,
+        recurring_class_professor_time:
+          String((data as any).recurring_class_professor_time ?? "").trim() || null,
+        recurring_class_lead_time:
+          String((data as any).recurring_class_lead_time ?? "").trim() || null,
       },
     });
   } catch (e) {
@@ -71,7 +124,8 @@ export async function PATCH(req: NextRequest) {
     if (!rawBody || typeof rawBody !== "object") {
       return NextResponse.json({ ok: false, error: "Corpo inválido." }, { status: 400 });
     }
-    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime } = rawBody as DraftPayload;
+    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password } =
+      rawBody as DraftPayload;
 
     const safePhoneDigits = String(telefone ?? "").replace(/\D/g, "").trim();
     if (safePhoneDigits.length < 10) {
@@ -89,9 +143,26 @@ export async function PATCH(req: NextRequest) {
     const safeLeadTime = String(leadTime ?? "").trim();
     const hasAnyTime = Boolean(safeProfessorTime || safeLeadTime);
 
-    if (!validWeekday && !hasAnyTime) {
+    const safeStepRaw =
+      typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 9 ? step : null;
+
+    const safePassword =
+      typeof password === "string" && password.trim().length >= 4 ? password.trim() : null;
+
+    const hasAnyPayload =
+      Boolean(validWeekday) ||
+      hasAnyTime ||
+      Boolean(safeNome) ||
+      safeStepRaw !== null ||
+      Boolean(safePassword);
+
+    if (!hasAnyPayload) {
       return NextResponse.json(
-        { ok: false, error: "Informe pelo menos dia ou horário para salvar o rascunho." },
+        {
+          ok: false,
+          error:
+            "Informe pelo menos dia, horário, nome, etapa do passo (step) ou senha para salvar o progresso.",
+        },
         { status: 400 },
       );
     }
@@ -133,6 +204,14 @@ export async function PATCH(req: NextRequest) {
       patch.full_name = safeNome;
     }
 
+    if (safeStepRaw !== null) {
+      patch.recurring_registration_step = safeStepRaw;
+    }
+
+    if (safePassword) {
+      patch.recurring_registration_password = safePassword;
+    }
+
     try {
       const { error } = await admin
         .from("atendimento_leads")
@@ -144,8 +223,14 @@ export async function PATCH(req: NextRequest) {
       if (/column|does not exist|PGRST204|PGRST205|42703/i.test(msg)) {
         try {
           const fallback: Record<string, unknown> = { updated_at: nowIso };
-      if (safeNome) {
+          if (safeNome) {
             fallback.full_name = safeNome;
+          }
+          if (safeStepRaw !== null) {
+            fallback.recurring_registration_step = safeStepRaw;
+          }
+          if (safePassword) {
+            fallback.recurring_registration_password = safePassword;
           }
           await admin
             .from("atendimento_leads")
@@ -193,6 +278,8 @@ export async function PATCH(req: NextRequest) {
         weekday_label: (patch.recurring_class_weekday_label as string) || null,
         professor_time: safeProfessorTime || null,
         lead_time: (patch.recurring_class_lead_time as string) || null,
+        step: safeStepRaw ?? null,
+        has_password: Boolean(safePassword),
       },
     });
   } catch (err) {

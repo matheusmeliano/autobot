@@ -244,6 +244,35 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
+  async function saveDraftRecurring(payload: {
+    weekday?: RecurringWeekdayKey | null;
+    weekdayLabel?: string | null;
+    professorTime?: string | null;
+    leadTime?: string | null;
+    step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null;
+    nomeOverride?: string | null;
+    password?: string | null;
+  }) {
+    try {
+      const telefone = phoneField.replace(/\D/g, "");
+      if (!telefone || telefone.length < 10) return;
+      await fetch("/api/cadastro/recorrente/draft", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefone,
+          nome: (payload.nomeOverride !== undefined ? payload.nomeOverride : nome.trim()) || null,
+          weekday: payload.weekday ?? null,
+          weekdayLabel: payload.weekdayLabel ?? null,
+          professorTime: payload.professorTime ?? null,
+          leadTime: payload.leadTime ?? null,
+          step: payload.step ?? null,
+          password: payload.password ?? null,
+        }),
+      }).catch(() => {});
+    } catch {}
+  }
+
   async function handleContractFinalize() {
     if (contractFinalizing) return;
     const tel = phoneField.replace(/\D/g, "").trim();
@@ -285,6 +314,7 @@ export default function CadastroRecorrenteBody() {
     setSubmitError("");
     setContractFieldError("");
     setContractFinalError("");
+    void saveDraftRecurring({ step: n, password: senha.trim() || null });
     if (typeof window !== "undefined") {
       setTimeout(() => {
         try {
@@ -329,8 +359,20 @@ export default function CadastroRecorrenteBody() {
               blocked?: boolean;
               error?: string | null;
               lead?: {
+                id?: string | null;
                 full_name?: string | null;
                 phone?: string | null;
+                cpf?: string | null;
+                legal_responsible_name?: string | null;
+                legal_responsible_cpf?: string | null;
+              } | null;
+              progress?: {
+                step?: number | null;
+                has_password?: boolean | null;
+                recurring_class_weekday?: string | null;
+                recurring_class_weekday_label?: string | null;
+                recurring_class_professor_time?: string | null;
+                recurring_class_lead_time?: string | null;
               } | null;
             }
           | null;
@@ -345,7 +387,12 @@ export default function CadastroRecorrenteBody() {
         if (json?.ok && json?.lead) {
           const leadFullName = String(json.lead?.full_name ?? "").trim();
           const leadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
+          const leadId = String((json.lead as any)?.id ?? "").trim();
           const normalizedLeadFullName = toNomeESobrenome(leadFullName);
+          if (leadId) {
+            setSubmitLeadId(leadId);
+            setContractLeadId(leadId);
+          }
           if (normalizedLeadFullName) {
             setNome(normalizedLeadFullName);
           } else if (initialNameParam && !leadFullName) {
@@ -355,6 +402,134 @@ export default function CadastroRecorrenteBody() {
             setPhoneField(leadPhone);
           } else if (initialPhoneParam && !leadPhone) {
             setPhoneField(initialPhoneParam);
+          }
+          if ((json.lead as any)?.cpf) {
+            setLastSavedFieldValues((prev) => ({ ...prev, cpf: (json.lead as any).cpf }));
+            setContractSnapshot((prev) => ({ ...prev, cpf: (json.lead as any).cpf }));
+          }
+          if ((json.lead as any)?.legal_responsible_name) {
+            setLastSavedFieldValues((prev) => ({
+              ...prev,
+              legal_responsible_name: (json.lead as any).legal_responsible_name,
+            }));
+            setContractSnapshot((prev) => ({
+              ...prev,
+              legal_responsible_name: (json.lead as any).legal_responsible_name,
+            }));
+          }
+          if ((json.lead as any)?.legal_responsible_cpf) {
+            setLastSavedFieldValues((prev) => ({
+              ...prev,
+              legal_responsible_cpf: (json.lead as any).legal_responsible_cpf,
+            }));
+            setContractSnapshot((prev) => ({
+              ...prev,
+              legal_responsible_cpf: (json.lead as any).legal_responsible_cpf,
+            }));
+          }
+        } else {
+          if (initialNameParam) {
+            setNome(toNomeESobrenome(initialNameParam));
+          }
+          if (initialPhoneParam) {
+            setPhoneField(initialPhoneParam);
+          }
+        }
+        if (json?.progress) {
+          const prog = json.progress;
+          const stepNum =
+            typeof prog.step === "number" && prog.step >= 0 && prog.step <= 9
+              ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9)
+              : 0;
+          if (prog.recurring_class_weekday) {
+            const w = String(prog.recurring_class_weekday).trim().toLowerCase();
+            const wd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(w)
+              ? (w as RecurringWeekdayKey)
+              : null;
+            if (wd) {
+              setSelectedWeekday(wd);
+            }
+          }
+          if (stepNum >= 1) {
+            setStep(stepNum);
+            if ((stepNum === 2 || stepNum >= 3) && prog.recurring_class_professor_time) {
+              const targetTime = String(prog.recurring_class_professor_time).trim();
+              const targetLeadTime = String(prog.recurring_class_lead_time ?? "").trim();
+              setAvailability((prevAvail) => {
+                if (!prevAvail?.slotsByWeekday || !selectedWeekday) {
+                  (async () => {
+                    try {
+                      const tz =
+                        typeof Intl !== "undefined" &&
+                        Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+                          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                          : "";
+                      const url = tz
+                        ? `/api/cadastro/recorrente/availability?timezone=${encodeURIComponent(tz)}`
+                        : `/api/cadastro/recorrente/availability`;
+                      const r = await fetch(url, { method: "GET" });
+                      const j = (await r.json().catch(() => null)) as AvailabilityResponse | null;
+                      if (r.ok && j?.ok) {
+                        setAvailability(j);
+                        const w = selectedWeekday;
+                        const arr = w ? j?.slotsByWeekday?.[w] ?? [] : [];
+                        const opt =
+                          (targetTime
+                            ? arr.find(
+                                (s: any) =>
+                                  String(s.professorTime ?? "").trim() === targetTime ||
+                                  String(s.leadTime ?? "").trim() === targetLeadTime ||
+                                  String(s.displayLabel ?? "").trim() === targetLeadTime,
+                              )
+                            : null) || null;
+                        if (opt) {
+                          setSelectedTimeOpt(opt as any);
+                          if (stepNum >= 3) {
+                            const lbl =
+                              (prog.recurring_class_weekday_label as string) ||
+                              w ||
+                              "";
+                            setSubmitResult({
+                              weekday: w || "fri",
+                              weekdayLabel: lbl,
+                              professorTime: targetTime,
+                              leadTime: targetLeadTime || targetTime,
+                              displayLabel: lbl + " " + (targetLeadTime || targetTime),
+                            } as any);
+                          }
+                        }
+                      }
+                    } catch {}
+                  })();
+                  return prevAvail;
+                }
+                const w = selectedWeekday;
+                const arr = w ? prevAvail.slotsByWeekday[w] ?? [] : [];
+                const opt =
+                  (targetTime
+                    ? arr.find(
+                        (s: any) =>
+                          String(s.professorTime ?? "").trim() === targetTime ||
+                          String(s.leadTime ?? "").trim() === targetLeadTime ||
+                          String(s.displayLabel ?? "").trim() === targetLeadTime,
+                      )
+                    : null) || null;
+                if (opt) {
+                  setSelectedTimeOpt(opt as any);
+                  if (stepNum >= 3) {
+                    const lbl = (prog.recurring_class_weekday_label as string) || w || "";
+                    setSubmitResult({
+                      weekday: w || "fri",
+                      weekdayLabel: lbl,
+                      professorTime: targetTime,
+                      leadTime: targetLeadTime || targetTime,
+                      displayLabel: lbl + " " + (targetLeadTime || targetTime),
+                    } as any);
+                  }
+                }
+                return prevAvail;
+              });
+            }
           }
         }
       } catch (e) {
@@ -369,30 +544,6 @@ export default function CadastroRecorrenteBody() {
     const parts = (nome || "Aluno(a)").trim().split(/\s+/).filter(Boolean);
     return parts[0] || "Aluno(a)";
   }, [nome]);
-
-  async function saveDraftRecurring(payload: {
-    weekday?: RecurringWeekdayKey | null;
-    weekdayLabel?: string | null;
-    professorTime?: string | null;
-    leadTime?: string | null;
-  }) {
-    try {
-      const telefone = phoneField.replace(/\D/g, "");
-      if (!telefone || telefone.length < 10) return;
-      await fetch("/api/cadastro/recorrente/draft", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          telefone,
-          nome: nome.trim() || null,
-          weekday: payload.weekday ?? null,
-          weekdayLabel: payload.weekdayLabel ?? null,
-          professorTime: payload.professorTime ?? null,
-          leadTime: payload.leadTime ?? null,
-        }),
-      }).catch(() => {});
-    } catch {}
-  }
 
   const availableWeekdays = useMemo<RecurringWeekdayOption[]>(() => {
     if (!availability?.dates) return [];
@@ -409,6 +560,50 @@ export default function CadastroRecorrenteBody() {
     const opt = availableWeekdays.find((d) => d.weekday === selectedWeekday);
     return opt?.displayLabel || opt?.label || "";
   }, [availableWeekdays, selectedWeekday]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function onBeforeUnload() {
+      const telefone = phoneField.replace(/\D/g, "");
+      if (!telefone || telefone.length < 10) return;
+      try {
+        const weekdayLabelComputed = (() => {
+          const opt = (availability?.dates ?? []).find(
+            (d) => d.weekday === selectedWeekday,
+          );
+          return opt?.displayLabel || opt?.label || "";
+        })();
+        const payload = {
+          telefone,
+          nome: nome.trim() || null,
+          step,
+          password: senha.trim() || null,
+          weekday: selectedWeekday || null,
+          weekdayLabel: weekdayLabelComputed || null,
+          professorTime: selectedTimeOpt?.professorTime || null,
+          leadTime: selectedTimeOpt?.leadTime || selectedTimeOpt?.displayLabel || null,
+        };
+        const body = JSON.stringify(payload);
+        if (typeof navigator !== "undefined" && (navigator as any).sendBeacon) {
+          try {
+            const blob = new Blob([body], { type: "application/json" });
+            (navigator as any).sendBeacon("/api/cadastro/recorrente/draft", blob);
+            return;
+          } catch {}
+        }
+        const xhr = new XMLHttpRequest();
+        xhr.open("PATCH", "/api/cadastro/recorrente/draft", false);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        try {
+          xhr.send(body);
+        } catch {}
+      } catch {}
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [step, phoneField, nome, senha, selectedWeekday, availability, selectedTimeOpt]);
 
   async function loadAvailability() {
     setAvailLoading(true);

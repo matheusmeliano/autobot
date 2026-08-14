@@ -79,22 +79,26 @@ export async function POST(req: NextRequest) {
       recurring_class_professor_time: String(professorTime ?? "").trim(),
       recurring_class_lead_time: String(leadTime ?? String(professorTime ?? "")).trim(),
       recurring_class_created_at: nowIso,
+      recurring_registration_step: 3,
       funnel_stage: "contrato_coletando_dados",
       status: "contrato_coletando_dados",
       contract_status: "coletando_dados",
       updated_at: nowIso,
       ...(safeNome ? { full_name: safeNome } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
+      ...(String(senha ?? "").trim() ? { recurring_registration_password: String(senha ?? "").trim() } : {}),
     };
 
     const patchMinimalGuaranteed: Record<string, unknown> = {
       recurring_class_status: "confirmado",
       recurring_class_weekday: weekday,
+      recurring_registration_step: 3,
       funnel_stage: "contrato_coletando_dados",
       status: "contrato_coletando_dados",
       contract_status: "coletando_dados",
       updated_at: nowIso,
       ...(safeNome ? { full_name: safeNome } : {}),
+      ...(String(senha ?? "").trim() ? { recurring_registration_password: String(senha ?? "").trim() } : {}),
     };
 
     let appliedPatch: "full" | "minimal" = "minimal";
