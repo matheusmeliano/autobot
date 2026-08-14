@@ -1090,20 +1090,20 @@ export default function CadastroRecorrenteBody() {
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 max-w-2xl mx-auto">{contractFinalError}</div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 max-w-2xl mx-auto w-full">
-                <button
-                  onClick={() => void handleContractFinalize()}
-                  disabled={contractFinalizing}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[340px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate sm:order-2 sm:justify-self-end"
-                >
-                  {contractFinalizing ? "Gerando contrato…" : "✓ Sim, formalizar contrato agora"}
-                </button>
+              <div className="grid grid-cols-1 sm:flex sm:flex-row sm:justify-between sm:items-start gap-3 pt-2 max-w-2xl mx-auto w-full">
                 <button
                   onClick={() => goStep(7)}
                   disabled={contractFinalizing}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[240px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
+                  className="w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1"
                 >
                   ← Voltar para revisar
+                </button>
+                <button
+                  onClick={() => void handleContractFinalize()}
+                  disabled={contractFinalizing}
+                  className="w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[300px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate sm:order-2"
+                >
+                  {contractFinalizing ? "Gerando contrato…" : "✓ Sim, formalizar contrato agora"}
                 </button>
               </div>
             </section>
