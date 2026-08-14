@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
@@ -44,6 +44,15 @@ type SubmitResponse = {
   error?: string;
 };
 
+type ChatMessage = {
+  id: string;
+  sender_role: "bot" | "lead" | "attendant";
+  content_text?: string | null;
+  created_at?: string | null;
+  media_type?: string | null;
+  media_url?: string | null;
+};
+
 export default function CadastroRecorrenteBody() {
   const sp = useSearchParams();
   const initialNameParam = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
@@ -74,7 +83,115 @@ export default function CadastroRecorrenteBody() {
   const [submitError, setSubmitError] = useState<string>("");
   const [submitResult, setSubmitResult] = useState<SubmitResponse["scheduled"] | null>(null);
   const [submitRedirect, setSubmitRedirect] = useState<string | null>(null);
+  const [chatSessionId, setChatSessionId] = useState<{
+    conversation_id: string;
+    public_slug: string;
+    telefone: string;
+  } | null>(null);
+  const [chatLoading, setChatLoading] = useState<boolean>(false);
+  const [chatError, setChatError] = useState<string>("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatDraft, setChatDraft] = useState<string>("");
+  const [chatSending, setChatSending] = useState<boolean>(false);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const [draftSaving, setDraftSaving] = useState<"weekday" | "time" | null>(null);
+
+  useEffect(() => {
+    if (step !== 3 || !submitResult) return;
+    const tel = phoneField.replace(/\D/g, "").trim();
+    if (!tel || tel.length < 10) return;
+    void (async () => {
+      setChatLoading(true);
+      setChatError("");
+      try {
+        const res = await fetch("/api/atendimento/public/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slug: "lucas-brum-online-music-usa",
+            telefone: tel,
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | { ok?: boolean; session?: { conversation?: { id?: string; public_slug?: string }; messages?: ChatMessage[]; lead?: any }; error?: string }
+          | null;
+        if (!res.ok || !json?.ok || !json.session?.conversation?.id) {
+          throw new Error(json?.error || "Falha ao iniciar a conversa do contrato. Tente novamente.");
+        }
+        setChatSessionId({
+          conversation_id: String(json.session.conversation.id),
+          public_slug: String(json.session.conversation.public_slug ?? ""),
+          telefone: tel,
+        });
+        const msgs = Array.isArray(json.session.messages) ? (json.session.messages as ChatMessage[]) : [];
+        if (msgs.length === 0) {
+          const poll = await fetch(
+            `/api/atendimento/public/messages?conversation_id=${encodeURIComponent(String(json.session.conversation.id))}&telefone=${encodeURIComponent(tel)}`,
+            { method: "GET" },
+          );
+          const pollJson = (await poll.json().catch(() => null)) as { ok?: boolean; messages?: ChatMessage[] } | null;
+          setChatMessages(Array.isArray(pollJson?.messages) ? (pollJson.messages as ChatMessage[]) : []);
+        } else {
+          setChatMessages(msgs);
+        }
+      } catch (e) {
+        setChatError(e instanceof Error ? e.message : String(e ?? "Erro ao carregar."));
+      } finally {
+        setChatLoading(false);
+      }
+    })();
+  }, [step, submitResult, phoneField]);
+
+  useEffect(() => {
+    if (!chatScrollRef.current) return;
+    chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  }, [chatMessages]);
+
+  async function reloadChatMessages() {
+    if (!chatSessionId) return;
+    try {
+      const res = await fetch(
+        `/api/atendimento/public/messages?conversation_id=${encodeURIComponent(chatSessionId.conversation_id)}&telefone=${encodeURIComponent(chatSessionId.telefone)}`,
+        { method: "GET" },
+      );
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; messages?: ChatMessage[] } | null;
+      if (json?.ok && Array.isArray(json.messages)) setChatMessages(json.messages as ChatMessage[]);
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (step !== 3 || !chatSessionId) return;
+    const interval = window.setInterval(() => void reloadChatMessages(), 3500);
+    return () => window.clearInterval(interval);
+  }, [step, chatSessionId]);
+
+  async function handleChatSend(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = chatDraft.trim();
+    if (!text || chatSending || !chatSessionId) return;
+    setChatSending(true);
+    try {
+      const res = await fetch("/api/atendimento/public/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: chatSessionId.conversation_id,
+          telefone: chatSessionId.telefone,
+          content_text: text,
+          media_type: "text",
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as any;
+      if (res.ok && json?.ok) {
+        setChatDraft("");
+      }
+    } finally {
+      setChatSending(false);
+      setTimeout(() => void reloadChatMessages(), 200);
+      setTimeout(() => void reloadChatMessages(), 1500);
+      setTimeout(() => void reloadChatMessages(), 3200);
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -627,80 +744,137 @@ export default function CadastroRecorrenteBody() {
           )}
 
           {step === 3 && submitResult && (
-            <section className="space-y-8 text-center">
-              <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                <svg
-                  className="w-10 h-10"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-3xl font-extrabold text-slate-900">Tudo certo, {firstName}! 🎉</h2>
-                <p className="mt-3 text-lg text-slate-600">
-                  Sua aula recorrente foi reservada.
-                </p>
+            <section className="space-y-6">
+              <div className="text-center">
+                <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                  <svg
+                    className="w-10 h-10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Tudo certo, {firstName}! 🎉</h2>
+                <p className="mt-3 text-lg text-slate-600">Sua aula recorrente foi reservada.</p>
                 <p className="mt-2 text-base text-slate-500">
-                  Em seguida, vamos formalizar o contrato de prestação de serviços.
+                  Agora vamos formalizar o contrato abaixo. Basta responder as perguntas.
                 </p>
               </div>
-              <div className="rounded-3xl bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-100 p-7 text-left max-w-lg mx-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+              <div className="rounded-3xl bg-gradient-to-br from-indigo-50 to-sky-50 border border-indigo-100 p-6 max-w-2xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 items-start">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Dia</div>
                     <div className="mt-1 text-xl font-bold text-slate-900">{submitResult.weekdayLabel}</div>
                   </div>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Horário</div>
-                    <div className="mt-1 text-xl font-bold text-slate-900 tabular-nums">
-                      {submitResult.leadTime}
+                    <div className="mt-1 text-xl font-bold text-slate-900 tabular-nums">{submitResult.leadTime}</div>
+                  </div>
+                  <div className="sm:text-right">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Status</div>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-emerald-500/15 text-emerald-700 px-3 py-1 text-sm font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Contrato em andamento
                     </div>
                   </div>
                 </div>
-                <div className="mt-6 pt-6 border-t border-indigo-100 text-sm text-slate-700 leading-relaxed space-y-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-bold mt-0.5">✓</span>
-                    <span>Dia e horário fixos registrados com sucesso no seu cadastro.</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-sky-600 font-bold mt-0.5">→</span>
-                    <span>
-                      Agora clique no botão abaixo para ir ao link de matrícula e formalizar o contrato
-                      automaticamente com seus dados já cadastrados.
-                    </span>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden max-w-2xl mx-auto">
+                <div className="border-b border-slate-100 px-5 py-4 flex items-center justify-between bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white flex items-center justify-center font-bold shadow-md">
+                      {firstName.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Formalização do contrato</div>
+                      <div className="text-xs text-slate-500">Responda as perguntas para prosseguir</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="pt-2 space-y-3">
-                <a
-                  href={submitRedirect || "/atendimento?slug=lucas-brum-online-music-usa"}
-                  className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition"
+
+                <div
+                  ref={chatScrollRef}
+                  className="h-[440px] overflow-y-auto px-4 py-5 space-y-4 bg-gradient-to-b from-slate-50 to-white"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Formalizar contrato agora
-                </a>
-                <div>
-                  <button
-                    onClick={() => {
-                      if (submitRedirect) {
-                        try {
-                          window.location.assign(submitRedirect);
-                        } catch {
-                          window.location.href = submitRedirect;
-                        }
+                  {chatLoading && chatMessages.length === 0 && (
+                    <div className="text-center text-slate-500 text-sm py-10">Preparando as perguntas do contrato…</div>
+                  )}
+                  {chatError && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      {chatError}
+                    </div>
+                  )}
+                  {chatMessages.map((msg) => {
+                    const isUser = msg.sender_role === "lead";
+                    const content = String(msg.content_text ?? "").trim();
+                    const isLinkPdf = content.startsWith("http") && /\.pdf/i.test(content);
+                    if (!content) return null;
+                    return (
+                      <div key={msg.id} className={"flex " + (isUser ? "justify-end" : "justify-start")}>
+                        <div
+                          className={
+                            "max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm " +
+                            (isUser
+                              ? "bg-indigo-600 text-white rounded-br-sm"
+                              : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm")
+                          }
+                        >
+                          {isLinkPdf ? (
+                            <a
+                              href={content}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={
+                                isUser
+                                  ? "font-semibold underline text-white hover:text-indigo-50"
+                                  : "font-semibold text-indigo-600 hover:text-indigo-700 underline"
+                              }
+                            >
+                              📄 Baixar contrato em PDF
+                            </a>
+                          ) : (
+                            content
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <form onSubmit={handleChatSend} className="border-t border-slate-100 p-4 flex items-end gap-3 bg-white">
+                  <textarea
+                    rows={2}
+                    value={chatDraft}
+                    onChange={(e) => setChatDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleChatSend(e as any);
                       }
                     }}
-                    className="rounded-2xl px-6 py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition"
+                    disabled={chatLoading || !chatSessionId || chatSending}
+                    placeholder={
+                      chatLoading
+                        ? "Carregando conversa…"
+                        : !chatSessionId
+                        ? "Aguarde a inicialização…"
+                        : "Digite sua resposta aqui (Enter para enviar)"
+                    }
+                    className="flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatDraft.trim() || chatSending || !chatSessionId || chatLoading}
+                    className="rounded-2xl px-5 py-3 bg-indigo-600 text-white text-sm font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
-                    Ir agora para o link de matrícula
+                    {chatSending ? "Enviando…" : "Enviar"}
                   </button>
-                </div>
+                </form>
               </div>
             </section>
           )}

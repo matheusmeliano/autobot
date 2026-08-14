@@ -47,6 +47,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   appendHistoryEvent,
   ensureInitialBotConversationFlow,
+  findLeadByPhone,
   formalizeAndPersistContract,
   getAuthenticatedAtendimentoConversationAccess,
   sendAtendimentoWhatsAppText,
@@ -770,14 +771,44 @@ async function presentExperimentalClassTimeOptions(params: {
   };
 }
 
+async function getConversationAccess(params: {
+  publicSlug?: string | null;
+  conversationId?: string | null;
+  telefone?: string | null;
+}) {
+  if (params.publicSlug) {
+    const access = await getAuthenticatedAtendimentoConversationAccess(params.publicSlug);
+    if (access.ok) return access;
+  }
+  const conversationIdRaw = String(params.conversationId ?? "").trim();
+  const phoneRaw = String(params.telefone ?? "").replace(/\D/g, "").trim();
+  if (conversationIdRaw && phoneRaw && phoneRaw.length >= 10) {
+    const admin = createSupabaseAdminClient();
+    const { data: conversation } = await admin
+      .from("atendimento_conversations")
+      .select("id, lead_id, public_slug, bot_enabled")
+      .eq("id", conversationIdRaw)
+      .maybeSingle();
+    if (conversation?.id) {
+      const lead = await findLeadByPhone({ phone: phoneRaw });
+      if (lead?.id && String(lead.id) === String(conversation.lead_id)) {
+        return { ok: true as const, admin, conversation, lead } as const;
+      }
+    }
+  }
+  return { ok: false as const, status: 401, error: "unauthorized" } as const;
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const publicSlug = String(searchParams.get("public_slug") ?? "").trim();
-  if (!publicSlug) {
-    return Response.json({ ok: false, error: "missing_public_slug" }, { status: 400 });
+  const conversationId = String(searchParams.get("conversation_id") ?? "").trim();
+  const telefone = String(searchParams.get("telefone") ?? "").trim();
+  if (!publicSlug && !conversationId) {
+    return Response.json({ ok: false, error: "missing_public_slug_or_conversation_id" }, { status: 400 });
   }
 
-  const access = await getAuthenticatedAtendimentoConversationAccess(publicSlug);
+  const access = await getConversationAccess({ publicSlug, conversationId, telefone });
   if (!access.ok) {
     return Response.json({ ok: false, error: access.error }, { status: access.status });
   }
@@ -811,6 +842,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const publicSlug = String(body?.public_slug ?? "").trim();
+  const conversationId = String(body?.conversation_id ?? "").trim();
+  const telefone = String(body?.telefone ?? "").trim();
   const contentText = String(body?.content_text ?? "").trim();
   const mediaType = String(body?.media_type ?? "text").trim() || "text";
   const mediaUrl = String(body?.media_url ?? "").trim() || null;
@@ -819,14 +852,14 @@ export async function POST(req: Request) {
   const fileSizeBytesRaw = Number(body?.file_size_bytes ?? 0);
   const fileSizeBytes = Number.isFinite(fileSizeBytesRaw) && fileSizeBytesRaw > 0 ? fileSizeBytesRaw : null;
 
-  if (!publicSlug) {
-    return Response.json({ ok: false, error: "missing_public_slug" }, { status: 400 });
+  if (!publicSlug && !conversationId) {
+    return Response.json({ ok: false, error: "missing_public_slug_or_conversation_id" }, { status: 400 });
   }
   if (!contentText && !mediaUrl) {
     return Response.json({ ok: false, error: "empty_message" }, { status: 400 });
   }
 
-  const access = await getAuthenticatedAtendimentoConversationAccess(publicSlug);
+  const access = await getConversationAccess({ publicSlug, conversationId, telefone });
   if (!access.ok) {
     return Response.json({ ok: false, error: access.error }, { status: access.status });
   }
