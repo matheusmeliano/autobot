@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
@@ -110,6 +110,7 @@ export default function CadastroRecorrenteBody() {
   const [contractFinalError, setContractFinalError] = useState<string>("");
   const [contractPdfUrl, setContractPdfUrl] = useState<string>("");
   const [contractSignedAt, setContractSignedAt] = useState<string>("");
+  const lastLoadedContractFieldKey = useRef<string>("__none__");
 
   useEffect(() => {
     if (step !== 3 || !submitResult) return;
@@ -302,13 +303,14 @@ export default function CadastroRecorrenteBody() {
     const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
     const target = contractAllFields[expectedIdx];
     if (!target) return;
+    const key = `${step}:${target.name}`;
+    if (lastLoadedContractFieldKey.current === key) return;
+    lastLoadedContractFieldKey.current = key;
     const preferred =
       lastSavedFieldValues[target.name] ?? target.currentValue ?? contractSnapshot[target.name] ?? "";
     const next = typeof preferred === "string" ? preferred.trim() : "";
-    if (contractCurrentValue !== String(next || "")) {
-      setContractCurrentValue(String(next || ""));
-    }
-  }, [step, contractAllFields, lastSavedFieldValues, contractSnapshot, contractCurrentValue]);
+    setContractCurrentValue(next);
+  }, [step, contractAllFields, lastSavedFieldValues, contractSnapshot]);
 
   useEffect(() => {
     void (async () => {
@@ -931,7 +933,7 @@ export default function CadastroRecorrenteBody() {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 divide-y divide-slate-100 sm:divide-y-0 sm:divide-x sm:divide-slate-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y divide-slate-100 sm:divide-y-0 sm:divide-x sm:divide-slate-100">
                     <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-3 sm:gap-4 sm:gap-4.5">
                       <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
                         <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
@@ -952,19 +954,6 @@ export default function CadastroRecorrenteBody() {
                       <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
                         <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500 whitespace-nowrap truncate">Horário fixo</div>
                         <div className="mt-2 text-[clamp(18px,4.4vw,26px)] sm:text-[26px] font-extrabold text-slate-900 tabular-nums leading-none whitespace-nowrap truncate">{submitResult.leadTime}</div>
-                      </div>
-                    </div>
-                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-3 sm:gap-4 sm:gap-4.5">
-                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
-                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500 whitespace-nowrap truncate">Situação</div>
-                        <div className="mt-2 inline-flex items-center w-full max-w-full">
-                          <span className="text-[clamp(14px,3.4vw,19px)] sm:text-[19px] font-extrabold text-emerald-700 leading-none whitespace-nowrap truncate max-w-full">Contrato em andamento</span>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -1043,12 +1032,12 @@ export default function CadastroRecorrenteBody() {
                             <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{contractFieldError}</div>
                           )}
                         </div>
-                        <div className="grid grid-cols-1 sm:flex sm:flex-row sm:justify-end sm:items-start gap-3 pt-2 w-full">
+                        <div className="grid grid-cols-1 sm:flex sm:flex-row sm:items-start gap-3 pt-2 w-full">
                           {meta.optional && (
                             <button
                               onClick={() => void contractAdvanceField(true)}
                               disabled={contractFieldSaving}
-                              className="order-1 sm:order-2 w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                              className="order-1 sm:order-2 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                             >
                               Pular →
                             </button>
@@ -1056,14 +1045,14 @@ export default function CadastroRecorrenteBody() {
                           <button
                             onClick={() => goStep((Math.max(0, (step as number) - 1)) as any)}
                             disabled={contractFieldSaving}
-                            className="order-2 sm:order-1 w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                            className="order-2 sm:order-1 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                           >
                             ← Voltar
                           </button>
                           <button
                             onClick={() => void contractAdvanceField(false)}
                             disabled={contractFieldSaving}
-                            className="order-3 sm:order-3 w-full sm:w-auto sm:flex-none shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
+                            className="order-3 sm:order-3 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                           >
                             {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
                           </button>
