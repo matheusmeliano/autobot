@@ -136,7 +136,7 @@ export default function CadastroRecorrenteBody() {
     return s;
   }
 
-  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9>(0);
+  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11>(0);
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>("");
@@ -323,7 +323,7 @@ export default function CadastroRecorrenteBody() {
     weekdayLabel?: string | null;
     professorTime?: string | null;
     leadTime?: string | null;
-    step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null;
+    step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | null;
     nomeOverride?: string | null;
     password?: string | null;
   }) {
@@ -383,7 +383,7 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
-  function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+  function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
     setStep(n);
     setSubmitError("");
     setContractFieldError("");
@@ -853,7 +853,8 @@ export default function CadastroRecorrenteBody() {
                 { key: 6, label: "Resp. Legal", shortLabel: "Resp" },
                 { key: 7, label: "CPF Resp.", shortLabel: "CPF-R" },
                 { key: 8, label: "Revisão", shortLabel: "Rev" },
-                { key: 9, label: "Concluído", shortLabel: "Fim" },
+                { key: 9, label: "Pagamento", shortLabel: "Pag" },
+                { key: 10, label: "Concluído", shortLabel: "Fim" },
               ];
               const N = allSteps.length;
               const buildDisplayOrder = (current: number): Array<{ kind: "step"; idx: number } | { kind: "ellipsis" }> => {
@@ -949,7 +950,7 @@ export default function CadastroRecorrenteBody() {
                     <div
                       className="h-full bg-gradient-to-r from-indigo-500 to-sky-500 transition-all duration-500 ease-out"
                       style={{
-                        width: `${step === 0 ? 10 : step === 1 ? 20 : step === 2 ? 30 : step === 3 ? 40 : step === 4 ? 50 : step === 5 ? 60 : step === 6 ? 70 : step === 7 ? 80 : step === 8 ? 90 : 100}%`,
+                        width: `${step === 0 ? 9 : step === 1 ? 18 : step === 2 ? 27 : step === 3 ? 36 : step === 4 ? 45 : step === 5 ? 55 : step === 6 ? 64 : step === 7 ? 73 : step === 8 ? 82 : step === 9 ? 91 : 100}%`,
                       }}
                     />
                   </div>
@@ -1613,6 +1614,61 @@ export default function CadastroRecorrenteBody() {
           )}
 
           {step === 9 && submitResult && (
+            <section className="space-y-7 text-center">
+              <div className="mx-auto w-20 h-20 rounded-full bg-sky-500/10 text-sky-600 flex items-center justify-center">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-3xl font-extrabold text-slate-900">Pagamento da primeira mensalidade</h2>
+                <p className="mt-5 text-xl text-slate-700 leading-snug">
+                  Agora, para finalizar, <strong className="text-slate-900">{firstName}</strong>, realize o pagamento da sua primeira mensalidade pelo link abaixo.
+                </p>
+              </div>
+
+              <a
+                href="https://buy.stripe.com/00wfZiemqfuk3t0gnmcwg02"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 sm:px-8 py-4 sm:py-4.5 bg-sky-600 text-white font-bold text-base sm:text-xl shadow-lg shadow-sky-200 hover:bg-sky-700 transition w-full max-w-2xl mx-auto min-w-0"
+              >
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                Pagar primeira mensalidade
+              </a>
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6 text-left space-y-3 max-w-2xl mx-auto">
+                <p className="text-sm sm:text-base text-amber-800 leading-relaxed">
+                  <strong className="font-bold">Importante:</strong> a data da mensalidade será definida com base na data desse primeiro pagamento realizado no cartão.
+                </p>
+                <p className="text-sm sm:text-base text-amber-800 leading-relaxed">
+                  <strong className="font-bold">Aviso:</strong> após efetuar o pagamento, você deverá retornar à página e clicar em <strong className="underline">Finalizar matrícula</strong> abaixo.
+                </p>
+                <p className="text-sm sm:text-base text-amber-900 leading-relaxed font-semibold pt-2 border-t border-amber-200/60">
+                  A matrícula só será considerada realmente efetivada após a confirmação do pagamento da primeira mensalidade.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
+                <button
+                  onClick={() => goStep(8)}
+                  className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={() => goStep(10)}
+                  className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
+                >
+                  Finalizar matrícula
+                </button>
+              </div>
+            </section>
+          )}
+
+          {step === 10 && submitResult && (
             <section className="space-y-7 text-center">
               <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
