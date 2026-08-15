@@ -90,6 +90,52 @@ export default function CadastroRecorrenteBody() {
     return `${parts[0]} ${parts[parts.length - 1]}`;
   }
 
+  function digitsOnly(v: string | null | undefined): string {
+    return String(v ?? "").replace(/\D/g, "");
+  }
+
+  function formatCpf(v: string | null | undefined): string {
+    const d = digitsOnly(v).slice(0, 11);
+    if (!d) return "";
+    let out = d.slice(0, 3);
+    if (d.length > 3) out += "." + d.slice(3, 6);
+    if (d.length > 6) out += "." + d.slice(6, 9);
+    if (d.length > 9) out += "-" + d.slice(9, 11);
+    return out;
+  }
+
+  function formatPhoneMasked(v: string | null | undefined): string {
+    const d = digitsOnly(v).slice(0, 13);
+    if (!d) return "";
+    if (d.length <= 10) {
+      // (##) ####-####
+      let out = "(" + d.slice(0, 2);
+      if (d.length > 2) out += ") " + d.slice(2, 6);
+      if (d.length > 6) out += "-" + d.slice(6, 10);
+      return out;
+    }
+    if (d.length <= 11) {
+      // (##) #####-####
+      return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
+    }
+    // +## (##) #####-####
+    return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9, 13)}`;
+  }
+
+  function formatFieldValue(name: string, raw: string | null | undefined): string {
+    if (name === "cpf" || name === "legal_responsible_cpf") return formatCpf(raw);
+    if (name === "phone") return formatPhoneMasked(raw);
+    return String(raw ?? "").trim();
+  }
+
+  function unformatFieldValue(name: string, val: string | null | undefined): string {
+    const s = String(val ?? "").trim();
+    if (!s) return "";
+    if (name === "cpf" || name === "legal_responsible_cpf") return digitsOnly(s);
+    if (name === "phone") return digitsOnly(s);
+    return s;
+  }
+
   const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9>(0);
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
@@ -209,6 +255,9 @@ export default function CadastroRecorrenteBody() {
     setContractFieldSaving(true);
     setContractFieldError("");
     try {
+      const payloadValue = skip
+        ? ""
+        : unformatFieldValue(currentMeta.name, contractCurrentValue);
       const res = await fetch("/api/cadastro/recorrente/contract-field-submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,7 +265,7 @@ export default function CadastroRecorrenteBody() {
           telefone: tel,
           leadId: contractLeadId || submitLeadId || undefined,
           field: currentMeta.name,
-          value: skip ? "" : contractCurrentValue.trim(),
+          value: payloadValue,
           skip,
         }),
       });
@@ -259,7 +308,7 @@ export default function CadastroRecorrenteBody() {
           nextMeta.currentValue ??
           lastSavedFieldValues[nextMeta.name] ??
           "";
-        setContractCurrentValue(typeof pre === "string" ? pre.trim() : "");
+        setContractCurrentValue(formatFieldValue(nextMeta.name, typeof pre === "string" ? pre.trim() : ""));
       } else {
         setContractCurrentValue("");
       }
@@ -363,7 +412,7 @@ export default function CadastroRecorrenteBody() {
     lastLoadedContractFieldKey.current = key;
     const preferred =
       lastSavedFieldValues[target.name] ?? target.currentValue ?? contractSnapshot[target.name] ?? "";
-    const next = typeof preferred === "string" ? preferred.trim() : "";
+    const next = formatFieldValue(target.name, typeof preferred === "string" ? preferred.trim() : "");
     setContractCurrentValue(next);
   }, [step, contractAllFields, lastSavedFieldValues, contractSnapshot]);
 
@@ -1233,7 +1282,7 @@ export default function CadastroRecorrenteBody() {
                           <input
                             type="text"
                             value={contractCurrentValue}
-                            onChange={(e) => setContractCurrentValue(e.target.value)}
+                            onChange={(e) => setContractCurrentValue(formatFieldValue(meta.name, e.target.value))}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
