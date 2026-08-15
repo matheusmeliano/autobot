@@ -1134,7 +1134,6 @@ export default function CadastroRecorrenteBody() {
                 </div>
                 <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Tudo certo, {firstName}! 🎉</h2>
                 <p className="mt-3 text-lg text-slate-600 leading-snug">Sua aula recorrente foi reservada.</p>
-                <p className="mt-2.5 text-base text-slate-500 leading-relaxed">Agora vamos <strong className="font-bold text-slate-700">formalizar o contrato</strong>. Responda uma pergunta por vez.</p>
               </div>
 
               {step === 3 && (
@@ -1180,6 +1179,10 @@ export default function CadastroRecorrenteBody() {
                 </div>
               </div>
               )}
+
+              <div className="max-w-2xl mx-auto mt-7">
+                <p className="text-center text-base text-slate-500 leading-relaxed">Agora vamos <strong className="font-bold text-slate-700">formalizar o contrato</strong>. Responda uma pergunta por vez.</p>
+              </div>
 
               {contractInitLoading && (
                 <div className="py-14 text-center text-slate-500">Preparando suas informações…</div>
