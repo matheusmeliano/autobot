@@ -1368,7 +1368,7 @@ export default function CadastroRecorrenteBody() {
                   if ((!rawVal || rawVal === "") && f.optional) return null;
                   const digits = String(rawVal ?? "").replace(/\D/g, "");
                   let displayVal = rawVal ?? "— não informado —";
-                  if (f.name === "cpf" && digits.length >= 11) {
+                  if ((f.name === "cpf" || f.name === "legal_responsible_cpf") && digits.length >= 11) {
                     displayVal = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
                   } else if (f.name === "phone") {
                     if (digits.length >= 13) {
