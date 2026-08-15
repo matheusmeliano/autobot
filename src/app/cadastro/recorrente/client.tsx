@@ -1263,6 +1263,8 @@ export default function CadastroRecorrenteBody() {
                               const label =
                                 meta.name === "phone"
                                   ? "WhatsApp"
+                                  : meta.name === "legal_responsible_cpf"
+                                  ? "CPF do responsável"
                                   : keepCase
                                   ? meta.label
                                   : meta.label.toLowerCase();
