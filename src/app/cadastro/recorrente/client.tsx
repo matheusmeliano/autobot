@@ -1644,9 +1644,9 @@ export default function CadastroRecorrenteBody() {
                     href={contractPdfUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-4 bg-emerald-600 text-white font-bold text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition w-full"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 sm:px-8 py-3.5 sm:py-4 bg-emerald-600 text-white font-bold text-sm sm:text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition w-full min-w-0"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Baixar contrato em PDF
