@@ -1118,7 +1118,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step >= 3 && step <= 7 && submitResult && contractAllFields.length > 0 && (
+          {step === 3 && submitResult && contractAllFields.length > 0 && (
             <section className="space-y-7">
               <div className="text-center">
                 <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
@@ -1136,8 +1136,7 @@ export default function CadastroRecorrenteBody() {
                 <p className="mt-3 text-lg text-slate-600 leading-snug">Sua aula recorrente foi reservada.</p>
               </div>
 
-              {step === 3 && (
-                <div className="max-w-2xl mx-auto">
+              <div className="max-w-2xl mx-auto">
                 <div className="rounded-3xl bg-white border border-slate-200 shadow-[0_8px_30px_-16px_rgba(15,23,42,0.18)] overflow-hidden">
                   <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 px-6 sm:px-8 py-5 sm:py-6 flex items-center gap-3 sm:gap-4">
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center text-white flex-shrink-0">
@@ -1178,11 +1177,15 @@ export default function CadastroRecorrenteBody() {
                   </div>
                 </div>
               </div>
-              )}
 
               <div className="max-w-2xl mx-auto mt-7">
                 <p className="text-center text-base text-slate-500 leading-relaxed">Agora vamos <strong className="font-bold text-slate-700">formalizar o contrato</strong>. Responda uma pergunta por vez.</p>
               </div>
+            </section>
+          )}
+
+          {step >= 3 && step <= 7 && submitResult && contractAllFields.length > 0 && (
+            <section className="space-y-7">
 
               {contractInitLoading && (
                 <div className="py-14 text-center text-slate-500">Preparando suas informações…</div>
