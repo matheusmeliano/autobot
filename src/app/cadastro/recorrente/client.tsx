@@ -1208,7 +1208,7 @@ export default function CadastroRecorrenteBody() {
                           <h2 className="text-2xl font-bold text-slate-900">
                             {(() => {
                               const useO = meta.name === "legal_responsible_name" || meta.name === "legal_responsible_cpf";
-                              const keepCase = meta.name === "legal_responsible_cpf";
+                              const keepCase = meta.name === "cpf" || meta.name === "legal_responsible_cpf";
                               const verb = hasExisting ? "Confirme" : "Informe";
                               const pronoun = useO ? "o" : "seu";
                               const label = keepCase ? meta.label : meta.label.toLowerCase();
