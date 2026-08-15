@@ -181,6 +181,8 @@ export default function CadastroRecorrenteBody() {
   const [contractFinalError, setContractFinalError] = useState<string>("");
   const [contractPdfUrl, setContractPdfUrl] = useState<string>("");
   const [contractSignedAt, setContractSignedAt] = useState<string>("");
+  const [paymentTab, setPaymentTab] = useState<"menu" | "link" | "deposit" | "pix">("menu");
+  const [pixCopied, setPixCopied] = useState<boolean>(false);
   const lastLoadedContractFieldKey = useRef<string>("__none__");
 
   useEffect(() => {
@@ -1615,56 +1617,348 @@ export default function CadastroRecorrenteBody() {
 
           {step === 9 && submitResult && (
             <section className="space-y-7 text-center">
-              <div className="mx-auto w-20 h-20 rounded-full bg-sky-500/10 text-sky-600 flex items-center justify-center">
-                <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-3xl font-extrabold text-slate-900">Pagamento da primeira mensalidade</h2>
-                <p className="mt-5 text-xl text-slate-700 leading-snug">
-                  Agora, para finalizar, <strong className="text-slate-900">{firstName}</strong>, realize o pagamento da sua primeira mensalidade pelo link abaixo.
-                </p>
-              </div>
+              {paymentTab === "menu" && (
+                <>
+                  <div className="mx-auto w-20 h-20 rounded-full bg-sky-500/10 text-sky-600 flex items-center justify-center">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-extrabold text-slate-900">Pagamento da primeira mensalidade</h2>
+                    <p className="mt-5 text-xl text-slate-700 leading-snug">
+                      Agora, para finalizar, <strong className="text-slate-900">{firstName}</strong>, escolha a forma de pagamento abaixo.
+                    </p>
+                  </div>
 
-              <a
-                href="https://buy.stripe.com/00wfZiemqfuk3t0gnmcwg02"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 sm:px-8 py-4 sm:py-4.5 bg-sky-600 text-white font-bold text-base sm:text-xl shadow-lg shadow-sky-200 hover:bg-sky-700 transition w-full max-w-2xl mx-auto min-w-0"
-              >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-                Pagar primeira mensalidade
-              </a>
+                  <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto w-full">
+                    <button
+                      onClick={() => setPaymentTab("link")}
+                      className="w-full text-left rounded-2xl border-2 border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 transition p-5 sm:p-6 bg-white shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-sky-500/10 text-sky-600 flex items-center justify-center shrink-0">
+                            <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-base sm:text-lg font-bold text-slate-900 truncate">1. Link de pagamento</div>
+                            <div className="text-sm text-slate-500 mt-0.5 truncate">Pagamento online por cartão</div>
+                          </div>
+                        </div>
+                        <div className="shrink-0 rounded-full bg-sky-500 text-white px-4 py-1.5 text-xs sm:text-sm font-bold tracking-wide">
+                          Recomendado
+                        </div>
+                      </div>
+                    </button>
 
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6 text-left space-y-3 max-w-2xl mx-auto">
-                <p className="text-sm sm:text-base text-amber-800 leading-relaxed">
-                  <strong className="font-bold">Importante:</strong> a data da mensalidade será definida com base na data desse primeiro pagamento realizado no cartão.
-                </p>
-                <p className="text-sm sm:text-base text-amber-800 leading-relaxed">
-                  <strong className="font-bold">Aviso:</strong> após efetuar o pagamento, você deverá retornar à página e clicar em <strong className="underline">Finalizar matrícula</strong> abaixo.
-                </p>
-                <p className="text-sm sm:text-base text-amber-900 leading-relaxed font-semibold pt-2 border-t border-amber-200/60">
-                  A matrícula só será considerada realmente efetivada após a confirmação do pagamento da primeira mensalidade.
-                </p>
-              </div>
+                    <button
+                      onClick={() => setPaymentTab("deposit")}
+                      className="w-full text-left rounded-2xl border-2 border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition p-5 sm:p-6 bg-white shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-slate-500/10 text-slate-700 flex items-center justify-center shrink-0">
+                            <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-base sm:text-lg font-bold text-slate-900 truncate">2. Depósito bancário</div>
+                            <div className="text-sm text-slate-500 mt-0.5 truncate">Wise US Inc · Checking · USD</div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xl sm:text-2xl font-black text-slate-900">US$ 119,00</div>
+                          <div className="text-xs sm:text-sm text-slate-500 mt-0.5">Dólar americano</div>
+                        </div>
+                      </div>
+                    </button>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
-                <button
-                  onClick={() => goStep(8)}
-                  className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
-                >
-                  Voltar
-                </button>
-                <button
-                  onClick={() => goStep(10)}
-                  className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
-                >
-                  Finalizar matrícula
-                </button>
-              </div>
+                    <button
+                      onClick={() => setPaymentTab("pix")}
+                      className="w-full text-left rounded-2xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition p-5 sm:p-6 bg-white shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+                            <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-base sm:text-lg font-bold text-slate-900 truncate">3. PIX</div>
+                            <div className="text-sm text-slate-500 mt-0.5 truncate">QR Code ou copia e cola · Cotação fixa</div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xl sm:text-2xl font-black text-emerald-700">R$ 595,00</div>
+                          <div className="text-xs sm:text-sm text-slate-500 mt-0.5">US$ 1,00 = R$ 5,00</div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6 text-left space-y-3 max-w-2xl mx-auto">
+                    <p className="text-sm sm:text-base text-amber-800 leading-relaxed">
+                      <strong className="font-bold">Importante:</strong> a data da mensalidade será definida com base na data da confirmação desse primeiro pagamento.
+                    </p>
+                    <p className="text-sm sm:text-base text-amber-900 leading-relaxed font-semibold pt-2 border-t border-amber-200/60">
+                      A matrícula só será considerada efetivada após a confirmação do pagamento.
+                    </p>
+                  </div>
+
+                  <div className="w-full max-w-2xl mx-auto pt-2">
+                    <button
+                      onClick={() => goStep(8)}
+                      className="order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {paymentTab === "link" && (
+                <>
+                  <div className="flex items-center justify-center gap-3 w-full max-w-2xl mx-auto">
+                    <button
+                      onClick={() => setPaymentTab("menu")}
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Voltar
+                    </button>
+                    <div className="text-xs sm:text-sm text-slate-500">Link de pagamento</div>
+                  </div>
+
+                  <div className="mx-auto w-20 h-20 rounded-full bg-sky-500/10 text-sky-600 flex items-center justify-center">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Pagamento online por cartão</h2>
+                    <p className="mt-4 text-lg text-slate-700 leading-snug max-w-2xl mx-auto">
+                      Clique no botão abaixo para abrir a página segura de pagamento e concluir em poucos segundos.
+                    </p>
+                  </div>
+
+                  <a
+                    href="https://buy.stripe.com/00wfZiemqfuk3t0gnmcwg02"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 sm:px-8 py-4 bg-sky-600 text-white font-bold text-base sm:text-xl shadow-lg shadow-sky-200 hover:bg-sky-700 transition w-full max-w-2xl mx-auto min-w-0"
+                  >
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Abrir link de pagamento
+                  </a>
+
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-5 sm:p-6 text-left space-y-2 max-w-2xl mx-auto">
+                    <p className="text-sm sm:text-base text-sky-900 leading-relaxed">
+                      <strong className="font-bold">Após efetuar o pagamento:</strong> retorne a esta página e clique em <strong className="underline">Finalizar matrícula</strong> abaixo.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
+                    <button
+                      onClick={() => setPaymentTab("menu")}
+                      className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={() => goStep(10)}
+                      className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
+                    >
+                      Finalizar matrícula
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {paymentTab === "deposit" && (
+                <>
+                  <div className="flex items-center justify-center gap-3 w-full max-w-2xl mx-auto">
+                    <button
+                      onClick={() => setPaymentTab("menu")}
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Voltar
+                    </button>
+                    <div className="text-xs sm:text-sm text-slate-500">Depósito bancário</div>
+                  </div>
+
+                  <div className="mx-auto w-20 h-20 rounded-full bg-slate-500/10 text-slate-700 flex items-center justify-center">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Depósito internacional USD</h2>
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-slate-50 px-5 py-2">
+                      <div className="text-base sm:text-sm font-semibold text-slate-700">Valor:</div>
+                      <div className="text-2xl sm:text-3xl font-black text-slate-900">US$ 119,00</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border-2 border-slate-200 bg-white p-5 sm:p-8 text-left space-y-5 max-w-2xl mx-auto shadow-sm">
+                    {([
+                      { label: "Titular", value: "Loivo de Brum Castro", mono: false },
+                      { label: "Banco", value: "Wise US Inc", mono: false },
+                      { label: "Tipo de conta", value: "Checking", mono: false },
+                      { label: "Routing Number", value: "101019628", mono: true },
+                      { label: "Account Number", value: "217900196692", mono: true },
+                    ] as const).map((row) => (
+                      <div key={row.label} className="grid grid-cols-1 sm:grid-cols-[minmax(120px,160px)_1fr] gap-1 sm:gap-4 items-start border-b last:border-b-0 border-slate-100 pb-4 last:pb-0">
+                        <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 pt-1">
+                          {row.label}
+                        </div>
+                        <div className={`font-semibold text-slate-900 text-base sm:text-lg break-words ${row.mono ? "font-mono tracking-tight" : ""}`}>
+                          {row.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6 text-left space-y-2 max-w-2xl mx-auto">
+                    <p className="text-sm sm:text-base text-slate-700 leading-relaxed">
+                      <strong className="font-bold">Após efetuar o depósito/transferência:</strong> retorne a esta página e clique em <strong className="underline">Finalizar matrícula</strong> abaixo.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
+                    <button
+                      onClick={() => setPaymentTab("menu")}
+                      className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={() => goStep(10)}
+                      className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
+                    >
+                      Finalizar matrícula
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {paymentTab === "pix" && (
+                <>
+                  <div className="flex items-center justify-center gap-3 w-full max-w-2xl mx-auto">
+                    <button
+                      onClick={() => setPaymentTab("menu")}
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Voltar
+                    </button>
+                    <div className="text-xs sm:text-sm text-slate-500">PIX</div>
+                  </div>
+
+                  <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Pagamento por PIX</h2>
+                    <div className="mt-4 inline-flex flex-col items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-5 py-2.5">
+                      <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-emerald-800">Cotação administrativa fixa · Ago/2026</div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-lg sm:text-xl font-bold text-slate-700">US$ 1,00 = R$ 5,00</div>
+                        <div className="h-4 w-px bg-emerald-300/70" />
+                        <div className="text-2xl sm:text-3xl font-black text-emerald-700">R$ 595,00</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-2xl mx-auto w-full">
+                    <div className="rounded-3xl border-2 border-emerald-200 bg-white p-5 sm:p-6 flex flex-col items-center text-center shadow-sm">
+                      <div className="text-sm font-bold uppercase tracking-wider text-emerald-800 mb-3">QR Code</div>
+                      <div className="w-full aspect-square max-w-[280px] rounded-2xl bg-white border-2 border-emerald-100 p-3 flex items-center justify-center mx-auto overflow-hidden">
+                        <img
+                          src="/qr-code.jpeg"
+                          alt="QR Code PIX"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="text-xs sm:text-sm text-slate-500 mt-3 leading-relaxed">
+                        Abra o app do seu banco e escaneie o QR Code ao lado.
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border-2 border-emerald-200 bg-white p-5 sm:p-6 flex flex-col shadow-sm">
+                      <div className="text-sm font-bold uppercase tracking-wider text-emerald-800 mb-3">PIX Copia e Cola</div>
+                      <div className="w-full rounded-2xl bg-slate-50 border border-slate-200 p-3 sm:p-4 break-all font-mono text-[11px] sm:text-xs leading-relaxed text-slate-800 select-all">
+                        00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406595.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***63043C96
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const code = "00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406595.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***63043C96";
+                            if (navigator?.clipboard?.writeText) {
+                              await navigator.clipboard.writeText(code);
+                            }
+                            setPixCopied(true);
+                            window.setTimeout(() => setPixCopied(false), 3000);
+                          } catch {}
+                        }}
+                        className="mt-4 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 py-3 bg-emerald-600 text-white font-bold text-sm sm:text-base hover:bg-emerald-700 active:scale-[0.98] transition w-full shadow-md shadow-emerald-200"
+                      >
+                        {pixCopied ? (
+                          <>
+                            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Código copiado!
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copiar código PIX
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 sm:p-6 text-left space-y-2 max-w-2xl mx-auto">
+                    <p className="text-sm sm:text-base text-emerald-900 leading-relaxed">
+                      <strong className="font-bold">Após efetuar o pagamento PIX:</strong> retorne a esta página e clique em <strong className="underline">Finalizar matrícula</strong> abaixo.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
+                    <button
+                      onClick={() => setPaymentTab("menu")}
+                      className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={() => goStep(10)}
+                      className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
+                    >
+                      Finalizar matrícula
+                    </button>
+                  </div>
+                </>
+              )}
             </section>
           )}
 
