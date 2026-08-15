@@ -1106,7 +1106,7 @@ export default function CadastroRecorrenteBody() {
                   disabled={!selectedTimeOpt || submitLoading}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[280px] py-3.5 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
                 >
-                  {submitLoading ? "Finalizando..." : "Finalizar cadastro ✓"}
+                  {submitLoading ? "Agendando..." : "Agendar"}
                 </button>
                 <button
                   onClick={() => goStep(1)}
