@@ -1659,7 +1659,7 @@ export default function CadastroRecorrenteBody() {
               </div>
 
               <div className="pt-2 max-w-2xl mx-auto text-center text-sm text-slate-500">
-                <p>Qualquer dúvida, entre em contato pelo WhatsApp <span className="font-semibold text-slate-700">(65) 9 9693-3336</span>.</p>
+                <p>Qualquer dúvida, entre em contato pelo WhatsApp <a href="https://wa.me/5565996933336" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-700 hover:text-indigo-600 transition-colors">(65) 9 9693-3336</a>.</p>
               </div>
             </section>
           )}
