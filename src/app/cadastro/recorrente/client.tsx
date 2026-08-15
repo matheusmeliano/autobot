@@ -1260,7 +1260,12 @@ export default function CadastroRecorrenteBody() {
                               const keepCase = meta.name === "cpf" || meta.name === "legal_responsible_cpf";
                               const verb = hasExisting ? "Confirme" : "Informe";
                               const pronoun = useO ? "o" : "seu";
-                              const label = keepCase ? meta.label : meta.label.toLowerCase();
+                              const label =
+                                meta.name === "phone"
+                                  ? "WhatsApp"
+                                  : keepCase
+                                  ? meta.label
+                                  : meta.label.toLowerCase();
                               return `${verb} ${pronoun} ${label}`;
                             })()}
                           </h2>
