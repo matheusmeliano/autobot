@@ -953,7 +953,7 @@ export default function CadastroRecorrenteBody() {
                   disabled={!canAdvanceFromStep0()}
                   className="w-full sm:w-auto sm:ml-auto rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
                 >
-                  Avançar →
+                  Avançar
                 </button>
               </div>
             </section>
@@ -1016,7 +1016,7 @@ export default function CadastroRecorrenteBody() {
                               (selected ? "border-indigo-600 bg-indigo-600" : "border-slate-300")
                             }
                           >
-                            {selected && <span className="text-white text-xs font-bold">✓</span>}
+                            {selected && <span className="text-white text-xs font-bold" />}
                           </div>
                         </div>
                       </button>
@@ -1030,13 +1030,13 @@ export default function CadastroRecorrenteBody() {
                   disabled={!selectedWeekday}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
                 >
-                  Avançar →
+                  Avançar
                 </button>
                 <button
                   onClick={() => goStep(0)}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
                 >
-                  ← Voltar
+                  Voltar
                 </button>
               </div>
             </section>
@@ -1089,7 +1089,7 @@ export default function CadastroRecorrenteBody() {
                               (selected ? "border-emerald-600 bg-emerald-600" : "border-slate-300")
                             }
                           >
-                            {selected && <span className="text-white text-xs font-bold">✓</span>}
+                            {selected && <span className="text-white text-xs font-bold" />}
                           </div>
                         </div>
                       </button>
@@ -1112,7 +1112,7 @@ export default function CadastroRecorrenteBody() {
                   onClick={() => goStep(1)}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
                 >
-                  ← Voltar
+                  Voltar
                 </button>
               </div>
             </section>
@@ -1259,7 +1259,7 @@ export default function CadastroRecorrenteBody() {
                               disabled={contractFieldSaving}
                               className="order-1 sm:order-2 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                             >
-                              Pular →
+                              Pular
                             </button>
                           )}
                           <button
@@ -1267,14 +1267,14 @@ export default function CadastroRecorrenteBody() {
                             disabled={contractFieldSaving}
                             className="order-2 sm:order-1 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                           >
-                            ← Voltar
+                            Voltar
                           </button>
                           <button
                             onClick={() => void contractAdvanceField(false)}
                             disabled={contractFieldSaving}
                             className="order-3 sm:order-3 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                           >
-                            {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar →" : "Avançar →"}
+                            {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar" : "Avançar"}
                           </button>
                         </div>
                       </div>
@@ -1544,7 +1544,7 @@ export default function CadastroRecorrenteBody() {
                   disabled={contractFinalizing}
                   className="order-1 sm:order-2 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[300px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate"
                 >
-                  {contractFinalizing ? "Gerando contrato…" : "✓ Sim, formalizar contrato agora"}
+                  {contractFinalizing ? "Gerando contrato…" : "Sim, formalizar contrato agora"}
                 </button>
               </div>
             </section>
