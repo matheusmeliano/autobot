@@ -1119,7 +1119,7 @@ export default function CadastroRecorrenteBody() {
           )}
 
           {step === 3 && submitResult && contractAllFields.length > 0 && (
-            <section className="space-y-7">
+            <section className="space-y-7 mb-10">
               <div className="text-center">
                 <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                   <svg
