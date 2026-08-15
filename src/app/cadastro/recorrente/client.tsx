@@ -1077,13 +1077,13 @@ export default function CadastroRecorrenteBody() {
                 <button
                   onClick={handleAdvance1}
                   disabled={!selectedWeekday}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
+                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate order-2 sm:order-2 sm:justify-self-end"
                 >
                   Avançar
                 </button>
                 <button
                   onClick={() => goStep(0)}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
+                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate order-1 sm:order-1 sm:justify-self-start"
                 >
                   Voltar
                 </button>
@@ -1153,13 +1153,13 @@ export default function CadastroRecorrenteBody() {
                 <button
                   onClick={() => void handleSubmitFinal()}
                   disabled={!selectedTimeOpt || submitLoading}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[280px] py-3.5 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:order-2 sm:justify-self-end"
+                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[280px] py-3.5 bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate order-2 sm:order-2 sm:justify-self-end"
                 >
                   {submitLoading ? "Agendando..." : "Agendar"}
                 </button>
                 <button
                   onClick={() => goStep(1)}
-                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:order-1 sm:justify-self-start"
+                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate order-1 sm:order-1 sm:justify-self-start"
                 >
                   Voltar
                 </button>
