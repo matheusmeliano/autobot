@@ -125,7 +125,7 @@ export default function CadastroRecorrenteBody() {
   function formatFieldValue(name: string, raw: string | null | undefined): string {
     if (name === "cpf" || name === "legal_responsible_cpf") return formatCpf(raw);
     if (name === "phone") return formatPhoneMasked(raw);
-    return String(raw ?? "").trim();
+    return String(raw ?? "");
   }
 
   function unformatFieldValue(name: string, val: string | null | undefined): string {
