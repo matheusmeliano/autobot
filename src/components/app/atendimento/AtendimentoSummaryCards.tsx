@@ -455,9 +455,9 @@ function ContractDetails({
           <div className="flex min-w-0 items-center gap-2.5">
             <div
               className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
-              title={lead.full_name || lead.phone || "Contrato"}
+              title={lead.phone || "Lead sem telefone"}
             >
-              {String(lead.full_name ?? "").trim() || lead.phone || "Contrato"}
+              {lead.phone || "Lead sem telefone"}
             </div>
             {lead.phone ? (
               <button
@@ -2010,27 +2010,11 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className="truncate text-lg font-semibold text-[var(--app-text-85)]"
-                            title={lead.full_name || lead.phone || "Lead sem nome"}
-                          >
-                            {String(lead.full_name ?? "").trim() || "Lead sem nome"}
-                          </div>
-                          {(() => {
-                            const phoneRaw = String(lead.phone ?? "").trim();
-                            if (!phoneRaw) return null;
-                            return (
-                              <div
-                                className="mt-1 truncate text-xs text-[var(--app-text-55)]"
-                                title={phoneRaw}
-                              >
-                                {phoneRaw}
-                              </div>
-                            );
-                          })()}
-                        </div>
+                      <div
+                        className="truncate text-sm font-semibold text-[var(--app-text-85)]"
+                        title={lead.phone || lead.full_name || "Interessado sem telefone"}
+                      >
+                        {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
                       </div>
                       {activeSection === "interessados" ? (() => {
                         const stateRaw = String((lead as any)?.state ?? "").trim();
