@@ -2010,6 +2010,16 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                       >
                         {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
                       </div>
+                      {activeSection === "interessados" ? (() => {
+                        const stateRaw = String((lead as any)?.state ?? "").trim();
+                        const cityRaw = String((lead as any)?.city ?? "").trim();
+                        if (stateRaw && cityRaw) return null;
+                        return (
+                          <div className="mt-1 text-[11px] font-semibold text-amber-300">
+                            Falta estado e cidade
+                          </div>
+                        );
+                      })() : null}
                       {(() => {
                         const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
                         const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
