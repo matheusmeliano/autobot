@@ -311,7 +311,7 @@ export async function GET(req: Request) {
           const cMs = parseStartAtMs
             ? parseStartAtMs(historyCandidate.professor_start_at || historyCandidate.lead_start_at)
             : (() => {
-                const v = String(historyCandidate.professor_start_at || historyCandidate.lead_start_at ?? "").trim();
+                const v = String((historyCandidate.professor_start_at || historyCandidate.lead_start_at) ?? "").trim();
                 if (!v) return 0;
                 const t = new Date(v).getTime();
                 return Number.isFinite(t) && t > 0 ? t : 0;
@@ -319,7 +319,7 @@ export async function GET(req: Request) {
           const currentLatest = latestBookingByLeadId.get(leadId);
           const curMs = currentLatest
             ? (() => {
-                const v = String(currentLatest.professor_start_at || currentLatest.lead_start_at ?? "").trim();
+                const v = String((currentLatest.professor_start_at || currentLatest.lead_start_at) ?? "").trim();
                 if (!v) return 0;
                 const t = new Date(v).getTime();
                 return Number.isFinite(t) && t > 0 ? t : 0;
@@ -332,7 +332,7 @@ export async function GET(req: Request) {
             const curFuture = futureExperimentalBookingByLeadId.get(leadId);
             const curFutureMs = curFuture
               ? (() => {
-                  const v = String(curFuture.professor_start_at || curFuture.lead_start_at ?? "").trim();
+                  const v = String((curFuture.professor_start_at || curFuture.lead_start_at) ?? "").trim();
                   if (!v) return 0;
                   const t = new Date(v).getTime();
                   return Number.isFinite(t) && t > 0 ? t : 0;
