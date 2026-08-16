@@ -1412,7 +1412,9 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   useEffect(() => {
     setQuery("");
     setPage(1);
-  }, [activeSection]);
+    const firstId = activeItems[0]?.id;
+    setSelectedLeadId(typeof firstId === "string" && firstId ? firstId : null);
+  }, [activeSection, activeItems]);
 
   useEffect(() => {
     setPage((current) => {
@@ -1425,7 +1427,10 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   useEffect(() => {
     setSelectedLeadId((currentSelectedLeadId) => {
       if (!filteredItems.length) return null;
-      return filteredItems.some((lead) => lead.id === currentSelectedLeadId) ? currentSelectedLeadId : filteredItems[0]?.id ?? null;
+      if (currentSelectedLeadId && filteredItems.some((lead) => lead.id === currentSelectedLeadId)) {
+        return currentSelectedLeadId;
+      }
+      return filteredItems[0]?.id ?? null;
     });
   }, [filteredItems]);
 
