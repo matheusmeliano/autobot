@@ -387,6 +387,7 @@ export default function CadastroRecorrenteBody() {
 
   function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
     setStep(n);
+    if (n === 9) setPaymentTab("menu");
     setSubmitError("");
     setContractFieldError("");
     setContractFinalError("");
@@ -401,6 +402,10 @@ export default function CadastroRecorrenteBody() {
       }, 0);
     }
   }
+
+  useEffect(() => {
+    if (step === 9) setPaymentTab("menu");
+  }, [step]);
 
   useEffect(() => {
     if (step < 3 || step > 7) return;
