@@ -105,17 +105,20 @@ function Field({
   label,
   value,
   copyable,
+  copyValue,
 }: {
   label: string;
   value: string | null | undefined;
   copyable?: boolean;
+  copyValue?: string | null | undefined;
 }) {
   const displayValue = value || "-";
-  const canCopy = Boolean(copyable && value && String(value).trim());
+  const rawValue = typeof copyValue !== "undefined" ? copyValue : value;
+  const canCopy = Boolean(copyable && rawValue && String(rawValue).trim());
 
   async function handleCopy() {
     if (!canCopy) return;
-    await navigator.clipboard.writeText(String(value).trim());
+    await navigator.clipboard.writeText(String(rawValue).trim());
     modalToast.success(`${label} copiado.`);
   }
 
@@ -141,6 +144,20 @@ function Field({
       </div>
     </div>
   );
+}
+
+function digitsOnly(v: string | null | undefined): string {
+  return String(v ?? "").replace(/\D/g, "");
+}
+
+function formatCpf(v: string | null | undefined): string {
+  const d = digitsOnly(v).slice(0, 11);
+  if (!d) return "";
+  let out = d.slice(0, 3);
+  if (d.length > 3) out += "." + d.slice(3, 6);
+  if (d.length > 6) out += "." + d.slice(6, 9);
+  if (d.length > 9) out += "-" + d.slice(9, 11);
+  return out;
 }
 
 type LeadNameValues = { full_name: string };
@@ -321,7 +338,7 @@ function LeadDetails({
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
-            <Field label="CPF" value={lead.cpf} copyable />
+            <Field label="CPF" value={formatCpf(lead.cpf)} copyable copyValue={digitsOnly(lead.cpf)} />
             <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
             <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
             <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
