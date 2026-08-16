@@ -1365,9 +1365,26 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
     const leadId = String(lead.id ?? "").trim();
     if (!leadId) return;
 
-    const name = String(lead.full_name ?? "").trim() || "Interessado sem nome";
+    const st = String(lead.status ?? "").trim().toLowerCase();
+    const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
+    const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+    const isAluno =
+      st === "matriculado" || fs === "matriculado" ||
+      st === "aluno" || fs === "aluno" ||
+      fs === "aluno_recorrente_cadastrado" ||
+      st === "cadastro_recorrente_pendente_plataforma" || fs === "cadastro_recorrente_pendente_plataforma" ||
+      st === "contrato_assinado" || fs === "contrato_assinado" ||
+      st === "contrato_aguardando_aceite" || fs === "contrato_aguardando_aceite" ||
+      st === "contrato_coletando_dados" || fs === "contrato_coletando_dados" ||
+      st === "matricula_confirmada" || fs === "matricula_confirmada" ||
+      rcs === "confirmado" || rcs === "cadastro_plataforma_pendente";
+
+    const label = isAluno ? "aluno" : "interessado";
+    const Label = isAluno ? "Aluno" : "Interessado";
+
+    const name = String(lead.full_name ?? "").trim() || `${Label} sem nome`;
     const phone = String(lead.phone ?? "").trim() || "-";
-    if (!window.confirm(`Excluir interessado?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
+    if (!window.confirm(`Excluir ${label}?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
       return;
     }
 
@@ -1376,7 +1393,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       const response = await fetch(`/api/atendimento/leads/${leadId}`, { method: "DELETE" });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!response.ok || !payload?.ok) {
-        modalToast.error(payload?.error ?? "Falha ao excluir interessado.");
+        modalToast.error(payload?.error ?? `Falha ao excluir ${label}.`);
         return;
       }
 
@@ -1384,9 +1401,9 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       setLocalSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
       setSelectedLeadId((current) => (current === leadId ? null : current));
       setMobileDetailsOpen((current) => (selectedLeadId === leadId ? false : current));
-      modalToast.success("Interessado excluído com sucesso.");
+      modalToast.success(`${Label} excluído com sucesso.`);
     } catch (error) {
-      modalToast.error(error instanceof Error ? error.message : "Falha ao excluir interessado.");
+      modalToast.error(error instanceof Error ? error.message : `Falha ao excluir ${label}.`);
     } finally {
       setDeletingLeadId(null);
     }
