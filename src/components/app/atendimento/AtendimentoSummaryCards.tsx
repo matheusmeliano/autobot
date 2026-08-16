@@ -2047,6 +2047,32 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                       >
                         {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
                       </div>
+                      {(() => {
+                        const warnings: JSX.Element[] = [];
+                        const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+                        const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+                        const hasTimeOk =
+                          Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+                          Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+                        if (hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim()) {
+                          warnings.push(
+                            <div key="rec-link" className="mt-1 text-[11px] font-semibold text-amber-300">
+                              Adicione link da aula recorrente
+                            </div>,
+                          );
+                        }
+                        const booking = lead.experimental_class_booking ?? null;
+                        const bookingId = String(booking?.id ?? "").trim();
+                        const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+                        if (bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim()) {
+                          warnings.push(
+                            <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
+                              Adicione link da aula experimental
+                            </div>,
+                          );
+                        }
+                        return warnings.length ? warnings : null;
+                      })()}
                       {activeSection === "interessados" ? (() => {
                         const stateRaw = String((lead as any)?.state ?? "").trim();
                         const cityRaw = String((lead as any)?.city ?? "").trim();
@@ -2059,21 +2085,6 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                           </div>
                         );
                       })() : null}
-                      {(() => {
-                        const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-                        const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
-                        const hasTimeOk =
-                          Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-                          Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-                        const hasRecurringBoth = hasWeekdayOk && hasTimeOk;
-                        if (!hasRecurringBoth) return null;
-                        if (String((lead as any).recurring_class_link ?? "").trim()) return null;
-                        return (
-                          <div className="mt-2 text-[11px] font-semibold text-amber-300">
-                            Adicione link da aula recorrente
-                          </div>
-                        );
-                      })()}
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {buildItemMeta(lead)}
                       </div>
@@ -2082,19 +2093,6 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                           <RepescagemBadge />
                         </div>
                       ) : null}
-                      {(() => {
-                        const booking = lead.experimental_class_booking ?? null;
-                        const bookingId = String(booking?.id ?? "").trim();
-                        if (!bookingId) return null;
-                        const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
-                        if (!bookingStatus || bookingStatus === "cancelled") return null;
-                        if (String(booking?.lesson_link ?? "").trim()) return null;
-                        return (
-                          <div className="mt-2 text-[11px] font-semibold text-amber-300">
-                            Adicione link da aula experimental
-                          </div>
-                        );
-                      })()}
                     </button>
                   );
                 })}
