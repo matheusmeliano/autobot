@@ -452,6 +452,26 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
+  function scrollToTop() {
+    if (typeof window !== "undefined") {
+      setTimeout(() => {
+        try {
+          window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+        } catch {
+          window.scrollTo(0, 0);
+        }
+      }, 0);
+    }
+  }
+
+  async function finalizarMatriculaStep9() {
+    if (contractFinalizing) return;
+    setContractFinalizing(true);
+    await new Promise<void>((r) => setTimeout(r, 700));
+    goStep(10);
+    setTimeout(() => setContractFinalizing(false), 250);
+  }
+
   useEffect(() => {
     if (step === 9) setPaymentTab("menu");
     if (step === 7) {
@@ -1710,7 +1730,7 @@ export default function CadastroRecorrenteBody() {
 
                   <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto w-full">
                     <button
-                      onClick={() => setPaymentTab("link")}
+                      onClick={() => { setPaymentTab("link"); scrollToTop(); }}
                       className="w-full text-left rounded-2xl border-2 border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 transition p-4 sm:p-6 bg-white shadow-sm"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -1734,7 +1754,7 @@ export default function CadastroRecorrenteBody() {
                     </button>
 
                     <button
-                      onClick={() => setPaymentTab("deposit")}
+                      onClick={() => { setPaymentTab("deposit"); scrollToTop(); }}
                       className="w-full text-left rounded-2xl border-2 border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition p-4 sm:p-6 bg-white shadow-sm"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -1757,7 +1777,7 @@ export default function CadastroRecorrenteBody() {
                     </button>
 
                     <button
-                      onClick={() => setPaymentTab("pix")}
+                      onClick={() => { setPaymentTab("pix"); scrollToTop(); }}
                       className="w-full text-left rounded-2xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition p-4 sm:p-6 bg-white shadow-sm"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -1828,7 +1848,7 @@ export default function CadastroRecorrenteBody() {
                 <>
                   <div className="flex items-center justify-center gap-3 w-full max-w-2xl mx-auto">
                     <button
-                      onClick={() => setPaymentTab("menu")}
+                      onClick={() => { setPaymentTab("menu"); scrollToTop(); }}
                       className="shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -1871,16 +1891,17 @@ export default function CadastroRecorrenteBody() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
                     <button
-                      onClick={() => setPaymentTab("menu")}
+                      onClick={() => { setPaymentTab("menu"); scrollToTop(); }}
                       className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
                     >
                       Voltar
                     </button>
                     <button
-                      onClick={() => goStep(10)}
+                      disabled={contractFinalizing}
+                      onClick={finalizarMatriculaStep9}
                       className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
                     >
-                      Finalizar matrícula
+                      {contractFinalizing ? "Finalizando matrícula…" : "Finalizar matrícula"}
                     </button>
                   </div>
                 </>
@@ -1890,7 +1911,7 @@ export default function CadastroRecorrenteBody() {
                 <>
                   <div className="flex items-center justify-center gap-3 w-full max-w-2xl mx-auto">
                     <button
-                      onClick={() => setPaymentTab("menu")}
+                      onClick={() => { setPaymentTab("menu"); scrollToTop(); }}
                       className="shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -1961,16 +1982,17 @@ export default function CadastroRecorrenteBody() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
                     <button
-                      onClick={() => setPaymentTab("menu")}
+                      onClick={() => { setPaymentTab("menu"); scrollToTop(); }}
                       className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
                     >
                       Voltar
                     </button>
                     <button
-                      onClick={() => goStep(10)}
+                      disabled={contractFinalizing}
+                      onClick={finalizarMatriculaStep9}
                       className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
                     >
-                      Finalizar matrícula
+                      {contractFinalizing ? "Finalizando matrícula…" : "Finalizar matrícula"}
                     </button>
                   </div>
                 </>
@@ -1980,7 +2002,7 @@ export default function CadastroRecorrenteBody() {
                 <>
                   <div className="flex items-center justify-center gap-3 w-full max-w-2xl mx-auto">
                     <button
-                      onClick={() => setPaymentTab("menu")}
+                      onClick={() => { setPaymentTab("menu"); scrollToTop(); }}
                       className="shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -2092,16 +2114,17 @@ export default function CadastroRecorrenteBody() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-2xl mx-auto">
                     <button
-                      onClick={() => setPaymentTab("menu")}
+                      onClick={() => { setPaymentTab("menu"); scrollToTop(); }}
                       className="order-1 sm:order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-start"
                     >
                       Voltar
                     </button>
                     <button
-                      onClick={() => goStep(10)}
+                      disabled={contractFinalizing}
+                      onClick={finalizarMatriculaStep9}
                       className="order-2 sm:order-2 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[260px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate sm:justify-self-end"
                     >
-                      Finalizar matrícula
+                      {contractFinalizing ? "Finalizando matrícula…" : "Finalizar matrícula"}
                     </button>
                   </div>
                 </>
