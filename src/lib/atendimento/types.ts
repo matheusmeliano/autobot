@@ -127,6 +127,7 @@ export type AtendimentoLeadListItem = AtendimentoLead & {
   conversation: AtendimentoConversation | null;
   last_message: AtendimentoMessage | null;
   experimental_class_booking: AtendimentoExperimentalClassBookingSummary | null;
+  latest_experimental_class_booking?: AtendimentoExperimentalClassBookingSummary | null;
   latest_experimental_class_cancelled_at: string | null;
   latest_experimental_class_event: string | null;
 };

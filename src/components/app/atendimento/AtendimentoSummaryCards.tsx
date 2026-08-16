@@ -1925,6 +1925,19 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
         bookingIsNotDraft &&
         bookingStatus !== "cancelled",
     );
+    const latestBooking = (lead as any)?.latest_experimental_class_booking ?? null;
+    const latestBookingStatus = String(latestBooking?.status ?? "").trim().toLowerCase();
+    const latestBookingHasId = Boolean(String(latestBooking?.id ?? "").trim());
+    const hasLatestBook = Boolean(
+      latestBooking &&
+        latestBookingStatus !== "cancelled",
+    );
+    if (hasLatestBook) {
+      const dateLabel = formatAtendimentoDate(latestBooking?.lead_date || latestBooking?.professor_date);
+      const timeLabel = String(latestBooking?.lead_time ?? latestBooking?.professor_time ?? "").trim();
+      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
+      return body ? `Última aula em: ${body}` : "";
+    }
     if (hasBook) {
       const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
       const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();

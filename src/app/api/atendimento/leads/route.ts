@@ -77,6 +77,7 @@ export async function GET(req: Request) {
   const leadIds = leadRows.map((row) => String(row.id ?? "")).filter(Boolean);
   const conversationsByLeadId = new Map<string, any>();
   const bookingsByLeadId = new Map<string, any>();
+  const latestBookingByLeadId = new Map<string, any>();
   const cancelledLeadBookingIds = new Set<string>();
   const cancelledByHistoryLeadIds = new Set<string>();
   const cancelledAtByLeadId = new Map<string, string>();
@@ -153,6 +154,35 @@ export async function GET(req: Request) {
         professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
       });
+    }
+
+    const parseStartAtMs = (value: unknown): number => {
+      const raw = String(value ?? "").trim();
+      if (!raw) return 0;
+      const t = new Date(raw).getTime();
+      return Number.isFinite(t) && t > 0 ? t : 0;
+    };
+    for (const booking of bookings ?? []) {
+      const leadId = String((booking as any)?.lead_id ?? "");
+      const status = String((booking as any)?.status ?? "").trim().toLowerCase();
+      if (!leadId) continue;
+      if (status === "cancelled") continue;
+      const candidate = {
+        ...(booking as any),
+        lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
+        student_start_notification_sent_at: null,
+        attendant_start_notification_sent_at: null,
+        attendance_status: null,
+        attendance_checked_at: null,
+        professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        source: "table",
+      };
+      const candidateMs = parseStartAtMs(candidate.professor_start_at || candidate.lead_start_at);
+      const current = latestBookingByLeadId.get(leadId);
+      const currentMs = current
+        ? parseStartAtMs(current.professor_start_at || current.lead_start_at)
+        : 0;
+      if (candidateMs > currentMs) latestBookingByLeadId.set(leadId, candidate);
     }
   }
 
@@ -239,6 +269,50 @@ export async function GET(req: Request) {
           created_at: String((event as any)?.created_at ?? ""),
           source: "history",
         });
+      }
+
+      if (eventType === "experimental_class_scheduled" && !cancelledLeadBookingIds.has(leadId) && !cancelledByHistoryLeadIds.has(leadId)) {
+        const bookingStatus = String(details.status ?? "").trim().toLowerCase() || "scheduled";
+        if (bookingStatus !== "cancelled") {
+          const historyCandidate = {
+            id: String((event as any)?.id ?? ""),
+            status: bookingStatus,
+            lesson_link: lessonLink,
+            student_start_notification_sent_at: null as null | string,
+            attendant_start_notification_sent_at: null as null | string,
+            attendance_status: null as null | string,
+            attendance_checked_at: null as null | string,
+            professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: String(details.lead_timezone ?? ""),
+            professor_date: String(details.professor_date ?? ""),
+            professor_time: String(details.professor_time ?? ""),
+            professor_start_at: String(details.professor_start_at ?? ""),
+            lead_date: String(details.lead_date ?? ""),
+            lead_time: String(details.lead_time ?? ""),
+            lead_start_at: String(details.lead_start_at ?? ""),
+            conversation_id: String((event as any)?.conversation_id ?? ""),
+            created_at: String((event as any)?.created_at ?? ""),
+            source: "history" as const,
+          };
+          const cMs = parseStartAtMs
+            ? parseStartAtMs(historyCandidate.professor_start_at || historyCandidate.lead_start_at)
+            : (() => {
+                const v = String(historyCandidate.professor_start_at || historyCandidate.lead_start_at ?? "").trim();
+                if (!v) return 0;
+                const t = new Date(v).getTime();
+                return Number.isFinite(t) && t > 0 ? t : 0;
+              })();
+          const currentLatest = latestBookingByLeadId.get(leadId);
+          const curMs = currentLatest
+            ? (() => {
+                const v = String(currentLatest.professor_start_at || currentLatest.lead_start_at ?? "").trim();
+                if (!v) return 0;
+                const t = new Date(v).getTime();
+                return Number.isFinite(t) && t > 0 ? t : 0;
+              })()
+            : 0;
+          if (cMs > curMs) latestBookingByLeadId.set(leadId, historyCandidate);
+        }
       }
 
       if (eventType === "experimental_class_date_selected" && !draftDateByLeadId.has(leadId)) {
@@ -416,6 +490,7 @@ export async function GET(req: Request) {
         experimental_class_status: mergedStatus || null,
         conversation: conversationsByLeadId.get(leadId) ?? null,
         experimental_class_booking: bookingWithFallback,
+        latest_experimental_class_booking: latestBookingByLeadId.get(leadId) ?? null,
         latest_experimental_class_cancelled_at: cancelledAtByLeadId.get(leadId) ?? null,
         latest_experimental_class_event: latestClassEventByLeadId.get(leadId) ?? null,
       };
