@@ -1708,6 +1708,30 @@ export default function CadastroRecorrenteBody() {
                     </button>
                   </div>
 
+                  <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 sm:p-6 text-left max-w-2xl mx-auto shadow-sm">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="w-11 h-11 shrink-0 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500">
+                          Titularidade das contas de recebimento
+                        </div>
+                        <div className="text-lg sm:text-xl font-extrabold text-slate-900 leading-snug">
+                          Loivo de Brum Castro
+                        </div>
+                        <div className="text-sm sm:text-base text-slate-600 leading-relaxed">
+                          Gestor Financeiro da Escola de Música Lucas Brum
+                        </div>
+                        <div className="text-xs sm:text-sm text-slate-500 pt-1.5 leading-relaxed">
+                          Cartão de crédito · Transferência bancária em dólar (Wise USD) · PIX
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6 text-left space-y-3 max-w-2xl mx-auto">
                     <p className="text-sm sm:text-base text-amber-800 leading-relaxed">
                       <strong className="font-bold">Importante:</strong> a data da mensalidade será definida com base na data da confirmação desse primeiro pagamento.
