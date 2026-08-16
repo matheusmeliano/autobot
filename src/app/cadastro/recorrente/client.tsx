@@ -1998,12 +1998,36 @@ export default function CadastroRecorrenteBody() {
                   </div>
                   <div>
                     <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Pagamento por PIX</h2>
-                    <div className="mt-4 inline-flex flex-col items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-5 py-2.5">
-                      <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-emerald-800">Cotação administrativa fixa · Ago/2026</div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-lg sm:text-xl font-bold text-slate-700">US$ 1,00 = R$ 5,00</div>
-                        <div className="h-4 w-px bg-emerald-300/70" />
-                        <div className="text-2xl sm:text-3xl font-black text-emerald-700">R$ 595,00</div>
+                    <div className="mt-4 mx-auto w-full max-w-lg rounded-3xl border-2 border-emerald-200 bg-emerald-50 px-4 sm:px-6 py-4 sm:py-5 text-center">
+                      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-300/60 px-3 sm:px-4 py-1.5 mb-3 sm:mb-4">
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-800">
+                          Cotação fixa · Ago/2026
+                        </span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-3 sm:gap-5">
+                        <div className="rounded-2xl bg-white/70 border border-emerald-200/60 px-4 sm:px-5 py-2.5 sm:py-3 flex flex-col items-center sm:items-start sm:text-left gap-0.5">
+                          <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700/90">
+                            Câmbio utilizado
+                          </div>
+                          <div className="text-base sm:text-xl font-black text-slate-800 leading-tight">
+                            US$ 1,00 = R$ 5,00
+                          </div>
+                        </div>
+                        <div className="hidden sm:flex self-stretch w-px bg-emerald-300/70" />
+                        <div className="sm:hidden flex justify-center">
+                          <div className="h-px w-16 bg-emerald-300/70" />
+                        </div>
+                        <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-md shadow-emerald-300/40 px-5 sm:px-7 py-3 sm:py-4 text-white flex flex-col items-center sm:items-start gap-0.5">
+                          <div className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.14em] text-emerald-50/90">
+                            Total a pagar
+                          </div>
+                          <div className="text-2xl sm:text-4xl font-black tracking-tight leading-none">
+                            R$ 595,00
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
