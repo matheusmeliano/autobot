@@ -109,7 +109,11 @@ export async function POST(req: Request) {
     } else if (fieldName === "phone") {
       patch = { phone: valueToSave };
     } else if (fieldName === "legal_responsible_name") {
-      patch = { legal_responsible_name: valueToSave };
+      if (skipped) {
+        patch = { legal_responsible_name: null, legal_responsible_cpf: null };
+      } else {
+        patch = { legal_responsible_name: valueToSave };
+      }
     } else if (fieldName === "legal_responsible_cpf") {
       patch = { legal_responsible_cpf: valueToSave };
     }

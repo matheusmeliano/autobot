@@ -289,10 +289,15 @@ export default function CadastroRecorrenteBody() {
         return;
       }
       setContractSnapshot(json.snapshot || contractSnapshot);
-      setLastSavedFieldValues((prev) => ({
-        ...prev,
-        [currentMeta.name]: json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name],
-      }));
+      setLastSavedFieldValues((prev) => {
+        let next: any = { ...prev };
+        next[currentMeta.name] = json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name];
+        if (step === 6 && skip) {
+          next.legal_responsible_name = "";
+          next.legal_responsible_cpf = "";
+        }
+        return next;
+      });
       setContractAllFields(json.allFields || contractAllFields);
       let nextStepBase: 4 | 5 | 6 | 7 | 8 =
         step === 3 ? 4 : step === 4 ? 5 : step === 5 ? 6 : step === 6 ? 7 : 8;
