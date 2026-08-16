@@ -1929,7 +1929,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
       const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-      return body ? `Aula em: ${body}` : "";
+      return body ? `Última aula em: ${body}` : "";
     }
     const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
     const recTimeOk =
