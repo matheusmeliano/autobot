@@ -1875,9 +1875,10 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       lead.funnel_stage === "cadastro_recorrente_pendente_plataforma";
     if (isAlunoOrMatriculado) {
       if (!hasWeekdayOk || !hasTimeOk) {
-        if (!hasWeekdayOk && !hasTimeOk) return "Falta dia e horário recorrentes";
-        if (!hasWeekdayOk) return "Falta dia recorrente";
-        return "Falta horário recorrente";
+        if (!hasWeekdayOk || !hasTimeOk) {
+          if (!hasWeekdayOk && !hasTimeOk) return "Falta dia e horário";
+          return "Falta horário";
+        }
       }
       return "Falta contrato";
     }
@@ -1936,13 +1937,11 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
       Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim());
     if (isRecorrente && (!recWeekdayOk || !recTimeOk)) {
-      if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
-      if (!recWeekdayOk) return "Falta dia recorrente";
-      return "Falta horário recorrente";
+      if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário";
+      return "Falta horário";
     }
     if (hasExpContext && (!hasExpDate || !hasExpTime)) {
       if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
-      if (!hasExpDate) return "Falta dia";
       return "Falta horário";
     }
     const rawDtAgend = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
