@@ -1198,11 +1198,16 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
         (lead) => {
           const st = String(lead.status ?? "").trim().toLowerCase();
           const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
+          const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
           if (st === "matriculado" || fs === "matriculado") return false;
           if (st === "aluno" || fs === "aluno") return false;
           if (fs === "aluno_recorrente_cadastrado") return false;
           if (st === "contrato_assinado" || fs === "contrato_assinado") return false;
           if (st === "cadastro_recorrente_pendente_plataforma" || fs === "cadastro_recorrente_pendente_plataforma") return false;
+          if (st === "contrato_aguardando_aceite" || fs === "contrato_aguardando_aceite") return false;
+          if (st === "contrato_coletando_dados" || fs === "contrato_coletando_dados") return false;
+          if (st === "matricula_confirmada" || fs === "matricula_confirmada") return false;
+          if (rcs === "confirmado" || rcs === "cadastro_plataforma_pendente") return false;
           return true;
         },
       ),
@@ -1214,11 +1219,16 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
         (lead) => {
           const st = String(lead.status ?? "").trim().toLowerCase();
           const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
+          const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
           if (st === "matriculado" || fs === "matriculado") return true;
           if (st === "aluno") return true;
           if (fs === "aluno_recorrente_cadastrado") return true;
           if (st === "cadastro_recorrente_pendente_plataforma" || fs === "cadastro_recorrente_pendente_plataforma") return true;
           if (st === "contrato_assinado" || fs === "contrato_assinado") return true;
+          if (st === "contrato_aguardando_aceite" || fs === "contrato_aguardando_aceite") return true;
+          if (st === "contrato_coletando_dados" || fs === "contrato_coletando_dados") return true;
+          if (st === "matricula_confirmada" || fs === "matricula_confirmada") return true;
+          if (rcs === "confirmado" || rcs === "cadastro_plataforma_pendente") return true;
           return false;
         },
       ),
