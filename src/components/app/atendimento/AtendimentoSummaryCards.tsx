@@ -748,7 +748,7 @@ function BookingDetails({
         {booking || showIncompleteState ? (
           <div
             className={[
-              showAttendanceCard ? "mt-4" : "",
+              showAttendanceCard || hasRecurringClass ? "mt-4" : "",
               "rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4",
             ]
               .filter(Boolean)
