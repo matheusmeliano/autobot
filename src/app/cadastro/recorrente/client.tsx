@@ -294,8 +294,10 @@ export default function CadastroRecorrenteBody() {
         [currentMeta.name]: json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name],
       }));
       setContractAllFields(json.allFields || contractAllFields);
-      const nextStep: 4 | 5 | 6 | 7 | 8 =
+      let nextStepBase: 4 | 5 | 6 | 7 | 8 =
         step === 3 ? 4 : step === 4 ? 5 : step === 5 ? 6 : step === 6 ? 7 : 8;
+      let nextStep: 4 | 5 | 6 | 7 | 8 = nextStepBase;
+      if (step === 6 && skip) nextStep = 8;
       if (nextStep === 8) {
         setContractCurrentValue("");
         goStep(8);
@@ -405,6 +407,17 @@ export default function CadastroRecorrenteBody() {
 
   useEffect(() => {
     if (step === 9) setPaymentTab("menu");
+    if (step === 7) {
+      const legalName =
+        typeof contractSnapshot?.legal_responsible_name === "string"
+          ? contractSnapshot.legal_responsible_name
+          : typeof lastSavedFieldValues?.legal_responsible_name === "string"
+          ? lastSavedFieldValues.legal_responsible_name
+          : "";
+      if (!String(legalName ?? "").trim()) {
+        goStep(8);
+      }
+    }
   }, [step]);
 
   useEffect(() => {
@@ -1603,7 +1616,19 @@ export default function CadastroRecorrenteBody() {
 
               <div className="grid grid-cols-1 sm:flex sm:flex-row sm:items-start gap-3 pt-2 max-w-2xl mx-auto w-full">
                 <button
-                  onClick={() => goStep(7)}
+                  onClick={() => {
+                    const legalName =
+                      typeof contractSnapshot?.legal_responsible_name === "string"
+                        ? contractSnapshot.legal_responsible_name
+                        : typeof lastSavedFieldValues?.legal_responsible_name === "string"
+                        ? lastSavedFieldValues.legal_responsible_name
+                        : "";
+                    if (!String(legalName ?? "").trim()) {
+                      goStep(6);
+                    } else {
+                      goStep(7);
+                    }
+                  }}
                   disabled={contractFinalizing}
                   className="order-1 sm:order-1 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                 >
