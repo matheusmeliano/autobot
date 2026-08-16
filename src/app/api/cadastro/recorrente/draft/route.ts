@@ -101,11 +101,12 @@ export async function GET(req: NextRequest) {
     if (!data) {
       return NextResponse.json(
         {
-          ok: true,
-          progress: null,
-          lead: null,
+          ok: false,
+          blocked: true,
+          error:
+            "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
         },
-        { status: 200 },
+        { status: 403 },
       );
     }
     const stepRaw = (data as any)?.recurring_registration_step;
@@ -210,6 +211,39 @@ export async function PATCH(req: NextRequest) {
     const patch: Record<string, unknown> = {
       updated_at: nowIso,
     };
+
+    const currentStatus = String((lead as any)?.status ?? "").trim().toLowerCase();
+    const currentFunnel = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+    const currentRcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+
+    function shouldPromoteToAlunosSection(): boolean {
+      const stChain = new Set([
+        "matriculado",
+        "aluno",
+        "cadastro_recorrente_pendente_plataforma",
+        "contrato_assinado",
+        "contrato_aguardando_aceite",
+        "contrato_coletando_dados",
+        "matricula_confirmada",
+      ]);
+      if (stChain.has(currentStatus) || stChain.has(currentFunnel)) return false;
+      if (currentRcs === "confirmado" || currentRcs === "cadastro_plataforma_pendente") return false;
+
+      // Se for interessado:
+      //   - salvou senha OU salvou dia/horário OU avançou step (>=1) → promover
+      if (safePassword) return true;
+      if (validWeekday || safeProfessorTime || safeLeadTime) return true;
+      if (safeStepRaw !== null && safeStepRaw >= 1) return true;
+      return false;
+    }
+
+    if (shouldPromoteToAlunosSection()) {
+      patch.status = patch.status ?? "aluno";
+      patch.funnel_stage = patch.funnel_stage ?? "cadastro_recorrente_pendente_plataforma";
+      if (!currentRcs) {
+        patch.recurring_class_status = "cadastro_plataforma_pendente";
+      }
+    }
 
     if (validWeekday) {
       patch.recurring_class_weekday = validWeekday;

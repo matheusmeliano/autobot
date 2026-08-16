@@ -49,7 +49,12 @@ export async function POST(req: Request) {
       lead = await findLeadByPhone({ phone: telefone });
     }
     if (!lead?.id) {
-      return Response.json({ ok: false, error: "Cadastro não encontrado." }, { status: 404 });
+      return Response.json({
+        ok: false,
+        blocked: true,
+        error:
+          "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+      }, { status: 403 });
     }
 
     function getRawFieldValue(name: ContractFieldName): string | null {
