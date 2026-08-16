@@ -489,31 +489,6 @@ function ContractDetails({
             <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
               <Field label="Plano" value="Modelo individual" />
               <Field label="Valor mensal" value="US$ 119,00" />
-              <Field
-                label="Dia da semana"
-                value={
-                  String(lead.recurring_class_weekday_label ?? "").trim() ||
-                  String(lead.recurring_class_weekday ?? "").trim() ||
-                  null
-                }
-              />
-              <Field
-                label="Horário fixo"
-                value={
-                  atendimentoTimeLabel(
-                    String(lead.recurring_class_lead_time ?? "").trim() ||
-                      String(lead.recurring_class_professor_time ?? "").trim() ||
-                      null,
-                  )
-                }
-              />
-              <Field label="Fuso horário" value={lead.timezone || ATENDIMENTO_PROFESSOR_TIME_ZONE} />
-              {String(lead.recurring_class_created_at ?? "").trim() ? (
-                <Field
-                  label="Cadastrado em"
-                  value={formatAtendimentoDateTime(String(lead.recurring_class_created_at ?? "").trim())}
-                />
-              ) : null}
             </div>
           </div>
         ) : null}
