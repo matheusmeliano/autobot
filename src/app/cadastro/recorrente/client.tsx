@@ -52,6 +52,48 @@ type ContractFieldMeta = {
   currentValue: string | null;
 };
 
+function CopyButton({ value, label }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState<boolean>(false);
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(String(value ?? ""));
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = String(value ?? "");
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand("copy"); } catch {}
+          document.body.removeChild(ta);
+        }
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2200);
+      }}
+      className={`inline-flex items-center gap-1.5 shrink-0 text-xs sm:text-sm font-semibold rounded-xl px-3 sm:px-3.5 py-1.5 sm:py-2 border transition ${
+        copied
+          ? "bg-emerald-500 border-emerald-500 text-white"
+          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+      }`}
+      title={copied ? "Copiado!" : "Copiar"}
+    >
+      {copied ? (
+        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      )}
+      <span>{copied ? "Copiado!" : label ?? "Copiar"}</span>
+    </button>
+  );
+}
+
 export default function CadastroRecorrenteBody() {
   const sp = useSearchParams();
   const initialNameParam = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
@@ -1874,18 +1916,23 @@ export default function CadastroRecorrenteBody() {
 
                   <div className="rounded-3xl border-2 border-slate-200 bg-white p-5 sm:p-8 text-left space-y-5 max-w-2xl mx-auto shadow-sm">
                     {([
-                      { label: "Titular", value: "Loivo de Brum Castro", mono: false },
-                      { label: "Banco", value: "Wise US Inc", mono: false },
-                      { label: "Tipo de conta", value: "Checking", mono: false },
-                      { label: "Routing Number", value: "101019628", mono: true },
-                      { label: "Account Number", value: "217900196692", mono: true },
+                      { key: "titular", label: "Titular", value: "Loivo de Brum Castro", mono: false, copy: true },
+                      { key: "banco", label: "Banco", value: "Wise US Inc", mono: false, copy: false },
+                      { key: "tipo", label: "Tipo de conta", value: "Checking", mono: false, copy: false },
+                      { key: "routing", label: "Routing Number", value: "101019628", mono: true, copy: true },
+                      { key: "account", label: "Account Number", value: "217900196692", mono: true, copy: true },
                     ] as const).map((row) => (
-                      <div key={row.label} className="grid grid-cols-1 sm:grid-cols-[minmax(120px,160px)_1fr] gap-1 sm:gap-4 items-start border-b last:border-b-0 border-slate-100 pb-4 last:pb-0">
+                      <div key={row.key} className="grid grid-cols-1 sm:grid-cols-[minmax(120px,160px)_1fr] gap-1 sm:gap-4 items-start border-b last:border-b-0 border-slate-100 pb-4 last:pb-0">
                         <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 pt-1">
                           {row.label}
                         </div>
-                        <div className={`font-semibold text-slate-900 text-base sm:text-lg break-words ${row.mono ? "font-mono tracking-tight" : ""}`}>
-                          {row.value}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className={`font-semibold text-slate-900 text-base sm:text-lg break-words min-w-0 ${row.mono ? "font-mono tracking-tight" : ""}`}>
+                            {row.value}
+                          </div>
+                          {row.copy && (
+                            <CopyButton value={row.value} label="Copiar" />
+                          )}
                         </div>
                       </div>
                     ))}
