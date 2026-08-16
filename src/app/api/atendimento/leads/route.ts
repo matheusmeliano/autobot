@@ -85,6 +85,14 @@ export async function GET(req: Request) {
   const cancelledAtByLeadId = new Map<string, string>();
   const latestClassEventByLeadId = new Map<string, string>();
 
+  const parseStartAtMs = (value: unknown): number => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return 0;
+    const t = new Date(raw).getTime();
+    return Number.isFinite(t) && t > 0 ? t : 0;
+  };
+  const nowMs = Date.now();
+
   if (leadIds.length > 0) {
     const { data: conversations, error: conversationsError } = await admin
       .from("atendimento_conversations")
@@ -158,13 +166,6 @@ export async function GET(req: Request) {
       });
     }
 
-    const parseStartAtMs = (value: unknown): number => {
-      const raw = String(value ?? "").trim();
-      if (!raw) return 0;
-      const t = new Date(raw).getTime();
-      return Number.isFinite(t) && t > 0 ? t : 0;
-    };
-    const nowMs = Date.now();
     for (const booking of bookings ?? []) {
       const leadId = String((booking as any)?.lead_id ?? "");
       const status = String((booking as any)?.status ?? "").trim().toLowerCase();
