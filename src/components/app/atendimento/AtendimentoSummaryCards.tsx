@@ -1915,6 +1915,19 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
     const hasExpTime = Boolean(expDraftTime);
 
     if (activeSection !== "agendamentos") {
+      if (activeSection === "contratos") {
+        const signedAt = String((lead as any)?.contract_signed_at ?? "").trim();
+        if (signedAt) {
+          const dt = formatAtendimentoDateTime(signedAt);
+          return dt ? `Criado em: ${dt}` : "";
+        }
+        const status = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+        if (status && status !== "nao_iniciado") {
+          const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
+          return rawDt ? `Criado em: ${rawDt}` : "";
+        }
+        return "";
+      }
       const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
       return rawDt ? `Criado em: ${rawDt}` : "";
     }
