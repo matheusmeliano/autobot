@@ -991,7 +991,7 @@ export default function CadastroRecorrenteBody() {
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-slate-800 mb-2">
-                    E-mail (identificador: seu WhatsApp)
+                    E-mail (seu WhatsApp)
                   </label>
                   <input
                     type="text"
