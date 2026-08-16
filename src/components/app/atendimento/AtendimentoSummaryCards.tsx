@@ -2015,7 +2015,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                         const cityRaw = String((lead as any)?.city ?? "").trim();
                         if (stateRaw && cityRaw) return null;
                         return (
-                          <div className="mt-1 text-[11px] font-semibold text-amber-300">
+                          <div className="mt-1 text-xs text-[var(--app-text-55)]">
                             Falta estado e cidade
                           </div>
                         );
