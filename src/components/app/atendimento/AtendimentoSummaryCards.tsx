@@ -1875,7 +1875,9 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       lead.funnel_stage === "cadastro_recorrente_pendente_plataforma";
     if (isAlunoOrMatriculado) {
       if (!hasWeekdayOk || !hasTimeOk) {
-        return "Falta dia e horário recorrentes";
+        if (!hasWeekdayOk && !hasTimeOk) return "Falta dia e horário recorrentes";
+        if (!hasWeekdayOk) return "Falta dia recorrente";
+        return "Falta horário recorrente";
       }
       return "Falta contrato";
     }
@@ -1934,10 +1936,14 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
       Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim());
     if (isRecorrente && (!recWeekdayOk || !recTimeOk)) {
-      return "Falta dia e horário recorrentes";
+      if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
+      if (!recWeekdayOk) return "Falta dia recorrente";
+      return "Falta horário recorrente";
     }
     if (hasExpContext && (!hasExpDate || !hasExpTime)) {
-      return "Falta dia e horário";
+      if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
+      if (!hasExpDate) return "Falta dia";
+      return "Falta horário";
     }
     const rawDtAgend = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
     return rawDtAgend ? `Criado em: ${rawDtAgend}` : "";
@@ -2014,9 +2020,11 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                         const stateRaw = String((lead as any)?.state ?? "").trim();
                         const cityRaw = String((lead as any)?.city ?? "").trim();
                         if (stateRaw && cityRaw) return null;
+                        let label = "Falta estado e cidade";
+                        if (stateRaw && !cityRaw) label = "Falta cidade";
                         return (
                           <div className="mt-1 text-xs text-[var(--app-text-55)]">
-                            Falta estado e cidade
+                            {label}
                           </div>
                         );
                       })() : null}
