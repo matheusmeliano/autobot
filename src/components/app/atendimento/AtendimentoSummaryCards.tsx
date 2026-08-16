@@ -517,7 +517,7 @@ function ContractDetails({
               ) : null}
             </div>
 
-            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+            <div className="mt-4 grid min-w-0 gap-3">
               <Field
                 label="Data da formalização"
                 value={contractSignedAt ? formatAtendimentoDateTime(contractSignedAt) : null}
