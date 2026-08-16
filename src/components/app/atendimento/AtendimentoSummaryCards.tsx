@@ -401,6 +401,186 @@ function LeadDetails({
   );
 }
 
+function ContractDetails({
+  lead,
+}: {
+  lead: AtendimentoLeadListItem;
+}) {
+  const contractStatusRaw = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+  const contractPdfUrl = String((lead as any)?.contract_pdf_url ?? "").trim();
+  const contractSignedAt = String((lead as any)?.contract_signed_at ?? "").trim();
+  const legalRespName = String((lead as any)?.legal_responsible_name ?? "").trim();
+  const legalRespCpf = String((lead as any)?.legal_responsible_cpf ?? "").trim();
+  const hasContractSection = Boolean(
+    (contractStatusRaw && contractStatusRaw !== "nao_iniciado") ||
+    contractPdfUrl ||
+    legalRespName ||
+    legalRespCpf,
+  );
+
+  const contractStatusLabel = (() => {
+    switch (contractStatusRaw) {
+      case "coletando_dados": return "Coletando dados";
+      case "aguardando_aceite": return "Aguardando aceite";
+      case "assinado": return "Assinado";
+      case "rejeitado": return "Rejeitado";
+      case "nao_iniciado": return "";
+      default:
+        return contractStatusRaw
+          ? contractStatusRaw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+          : "";
+    }
+  })();
+  const contractStatusBadgeTone = (() => {
+    if (contractStatusRaw === "assinado") return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
+    if (contractStatusRaw === "aguardando_aceite") return "bg-amber-400/15 text-amber-100 border-amber-500/30";
+    if (contractStatusRaw === "rejeitado") return "bg-red-500/15 text-red-200 border-red-500/30";
+    if (contractStatusRaw === "coletando_dados") return "bg-sky-500/15 text-sky-200 border-sky-500/30";
+    return "bg-[var(--app-card)] text-[var(--app-text-70)] border-[var(--app-border)]";
+  })();
+  const contractDownloadHref = contractPdfUrl
+    ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(lead.full_name ?? lead.phone ?? lead.id).replace(/\s+/g, "_")}.pdf`)}`
+    : "";
+
+  const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+  const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+  const hasRecurring = recurringWeekdayOk && recurringTimeOk;
+
+  return (
+    <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
+      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
+        <div className="min-w-0 flex flex-1 flex-col gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div
+              className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
+              title={lead.full_name || lead.phone || "Contrato"}
+            >
+              {String(lead.full_name ?? "").trim() || lead.phone || "Contrato"}
+            </div>
+            {lead.phone ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const toCopy = String(lead.phone ?? "").trim();
+                  if (!toCopy) return;
+                  navigator.clipboard
+                    ?.writeText(toCopy)
+                    .then(() => modalToast.success("Telefone copiado para a área de transferência."))
+                    .catch(() => modalToast.error("Não foi possível copiar o telefone."));
+                }}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                title="Copiar telefone"
+              >
+                <Copy className="h-3.5 w-3.5 shrink-0" />
+                Copiar
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 space-y-4">
+        {hasRecurring ? (
+          <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
+              Plano vinculado
+            </div>
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field label="Plano" value="Aulas recorrentes · 1x por semana · 40 minutos" />
+              <Field label="Valor mensal" value="US$ 119,00" />
+              <Field
+                label="Dia da semana"
+                value={
+                  String(lead.recurring_class_weekday_label ?? "").trim() ||
+                  String(lead.recurring_class_weekday ?? "").trim() ||
+                  null
+                }
+              />
+              <Field
+                label="Horário fixo"
+                value={
+                  atendimentoTimeLabel(
+                    String(lead.recurring_class_lead_time ?? "").trim() ||
+                      String(lead.recurring_class_professor_time ?? "").trim() ||
+                      null,
+                  )
+                }
+              />
+              <Field label="Fuso horário" value={lead.timezone || ATENDIMENTO_PROFESSOR_TIME_ZONE} />
+              {String(lead.recurring_class_created_at ?? "").trim() ? (
+                <Field
+                  label="Cadastrado em"
+                  value={formatAtendimentoDateTime(String(lead.recurring_class_created_at ?? "").trim())}
+                />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {hasContractSection ? (
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Contrato de prestação de serviços
+                </div>
+                {contractStatusLabel ? (
+                  <div className="mt-2.5">
+                    <span className={["inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]", contractStatusBadgeTone].join(" ")}>
+                      {contractStatusRaw === "assinado" ? <Check className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+                      {contractStatusLabel}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+              {contractPdfUrl ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 min-[600px]:mt-0">
+                  <a
+                    href={contractDownloadHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
+                    title="Baixar contrato em PDF"
+                  >
+                    <Download className="h-4 w-4 shrink-0" />
+                    Baixar contrato em PDF
+                  </a>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field
+                label="Data da formalização"
+                value={contractSignedAt ? formatAtendimentoDateTime(contractSignedAt) : null}
+              />
+              {legalRespName ? (
+                <Field label="Responsável legal" value={legalRespName} copyable />
+              ) : null}
+              {legalRespCpf ? (
+                <Field label="CPF do responsável" value={formatCpf(legalRespCpf)} copyable copyValue={digitsOnly(legalRespCpf)} />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {!hasContractSection ? (
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-6 text-center">
+            <FileText className="mx-auto h-8 w-8 shrink-0 text-[var(--app-text-45)]" />
+            <div className="mt-3 text-sm font-semibold text-[var(--app-text-85)]">
+              Nenhum contrato encontrado para este aluno
+            </div>
+            <div className="mt-1.5 text-xs text-[var(--app-text-45)] leading-relaxed">
+              Os dados do contrato aparecerão aqui assim que o processo de formalização for iniciado.
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function BookingDetails({
   lead,
   cancellingBookingId,
@@ -1834,6 +2014,8 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                   onSendStudentNotification={handleSendStudentNotification}
                   onSaveRecurringLink={handleSaveRecurringLink}
                 />
+              ) : activeSection === "contratos" ? (
+                <ContractDetails lead={selectedLead} />
               ) : (
                 <LeadDetails
                   lead={selectedLead}
@@ -1913,6 +2095,8 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                       onSendStudentNotification={handleSendStudentNotification}
                       onSaveRecurringLink={handleSaveRecurringLink}
                     />
+                  ) : activeSection === "contratos" ? (
+                    <ContractDetails lead={selectedLead} />
                   ) : (
                     <LeadDetails
                       lead={selectedLead}
