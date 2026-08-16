@@ -1938,6 +1938,21 @@ export default function CadastroRecorrenteBody() {
                     ))}
                   </div>
 
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5 sm:p-6 text-left space-y-2 max-w-2xl mx-auto">
+                    <p className="text-sm sm:text-base text-sky-900 leading-relaxed">
+                      <span className="inline-flex items-center gap-1.5 font-black uppercase tracking-wider text-xs sm:text-sm text-sky-700 mb-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Recomendado
+                      </span>
+                      <strong className="font-bold block">Preferencialmente, utilize ACH Transfer para realizar o pagamento.</strong>
+                    </p>
+                    <p className="text-xs sm:text-sm text-sky-800/90 leading-relaxed">
+                      Transferências ACH são processadas em dólares americanos diretamente entre contas bancárias dos EUA, com tarifas menores e liberação mais rápida.
+                    </p>
+                  </div>
+
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6 text-left space-y-2 max-w-2xl mx-auto">
                     <p className="text-sm sm:text-base text-slate-700 leading-relaxed">
                       <strong className="font-bold">Após efetuar o depósito/transferência:</strong> retorne a esta página e clique em <strong className="underline">Finalizar matrícula</strong> abaixo.
