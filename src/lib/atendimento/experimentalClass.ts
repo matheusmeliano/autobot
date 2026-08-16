@@ -1118,3 +1118,91 @@ export function calculateNextRecurringOccurrence(params: {
   }
   return null;
 }
+
+export function calculatePastRecurringOccurrences(params: {
+  weekday: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  professorTimeHHMM: string;
+  professorTimeZone?: string | null;
+  leadTimeZone?: string | null;
+  fromDate?: Date | string | null;
+  toDate?: Date;
+}) {
+  const wantWeekday = String(params.weekday ?? "").trim().toLowerCase();
+  if (!wantWeekday) return [];
+  const time = String(params.professorTimeHHMM ?? "").trim();
+  if (!/^\d{2}:\d{2}$/.test(time)) return [];
+  const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
+  const to = params.toDate ?? new Date();
+
+  let fromMs: number;
+  if (params.fromDate && String(params.fromDate).trim()) {
+    const rawMs = new Date(params.fromDate).getTime();
+    fromMs = Number.isFinite(rawMs) ? rawMs : to.getTime() - 365 * 24 * 60 * 60 * 1000;
+  } else {
+    fromMs = to.getTime() - 365 * 24 * 60 * 60 * 1000;
+  }
+
+  const toLocal = localDateInTimeZone(to, profTz);
+  let scanLocal = localDateInTimeZone(new Date(fromMs), profTz);
+
+  const ptbrLabels: Record<string, string> = {
+    mon: "Segunda-feira",
+    tue: "Terça-feira",
+    wed: "Quarta-feira",
+    thu: "Quinta-feira",
+    fri: "Sexta-feira",
+    sat: "Sábado",
+    sun: "Domingo",
+  };
+
+  const results: Array<{
+    professorDate: string;
+    professorTime: string;
+    professorTimeZone: string;
+    professorStartAt: string;
+    leadDate: string;
+    leadTime: string;
+    leadStartAt: string;
+    leadTimeZone: string;
+    weekdayLabel: string;
+  }> = [];
+
+  for (let safety = 0; safety < 1200; safety++) {
+    if (scanLocal > toLocal) break;
+    const noonUtc = zonedDateTimeToUtcIso({
+      date: scanLocal,
+      time: "12:00",
+      timeZone: profTz,
+    });
+    const candidateWeekday = weekdayInTimeZone(noonUtc, profTz).toLowerCase();
+    if (candidateWeekday === wantWeekday) {
+      const startUtcIso = zonedDateTimeToUtcIso({
+        date: scanLocal,
+        time,
+        timeZone: profTz,
+      });
+      const startUtcMs = new Date(startUtcIso).getTime();
+      if (Number.isFinite(startUtcMs) && startUtcMs < to.getTime()) {
+        results.push({
+          professorDate: scanLocal,
+          professorTime: time,
+          professorTimeZone: profTz,
+          professorStartAt: startUtcIso,
+          leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
+          leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
+          leadStartAt: startUtcIso,
+          leadTimeZone: leadTz,
+          weekdayLabel:
+            (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)?.[wantWeekday] ??
+            ptbrLabels[wantWeekday] ??
+            wantWeekday.toUpperCase(),
+        });
+      }
+    }
+    scanLocal = addDaysToLocalDate(scanLocal, 1);
+  }
+
+  results.sort((a, b) => new Date(b.professorStartAt).getTime() - new Date(a.professorStartAt).getTime());
+  return results;
+}

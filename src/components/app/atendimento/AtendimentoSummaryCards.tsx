@@ -10,6 +10,7 @@ import {
   deriveExperimentalClassBookingDisplayStatus,
   experimentalClassBookingDisplayStatusLabel,
   calculateNextRecurringOccurrence,
+  calculatePastRecurringOccurrences,
 } from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime, formatAtendimentoLocationName } from "@/lib/atendimento/utils";
@@ -657,6 +658,34 @@ function BookingDetails({
           leadTimeZone: lead.timezone || null,
         })
       : null;
+  const pastRecurringOccurrences = useMemo(() => {
+    if (!hasRecurringClass || !recurringWeekday || !/^\d{2}:\d{2}$/.test(recurringTime)) return [];
+    return calculatePastRecurringOccurrences({
+      weekday: recurringWeekday,
+      professorTimeHHMM: recurringTime,
+      professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      leadTimeZone: lead.timezone || null,
+      fromDate: String((lead as any).recurring_class_created_at ?? lead.created_at ?? "").trim(),
+    });
+  }, [
+    hasRecurringClass,
+    recurringWeekday,
+    recurringTime,
+    lead.timezone,
+    (lead as any).recurring_class_created_at,
+    lead.created_at,
+  ]);
+  const PAST_RECURRING_PAGE_SIZE = 5;
+  const [pastRecurringPage, setPastRecurringPage] = useState(1);
+  useEffect(() => {
+    setPastRecurringPage(1);
+  }, [lead.id]);
+  const pastRecurringTotalPages = Math.max(1, Math.ceil(pastRecurringOccurrences.length / PAST_RECURRING_PAGE_SIZE));
+  const pastRecurringPageSafe = Math.min(pastRecurringPage, pastRecurringTotalPages);
+  const pastRecurringPaged = useMemo(() => {
+    const start = (pastRecurringPageSafe - 1) * PAST_RECURRING_PAGE_SIZE;
+    return pastRecurringOccurrences.slice(start, start + PAST_RECURRING_PAGE_SIZE);
+  }, [pastRecurringOccurrences, pastRecurringPageSafe]);
   const recurringStatusLabel = String(lead.recurring_class_status ?? "").trim()
     ? String(lead.recurring_class_status ?? "")
         .toLowerCase()
@@ -819,6 +848,64 @@ function BookingDetails({
                 </button>
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {pastRecurringPaged.length ? (
+          <div className="mt-4 space-y-3">
+            {pastRecurringPaged.map((occ) => {
+              return (
+                <div
+                  key={occ.professorStartAt}
+                  className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4"
+                >
+                  <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                      Aula recorrente
+                    </div>
+                    <div className="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-emerald-500/15 text-emerald-200">
+                      Concluído
+                    </div>
+                  </div>
+                  <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+                    <Field
+                      label="Dia"
+                      value={formatAtendimentoDate(occ.professorDate)}
+                    />
+                    <Field
+                      label="Horário"
+                      value={atendimentoTimeLabel(occ.professorTime)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+
+            {pastRecurringOccurrences.length > PAST_RECURRING_PAGE_SIZE ? (
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  {pastRecurringPageSafe}/{pastRecurringTotalPages}
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setPastRecurringPage((p) => Math.max(1, p - 1))}
+                    disabled={pastRecurringPageSafe <= 1}
+                    className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPastRecurringPage((p) => Math.min(pastRecurringTotalPages, p + 1))}
+                    disabled={pastRecurringPageSafe >= pastRecurringTotalPages}
+                    className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Próximo
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
