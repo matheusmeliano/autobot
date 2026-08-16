@@ -500,14 +500,6 @@ function ContractDetails({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                   Contrato de prestação de serviços
                 </div>
-                {contractStatusLabel ? (
-                  <div className="mt-2.5">
-                    <span className={["inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]", contractStatusBadgeTone].join(" ")}>
-                      {contractStatusRaw === "assinado" ? <Check className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
-                      {contractStatusLabel}
-                    </span>
-                  </div>
-                ) : null}
               </div>
               {contractPdfUrl ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2 min-[600px]:mt-0">
