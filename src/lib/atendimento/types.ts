@@ -128,6 +128,8 @@ export type AtendimentoLeadListItem = AtendimentoLead & {
   last_message: AtendimentoMessage | null;
   experimental_class_booking: AtendimentoExperimentalClassBookingSummary | null;
   latest_experimental_class_booking?: AtendimentoExperimentalClassBookingSummary | null;
+  future_experimental_class_booking?: AtendimentoExperimentalClassBookingSummary | null;
+  latest_past_class_meta?: { date: string; time: string; startAtMs: number } | null;
   latest_experimental_class_cancelled_at: string | null;
   latest_experimental_class_event: string | null;
 };

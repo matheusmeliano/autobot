@@ -1919,35 +1919,44 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       return rawDt ? `Criado em: ${rawDt}` : "";
     }
 
+    const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+    const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+    const recTimeOk =
+      Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+      Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+    const hasRecurringOk = recWeekdayOk && recTimeOk;
+
+    const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
+    const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
+    const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
+    if (!hasRecurringOk && hasFutureExp) {
+      const dateLabel = formatAtendimentoDate(futureExp?.lead_date || futureExp?.professor_date);
+      const timeLabel = String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim();
+      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
+      return body ? `Aula em: ${body}` : "";
+    }
+
+    const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
+    if (pastMeta) {
+      const dateLabel = formatAtendimentoDate(String((pastMeta as any).date ?? ""));
+      const timeLabel = String((pastMeta as any).time ?? "").trim();
+      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
+      return body ? `Última aula em: ${body}` : "";
+    }
+
     const hasBook = Boolean(
       booking &&
         bookingHasId &&
         bookingIsNotDraft &&
         bookingStatus !== "cancelled",
     );
-    const latestBooking = (lead as any)?.latest_experimental_class_booking ?? null;
-    const latestBookingStatus = String(latestBooking?.status ?? "").trim().toLowerCase();
-    const latestBookingHasId = Boolean(String(latestBooking?.id ?? "").trim());
-    const hasLatestBook = Boolean(
-      latestBooking &&
-        latestBookingStatus !== "cancelled",
-    );
-    if (hasLatestBook) {
-      const dateLabel = formatAtendimentoDate(latestBooking?.lead_date || latestBooking?.professor_date);
-      const timeLabel = String(latestBooking?.lead_time ?? latestBooking?.professor_time ?? "").trim();
-      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-      return body ? `Última aula em: ${body}` : "";
-    }
     if (hasBook) {
       const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
       const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-      return body ? `Última aula em: ${body}` : "";
+      const prefix = hasRecurringOk ? "Última aula em:" : "Aula em:";
+      return body ? `${prefix} ${body}` : "";
     }
-    const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
-    const recTimeOk =
-      Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-      Boolean(String(lead.recurring_class_lead_time ?? "").trim());
     const recBothOk = recWeekdayOk && recTimeOk;
     if (recBothOk || hasRecurring) {
       return "Falta contrato";

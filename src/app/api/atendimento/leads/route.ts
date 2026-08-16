@@ -1,6 +1,7 @@
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, isZapiInternalBlocklistedPhone } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
 import {
   loadHiddenWhatsAppPhoneBlocklist,
   phoneIsInHiddenBrazilianBlocklist,
@@ -78,6 +79,7 @@ export async function GET(req: Request) {
   const conversationsByLeadId = new Map<string, any>();
   const bookingsByLeadId = new Map<string, any>();
   const latestBookingByLeadId = new Map<string, any>();
+  const futureExperimentalBookingByLeadId = new Map<string, any>();
   const cancelledLeadBookingIds = new Set<string>();
   const cancelledByHistoryLeadIds = new Set<string>();
   const cancelledAtByLeadId = new Map<string, string>();
@@ -162,6 +164,7 @@ export async function GET(req: Request) {
       const t = new Date(raw).getTime();
       return Number.isFinite(t) && t > 0 ? t : 0;
     };
+    const nowMs = Date.now();
     for (const booking of bookings ?? []) {
       const leadId = String((booking as any)?.lead_id ?? "");
       const status = String((booking as any)?.status ?? "").trim().toLowerCase();
@@ -182,7 +185,18 @@ export async function GET(req: Request) {
       const currentMs = current
         ? parseStartAtMs(current.professor_start_at || current.lead_start_at)
         : 0;
-      if (candidateMs > currentMs) latestBookingByLeadId.set(leadId, candidate);
+      if (candidateMs > 0 && candidateMs < nowMs && candidateMs > currentMs) {
+        latestBookingByLeadId.set(leadId, candidate);
+      }
+      if (candidateMs >= nowMs) {
+        const curFuture = futureExperimentalBookingByLeadId.get(leadId);
+        const curFutureMs = curFuture
+          ? parseStartAtMs(curFuture.professor_start_at || curFuture.lead_start_at)
+          : 0;
+        if (curFutureMs <= 0 || (candidateMs > 0 && candidateMs < curFutureMs)) {
+          futureExperimentalBookingByLeadId.set(leadId, candidate);
+        }
+      }
     }
   }
 
@@ -311,7 +325,23 @@ export async function GET(req: Request) {
                 return Number.isFinite(t) && t > 0 ? t : 0;
               })()
             : 0;
-          if (cMs > curMs) latestBookingByLeadId.set(leadId, historyCandidate);
+          if (cMs > 0 && cMs < nowMs && cMs > curMs) {
+            latestBookingByLeadId.set(leadId, historyCandidate);
+          }
+          if (cMs >= nowMs) {
+            const curFuture = futureExperimentalBookingByLeadId.get(leadId);
+            const curFutureMs = curFuture
+              ? (() => {
+                  const v = String(curFuture.professor_start_at || curFuture.lead_start_at ?? "").trim();
+                  if (!v) return 0;
+                  const t = new Date(v).getTime();
+                  return Number.isFinite(t) && t > 0 ? t : 0;
+                })()
+              : 0;
+            if (curFutureMs <= 0 || (cMs > 0 && cMs < curFutureMs)) {
+              futureExperimentalBookingByLeadId.set(leadId, historyCandidate);
+            }
+          }
         }
       }
 
@@ -479,6 +509,65 @@ export async function GET(req: Request) {
             } as any)
           : null;
 
+      const futureExpBooking = futureExperimentalBookingByLeadId.get(leadId) ?? null;
+      const latestPastExpBooking = latestBookingByLeadId.get(leadId) ?? null;
+      const recWeekdayRaw = String((row as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
+      const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+      const recTimeOk =
+        Boolean(String((row as any)?.recurring_class_professor_time ?? "").trim()) ||
+        Boolean(String((row as any)?.recurring_class_lead_time ?? "").trim());
+
+      let latestPastClassMeta: { date: string; time: string; startAtMs: number } | null = null;
+      if (recWeekdayOk && recTimeOk) {
+        try {
+          const recOcc = calculatePastRecurringOccurrences({
+            weekday: recWeekdayRaw as any,
+            professorTimeHHMM: String((row as any)?.recurring_class_professor_time ?? "").trim() || String((row as any)?.recurring_class_lead_time ?? "").trim(),
+            professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            leadTimeZone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            fromDate: String((row as any)?.recurring_class_created_at ?? row.created_at ?? "").trim(),
+          });
+          const lastRec = recOcc[0] ?? null;
+          const recMs = lastRec ? Number(lastRec.professorStartAt ?? 0) : 0;
+          const expMs = latestPastExpBooking
+            ? parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at)
+            : 0;
+          if (recMs > 0 && recMs >= expMs && lastRec) {
+            latestPastClassMeta = {
+              date: String(lastRec.professorDate ?? ""),
+              time: String(lastRec.professorTime ?? ""),
+              startAtMs: recMs,
+            };
+          } else if (expMs > 0 && latestPastExpBooking) {
+            latestPastClassMeta = {
+              date: String(latestPastExpBooking.professor_date ?? latestPastExpBooking.lead_date ?? ""),
+              time: String(latestPastExpBooking.professor_time ?? latestPastExpBooking.lead_time ?? ""),
+              startAtMs: expMs,
+            };
+          }
+        } catch {
+          const expMs = latestPastExpBooking
+            ? parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at)
+            : 0;
+          if (expMs > 0 && latestPastExpBooking) {
+            latestPastClassMeta = {
+              date: String(latestPastExpBooking.professor_date ?? latestPastExpBooking.lead_date ?? ""),
+              time: String(latestPastExpBooking.professor_time ?? latestPastExpBooking.lead_time ?? ""),
+              startAtMs: expMs,
+            };
+          }
+        }
+      } else if (latestPastExpBooking) {
+        const expMs = parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at);
+        if (expMs > 0) {
+          latestPastClassMeta = {
+            date: String(latestPastExpBooking.professor_date ?? latestPastExpBooking.lead_date ?? ""),
+            time: String(latestPastExpBooking.professor_time ?? latestPastExpBooking.lead_time ?? ""),
+            startAtMs: expMs,
+          };
+        }
+      }
+
       return {
         ...row,
         experimental_class_professor_date: mergedProfessorDate || null,
@@ -490,7 +579,9 @@ export async function GET(req: Request) {
         experimental_class_status: mergedStatus || null,
         conversation: conversationsByLeadId.get(leadId) ?? null,
         experimental_class_booking: bookingWithFallback,
-        latest_experimental_class_booking: latestBookingByLeadId.get(leadId) ?? null,
+        latest_experimental_class_booking: latestPastExpBooking,
+        future_experimental_class_booking: futureExpBooking,
+        latest_past_class_meta: latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAtByLeadId.get(leadId) ?? null,
         latest_experimental_class_event: latestClassEventByLeadId.get(leadId) ?? null,
       };
