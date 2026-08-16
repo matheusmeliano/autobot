@@ -330,91 +330,6 @@ function LeadDetails({
           </div>
         ) : null}
 
-        {hasRecurring ? (
-          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
-                Aula recorrente
-              </div>
-            </div>
-            <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2">
-              <Field
-                label="Dia da semana"
-                value={
-                  String(lead.recurring_class_weekday_label ?? "").trim() ||
-                  String(lead.recurring_class_weekday ?? "").trim() ||
-                  null
-                }
-              />
-              <Field
-                label="Horário fixo"
-                value={
-                  atendimentoTimeLabel(
-                    String(lead.recurring_class_lead_time ?? "").trim() ||
-                      String(lead.recurring_class_professor_time ?? "").trim() ||
-                      null,
-                  )
-                }
-              />
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  Link fixo das aulas
-                </div>
-                {canOpenRecurringLink ? (
-                  <a
-                    href={savedRecurringLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
-                    title="Abrir link da aula recorrente"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                    Abrir aula
-                  </a>
-                ) : null}
-              </div>
-
-              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
-                <div className="min-w-0 flex-1">
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                    URL da aula
-                  </label>
-                  <input
-                    type="url"
-                    inputMode="url"
-                    placeholder="https://meet.google.com/..."
-                    value={recurringLinkDraft}
-                    onChange={(e) => setRecurringLinkDraft(e.target.value)}
-                    className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={savingRecurringLink}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void onSaveRecurringLink(lead, recurringLinkDraft)}
-                  disabled={savingRecurringLink || !recurringLinkChanged}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {savingRecurringLink ? (
-                    <>
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 shrink-0" />
-                      {savedRecurringLink ? "Atualizar" : "Salvar"}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         {showDraftSection ? (
           <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
@@ -712,6 +627,91 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
+        {hasRecurringClass ? (
+          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+                Aula recorrente
+              </div>
+            </div>
+            <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2">
+              <Field
+                label="Dia da semana"
+                value={
+                  String(lead.recurring_class_weekday_label ?? "").trim() ||
+                  String(lead.recurring_class_weekday ?? "").trim() ||
+                  null
+                }
+              />
+              <Field
+                label="Horário fixo"
+                value={
+                  atendimentoTimeLabel(
+                    String(lead.recurring_class_lead_time ?? "").trim() ||
+                      String(lead.recurring_class_professor_time ?? "").trim() ||
+                      null,
+                  )
+                }
+              />
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Link fixo das aulas
+                </div>
+                {canOpenSavedRecurringLink ? (
+                  <a
+                    href={savedRecurringLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
+                    title="Abrir link da aula recorrente"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    Abrir aula
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                    URL da aula
+                  </label>
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://meet.google.com/..."
+                    value={recurringLinkDraft}
+                    onChange={(e) => setRecurringLinkDraft(e.target.value)}
+                    className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={savingRecurringLink}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onSaveRecurringLink(lead, recurringLinkDraft)}
+                  disabled={savingRecurringLink || !recurringLinkChanged}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingRecurringLink ? (
+                    <>
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 shrink-0" />
+                      {savedRecurringLink ? "Atualizar" : "Salvar"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {showAttendanceCard ? (
           <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
