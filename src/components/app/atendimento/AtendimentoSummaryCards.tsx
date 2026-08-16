@@ -379,60 +379,6 @@ function LeadDetails({
           </div>
         ) : null}
 
-        {hasContractSection ? (
-          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  Contrato de prestação de serviços
-                </div>
-                {contractStatusLabel ? (
-                  <div className="mt-2.5">
-                    <span className={["inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]", contractStatusBadgeTone].join(" ")}>
-                      {contractStatusRaw === "assinado" ? <Check className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
-                      {contractStatusLabel}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-              {contractPdfUrl ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2 min-[600px]:mt-0">
-                  <a
-                    href={contractDownloadHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
-                    title="Baixar contrato em PDF"
-                  >
-                    <Download className="h-4 w-4 shrink-0" />
-                    Baixar contrato em PDF
-                  </a>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-              <Field
-                label="Data da formalização"
-                value={contractSignedAt ? formatAtendimentoDateTime(contractSignedAt) : null}
-              />
-              {legalRespName ? (
-                <Field
-                  label="Responsável legal"
-                  value={legalRespName}
-                  copyable
-                />
-              ) : null}
-              {legalRespCpf ? (
-                <Field
-                  label="CPF do responsável"
-                  value={legalRespCpf}
-                  copyable
-                />
-              ) : null}
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
