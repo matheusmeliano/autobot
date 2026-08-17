@@ -58,6 +58,39 @@ export async function POST(req: Request) {
     if (!lead?.id && telefone.length >= 10) {
       lead = await findLeadByPhone({ phone: telefone });
     }
+    if (!lead?.id && telefone.length >= 10) {
+      try {
+        function phoneCandidates(base: string): string[] {
+          const out = new Set<string>();
+          out.add(base);
+          if (base.startsWith("55") && base.length >= 12) out.add(base.slice(2));
+          else if (base.length >= 10 && !base.startsWith("55")) out.add(`55${base}`);
+          if (base.length === 10 && !base.startsWith("55")) {
+            const ddd = base.slice(0, 2); const rest = base.slice(2);
+            out.add(`${ddd}9${rest}`); out.add(`55${ddd}9${rest}`);
+          } else if (base.length === 11 && !base.startsWith("55") && base[2] === "9") {
+            const ddd = base.slice(0, 2); const rest = base.slice(3);
+            out.add(`${ddd}${rest}`); out.add(`55${ddd}${rest}`);
+          } else if (base.length === 13 && base.startsWith("55") && base[4] === "9") {
+            const ddd = base.slice(2, 4); const rest = base.slice(5);
+            out.add(`55${ddd}${rest}`); out.add(`${ddd}${rest}`);
+          } else if (base.length === 12 && base.startsWith("55")) {
+            const ddd = base.slice(2, 4); const rest = base.slice(4);
+            out.add(`55${ddd}9${rest}`); out.add(`${ddd}9${rest}`);
+          }
+          return Array.from(out);
+        }
+        const cands = phoneCandidates(telefone);
+        const { data: fbData } = await admin
+          .from("atendimento_leads")
+          .select("*")
+          .in("phone", cands)
+          .order("created_at", { ascending: false })
+          .limit(5)
+          .maybeSingle();
+        if (fbData && (fbData as any).id) lead = fbData as any;
+      } catch {}
+    }
     if (!lead?.id) {
       return Response.json({
         ok: false,

@@ -2619,12 +2619,79 @@ export async function findLeadByPhone(params: { phone: string; userId?: string |
   const normalizedSearch = normalizePhoneDigitsOnly(params.phone);
   if (!normalizedSearch) return null;
 
+  function phoneCandidates(base: string): string[] {
+    const out = new Set<string>();
+    out.add(base);
+    if (base.startsWith("55") && base.length >= 12) {
+      out.add(base.slice(2));
+    } else if (base.length >= 10 && !base.startsWith("55")) {
+      out.add(`55${base}`);
+    }
+    if (base.length === 10 && !base.startsWith("55")) {
+      const ddd = base.slice(0, 2);
+      const rest = base.slice(2);
+      out.add(`${ddd}9${rest}`);
+      out.add(`55${ddd}9${rest}`);
+    } else if (base.length === 11 && !base.startsWith("55") && base[2] === "9") {
+      const ddd = base.slice(0, 2);
+      const rest = base.slice(3);
+      out.add(`${ddd}${rest}`);
+      out.add(`55${ddd}${rest}`);
+    } else if (base.length === 13 && base.startsWith("55") && base[4] === "9") {
+      const ddd = base.slice(2, 4);
+      const rest = base.slice(5);
+      out.add(`55${ddd}${rest}`);
+      out.add(`${ddd}${rest}`);
+    } else if (base.length === 12 && base.startsWith("55")) {
+      const ddd = base.slice(2, 4);
+      const rest = base.slice(4);
+      out.add(`55${ddd}9${rest}`);
+      out.add(`${ddd}9${rest}`);
+    }
+    return Array.from(out);
+  }
+
+  const candidates = phoneCandidates(normalizedSearch);
+
+  const { data: byDirect } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .in("phone", candidates)
+    .order("created_at", { ascending: false })
+    .limit(10)
+    .maybeSingle();
+
+  if (byDirect && typeof (byDirect as any).id !== "undefined" && (byDirect as any).id) {
+    return byDirect as any;
+  }
+
+  const { data: byAll } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(300);
+
+  const rowsAll = (byAll ?? []) as any[];
+  for (const row of rowsAll) {
+    const storedNorm = normalizePhoneDigitsOnly(row?.phone);
+    if (!storedNorm) continue;
+    const rowCandidates = phoneCandidates(storedNorm);
+    if (rowCandidates.includes(normalizedSearch)) {
+      return row as any;
+    }
+    for (const cand of candidates) {
+      if (rowCandidates.includes(cand)) {
+        return row as any;
+      }
+    }
+  }
+
   const { data: byAssigned } = await admin
     .from("atendimento_leads")
     .select("*")
     .eq("assigned_user_email", ATENDIMENTO_EMAIL)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(300);
 
   const rows = (byAssigned ?? []) as any[];
   for (const row of rows) {
