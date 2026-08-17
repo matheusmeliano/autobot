@@ -1265,27 +1265,9 @@ export function inferCountry(
 
   if (!stateLow && !cityLow && !timezone) return null;
 
-  const brTz = [
-    "America/Sao_Paulo",
-    "America/Cuiaba",
-    "America/Porto_Velho",
-    "America/Boa_Vista",
-    "America/Manaus",
-    "America/Eirunepe",
-    "America/Rio_Branco",
-    "America/Recife",
-    "America/Bahia",
-    "America/Santarem",
-    "America/Campo_Grande",
-    "Brazil/East",
-    "Brazil/West",
-    "Brazil/Acre",
-    "Brazil/DeNoronha",
-  ];
-  if (timezone && brTz.includes(timezone)) return "Brasil";
-
-  if (stateLow && BRAZILIAN_STATE_KEYWORDS.has(stateLow)) return "Brasil";
-
+  // 1) PRIORIDADE MAXIMA: keywords explicitas de estado/cidade que o usuario digitou.
+  //    Isso vence de timezone default/professor (ex: Florida/Tampa deve ser EUA
+  //    mesmo se o timezone padrao do sistema for America/Cuiaba).
   const keywordMap: Array<[RegExp, string]> = [
     [/(florida|california|texas|new york|califórnia|nova york|washington|oregon|illinois|pennsylvania|nova jersey|georgia|ohio|michigan|carolina do norte|arizona|colorado|massachusetts|tennessee|nevada|virgínia|maryland|carolina do sul|kentucky|indiana|wisconsin|minnesota|missouri|maryland|iowa|arkansas|mississippi|nova hampshire|nebraska|virgínia ocidental|idaho|maine|montana|ri|delaware|dakota do sul|dakota do norte|alasca|wyoming|vermont|hawai|hawaii)/i, "Estados Unidos"],
     [/\b(fl|ca|tx|ny|wa|il|pa|nj|ga|oh|mi|nc|az|co|ma|tn|nv|va|md|sc|al|ky|or|ok|ct|ks|ut|ia|ar|ms|nh|ne|wv|id|me|mt|ri|de|sd|nd|ak|wy|vt|hi)\b/i, "Estados Unidos"],
@@ -1363,6 +1345,29 @@ export function inferCountry(
     if (stateLow && rx.test(stateLow)) return country;
     if (cityLow && rx.test(cityLow)) return country;
   }
+
+  // 2) Estados brasileiros por Set (nome oficial, sem acento, sigla 2 letras, DF)
+  if (stateLow && BRAZILIAN_STATE_KEYWORDS.has(stateLow)) return "Brasil";
+
+  // 3) Timezone -> Brasil primeiro, depois regional tail
+  const brTz = [
+    "America/Sao_Paulo",
+    "America/Cuiaba",
+    "America/Porto_Velho",
+    "America/Boa_Vista",
+    "America/Manaus",
+    "America/Eirunepe",
+    "America/Rio_Branco",
+    "America/Recife",
+    "America/Bahia",
+    "America/Santarem",
+    "America/Campo_Grande",
+    "Brazil/East",
+    "Brazil/West",
+    "Brazil/Acre",
+    "Brazil/DeNoronha",
+  ];
+  if (timezone && brTz.includes(timezone)) return "Brasil";
 
   // Timezone -> fallback regional (mais largo). Ja deu preferencia para keywords/estados Brasil acima.
   if (timezone.startsWith("America/")) {
