@@ -1209,7 +1209,7 @@ export default function CadastroRecorrenteBody() {
               </div>
               {availableTimesForSelected.length === 0 && (
                 <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5 text-amber-800">
-                  Nenhum horário disponível nesse dia. Volte e escolha outro dia.
+                  Houve uma falha no carregamento ou não há dados disponíveis para a opção escolhida. Volte uma etapa e tente novamente.
                 </div>
               )}
               {availableTimesForSelected.length > 0 && (
