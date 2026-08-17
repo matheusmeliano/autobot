@@ -98,6 +98,7 @@ export default function CadastroRecorrenteBody() {
   const sp = useSearchParams();
   const initialNameParam = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
   const initialPhoneParam = decodeURIComponent(String(sp.get("telefone") ?? "").trim()) || "";
+  const initialLeadIdParam = String(sp.get("id") ?? "").trim() || "";
 
   function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
     if (raw === null || raw === undefined) return fallback;
@@ -681,6 +682,8 @@ export default function CadastroRecorrenteBody() {
                 cpf?: string | null;
                 legal_responsible_name?: string | null;
                 legal_responsible_cpf?: string | null;
+                contract_pdf_url?: string | null;
+                contract_signed_at?: string | null;
               } | null;
               progress?: {
                 step?: number | null;
@@ -749,6 +752,15 @@ export default function CadastroRecorrenteBody() {
           if (restoredLegalCpf) {
             setLastSavedFieldValues((prev) => ({ ...prev, legal_responsible_cpf: restoredLegalCpf! }));
             setContractSnapshot((prev) => ({ ...prev, legal_responsible_cpf: restoredLegalCpf! }));
+          }
+
+          const restoredContractPdfUrl = typeof (json.lead as any)?.contract_pdf_url === "string" ? String((json.lead as any).contract_pdf_url).trim() : "";
+          const restoredContractSignedAt = typeof (json.lead as any)?.contract_signed_at === "string" ? String((json.lead as any).contract_signed_at).trim() : "";
+          if (restoredContractPdfUrl) {
+            setContractPdfUrl(restoredContractPdfUrl);
+          }
+          if (restoredContractSignedAt) {
+            setContractSignedAt(restoredContractSignedAt);
           }
         } else {
           if (initialNameParam) {

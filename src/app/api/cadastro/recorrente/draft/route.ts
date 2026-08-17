@@ -127,6 +127,8 @@ export async function GET(req: NextRequest) {
         cpf: readStr("cpf"),
         legal_responsible_name: readStr("legal_responsible_name"),
         legal_responsible_cpf: readStr("legal_responsible_cpf"),
+        contract_pdf_url: readStr("contract_pdf_url"),
+        contract_signed_at: readStr("contract_signed_at"),
       },
       progress: {
         step: parsedStep,
