@@ -8,7 +8,6 @@ import {
   CONTRACT_OPTIONAL_FIELDS,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
 } from "./constants.ts";
-import { parseStateCityCombined } from "@/lib/timezone";
 import type { AtendimentoLead, AtendimentoStage, AtendimentoStatus, CapturedFieldName } from "./types.ts";
 
 export type ContractFieldName = (typeof CONTRACT_FIELD_ORDER)[number];
@@ -76,21 +75,13 @@ export function filterCapturedDataForLead(params: {
   expectedField: CapturedFieldName | null;
 }) {
   const next: CapturedData = {};
-  const expectedIsLocation = params.expectedField === "state" || params.expectedField === "city";
 
   for (const field of CAPTURED_FIELD_ORDER) {
     const value = String(params.captured[field] ?? "").trim();
     if (!value) continue;
 
     const currentValue = String((params.lead as any)?.[field] ?? "").trim();
-    const fieldIsLocation = field === "state" || field === "city";
-    if (currentValue && params.expectedField !== field) {
-      if (expectedIsLocation && fieldIsLocation) {
-        // permite sobrescrever/registrar cidade durante etapa de estado e vice-versa
-      } else {
-        continue;
-      }
-    }
+    if (currentValue && params.expectedField !== field) continue;
 
     next[field] = value;
   }
@@ -122,7 +113,7 @@ export function fieldFromBotPrompt(promptText: unknown): CapturedFieldName | nul
   return null;
 }
 
-export function extractLeadDataFromMessage(text: string, opts?: { phone?: string | null }): CapturedData {
+export function extractLeadDataFromMessage(text: string): CapturedData {
   const clean = text.trim();
   if (!clean) return {};
 
@@ -140,12 +131,6 @@ export function extractLeadDataFromMessage(text: string, opts?: { phone?: string
     looksLikeFullName(clean)
   ) {
     result.full_name = clean.replace(/\s+/g, " ").trim();
-  }
-
-  if (!result.state || !result.city) {
-    const locationCombo = parseStateCityCombined(clean, { phone: opts?.phone ?? null });
-    if (locationCombo?.state && !result.state) result.state = locationCombo.state;
-    if (locationCombo?.city && !result.city) result.city = locationCombo.city;
   }
 
   return result;

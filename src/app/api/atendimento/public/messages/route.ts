@@ -56,7 +56,7 @@ import {
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
-import { parseStateCityCombined, resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/lib/timezone";
+import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/lib/timezone";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
@@ -329,11 +329,10 @@ function looksLikeFieldValue(field: CapturedFieldName, text: string) {
 function buildLeadLocationContext(params: {
   captured: Record<string, string>;
   leadState?: string | null;
-  leadCity?: string | null;
   phone?: string | null;
 }) {
   const state = String(params.captured.state ?? params.leadState ?? "").trim();
-  const city = String(params.captured.city ?? params.leadCity ?? "").trim();
+  const city = String(params.captured.city ?? "").trim();
   if (!city) {
     const normalizedState = state.replace(/\s+/g, " ").trim();
     return {
@@ -944,24 +943,10 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: inboundError?.message ?? "message_error" }, { status: 500 });
   }
 
-  const extracted = extractLeadDataFromMessage(contentText, {
-    phone: String((lead as any)?.phone ?? "").trim() || null,
-  }) as Record<string, string>;
+  const extracted = extractLeadDataFromMessage(contentText) as Record<string, string>;
   const isAwaitingPhoneConfirmation =
     String(lastBotMessage?.content_text ?? "").trim() === PHONE_CONFIRMATION_PROMPT_MESSAGE;
   const expectedField = inferExpectedFieldFromBotMessage(lastBotMessage?.content_text ?? "") ?? getNextMissingField(lead as any);
-  const isLocationPrompt = expectedField === "state" || expectedField === "city";
-  if (
-    isLocationPrompt &&
-    (!extracted.state || !extracted.city)
-  ) {
-    const phoneForParsing = String((lead as any)?.phone ?? "").trim() || null;
-    const combo = parseStateCityCombined(contentText, { phone: phoneForParsing });
-    if (combo) {
-      if (combo.state && !extracted.state) extracted.state = combo.state;
-      if (combo.city && !extracted.city) extracted.city = combo.city;
-    }
-  }
   if (
     expectedField &&
     !extracted[expectedField] &&
@@ -969,14 +954,6 @@ export async function POST(req: Request) {
     looksLikeFieldValue(expectedField, contentText)
   ) {
     extracted[expectedField] = contentText.trim();
-    if (isLocationPrompt) {
-      const phoneForParsing = String((lead as any)?.phone ?? "").trim() || null;
-      const combo = parseStateCityCombined(contentText, { phone: phoneForParsing });
-      if (combo) {
-        if (combo.state && !extracted.state) extracted.state = combo.state;
-        if (combo.city && !extracted.city) extracted.city = combo.city;
-      }
-    }
   }
   const captured = filterCapturedDataForLead({
     lead: lead as any,
@@ -2037,7 +2014,7 @@ export async function POST(req: Request) {
   if (locationValidationField) {
     const phoneForLocationValidation = String(captured.phone ?? (lead as any)?.phone ?? "").trim() || null;
     const currentState = String(captured.state ?? (lead as any)?.state ?? "").trim();
-    const currentCity = String(captured.city ?? (lead as any)?.city ?? "").trim();
+    const currentCity = String(captured.city ?? "").trim();
 
     const stateResolution = currentState
       ? resolveTimeZoneFromStateInput({
@@ -2045,20 +2022,18 @@ export async function POST(req: Request) {
           phone: phoneForLocationValidation,
         })
       : null;
-    const cityResolution = currentCity
-      ? resolveTimeZoneFromCityInput({
-          city: currentCity,
-          state: currentState,
-          phone: phoneForLocationValidation,
-          allowPhoneCountryFallback: false,
-        })
-      : null;
+    const cityResolution =
+      locationValidationField === "city" && currentCity
+        ? resolveTimeZoneFromCityInput({
+            city: currentCity,
+            state: currentState,
+            phone: phoneForLocationValidation,
+            allowPhoneCountryFallback: false,
+          })
+        : null;
 
     const locationValidationPassed =
-      locationValidationField === "state"
-        ? Boolean(stateResolution)
-        : Boolean(cityResolution);
-    const bothCapturedValid = Boolean(currentState && currentCity && stateResolution && cityResolution);
+      locationValidationField === "state" ? Boolean(stateResolution) : Boolean(cityResolution);
 
     if (!locationValidationPassed) {
       const nextFailureAttempt =
@@ -2698,7 +2673,6 @@ export async function POST(req: Request) {
   const locationContext = buildLeadLocationContext({
     captured,
     leadState: String((lead as any)?.state ?? "").trim() || null,
-    leadCity: String((lead as any)?.city ?? "").trim() || null,
     phone: String(captured.phone ?? (lead as any)?.phone ?? "").trim() || null,
   });
   const persistedLeadValues = locationContext.leadPatch;
