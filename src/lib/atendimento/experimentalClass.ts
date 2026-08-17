@@ -969,27 +969,21 @@ export function listRecurringWeekdayAvailability(params: {
       const comboKey = `${weekday}|${professorTime}`;
       if (blockedCombos.has(comboKey)) continue;
 
-      const nextMonday = (() => {
-        const base = new Date(now);
-        const dow = base.getUTCDay();
-        const diff = (dow + 6) % 7;
-        const d = new Date(base.getTime() - diff * 24 * 60 * 60 * 1000);
-        return d;
-      })();
-      const weekdayOffset = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5 }[weekday];
-      const sampleDate = new Date(nextMonday.getTime() + weekdayOffset * 24 * 60 * 60 * 1000);
-      const localDate = localDateInTimeZone(sampleDate, ATENDIMENTO_PROFESSOR_TIME_ZONE);
-      const sampleStartAt = zonedDateTimeToUtcIso({
-        date: localDate,
-        time: professorTime,
-        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      const nextOccurrence = calculateNextRecurringOccurrence({
+        weekday,
+        professorTimeHHMM: professorTime,
+        professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        leadTimeZone,
+        fromDate: now,
       });
+      if (!nextOccurrence) continue;
+
       slots.push({
         id: `${weekday}|${professorTime}`,
         weekday,
         professorTime,
-        leadTime: formatTimeInTimeZone(sampleStartAt, leadTimeZone),
-        displayLabel: formatTimeInTimeZone(sampleStartAt, leadTimeZone),
+        leadTime: formatTimeInTimeZone(nextOccurrence.professorStartAt, leadTimeZone),
+        displayLabel: formatTimeInTimeZone(nextOccurrence.professorStartAt, leadTimeZone),
       });
     }
     if (slots.length > 0) {
