@@ -76,13 +76,21 @@ export function filterCapturedDataForLead(params: {
   expectedField: CapturedFieldName | null;
 }) {
   const next: CapturedData = {};
+  const expectedIsLocation = params.expectedField === "state" || params.expectedField === "city";
 
   for (const field of CAPTURED_FIELD_ORDER) {
     const value = String(params.captured[field] ?? "").trim();
     if (!value) continue;
 
     const currentValue = String((params.lead as any)?.[field] ?? "").trim();
-    if (currentValue && params.expectedField !== field) continue;
+    const fieldIsLocation = field === "state" || field === "city";
+    if (currentValue && params.expectedField !== field) {
+      if (expectedIsLocation && fieldIsLocation) {
+        // permite sobrescrever/registrar cidade durante etapa de estado e vice-versa
+      } else {
+        continue;
+      }
+    }
 
     next[field] = value;
   }

@@ -329,10 +329,11 @@ function looksLikeFieldValue(field: CapturedFieldName, text: string) {
 function buildLeadLocationContext(params: {
   captured: Record<string, string>;
   leadState?: string | null;
+  leadCity?: string | null;
   phone?: string | null;
 }) {
   const state = String(params.captured.state ?? params.leadState ?? "").trim();
-  const city = String(params.captured.city ?? "").trim();
+  const city = String(params.captured.city ?? params.leadCity ?? "").trim();
   if (!city) {
     const normalizedState = state.replace(/\s+/g, " ").trim();
     return {
@@ -2036,7 +2037,7 @@ export async function POST(req: Request) {
   if (locationValidationField) {
     const phoneForLocationValidation = String(captured.phone ?? (lead as any)?.phone ?? "").trim() || null;
     const currentState = String(captured.state ?? (lead as any)?.state ?? "").trim();
-    const currentCity = String(captured.city ?? "").trim();
+    const currentCity = String(captured.city ?? (lead as any)?.city ?? "").trim();
 
     const stateResolution = currentState
       ? resolveTimeZoneFromStateInput({
@@ -2044,18 +2045,20 @@ export async function POST(req: Request) {
           phone: phoneForLocationValidation,
         })
       : null;
-    const cityResolution =
-      locationValidationField === "city" && currentCity
-        ? resolveTimeZoneFromCityInput({
-            city: currentCity,
-            state: currentState,
-            phone: phoneForLocationValidation,
-            allowPhoneCountryFallback: false,
-          })
-        : null;
+    const cityResolution = currentCity
+      ? resolveTimeZoneFromCityInput({
+          city: currentCity,
+          state: currentState,
+          phone: phoneForLocationValidation,
+          allowPhoneCountryFallback: false,
+        })
+      : null;
 
     const locationValidationPassed =
-      locationValidationField === "state" ? Boolean(stateResolution) : Boolean(cityResolution);
+      locationValidationField === "state"
+        ? Boolean(stateResolution)
+        : Boolean(cityResolution);
+    const bothCapturedValid = Boolean(currentState && currentCity && stateResolution && cityResolution);
 
     if (!locationValidationPassed) {
       const nextFailureAttempt =
@@ -2695,6 +2698,7 @@ export async function POST(req: Request) {
   const locationContext = buildLeadLocationContext({
     captured,
     leadState: String((lead as any)?.state ?? "").trim() || null,
+    leadCity: String((lead as any)?.city ?? "").trim() || null,
     phone: String(captured.phone ?? (lead as any)?.phone ?? "").trim() || null,
   });
   const persistedLeadValues = locationContext.leadPatch;
