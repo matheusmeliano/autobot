@@ -67,7 +67,13 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
-    const optional = CONTRACT_OPTIONAL_FIELDS.has(fieldName as any);
+    const hasLegalResponsibleNameBefore = Boolean(String(lead.legal_responsible_name ?? "").trim());
+    const dynamicOptionalFields: Set<string> = new Set(CONTRACT_OPTIONAL_FIELDS as unknown as Set<string>);
+    if (hasLegalResponsibleNameBefore) dynamicOptionalFields.delete("legal_responsible_cpf");
+    if (fieldName === "legal_responsible_name" && !skip && !normalizeContractFieldSkip(rawValue)) {
+      dynamicOptionalFields.delete("legal_responsible_cpf");
+    }
+    const optional = dynamicOptionalFields.has(fieldName as any);
     let valueToSave: string | null = null;
     let skipped = false;
 
@@ -201,6 +207,10 @@ export async function POST(req: Request) {
     );
     const nextField: ContractFieldName | null = pending[0] ?? null;
 
+    const hasLegalResponsibleNameAfter = Boolean(String(snapshot.legal_responsible_name ?? "").trim());
+    const finalOptionalFields: Set<string> = new Set(CONTRACT_OPTIONAL_FIELDS as unknown as Set<string>);
+    if (hasLegalResponsibleNameAfter) finalOptionalFields.delete("legal_responsible_cpf");
+
     return Response.json({
       ok: true,
       savedField: fieldName,
@@ -210,7 +220,7 @@ export async function POST(req: Request) {
       nextField,
       allFields: (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).map((name) => ({
         name,
-        optional: CONTRACT_OPTIONAL_FIELDS.has(name as any),
+        optional: finalOptionalFields.has(name as any),
         label: CONTRACT_FIELD_LABELS[name],
         currentValue: snapshot[name],
         alreadyFilled: Boolean(snapshot[name]),

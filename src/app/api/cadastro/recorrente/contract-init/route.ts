@@ -100,17 +100,21 @@ export async function POST(req: Request) {
     ) as unknown as ContractFieldName[];
     const next: ContractFieldName | null = pending[0] ?? null;
 
+    const hasLegalResponsibleName = Boolean(String(snapshot.legal_responsible_name ?? "").trim());
+    const dynamicOptionalFields: Set<string> = new Set(CONTRACT_OPTIONAL_FIELDS as unknown as Set<string>);
+    if (hasLegalResponsibleName) dynamicOptionalFields.delete("legal_responsible_cpf");
+
     return Response.json({
       ok: true,
       leadId: String(lead.id),
       snapshot,
       allFieldOrder: CONTRACT_FIELD_ORDER as unknown as ContractFieldName[],
-      optionalFields: Array.from(CONTRACT_OPTIONAL_FIELDS) as unknown as ContractFieldName[],
+      optionalFields: Array.from(dynamicOptionalFields) as unknown as ContractFieldName[],
       fieldLabels: CONTRACT_FIELD_LABELS,
       nextField: next,
       allFields: (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).map((name) => ({
         name,
-        optional: CONTRACT_OPTIONAL_FIELDS.has(name as any),
+        optional: dynamicOptionalFields.has(name as any),
         label: CONTRACT_FIELD_LABELS[name],
         currentValue: snapshot[name] === "" ? null : snapshot[name],
         alreadyFilled: snapshot[name] !== null,
