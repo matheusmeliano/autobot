@@ -45,8 +45,11 @@ type DraftPayload = {
   weekdayLabel?: string | null;
   professorTime?: string | null;
   leadTime?: string | null;
-  step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | null;
+  step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | null;
   password?: string | null;
+  state?: string | null;
+  city?: string | null;
+  timezone?: string | null;
 };
 
 export async function GET(req: NextRequest) {
@@ -111,8 +114,8 @@ export async function GET(req: NextRequest) {
     }
     const stepRaw = (data as any)?.recurring_registration_step;
     const parsedStep =
-      typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 11
-        ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11)
+      typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 12
+        ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12)
         : 0;
     const readStr = (key: string) => {
       const v = (data as any)?.[key];
@@ -129,6 +132,9 @@ export async function GET(req: NextRequest) {
         legal_responsible_cpf: readStr("legal_responsible_cpf"),
         contract_pdf_url: readStr("contract_pdf_url"),
         contract_signed_at: readStr("contract_signed_at"),
+        state: readStr("state"),
+        city: readStr("city"),
+        timezone: readStr("timezone"),
       },
       progress: {
         step: parsedStep,
@@ -153,7 +159,7 @@ export async function PATCH(req: NextRequest) {
     if (!rawBody || typeof rawBody !== "object") {
       return NextResponse.json({ ok: false, error: "Corpo inválido." }, { status: 400 });
     }
-    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password } =
+    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password, state, city, timezone } =
       rawBody as DraftPayload;
 
     const safePhoneDigits = String(telefone ?? "").replace(/\D/g, "").trim();
@@ -162,6 +168,9 @@ export async function PATCH(req: NextRequest) {
     }
 
     const safeNome = toNomeESobrenome(nome);
+    const safeState = String(state ?? "").trim();
+    const safeCity = String(city ?? "").trim();
+    const safeTimezone = String(timezone ?? "").trim();
 
     const safeWeekday = weekday ? String(weekday).trim().toLowerCase() : "";
     const validWeekday = safeWeekday && ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(safeWeekday)
@@ -173,7 +182,7 @@ export async function PATCH(req: NextRequest) {
     const hasAnyTime = Boolean(safeProfessorTime || safeLeadTime);
 
     const safeStepRaw =
-      typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 11 ? step : null;
+      typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 12 ? step : null;
 
     const safePassword =
       typeof password === "string" && password.trim().length >= 4 ? password.trim() : null;
@@ -183,7 +192,10 @@ export async function PATCH(req: NextRequest) {
       hasAnyTime ||
       Boolean(safeNome) ||
       safeStepRaw !== null ||
-      Boolean(safePassword);
+      Boolean(safePassword) ||
+      Boolean(safeState) ||
+      Boolean(safeCity) ||
+      Boolean(safeTimezone);
 
     if (!hasAnyPayload) {
       return NextResponse.json(
@@ -300,6 +312,15 @@ export async function PATCH(req: NextRequest) {
     if (safeNome) {
       patch.full_name = safeNome;
     }
+    if (safeState) {
+      patch.state = safeState;
+    }
+    if (safeCity) {
+      patch.city = safeCity;
+    }
+    if (safeTimezone) {
+      patch.timezone = safeTimezone;
+    }
 
     if (safeStepRaw !== null) {
       patch.recurring_registration_step = safeStepRaw;
@@ -371,6 +392,9 @@ export async function PATCH(req: NextRequest) {
         lead_time: (patch.recurring_class_lead_time as string) || null,
         step: safeStepRaw ?? null,
         has_password: Boolean(safePassword),
+        state: safeState || null,
+        city: safeCity || null,
+        timezone: safeTimezone || null,
       },
     });
   } catch (err) {

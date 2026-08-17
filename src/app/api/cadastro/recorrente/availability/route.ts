@@ -48,7 +48,9 @@ async function listBookedExperimental(admin: ReturnType<typeof createSupabaseAdm
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const tzRaw = String(searchParams.get("timezone") ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+    const tzLead = String(searchParams.get("lead_timezone") ?? "").trim();
+    const tzBrowser = String(searchParams.get("timezone") ?? "").trim();
+    const tzRaw = tzLead || tzBrowser || ATENDIMENTO_PROFESSOR_TIME_ZONE;
     const admin = createSupabaseAdminClient();
     const nowIso = new Date().toISOString();
     const bookedStarts = await listBookedExperimental(admin, nowIso);

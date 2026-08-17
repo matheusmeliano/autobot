@@ -179,11 +179,14 @@ export default function CadastroRecorrenteBody() {
     return s;
   }
 
-  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11>(0);
+  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>(0);
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>("");
   const [hasPasswordInitial, setHasPasswordInitial] = useState<boolean>(false);
+  const [stateField, setStateField] = useState<string>("");
+  const [cityField, setCityField] = useState<string>("");
+  const [leadTimezone, setLeadTimezone] = useState<string>("");
   const [initialDataLoading, setInitialDataLoading] = useState<boolean>(true);
   const [initialDataError, setInitialDataError] = useState<string>("");
   const [accessBlocked, setAccessBlocked] = useState<boolean>(false);
@@ -231,7 +234,7 @@ export default function CadastroRecorrenteBody() {
 
   useEffect(() => {
     if (!submitResult) return;
-    if (!(step >= 3 && step <= 8)) return;
+    if (!(step >= 4 && step <= 8)) return;
     if (contractAllFields.length > 0) return;
     const tel = phoneField.replace(/\D/g, "").trim();
     if (!tel || tel.length < 10) return;
@@ -268,8 +271,8 @@ export default function CadastroRecorrenteBody() {
           full_name: 0, cpf: 1, phone: 2, legal_responsible_name: 3, legal_responsible_cpf: 4,
         };
         let startIdx = 0;
-        if (step >= 3 && step <= 7) {
-          startIdx = step - 3;
+        if (step >= 4 && step <= 8) {
+          startIdx = step - 4;
         } else {
           startIdx = json.nextField && typeof fieldOrderMap[json.nextField] === "number"
             ? fieldOrderMap[json.nextField]
@@ -300,9 +303,9 @@ export default function CadastroRecorrenteBody() {
 
   useEffect(() => {
     if (contractAllFields.length === 0) return;
-    if (!(step >= 3 && step <= 7)) return;
-    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
-    const targetIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    if (!(step >= 4 && step <= 8)) return;
+    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
+    const targetIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
     const targetMeta = contractAllFields[targetIdx];
     if (targetMeta) {
       setContractCurrentFieldIdx(targetIdx);
@@ -321,24 +324,24 @@ export default function CadastroRecorrenteBody() {
   }, [step, contractAllFields, contractSnapshot, lastSavedFieldValues]);
 
   function contractFieldForStep(
-    s: 3 | 4 | 5 | 6 | 7,
+    s: 4 | 5 | 6 | 7 | 8,
   ): { stepLabel: string; stepIdx: number } {
-    const map: Record<3 | 4 | 5 | 6 | 7, { stepLabel: string; stepIdx: number }> = {
-      3: { stepLabel: "Nome completo", stepIdx: 0 },
-      4: { stepLabel: "CPF", stepIdx: 1 },
-      5: { stepLabel: "Telefone/WhatsApp", stepIdx: 2 },
-      6: { stepLabel: "Responsável (opcional)", stepIdx: 3 },
-      7: { stepLabel: "CPF resp. legal (opcional)", stepIdx: 4 },
+    const map: Record<4 | 5 | 6 | 7 | 8, { stepLabel: string; stepIdx: number }> = {
+      4: { stepLabel: "Nome completo", stepIdx: 0 },
+      5: { stepLabel: "CPF", stepIdx: 1 },
+      6: { stepLabel: "Telefone/WhatsApp", stepIdx: 2 },
+      7: { stepLabel: "Responsável (opcional)", stepIdx: 3 },
+      8: { stepLabel: "CPF resp. legal (opcional)", stepIdx: 4 },
     };
     return map[s];
   }
 
   async function contractAdvanceField(skip = false) {
-    if (step < 3 || step > 7) return;
+    if (step < 4 || step > 8) return;
     const tel = phoneField.replace(/\D/g, "").trim();
     if (contractFieldSaving) return;
-    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
-    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
+    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
     const currentMeta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
     if (!currentMeta) return;
     if (!skip && !contractCurrentValue.trim() && !currentMeta.optional) {
@@ -383,23 +386,23 @@ export default function CadastroRecorrenteBody() {
       setLastSavedFieldValues((prev) => {
         let next: any = { ...prev };
         next[currentMeta.name] = json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name];
-        if (step === 6 && skip) {
+        if (step === 7 && skip) {
           next.legal_responsible_name = "";
           next.legal_responsible_cpf = "";
         }
         return next;
       });
       setContractAllFields(json.allFields || contractAllFields);
-      let nextStepBase: 4 | 5 | 6 | 7 | 8 =
-        step === 3 ? 4 : step === 4 ? 5 : step === 5 ? 6 : step === 6 ? 7 : 8;
-      let nextStep: 4 | 5 | 6 | 7 | 8 = nextStepBase;
-      if (step === 6 && skip) nextStep = 8;
-      if (nextStep === 8) {
+      let nextStepBase: 5 | 6 | 7 | 8 | 9 =
+        step === 4 ? 5 : step === 5 ? 6 : step === 6 ? 7 : step === 7 ? 8 : 9;
+      let nextStep: 5 | 6 | 7 | 8 | 9 = nextStepBase;
+      if (step === 7 && skip) nextStep = 9;
+      if (nextStep === 9) {
         setContractCurrentValue("");
-        goStep(8);
+        goStep(9);
         return;
       }
-      const nextFieldIdx = nextStep - 3;
+      const nextFieldIdx = nextStep - 4;
       setContractCurrentFieldIdx(nextFieldIdx);
       const nextMeta = (json.allFields || contractAllFields)[nextFieldIdx];
       if (nextMeta) {
@@ -423,16 +426,16 @@ export default function CadastroRecorrenteBody() {
   }
 
   async function contractBackField() {
-    if (step < 3 || step > 7) return;
-    const backTargetStep = Math.max(0, (step as number) - 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
-    if (!(step >= 3 && step <= 7) || backTargetStep < 3) {
+    if (step < 4 || step > 8) return;
+    const backTargetStep = Math.max(0, (step as number) - 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+    if (!(step >= 4 && step <= 8) || backTargetStep < 4) {
       goStep(backTargetStep);
       return;
     }
     const tel = phoneField.replace(/\D/g, "").trim();
     if (contractFieldSaving) return;
-    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
-    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
+    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
     const currentMeta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
     let needSave = !!currentMeta && contractCurrentValue.trim().length > 0;
     if (currentMeta && contractCurrentValue.trim()) {
@@ -493,7 +496,7 @@ export default function CadastroRecorrenteBody() {
       } catch {}
       setContractFieldSaving(false);
     }
-    const backStepAsContractStep = backTargetStep as 3 | 4 | 5 | 6 | 7;
+    const backStepAsContractStep = backTargetStep as 4 | 5 | 6 | 7 | 8;
     const backTargetIdx = fieldIdxByStep[backStepAsContractStep];
     const fallbackAllFields = latestAllFieldsFromSave && latestAllFieldsFromSave.length > 0
       ? latestAllFieldsFromSave
@@ -523,9 +526,12 @@ export default function CadastroRecorrenteBody() {
     weekdayLabel?: string | null;
     professorTime?: string | null;
     leadTime?: string | null;
-    step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | null;
+    step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | null;
     nomeOverride?: string | null;
     password?: string | null;
+    state?: string | null;
+    city?: string | null;
+    timezone?: string | null;
   }) {
     try {
       const telefone = phoneField.replace(/\D/g, "");
@@ -549,6 +555,9 @@ export default function CadastroRecorrenteBody() {
           leadTime: payload.leadTime ?? null,
           step: payload.step ?? null,
           password: safePassword,
+          state: payload.state ?? null,
+          city: payload.city ?? null,
+          timezone: payload.timezone ?? null,
         }),
       }).catch(() => {});
     } catch {}
@@ -590,9 +599,9 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
-  function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+  function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12) {
     setStep(n);
-    if (n === 9) setPaymentTab("menu");
+    if (n === 10) setPaymentTab("menu");
     setSubmitError("");
     setContractFieldError("");
     setContractFinalError("");
@@ -624,13 +633,13 @@ export default function CadastroRecorrenteBody() {
     if (contractFinalizing) return;
     setContractFinalizing(true);
     await new Promise<void>((r) => setTimeout(r, 700));
-    goStep(10);
+    goStep(11);
     setTimeout(() => setContractFinalizing(false), 250);
   }
 
   useEffect(() => {
-    if (step === 9) setPaymentTab("menu");
-    if (step === 7) {
+    if (step === 10) setPaymentTab("menu");
+    if (step === 8) {
       const legalName =
         typeof contractSnapshot?.legal_responsible_name === "string"
           ? contractSnapshot.legal_responsible_name
@@ -638,16 +647,16 @@ export default function CadastroRecorrenteBody() {
           ? lastSavedFieldValues.legal_responsible_name
           : "";
       if (!String(legalName ?? "").trim()) {
-        goStep(8);
+        goStep(9);
       }
     }
   }, [step]);
 
   useEffect(() => {
-    if (step < 3 || step > 7) return;
+    if (step < 4 || step > 8) return;
     if (!contractAllFields.length) return;
-    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
-    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
+    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
     const target = contractAllFields[expectedIdx];
     if (!target) return;
     const key = `${step}:${target.name}`;
@@ -684,6 +693,9 @@ export default function CadastroRecorrenteBody() {
                 legal_responsible_cpf?: string | null;
                 contract_pdf_url?: string | null;
                 contract_signed_at?: string | null;
+                state?: string | null;
+                city?: string | null;
+                timezone?: string | null;
               } | null;
               progress?: {
                 step?: number | null;
@@ -717,6 +729,9 @@ export default function CadastroRecorrenteBody() {
         let restoredCpf: string | null = null;
         let restoredLegalName: string | null = null;
         let restoredLegalCpf: string | null = null;
+        let restoredState: string | null = null;
+        let restoredCity: string | null = null;
+        let restoredTimezone: string | null = null;
 
         if (json?.ok && json?.lead) {
           restoredLeadFullName = String(json.lead?.full_name ?? "").trim();
@@ -725,6 +740,9 @@ export default function CadastroRecorrenteBody() {
           restoredCpf = (json.lead as any)?.cpf ? String((json.lead as any).cpf) : null;
           restoredLegalName = (json.lead as any)?.legal_responsible_name ? String((json.lead as any).legal_responsible_name) : null;
           restoredLegalCpf = (json.lead as any)?.legal_responsible_cpf ? String((json.lead as any).legal_responsible_cpf) : null;
+          restoredState = (json.lead as any)?.state ? String((json.lead as any).state) : null;
+          restoredCity = (json.lead as any)?.city ? String((json.lead as any).city) : null;
+          restoredTimezone = (json.lead as any)?.timezone ? String((json.lead as any).timezone) : null;
 
           const normalizedLeadFullName = toNomeESobrenome(restoredLeadFullName);
           if (restoredLeadId) {
@@ -741,6 +759,9 @@ export default function CadastroRecorrenteBody() {
           } else if (initialPhoneParam && !restoredLeadPhone) {
             setPhoneField(initialPhoneParam);
           }
+          if (restoredState) setStateField(restoredState);
+          if (restoredCity) setCityField(restoredCity);
+          if (restoredTimezone) setLeadTimezone(restoredTimezone);
           if (restoredCpf) {
             setLastSavedFieldValues((prev) => ({ ...prev, cpf: restoredCpf! }));
             setContractSnapshot((prev) => ({ ...prev, cpf: restoredCpf! }));
@@ -771,7 +792,7 @@ export default function CadastroRecorrenteBody() {
           }
         }
 
-        let stepNum: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 = 0;
+        let stepNum: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 = 0;
         let hasPassword = false;
         let savedWeekdayRaw: string = "";
         let savedWeekdayLabel: string = "";
@@ -783,8 +804,8 @@ export default function CadastroRecorrenteBody() {
         if (json?.progress) {
           const prog = json.progress;
           stepNum =
-            typeof prog.step === "number" && prog.step >= 0 && prog.step <= 11
-              ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11)
+            typeof prog.step === "number" && prog.step >= 0 && prog.step <= 12
+              ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12)
               : 0;
           hasPassword = Boolean(prog.has_password);
           savedWeekdayRaw = String(prog.recurring_class_weekday ?? "").trim().toLowerCase();
@@ -803,7 +824,7 @@ export default function CadastroRecorrenteBody() {
             setHasPasswordInitial(true);
             if (stepNum >= 1) setSenha("••••••••");
           }
-          if (stepNum >= 2 && resolvedWeekday && savedProfessorTime) {
+          if (stepNum >= 3 && resolvedWeekday && savedProfessorTime) {
             const finalLeadTime = savedLeadTime || savedProfessorTime;
             const finalLabel = savedWeekdayLabel || savedWeekdayRaw;
             savedSubmitResult = {
@@ -812,18 +833,23 @@ export default function CadastroRecorrenteBody() {
               professorTime: savedProfessorTime,
               leadTime: finalLeadTime,
             };
-            if (stepNum >= 3) {
+            if (stepNum >= 4) {
               setSubmitResult(savedSubmitResult);
             }
             (async () => {
               try {
-                const tz =
+                const tzBrowser =
                   typeof Intl !== "undefined" &&
                   Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
                     ? Intl.DateTimeFormat().resolvedOptions().timeZone
                     : "";
-                const url = tz
-                  ? `/api/cadastro/recorrente/availability?timezone=${encodeURIComponent(tz)}`
+                const tzLead = restoredTimezone || leadTimezone;
+                const params = new URLSearchParams();
+                if (tzLead) params.set("lead_timezone", tzLead);
+                if (tzBrowser) params.set("timezone", tzBrowser);
+                const qs = params.toString();
+                const url = qs
+                  ? `/api/cadastro/recorrente/availability?${qs}`
                   : `/api/cadastro/recorrente/availability`;
                 const r = await fetch(url, { method: "GET" });
                 const j = (await r.json().catch(() => null)) as AvailabilityResponse | null;
@@ -844,7 +870,7 @@ export default function CadastroRecorrenteBody() {
                       : null) || null;
                   if (opt) {
                     setSelectedTimeOpt(opt as any);
-                    if (stepNum >= 3) {
+                    if (stepNum >= 4) {
                       const lbl = savedWeekdayLabel || w || "";
                       const leadT = targetLeadT || targetTime;
                       setSubmitResult({
@@ -902,6 +928,7 @@ export default function CadastroRecorrenteBody() {
           );
           return opt?.displayLabel || opt?.label || "";
         })();
+        const tz = leadTimezone || (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone ? Intl.DateTimeFormat().resolvedOptions().timeZone : "");
         const payload = {
           telefone,
           nome: nome.trim() || null,
@@ -911,6 +938,9 @@ export default function CadastroRecorrenteBody() {
           weekdayLabel: weekdayLabelComputed || null,
           professorTime: selectedTimeOpt?.professorTime || null,
           leadTime: selectedTimeOpt?.leadTime || selectedTimeOpt?.displayLabel || null,
+          state: stateField.trim() || null,
+          city: cityField.trim() || null,
+          timezone: tz || null,
         };
         const body = JSON.stringify(payload);
         if (typeof navigator !== "undefined" && (navigator as any).sendBeacon) {
@@ -932,17 +962,22 @@ export default function CadastroRecorrenteBody() {
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
-  }, [step, phoneField, nome, senha, selectedWeekday, availability, selectedTimeOpt]);
+  }, [step, phoneField, nome, senha, selectedWeekday, availability, selectedTimeOpt, stateField, cityField, leadTimezone]);
 
   async function loadAvailability() {
     setAvailLoading(true);
     setAvailError("");
     try {
-      const tz = typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+      const tzBrowser = typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
         ? Intl.DateTimeFormat().resolvedOptions().timeZone
         : "";
-      const url = tz
-        ? `/api/cadastro/recorrente/availability?timezone=${encodeURIComponent(tz)}`
+      const tzLead = leadTimezone;
+      const params = new URLSearchParams();
+      if (tzLead) params.set("lead_timezone", tzLead);
+      if (tzBrowser) params.set("timezone", tzBrowser);
+      const qs = params.toString();
+      const url = qs
+        ? `/api/cadastro/recorrente/availability?${qs}`
         : `/api/cadastro/recorrente/availability`;
       const res = await fetch(url, { method: "GET" });
       const json = (await res.json().catch(() => null)) as AvailabilityResponse | null;
@@ -958,7 +993,7 @@ export default function CadastroRecorrenteBody() {
   }
 
   useEffect(() => {
-    if (step === 1 && !availability && !availLoading) {
+    if (step === 2 && !availability && !availLoading) {
       void loadAvailability();
     }
   }, [step]);
@@ -970,12 +1005,47 @@ export default function CadastroRecorrenteBody() {
     return senha.trim().length >= 4;
   }
 
-  function handleAdvance0() {
+  async function handleAdvance0() {
     if (!canAdvanceFromStep0()) return;
+    const tzAuto = leadTimezone || (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone ? Intl.DateTimeFormat().resolvedOptions().timeZone : "");
+    if (tzAuto && !leadTimezone) {
+      setLeadTimezone(tzAuto);
+    }
+    const safeState = stateField.trim();
+    const safeCity = cityField.trim();
+    if (safeState && safeCity) {
+      await saveDraftRecurring({
+        step: 1,
+        password: senha.trim() || null,
+        state: safeState,
+        city: safeCity,
+        timezone: tzAuto || null,
+      });
+      setStep(2);
+      return;
+    }
     goStep(1);
   }
 
-  function handleAdvance1() {
+  async function handleAdvance1() {
+    const st = stateField.trim();
+    const ct = cityField.trim();
+    if (!st || !ct) return;
+    const tzAuto = leadTimezone || (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone ? Intl.DateTimeFormat().resolvedOptions().timeZone : "");
+    if (tzAuto && !leadTimezone) {
+      setLeadTimezone(tzAuto);
+    }
+    await saveDraftRecurring({
+      step: 2,
+      state: st,
+      city: ct,
+      timezone: tzAuto || null,
+    });
+    setSubmitError("");
+    setStep(2);
+  }
+
+  function handleAdvance2() {
     if (!selectedWeekday) return;
     (async () => {
       setDraftSaving("weekday");
@@ -989,7 +1059,7 @@ export default function CadastroRecorrenteBody() {
         setDraftSaving(null);
       }
     })();
-    goStep(2);
+    goStep(3);
   }
 
   async function handleSubmitFinal() {
@@ -1038,7 +1108,7 @@ export default function CadastroRecorrenteBody() {
       }
       setSubmitLeadId(String(json.leadId || ""));
       setSubmitResult(json.scheduled);
-      goStep(3);
+      goStep(4);
     } catch (e) {
       setSubmitError(toErrorMessage(e, "Erro desconhecido."));
     } finally {
@@ -1099,16 +1169,17 @@ export default function CadastroRecorrenteBody() {
             {(() => {
               const allSteps = [
                 { key: 0, label: "Conta", shortLabel: "Conta" },
-                { key: 1, label: "Dia", shortLabel: "Dia" },
-                { key: 2, label: "Horário", shortLabel: "Hora" },
-                { key: 3, label: "Nome", shortLabel: "Nome" },
-                { key: 4, label: "CPF", shortLabel: "CPF" },
-                { key: 5, label: "Telefone", shortLabel: "Tel" },
-                { key: 6, label: "Resp. Legal", shortLabel: "Resp" },
-                { key: 7, label: "CPF Resp.", shortLabel: "CPF-R" },
-                { key: 8, label: "Revisão", shortLabel: "Rev" },
-                { key: 9, label: "Pagamento", shortLabel: "Pag" },
-                { key: 10, label: "Concluído", shortLabel: "Fim" },
+                { key: 1, label: "Localização", shortLabel: "Loc" },
+                { key: 2, label: "Dia", shortLabel: "Dia" },
+                { key: 3, label: "Horário", shortLabel: "Hora" },
+                { key: 4, label: "Nome", shortLabel: "Nome" },
+                { key: 5, label: "CPF", shortLabel: "CPF" },
+                { key: 6, label: "Telefone", shortLabel: "Tel" },
+                { key: 7, label: "Resp. Legal", shortLabel: "Resp" },
+                { key: 8, label: "CPF Resp.", shortLabel: "CPF-R" },
+                { key: 9, label: "Revisão", shortLabel: "Rev" },
+                { key: 10, label: "Pagamento", shortLabel: "Pag" },
+                { key: 11, label: "Concluído", shortLabel: "Fim" },
               ];
               const N = allSteps.length;
               const buildDisplayOrder = (current: number): Array<{ kind: "step"; idx: number } | { kind: "ellipsis" }> => {
@@ -1204,7 +1275,7 @@ export default function CadastroRecorrenteBody() {
                     <div
                       className="h-full bg-gradient-to-r from-indigo-500 to-sky-500 transition-all duration-500 ease-out"
                       style={{
-                        width: `${step === 0 ? 9 : step === 1 ? 18 : step === 2 ? 27 : step === 3 ? 36 : step === 4 ? 45 : step === 5 ? 55 : step === 6 ? 64 : step === 7 ? 73 : step === 8 ? 82 : step === 9 ? 91 : 100}%`,
+                        width: `${step === 0 ? 8 : step === 1 ? 17 : step === 2 ? 25 : step === 3 ? 33 : step === 4 ? 42 : step === 5 ? 50 : step === 6 ? 58 : step === 7 ? 67 : step === 8 ? 75 : step === 9 ? 83 : step === 10 ? 92 : 100}%`,
                       }}
                     />
                   </div>
@@ -1264,6 +1335,89 @@ export default function CadastroRecorrenteBody() {
           )}
 
           {step === 1 && (
+            <section className="space-y-7">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {firstName}, onde você mora?
+                </h2>
+                <p className="mt-1 text-slate-600">
+                  Precisamos do seu estado e cidade para oferecer horários compatíveis com o seu fuso horário e a localização do professor.
+                </p>
+              </div>
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    Estado
+                  </label>
+                  <select
+                    value={stateField}
+                    onChange={(e) => setStateField(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
+                  >
+                    <option value="">Selecione seu estado</option>
+                    <option value="AC">Acre (AC)</option>
+                    <option value="AL">Alagoas (AL)</option>
+                    <option value="AP">Amapá (AP)</option>
+                    <option value="AM">Amazonas (AM)</option>
+                    <option value="BA">Bahia (BA)</option>
+                    <option value="CE">Ceará (CE)</option>
+                    <option value="DF">Distrito Federal (DF)</option>
+                    <option value="ES">Espírito Santo (ES)</option>
+                    <option value="GO">Goiás (GO)</option>
+                    <option value="MA">Maranhão (MA)</option>
+                    <option value="MT">Mato Grosso (MT)</option>
+                    <option value="MS">Mato Grosso do Sul (MS)</option>
+                    <option value="MG">Minas Gerais (MG)</option>
+                    <option value="PA">Pará (PA)</option>
+                    <option value="PB">Paraíba (PB)</option>
+                    <option value="PR">Paraná (PR)</option>
+                    <option value="PE">Pernambuco (PE)</option>
+                    <option value="PI">Piauí (PI)</option>
+                    <option value="RJ">Rio de Janeiro (RJ)</option>
+                    <option value="RN">Rio Grande do Norte (RN)</option>
+                    <option value="RS">Rio Grande do Sul (RS)</option>
+                    <option value="RO">Rondônia (RO)</option>
+                    <option value="RR">Roraima (RR)</option>
+                    <option value="SC">Santa Catarina (SC)</option>
+                    <option value="SP">São Paulo (SP)</option>
+                    <option value="SE">Sergipe (SE)</option>
+                    <option value="TO">Tocantins (TO)</option>
+                    <option value="Outro">Outro / Fora do Brasil</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    value={cityField}
+                    onChange={(e) => setCityField(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
+                    placeholder="Ex: Campo Novo do Parecis"
+                    autoComplete="address-level2"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full">
+                <button
+                  onClick={() => void handleAdvance1()}
+                  disabled={!stateField.trim() || !cityField.trim()}
+                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate order-2 sm:order-2 sm:justify-self-end"
+                >
+                  Avançar
+                </button>
+                <button
+                  onClick={() => goStep(0)}
+                  className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate order-1 sm:order-1 sm:justify-self-start"
+                >
+                  Voltar
+                </button>
+              </div>
+            </section>
+          )}
+
+          {step === 2 && (
             <section className="space-y-7">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">
@@ -1330,14 +1484,14 @@ export default function CadastroRecorrenteBody() {
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full">
                 <button
-                  onClick={handleAdvance1}
+                  onClick={handleAdvance2}
                   disabled={!selectedWeekday}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate order-2 sm:order-2 sm:justify-self-end"
                 >
                   Avançar
                 </button>
                 <button
-                  onClick={() => goStep(0)}
+                  onClick={() => goStep(1)}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate order-1 sm:order-1 sm:justify-self-start"
                 >
                   Voltar
@@ -1346,7 +1500,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <section className="space-y-7">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">
@@ -1413,7 +1567,7 @@ export default function CadastroRecorrenteBody() {
                   {submitLoading ? "Agendando..." : "Agendar"}
                 </button>
                 <button
-                  onClick={() => goStep(1)}
+                  onClick={() => goStep(2)}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate order-1 sm:order-1 sm:justify-self-start"
                 >
                   Voltar
@@ -1422,7 +1576,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 3 && submitResult && (
+          {step === 4 && submitResult && (
             <section className="space-y-7 mb-10">
               <div className="text-center">
                 <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
@@ -1488,7 +1642,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step >= 3 && step <= 7 && submitResult && (
+          {step >= 4 && step <= 8 && submitResult && (
             <section className="space-y-7">
 
               {(contractInitLoading || contractAllFields.length === 0) && !contractInitError && (
@@ -1503,8 +1657,8 @@ export default function CadastroRecorrenteBody() {
               {!contractInitLoading && !contractInitError && contractAllFields.length > 0 && contractCurrentFieldIdx >= 0 && (
                 <div className="max-w-2xl mx-auto space-y-6">
                   {(() => {
-                    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
-                    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+                    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
+                    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
                     const meta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
                     if (!meta) return null;
                     const hasExisting = Boolean(meta.currentValue);
@@ -1604,7 +1758,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 8 && submitResult && (
+          {step === 9 && submitResult && (
             <section className="space-y-7">
               <div className="text-center">
                 <div className="mx-auto w-20 h-20 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
@@ -1865,9 +2019,9 @@ export default function CadastroRecorrenteBody() {
                         ? lastSavedFieldValues.legal_responsible_name
                         : "";
                     if (!String(legalName ?? "").trim()) {
-                      goStep(6);
-                    } else {
                       goStep(7);
+                    } else {
+                      goStep(8);
                     }
                   }}
                   disabled={contractFinalizing}
@@ -1886,7 +2040,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 9 && submitResult && (
+          {step === 10 && submitResult && (
             <section className="space-y-7 text-center">
               {paymentTab === "menu" && (
                 <>
@@ -2009,7 +2163,7 @@ export default function CadastroRecorrenteBody() {
 
                   <div className="w-full max-w-2xl mx-auto pt-2">
                     <button
-                      onClick={() => goStep(8)}
+                      onClick={() => goStep(9)}
                       className="order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate"
                     >
                       Voltar
@@ -2306,7 +2460,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 10 && submitResult && (
+          {step === 11 && submitResult && (
             <section className="space-y-7 text-center">
               <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
