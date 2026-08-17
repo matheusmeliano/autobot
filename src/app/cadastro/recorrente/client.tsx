@@ -692,11 +692,18 @@ export default function CadastroRecorrenteBody() {
               } | null;
             }
           | null;
-        if (!res.ok || json?.blocked) {
+        if (json?.blocked === true) {
           setAccessBlocked(true);
           setAccessBlockedMessage(
             String(json?.error ?? "").trim() ||
               "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+          );
+          return;
+        }
+        if (!res.ok || !json?.ok) {
+          setInitialDataError(
+            String(json?.error ?? "").trim() ||
+              toErrorMessage(json?.error, "Não foi possível carregar seus dados. Tente novamente em alguns segundos."),
           );
           return;
         }
@@ -1006,7 +1013,7 @@ export default function CadastroRecorrenteBody() {
       const json = (await res.json().catch(() => null)) as
         | (SubmitResponse & { blocked?: boolean })
         | null;
-      if (res.status === 403 || json?.blocked) {
+      if (json?.blocked === true) {
         setAccessBlocked(true);
         setAccessBlockedMessage(
           toErrorMessage(json?.error, "") ||

@@ -61,16 +61,15 @@ export async function GET(req: NextRequest) {
     const normalizedPhone = safePhoneDigits;
     let data: any = null;
     try {
-      const sel = await admin
+      const selFull = await admin
         .from("atendimento_leads")
-        .select(
-          "id, phone, full_name, cpf, recurring_registration_step, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, legal_responsible_name, legal_responsible_cpf",
-        )
+        .select("*")
         .eq("phone", normalizedPhone)
         .limit(1)
         .maybeSingle();
-      if (sel?.error) {
-        if (/column.*does not exist|PGRST204|42703/i.test(String(sel.error?.message ?? ""))) {
+      if (!selFull.error) {
+        data = selFull.data ?? null;
+      } else if (/column.*does not exist|PGRST204|42703/i.test(String(selFull.error?.message ?? ""))) {
           const fallback = await admin
             .from("atendimento_leads")
             .select("id, phone, full_name, cpf")
@@ -79,21 +78,22 @@ export async function GET(req: NextRequest) {
             .maybeSingle();
           data = fallback?.data ?? null;
         } else {
-          throw sel.error;
+          throw selFull.error;
         }
-      } else {
-        data = sel?.data ?? null;
-      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e ?? "");
       if (/column.*does not exist|PGRST204|42703/i.test(msg)) {
-        const fallback = await admin
-          .from("atendimento_leads")
-          .select("id, phone, full_name, cpf")
-          .eq("phone", normalizedPhone)
-          .limit(1)
-          .maybeSingle();
-        data = fallback?.data ?? null;
+        try {
+          const fallback = await admin
+            .from("atendimento_leads")
+            .select("id, phone, full_name, cpf")
+            .eq("phone", normalizedPhone)
+            .limit(1)
+            .maybeSingle();
+          data = fallback?.data ?? null;
+        } catch {
+          data = null;
+        }
       } else {
         throw e;
       }
@@ -114,26 +114,27 @@ export async function GET(req: NextRequest) {
       typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 11
         ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11)
         : 0;
+    const readStr = (key: string) => {
+      const v = (data as any)?.[key];
+      return typeof v === "string" && v.trim() ? v.trim() : null;
+    }
     return NextResponse.json({
       ok: true,
       lead: {
         id: (data as any).id,
         phone: String((data as any).phone ?? ""),
-        full_name: String((data as any).full_name ?? "").trim() || null,
-        cpf: String((data as any).cpf ?? "").trim() || null,
-        legal_responsible_name: String((data as any).legal_responsible_name ?? "").trim() || null,
-        legal_responsible_cpf: String((data as any).legal_responsible_cpf ?? "").trim() || null,
+        full_name: readStr("full_name"),
+        cpf: readStr("cpf"),
+        legal_responsible_name: readStr("legal_responsible_name"),
+        legal_responsible_cpf: readStr("legal_responsible_cpf"),
       },
       progress: {
         step: parsedStep,
         has_password: Boolean(String((data as any).recurring_registration_password ?? "").trim()),
-        recurring_class_weekday: String((data as any).recurring_class_weekday ?? "").trim() || null,
-        recurring_class_weekday_label:
-          String((data as any).recurring_class_weekday_label ?? "").trim() || null,
-        recurring_class_professor_time:
-          String((data as any).recurring_class_professor_time ?? "").trim() || null,
-        recurring_class_lead_time:
-          String((data as any).recurring_class_lead_time ?? "").trim() || null,
+        recurring_class_weekday: readStr("recurring_class_weekday"),
+        recurring_class_weekday_label: readStr("recurring_class_weekday_label"),
+        recurring_class_professor_time: readStr("recurring_class_professor_time"),
+        recurring_class_lead_time: readStr("recurring_class_lead_time"),
       },
     });
   } catch (e) {
