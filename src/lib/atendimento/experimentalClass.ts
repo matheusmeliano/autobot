@@ -12,6 +12,21 @@ export const EXPERIMENTAL_CLASS_SLOT_TIMES = [
   "18:30",
   "20:00",
 ] as const;
+
+export const PROFESSOR_SATURDAY_CUTOFF_TIME = "12:00";
+function professorTimeIsAllowed({ weekdayShort, professorTimeHHMM }: { weekdayShort: string; professorTimeHHMM: string }): boolean {
+  if (weekdayShort !== "sat") return true;
+  const cutoff = PROFESSOR_SATURDAY_CUTOFF_TIME.split(":").map(Number);
+  const slot = String(professorTimeHHMM ?? "").split(":").map(Number);
+  if (cutoff.length !== 2 || slot.length !== 2) return true;
+  const [cutHH, cutMM] = cutoff;
+  const [slotHH, slotMM] = slot;
+  if (!Number.isFinite(cutHH) || !Number.isFinite(cutMM) || !Number.isFinite(slotHH) || !Number.isFinite(slotMM)) return true;
+  const slotTotal = slotHH * 60 + slotMM;
+  const cutTotal = cutHH * 60 + cutMM;
+  return slotTotal <= cutTotal;
+}
+
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
@@ -540,6 +555,7 @@ export function listExperimentalClassAvailability(params: {
       const daySlots: ExperimentalClassTimeOption[] = [];
 
       for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
+        if (!professorTimeIsAllowed({ weekdayShort: weekday, professorTimeHHMM: professorTime })) continue;
         const professorStartAt = zonedDateTimeToUtcIso({
           date: currentDate,
           time: professorTime,
@@ -949,6 +965,7 @@ export function listRecurringWeekdayAvailability(params: {
   for (const weekday of weekdayOrder) {
     const slots: RecurringWeekdayTimeOption[] = [];
     for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
+      if (!professorTimeIsAllowed({ weekdayShort: weekday, professorTimeHHMM: professorTime })) continue;
       const comboKey = `${weekday}|${professorTime}`;
       if (blockedCombos.has(comboKey)) continue;
 
