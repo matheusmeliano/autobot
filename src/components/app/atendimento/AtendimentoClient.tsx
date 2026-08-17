@@ -24,8 +24,10 @@ export function AtendimentoClient() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [summaryCardsRefreshNonce, setSummaryCardsRefreshNonce] = useState<number>(0);
   const fallbackRefreshIntervalRef = useRef<number | null>(null);
   const realtimeSubscribedRef = useRef(false);
+  const initialLoadCompletedRef = useRef(false);
 
   function handleForbiddenResponse(res: Response) {
     if (res.status !== 401 && res.status !== 403) return false;
@@ -82,6 +84,7 @@ export function AtendimentoClient() {
     setRefreshing(true);
     try {
       await Promise.all([loadSummary({ silent: true }), loadPanelLeads()]);
+      setSummaryCardsRefreshNonce((n) => (n + 1) % 1000000);
       modalToast.success("Painel atualizado.");
     } finally {
       setRefreshing(false);
@@ -93,6 +96,8 @@ export function AtendimentoClient() {
     Promise.all([loadSummary(), loadPanelLeads()])
       .then(() => {
         setLoadError(null);
+        initialLoadCompletedRef.current = true;
+        setSummaryCardsRefreshNonce((n) => (n + 1) % 1000000);
       })
       .finally(() => {
         setLoading(false);
@@ -209,7 +214,7 @@ export function AtendimentoClient() {
       </div>
 
       <div className="min-h-0 min-w-0 lg:flex-1">
-        <AtendimentoSummaryCards summary={summary} leads={panelLeads} />
+        <AtendimentoSummaryCards summary={summary} leads={panelLeads} refreshNonce={summaryCardsRefreshNonce} />
       </div>
     </div>
   );

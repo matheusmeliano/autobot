@@ -1105,9 +1105,11 @@ function BookingDetails({
 export function AtendimentoSummaryCards({
   summary,
   leads,
+  refreshNonce,
 }: {
   summary: AtendimentoSummary;
   leads: AtendimentoLeadListItem[];
+  refreshNonce: number;
 }) {
   const [localSummary, setLocalSummary] = useState(summary);
   const [localLeads, setLocalLeads] = useState(leads);
@@ -1421,9 +1423,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   useEffect(() => {
     setQuery("");
     setPage(1);
-    const firstId = activeItems[0]?.id;
-    setSelectedLeadId(typeof firstId === "string" && firstId ? firstId : null);
-  }, [activeSection, activeItems]);
+  }, [activeSection]);
 
   useEffect(() => {
     setPage((current) => {
@@ -1439,9 +1439,23 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       if (currentSelectedLeadId && filteredItems.some((lead) => lead.id === currentSelectedLeadId)) {
         return currentSelectedLeadId;
       }
-      return filteredItems[0]?.id ?? null;
+      return currentSelectedLeadId;
     });
   }, [filteredItems]);
+
+  useEffect(() => {
+    if (!refreshNonce) return;
+    const target = sections.find((s) => s.id === activeSection) ?? sections[0];
+    const items = target?.items ?? [];
+    if (!items.length) {
+      setSelectedLeadId(null);
+      return;
+    }
+    setQuery("");
+    setPage(1);
+    const firstId = items[0]?.id;
+    setSelectedLeadId(typeof firstId === "string" && firstId ? firstId : null);
+  }, [refreshNonce, activeSection, sections]);
 
   useEffect(() => {
     if (!selectedLead) {
