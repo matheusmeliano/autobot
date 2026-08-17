@@ -20,6 +20,61 @@ type CapturedData = Partial<Record<CapturedFieldName, string>>;
 
 const YES_WORDS = ["sim", "quero", "vamos", "pode", "tenho interesse", "quero agendar", "agendar"];
 const NAME_CONNECTORS = new Set(["da", "de", "do", "das", "dos", "e"]);
+const GREETING_SINGLE_WORDS = new Set([
+  "oi", "ola", "olá", "olaa", "oiie", "oie", "hey", "hi", "hello",
+  "tchau", "bye", "obrigado", "obrigada", "obg", "valeu",
+  "bom", "boa", "boanoite", "boatarde", "bomdia",
+  "tudo", "bem", "tudobem", "ok", "okay", "okey", "certo", "claro",
+  "sim", "nao", "não", "yes", "no",
+  "qual", "que", "como", "onde", "quando", "quem", "porque", "porquê",
+  "meu", "minha", "nome", "sou", "chamo",
+  "aula", "experimental", "agendar", "horario", "horário", "dia", "dias",
+  "estados", "unidos", "brasil", "eua", "usa",
+  "lucas", "brum", "professor",
+  "whatsapp", "zap", "whats", "telefone", "numero", "número",
+  "senhor", "senhora", "senhorita", "sr", "sra", "srta", "dr", "dra",
+]);
+
+const GREETING_PHRASE_STARTS = [
+  "oi ", "ola ", "olá ", "hey ", "hi ", "hello ", "tudo bem", "tudobem",
+  "bom dia", "boa tarde", "boa noite", "como vai", "tudo bem com",
+  "obrigado", "obrigada", "muito obrigado", "muito obrigada",
+  "gostaria de", "queria saber", "quero saber",
+  "meu nome", "sou o", "sou a", "eu sou", "me chamo",
+  "qual o", "qual a", "quanto",
+  "tem aula", "aula experimental", "agendar aula",
+  "você tem", "voce tem", "funciona assim",
+  "por favor", "porfavor", "pf ", "pfv ", "pode me", "me ajuda", "ajuda me",
+];
+
+function containsAnyEmojiOrSymbol(text: string): boolean {
+  if (/[\p{Extended_Pictographic}\u200D]/u.test(text)) return true;
+  if (/[!@#$%^&*(){}\[\];<>"?~`|+=♥•●■♦♣♠※★☆✓✔✕✖❤☺]/.test(text)) return true;
+  return false;
+}
+
+function isLikelyGreetingOrPhrase(value: string): boolean {
+  const lower = value.toLowerCase().trim();
+  const lowerNoAccent = lower
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const noPunct = lowerNoAccent.replace(/[.,!?¿¡]/g, "").replace(/\s+/g, " ").trim();
+  const words = noPunct.split(" ").filter(Boolean);
+
+  if (words.length === 1) {
+    return GREETING_SINGLE_WORDS.has(noPunct);
+  }
+
+  for (const start of GREETING_PHRASE_STARTS) {
+    if (noPunct.startsWith(start)) return true;
+  }
+
+  const allGreetingOrStop = words.every((w) => GREETING_SINGLE_WORDS.has(w) || NAME_CONNECTORS.has(w));
+  if (allGreetingOrStop && words.length <= 5) return true;
+
+  if (/\?$/.test(lower)) return true;
+
+  return false;
+}
 
 export function firstTwoNamesFromFullName(value: string | null | undefined) {
   const clean = String(value ?? "").trim().replace(/\s+/g, " ");
@@ -54,15 +109,23 @@ export function looksLikeFullName(value: string) {
   if (/\d/.test(clean)) return false;
   if (/[/:@\\]/.test(clean)) return false;
   if (/\b(?:america\/|gmt|utc)\b/i.test(clean)) return false;
+  if (containsAnyEmojiOrSymbol(clean)) return false;
+
+  if (isLikelyGreetingOrPhrase(clean)) return false;
 
   const parts = clean.split(" ").filter(Boolean);
   if (parts.length < 2 || parts.length > 6) return false;
+
+  for (const part of parts) {
+    if (part.length < 2 && !NAME_CONNECTORS.has(part.toLowerCase())) return false;
+  }
 
   let significantParts = 0;
   for (const part of parts) {
     const normalized = part.toLowerCase();
     if (NAME_CONNECTORS.has(normalized)) continue;
     if (!/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*$/.test(part)) return false;
+    if (GREETING_SINGLE_WORDS.has(normalized)) return false;
     significantParts += 1;
   }
 
