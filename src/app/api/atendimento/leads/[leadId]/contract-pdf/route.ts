@@ -23,6 +23,62 @@ async function parseParams(req: Request): Promise<RouteParams> {
   return { leadId: String(leadId ?? "").trim() };
 }
 
+async function loadEffectiveLead(admin: any, leadId: string) {
+  const { data: lead, error } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("id", leadId)
+    .limit(1)
+    .maybeSingle();
+  if (error || !lead) return { error, lead: lead as any, effectiveLead: null as any };
+
+  let historyByField: Record<string, string> = {};
+  try {
+    const { data: hData } = await admin
+      .from("atendimento_history_events")
+      .select("event_type, details, created_at")
+      .eq("lead_id", leadId)
+      .eq("event_type", "contract_field_updated")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const seen = new Set<string>();
+    for (const ev of (hData ?? []) as any[]) {
+      const details = (ev?.details ?? {}) as Record<string, unknown>;
+      const field = String(details?.field ?? "").trim();
+      if (!field || seen.has(field)) continue;
+      const value = details?.value;
+      if (value === null || value === undefined) continue;
+      const strVal = typeof value === "string" ? value : String(value ?? "");
+      if (strVal) {
+        historyByField[field] = strVal;
+        seen.add(field);
+      }
+    }
+  } catch {}
+
+  const effectiveLead: any = { ...(lead ?? {}) };
+  const contractFull = typeof effectiveLead.contract_full_name === "string" ? String(effectiveLead.contract_full_name).trim() : "";
+  const historyFull = String(historyByField["full_name"] ?? "").trim();
+  if (contractFull || historyFull) {
+    effectiveLead.full_name = contractFull || historyFull;
+  }
+  const contractPhoneRaw = typeof effectiveLead.contract_phone === "string" ? String(effectiveLead.contract_phone).replace(/\D/g, "").trim() : "";
+  const historyPhoneRaw = String(historyByField["phone"] ?? "").replace(/\D/g, "").trim();
+  if (contractPhoneRaw || historyPhoneRaw) {
+    effectiveLead.phone = contractPhoneRaw || historyPhoneRaw;
+  }
+  if (String(historyByField["cpf"] ?? "").trim()) {
+    effectiveLead.cpf = String(historyByField["cpf"] ?? effectiveLead.cpf ?? "");
+  }
+  if (String(historyByField["legal_responsible_name"] ?? "").trim()) {
+    effectiveLead.legal_responsible_name = String(historyByField["legal_responsible_name"] ?? effectiveLead.legal_responsible_name ?? "");
+  }
+  if (String(historyByField["legal_responsible_cpf"] ?? "").trim()) {
+    effectiveLead.legal_responsible_cpf = String(historyByField["legal_responsible_cpf"] ?? effectiveLead.legal_responsible_cpf ?? "");
+  }
+  return { error, lead: lead as any, effectiveLead };
+}
+
 export async function GET(req: Request) {
   try {
     const admin = createSupabaseAdminClient();
@@ -31,18 +87,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "leadId obrigatório." }, { status: 400 });
     }
 
-    const { data: lead, error } = await admin
-      .from("atendimento_leads")
-      .select("*")
-      .eq("id", leadId)
-      .limit(1)
-      .maybeSingle();
+    const { error, lead, effectiveLead } = await loadEffectiveLead(admin, leadId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (!lead) return NextResponse.json({ ok: false, error: "Lead não encontrado." }, { status: 404 });
 
     const signedAtOverride = (lead as any).contract_signed_at ?? new Date().toISOString();
     const contractData = buildContractData({
-      lead: lead as Partial<AtendimentoLead>,
+      lead: (effectiveLead ?? lead) as Partial<AtendimentoLead>,
       overrideSignedAtIso: signedAtOverride,
     });
 
@@ -53,13 +104,13 @@ export async function GET(req: Request) {
         status: 200,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
-          "Content-Disposition": `inline; filename="${buildContractFileName(lead as any).replace(/\.pdf$/, ".html")}"`,
+          "Content-Disposition": `inline; filename="${buildContractFileName((effectiveLead ?? lead) as any).replace(/\.pdf$/, ".html")}"`,
         },
       });
     }
 
     const bytes = await buildContractPdfBytes(contractData);
-    const fileName = buildContractFileName(lead as any);
+    const fileName = buildContractFileName((effectiveLead ?? lead) as any);
     return new NextResponse(bytes, {
       status: 200,
       headers: {
@@ -81,23 +132,18 @@ export async function POST(req: Request) {
     if (!leadId) {
       return NextResponse.json({ ok: false, error: "leadId obrigatório." }, { status: 400 });
     }
-    const { data: lead, error: leadErr } = await admin
-      .from("atendimento_leads")
-      .select("*")
-      .eq("id", leadId)
-      .limit(1)
-      .maybeSingle();
+    const { error: leadErr, lead, effectiveLead } = await loadEffectiveLead(admin, leadId);
     if (leadErr) return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });
     if (!lead) return NextResponse.json({ ok: false, error: "Lead não encontrado." }, { status: 404 });
 
     const signedAt = new Date().toISOString();
     const contractData = buildContractData({
-      lead: lead as Partial<AtendimentoLead>,
+      lead: (effectiveLead ?? lead) as Partial<AtendimentoLead>,
       overrideSignedAtIso: signedAt,
     });
     const htmlSnapshot = buildContractHtml(contractData);
     const pdfBytes = await buildContractPdfBytes(contractData);
-    const fileName = buildContractFileName(lead as any);
+    const fileName = buildContractFileName((effectiveLead ?? lead) as any);
     const storagePath = `atendimento/contratos/${String((lead as any).id ?? leadId).slice(0, 12)}_${fileName}`;
 
     const { data: uploadData, error: uploadErr } = await admin.storage

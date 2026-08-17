@@ -2973,14 +2973,61 @@ export async function formalizeAndPersistContract(params: {
   if (leadErr) return { ok: false, error: leadErr.message };
   if (!lead) return { ok: false, error: "Lead não encontrado." };
 
+  let historyByField: Record<string, string> = {};
+  try {
+    const { data: hData } = await admin
+      .from("atendimento_history_events")
+      .select("event_type, details, created_at")
+      .eq("lead_id", leadId)
+      .eq("event_type", "contract_field_updated")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const seen = new Set<string>();
+    for (const ev of (hData ?? []) as any[]) {
+      const details = (ev?.details ?? {}) as Record<string, unknown>;
+      const field = String(details?.field ?? "").trim();
+      if (!field || seen.has(field)) continue;
+      const value = details?.value;
+      if (value === null || value === undefined) continue;
+      const strVal = typeof value === "string" ? value : String(value ?? "");
+      if (strVal) {
+        historyByField[field] = strVal;
+        seen.add(field);
+      }
+    }
+  } catch {}
+
+  const effectiveLead: any = { ...(lead ?? {}) };
+
+  const contractFull = typeof effectiveLead.contract_full_name === "string" ? String(effectiveLead.contract_full_name).trim() : "";
+  const historyFull = String(historyByField["full_name"] ?? "").trim();
+  if (contractFull || historyFull) {
+    effectiveLead.full_name = contractFull || historyFull;
+  }
+
+  const contractPhoneRaw = typeof effectiveLead.contract_phone === "string" ? String(effectiveLead.contract_phone).replace(/\D/g, "").trim() : "";
+  const historyPhoneRaw = String(historyByField["phone"] ?? "").replace(/\D/g, "").trim();
+  if (contractPhoneRaw || historyPhoneRaw) {
+    effectiveLead.phone = contractPhoneRaw || historyPhoneRaw;
+  }
+  if (String(historyByField["cpf"] ?? "").trim()) {
+    effectiveLead.cpf = String(historyByField["cpf"] ?? effectiveLead.cpf ?? "");
+  }
+  if (String(historyByField["legal_responsible_name"] ?? "").trim()) {
+    effectiveLead.legal_responsible_name = String(historyByField["legal_responsible_name"] ?? effectiveLead.legal_responsible_name ?? "");
+  }
+  if (String(historyByField["legal_responsible_cpf"] ?? "").trim()) {
+    effectiveLead.legal_responsible_cpf = String(historyByField["legal_responsible_cpf"] ?? effectiveLead.legal_responsible_cpf ?? "");
+  }
+
   const signedAt = new Date().toISOString();
   const contractData = buildContractData({
-    lead: lead as any,
+    lead: effectiveLead as any,
     overrideSignedAtIso: signedAt,
   });
   const htmlSnapshot = buildContractHtml(contractData);
   const pdfBytes = await buildContractPdfBytes(contractData);
-  const fileName = buildContractFileName(lead as any);
+  const fileName = buildContractFileName(effectiveLead as any);
   const storagePath = `atendimento/contratos/${String((lead as any).id ?? leadId).slice(0, 12)}_${fileName}`;
 
   const { data: uploadData, error: uploadErr } = await admin.storage
