@@ -758,17 +758,6 @@ function BookingDetails({
     String(booking?.attendance_status ?? "").trim() === "attended" ||
     String(booking?.attendance_status ?? "").trim() === "no_show";
   const attendanceStatus = booking?.attendance_status ?? null;
-  const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
-    bookingStatus: booking?.status,
-    studentStartNotificationSentAt: booking?.student_start_notification_sent_at,
-    attendantStartNotificationSentAt: booking?.attendant_start_notification_sent_at,
-    attendanceStatus,
-    hasSchedulingProgress: leadHasExperimentalClassPanelStatus(lead),
-    hasLead: true,
-    hasRecurringClassScheduled: hasRecurringClass,
-  });
-  const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
-  const displayDash = "-";
 
   const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
   const recurringWeekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
@@ -783,6 +772,19 @@ function BookingDetails({
   const hasRecurringClass = Boolean(
     recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime),
   );
+
+  const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
+    bookingStatus: booking?.status,
+    studentStartNotificationSentAt: booking?.student_start_notification_sent_at,
+    attendantStartNotificationSentAt: booking?.attendant_start_notification_sent_at,
+    attendanceStatus,
+    hasSchedulingProgress: leadHasExperimentalClassPanelStatus(lead),
+    hasLead: true,
+    hasRecurringClassScheduled: hasRecurringClass,
+  });
+  const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
+  const displayDash = "-";
+
   const savedBookingRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
   const leadIsRecurringAlunoNow = Boolean(
     hasRecurringClass ||
