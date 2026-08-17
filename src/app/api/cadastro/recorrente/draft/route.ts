@@ -45,7 +45,7 @@ type DraftPayload = {
   weekdayLabel?: string | null;
   professorTime?: string | null;
   leadTime?: string | null;
-  step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null;
+  step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | null;
   password?: string | null;
 };
 
@@ -111,8 +111,8 @@ export async function GET(req: NextRequest) {
     }
     const stepRaw = (data as any)?.recurring_registration_step;
     const parsedStep =
-      typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 9
-        ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9)
+      typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 11
+        ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11)
         : 0;
     return NextResponse.json({
       ok: true,
@@ -170,7 +170,7 @@ export async function PATCH(req: NextRequest) {
     const hasAnyTime = Boolean(safeProfessorTime || safeLeadTime);
 
     const safeStepRaw =
-      typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 9 ? step : null;
+      typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 11 ? step : null;
 
     const safePassword =
       typeof password === "string" && password.trim().length >= 4 ? password.trim() : null;

@@ -182,6 +182,7 @@ export default function CadastroRecorrenteBody() {
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>("");
+  const [hasPasswordInitial, setHasPasswordInitial] = useState<boolean>(false);
   const [initialDataLoading, setInitialDataLoading] = useState<boolean>(true);
   const [initialDataError, setInitialDataError] = useState<string>("");
   const [accessBlocked, setAccessBlocked] = useState<boolean>(false);
@@ -260,8 +261,25 @@ export default function CadastroRecorrenteBody() {
         setContractSnapshot(json.snapshot || contractSnapshot);
         setLastSavedFieldValues(json.snapshot || lastSavedFieldValues);
         setContractAllFields(json.allFields || []);
-        setContractCurrentFieldIdx(0);
-        setContractCurrentValue((json.allFields || [])[0]?.currentValue || "");
+        const fieldOrderMap: Record<ContractFieldMeta["name"], number> = {
+          full_name: 0, cpf: 1, phone: 2, legal_responsible_name: 3, legal_responsible_cpf: 4,
+        };
+        const startIdx = json.nextField && typeof fieldOrderMap[json.nextField] === "number"
+          ? fieldOrderMap[json.nextField]
+          : 0;
+        setContractCurrentFieldIdx(startIdx);
+        const allF = json.allFields || [];
+        const initialMeta = allF[startIdx] ?? allF[0];
+        const preVal =
+          initialMeta
+            ? (json.snapshot || contractSnapshot)[initialMeta.name] ??
+              initialMeta.currentValue ??
+              lastSavedFieldValues[initialMeta.name] ??
+              ""
+            : "";
+        setContractCurrentValue(
+          formatFieldValue(initialMeta?.name ?? "full_name", typeof preVal === "string" ? preVal.trim() : "")
+        );
         goStep(3);
       } catch (e) {
         setContractInitError(toErrorMessage(e, "Erro ao carregar."));
@@ -381,6 +399,13 @@ export default function CadastroRecorrenteBody() {
     try {
       const telefone = phoneField.replace(/\D/g, "");
       if (!telefone || telefone.length < 10) return;
+      const passwordRaw = payload.password;
+      const safePassword =
+        typeof passwordRaw === "string" &&
+        passwordRaw.trim().length >= 4 &&
+        !/^[•·*]{4,}$/.test(passwordRaw)
+          ? passwordRaw.trim()
+          : null;
       await fetch("/api/cadastro/recorrente/draft", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -392,7 +417,7 @@ export default function CadastroRecorrenteBody() {
           professorTime: payload.professorTime ?? null,
           leadTime: payload.leadTime ?? null,
           step: payload.step ?? null,
-          password: payload.password ?? null,
+          password: safePassword,
         }),
       }).catch(() => {});
     } catch {}
@@ -545,48 +570,48 @@ export default function CadastroRecorrenteBody() {
           );
           return;
         }
+
+        let restoredLeadFullName = "";
+        let restoredLeadPhone = "";
+        let restoredLeadId = "";
+        let restoredCpf: string | null = null;
+        let restoredLegalName: string | null = null;
+        let restoredLegalCpf: string | null = null;
+
         if (json?.ok && json?.lead) {
-          const leadFullName = String(json.lead?.full_name ?? "").trim();
-          const leadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
-          const leadId = String((json.lead as any)?.id ?? "").trim();
-          const normalizedLeadFullName = toNomeESobrenome(leadFullName);
-          if (leadId) {
-            setSubmitLeadId(leadId);
-            setContractLeadId(leadId);
+          restoredLeadFullName = String(json.lead?.full_name ?? "").trim();
+          restoredLeadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
+          restoredLeadId = String((json.lead as any)?.id ?? "").trim();
+          restoredCpf = (json.lead as any)?.cpf ? String((json.lead as any).cpf) : null;
+          restoredLegalName = (json.lead as any)?.legal_responsible_name ? String((json.lead as any).legal_responsible_name) : null;
+          restoredLegalCpf = (json.lead as any)?.legal_responsible_cpf ? String((json.lead as any).legal_responsible_cpf) : null;
+
+          const normalizedLeadFullName = toNomeESobrenome(restoredLeadFullName);
+          if (restoredLeadId) {
+            setSubmitLeadId(restoredLeadId);
+            setContractLeadId(restoredLeadId);
           }
           if (normalizedLeadFullName) {
             setNome(normalizedLeadFullName);
-          } else if (initialNameParam && !leadFullName) {
+          } else if (initialNameParam && !restoredLeadFullName) {
             setNome(toNomeESobrenome(initialNameParam));
           }
-          if (leadPhone) {
-            setPhoneField(leadPhone);
-          } else if (initialPhoneParam && !leadPhone) {
+          if (restoredLeadPhone) {
+            setPhoneField(restoredLeadPhone);
+          } else if (initialPhoneParam && !restoredLeadPhone) {
             setPhoneField(initialPhoneParam);
           }
-          if ((json.lead as any)?.cpf) {
-            setLastSavedFieldValues((prev) => ({ ...prev, cpf: (json.lead as any).cpf }));
-            setContractSnapshot((prev) => ({ ...prev, cpf: (json.lead as any).cpf }));
+          if (restoredCpf) {
+            setLastSavedFieldValues((prev) => ({ ...prev, cpf: restoredCpf! }));
+            setContractSnapshot((prev) => ({ ...prev, cpf: restoredCpf! }));
           }
-          if ((json.lead as any)?.legal_responsible_name) {
-            setLastSavedFieldValues((prev) => ({
-              ...prev,
-              legal_responsible_name: (json.lead as any).legal_responsible_name,
-            }));
-            setContractSnapshot((prev) => ({
-              ...prev,
-              legal_responsible_name: (json.lead as any).legal_responsible_name,
-            }));
+          if (restoredLegalName) {
+            setLastSavedFieldValues((prev) => ({ ...prev, legal_responsible_name: restoredLegalName! }));
+            setContractSnapshot((prev) => ({ ...prev, legal_responsible_name: restoredLegalName! }));
           }
-          if ((json.lead as any)?.legal_responsible_cpf) {
-            setLastSavedFieldValues((prev) => ({
-              ...prev,
-              legal_responsible_cpf: (json.lead as any).legal_responsible_cpf,
-            }));
-            setContractSnapshot((prev) => ({
-              ...prev,
-              legal_responsible_cpf: (json.lead as any).legal_responsible_cpf,
-            }));
+          if (restoredLegalCpf) {
+            setLastSavedFieldValues((prev) => ({ ...prev, legal_responsible_cpf: restoredLegalCpf! }));
+            setContractSnapshot((prev) => ({ ...prev, legal_responsible_cpf: restoredLegalCpf! }));
           }
         } else {
           if (initialNameParam) {
@@ -596,102 +621,96 @@ export default function CadastroRecorrenteBody() {
             setPhoneField(initialPhoneParam);
           }
         }
+
+        let stepNum: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 = 0;
+        let hasPassword = false;
+        let savedWeekdayRaw: string = "";
+        let savedWeekdayLabel: string = "";
+        let savedProfessorTime: string = "";
+        let savedLeadTime: string = "";
+        let resolvedWeekday: RecurringWeekdayKey | null = null;
+        let savedSubmitResult: any = null;
+
         if (json?.progress) {
           const prog = json.progress;
-          const stepNum =
-            typeof prog.step === "number" && prog.step >= 0 && prog.step <= 9
-              ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9)
+          stepNum =
+            typeof prog.step === "number" && prog.step >= 0 && prog.step <= 11
+              ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11)
               : 0;
-          if (prog.recurring_class_weekday) {
-            const w = String(prog.recurring_class_weekday).trim().toLowerCase();
-            const wd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(w)
-              ? (w as RecurringWeekdayKey)
-              : null;
-            if (wd) {
-              setSelectedWeekday(wd);
+          hasPassword = Boolean(prog.has_password);
+          savedWeekdayRaw = String(prog.recurring_class_weekday ?? "").trim().toLowerCase();
+          savedWeekdayLabel = String(prog.recurring_class_weekday_label ?? "").trim();
+          savedProfessorTime = String(prog.recurring_class_professor_time ?? "").trim();
+          savedLeadTime = String(prog.recurring_class_lead_time ?? "").trim();
+
+          if (savedWeekdayRaw) {
+            const isWd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(savedWeekdayRaw);
+            if (isWd) {
+              resolvedWeekday = savedWeekdayRaw as RecurringWeekdayKey;
+              setSelectedWeekday(resolvedWeekday);
             }
           }
-          if (stepNum >= 1) {
-            setStep(stepNum);
-            if ((stepNum === 2 || stepNum >= 3) && prog.recurring_class_professor_time) {
-              const targetTime = String(prog.recurring_class_professor_time).trim();
-              const targetLeadTime = String(prog.recurring_class_lead_time ?? "").trim();
-              setAvailability((prevAvail) => {
-                if (!prevAvail?.slotsByWeekday || !selectedWeekday) {
-                  (async () => {
-                    try {
-                      const tz =
-                        typeof Intl !== "undefined" &&
-                        Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
-                          ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                          : "";
-                      const url = tz
-                        ? `/api/cadastro/recorrente/availability?timezone=${encodeURIComponent(tz)}`
-                        : `/api/cadastro/recorrente/availability`;
-                      const r = await fetch(url, { method: "GET" });
-                      const j = (await r.json().catch(() => null)) as AvailabilityResponse | null;
-                      if (r.ok && j?.ok) {
-                        setAvailability(j);
-                        const w = selectedWeekday;
-                        const arr = w ? j?.slotsByWeekday?.[w] ?? [] : [];
-                        const opt =
-                          (targetTime
-                            ? arr.find(
-                                (s: any) =>
-                                  String(s.professorTime ?? "").trim() === targetTime ||
-                                  String(s.leadTime ?? "").trim() === targetLeadTime ||
-                                  String(s.displayLabel ?? "").trim() === targetLeadTime,
-                              )
-                            : null) || null;
-                        if (opt) {
-                          setSelectedTimeOpt(opt as any);
-                          if (stepNum >= 3) {
-                            const lbl =
-                              (prog.recurring_class_weekday_label as string) ||
-                              w ||
-                              "";
-                            setSubmitResult({
-                              weekday: w || "fri",
-                              weekdayLabel: lbl,
-                              professorTime: targetTime,
-                              leadTime: targetLeadTime || targetTime,
-                              displayLabel: lbl + " " + (targetLeadTime || targetTime),
-                            } as any);
-                          }
-                        }
-                      }
-                    } catch {}
-                  })();
-                  return prevAvail;
-                }
-                const w = selectedWeekday;
-                const arr = w ? prevAvail.slotsByWeekday[w] ?? [] : [];
-                const opt =
-                  (targetTime
-                    ? arr.find(
-                        (s: any) =>
-                          String(s.professorTime ?? "").trim() === targetTime ||
-                          String(s.leadTime ?? "").trim() === targetLeadTime ||
-                          String(s.displayLabel ?? "").trim() === targetLeadTime,
-                      )
-                    : null) || null;
-                if (opt) {
-                  setSelectedTimeOpt(opt as any);
-                  if (stepNum >= 3) {
-                    const lbl = (prog.recurring_class_weekday_label as string) || w || "";
-                    setSubmitResult({
-                      weekday: w || "fri",
-                      weekdayLabel: lbl,
-                      professorTime: targetTime,
-                      leadTime: targetLeadTime || targetTime,
-                      displayLabel: lbl + " " + (targetLeadTime || targetTime),
-                    } as any);
+          if (hasPassword) {
+            setHasPasswordInitial(true);
+            if (stepNum >= 1) setSenha("••••••••");
+          }
+          if (stepNum >= 2 && resolvedWeekday && savedProfessorTime) {
+            const finalLeadTime = savedLeadTime || savedProfessorTime;
+            const finalLabel = savedWeekdayLabel || savedWeekdayRaw;
+            savedSubmitResult = {
+              weekday: resolvedWeekday,
+              weekdayLabel: finalLabel,
+              professorTime: savedProfessorTime,
+              leadTime: finalLeadTime,
+            };
+            if (stepNum >= 3) {
+              setSubmitResult(savedSubmitResult);
+            }
+            (async () => {
+              try {
+                const tz =
+                  typeof Intl !== "undefined" &&
+                  Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+                    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                    : "";
+                const url = tz
+                  ? `/api/cadastro/recorrente/availability?timezone=${encodeURIComponent(tz)}`
+                  : `/api/cadastro/recorrente/availability`;
+                const r = await fetch(url, { method: "GET" });
+                const j = (await r.json().catch(() => null)) as AvailabilityResponse | null;
+                if (r.ok && j?.ok) {
+                  setAvailability(j);
+                  const w = resolvedWeekday;
+                  const arr = w ? j?.slotsByWeekday?.[w] ?? [] : [];
+                  const targetTime = savedProfessorTime;
+                  const targetLeadT = savedLeadTime;
+                  const opt =
+                    (targetTime
+                      ? arr.find(
+                          (s: any) =>
+                            String(s.professorTime ?? "").trim() === targetTime ||
+                            String(s.leadTime ?? "").trim() === targetLeadT ||
+                            String(s.displayLabel ?? "").trim() === targetLeadT,
+                        )
+                      : null) || null;
+                  if (opt) {
+                    setSelectedTimeOpt(opt as any);
+                    if (stepNum >= 3) {
+                      const lbl = savedWeekdayLabel || w || "";
+                      const leadT = targetLeadT || targetTime;
+                      setSubmitResult({
+                        weekday: w || "fri",
+                        weekdayLabel: lbl,
+                        professorTime: targetTime,
+                        leadTime: leadT,
+                      } as any);
+                    }
                   }
                 }
-                return prevAvail;
-              });
-            }
+              } catch {}
+            })();
           }
+          setStep(stepNum);
         }
       } catch (e) {
         setInitialDataError(toErrorMessage(e, ""));
@@ -797,10 +816,9 @@ export default function CadastroRecorrenteBody() {
 
   function canAdvanceFromStep0() {
     if (accessBlocked) return false;
-    return (
-      phoneField.replace(/\D/g, "").length >= 10 &&
-      senha.trim().length >= 4
-    );
+    if (phoneField.replace(/\D/g, "").length < 10) return false;
+    if (hasPasswordInitial) return true;
+    return senha.trim().length >= 4;
   }
 
   function handleAdvance0() {
