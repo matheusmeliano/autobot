@@ -234,7 +234,7 @@ export default function CadastroRecorrenteBody() {
 
   useEffect(() => {
     if (!submitResult) return;
-    if (!(step >= 4 && step <= 8)) return;
+    if (!(step >= 4 && step <= 9)) return;
     if (contractAllFields.length > 0) return;
     const tel = phoneField.replace(/\D/g, "").trim();
     if (!tel || tel.length < 10) return;
@@ -765,6 +765,14 @@ export default function CadastroRecorrenteBody() {
           if (restoredCpf) {
             setLastSavedFieldValues((prev) => ({ ...prev, cpf: restoredCpf! }));
             setContractSnapshot((prev) => ({ ...prev, cpf: restoredCpf! }));
+          }
+          if (normalizedLeadFullName) {
+            setLastSavedFieldValues((prev) => ({ ...prev, full_name: normalizedLeadFullName! }));
+            setContractSnapshot((prev) => ({ ...prev, full_name: normalizedLeadFullName! }));
+          }
+          if (restoredLeadPhone) {
+            setLastSavedFieldValues((prev) => ({ ...prev, phone: restoredLeadPhone! }));
+            setContractSnapshot((prev) => ({ ...prev, phone: restoredLeadPhone! }));
           }
           if (restoredLegalName) {
             setLastSavedFieldValues((prev) => ({ ...prev, legal_responsible_name: restoredLegalName! }));
