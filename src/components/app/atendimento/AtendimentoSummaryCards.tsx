@@ -1299,7 +1299,13 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
     [agendamentoItems, interessadosItems, alunosItems, contratosItems],
   );
   const [activeSection, setActiveSection] = useState<SummarySectionId>("interessados");
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [selectedLeadIdBySection, setSelectedLeadIdBySection] = useState<
+    Partial<Record<SummarySectionId, string | null>>
+  >({});
+  function setActiveSectionSelectedLead(id: string | null) {
+    setSelectedLeadIdBySection((current) => ({ ...current, [activeSection]: id }));
+  }
+  const selectedLeadId: string | null = selectedLeadIdBySection[activeSection] ?? null;
   const queryParamsInitializedRef = useRef(false);
   useEffect(() => {
     if (queryParamsInitializedRef.current || typeof window === "undefined") return;
@@ -1307,12 +1313,14 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
     try {
       const params = new URLSearchParams(window.location.search);
       const rawSection = String(params.get("section") ?? "").trim().toLowerCase();
+      let initialSection: SummarySectionId = "interessados";
       if (rawSection === "interessados" || rawSection === "alunos" || rawSection === "agendamentos" || rawSection === "contratos") {
+        initialSection = rawSection;
         setActiveSection(rawSection);
       }
       const rawLeadId = String(params.get("leadId") ?? "").trim();
       if (rawLeadId) {
-        setSelectedLeadId(rawLeadId);
+        setSelectedLeadIdBySection((current) => ({ ...current, [initialSection]: rawLeadId }));
       }
     } catch (_e) {}
   }, []);
@@ -1410,7 +1418,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
 
       setLocalLeads((current) => current.filter((item) => item.id !== leadId));
       setLocalSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
-      setSelectedLeadId((current) => (current === leadId ? null : current));
+      setActiveSectionSelectedLead(selectedLeadId === leadId ? null : selectedLeadId);
       setMobileDetailsOpen((current) => (selectedLeadId === leadId ? false : current));
       modalToast.success(`${Label} excluído com sucesso.`);
     } catch (error) {
@@ -1423,7 +1431,22 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   useEffect(() => {
     setQuery("");
     setPage(1);
-  }, [activeSection]);
+    const targetSection = sections.find((s) => s.id === activeSection) ?? sections[0];
+    const targetItems = targetSection?.items ?? [];
+    setSelectedLeadIdBySection((current) => {
+      const existingForSection = Object.prototype.hasOwnProperty.call(current, activeSection)
+        ? current[activeSection] ?? null
+        : null;
+      if (existingForSection && targetItems.some((lead) => lead.id === existingForSection)) {
+        return current;
+      }
+      if (!targetItems.length) {
+        return { ...current, [activeSection]: null };
+      }
+      const firstId = targetItems[0]?.id;
+      return { ...current, [activeSection]: typeof firstId === "string" && firstId ? firstId : null };
+    });
+  }, [activeSection, sections]);
 
   useEffect(() => {
     setPage((current) => {
@@ -1434,27 +1457,32 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   }, [totalPages]);
 
   useEffect(() => {
-    setSelectedLeadId((currentSelectedLeadId) => {
-      if (!filteredItems.length) return null;
-      if (currentSelectedLeadId && filteredItems.some((lead) => lead.id === currentSelectedLeadId)) {
-        return currentSelectedLeadId;
+    setSelectedLeadIdBySection((current) => {
+      const existingForSection = Object.prototype.hasOwnProperty.call(current, activeSection)
+        ? current[activeSection] ?? null
+        : null;
+      if (!filteredItems.length) return { ...current, [activeSection]: null };
+      if (existingForSection && filteredItems.some((lead) => lead.id === existingForSection)) {
+        return current;
       }
-      return currentSelectedLeadId;
+      return current;
     });
-  }, [filteredItems]);
+  }, [filteredItems, activeSection]);
 
   useEffect(() => {
     if (!refreshNonce) return;
+    setSelectedLeadIdBySection({});
     const target = sections.find((s) => s.id === activeSection) ?? sections[0];
     const items = target?.items ?? [];
     if (!items.length) {
-      setSelectedLeadId(null);
       return;
     }
     setQuery("");
     setPage(1);
     const firstId = items[0]?.id;
-    setSelectedLeadId(typeof firstId === "string" && firstId ? firstId : null);
+    if (typeof firstId === "string" && firstId) {
+      setSelectedLeadIdBySection((current) => ({ ...current, [activeSection]: firstId }));
+    }
   }, [refreshNonce, activeSection, sections]);
 
   useEffect(() => {
@@ -1464,7 +1492,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   }, [selectedLead]);
 
   function handleSelectLead(lead: AtendimentoLeadListItem) {
-    setSelectedLeadId(lead.id);
+    setActiveSectionSelectedLead(lead.id);
     setMobileDetailsOpen(true);
   }
 
@@ -1516,7 +1544,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
         aulasExperimentaisAgendadas: Math.max(0, current.aulasExperimentaisAgendadas - 1),
         totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1),
       }));
-      setSelectedLeadId((current) => (current === lead.id ? null : current));
+      setActiveSectionSelectedLead(selectedLeadId === lead.id ? null : selectedLeadId);
       setMobileDetailsOpen((current) => (selectedLeadId === lead.id ? false : current));
       modalToast.success("Agendamento cancelado e interessado removido.");
     } catch (error) {
