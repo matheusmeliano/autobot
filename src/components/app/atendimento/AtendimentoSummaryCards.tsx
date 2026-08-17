@@ -208,7 +208,7 @@ function RecurringClassLinkCard({
   })();
 
   const savedLink = String((lead as any)?.recurring_class_link ?? "").trim();
-  const finalLink = savedLink || urlEncoded;
+  const finalLink = urlEncoded;
 
   return (
     <div className="rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 px-3 py-2.5 space-y-2">
@@ -221,16 +221,13 @@ function RecurringClassLinkCard({
           onClick={async (ev) => {
             if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
             try {
-              if (!savedLink) {
-                try { await onSaveRecurringLink(lead, urlEncoded); } catch {}
-              }
               window.open(finalLink, "_blank", "noopener,noreferrer");
             } catch {}
           }}
           disabled={savingThisLead}
           className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-700 disabled:opacity-60"
         >
-          {savingThisLead && !savedLink ? (
+          {savingThisLead ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <ExternalLink className="h-3.5 w-3.5" />
@@ -242,9 +239,6 @@ function RecurringClassLinkCard({
           onClick={async (ev) => {
             if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
             try {
-              if (!savedLink) {
-                try { await onSaveRecurringLink(lead, urlEncoded); } catch {}
-              }
               if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
                 await (navigator as any).clipboard.writeText(finalLink);
                 modalToast.success("Link de matrícula copiado.");
@@ -270,22 +264,16 @@ function RecurringClassLinkCard({
           disabled={savingThisLead}
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60"
         >
-          {savingThisLead && !savedLink ? (
+          {savingThisLead ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <Copy className="h-3.5 w-3.5" />
           )}
           Copiar
         </button>
-        {savedLink ? (
-          <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700/80 ml-0.5">
-            <Check className="h-3 w-3" /> salvo
-          </div>
-        ) : (
-          <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500/85 ml-0.5">
-            <Zap className="h-3 w-3" /> auto-salva ao abrir/copiar
-          </div>
-        )}
+        <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700/80 ml-0.5">
+          <Check className="h-3 w-3" /> salvo
+        </div>
       </div>
     </div>
   );
