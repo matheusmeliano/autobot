@@ -61,7 +61,6 @@ import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/l
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
 const MAX_LOCATION_VALIDATION_ATTEMPTS = 3;
-const MAX_FULL_NAME_VALIDATION_ATTEMPTS = 3;
 const MAX_SCHEDULE_SELECTION_ATTEMPTS = 3;
 const WHATSAPP_PENDING_MESSAGE =
   "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
@@ -70,9 +69,6 @@ const WHATSAPP_INVALID_MESSAGE =
 const WHATSAPP_INVALID_FORMAT_MESSAGE =
   "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE = ATENDIMENTO_BLOCKED_FINAL_MESSAGE;
-const FULL_NAME_INVALID_MESSAGE =
-  "Essa resposta não parece ser um nome completo válido. Por favor, informe seu nome e sobrenome (apenas letras, sem números, saudações ou emojis).";
-const FULL_NAME_BLOCKED_FINAL_MESSAGE = ATENDIMENTO_BLOCKED_FINAL_MESSAGE;
 const NUMERIC_ONLY_TEXT_MESSAGE =
   "Essa resposta não me parece válida. Responda somente com números.";
 const NUMERIC_ONLY_MIXED_MESSAGE =
@@ -274,27 +270,6 @@ function getLocationFailureEventType(field: "state" | "city") {
   return field === "state" ? "state_validation_failed" : "city_validation_failed";
 }
 
-const FULL_NAME_VALIDATION_FAILURE_EVENT_TYPE = "full_name_validation_failed";
-
-function buildFullNameRetryMessage(attempts: number) {
-  return `${FULL_NAME_INVALID_MESSAGE}\n\nTentativa ${attempts} de ${MAX_FULL_NAME_VALIDATION_ATTEMPTS}.`;
-}
-
-async function getFullNameValidationFailureCount(params: {
-  admin: ReturnType<typeof createSupabaseAdminClient>;
-  leadId: string;
-  conversationId: string;
-}) {
-  const { count } = await params.admin
-    .from("atendimento_history_events")
-    .select("id", { count: "exact", head: true })
-    .eq("lead_id", params.leadId)
-    .eq("conversation_id", params.conversationId)
-    .eq("event_type", FULL_NAME_VALIDATION_FAILURE_EVENT_TYPE);
-
-  return Number(count ?? 0);
-}
-
 function buildScheduleSelectionRetryMessage(field: "date" | "time", attempts: number) {
   const baseMessage =
     field === "date" ? EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE : EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE;
@@ -347,7 +322,7 @@ function looksLikeFieldValue(field: CapturedFieldName, text: string) {
   const clean = text.trim();
   if (!clean) return false;
   if (field === "phone") return clean.replace(/\D/g, "").length >= 8;
-  if (field === "full_name") return looksLikeFullName(clean);
+  if (field === "full_name") return clean.split(/\s+/).length >= 2;
   return true;
 }
 
@@ -1075,149 +1050,6 @@ export async function POST(req: Request) {
         bot_enabled: true,
       },
     });
-  }
-
-  const existingFullName = String((lead as any)?.full_name ?? "").trim();
-  const existingFullNameIsValid = Boolean(existingFullName && looksLikeFullName(existingFullName));
-  const fullNameValidationNeeded =
-    expectedField === "full_name" &&
-    !existingFullNameIsValid;
-  if (fullNameValidationNeeded) {
-    const capturedFullName = String(captured.full_name ?? extracted.full_name ?? "").trim();
-    const fallbackName = looksLikeFullName(contentText.trim()) ? contentText.trim() : "";
-    const candidateName = capturedFullName || fallbackName;
-    const validationPassed = Boolean(candidateName && looksLikeFullName(candidateName));
-
-    if (!validationPassed) {
-      const nextFailureAttempt =
-        (await getFullNameValidationFailureCount({
-          admin,
-          leadId: String(lead.id),
-          conversationId: String(conversation.id),
-        })) + 1;
-      const shouldBlockConversation = nextFailureAttempt >= MAX_FULL_NAME_VALIDATION_ATTEMPTS;
-      const replyMessage = shouldBlockConversation
-        ? FULL_NAME_BLOCKED_FINAL_MESSAGE
-        : buildFullNameRetryMessage(nextFailureAttempt);
-
-      await admin
-        .from("atendimento_leads")
-        .update({
-          unread_count: Number(lead.unread_count ?? 0) + 1,
-          is_new_for_attendant: true,
-          last_interaction_at: nowIso,
-          updated_at: nowIso,
-          ...(shouldBlockConversation
-            ? {
-                status: "encerrado",
-                funnel_stage: "encerrado",
-              }
-            : {}),
-        })
-        .eq("id", String(lead.id));
-
-      await syncConversationPreview({
-        conversationId: String(conversation.id),
-        contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
-        createdAt: nowIso,
-      });
-
-      await appendHistoryEvent({
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-        eventType: "message_received",
-        title: "Mensagem recebida do lead",
-        details: {
-          content_text: contentText || null,
-          media_type: mediaType,
-          media_url: mediaUrl,
-          mime_type: mimeType,
-          file_name: fileName,
-          file_size_bytes: fileSizeBytes,
-        },
-        actorType: "lead",
-      });
-
-      await appendHistoryEvent({
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-        eventType: FULL_NAME_VALIDATION_FAILURE_EVENT_TYPE,
-        title: "Falha ao identificar o nome completo informado",
-        details: {
-          attempt: nextFailureAttempt,
-          content_text: contentText || null,
-          captured_full_name: capturedFullName || null,
-          candidate_name: candidateName || null,
-        },
-        actorType: "system",
-      });
-
-      if (shouldBlockConversation) {
-        await admin
-          .from("atendimento_conversations")
-          .update({
-            bot_enabled: false,
-            updated_at: nowIso,
-          })
-          .eq("id", String(conversation.id));
-
-        await appendHistoryEvent({
-          leadId: String(lead.id),
-          conversationId: String(conversation.id),
-          eventType: "conversation_closed",
-          title: "Atendimento encerrado após 3 falhas de identificação de nome completo",
-          details: {
-            invalid_attempts: nextFailureAttempt,
-            source: "full_name_validation",
-          },
-          actorType: "system",
-        });
-      }
-
-      await sleep(POST_LEAD_REPLY_DELAY_MS);
-      const botNowIso = new Date().toISOString();
-      const { data: outbound, error: outboundError } = await admin
-        .from("atendimento_messages")
-        .insert({
-          conversation_id: String(conversation.id),
-          sender_role: "bot",
-          content_text: replyMessage,
-          media_type: "text",
-          status: "entregue",
-          sent_at: botNowIso,
-          delivered_at: botNowIso,
-        })
-        .select("*")
-        .maybeSingle();
-
-      if (outboundError) {
-        const code = String((outboundError as any)?.code ?? "").trim();
-        if (code !== "23505") {
-          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
-        }
-      }
-
-      await syncConversationPreview({
-        conversationId: String(conversation.id),
-        contentText: replyMessage,
-        createdAt: botNowIso,
-      });
-
-      return Response.json({
-        ok: true,
-        inbound,
-        outbound: outboundError ? null : outbound,
-        blocked: shouldBlockConversation,
-        conversation: {
-          id: String(conversation.id),
-          bot_enabled: !shouldBlockConversation,
-        },
-      });
-    }
-
-    if (candidateName && !captured.full_name) {
-      captured.full_name = candidateName.replace(/\s+/g, " ").trim();
-    }
   }
 
   const currentFunnelStage = String((lead as any).funnel_stage ?? "").trim();
@@ -2836,139 +2668,6 @@ export async function POST(req: Request) {
         bot_enabled: true,
       },
     });
-  }
-
-  if (expectedField === "full_name") {
-    const persistedAfterLocation =
-      (captured as any).full_name ?? String((lead as any).full_name ?? "").trim();
-    const nameIsValid = Boolean(persistedAfterLocation && looksLikeFullName(persistedAfterLocation));
-    if (!nameIsValid) {
-      const nextFailureAttempt =
-        (await getFullNameValidationFailureCount({
-          admin,
-          leadId: String(lead.id),
-          conversationId: String(conversation.id),
-        })) + 1;
-      const shouldBlockConversation = nextFailureAttempt >= MAX_FULL_NAME_VALIDATION_ATTEMPTS;
-      const replyMessage = shouldBlockConversation
-        ? FULL_NAME_BLOCKED_FINAL_MESSAGE
-        : buildFullNameRetryMessage(nextFailureAttempt);
-
-      await admin
-        .from("atendimento_leads")
-        .update({
-          unread_count: Number(lead.unread_count ?? 0) + 1,
-          is_new_for_attendant: true,
-          last_interaction_at: nowIso,
-          updated_at: nowIso,
-          ...(shouldBlockConversation
-            ? {
-                status: "encerrado",
-                funnel_stage: "encerrado",
-              }
-            : {}),
-        })
-        .eq("id", String(lead.id));
-
-      await syncConversationPreview({
-        conversationId: String(conversation.id),
-        contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
-        createdAt: nowIso,
-      });
-
-      await appendHistoryEvent({
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-        eventType: "message_received",
-        title: "Mensagem recebida do lead",
-        details: {
-          content_text: contentText || null,
-          media_type: mediaType,
-          media_url: mediaUrl,
-          mime_type: mimeType,
-          file_name: fileName,
-          file_size_bytes: fileSizeBytes,
-        },
-        actorType: "lead",
-      });
-
-      await appendHistoryEvent({
-        leadId: String(lead.id),
-        conversationId: String(conversation.id),
-        eventType: FULL_NAME_VALIDATION_FAILURE_EVENT_TYPE,
-        title: "Falha ao identificar o nome completo informado",
-        details: {
-          attempt: nextFailureAttempt,
-          content_text: contentText || null,
-          captured_full_name: String((captured as any).full_name ?? "").trim() || null,
-          persisted_after_location: persistedAfterLocation || null,
-          source: "fallback_full_name_validation_before_location",
-        },
-        actorType: "system",
-      });
-
-      if (shouldBlockConversation) {
-        await admin
-          .from("atendimento_conversations")
-          .update({
-            bot_enabled: false,
-            updated_at: nowIso,
-          })
-          .eq("id", String(conversation.id));
-
-        await appendHistoryEvent({
-          leadId: String(lead.id),
-          conversationId: String(conversation.id),
-          eventType: "conversation_closed",
-          title: "Atendimento encerrado após 3 falhas de identificação de nome completo",
-          details: {
-            invalid_attempts: nextFailureAttempt,
-            source: "fallback_full_name_validation_before_location",
-          },
-          actorType: "system",
-        });
-      }
-
-      await sleep(POST_LEAD_REPLY_DELAY_MS);
-      const botNowIso = new Date().toISOString();
-      const { data: outbound, error: outboundError } = await admin
-        .from("atendimento_messages")
-        .insert({
-          conversation_id: String(conversation.id),
-          sender_role: "bot",
-          content_text: replyMessage,
-          media_type: "text",
-          status: "entregue",
-          sent_at: botNowIso,
-          delivered_at: botNowIso,
-        })
-        .select("*")
-        .maybeSingle();
-
-      if (outboundError) {
-        const code = String((outboundError as any)?.code ?? "").trim();
-        if (code !== "23505") {
-          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
-        }
-      }
-
-      await syncConversationPreview({
-        conversationId: String(conversation.id),
-        contentText: replyMessage,
-        createdAt: botNowIso,
-      });
-
-      return Response.json({
-        ok: true,
-        inbound,
-        outbound: outboundError ? null : outbound,
-        blocked: shouldBlockConversation,
-        conversation: {
-          id: String(conversation.id),
-          bot_enabled: !shouldBlockConversation,
-        },
-      });
-    }
   }
 
   const locationContext = buildLeadLocationContext({
