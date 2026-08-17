@@ -1307,6 +1307,12 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   }
   const selectedLeadId: string | null = selectedLeadIdBySection[activeSection] ?? null;
   const queryParamsInitializedRef = useRef(false);
+  const lastActiveSectionRef = useRef<SummarySectionId | null>(null);
+  const lastProcessedRefreshNonceRef = useRef<number>(-1);
+  const sectionsRef = useRef(sections);
+  useEffect(() => {
+    sectionsRef.current = sections;
+  }, [sections]);
   useEffect(() => {
     if (queryParamsInitializedRef.current || typeof window === "undefined") return;
     queryParamsInitializedRef.current = true;
@@ -1429,9 +1435,12 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   }
 
   useEffect(() => {
+    if (lastActiveSectionRef.current === activeSection) return;
+    lastActiveSectionRef.current = activeSection;
     setQuery("");
     setPage(1);
-    const targetSection = sections.find((s) => s.id === activeSection) ?? sections[0];
+    const sectionsNow = sectionsRef.current;
+    const targetSection = sectionsNow.find((s) => s.id === activeSection) ?? sectionsNow[0];
     const targetItems = targetSection?.items ?? [];
     setSelectedLeadIdBySection((current) => {
       const existingForSection = Object.prototype.hasOwnProperty.call(current, activeSection)
@@ -1446,7 +1455,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
       const firstId = targetItems[0]?.id;
       return { ...current, [activeSection]: typeof firstId === "string" && firstId ? firstId : null };
     });
-  }, [activeSection, sections]);
+  }, [activeSection]);
 
   useEffect(() => {
     setPage((current) => {
@@ -1470,9 +1479,12 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   }, [filteredItems, activeSection]);
 
   useEffect(() => {
-    if (!refreshNonce) return;
+    if (refreshNonce === 0) return;
+    if (lastProcessedRefreshNonceRef.current === refreshNonce) return;
+    lastProcessedRefreshNonceRef.current = refreshNonce;
+    const sectionsNow = sectionsRef.current;
     setSelectedLeadIdBySection({});
-    const target = sections.find((s) => s.id === activeSection) ?? sections[0];
+    const target = sectionsNow.find((s) => s.id === activeSection) ?? sectionsNow[0];
     const items = target?.items ?? [];
     if (!items.length) {
       return;
@@ -1483,7 +1495,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
     if (typeof firstId === "string" && firstId) {
       setSelectedLeadIdBySection((current) => ({ ...current, [activeSection]: firstId }));
     }
-  }, [refreshNonce, activeSection, sections]);
+  }, [refreshNonce, activeSection]);
 
   useEffect(() => {
     if (!selectedLead) {
