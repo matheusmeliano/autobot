@@ -1238,3 +1238,295 @@ export function calculatePastRecurringOccurrences(params: {
   results.sort((a, b) => new Date(b.professorStartAt).getTime() - new Date(a.professorStartAt).getTime());
   return results;
 }
+
+const BRAZILIAN_STATE_KEYWORDS = new Set<string>([
+  "acre", "alagoas", "amapa", "amapá", "amazonas", "bahia", "ceara", "ceará",
+  "distrito federal", "espirito santo", "espírito santo", "goias", "goiás",
+  "maranhao", "maranhão", "mato grosso do sul", "mato grosso", "minas gerais",
+  "para", "pará", "paraiba", "paraíba", "parana", "paraná", "pernambuco",
+  "piaui", "piauí", "rio de janeiro", "rio grande do norte", "rio grande do sul",
+  "rondonia", "roraima", "santa catarina", "sao paulo", "são paulo",
+  "sergipe", "tocantins",
+  "ac", "al", "ap", "am", "ba", "ce", "df", "es", "go", "ma", "mt", "ms",
+  "mg", "pa", "pb", "pr", "pe", "pi", "rj", "rn", "rs", "ro", "rr", "sc",
+  "sp", "se", "to",
+]);
+
+export function inferCountry(
+  rawState: string | null | undefined,
+  rawCity: string | null | undefined,
+  rawTimezone: string | null | undefined
+): string | null {
+  const state = (rawState ?? "").trim();
+  const city = (rawCity ?? "").trim();
+  const timezone = (rawTimezone ?? "").trim();
+  const stateLow = state.toLowerCase();
+  const cityLow = city.toLowerCase();
+
+  if (!stateLow && !cityLow && !timezone) return null;
+
+  const brTz = [
+    "America/Sao_Paulo",
+    "America/Cuiaba",
+    "America/Porto_Velho",
+    "America/Boa_Vista",
+    "America/Manaus",
+    "America/Eirunepe",
+    "America/Rio_Branco",
+    "America/Recife",
+    "America/Bahia",
+    "America/Santarem",
+    "America/Campo_Grande",
+    "Brazil/East",
+    "Brazil/West",
+    "Brazil/Acre",
+    "Brazil/DeNoronha",
+  ];
+  if (timezone && brTz.includes(timezone)) return "Brasil";
+
+  if (stateLow && BRAZILIAN_STATE_KEYWORDS.has(stateLow)) return "Brasil";
+
+  const keywordMap: Array<[RegExp, string]> = [
+    [/(florida|california|texas|new york|califórnia|nova york|washington|oregon|illinois|pennsylvania|nova jersey|georgia|ohio|michigan|carolina do norte|arizona|colorado|massachusetts|tennessee|nevada|virgínia|maryland|carolina do sul|kentucky|indiana|wisconsin|minnesota|missouri|maryland|iowa|arkansas|mississippi|nova hampshire|nebraska|virgínia ocidental|idaho|maine|montana|ri|delaware|dakota do sul|dakota do norte|alasca|wyoming|vermont|hawai|hawaii)/i, "Estados Unidos"],
+    [/\b(fl|ca|tx|ny|wa|il|pa|nj|ga|oh|mi|nc|az|co|ma|tn|nv|va|md|sc|al|ky|or|ok|ct|ks|ut|ia|ar|ms|nh|ne|wv|id|me|mt|ri|de|sd|nd|ak|wy|vt|hi)\b/i, "Estados Unidos"],
+    [/(ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|prince edward island|newfoundland|labrador|nunavut|northwest territories|yukon|canadá|canada)/i, "Canadá"],
+    [/(london|londres|england|inglaterra|scotland|escócia|wales|país de gales|northern ireland|irlanda do norte|united kingdom|reino unido|birmingham|manchester|liverpool|leeds|glasgow|edinburgh|bristol|sheffield|cardiff|belfast)/i, "Reino Unido"],
+    [/(dublin|ireland|irlanda|cork|galway|limerick)/i, "Irlanda"],
+    [/(lisboa|lisbon|oporto|porto|coimbra|aveiro|braga|faro|madeira|açores|portugal)/i, "Portugal"],
+    [/(paris|parís|lyon|marseille|nice|toulouse|bordeaux|lille|strasbourg|montpellier|grenoble|frança)/i, "França"],
+    [/(madrid|barcelona|valencia|valência|sevilla|sevilha|espanha|españa|malaga|bilbao|granada|zaragoza|palma|alicante|cordoba)/i, "Espanha"],
+    [/(roma|rome|milano|milan|napoli|florence|firenze|venezia|venice|turin|torino|bologna|palermo|genova|itália)/i, "Itália"],
+    [/(berlin|berlim|munich|munique|hamburg|hamburgo|frankfurt|cologne|colônia|düsseldorf|stuttgart|leipzig|dresden|alemanha|deutschland)/i, "Alemanha"],
+    [/(zurich|zurique|geneva|genebra|bern|basel|lausanne|switzerland|suíça|suiça)/i, "Suíça"],
+    [/(amsterdam|rotterdam|the hague|den haag|netherlands|países baixos|holanda|holland|utrecht|eindhoven|groningen)/i, "Países Baixos"],
+    [/(brussels|bruxelas|antwerp|belgium|bélgica|belgica|ghent|charleroi|liege)/i, "Bélgica"],
+    [/(stockholm|gothenburg|sweden|suécia|suecia|uppsala|malmo|linkoping)/i, "Suécia"],
+    [/(oslo|bergen|norway|noruega|trondheim|stavanger|tromso)/i, "Noruega"],
+    [/(copenhagen|copenhague|denmark|dinamarca|aarhus|odense|aalborg)/i, "Dinamarca"],
+    [/(helsinki|finland|finlândia|tampere|turku|oulu)/i, "Finlândia"],
+    [/(moscow|moscou|saint petersburg|são petersburgo|russia|rússia|novosibirsk|yekaterinburg|nizhny novgorod|kazan|chelyabinsk|omsk|samara|rostov-on-don|ufa|krasnoyarsk|voronezh|perm|volgograd)/i, "Rússia"],
+    [/(mexico city|cidade do méxico|guadalajara|monterrey|cancun|méxico|mexico|puebla|tijuana|ciudad juarez|leon|queretaro|zapopan|monterrey|chihuahua)/i, "México"],
+    [/(buenos aires|cordoba|rosario|argentina|mendoza|tucuman|la plata|mar del plata|salta)/i, "Argentina"],
+    [/(santiago|valparaiso|concepción|chile|puente alto|antofagasta|la serena|temuco|iquique|punta arenas)/i, "Chile"],
+    [/(bogotá|medellín|cali|barranquilla|colômbia|cartagena|cúcuta|soledad|ibagué|bucaramanga)/i, "Colômbia"],
+    [/(lima|cusco|peru|arequipa|trujillo|chiclayo|piura|iquitos|huancayo|tacna)/i, "Peru"],
+    [/(la paz|santa cruz|cochabamba|bolívia|bolivia|oruro|potosi|sucre|tarija|beni)/i, "Bolívia"],
+    [/(caracas|maracaibo|venezuela|valencia|barquisimeto|ciudad guayana|san cristobal|maturin|barcelona|maracay)/i, "Venezuela"],
+    [/(asunción|paraguay|paraguai|ciudad del este|san lorenzo|luque|fernando de la mora|limpio|ñemby|encarnación)/i, "Paraguai"],
+    [/(montevideo|uruguay|uruguai|salto|ciudad de la costa|las piedras|durazno|florida|maldonado|rivera|tacuarembó)/i, "Uruguai"],
+    [/(tokyo|tóquio|osaka|kyoto|japan|japão|yokohama|nagoya|sapporo|fukuoka|kobe|kawasaki|saitama|hiroshima|sendai|chiba|kitakyushu|sakai|niigata|hamamatsu|kumamoto|sagamihara|okayama|kyoto|okinawa)/i, "Japão"],
+    [/(beijing|pequim|shanghai|hong kong|china|guangzhou|shenzhen|chengdu|wuhan|xian|nanjing|chongqing|tianjin|macau|taipei|kaohsiung|taichung|tainan)/i, "China"],
+    [/(seoul|seul|busan|daegu|incheon|gwangju|daejeon|ulsan|suwon|korea|coreia do sul)/i, "Coreia do Sul"],
+    [/(pyongyang|coreia do norte|north korea)/i, "Coreia do Norte"],
+    [/(mumbai|bombaim|new delhi|nova déli|índia|india|delhi|bangalore|chennai|hyderabad|ahmedabad|pune|surat|jaipur|lucknow|kanpur|nagpur|patna|indore|thiruvananthapuram|bhopal|vadodara|coimbatore|kochi|ludhiana|visakhapatnam|agra|varanasi|madurai|meerut|nashik|jodhpur|rajkot|gwalior|vijayawada|chandigarh|jamshedpur|bhubaneswar|amritsar|allahabad|ranchi|srinagar|raipur|kota|aurangabad)/i, "Índia"],
+    [/(dubai|abu dhabi|sharjah|al ain|ajman|ras al-khaimah|fujairah|umm al-quwain|emirados árabes unidos|uae)/i, "Emirados Árabes Unidos"],
+    [/(istanbul|ankara|izmir|turkey|turquia|bursa|adana|gaziantep|konya|antalya|mersin|diyarbakir|kayseri|eskisehir|denizli|sanliurfa|malatya|samsun|kahramanmaras|trabzon)/i, "Turquia"],
+    [/(cape town|cidade do cabo|johannesburg|pretoria|durban|port elizabeth|bloemfontein|áfrica do sul|south africa|boksburg|benoni|potchefstroom|nelspruit|kimberley|polokwane|george|richards bay|upington|mossel bay|stellenbosch)/i, "África do Sul"],
+    [/(cairo|el cairo|egypt|egito|alexandria|giza|luxor|aswan|port said|suez|sharm el-sheikh|hurghada|mansoura|tanta|faiyum|ismailia|zagazig|damietta|asyut)/i, "Egito"],
+    [/(tel aviv|jerusalem|jerusalém|israel|haifa|rishon lezion|petah tikva|ashdod|netanya|beer sheva|bnei brak|holon|ramat gan|bat yam|herzliya|kfar saba|modi'in|nahariya|ramla|lod|nahariya|eilat)/i, "Israel"],
+    [/(riyadh|riade|jeddah|mecca|medina|dammam|khobar|taif|tabuk|buraydah|abha|jazan|najran|saudi|arábia saudita)/i, "Arábia Saudita"],
+    [/(sydney|melbourne|brisbane|perth|adelaide|gold coast|newcastle|canberra|sunshine coast|wollongong|geelong|hobart|townsville|cairns|darwin|toowoomba|ballarat|bendigo|albury wodonga|launceston|mackay|rockhampton|bunbury|bundaberg|hervey bay|wagga wagga|australia)/i, "Austrália"],
+    [/(auckland|wellington|christchurch|dunedin|hamilton|tauranga|lower hutt|palmerston north|napier hastings|porirua|invercargill|whangarei|new plymouth|whanganui|gisborne|blenheim|timaru|nelson|rotorua|new zealand|nova zelândia)/i, "Nova Zelândia"],
+    [/(singapore|singapura|woodlands|yishun|jurong|tampines|bedok|pasir ris|hougang|sengkang|punggol|serangoon|bishan|ang mo kio|kallang|toapayoh|marine parade|queenstown|buangkok|sembawang|canberra)/i, "Singapura"],
+    [/(bangkok|nonthaburi|pak kret|hat yai|chiang mai|si racha|phuket|thailand|tailândia|udon thani|nakhon ratchasima|chiang rai|khon kaen|surat thani|nakhon si thammarat|pattaya|samut prakan|ayutthaya|rayong|songkhla|trang)/i, "Tailândia"],
+    [/(ho chi minh|hanoi|hai phong|da nang|can tho|hai duong|thanh pho bien|vietnam|vietnã|bien hoa|long xuyen|hai phong|haiphong|nam dinh|nha trang|tuy hoa|qui nhon|da lat|vung tau|phan thiet|kon tum|buon ma thuot|pleiku|tuyen quang|lao cai|lang son|cao bang|bac giang|thai nguyen|quang ninh|hai duong|hung yen|bac ninh|phu tho|vinh|thanh hoa|ha tinh|quang binh|quang tri|thua thien hue|da nang|quang nam|quang ngai|binh dinh|phu yen|khanh hoa|ninh thuan|binh thuan|lam dong|binh phuoc|tay ninh|binh duong|dong nai|ba ria vung tau|an giang|dong thap|tien giang|kien giang|can tho|vinh long|ben tre|tra vinh|soc trang|bac lieu|ca mau|long an|tay ninh)/i, "Vietnã"],
+    [/(kuala lumpur|petaling jaya|ipoh|shah alam|klang|melaka|malacca|george town|penang|johor bahru|kuching|malaysia|kotakinabalu|seremban|kuantan|alor setar|sungai petani|terengganu|kelantan|pahang|perak|negeri sembilan|johor|kedah|penang|perlis|sabah|sarawak)/i, "Malásia"],
+    [/(jakarta|surabaya|bandung|medan|bekasi|palembang|tangerang|semarang|depok|makassar|indonesia|padang|batam|bandar lampung|pekanbaru|bogor|malang|denpasar|tangerang selatan|serang|yogyakarta|surakarta|solo|samarinda|tegal|cirebon|manado|pekalongan|balikpapan|mataram|pontianak|purwokerto|jambi|palembang|bengkulu|ambon|kupang|pematangsiantar|bitung|banjarmasin|papua|aceh|sulawesi|kalimantan|sumatra|jawa|bali|nusa tenggara|maluku)/i, "Indonésia"],
+    [/(manila|quezon city|davao|cebu|zinamboanga|taguig|antipolo|cagayan de oro|paranaque|dasmariñas|valenzuela|bacoor|general santos|las piñas|makati|san jose del monte|mandaluyong|muntinlupa|caloocan|mandaue|tacloban|butuan|angeles|iloilo|batangas|baguio|bacolod|santa rosa|san fernando|cabanatuan|tarlac|legazpi|dumaguete|surigao|calbayog|pasig|marikina|navotas|pateros|malabon|tagaytay|olongapo|vigan|candon|laoag|tuguegarao|santiago|cabanatuan|san jose|urdaneta|dagupan|san fernando la union|bangued|virac|lucena|gumaca|masbate|catbalogan|calapan|gasan|kalibo|roxas|san carlos|passi|iloilo|tagbilaran|dipolog|pagadian|zamboanga|cagayan de oro|valencia|malaybalay|kidapawan|koronadal|sultan kudarat|tacurong|isulan|digos|mati|surigao del sur|tandag|bislig|san francisco|agusan|butuan|surigao|bayugan|cabadbaran|tandag|san jose|baganga|cateel|manay|caraga|surigao del norte|dinagat islands|siargao|philippines|filipinas)/i, "Filipinas"],
+    [/(tehran|isfahan|mashhad|shiraz|tabriz|karaj|qom|ahvaz|kermanshah|urmia|rasht|zahedan|kerman|araks|hamadan|khorramabad|sanandaj|bandar abbas|arak|ilam|bushehr|yazd|sari|semnan|zanjan|gorgan|shahr-e kord|birjand|bojnurd|torbat-e jam|kashan|qazvin|ghorveh|sepidan|mahabad|bukan|sardasht|urmia|maragheh|miandoab|naqadeh|oshnavieh|piranshahr|salmas|chaldoran|mahshahr|omadiyeh|andimeshk|khorramshahr|abadan|ahvaz|susangerd|hendijan|deylam|ganaveh|asaluyeh|lar|bastak|kish|qeshm|bandar abbas|minab|jask|chabahar|konarak|zabol|zahedan|iranshahr|saravan|nikshahr|peshwar|quetta|iran)/i, "Irã"],
+    [/(baghdad|basra|erbil|mosul|najaf|karbala|sulaymaniyah|fallujah|nasiriyah|kirkuk|ramadi|tiqrit|babil|an najaf|karbala|samawah|diwaniyah|kut|amarah|badra|mandali|khanaqin|mandali|balad|dukhul|samarra|ad dawr|tikrit|beiji|mosul|zumar|tal afar|sinjar|al-qaim|rawah|anah|hadithah|hit|baghdadi|fallujah|abu ghraib|yusufiyah|mahmudiyah|iskandariyah|kufa|hillah|musayyib|faluja|iraq|iraque)/i, "Iraque"],
+    [/(doha|al-rayyan|al wakrah|al khor|umm salal mohammed|al daayen|qatar|al-shahaniya|al wakrah|al khor|umm salal ali|al jumayliyah|al shahaniya|doha|qatar|catar)/i, "Qatar"],
+    [/(kuwait|al farwaniyah|hawalli|al ahmadi|al jahra|mubarak al-kabeer|farwaniya|jleeb al-shuyoukh|sulaibikhat|sabah al-salem|qurain|abdullah al-mubarak|mahboula|fintas|abu al hasaniya|al abdali|kuwait city|salmiya|hadiyah|qortuba|jabriya|sharq|kuwait|cidade do kuwait|kuwait city)/i, "Kuwait"],
+    [/(muscat|salalah|suhar|bawshar|seeb|al buraimi|nizwa|ibri|sur|ruwi|mutrah|wadi al maawal|oman|omã|sohar|ibra|barka|rustaq|nakhal|bahla|al hamra|izki|al mudhaibi|samail|bidbid|al khuwair|al ansab|al seeb|bawshar|al amerat|mabela|maabela|sohar|shinas|liwa|saham|khabourah|al suwaiq|al masnaah|barka|musannah|nakhal|al rustaq|bidbid|samail|al mudhaibi|izki|al hamra|bahla|nizwa|adam|al hamra|manah|bahla|izki|al jabal al akhdar|sur|tiwi|al ashkharah|ras al hadd|masirah|duqm|jiddat il harasis|dhofar|salalah|taqah|mirbat|thumrait|rakhyut|dhalkut|muqshin|al mazyona|al wusta|mahout|duqm|jalan bani bu ali|jalan bani hasan|bidiya|al kamil wadi al wafi|hawiyat najm|sinkar|jiddat il harasis|al wusta governorate|al sharqiyah north|al sharqiyah south|al batinah north|al batinah south|al dahirah|al dhahirah|al buraimi|muscat governorate|muscat|oman|omã)/i, "Omã"],
+    [/(karachi|lahore|islamabad|rawalpindi|faisalabad|multan|gujranwala|hyderabad|peshawar|quetta|islamabad|rawalpindi|sargodha|bahawalpur|sialkot|sheikhupura|gujrat|jhang|sahiwal|okara|mardan|kasur|rahim yar khan|dera ghazi khan|nowshera|mingora|kohat|abbottabad|daska|campbellpur|nawabshah|kandhkot|khuzdar|chaman|zhob|loralai|mastung|sibi|ujjan shah kot|bannu|tank|dera ismail khan|mansehra|batgram|kolai palas|battagram|diamer|astore|gilgit|skardu|ghizer|hunza|nagar|chitral|upper dir|lower dir|malakand|swabi|charsadda|mardan|swat|khyber|kurram|north waziristan|south waziristan|federally administered tribal areas|fata|azad kashmir|muzaffarabad|mirpur|kotli|bhimber|neelum|pakistan|paquistão|paquistao)/i, "Paquistão"],
+    [/(dhaka|chittagong|khulna|rajshahi|sylhet|barisal|rangpur|mymensingh|comilla|narayanganj|gazipur|tongi|chittagong|cox's bazar|bogra|rangamati|savar|narsingdi|netrakona|kishoreganj|manikganj|munshiganj|faridpur|shariatpur|madaripur|barisal|patuakhali|bhola|jhalokati|pirojpur|potia|lakshmipur|noakhali|feni|chandpur|brammanbaria|comilla|sylhet|moulvibazar|habiganj|sunamganj|dinajpur|thakurgaon|rangpur|nilphamari|lalmonirhat|kurigram|gaibandha|bogra|joypurhat|naogaon|natore|chapai nawabganj|rajshahi|sirajganj|pabna|jessore|magura|narail|khulna|bagerhat|satkhira|jhenaidah|chuadanga|meherpur|kushtia|jhenaidah|bangladesh|bangladeche|bangladexe)/i, "Bangladesh"],
+    [/(kathmandu|pokhara|biratnagar|birgunj|lalitpur|bhaktapur|bharatpur|birtamod|butwal|hetauda|dhangadhi|itahari|dharan|nepalgunj|janakpur|banepa|siddharthanagar|gaushala|rampur|tansen|dipayal|mahendranagar|bhimeshwar|inaruwa|kanchanrup|siraha|biratnagar|jhapa|morang|sunsari|udayapur|saptari|siraha|dhankuta|panchthar|taplejung|tehrathum|bhojpur|khotang|okhaldhunga|sindhuli|ramechhap|dolakha|sindhupalchok|kavrepalanchok|lalitpur|bhaktapur|kathmandu|nuwakot|dhading|nuwakot|rasuwa|gorkha|lamjung|kaski|syangja|tanahu|parbat|baglung|myagdi|mustang|palpa|gulmi|argakhanchi|pyuthan|rukum|rolpa|salyan|dang|banke|bardiya|surkhet|dailekh|jajarkot|humla|jumla|kalikot|mugu|bajura|bajhang|doti|achham|darchula|baitadi|dadeldhura|kanchanpur|kailali|nepal|nepal|nepal)/i, "Nepal"],
+    [/(colombo|sri jayawardenepura kotte|kandy|galle|jaffna|anuradhapura|negombo|trincomalee|matara|batticaloa|ratnapura|dambulla|nuwara eliya|polonnaruwa|kurunegala|hambantota|badulla|puttalam|kegalle|mannar|vavuniya|mullaitivu|kilinochchi|ampara|batticaloa|trincomalee|mullaittivu|mullaitivu|point pedro|valvettithurai|kankesanturai|manalkadu|thondamanaru|elephant pass|palaly|veli|point pedro|chavakachcheri|sandilipay|sithamparapuram|navaly|alyady|udappu|mannar|pesalai|talaimannar|mathot|jaffna|kandy|nuwara eliya|sri lanka|sri lanka|serendiva|ceilão|ceylon)/i, "Sri Lanka"],
+    [/(baku|ganja|sumgait|lankaran|mingachevir|shaki|nakhchivan|azerbaijan|azerbaijão|xirdalan|bilasuvar|agdam|shusha|julfa|ordubad|astara|lenkaran|masallı|lerik|astara|haftoni|imishli|shirvan|salyan|bilasuvar|dashkasan|goygol|shamkir|gadabay|tartar|agstafa|gazakh|tovuz|samukh|goranboy|dashkasan|yevlakh|balakan|zardab|sabirabad|imishli|barda|agjabedi|beylagan|fuzuli|jabrayil|zangilan|gubadly|shahbuzkend|kalbajar|lacin|khojavend|khojali|shusha|agdam|terter|tartar|barda|agjabedi|kurdamir|yevlakh|samukh|goranboy|dashkasan|kalbajar|lacin|gubadly|zangilan|jabrayil|fuzuli|tartar|agstafa|gazakh|tovuz|gadabay|shamkir|dashkasan|goygol|shaki|shaki|shemakha|guba|khachmaz|quba|xachmaz|shabran|khizi|siyazan|abseron|baku|sumgayit|nakhchivan|ordubad|culfa|sarur|babek|shahbuz|julfa|nakhchivan|azerbaijan|azerbaijão)/i, "Azerbaijão"],
+    [/(tbilisi|batumi|kutaisi|rustavi|zugdidi|sukhumi|gagra|poti|tbilisi|gori|akhaltsikhe|samtredia|senaki|zestaponi|kobuleti|telavi|akhalgori|tskhinvali|java|tsalenjikha|mtskheta|georgia|geórgia|georgia|georgia)/i, "Geórgia"],
+    [/(yerevan|gyumri|vanadzor|hrazdan|armavir|kapan|artashat|kajaran|armenia|armênia|gavar|charentsavan|sevan|abovyan|shenavan|aratsk|yeghvard|byureghavan|meghri|agarak|kapan|sisian|goris|goris|kajaran|syunik|vayk|vardenis|noyemberyan|iljavan|tashir|stefanavan|spitak|talin|arasbarani|azatashen|baghramyan|chapar|mkhchyan|avan|kanaker|davtashen|arabkir|malatia|kentron|qanaqer|echtum|azat|kotayk|ararat|armavir|shirak|lori|tavush|gegharkunik|vayots dzor|syunik|kotayk|yerevan|armenia|armênia)/i, "Armênia"],
+    [/(sana'a|sanaa|aden|hodeidah|taiz|mukalla|ibb|dhamar|sayyan|riyan|hais|sahar|qatn|marib|al jawf|sa'dah|hajjah|al bayda|dalah|zabid|al mahwit|al hudaydah|yemen|iêmen|iemen|sana'a|sanaa|aden|hodeidah|taiz|mukalla|ibb|dhamar|riyan|sayyan|yemen|iemen)/i, "Iêmen"],
+    [/(beirut|tripoli|sidon|tyre|jounieh|nabatieh|zgharta|batroun|baalbek|hermel|sour|marjayoun|bint jbeil|jbeil|aqoura|zahle|anjar|caza|north governorate|mount lebanon|south governorate|nabatieh|beqaa|akkar|baalbek hermel|lebanon|líbano|libano)/i, "Líbano"],
+    [/(damascus|aleppo|homs|hama|latakia|deir ez-zor|al-hasakah|raqqa|idlib|daraa|as-sweida|tartus|qamishli|palmyra|baniyas|kafr halab|al bab|manbij|jarabulus|abu kamal|mayadin|deir ez zor|del az zor|deir al-zur|tabqa|tal abyad|azaz|al rai|kobani|a'zaz|sirin|suruj|tel abiad|amuda|qamishli|al darbasiyah|ras al-ain|malikiyah|derik|afrin|sheikh wassouf|al-qusayr|zabadani|madaya|kobani|sarrin|manbij|jarabulus|al-bab|azaz|tell abyad|al-hasakah|qamishli|derik|malikiyah|qamishli|amuda|al darbasiyah|ras al ain|tell abyad|syria|síria|siria)/i, "Síria"],
+    [/(amman|zarqa|irbid|aqaba|madaba|salt|karak|ma'an|tafilah|ajloun|jerash|mafraq|al-balqa|amman|zarka|irbid|ma'an|aqaba|ma'an|jordânia|jordan|jordania)/i, "Jordânia"],
+    [/(tunis|sfax|sousse|kairouan|bizerte|gabes|ariana|nabeul|tunisia|tunísia|tunísia|ben arous|manouba|kef|siliana|jendouba|beja|ghardimaou|sidi bouzid|gafsa|tozeur|gasa|médéen|tataouine|mahdia|monastir|moknine|bizerte|nabel|kef|silyana|jendouba|béja|tunis|tunísia|tunisia|tunez)/i, "Tunísia"],
+    [/(algiers|oran|constantine|annaba|blida|batna|djelfa|sétif|algeria|argélia|argelia|biskra|tlemcen|bejaia|tizi ouzou|tébessa|cherchell|boumerdès|bouchrouch|souk ahras|guelma|skikda|jijel|bejaia|bouira|médéa|tiaret|m'sila|chlef|saïda|m ascara|ghardaïa|adrar|illizi|tamanrasset|ouargla|tindouf|el oued|khenchela|el bayadh|naâma|sidi bel abbès|bordj bou arreridj|tissemsilt|ain temouchent|relizane|mostaganem|ain defla|mila|bousfer|djendel|bouzeghaia|beni saf|nihtar|el kataf|guemar|touggourt|ouled djellal|bordj badji mokhtar|chegga|taghit|taghit|ouargla|tamanrasset|illizi|adrar|in salah|tin zaouatine|tindouf|algeria|argélia|argelia)/i, "Argélia"],
+    [/(casablanca|rabat|tangier|agadir|fes|marrakech|meknes|oujda|kenitra|salé|tetouan|morocco|marrocos|marocco|agadir|safi|mohammedia|beni mellal|khouribga|guelmim|tan-tan|laayoune|dakhla|smara|tarfaya|boujdour|goulimine|tan tan|es semara|laâyoune|assa zag|nouakchott|ouarzazate|midelt|ifrane|azrou|taza|hoceima|chefchaouen|ouazzane|sidi slimane|berrechid|settat|khemisset|tamesna|kalaat sraghna|youssoufia|ben ahmed|el jadida|azemmour|bir jdid|dar bouazza|ain harrouda|temara|skhirate|témara|sidi kacem|meknès|fès|nador|jerada|oued zem|beni ansar|al hoceima|fnideq|m'diq|chefchaouen|asilah|larache|kénitra|sidi allal bahdja|taza|guercif|taounate|taourirt|midelt|errichid|tinghir|zagora|mhamid|guelmim|sidi ifni|legzira|mirleft|sidi bouknadel|mohammedia|bouskoura|dar bouazza|ain aouda|skhirate|temara|rabat|salé|kenitra|casa|casablanca|dar bouazza|mohammedia|marrakesh|safi|el jadida|azemmour|bir jdid|essaouira|agadir|tiznit|taroudannt|maroc|marrocos|marocco|morocco|marrocos)/i, "Marrocos"],
+    [/(tripoli|benghazi|misrata|zawiya|khoms|sabha|bayda|misurata|tarhuna|zleiten|ajdabiya|al bayda|az zawiyah|derna|sirte|benina|tolmeita|susa|ghat|ubari|ghemis|al khums|libya|líbia|libia|benghazi|tripoli|misrata|benghazi|derna|al byda|marj|suluq|al qubah|karkur|derna|al bayda|shahhat|aluqaylah|auluq|ajdabiya|tawergha|misurata|bani walid|tarhuna|msallata|zawiya|zyara|al mayah|ziltin|sabratah|surman|al aziziyah|gharyan|yafran|kikla|nalut|ghat|gheriat|fezzan|sabha|awbari|ghat|ubari|tamanhint|waddan|hun|awjilah|jalu|al fuqaha|tazirbu|awjila|jalu|sokna|zella|awjila|jalu|al fuqaha|tazirbu|libya|líbia|libia)/i, "Líbia"],
+    [/(nairobi|mombasa|kisumu|nairobi|kenya|nakuru|eldoret|thika|malindi|kitale|garissa|meru|kakamega|machakos|nyeri|likuyani|bungoma|busia|homabay|migori|siaya|kisii|kajiado|ruiru|kiambu|juja|limuru|thika|machakos|wote|makueni|mutomo|vihiga|bondo|busia|bungoma|kitale|eldoret|kapsabet|kericho|bomet|narok|kajiado|kajiado|mombasa|malindi|watamu|lamu|kwale|ukunda|msambweni|mwatate|voi|tsavo|magadi|kajiado|namanga|narok|maji moto|gucha|migori|siaya|homabay|kisumu|busia|bondo|vihiga|kakamega|bungoma|kitale|trans nzoia|ugar|tengelia|kenya|quênia|quenia|kenia|kenya)/i, "Quênia"],
+    [/(lagos|abuja|kano|ibadan|port harcourt|benin city|kaduna|ilorin|jos|enugu|nigeria|nigéria|onitsha|warri|maiduguri|zaria|ake|asaba|awka|sokoto|uyo|akure|oyo|osogbo|ilorin|ilorin|minna|lokoja|makurdi|damaturu|yola|bauchi|gombe|gashua|mubi|maidiguri|borno|adamawa|taraba|cross river|rivers|bayelsa|delta|edo|anambra|enugu|abia|ebonyi|imo|akwa ibom|cross river|oyo|osun|ekiti|ondo|ogun|lagos|niger|kogi|kwara|nasarawa|plateau|benue|taraba|adamawa|bauchi|gombe|borno|yobe|jigawa|katsina|kano|kaduna|zamfara|sokoto|kebbi|niger|kogi|abuja|f.c.t.|nassarawa|plateau|benue|enugu|abia|ebonyi|imo|akwa ibom|cross river|rivers|bayelsa|delta|edo|anambra|nigeria|nigéria|nigeria)/i, "Nigéria"],
+    [/(addis ababa|dire dawa|mekele|adama|gondar|hawassa|bahir dar|dessie|jimma|jijiga|shashamane|arbaminch|bahir dar|adama|nazret|nairobi|harar|debre birhan|sodo|nekemte|asella|arba minch|hosaena|wolaita|sodo|bule hora|yirga alem|amaro|gorobe|abeya|gidole|konso|sawla|gofa|sawla|gidami|dilla|bule hora|yirga alem|hagere maryam|dilla|goba|bale|robe|goba|hirna|deder|babile|shinile|hara|mizan|bonga|jimma|agarfa|gumer|butajira|hosanna|sodo|durame|badessa|bole|addis ababa|ethiopia|etiópia|etiopia|etiopia)/i, "Etiópia"],
+    [/(khartoum|oum durman|bahri|omdurman|port sudan|kasala|medani|kosti|nyala|el fasher|geneina|al-managil|shendi|sennar|dinder|rahad|sudan|sudão|kassala|red sea|river nile|al qadarif|sennar|blue nile|white nile|north kordofan|south kordofan|north darfur|south darfur|west darfur|central darfur|east darfur|north kurdufan|south kurdufan|al jazirah|alnīl al'abyad|alnīl al'azraq|sennar|gadarif|qadarif|al butana|halfa al jadida|dongola|karima|merowe|wadi halfa|al abadiya|barakat|um rawaba|el obeid|nahud|talodi|kaduqli|dilling|tiwal|el renk|malakal|pariak|kajo keji|kaka|shirkat|barah|abu zabad|al fulah|rafa|gadid|abu jabra|abu hijer|sudan|sudão|sudan|south sudan|sul do sudão|juba|malakal|wau|renk|torit|yei|yambio|kajo keji|nimule|nasir|malakal|pariak|rubkona|bentiu|mayom|leer|pibor|pibor|cueibet|tonj|gogrial|kuacjok|akot|maper|rumbek|mapel|ganyliel|yirol|bor|panyang|terekeka|juba|katigiri|torit|kasengere|imotong|kapoeta|narus|lolim|mogiri|natinga|kidepo|kidepo valley|lotuke|pageri|kajo keji|yei|loka|lainya|maridi|island|mundri|amadi|maridi|kajo keji|tombura|tambura|yambio|nabiapai|wiku|bangassou|deim zubeir|sopo|kuru|maridi|wau|dem zubeir|raja|daym as suluk|mboro|kafia kingi|bussere|kafia kingi|tumbura|tombolo|yambio|nyamlell|busser|sopo|gidel|gombi|kangi|kordofan|darfur|kassala|gedaref|sennar|al jazirah|alnīl al'abyad|alnīl al'azraq|white nile|blue nile|river nile|north sudan|south sudan|sudan do norte|sul do sudão|sudão do sul|sudan|sudão)/i, "Sudão"],
+  ];
+
+  for (const [rx, country] of keywordMap) {
+    if (stateLow && rx.test(stateLow)) return country;
+    if (cityLow && rx.test(cityLow)) return country;
+  }
+
+  // Timezone -> fallback regional (mais largo). Ja deu preferencia para keywords/estados Brasil acima.
+  if (timezone.startsWith("America/")) {
+    const tail = timezone.slice("America/".length);
+    const brTail = [
+      "Sao_Paulo","Cuiaba","Porto_Velho","Boa_Vista","Manaus","Eirunepe","Rio_Branco",
+      "Recife","Bahia","Santarem","Campo_Grande","Araguaina","Belem","Boa_Vista","Fortaleza",
+      "Maceio","Paramaribo","Cayenne","Macapa","Santarem"
+    ];
+    const usTail = [
+      "New_York","Chicago","Denver","Phoenix","Los_Angeles","Anchorage","Honolulu","Boise",
+      "Detroit","Indianapolis","Louisville","Menominee","Marquette","Nome","Nome","Juneau",
+      "Sitka","Yakutat","Metlakatla","Petersburg","Ketchikan","Adak","Indiana/Knox",
+      "Indiana/Marengo","Indiana/Petersburg","Indiana/Tell_City","Indiana/Vevay","Indiana/Vincennes",
+      "Indiana/Winamac","Kentucky/Monticello","North_Dakota/Beulah","North_Dakota/Center",
+      "North_Dakota/New_Salem","Nipigon","Pangnirtung","Resolute","Thunder_Bay"
+    ];
+    const caTail = [
+      "Winnipeg","Goose_Bay","Halifax","Moncton","St_Johns","Regina","Saskatoon","Edmonton",
+      "Calgary","Vancouver","Dawson_Creek","Fort_Nelson","Whitehorse","Yellowknife","Inuvik",
+      "Toronto","Ottawa","Montreal","Quebec","Rainy_River","Tegucigalpa","Panama","Guatemala",
+      "San_Jose","San_Salvador","Managua","San_Juan","Santo_Domingo","Havana","Port-au-Prince",
+      "Kingston","Bridgetown","Castries","Roseau","Basseterre","St_Johns","Gustavia","Philipsburg",
+      "Marigot","Tortola","Road_Town","Cayman","Grand_Turk","Providenciales","Bermuda",
+      "Puerto_Rico","US_Eastern","US_Central","US_Mountain","US_Pacific","US_Alaska",
+      "US_Hawaii","Eastern","Central","Mountain","Pacific","Aleutian","Hawaii"
+    ];
+    if (brTail.includes(tail)) return "Brasil";
+    if (tail.startsWith("Argentina")) return "Argentina";
+    if (["Buenos_Aires","Cordoba","Rosario","Jujuy","Mendoza","Tucuman","Catamarca","La_Rioja","San_Juan","San_Luis","Rio_Gallegos","Comodoro_Rivadavia","Salta","Santiago_del_Estero","Mercedes","Corrientes","Posadas","Formosa","Resistencia","Bariloche","Ushuaia"].includes(tail)) return "Argentina";
+    if (["Santiago","Punta_Arenas","Easter","Rapa_Nui"].includes(tail)) return "Chile";
+    if (tail.startsWith("Chile")) return "Chile";
+    if (["Bogota","Colombia","Medellin","Cali","Barranquilla","Cartagena","Bucaramanga","Ibagué","Manizales","Pereira","Cúcuta","Neiva","Pasto","Armenia","Soledad","Montería","Valledupar","Santa_Marta","Sincelejo","Riohacha","Villavicencio","Florencia","Mocoa","Pitalito","Garzon","Popayán","Cali","Tumaco","Ipiales","Leticia","Puerto_Carreno","Inirida","San_Andres","Providencia"].includes(tail)) return "Colômbia";
+    if (["Lima","Piura","Trujillo","Arequipa","Iquitos","Chiclayo","Cajamarca","Jauja","Huancayo","Ica","Cusco","Puno","Ayacucho","Huanuco","Chachapoyas","Huancavelica","Abancay","Tacna","Moquegua","Tumbes","Mollendo","Ilo","Callao","Pucallpa","Tarapoto","Jaen","Tingo_Maria","Cerro_de_Pasco"].includes(tail)) return "Peru";
+    if (["La_Paz","Sucre","Cochabamba","Santa_Cruz","Oruro","Potosí","Tarija","Trinidad","Cobija","Riberalta","Guayaramerín"].includes(tail)) return "Bolívia";
+    if (["Caracas","Venezuela","Maracaibo","Valencia","Barquisimeto","Ciudad_Guayana","San_Cristóbal","Maturín","Barcelona","Maracay"].includes(tail)) return "Venezuela";
+    if (["Asuncion","Encarnacion","Ciudad_del_Este","Pedro_Juan_Caballero","Villarrica","Concepcion","Luque","San_Lorenzo","Fernando_de_la_Mora","Limpio","Capiata","Ñemby","Itaugua","Mariano_Roque_Alonso","Presidente_Franco","Aregua","Pilar","Caaguazu","Ciudad_Nueva"].includes(tail)) return "Paraguai";
+    if (["Montevideo","Salto","Ciudad_de_la_Costa","Las_Piedras","Durazno","Florida","Maldonado","Rivera","Tacuarembó","Mercedes","Minas","Treinta_y_Tres","Artigas","San_Jose_de_Mayo","Paysandu","Rocha","Fray_Bentos","Trinidad","Canelones","Carmelo","Colonia_del_Sacramento","Punta_del_Este","Melo"].includes(tail)) return "Uruguai";
+    if (["Mexico_City","Guadalajara","Monterrey","Merida","Cancun","Tijuana","Puebla","Leon","Queretaro","Zapopan","Juarez","Chihuahua","Toluca","Aguascalientes","Morelia","San_Luis_Potosi","Culiacan","Saltillo","Hermosillo","Mexicali","Veracruz","Acapulco","Tehuacan","Chetumal","Tampico","Villahermosa","Campeche","Tuxtla_Gutierrez","Oaxaca","Puerto_Vallarta","Acapulco_de_Juarez","Cabo_San_Lucas","Cozumel","Isla_Mujeres","Playa_del_Carmen","Bacalar","Ciudad_Juarez","Ciudad_de_Mexico","Tijuana","Ensenada","La_Paz_BCS","Los_Mochis","Guaymas","Nogales","Ciudad_Obregon","Torreon","Matamoros","Reynosa","Nuevo_Laredo","Monclova","Piedras_Negras","Ciudad_Acuña","Zacatecas","Guadalajara","Puebla","Guanajuato","San_Miguel_de_Allende","Tepic","Mazatlan","Nayarit","Puerto_Vallarta","Ciudad_Guzman","Colima","Manzanillo","Tapachula","San_Cristobal_de_las_Casas","Villahermosa","Ciudad_del_Carmen","Ciudad_Constitucion","Ciudad_Insurgentes","La_Paz_BCS","Los_Cabos"].includes(tail)) return "México";
+    if (caTail.includes(tail)) return "Canadá";
+    if (usTail.includes(tail)) return "Estados Unidos";
+    if (tail.startsWith("Brazil")) return "Brasil";
+    // fallback default: eh Americas sem informacao
+    if (timezone.startsWith("America/")) return "Estados Unidos";
+  }
+  if (timezone.startsWith("Europe/")) {
+    const tail = timezone.slice("Europe/".length);
+    if (["Lisbon","Madeira","Azores"].includes(tail)) return "Portugal";
+    if (["Madrid","Barcelona","Canary","Ceuta","Melilla"].includes(tail)) return "Espanha";
+    if (["Paris","Marseille","Toulouse","Lyon","Nice","Corsica","Grenoble","Strasbourg","Busingen"].includes(tail)) return "França";
+    if (["Rome","Milan","Naples","Florence","Venice","Copenhagen","Amsterdam","Brussels","Berlin","Stockholm","Oslo","Helsinki","Warsaw","Prague","Vienna","Zurich","Dublin","Belfast","London","Bucharest","Sofia","Athens","Budapest","Riga","Tallinn","Vilnius","Ljubljana","Bratislava","Podgorica","Skopje","Sarajevo","Zagreb","Belgrade","Chisinau","Tirana","Simferopol"].includes(tail)) {
+      if (["London","Isle_of_Man","Guernsey","Jersey","Belfast","Lisburn","Derry","Newry","Portadown","Enniskillen","Omagh","Dungannon","Strabane","Craigavon","Antrim","Ballymena","Newtownabbey","Ards","Carrickfergus","Newtownards","Larne","Coleraine","Bangor","Causeway","Belfast","Londonderry","Downpatrick","Bagenalstown","Carlow","Cashel","Cork","Drogheda","Dublin","Ennis","Galway","Kilkenny","Limerick","Longford","Nenagh","Sligo","Thurles","Tralee","Waterford","Wexford","Dundalk","Swords","Drogheda","Sligo","Killarney","Cobh","Bray","Naas","Athlone","Clonmel","Enniscorthy","Carlow","Mullingar","Letterkenny","Tipperary","Cavan","Monaghan","Roscommon","Castlebar","Tullamore","Longford","Laois","Offaly","Meath","Kildare","Westmeath","Wicklow","Donegal","Mayo","Galway","Clare","Kerry","Cork","Limerick","Tipperary","Waterford","Wexford","Kilkenny","Carlow","Louth","Meath","Westmeath","Offaly","Laois","Kildare","Wicklow","Dublin","Cork","Galway","Mayo","Donegal","Tipperary","Clare","Kerry","Waterford","Wexford","Kilkenny","Carlow","Louth","Meath","Westmeath","Offaly","Laois","Kildare","Wicklow"].includes(tail)) return "Irlanda";
+      if (["London","Isle_of_Man","Guernsey","Jersey"].includes(tail)) return "Reino Unido";
+      if (["Europe/Zurich","Europe/Bern","Europe/Geneva","Europe/Basel","Europe/Lausanne","Europe/Zurich","Europe/Bern","Europe/Geneve"].includes(timezone)) return "Suíça";
+      if (["Europe/Vienna"].includes(timezone)) return "Áustria";
+      if (["Europe/Amsterdam","Europe/Rotterdam"].includes(timezone)) return "Países Baixos";
+      if (["Europe/Brussels"].includes(timezone)) return "Bélgica";
+      if (["Europe/Stockholm"].includes(timezone)) return "Suécia";
+      if (["Europe/Oslo"].includes(timezone)) return "Noruega";
+      if (["Europe/Copenhagen"].includes(timezone)) return "Dinamarca";
+      if (["Europe/Helsinki"].includes(timezone)) return "Finlândia";
+      if (["Europe/Moscow","Europe/Samara","Europe/Kaliningrad","Europe/Volgograd","Europe/Astrakhan","Europe/Saratov","Europe/Ulyanovsk"].includes(timezone)) return "Rússia";
+      if (["Europe/Istanbul"].includes(timezone)) return "Turquia";
+      if (["Europe/Warsaw"].includes(timezone)) return "Polônia";
+      if (["Europe/Prague"].includes(timezone)) return "República Tcheca";
+      if (["Europe/Budapest"].includes(timezone)) return "Hungria";
+      if (["Europe/Bucharest"].includes(timezone)) return "Romênia";
+      if (["Europe/Sofia"].includes(timezone)) return "Bulgária";
+      if (["Europe/Athens"].includes(timezone)) return "Grécia";
+      if (["Europe/Riga"].includes(timezone)) return "Letônia";
+      if (["Europe/Tallinn"].includes(timezone)) return "Estônia";
+      if (["Europe/Vilnius"].includes(timezone)) return "Lituânia";
+      if (["Europe/Ljubljana"].includes(timezone)) return "Eslovênia";
+      if (["Europe/Bratislava"].includes(timezone)) return "Eslováquia";
+      if (["Europe/Podgorica"].includes(timezone)) return "Montenegro";
+      if (["Europe/Skopje"].includes(timezone)) return "Macedônia do Norte";
+      if (["Europe/Sarajevo"].includes(timezone)) return "Bósnia e Herzegovina";
+      if (["Europe/Zagreb"].includes(timezone)) return "Croácia";
+      if (["Europe/Belgrade"].includes(timezone)) return "Sérvia";
+      if (["Europe/Chisinau"].includes(timezone)) return "Moldávia";
+      if (["Europe/Tirana"].includes(timezone)) return "Albânia";
+      if (["Europe/Simferopol"].includes(timezone)) return "Ucrânia";
+      if (["Europe/Kyiv","Europe/Kiev","Europe/Uzhgorod","Europe/Zaporozhye"].includes(timezone)) return "Ucrânia";
+      if (["Europe/Berlin","Europe/Frankfurt","Europe/Munich","Europe/Cologne","Europe/Hamburg","Europe/Leipzig","Europe/Dresden","Europe/Düsseldorf","Europe/Stuttgart","Europe/Nuremberg","Europe/Bremen","Europe/Dortmund","Europe/Essen","Europe/Hannover","Europe/Duisburg","Europe/Bochum","Europe/Wuppertal","Europe/Bielefeld","Europe/Bonn","Europe/Mannheim","Europe/Karlsruhe","Europe/Augsburg","Europe/Wiesbaden","Europe/Gelsenkirchen","Europe/Mönchengladbach","Europe/Brunswick","Europe/Chemnitz","Europe/Kiel","Europe/Aachen","Europe/Halle","Europe/Magdeburg","Europe/Erfurt","Europe/Ludwigshafen","Europe/Oldenburg","Europe/Leverkusen","Europe/Osnabrück","Europe/Darmstadt","Europe/Paderborn","Europe/Regensburg","Europe/Ingolstadt","Europe/Würzburg","Europe/Fürth","Europe/Wolfsburg","Europe/Ulm","Europe/Heilbronn","Europe/Pforzheim","Europe/Offenbach","Europe/Göttingen","Europe/Bottrop","Europe/Trier","Europe/Recklinghausen","Europe/Reutlingen","Europe/Bremerhaven","Europe/Koblenz","Europe/Bergisch_Gladbach","Europe/Jena","Europe/Remscheid","Europe/Erlangen","Europe/Solingen","Europe/Moers","Europe/Siegen","Europe/Hildesheim","Europe/Avranches","Europe/Salzgitter","Europe/Potsdam","Europe/Kaiserslautern","Europe/Landshut","Europe/Straubing","Europe/Neuss","Europe/Düsseldorf","Europe/Münster","Europe/Herford","Europe/Minden","Europe/Osnabrück","Europe/Hagen","Europe/Neumünster","Europe/Dessau","Europe/Rosslau","Europe/Zwickau","Europe/Zeitz","Europe/Gera","Europe/Suhl","Europe/Altenburg","Europe/Cottbus","Europe/Frankfurt_oder","Europe/Brandenburg","Europe/Neubrandenburg","Europe/Schwerin","Europe/Rostock","Europe/Stralsund","Europe/Wismar","Europe/Greifswald","Europe/Prenzlau","Europe/Ludwigslust","Europe/Karlsruhe","Europe/Freiburg","Europe/Heidelberg","Europe/Mannheim","Europe/Schwäbisch_Hall","Europe/Aalen","Europe/Reutlingen","Europe/Heidenheim","Europe/Friedrichshafen","Europe/Ravensburg","Europe/Constance","Europe/Konstanz","Europe/Bregenz","Europe/Dornbirn","Europe/Feldkirch","Europe/Innsbruck","Europe/Salzburg","Europe/Linz","Europe/Graz","Europe/Klagenfurt","Europe/Villach","Europe/St_Pölten","Europe/Eisenstadt","Europe/Baden","Europe/Wien","Europe/Vienna","Europe/Braunschweig","Europe/Delbrück","Europe/Bielefeld","Europe/Bielefeld"].includes(timezone)) return "Alemanha";
+      if (["Europe/Rome","Europe/Milan","Europe/Naples","Europe/Florence","Europe/Venice","Europe/Bologna","Europe/Genoa","Europe/Turin","Europe/Palermo","Europe/Bari","Europe/Catania","Europe/Verona","Europe/Venice","Europe/Padua","Europe/Trieste","Europe/Brescia","Europe/Taranto","Europe/Prato","Europe/Modena","Europe/Parma","Europe/Reggio_Emilia","Europe/Reggio_Calabria","Europe/Perugia","Europe/Cagliari","Europe/Sassari","Europe/Lecce","Europe/Pescara","Europe/Trento","Europe/Siracusa","Europe/Bergamo","Europe/Forlì","Europe/Vicenza","Europe/Terni","Europe/Bolzano","Europe/Ravenna","Europe/Novara","Europe/Ferrara","Europe/Rimini","Europe/Salerno","Europe/Foggia","Europe/Ravenna","Europe/Livorno","Europe/L'Aquila","Europe/Lucca","Europe/Siena","Europe/Pisa","Europe/Arezzo","Europe/Potenza","Europe/Crotone","Europe/Vibo_Valentia","Europe/Cosenza","Europe/Catanzaro","Europe/Reggio_Calabria","Europe/Lamezia_Terme","Europe/Crotone","Europe/Vibo_Valentia","Europe/Cosenza","Europe/Catanzaro","Europe/Messina","Europe/Syracuse","Europe/Agrigento","Europe/Trapani","Europe/Ragusa","Europe/Caltanissetta","Europe/Enna","Europe/Nuoro","Europe/Sassari","Europe/Cagliari","Europe/Olbia","Europe/Tortolì","Europe/Carbonia","Europe/Iglesias","Europe/Lanusei","Europe/Tempio","Europe/Alghero","Europe/Nuoro","Europe/Macerata","Europe/Ascoli_Piceno","Europe/Fermo","Europe/Pescara","Europe/Chieti","Europe/L'Aquila","Europe/Campobasso","Europe/Potenza","Europe/Cosenza","Europe/Catanzaro","Europe/Reggio_Calabria","Europe/Naples","Europe/Benevento","Europe/Avellino","Europe/Salerno","Europe/Battipaglia","Europe/Caserta","Europe/Serravalle","Europe/San_Marino","Europe/Vatican"].includes(timezone)) return "Itália";
+      return "Europa";
+    }
+  }
+  if (timezone.startsWith("Asia/")) {
+    const tail = timezone.slice("Asia/".length);
+    if (["Tokyo","Osaka","Sapporo"].includes(tail)) return "Japão";
+    if (["Shanghai","Beijing","Hong_Kong","Chongqing","Taipei","Harbin","Urumqi","Kashgar","Macau"].includes(tail)) return "China";
+    if (["Seoul","Incheon","Busan"].includes(tail)) return "Coreia do Sul";
+    if (["Singapore"].includes(tail)) return "Singapura";
+    if (["Bangkok"].includes(tail)) return "Tailândia";
+    if (["Hanoi","Ho_Chi_Minh"].includes(tail)) return "Vietnã";
+    if (["Dubai","Abu_Dhabi"].includes(tail)) return "Emirados Árabes Unidos";
+    if (["Riyadh","Jeddah","Dammam","Mecca","Medina"].includes(tail)) return "Arábia Saudita";
+    if (["Kuala_Lumpur","Kuching","Penang"].includes(tail)) return "Malásia";
+    if (["Jakarta","Surabaya","Makassar","Jayapura"].includes(tail)) return "Indonésia";
+    if (["Manila","Cebu","Davao"].includes(tail)) return "Filipinas";
+    if (["Delhi","Kolkata","Mumbai","Chennai","Bangalore","Hyderabad"].includes(tail)) return "Índia";
+    if (["Tehran","Isfahan","Mashhad","Shiraz","Tabriz"].includes(tail)) return "Irã";
+    if (["Baghdad","Erbil","Basra","Nassiriyah"].includes(tail)) return "Iraque";
+    if (["Istanbul","Ankara","Izmir"].includes(tail)) return "Turquia";
+    if (["Doha","Al_Dayeen"].includes(tail)) return "Qatar";
+    if (["Kuwait"].includes(tail)) return "Kuwait";
+    if (["Muscat","Salalah"].includes(tail)) return "Omã";
+    if (["Karachi","Lahore","Islamabad"].includes(tail)) return "Paquistão";
+    if (["Dhaka","Chittagong","Sylhet","Rajshahi","Khulna"].includes(tail)) return "Bangladesh";
+    if (["Kathmandu","Pokhara","Biratnagar","Birgunj"].includes(tail)) return "Nepal";
+    if (["Colombo","Sri_Jayawardenepura"].includes(tail)) return "Sri Lanka";
+    if (["Baku"].includes(tail)) return "Azerbaijão";
+    if (["Tbilisi"].includes(tail)) return "Geórgia";
+    if (["Yerevan"].includes(tail)) return "Armênia";
+    if (["Sanaa","Aden","Hodeidah","Mukalla","Taiz"].includes(tail)) return "Iêmen";
+    if (["Beirut","Tripoli","Sidon","Tyre","Jounieh","Nabatieh","Zgharta","Batroun","Baalbek","Hermel","Sour","Marjayoun","Bint_Jbeil","Jbeil","Aqoura","Zahle","Anjar","Caza","North_Governorate","Mount_Lebanon","South_Governorate","Nabatieh","Beqaa","Akkar","Baalbek_Hermel","Lebanon"].includes(tail)) return "Líbano";
+    if (["Damascus","Aleppo","Homs","Hama","Latakia","Deir_ez-Zor","Al-Hasakah","Raqqa","Idlib","Daraa","As-Sweida","Tartus","Qamishli","Palmyra","Baniyas","Kafr_Halab","Al_Bab","Manbij","Jarabulus","Abu_Kamal","Mayadin","Deir_ez_Zor","Del_Az_Zor","Deir_al-Zur","Tabqa","Tal_Abyad","Azaz","Al_Rai","Kobani","A'zaz","Sirin","Suruj","Tel_Abiad","Amuda","Qamishli","Al_Darbasiyah","Ras_al-Ain","Malikiyah","Derik","Afrin","Sheikh_Wassouf","Al-Qusayr","Zabadani","Madaya","Kobani","Sarrin","Manbij","Jarabulus","Al-Bab","Azaz","Tell_Abyad","Al-Hasakah","Qamishli","Derik","Malikiyah","Qamishli","Amuda","Al_Darbasiyah","Ras_al_Ain","Tell_Abyad","Syria","Damascus","Syria","Syria","Syria"].includes(tail)) return "Síria";
+    if (["Amman","Zarqa","Irbid","Aqaba","Madaba","Salt","Karak","Ma'an","Tafilah","Ajloun","Jerash","Mafraq","Al-Balqa","Amman","Zarka","Irbid","Ma'an","Aqaba","Ma'an","Jordan","Jordan","Jordan"].includes(tail)) return "Jordânia";
+  }
+  if (timezone.startsWith("Africa/")) {
+    const tail = timezone.slice("Africa/".length);
+    if (["Cairo","Alexandria","Luxor","Port_Said","Suez"].includes(tail)) return "Egito";
+    if (["Johannesburg","Cape_Town","Durban","Port_Elizabeth","Pretoria"].includes(tail)) return "África do Sul";
+    if (["Lagos","Abuja","Kano","Port_Harcourt","Ibadan"].includes(tail)) return "Nigéria";
+    if (["Nairobi","Mombasa","Kisumu"].includes(tail)) return "Quênia";
+    if (["Casablanca","Rabat","Tangier","Agadir","Fez","Marrakech"].includes(tail)) return "Marrocos";
+    if (["Tunis","Sfax","Sousse"].includes(tail)) return "Tunísia";
+    if (["Algiers","Oran","Constantine"].includes(tail)) return "Argélia";
+    if (["Tripoli","Benghazi","Misrata"].includes(tail)) return "Líbia";
+    if (["Khartoum","Omdurman","Port_Sudan"].includes(tail)) return "Sudão";
+    if (["Addis_Ababa","Dire_Dawa","Mekele"].includes(tail)) return "Etiópia";
+  }
+  if (timezone.startsWith("Australia/")) {
+    const tail = timezone.slice("Australia/".length);
+    if (["Sydney","Melbourne","Brisbane","Perth","Adelaide","Hobart","Darwin","Canberra","Gold_Coast","Newcastle","Geelong","Wollongong"].includes(tail)) return "Austrália";
+  }
+  if (timezone.startsWith("Pacific/")) {
+    const tail = timezone.slice("Pacific/".length);
+    if (["Auckland","Wellington","Christchurch","Dunedin","Hamilton","Tauranga"].includes(tail)) return "Nova Zelândia";
+    if (["Honolulu","Fiji","Samoa","Tahiti","Papeete","Port_Moresby","Noumea","Guadalcanal","Hawaii"].includes(tail)) {
+      if (["Honolulu"].includes(tail)) return "Estados Unidos";
+      if (["Fiji","Suva","Nadi","Lautoka"].includes(tail)) return "Fiji";
+      if (["Samoa","Pago_Pago","Apia"].includes(tail)) return "Samoa";
+      if (["Tahiti","Papeete","Marquesas","Gambier","Marotiri"].includes(tail)) return "Polinésia Francesa";
+      if (["Port_Moresby","Lae","Madang"].includes(tail)) return "Papua-Nova Guiné";
+      if (["Noumea","Loyalty","Isle_of_Pines"].includes(tail)) return "Nova Caledônia";
+      if (["Guadalcanal","Honiara"].includes(tail)) return "Ilhas Salomão";
+    }
+  }
+  if (timezone.startsWith("Antarctica/")) {
+    return "Antártida";
+  }
+  if (timezone === "UTC" || timezone === "GMT" || timezone.startsWith("Etc/")) {
+    return null;
+  }
+
+  // Fallback por acentos
+  if (stateLow || cityLow) {
+    if (/[ãõçáàâéêíóôúü]/i.test(stateLow + " " + cityLow)) {
+      if (/ñ/i.test(stateLow + " " + cityLow)) return null;
+      return "Brasil";
+    }
+  }
+
+  return null;
+}
