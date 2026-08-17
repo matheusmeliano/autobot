@@ -765,6 +765,7 @@ function BookingDetails({
     attendanceStatus,
     hasSchedulingProgress: leadHasExperimentalClassPanelStatus(lead),
     hasLead: true,
+    hasRecurringClassScheduled: hasRecurringClass,
   });
   const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
   const displayDash = "-";
@@ -1157,6 +1158,10 @@ function BookingDetails({
                     : attendanceStatus === "no_show"
                     ? "Não compareceu"
                     : experimentalClassBookingDisplayStatusLabel(derivedStatus)}
+                </div>
+              ) : derivedStatus === "skipped" ? (
+                <div className="inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-100">
+                  {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
                 </div>
               ) : (
                 <div className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)]">

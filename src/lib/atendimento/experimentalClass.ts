@@ -58,7 +58,8 @@ export type ExperimentalClassBookingDisplayStatus =
   | "cancelled"
   | "in_progress"
   | "no_show"
-  | "completed";
+  | "completed"
+  | "skipped";
 
 function partsToMap(parts: Intl.DateTimeFormatPart[]) {
   const map: Record<string, string> = {};
@@ -322,6 +323,7 @@ export function deriveExperimentalClassBookingDisplayStatus(params: {
   attendanceStatus?: string | null;
   hasSchedulingProgress?: boolean;
   hasLead?: boolean;
+  hasRecurringClassScheduled?: boolean;
 }) {
   const bookingStatus = String(params.bookingStatus ?? "").trim().toLowerCase();
   const attendanceStatus = String(params.attendanceStatus ?? "").trim().toLowerCase();
@@ -334,7 +336,10 @@ export function deriveExperimentalClassBookingDisplayStatus(params: {
   if (bookingStatus === "completed") return "completed" as const;
   if (studentStartNotificationSentAt && attendantStartNotificationSentAt) return "in_progress" as const;
   if (bookingStatus === "scheduled") return "scheduled" as const;
-  if (params.hasSchedulingProgress || params.hasLead) return "incomplete" as const;
+  if (params.hasSchedulingProgress || params.hasLead) {
+    if (params.hasRecurringClassScheduled && !bookingStatus) return "skipped" as const;
+    return "incomplete" as const;
+  }
   return null;
 }
 
@@ -345,6 +350,7 @@ export function experimentalClassBookingDisplayStatusLabel(status: ExperimentalC
   if (status === "in_progress") return "Em andamento";
   if (status === "no_show") return "Não compareceu";
   if (status === "completed") return "Concluído";
+  if (status === "skipped") return "Etapa pulada";
   return "-";
 }
 
