@@ -146,12 +146,18 @@ export async function POST(req: Request) {
     }
 
     let patch: any = {};
+    let contractOnly: boolean = false;
+    let contractCol: string | null = null;
     if (fieldName === "full_name") {
-      patch = { full_name: valueToSave };
+      contractOnly = true;
+      contractCol = "contract_full_name";
+      patch = {};
+    } else if (fieldName === "phone") {
+      contractOnly = true;
+      contractCol = "contract_phone";
+      patch = {};
     } else if (fieldName === "cpf") {
       patch = { cpf: valueToSave };
-    } else if (fieldName === "phone") {
-      patch = { phone: valueToSave };
     } else if (fieldName === "legal_responsible_name") {
       if (skipped) {
         patch = { legal_responsible_name: null, legal_responsible_cpf: null };
@@ -164,20 +170,52 @@ export async function POST(req: Request) {
 
     let updatedLead: any = null;
     try {
-      const { data, error } = await admin
-        .from("atendimento_leads")
-        .update(patch)
-        .eq("id", String(lead.id))
-        .select("*")
-        .maybeSingle();
-      if (error) {
-        console.error("update lead contract field supabase error:", error?.message || error);
-        return Response.json({ ok: false, error: "Falha ao salvar no banco. Tente novamente." }, { status: 500 });
+      const hasPatch = Object.keys(patch).length > 0;
+      if (hasPatch) {
+        const { data, error } = await admin
+          .from("atendimento_leads")
+          .update(patch)
+          .eq("id", String(lead.id))
+          .select("*")
+          .maybeSingle();
+        if (error) {
+          console.error("update lead contract field supabase error:", error?.message || error);
+          return Response.json({ ok: false, error: "Falha ao salvar no banco. Tente novamente." }, { status: 500 });
+        }
+        updatedLead = data ?? null;
       }
-      if (!data) {
-        return Response.json({ ok: false, error: "Cadastro não encontrado após salvar." }, { status: 404 });
+
+      if (contractOnly && contractCol) {
+        try {
+          const dedicatedPatch: any = {};
+          dedicatedPatch[contractCol] = valueToSave;
+          const { data: data2, error: err2 } = await admin
+            .from("atendimento_leads")
+            .update(dedicatedPatch as any)
+            .eq("id", String(lead.id))
+            .select("*")
+            .maybeSingle();
+          if (!err2 && data2) {
+            updatedLead = data2;
+          }
+        } catch (e2: any) {
+          const msg2 = toErrorMessage(e2, "");
+          if (!/column.*does not exist|PGRST204|42703/i.test(msg2)) {
+            console.error("contract dedicated column update error:", msg2);
+          }
+        }
       }
-      updatedLead = data;
+      if (!updatedLead) {
+        const reload = await admin
+          .from("atendimento_leads")
+          .select("*")
+          .eq("id", String(lead.id))
+          .maybeSingle();
+        updatedLead = reload?.data ?? null;
+        if (!updatedLead) {
+          updatedLead = { ...(lead ?? {}) };
+        }
+      }
     } catch (e: any) {
       console.error("update lead contract field exception error:", toErrorMessage(e, ""));
       return Response.json({ ok: false, error: toErrorMessage(e, "Falha ao salvar o campo (exceção).") }, { status: 500 });
@@ -195,24 +233,56 @@ export async function POST(req: Request) {
       } as any);
     } catch {}
 
+    let historyByField: Record<string, string> = {};
+    try {
+      const { data: hData } = await admin
+        .from("atendimento_history_events")
+        .select("event_type, details, created_at")
+        .eq("lead_id", String(lead.id))
+        .eq("event_type", "contract_field_updated")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      const seen = new Set<string>();
+      for (const ev of (hData ?? []) as any[]) {
+        const details = (ev?.details ?? {}) as Record<string, unknown>;
+        const field = String(details?.field ?? "").trim();
+        if (!field || seen.has(field)) continue;
+        const value = details?.value;
+        if (value === null || value === undefined) continue;
+        const strVal = typeof value === "string" ? value : String(value ?? "");
+        if (strVal) {
+          historyByField[field] = strVal;
+          seen.add(field);
+        }
+      }
+    } catch {}
+
     function getRawFieldValue(name: ContractFieldName, updated: any, old: any): string | null {
       const src = updated && typeof updated === "object" ? updated : old;
       const obj = { ...(old ?? {}), ...(src ?? {}) };
       if (name === "full_name") {
+        const dedicated = typeof (src ?? {}).contract_full_name === "string" ? String((src ?? {}).contract_full_name).trim() : "";
+        if (dedicated) return dedicated;
+        const fromHistory = historyByField["full_name"];
+        if (fromHistory) return fromHistory;
         const v = (src ?? {}).full_name ?? obj.full_name;
         if (v === "") return "";
         return String(v ?? "").trim() || null;
+      }
+      if (name === "phone") {
+        const dedicated = typeof (src ?? {}).contract_phone === "string" ? String((src ?? {}).contract_phone).replace(/\D/g, "").trim() : "";
+        if (dedicated) return dedicated;
+        const fromHistory = String(historyByField["phone"] ?? "").replace(/\D/g, "").trim();
+        if (fromHistory) return fromHistory;
+        const v = (src ?? {}).phone ?? obj.phone;
+        if (v === "") return "";
+        const p = String(v ?? "").replace(/\D/g, "").trim();
+        return p || null;
       }
       if (name === "cpf") {
         const v = (src ?? {}).cpf ?? obj.cpf;
         if (v === "") return "";
         return String(v ?? "").replace(/\D/g, "").trim() || null;
-      }
-      if (name === "phone") {
-        const v = (src ?? {}).phone ?? obj.phone;
-        if (v === "") return "";
-        const p = String(v ?? "").replace(/\D/g, "").trim();
-        return p || null;
       }
       if (name === "legal_responsible_name") {
         const v = (src ?? {}).legal_responsible_name ?? obj.legal_responsible_name;
@@ -228,9 +298,9 @@ export async function POST(req: Request) {
     }
 
     const snapshot: Record<ContractFieldName, string | null> = {
-      full_name: getRawFieldValue("full_name", updatedLead, lead),
+      full_name: fieldName === "full_name" ? valueToSave : (getRawFieldValue("full_name", updatedLead, lead)),
       cpf: getRawFieldValue("cpf", updatedLead, lead),
-      phone: getRawFieldValue("phone", updatedLead, lead),
+      phone: fieldName === "phone" ? valueToSave : (getRawFieldValue("phone", updatedLead, lead)),
       legal_responsible_name: getRawFieldValue("legal_responsible_name", updatedLead, lead),
       legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf", updatedLead, lead),
     };

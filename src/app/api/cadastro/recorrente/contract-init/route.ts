@@ -90,22 +90,54 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
+    let historyByField: Record<string, string> = {};
+    try {
+      const { data: hData } = await admin
+        .from("atendimento_history_events")
+        .select("event_type, details, created_at")
+        .eq("lead_id", String(lead.id))
+        .eq("event_type", "contract_field_updated")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      const seen = new Set<string>();
+      for (const ev of (hData ?? []) as any[]) {
+        const details = (ev?.details ?? {}) as Record<string, unknown>;
+        const field = String(details?.field ?? "").trim();
+        if (!field || seen.has(field)) continue;
+        const value = details?.value;
+        if (value === null || value === undefined) continue;
+        const strVal = typeof value === "string" ? value : String(value ?? "");
+        if (strVal) {
+          historyByField[field] = strVal;
+          seen.add(field);
+        }
+      }
+    } catch {}
+
     function getRawFieldValue(name: ContractFieldName): string | null {
       if (name === "full_name") {
+        const dedicated = typeof (lead as any).contract_full_name === "string" ? String((lead as any).contract_full_name).trim() : "";
+        if (dedicated) return dedicated;
+        const fromHistory = historyByField["full_name"];
+        if (fromHistory) return fromHistory;
         const v = lead.full_name;
         if (v === "") return "";
         return String(v ?? "").trim() || null;
+      }
+      if (name === "phone") {
+        const dedicated = typeof (lead as any).contract_phone === "string" ? String((lead as any).contract_phone).replace(/\D/g, "").trim() : "";
+        if (dedicated) return dedicated;
+        const fromHistory = String(historyByField["phone"] ?? "").replace(/\D/g, "").trim();
+        if (fromHistory) return fromHistory;
+        const v = lead.phone;
+        if (v === "") return "";
+        const p = String(v ?? "").replace(/\D/g, "").trim();
+        return p || null;
       }
       if (name === "cpf") {
         const v = lead.cpf;
         if (v === "") return "";
         return String(v ?? "").replace(/\D/g, "").trim() || null;
-      }
-      if (name === "phone") {
-        const v = lead.phone;
-        if (v === "") return "";
-        const p = String(v ?? "").replace(/\D/g, "").trim();
-        return p || null;
       }
       if (name === "legal_responsible_name") {
         const v = lead.legal_responsible_name;
