@@ -277,13 +277,15 @@ export default function CadastroRecorrenteBody() {
         setContractCurrentFieldIdx(startIdx);
         const allF = json.allFields || [];
         const initialMeta = allF[startIdx] ?? allF[0];
-        const preVal =
-          initialMeta
-            ? (json.snapshot || contractSnapshot)[initialMeta.name] ??
-              initialMeta.currentValue ??
-              lastSavedFieldValues[initialMeta.name] ??
-              ""
-            : "";
+        let preVal = "";
+        if (initialMeta && typeof initialMeta.currentValue === "string" && initialMeta.currentValue.trim()) {
+          preVal = String(initialMeta.currentValue).trim();
+        } else if (initialMeta) {
+          preVal = (json.snapshot || contractSnapshot)[initialMeta.name] ??
+            initialMeta.currentValue ??
+            lastSavedFieldValues[initialMeta.name] ??
+            "";
+        }
         setContractCurrentValue(
           formatFieldValue(initialMeta?.name ?? "full_name", typeof preVal === "string" ? preVal.trim() : "")
         );
@@ -303,14 +305,17 @@ export default function CadastroRecorrenteBody() {
     const targetMeta = contractAllFields[targetIdx];
     if (targetMeta) {
       setContractCurrentFieldIdx(targetIdx);
+      let pre = "";
       const snapShot = (contractSnapshot || {}) as Record<string, string | null>;
       const lastSaved = (lastSavedFieldValues || {}) as Record<string, string | null>;
-      const pre =
-        (snapShot[targetMeta.name] != null ? String(snapShot[targetMeta.name] ?? "") : "") ||
-        (lastSaved[targetMeta.name] != null ? String(lastSaved[targetMeta.name] ?? "") : "") ||
-        targetMeta.currentValue ||
-        "";
-      setContractCurrentValue(formatFieldValue(targetMeta.name, typeof pre === "string" ? pre.trim() : ""));
+      if (typeof targetMeta.currentValue === "string" && targetMeta.currentValue.trim()) {
+        pre = String(targetMeta.currentValue).trim();
+      } else if (snapShot[targetMeta.name] != null && String(snapShot[targetMeta.name] ?? "").trim()) {
+        pre = String(snapShot[targetMeta.name] ?? "").trim();
+      } else if (lastSaved[targetMeta.name] != null && String(lastSaved[targetMeta.name] ?? "").trim()) {
+        pre = String(lastSaved[targetMeta.name] ?? "").trim();
+      }
+      setContractCurrentValue(formatFieldValue(targetMeta.name, pre));
     }
   }, [step, contractAllFields, contractSnapshot, lastSavedFieldValues]);
 
@@ -397,11 +402,15 @@ export default function CadastroRecorrenteBody() {
       setContractCurrentFieldIdx(nextFieldIdx);
       const nextMeta = (json.allFields || contractAllFields)[nextFieldIdx];
       if (nextMeta) {
-        const pre =
-          (json.snapshot || contractSnapshot)[nextMeta.name] ??
-          nextMeta.currentValue ??
-          lastSavedFieldValues[nextMeta.name] ??
-          "";
+        let pre = "";
+        if (json.allFields && typeof json.allFields[nextFieldIdx]?.currentValue === "string" && json.allFields[nextFieldIdx].currentValue.trim()) {
+          pre = String(json.allFields[nextFieldIdx].currentValue).trim();
+        } else {
+          pre = (json.snapshot || contractSnapshot)[nextMeta.name] ??
+            nextMeta.currentValue ??
+            lastSavedFieldValues[nextMeta.name] ??
+            "";
+        }
         setContractCurrentValue(formatFieldValue(nextMeta.name, typeof pre === "string" ? pre.trim() : ""));
       } else {
         setContractCurrentValue("");
@@ -439,6 +448,8 @@ export default function CadastroRecorrenteBody() {
         needSave = false;
       }
     }
+    let latestSnapshotFromSave: Record<ContractFieldMeta["name"], string | null> | null = null;
+    let latestAllFieldsFromSave: ContractFieldMeta[] | null = null;
     if (needSave && currentMeta) {
       setContractFieldSaving(true);
       setContractFieldError("");
@@ -468,6 +479,8 @@ export default function CadastroRecorrenteBody() {
             }
           | null;
         if (res.ok && json?.ok) {
+          latestSnapshotFromSave = json.snapshot || null;
+          latestAllFieldsFromSave = json.allFields || null;
           setContractSnapshot(json.snapshot || contractSnapshot);
           setLastSavedFieldValues((prev) => {
             let next: any = { ...prev };
@@ -481,17 +494,25 @@ export default function CadastroRecorrenteBody() {
     }
     const backStepAsContractStep = backTargetStep as 3 | 4 | 5 | 6 | 7;
     const backTargetIdx = fieldIdxByStep[backStepAsContractStep];
-    const backMeta = contractAllFields[backTargetIdx];
+    const fallbackAllFields = latestAllFieldsFromSave && latestAllFieldsFromSave.length > 0
+      ? latestAllFieldsFromSave
+      : contractAllFields;
+    const backMeta = fallbackAllFields[backTargetIdx];
     if (backMeta) {
-      const snapShot = (contractSnapshot || {}) as Record<string, string | null>;
-      const lastSaved = (lastSavedFieldValues || {}) as Record<string, string | null>;
-      const pre =
-        (snapShot[backMeta.name] != null ? String(snapShot[backMeta.name] ?? "") : "") ||
-        (lastSaved[backMeta.name] != null ? String(lastSaved[backMeta.name] ?? "") : "") ||
-        backMeta.currentValue ||
-        "";
+      let pre = "";
+      const snapShotLocal = latestSnapshotFromSave || contractSnapshot || {} as any;
+      const lastSavedLocal = lastSavedFieldValues || {} as any;
+      if (latestAllFieldsFromSave && typeof latestAllFieldsFromSave[backTargetIdx]?.currentValue === "string" && latestAllFieldsFromSave[backTargetIdx].currentValue.trim()) {
+        pre = String(latestAllFieldsFromSave[backTargetIdx].currentValue).trim();
+      } else if (snapShotLocal && snapShotLocal[backMeta.name] != null && String(snapShotLocal[backMeta.name] ?? "").trim()) {
+        pre = String(snapShotLocal[backMeta.name] ?? "").trim();
+      } else if (lastSavedLocal && lastSavedLocal[backMeta.name] != null && String(lastSavedLocal[backMeta.name] ?? "").trim()) {
+        pre = String(lastSavedLocal[backMeta.name] ?? "").trim();
+      } else if (backMeta.currentValue && String(backMeta.currentValue).trim()) {
+        pre = String(backMeta.currentValue).trim();
+      }
       setContractCurrentFieldIdx(backTargetIdx);
-      setContractCurrentValue(formatFieldValue(backMeta.name, typeof pre === "string" ? pre.trim() : ""));
+      setContractCurrentValue(formatFieldValue(backMeta.name, pre));
     }
     goStep(backTargetStep);
   }
