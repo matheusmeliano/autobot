@@ -591,7 +591,7 @@ export default function CadastroRecorrenteBody() {
       }
       setContractPdfUrl(String(json.contract_pdf_url || ""));
       setContractSignedAt(String(json.contract_signed_at || new Date().toISOString()));
-      goStep(9);
+      goStep(10);
     } catch (e) {
       setContractFinalError(toErrorMessage(e, "Erro ao gerar o contrato."));
     } finally {
