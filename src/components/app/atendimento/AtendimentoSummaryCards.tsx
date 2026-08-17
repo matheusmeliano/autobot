@@ -1002,8 +1002,16 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {pastRecurringPaged.length ? (
-          <div className="mt-4 space-y-3">
+        {hasRecurringClass && pastRecurringPaged.length ? (
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                Histórico
+              </div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-55)]">
+                {pastRecurringOccurrences.length} aula(s) realizada(s)
+              </div>
+            </div>
             {pastRecurringPaged.map((occ) => {
               return (
                 <div
