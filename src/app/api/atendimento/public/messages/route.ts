@@ -2838,6 +2838,139 @@ export async function POST(req: Request) {
     });
   }
 
+  if (expectedField === "full_name") {
+    const persistedAfterLocation =
+      (captured as any).full_name ?? String((lead as any).full_name ?? "").trim();
+    const nameIsValid = Boolean(persistedAfterLocation && looksLikeFullName(persistedAfterLocation));
+    if (!nameIsValid) {
+      const nextFailureAttempt =
+        (await getFullNameValidationFailureCount({
+          admin,
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+        })) + 1;
+      const shouldBlockConversation = nextFailureAttempt >= MAX_FULL_NAME_VALIDATION_ATTEMPTS;
+      const replyMessage = shouldBlockConversation
+        ? FULL_NAME_BLOCKED_FINAL_MESSAGE
+        : buildFullNameRetryMessage(nextFailureAttempt);
+
+      await admin
+        .from("atendimento_leads")
+        .update({
+          unread_count: Number(lead.unread_count ?? 0) + 1,
+          is_new_for_attendant: true,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+          ...(shouldBlockConversation
+            ? {
+                status: "encerrado",
+                funnel_stage: "encerrado",
+              }
+            : {}),
+        })
+        .eq("id", String(lead.id));
+
+      await syncConversationPreview({
+        conversationId: String(conversation.id),
+        contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+        createdAt: nowIso,
+      });
+
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: "message_received",
+        title: "Mensagem recebida do lead",
+        details: {
+          content_text: contentText || null,
+          media_type: mediaType,
+          media_url: mediaUrl,
+          mime_type: mimeType,
+          file_name: fileName,
+          file_size_bytes: fileSizeBytes,
+        },
+        actorType: "lead",
+      });
+
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: FULL_NAME_VALIDATION_FAILURE_EVENT_TYPE,
+        title: "Falha ao identificar o nome completo informado",
+        details: {
+          attempt: nextFailureAttempt,
+          content_text: contentText || null,
+          captured_full_name: String((captured as any).full_name ?? "").trim() || null,
+          persisted_after_location: persistedAfterLocation || null,
+          source: "fallback_full_name_validation_before_location",
+        },
+        actorType: "system",
+      });
+
+      if (shouldBlockConversation) {
+        await admin
+          .from("atendimento_conversations")
+          .update({
+            bot_enabled: false,
+            updated_at: nowIso,
+          })
+          .eq("id", String(conversation.id));
+
+        await appendHistoryEvent({
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+          eventType: "conversation_closed",
+          title: "Atendimento encerrado após 3 falhas de identificação de nome completo",
+          details: {
+            invalid_attempts: nextFailureAttempt,
+            source: "fallback_full_name_validation_before_location",
+          },
+          actorType: "system",
+        });
+      }
+
+      await sleep(POST_LEAD_REPLY_DELAY_MS);
+      const botNowIso = new Date().toISOString();
+      const { data: outbound, error: outboundError } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String(conversation.id),
+          sender_role: "bot",
+          content_text: replyMessage,
+          media_type: "text",
+          status: "entregue",
+          sent_at: botNowIso,
+          delivered_at: botNowIso,
+        })
+        .select("*")
+        .maybeSingle();
+
+      if (outboundError) {
+        const code = String((outboundError as any)?.code ?? "").trim();
+        if (code !== "23505") {
+          return Response.json({ ok: false, error: outboundError.message }, { status: 500 });
+        }
+      }
+
+      await syncConversationPreview({
+        conversationId: String(conversation.id),
+        contentText: replyMessage,
+        createdAt: botNowIso,
+      });
+
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: outboundError ? null : outbound,
+        blocked: shouldBlockConversation,
+        conversation: {
+          id: String(conversation.id),
+          bot_enabled: !shouldBlockConversation,
+        },
+      });
+    }
+  }
+
   const locationContext = buildLeadLocationContext({
     captured,
     leadState: String((lead as any)?.state ?? "").trim() || null,
