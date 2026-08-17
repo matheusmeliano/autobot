@@ -1349,52 +1349,31 @@ export default function CadastroRecorrenteBody() {
                   <label className="block text-sm font-semibold text-slate-800 mb-2">
                     Estado
                   </label>
-                  <select
+                  <p className="mb-2 text-xs sm:text-sm text-slate-500">
+                    Digite corretamente o nome do seu estado.
+                  </p>
+                  <input
+                    type="text"
                     value={stateField}
                     onChange={(e) => setStateField(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
-                  >
-                    <option value="">Selecione seu estado</option>
-                    <option value="AC">Acre (AC)</option>
-                    <option value="AL">Alagoas (AL)</option>
-                    <option value="AP">Amapá (AP)</option>
-                    <option value="AM">Amazonas (AM)</option>
-                    <option value="BA">Bahia (BA)</option>
-                    <option value="CE">Ceará (CE)</option>
-                    <option value="DF">Distrito Federal (DF)</option>
-                    <option value="ES">Espírito Santo (ES)</option>
-                    <option value="GO">Goiás (GO)</option>
-                    <option value="MA">Maranhão (MA)</option>
-                    <option value="MT">Mato Grosso (MT)</option>
-                    <option value="MS">Mato Grosso do Sul (MS)</option>
-                    <option value="MG">Minas Gerais (MG)</option>
-                    <option value="PA">Pará (PA)</option>
-                    <option value="PB">Paraíba (PB)</option>
-                    <option value="PR">Paraná (PR)</option>
-                    <option value="PE">Pernambuco (PE)</option>
-                    <option value="PI">Piauí (PI)</option>
-                    <option value="RJ">Rio de Janeiro (RJ)</option>
-                    <option value="RN">Rio Grande do Norte (RN)</option>
-                    <option value="RS">Rio Grande do Sul (RS)</option>
-                    <option value="RO">Rondônia (RO)</option>
-                    <option value="RR">Roraima (RR)</option>
-                    <option value="SC">Santa Catarina (SC)</option>
-                    <option value="SP">São Paulo (SP)</option>
-                    <option value="SE">Sergipe (SE)</option>
-                    <option value="TO">Tocantins (TO)</option>
-                    <option value="Outro">Outro / Fora do Brasil</option>
-                  </select>
+                    placeholder="Ex: São Paulo, Mato Grosso, Florida..."
+                    autoComplete="address-level1"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-800 mb-2">
                     Cidade
                   </label>
+                  <p className="mb-2 text-xs sm:text-sm text-slate-500">
+                    Digite corretamente o nome da sua cidade.
+                  </p>
                   <input
                     type="text"
                     value={cityField}
                     onChange={(e) => setCityField(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
-                    placeholder="Ex: Campo Novo do Parecis"
+                    placeholder="Ex: Campo Novo do Parecis, São Paulo, Miami..."
                     autoComplete="address-level2"
                   />
                 </div>
