@@ -811,10 +811,10 @@ export default function CadastroRecorrenteBody() {
                 browserTimeZone: browserTz || null,
               })
             : null;
-          const tzToUse = resolvedTz || restoredTimezone || browserTz || null;
+          const tzToUse = resolvedTz || restoredTimezone || (hasLoc ? browserTz : "") || null;
           const badTz =
             !restoredTimezone || restoredTimezone === "America/Cuiaba";
-          if ((!savedCountry || (hasLoc && badTz)) && (hasLoc || tzToUse)) {
+          if (hasLoc && (tzToUse || !savedCountry)) {
             const inferred = inferCountry(
               restoredState || null,
               restoredCity || null,
@@ -990,8 +990,8 @@ export default function CadastroRecorrenteBody() {
                 browserTimeZone: browserTz || null,
               })
             : null;
-        const tz = tzFromLoc || leadTimezone || browserTz || null;
-        const inferredCountry = tz || st || ct ? inferCountry(st, ct, tz || null) : null;
+        const tz = tzFromLoc || leadTimezone || ((st || ct) ? browserTz : "") || null;
+        const inferredCountry = (st || ct) && (tz || st || ct) ? inferCountry(st, ct, tz || null) : null;
         const payload = {
           telefone,
           nome: nome.trim() || null,

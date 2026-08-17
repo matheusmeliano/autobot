@@ -1263,6 +1263,7 @@ export function inferCountry(
   const stateLow = state.toLowerCase();
   const cityLow = city.toLowerCase();
 
+  if (!stateLow && !cityLow) return null;
   if (!stateLow && !cityLow && !timezone) return null;
 
   // 1) PRIORIDADE MAXIMA: keywords explicitas de estado/cidade que o usuario digitou.
