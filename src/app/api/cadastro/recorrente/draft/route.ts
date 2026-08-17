@@ -49,6 +49,7 @@ type DraftPayload = {
   password?: string | null;
   state?: string | null;
   city?: string | null;
+  country?: string | null;
   timezone?: string | null;
 };
 
@@ -134,6 +135,7 @@ export async function GET(req: NextRequest) {
         contract_signed_at: readStr("contract_signed_at"),
         state: readStr("state"),
         city: readStr("city"),
+        country: readStr("country"),
         timezone: readStr("timezone"),
       },
       progress: {
@@ -159,7 +161,7 @@ export async function PATCH(req: NextRequest) {
     if (!rawBody || typeof rawBody !== "object") {
       return NextResponse.json({ ok: false, error: "Corpo inválido." }, { status: 400 });
     }
-    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password, state, city, timezone } =
+    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password, state, city, country, timezone } =
       rawBody as DraftPayload;
 
     const safePhoneDigits = String(telefone ?? "").replace(/\D/g, "").trim();
@@ -170,6 +172,7 @@ export async function PATCH(req: NextRequest) {
     const safeNome = toNomeESobrenome(nome);
     const safeState = String(state ?? "").trim();
     const safeCity = String(city ?? "").trim();
+    const safeCountry = String(country ?? "").trim();
     const safeTimezone = String(timezone ?? "").trim();
 
     const safeWeekday = weekday ? String(weekday).trim().toLowerCase() : "";
@@ -195,6 +198,7 @@ export async function PATCH(req: NextRequest) {
       Boolean(safePassword) ||
       Boolean(safeState) ||
       Boolean(safeCity) ||
+      Boolean(safeCountry) ||
       Boolean(safeTimezone);
 
     if (!hasAnyPayload) {
@@ -318,6 +322,9 @@ export async function PATCH(req: NextRequest) {
     if (safeCity) {
       patch.city = safeCity;
     }
+    if (safeCountry) {
+      patch.country = safeCountry;
+    }
     if (safeTimezone) {
       patch.timezone = safeTimezone;
     }
@@ -394,6 +401,7 @@ export async function PATCH(req: NextRequest) {
         has_password: Boolean(safePassword),
         state: safeState || null,
         city: safeCity || null,
+        country: safeCountry || null,
         timezone: safeTimezone || null,
       },
     });

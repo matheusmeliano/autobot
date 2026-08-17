@@ -186,6 +186,7 @@ export default function CadastroRecorrenteBody() {
   const [hasPasswordInitial, setHasPasswordInitial] = useState<boolean>(false);
   const [stateField, setStateField] = useState<string>("");
   const [cityField, setCityField] = useState<string>("");
+  const [countryField, setCountryField] = useState<string>("");
   const [leadTimezone, setLeadTimezone] = useState<string>("");
   const [initialDataLoading, setInitialDataLoading] = useState<boolean>(true);
   const [initialDataError, setInitialDataError] = useState<string>("");
@@ -531,6 +532,7 @@ export default function CadastroRecorrenteBody() {
     password?: string | null;
     state?: string | null;
     city?: string | null;
+    country?: string | null;
     timezone?: string | null;
   }) {
     try {
@@ -557,6 +559,7 @@ export default function CadastroRecorrenteBody() {
           password: safePassword,
           state: payload.state ?? null,
           city: payload.city ?? null,
+          country: payload.country ?? null,
           timezone: payload.timezone ?? null,
         }),
       }).catch(() => {});
@@ -731,6 +734,7 @@ export default function CadastroRecorrenteBody() {
         let restoredLegalCpf: string | null = null;
         let restoredState: string | null = null;
         let restoredCity: string | null = null;
+        let restoredCountry: string | null = null;
         let restoredTimezone: string | null = null;
 
         if (json?.ok && json?.lead) {
@@ -742,6 +746,7 @@ export default function CadastroRecorrenteBody() {
           restoredLegalCpf = (json.lead as any)?.legal_responsible_cpf ? String((json.lead as any).legal_responsible_cpf) : null;
           restoredState = (json.lead as any)?.state ? String((json.lead as any).state) : null;
           restoredCity = (json.lead as any)?.city ? String((json.lead as any).city) : null;
+          restoredCountry = (json.lead as any)?.country ? String((json.lead as any).country) : null;
           restoredTimezone = (json.lead as any)?.timezone ? String((json.lead as any).timezone) : null;
 
           const normalizedLeadFullName = toNomeESobrenome(restoredLeadFullName);
@@ -761,6 +766,7 @@ export default function CadastroRecorrenteBody() {
           }
           if (restoredState) setStateField(restoredState);
           if (restoredCity) setCityField(restoredCity);
+          if (restoredCountry) setCountryField(restoredCountry);
           if (restoredTimezone) setLeadTimezone(restoredTimezone);
           if (restoredCpf) {
             setLastSavedFieldValues((prev) => ({ ...prev, cpf: restoredCpf! }));
@@ -948,6 +954,7 @@ export default function CadastroRecorrenteBody() {
           leadTime: selectedTimeOpt?.leadTime || selectedTimeOpt?.displayLabel || null,
           state: stateField.trim() || null,
           city: cityField.trim() || null,
+          country: countryField.trim() || null,
           timezone: tz || null,
         };
         const body = JSON.stringify(payload);
@@ -970,7 +977,7 @@ export default function CadastroRecorrenteBody() {
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
-  }, [step, phoneField, nome, senha, selectedWeekday, availability, selectedTimeOpt, stateField, cityField, leadTimezone]);
+  }, [step, phoneField, nome, senha, selectedWeekday, availability, selectedTimeOpt, stateField, cityField, countryField, leadTimezone]);
 
   async function loadAvailability() {
     setAvailLoading(true);
@@ -1021,12 +1028,14 @@ export default function CadastroRecorrenteBody() {
     }
     const safeState = stateField.trim();
     const safeCity = cityField.trim();
-    if (safeState && safeCity) {
+    const safeCountry = countryField.trim();
+    if (safeState && safeCity && safeCountry) {
       await saveDraftRecurring({
         step: 1,
         password: senha.trim() || null,
         state: safeState,
         city: safeCity,
+        country: safeCountry,
         timezone: tzAuto || null,
       });
       setStep(2);
@@ -1038,7 +1047,8 @@ export default function CadastroRecorrenteBody() {
   async function handleAdvance1() {
     const st = stateField.trim();
     const ct = cityField.trim();
-    if (!st || !ct) return;
+    const co = countryField.trim();
+    if (!st || !ct || !co) return;
     const tzAuto = leadTimezone || (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone ? Intl.DateTimeFormat().resolvedOptions().timeZone : "");
     if (tzAuto && !leadTimezone) {
       setLeadTimezone(tzAuto);
@@ -1047,6 +1057,7 @@ export default function CadastroRecorrenteBody() {
       step: 2,
       state: st,
       city: ct,
+      country: co,
       timezone: tzAuto || null,
     });
     setSubmitError("");
@@ -1349,7 +1360,7 @@ export default function CadastroRecorrenteBody() {
                   {firstName}, onde você mora?
                 </h2>
                 <p className="mt-1 text-slate-600">
-                  Precisamos do seu estado e cidade para oferecer horários compatíveis com o seu fuso horário e a localização do professor.
+                  Precisamos do seu estado, cidade e país para oferecer horários compatíveis com o seu fuso horário e a localização do professor.
                 </p>
               </div>
               <div className="space-y-5">
@@ -1385,11 +1396,27 @@ export default function CadastroRecorrenteBody() {
                     autoComplete="address-level2"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    País
+                  </label>
+                  <p className="mb-2 text-xs sm:text-sm text-slate-500">
+                    Digite corretamente o nome do seu país.
+                  </p>
+                  <input
+                    type="text"
+                    value={countryField}
+                    onChange={(e) => setCountryField(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
+                    placeholder="Ex: Brasil, Estados Unidos, Portugal..."
+                    autoComplete="country-name"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full">
                 <button
                   onClick={() => void handleAdvance1()}
-                  disabled={!stateField.trim() || !cityField.trim()}
+                  disabled={!stateField.trim() || !cityField.trim() || !countryField.trim()}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate order-2 sm:order-2 sm:justify-self-end"
                 >
                   Avançar
