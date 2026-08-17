@@ -2096,7 +2096,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
         if (!hasWeekdayOk) return "Falta dia recorrente";
         return "Falta horário recorrente";
       }
-      return "Falta contrato";
+      return "Falta confirmar pagamento";
     }
 
     const expDraftDate = hasLatestCancelledMarker
@@ -2180,7 +2180,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
     }
     const recBothOk = recWeekdayOk && recTimeOk;
     if (recBothOk || hasRecurring) {
-      return "Falta contrato";
+      return "Falta confirmar pagamento";
     }
     const isRecorrente =
       hasWeekdayOk ||
