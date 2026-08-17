@@ -782,7 +782,8 @@ function BookingDetails({
     hasLead: true,
     hasRecurringClassScheduled: hasRecurringClass,
   });
-  const showIncompleteState = derivedStatus === "incomplete" && !bookingId;
+  const showIncompleteState =
+    (derivedStatus === "incomplete" || derivedStatus === "skipped") && !bookingId;
   const displayDash = "-";
 
   const savedBookingRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
