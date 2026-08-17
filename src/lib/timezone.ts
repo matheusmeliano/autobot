@@ -1085,6 +1085,42 @@ export function resolveTimeZoneFromCityInput(params: {
   };
 }
 
+export function resolveStudentTimezone(params: {
+  state?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  browserTimeZone?: string | null;
+}): string | null {
+  const state = String(params.state ?? "").trim() || null;
+  const city = String(params.city ?? "").trim() || null;
+  const phone = String(params.phone ?? "").trim() || null;
+  const browserTz = String(params.browserTimeZone ?? "").trim() || null;
+
+  if (city) {
+    const r = resolveTimeZoneFromCityInput({
+      city,
+      state: state ?? undefined,
+      phone: phone ?? undefined,
+      allowPhoneCountryFallback: false,
+    });
+    if (r?.timeZone) return r.timeZone;
+  }
+
+  if (state) {
+    const r = resolveTimeZoneFromStateInput({
+      state,
+      phone: phone ?? undefined,
+    });
+    if (r?.timeZone) return r.timeZone;
+  }
+
+  if (browserTz && browserTz !== PROFESSOR_TIME_ZONE) {
+    return browserTz;
+  }
+
+  return null;
+}
+
 export function formatUtcIsoInTimeZone(params: {
   iso: string;
   timeZone: string;

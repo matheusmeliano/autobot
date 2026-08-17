@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { inferCountry } from "../../../lib/atendimento/experimentalClass";
+import { resolveStudentTimezone } from "../../../lib/timezone";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
@@ -797,14 +798,36 @@ export default function CadastroRecorrenteBody() {
             setContractSignedAt(restoredContractSignedAt);
           }
 
-          if (!savedCountry && (restoredState || restoredCity || restoredTimezone)) {
-            const autoTz = restoredTimezone ||
-              (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
-                ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                : "");
-            const inferred = inferCountry(restoredState, restoredCity, autoTz || null);
-            if (inferred) {
-              void saveDraftRecurring({ country: inferred, timezone: autoTz || null }).catch(() => {});
+          const hasLoc = Boolean(restoredState || restoredCity);
+          const browserTz =
+            typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+              ? Intl.DateTimeFormat().resolvedOptions().timeZone
+              : "";
+          const resolvedTz = hasLoc
+            ? resolveStudentTimezone({
+                state: restoredState || null,
+                city: restoredCity || null,
+                phone: restoredLeadPhone || null,
+                browserTimeZone: browserTz || null,
+              })
+            : null;
+          const tzToUse = resolvedTz || restoredTimezone || browserTz || null;
+          const badTz =
+            !restoredTimezone || restoredTimezone === "America/Cuiaba";
+          if ((!savedCountry || (hasLoc && badTz)) && (hasLoc || tzToUse)) {
+            const inferred = inferCountry(
+              restoredState || null,
+              restoredCity || null,
+              tzToUse || null
+            );
+            const patch: any = {};
+            if (inferred && inferred !== savedCountry) patch.country = inferred;
+            if (resolvedTz && resolvedTz !== restoredTimezone) {
+              patch.timezone = resolvedTz;
+              setLeadTimezone(resolvedTz);
+            }
+            if (Object.keys(patch).length) {
+              void saveDraftRecurring(patch).catch(() => {});
             }
           }
         } else {
@@ -952,9 +975,22 @@ export default function CadastroRecorrenteBody() {
           );
           return opt?.displayLabel || opt?.label || "";
         })();
-        const tz = leadTimezone || (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone ? Intl.DateTimeFormat().resolvedOptions().timeZone : "");
+        const browserTz =
+          typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+            ? Intl.DateTimeFormat().resolvedOptions().timeZone
+            : "";
         const st = stateField.trim() || null;
         const ct = cityField.trim() || null;
+        const tzFromLoc =
+          st || ct
+            ? resolveStudentTimezone({
+                state: st,
+                city: ct,
+                phone: telefone || null,
+                browserTimeZone: browserTz || null,
+              })
+            : null;
+        const tz = tzFromLoc || leadTimezone || browserTz || null;
         const inferredCountry = tz || st || ct ? inferCountry(st, ct, tz || null) : null;
         const payload = {
           telefone,
@@ -1035,13 +1071,31 @@ export default function CadastroRecorrenteBody() {
 
   async function handleAdvance0() {
     if (!canAdvanceFromStep0()) return;
-    const tzAuto = leadTimezone || (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone ? Intl.DateTimeFormat().resolvedOptions().timeZone : "");
-    if (tzAuto && !leadTimezone) {
-      setLeadTimezone(tzAuto);
-    }
+    const browserTz =
+      typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : "";
     const safeState = stateField.trim();
     const safeCity = cityField.trim();
-    const inferredCountry = inferCountry(safeState || null, safeCity || null, tzAuto || null);
+    const safePhone = phoneField.replace(/\D/g, "");
+    const tzFromLoc =
+      safeState || safeCity
+        ? resolveStudentTimezone({
+            state: safeState || null,
+            city: safeCity || null,
+            phone: safePhone || null,
+            browserTimeZone: browserTz || null,
+          })
+        : null;
+    const tzFinal = tzFromLoc || leadTimezone || browserTz || null;
+    if (tzFinal && !leadTimezone) {
+      setLeadTimezone(tzFinal);
+    }
+    const inferredCountry = inferCountry(
+      safeState || null,
+      safeCity || null,
+      tzFinal || null
+    );
     if (safeState && safeCity && inferredCountry) {
       await saveDraftRecurring({
         step: 1,
@@ -1049,7 +1103,7 @@ export default function CadastroRecorrenteBody() {
         state: safeState,
         city: safeCity,
         country: inferredCountry,
-        timezone: tzAuto || null,
+        timezone: tzFinal || null,
       });
       setStep(2);
       return;
@@ -1061,17 +1115,28 @@ export default function CadastroRecorrenteBody() {
     const st = stateField.trim();
     const ct = cityField.trim();
     if (!st || !ct) return;
-    const tzAuto = leadTimezone || (typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone ? Intl.DateTimeFormat().resolvedOptions().timeZone : "");
-    if (tzAuto && !leadTimezone) {
-      setLeadTimezone(tzAuto);
+    const browserTz =
+      typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : "";
+    const safePhone = phoneField.replace(/\D/g, "");
+    const tzFromLoc = resolveStudentTimezone({
+      state: st || null,
+      city: ct || null,
+      phone: safePhone || null,
+      browserTimeZone: browserTz || null,
+    });
+    const tzFinal = tzFromLoc || leadTimezone || browserTz || null;
+    if (tzFinal && !leadTimezone) {
+      setLeadTimezone(tzFinal);
     }
-    const inferred = inferCountry(st, ct, tzAuto || null);
+    const inferred = inferCountry(st, ct, tzFinal || null);
     await saveDraftRecurring({
       step: 2,
       state: st,
       city: ct,
       country: inferred,
-      timezone: tzAuto || null,
+      timezone: tzFinal || null,
     });
     setSubmitError("");
     setStep(2);
