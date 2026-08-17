@@ -2164,7 +2164,10 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                         if (activeSection !== "interessados" && activeSection !== "alunos") return null;
                         const nomeStr = String(lead.full_name ?? "").trim();
                         const telStr = String(lead.phone ?? "").replace(/\D/g, "").trim();
-                        const isNomeOk = nomeStr.split(/\s+/).filter(Boolean).length >= 2;
+                        const partes = nomeStr.split(/\s+/).filter(Boolean);
+                        const isNomeOk =
+                          partes.length >= 2 ||
+                          (partes.length === 1 && partes[0].length >= 3);
                         const isTelOk = telStr.length >= 10;
 
                         if (!isNomeOk || !isTelOk) {
