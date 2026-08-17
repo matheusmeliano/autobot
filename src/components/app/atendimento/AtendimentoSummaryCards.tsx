@@ -163,8 +163,137 @@ function formatCpf(v: string | null | undefined): string {
 
 type LeadNameValues = { full_name: string };
 
+function RecurringClassLinkCard({
+  lead,
+  activeSection,
+  savingThisLead,
+  onSaveRecurringLink,
+}: {
+  lead: AtendimentoLeadListItem;
+  activeSection: SummarySectionId;
+  savingThisLead: boolean;
+  onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
+}) {
+  if (activeSection !== "interessados" && activeSection !== "alunos") return null;
+  const nomeStr = String(lead.full_name ?? "").trim();
+  const telStr = String(lead.phone ?? "").replace(/\D/g, "").trim();
+  const partes = nomeStr.split(/\s+/).filter(Boolean);
+  const isNomeOk =
+    partes.length >= 2 ||
+    (partes.length === 1 && partes[0].length >= 3);
+  const isTelOk = telStr.length >= 10;
+
+  if (!isNomeOk || !isTelOk) {
+    const missing: string[] = [];
+    if (!isNomeOk) missing.push("nome");
+    if (!isTelOk) missing.push("telefone");
+    return (
+      <div className="rounded-xl border border-amber-200/60 bg-amber-50/70 px-3 py-2.5 text-[11px] font-semibold text-amber-700/90">
+        Link de matrícula: aguardando {missing.join(" + ")}.
+      </div>
+    );
+  }
+
+  const baseOrigin =
+    typeof window !== "undefined" && window?.location?.origin
+      ? String(window.location.origin)
+      : "";
+  const urlEncoded = (() => {
+    const qs = new URLSearchParams();
+    qs.set("nome", nomeStr);
+    qs.set("telefone", telStr);
+    const rel = `/cadastro/recorrente?${qs.toString()}`;
+    if (baseOrigin) return new URL(rel, baseOrigin).toString();
+    return rel;
+  })();
+
+  const savedLink = String((lead as any)?.recurring_class_link ?? "").trim();
+  const finalLink = savedLink || urlEncoded;
+
+  return (
+    <div className="rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 px-3 py-2.5 space-y-2">
+      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700/85">
+        Link de matrícula
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <button
+          type="button"
+          onClick={async (ev) => {
+            if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+            try {
+              if (!savedLink) {
+                try { await onSaveRecurringLink(lead, urlEncoded); } catch {}
+              }
+              window.open(finalLink, "_blank", "noopener,noreferrer");
+            } catch {}
+          }}
+          disabled={savingThisLead}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-700 disabled:opacity-60"
+        >
+          {savingThisLead && !savedLink ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ExternalLink className="h-3.5 w-3.5" />
+          )}
+          Abrir
+        </button>
+        <button
+          type="button"
+          onClick={async (ev) => {
+            if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+            try {
+              if (!savedLink) {
+                try { await onSaveRecurringLink(lead, urlEncoded); } catch {}
+              }
+              if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
+                await (navigator as any).clipboard.writeText(finalLink);
+                modalToast.success("Link de matrícula copiado.");
+              } else {
+                try {
+                  const ta = document.createElement("textarea");
+                  ta.value = finalLink;
+                  ta.style.position = "fixed";
+                  ta.style.opacity = "0";
+                  document.body.appendChild(ta);
+                  ta.select();
+                  document.execCommand("copy");
+                  document.body.removeChild(ta);
+                  modalToast.success("Link de matrícula copiado.");
+                } catch {
+                  prompt("Copie o link de matrícula:", finalLink);
+                }
+              }
+            } catch (e) {
+              modalToast.error(e instanceof Error ? e.message : "Falha ao copiar o link.");
+            }
+          }}
+          disabled={savingThisLead}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60"
+        >
+          {savingThisLead && !savedLink ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
+          Copiar
+        </button>
+        {savedLink ? (
+          <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700/80 ml-0.5">
+            <Check className="h-3 w-3" /> salvo
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500/85 ml-0.5">
+            <Zap className="h-3 w-3" /> auto-salva ao abrir/copiar
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LeadDetails({
   lead,
+  activeSection,
   showDelete,
   deleting,
   onDelete,
@@ -173,6 +302,7 @@ function LeadDetails({
   onSaveRecurringLink,
 }: {
   lead: AtendimentoLeadListItem;
+  activeSection: SummarySectionId;
   showDelete: boolean;
   deleting: boolean;
   onDelete: () => void;
@@ -337,6 +467,14 @@ function LeadDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
+        <div className="mb-4">
+          <RecurringClassLinkCard
+            lead={lead}
+            activeSection={activeSection}
+            savingThisLead={savingRecurringLink}
+            onSaveRecurringLink={onSaveRecurringLink}
+          />
+        </div>
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="CPF" value={formatCpf(lead.cpf)} copyable copyValue={digitsOnly(lead.cpf)} />
@@ -2160,117 +2298,14 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                           <RepescagemBadge />
                         </div>
                       ) : null}
-                      {(() => {
-                        if (activeSection !== "interessados" && activeSection !== "alunos") return null;
-                        const nomeStr = String(lead.full_name ?? "").trim();
-                        const telStr = String(lead.phone ?? "").replace(/\D/g, "").trim();
-                        const partes = nomeStr.split(/\s+/).filter(Boolean);
-                        const isNomeOk =
-                          partes.length >= 2 ||
-                          (partes.length === 1 && partes[0].length >= 3);
-                        const isTelOk = telStr.length >= 10;
-
-                        if (!isNomeOk || !isTelOk) {
-                          const missing: string[] = [];
-                          if (!isNomeOk) missing.push("nome");
-                          if (!isTelOk) missing.push("telefone");
-                          return (
-                            <div className="mt-3 rounded-xl border border-amber-200/60 bg-amber-50/70 px-3 py-2.5 text-[11px] font-semibold text-amber-700/90">
-                              Link de matrícula: aguardando {missing.join(" + ")}.
-                            </div>
-                          );
-                        }
-
-                        const baseOrigin =
-                          typeof window !== "undefined" && window?.location?.origin
-                            ? String(window.location.origin)
-                            : "";
-                        const urlEncoded = (() => {
-                          const qs = new URLSearchParams();
-                          qs.set("nome", nomeStr);
-                          qs.set("telefone", telStr);
-                          const rel = `/cadastro/recorrente?${qs.toString()}`;
-                          if (baseOrigin) return new URL(rel, baseOrigin).toString();
-                          return rel;
-                        })();
-
-                        const savedLink = String((lead as any)?.recurring_class_link ?? "").trim();
-                        const finalLink = savedLink || urlEncoded;
-
-                        return (
-                          <div className="mt-3 rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 px-3 py-2.5 space-y-2">
-                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700/85">
-                              Link de matrícula
-                            </div>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={async (ev) => {
-                                  ev.stopPropagation();
-                                  try {
-                                    if (!savedLink) {
-                                      setSavingRecurringLinkLeadId(String(lead.id));
-                                      try { await handleSaveRecurringLink(lead, urlEncoded); } catch {}
-                                      try { setSavingRecurringLinkLeadId(null); } catch {}
-                                    }
-                                    window.open(finalLink, "_blank", "noopener,noreferrer");
-                                  } catch {}
-                                }}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-700 disabled:opacity-60"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                                Abrir
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async (ev) => {
-                                  ev.stopPropagation();
-                                  try {
-                                    if (!savedLink) {
-                                      setSavingRecurringLinkLeadId(String(lead.id));
-                                      try { await handleSaveRecurringLink(lead, urlEncoded); } catch {}
-                                      try { setSavingRecurringLinkLeadId(null); } catch {}
-                                    }
-                                    if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
-                                      await (navigator as any).clipboard.writeText(finalLink);
-                                      modalToast.success("Link de matrícula copiado.");
-                                    } else {
-                                      try {
-                                        const ta = document.createElement("textarea");
-                                        ta.value = finalLink;
-                                        ta.style.position = "fixed";
-                                        ta.style.opacity = "0";
-                                        document.body.appendChild(ta);
-                                        ta.select();
-                                        document.execCommand("copy");
-                                        document.body.removeChild(ta);
-                                        modalToast.success("Link de matrícula copiado.");
-                                      } catch {
-                                        prompt("Copie o link de matrícula:", finalLink);
-                                      }
-                                    }
-                                  } catch (e) {
-                                    modalToast.error(e instanceof Error ? e.message : "Falha ao copiar o link.");
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 active:bg-slate-100"
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                                Copiar
-                              </button>
-                              {savedLink ? (
-                                <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700/80 ml-0.5">
-                                  <Check className="h-3 w-3" /> salvo
-                                </div>
-                              ) : (
-                                <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500/85 ml-0.5">
-                                  <Zap className="h-3 w-3" /> auto-salva ao abrir/copiar
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      <div className="mt-3">
+                        <RecurringClassLinkCard
+                          lead={lead}
+                          activeSection={activeSection}
+                          savingThisLead={savingRecurringLinkLeadId === lead.id}
+                          onSaveRecurringLink={handleSaveRecurringLink}
+                        />
+                      </div>
                     </button>
                   );
                 })}
@@ -2330,6 +2365,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
               ) : (
                 <LeadDetails
                   lead={selectedLead}
+                  activeSection={activeSection}
                   showDelete={activeSection === "interessados" || activeSection === "alunos"}
                   deleting={deletingLeadId === selectedLead.id}
                   onDelete={() => handleDeleteLead(selectedLead)}
@@ -2411,6 +2447,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
                   ) : (
                     <LeadDetails
                       lead={selectedLead}
+                      activeSection={activeSection}
                       showDelete={activeSection === "interessados" || activeSection === "alunos"}
                       deleting={deletingLeadId === selectedLead.id}
                       onDelete={() => handleDeleteLead(selectedLead)}
