@@ -266,9 +266,14 @@ export default function CadastroRecorrenteBody() {
         const fieldOrderMap: Record<ContractFieldMeta["name"], number> = {
           full_name: 0, cpf: 1, phone: 2, legal_responsible_name: 3, legal_responsible_cpf: 4,
         };
-        const startIdx = json.nextField && typeof fieldOrderMap[json.nextField] === "number"
-          ? fieldOrderMap[json.nextField]
-          : 0;
+        let startIdx = 0;
+        if (step >= 3 && step <= 7) {
+          startIdx = step - 3;
+        } else {
+          startIdx = json.nextField && typeof fieldOrderMap[json.nextField] === "number"
+            ? fieldOrderMap[json.nextField]
+            : 0;
+        }
         setContractCurrentFieldIdx(startIdx);
         const allF = json.allFields || [];
         const initialMeta = allF[startIdx] ?? allF[0];
@@ -289,6 +294,25 @@ export default function CadastroRecorrenteBody() {
       }
     })();
   }, [step, submitResult, phoneField, submitLeadId, contractAllFields.length, contractSnapshot, lastSavedFieldValues]);
+
+  useEffect(() => {
+    if (contractAllFields.length === 0) return;
+    if (!(step >= 3 && step <= 7)) return;
+    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
+    const targetIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    const targetMeta = contractAllFields[targetIdx];
+    if (targetMeta) {
+      setContractCurrentFieldIdx(targetIdx);
+      const snapShot = (contractSnapshot || {}) as Record<string, string | null>;
+      const lastSaved = (lastSavedFieldValues || {}) as Record<string, string | null>;
+      const pre =
+        (snapShot[targetMeta.name] != null ? String(snapShot[targetMeta.name] ?? "") : "") ||
+        (lastSaved[targetMeta.name] != null ? String(lastSaved[targetMeta.name] ?? "") : "") ||
+        targetMeta.currentValue ||
+        "";
+      setContractCurrentValue(formatFieldValue(targetMeta.name, typeof pre === "string" ? pre.trim() : ""));
+    }
+  }, [step, contractAllFields, contractSnapshot, lastSavedFieldValues]);
 
   function contractFieldForStep(
     s: 3 | 4 | 5 | 6 | 7,
@@ -386,6 +410,90 @@ export default function CadastroRecorrenteBody() {
     } finally {
       setContractFieldSaving(false);
     }
+  }
+
+  async function contractBackField() {
+    if (step < 3 || step > 7) return;
+    const backTargetStep = Math.max(0, (step as number) - 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+    if (!(step >= 3 && step <= 7) || backTargetStep < 3) {
+      goStep(backTargetStep);
+      return;
+    }
+    const tel = phoneField.replace(/\D/g, "").trim();
+    if (contractFieldSaving) return;
+    const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
+    const expectedIdx = fieldIdxByStep[step as 3 | 4 | 5 | 6 | 7];
+    const currentMeta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
+    let needSave = !!currentMeta && contractCurrentValue.trim().length > 0;
+    if (currentMeta && contractCurrentValue.trim()) {
+      const snapshotVal =
+        (contractSnapshot && typeof contractSnapshot[currentMeta.name] === "string"
+          ? String(contractSnapshot[currentMeta.name])
+          : "") ||
+        (lastSavedFieldValues && typeof lastSavedFieldValues[currentMeta.name] === "string"
+          ? String(lastSavedFieldValues[currentMeta.name])
+          : "") ||
+        "";
+      const formattedSnapshot = formatFieldValue(currentMeta.name, snapshotVal.trim());
+      if (formattedSnapshot.trim() === contractCurrentValue.trim() || unformatFieldValue(currentMeta.name, formattedSnapshot) === unformatFieldValue(currentMeta.name, contractCurrentValue)) {
+        needSave = false;
+      }
+    }
+    if (needSave && currentMeta) {
+      setContractFieldSaving(true);
+      setContractFieldError("");
+      try {
+        const payloadValue = unformatFieldValue(currentMeta.name, contractCurrentValue);
+        const res = await fetch("/api/cadastro/recorrente/contract-field-submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            telefone: tel,
+            leadId: contractLeadId || submitLeadId || undefined,
+            field: currentMeta.name,
+            value: payloadValue,
+            skip: false,
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | {
+              ok?: boolean;
+              error?: string;
+              code?: string;
+              snapshot?: Record<ContractFieldMeta["name"], string | null>;
+              nextField?: ContractFieldMeta["name"] | null;
+              allFields?: ContractFieldMeta[];
+              savedField?: ContractFieldMeta["name"];
+              savedValue?: string | null;
+            }
+          | null;
+        if (res.ok && json?.ok) {
+          setContractSnapshot(json.snapshot || contractSnapshot);
+          setLastSavedFieldValues((prev) => {
+            let next: any = { ...prev };
+            next[currentMeta.name] = json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name];
+            return next;
+          });
+          setContractAllFields(json.allFields || contractAllFields);
+        }
+      } catch {}
+      setContractFieldSaving(false);
+    }
+    const backStepAsContractStep = backTargetStep as 3 | 4 | 5 | 6 | 7;
+    const backTargetIdx = fieldIdxByStep[backStepAsContractStep];
+    const backMeta = contractAllFields[backTargetIdx];
+    if (backMeta) {
+      const snapShot = (contractSnapshot || {}) as Record<string, string | null>;
+      const lastSaved = (lastSavedFieldValues || {}) as Record<string, string | null>;
+      const pre =
+        (snapShot[backMeta.name] != null ? String(snapShot[backMeta.name] ?? "") : "") ||
+        (lastSaved[backMeta.name] != null ? String(lastSaved[backMeta.name] ?? "") : "") ||
+        backMeta.currentValue ||
+        "";
+      setContractCurrentFieldIdx(backTargetIdx);
+      setContractCurrentValue(formatFieldValue(backMeta.name, typeof pre === "string" ? pre.trim() : ""));
+    }
+    goStep(backTargetStep);
   }
 
   async function saveDraftRecurring(payload: {
@@ -1434,7 +1542,7 @@ export default function CadastroRecorrenteBody() {
                             </button>
                           )}
                           <button
-                            onClick={() => goStep((Math.max(0, (step as number) - 1)) as any)}
+                            onClick={() => void contractBackField()}
                             disabled={contractFieldSaving}
                             className="order-2 sm:order-1 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                           >
