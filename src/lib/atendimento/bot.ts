@@ -8,6 +8,7 @@ import {
   CONTRACT_OPTIONAL_FIELDS,
   EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
 } from "./constants.ts";
+import { parseStateCityCombined } from "@/lib/timezone";
 import type { AtendimentoLead, AtendimentoStage, AtendimentoStatus, CapturedFieldName } from "./types.ts";
 
 export type ContractFieldName = (typeof CONTRACT_FIELD_ORDER)[number];
@@ -113,7 +114,7 @@ export function fieldFromBotPrompt(promptText: unknown): CapturedFieldName | nul
   return null;
 }
 
-export function extractLeadDataFromMessage(text: string): CapturedData {
+export function extractLeadDataFromMessage(text: string, opts?: { phone?: string | null }): CapturedData {
   const clean = text.trim();
   if (!clean) return {};
 
@@ -131,6 +132,12 @@ export function extractLeadDataFromMessage(text: string): CapturedData {
     looksLikeFullName(clean)
   ) {
     result.full_name = clean.replace(/\s+/g, " ").trim();
+  }
+
+  if (!result.state || !result.city) {
+    const locationCombo = parseStateCityCombined(clean, { phone: opts?.phone ?? null });
+    if (locationCombo?.state && !result.state) result.state = locationCombo.state;
+    if (locationCombo?.city && !result.city) result.city = locationCombo.city;
   }
 
   return result;

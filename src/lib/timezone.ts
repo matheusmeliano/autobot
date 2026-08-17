@@ -1099,3 +1099,84 @@ export function formatUtcIsoInTimeZone(params: {
     timeStyle: "short",
   }).format(date);
 }
+
+export function parseStateCityCombined(
+  rawText: string,
+  opts?: { phone?: string | null },
+): { state?: string; city?: string } | null {
+  const clean = String(rawText ?? "").trim();
+  if (!clean) return null;
+
+  const tryCombo = (parts: [string, string]) => {
+    const [a, b] = parts.map((s) => s.replace(/\s+/g, " ").trim());
+    if (!a || !b) return null;
+    const ab = resolveTimeZoneFromCityInput({
+      city: a,
+      state: b,
+      phone: opts?.phone ?? null,
+      allowPhoneCountryFallback: false,
+    });
+    if (ab?.city && ab?.state) return { city: ab.city, state: ab.state };
+    const ba = resolveTimeZoneFromCityInput({
+      city: b,
+      state: a,
+      phone: opts?.phone ?? null,
+      allowPhoneCountryFallback: false,
+    });
+    if (ba?.city && ba?.state) return { city: ba.city, state: ba.state };
+    const aState = resolveTimeZoneFromStateInput({ state: a, phone: opts?.phone ?? null });
+    const bState = resolveTimeZoneFromStateInput({ state: b, phone: opts?.phone ?? null });
+    if (aState?.normalizedState && !bState) {
+      const bCity = resolveTimeZoneFromCityInput({
+        city: b,
+        state: aState.normalizedState,
+        phone: opts?.phone ?? null,
+        allowPhoneCountryFallback: false,
+      });
+      if (bCity?.city) return { city: bCity.city, state: aState.normalizedState };
+    }
+    if (bState?.normalizedState && !aState) {
+      const aCity = resolveTimeZoneFromCityInput({
+        city: a,
+        state: bState.normalizedState,
+        phone: opts?.phone ?? null,
+        allowPhoneCountryFallback: false,
+      });
+      if (aCity?.city) return { city: aCity.city, state: bState.normalizedState };
+    }
+    return null;
+  };
+
+  const whole = resolveTimeZoneFromCityInput({
+    city: clean,
+    state: null,
+    phone: opts?.phone ?? null,
+    allowPhoneCountryFallback: false,
+  });
+  if (whole?.city && whole?.state) {
+    return { state: whole.state, city: whole.city };
+  }
+
+  const sep = /\s*(?:,|-|–|—|\/|\|)\s*/;
+  const sepSplit = clean.split(sep).filter(Boolean);
+  if (sepSplit.length === 2) {
+    const combo = tryCombo([sepSplit[0], sepSplit[1]]);
+    if (combo) return combo;
+  }
+
+  const ufAtEnd = clean.match(/^(.+?)\s+(\S{2})$/);
+  if (ufAtEnd) {
+    const [, rest, uf] = ufAtEnd;
+    const combo = tryCombo([rest, uf]);
+    if (combo) return combo;
+  }
+
+  const ufAtStart = clean.match(/^(\S{2})\s+(.+)$/);
+  if (ufAtStart) {
+    const [, uf, rest] = ufAtStart;
+    const combo = tryCombo([uf, rest]);
+    if (combo) return combo;
+  }
+
+  return null;
+}

@@ -56,7 +56,7 @@ import {
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
-import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/lib/timezone";
+import { parseStateCityCombined, resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/lib/timezone";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
@@ -943,10 +943,24 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: inboundError?.message ?? "message_error" }, { status: 500 });
   }
 
-  const extracted = extractLeadDataFromMessage(contentText) as Record<string, string>;
+  const extracted = extractLeadDataFromMessage(contentText, {
+    phone: String((lead as any)?.phone ?? "").trim() || null,
+  }) as Record<string, string>;
   const isAwaitingPhoneConfirmation =
     String(lastBotMessage?.content_text ?? "").trim() === PHONE_CONFIRMATION_PROMPT_MESSAGE;
   const expectedField = inferExpectedFieldFromBotMessage(lastBotMessage?.content_text ?? "") ?? getNextMissingField(lead as any);
+  const isLocationPrompt = expectedField === "state" || expectedField === "city";
+  if (
+    isLocationPrompt &&
+    (!extracted.state || !extracted.city)
+  ) {
+    const phoneForParsing = String((lead as any)?.phone ?? "").trim() || null;
+    const combo = parseStateCityCombined(contentText, { phone: phoneForParsing });
+    if (combo) {
+      if (combo.state && !extracted.state) extracted.state = combo.state;
+      if (combo.city && !extracted.city) extracted.city = combo.city;
+    }
+  }
   if (
     expectedField &&
     !extracted[expectedField] &&
@@ -954,6 +968,14 @@ export async function POST(req: Request) {
     looksLikeFieldValue(expectedField, contentText)
   ) {
     extracted[expectedField] = contentText.trim();
+    if (isLocationPrompt) {
+      const phoneForParsing = String((lead as any)?.phone ?? "").trim() || null;
+      const combo = parseStateCityCombined(contentText, { phone: phoneForParsing });
+      if (combo) {
+        if (combo.state && !extracted.state) extracted.state = combo.state;
+        if (combo.city && !extracted.city) extracted.city = combo.city;
+      }
+    }
   }
   const captured = filterCapturedDataForLead({
     lead: lead as any,
