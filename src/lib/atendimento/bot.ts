@@ -28,9 +28,11 @@ const GREETING_SINGLE_WORDS = new Set([
   "sim", "nao", "não", "yes", "no",
   "qual", "que", "como", "onde", "quando", "quem", "porque", "porquê",
   "meu", "minha", "nome", "sou", "chamo",
-  "aula", "experimental", "agendar", "horario", "horário", "dia", "dias",
+  "tenho", "interesse", "quero", "agendar", "vamos", "pode",
+  "aula", "experimental", "horario", "horário", "dia", "dias",
+  "estado", "cidade", "morar", "moro", "resido", "vivo",
   "estados", "unidos", "brasil", "eua", "usa",
-  "lucas", "brum", "professor",
+  "professor",
   "whatsapp", "zap", "whats", "telefone", "numero", "número",
   "senhor", "senhora", "senhorita", "sr", "sra", "srta", "dr", "dra",
 ]);
@@ -45,6 +47,8 @@ const GREETING_PHRASE_STARTS = [
   "tem aula", "aula experimental", "agendar aula",
   "você tem", "voce tem", "funciona assim",
   "por favor", "porfavor", "pf ", "pfv ", "pode me", "me ajuda", "ajuda me",
+  "tenho interesse", "quero agendar", "vamos la", "vamos lá", "bora la", "bora lá",
+  "moro em", "resido em", "vivo em", "sou de",
 ];
 
 function containsAnyEmojiOrSymbol(text: string): boolean {

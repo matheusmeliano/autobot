@@ -1077,9 +1077,11 @@ export async function POST(req: Request) {
     });
   }
 
+  const existingFullName = String((lead as any)?.full_name ?? "").trim();
+  const existingFullNameIsValid = Boolean(existingFullName && looksLikeFullName(existingFullName));
   const fullNameValidationNeeded =
     expectedField === "full_name" &&
-    !String((lead as any)?.full_name ?? "").trim();
+    !existingFullNameIsValid;
   if (fullNameValidationNeeded) {
     const capturedFullName = String(captured.full_name ?? extracted.full_name ?? "").trim();
     const fallbackName = looksLikeFullName(contentText.trim()) ? contentText.trim() : "";
