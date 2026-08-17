@@ -1345,6 +1345,20 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
   return "Não iniciado";
 }
 
+function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
+  const contractStatus = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+  const contractSignedAt = String((lead as any)?.contract_signed_at ?? "").trim();
+  const contractPdfUrl = String((lead as any)?.contract_pdf_url ?? "").trim();
+  const status = String((lead as any)?.status ?? "").trim().toLowerCase();
+  const funnel = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  if (contractStatus === "assinado") return true;
+  if (contractSignedAt && contractSignedAt !== "null") return true;
+  if (contractPdfUrl) return true;
+  if (status === "contrato_assinado") return true;
+  if (funnel === "contrato_assinado") return true;
+  return false;
+}
+
   const interessadosItems = useMemo(
     () =>
       localLeads.filter(
@@ -2084,7 +2098,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
         if (!hasWeekdayOk) return "Falta dia recorrente";
         return "Falta horário recorrente";
       }
-      return "Falta confirmar pagamento";
+      return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
     }
 
     const expDraftDate = hasLatestCancelledMarker
@@ -2168,7 +2182,7 @@ function atendimentoContractStatusLabel(contractStatus: string | null | undefine
     }
     const recBothOk = recWeekdayOk && recTimeOk;
     if (recBothOk || hasRecurring) {
-      return "Falta confirmar pagamento";
+      return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
     }
     const isRecorrente =
       hasWeekdayOk ||
