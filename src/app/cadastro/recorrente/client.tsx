@@ -229,7 +229,9 @@ export default function CadastroRecorrenteBody() {
   const lastLoadedContractFieldKey = useRef<string>("__none__");
 
   useEffect(() => {
-    if (step !== 3 || !submitResult) return;
+    if (!submitResult) return;
+    if (!(step >= 3 && step <= 8)) return;
+    if (contractAllFields.length > 0) return;
     const tel = phoneField.replace(/\D/g, "").trim();
     if (!tel || tel.length < 10) return;
     void (async () => {
@@ -280,14 +282,13 @@ export default function CadastroRecorrenteBody() {
         setContractCurrentValue(
           formatFieldValue(initialMeta?.name ?? "full_name", typeof preVal === "string" ? preVal.trim() : "")
         );
-        goStep(3);
       } catch (e) {
         setContractInitError(toErrorMessage(e, "Erro ao carregar."));
       } finally {
         setContractInitLoading(false);
       }
     })();
-  }, [step, submitResult, phoneField, submitLeadId]);
+  }, [step, submitResult, phoneField, submitLeadId, contractAllFields.length, contractSnapshot, lastSavedFieldValues]);
 
   function contractFieldForStep(
     s: 3 | 4 | 5 | 6 | 7,
@@ -1273,7 +1274,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 3 && submitResult && contractAllFields.length > 0 && (
+          {step === 3 && submitResult && (
             <section className="space-y-7 mb-10">
               <div className="text-center">
                 <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
@@ -1339,17 +1340,19 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step >= 3 && step <= 7 && submitResult && contractAllFields.length > 0 && (
+          {step >= 3 && step <= 7 && submitResult && (
             <section className="space-y-7">
 
-              {contractInitLoading && (
-                <div className="py-14 text-center text-slate-500">Preparando suas informações…</div>
+              {(contractInitLoading || contractAllFields.length === 0) && !contractInitError && (
+                <div className="py-14 text-center text-slate-500">
+                  {contractInitLoading ? "Preparando suas informações…" : "Carregando seus dados…"}
+                </div>
               )}
               {contractInitError && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{toErrorMessage(contractInitError, "Erro desconhecido.")}</div>
               )}
 
-              {!contractInitLoading && !contractInitError && contractCurrentFieldIdx >= 0 && (
+              {!contractInitLoading && !contractInitError && contractAllFields.length > 0 && contractCurrentFieldIdx >= 0 && (
                 <div className="max-w-2xl mx-auto space-y-6">
                   {(() => {
                     const fieldIdxByStep: Record<3 | 4 | 5 | 6 | 7, number> = { 3: 0, 4: 1, 5: 2, 6: 3, 7: 4 };
@@ -1466,6 +1469,10 @@ export default function CadastroRecorrenteBody() {
                   Confirme se as informações abaixo estão corretas para formalizar o contrato.
                 </p>
               </div>
+              {contractAllFields.length === 0 && (
+                <div className="py-14 text-center text-slate-500">Carregando seus dados para revisão…</div>
+              )}
+              {contractAllFields.length > 0 && (
               <div className="rounded-3xl border border-slate-200 bg-white max-w-2xl mx-auto divide-y divide-slate-100">
                 {contractAllFields.map((f, idx) => {
                   const raw =
@@ -1498,6 +1505,7 @@ export default function CadastroRecorrenteBody() {
                   );
                 })}
               </div>
+              )}
 
               {(() => {
                 function fmtCPF(v: string | null): string {
