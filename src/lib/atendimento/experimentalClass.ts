@@ -962,28 +962,43 @@ export function listRecurringWeekdayAvailability(params: {
   const weekdayOrder: RecurringWeekdayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
   const optionsByWeekday = new Map<RecurringWeekdayKey, RecurringWeekdayTimeOption[]>();
 
+  function nextProfessorDateSameWeek(targetWeekday: RecurringWeekdayKey): string {
+    const todayLocal = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
+    const todayNoonUtc = zonedDateTimeToUtcIso({
+      date: todayLocal,
+      time: "12:00",
+      timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+    });
+    const todayWeekday = weekdayInTimeZone(todayNoonUtc, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
+    const order: Array<RecurringWeekdayKey | "sun"> = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const todayIdx = order.indexOf(todayWeekday as any);
+    const targetIdx = order.indexOf(targetWeekday);
+    const diff = (targetIdx - todayIdx + 7) % 7;
+    return addDaysToLocalDate(todayLocal, diff);
+  }
+
   for (const weekday of weekdayOrder) {
     const slots: RecurringWeekdayTimeOption[] = [];
+    const professorDate = nextProfessorDateSameWeek(weekday);
     for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
       if (!professorTimeIsAllowed({ weekdayShort: weekday, professorTimeHHMM: professorTime })) continue;
       const comboKey = `${weekday}|${professorTime}`;
       if (blockedCombos.has(comboKey)) continue;
 
-      const nextOccurrence = calculateNextRecurringOccurrence({
-        weekday,
-        professorTimeHHMM: professorTime,
-        professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-        leadTimeZone,
-        fromDate: now,
+      const professorStartAt = zonedDateTimeToUtcIso({
+        date: professorDate,
+        time: professorTime,
+        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       });
-      if (!nextOccurrence) continue;
+      const startMs = new Date(professorStartAt).getTime();
+      if (!Number.isFinite(startMs) || startMs <= now.getTime()) continue;
 
       slots.push({
         id: `${weekday}|${professorTime}`,
         weekday,
         professorTime,
-        leadTime: formatTimeInTimeZone(nextOccurrence.professorStartAt, leadTimeZone),
-        displayLabel: formatTimeInTimeZone(nextOccurrence.professorStartAt, leadTimeZone),
+        leadTime: formatTimeInTimeZone(professorStartAt, leadTimeZone),
+        displayLabel: formatTimeInTimeZone(professorStartAt, leadTimeZone),
       });
     }
     if (slots.length > 0) {
