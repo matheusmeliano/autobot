@@ -884,7 +884,6 @@ function BookingDetails({
   );
   const showAttendanceCard =
     !leadIsRecurringAlunoNow &&
-    !hasRecurringSignalForHideExperimental &&
     (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
@@ -1224,7 +1223,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {(booking || showIncompleteState) && !hasRecurringSignalForHideExperimental ? (
+        {(booking || showIncompleteState) ? (
           <div
             className={[
               showAttendanceCard || hasRecurringClass ? "mt-4" : "",
