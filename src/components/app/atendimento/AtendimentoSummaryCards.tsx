@@ -1105,7 +1105,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {hasRecurringClass && pastRecurringPaged.length ? (
+        {activeSection !== "agendamentos" && hasRecurringClass && pastRecurringPaged.length ? (
           <div className="mt-6 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
