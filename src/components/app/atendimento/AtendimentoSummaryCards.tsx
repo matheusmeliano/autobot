@@ -1020,7 +1020,7 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {hasRecurringClass ? (
+        {activeSection !== "interessados" ? (
           <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
@@ -1575,6 +1575,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const contratosItems = useMemo(
     () =>
       sortLeadsBySectionEnteredDesc(localLeads.filter((lead) => {
+        // GARANTIA DEFINITIVA: todo lead que pertence a secao ALUNOS
+        // SEMPRE aparece na secao CONTRATOS tambem.
+        if (isLeadInAlunosSection(lead)) return true;
         const st = String(lead.status ?? "").trim().toLowerCase();
         const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
         const cs = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
