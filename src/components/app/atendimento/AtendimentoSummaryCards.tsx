@@ -188,7 +188,7 @@ function RecurringClassLinkCard({
     if (!isNomeOk) missing.push("nome");
     if (!isTelOk) missing.push("telefone");
     return (
-      <div className="rounded-xl border border-amber-200/60 bg-amber-50/70 px-3 py-2.5 text-[11px] font-semibold text-amber-700/90">
+      <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-[11px] font-semibold text-rose-500/95">
         Link de matrícula: aguardando {missing.join(" + ")}.
       </div>
     );
@@ -207,15 +207,14 @@ function RecurringClassLinkCard({
     return rel;
   })();
 
-  const savedLink = String((lead as any)?.recurring_class_link ?? "").trim();
   const finalLink = urlEncoded;
 
   return (
-    <div className="rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 px-3 py-2.5 space-y-2">
-      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700/85">
+    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 space-y-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/95">
         Link de matrícula
       </div>
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button"
           onClick={async (ev) => {
@@ -225,7 +224,7 @@ function RecurringClassLinkCard({
             } catch {}
           }}
           disabled={savingThisLead}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-700 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-500 active:bg-emerald-500 disabled:opacity-60"
         >
           {savingThisLead ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -262,7 +261,7 @@ function RecurringClassLinkCard({
             }
           }}
           disabled={savingThisLead}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
         >
           {savingThisLead ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
