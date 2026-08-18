@@ -515,7 +515,6 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
     ) {
       addTime(row.updated_at);
     }
-    addTime(row.created_at);
   }
 
   if (sectionName === "contratos") {
@@ -548,7 +547,6 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
     ) {
       addTime(row.updated_at);
     }
-    addTime(row.created_at);
   }
 
   if (!candidates.length) {
