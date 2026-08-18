@@ -2100,13 +2100,16 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
       Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim()) ||
       Number((lead as any)?.recurring_registration_step ?? 0) > 0;
+    const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
+    const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
+    const paymentStepReached = (regStepValid && regStepRaw >= 10) || isRecurringContractFormalized(lead);
 
     if (activeSection === "agendamentos") {
       if (hasAnyRecurringSignal || isRecurringContractFormalized(lead)) {
         if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
         if (!recWeekdayOk) return "Falta dia recorrente";
         if (!recTimeOk) return "Falta horário";
-        return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
+        return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
       }
 
       const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
@@ -2147,7 +2150,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         if (!recWeekdayOk) return "Falta dia recorrente";
         return "Falta horário recorrente";
       }
-      return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
+      return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
     }
 
     const expDraftDate = hasLatestCancelledMarker
@@ -2223,7 +2226,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return body ? `${prefix} ${body}` : "";
     }
     if (hasRecurringBoth) {
-      return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
+      return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
     }
     if (hasAnyRecurringSignal && (!recWeekdayOk || !recTimeOk)) {
       if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
