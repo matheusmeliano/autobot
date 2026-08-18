@@ -968,7 +968,10 @@ export function listRecurringWeekdayAvailability(params: {
   const weekdayOrder: RecurringWeekdayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
   const optionsByWeekday = new Map<RecurringWeekdayKey, RecurringWeekdayTimeOption[]>();
 
-  function nextProfessorDateSameWeek(targetWeekday: RecurringWeekdayKey): string {
+  function nextProfessorDateSameWeek(targetWeekday: RecurringWeekdayKey): {
+    date: string;
+    isSameWeekAsToday: boolean;
+  } {
     const todayLocal = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
     const todayNoonUtc = zonedDateTimeToUtcIso({
       date: todayLocal,
@@ -979,13 +982,27 @@ export function listRecurringWeekdayAvailability(params: {
     const order: Array<RecurringWeekdayKey | "sun"> = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
     const todayIdx = order.indexOf(todayWeekday as any);
     const targetIdx = order.indexOf(targetWeekday);
-    const diff = (targetIdx - todayIdx + 7) % 7;
-    return addDaysToLocalDate(todayLocal, diff);
+    const rawDiff = targetIdx - todayIdx;
+    // isSameWeekAsToday: dia NAO cai na semana que vem.
+    // rawDiff >= 0 -> target ainda esta nesta semana (hoje ou futuro).
+    // rawDiff < 0 -> target ja passou nesta semana, proxima ocorrencia eh na proxima semana.
+    const isSameWeekAsToday = rawDiff >= 0;
+    const diff = isSameWeekAsToday ? rawDiff : rawDiff + 7;
+    return {
+      date: addDaysToLocalDate(todayLocal, diff),
+      isSameWeekAsToday,
+    };
   }
 
   for (const weekday of weekdayOrder) {
+    const nextInfo = nextProfessorDateSameWeek(weekday);
+    // REGRA: Se a proxima ocorrencia deste weekday cai APENAS na semana QUE VEM
+    // (ou seja, o weekday ja passou nesta semana), OCULTAMOS da lista.
+    // Mostramos somente dias que ainda estao disponiveis NA SEMANA ATUAL.
+    if (!nextInfo.isSameWeekAsToday) continue;
+
     const slots: RecurringWeekdayTimeOption[] = [];
-    const professorDate = nextProfessorDateSameWeek(weekday);
+    const professorDate = nextInfo.date;
     for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
       if (!professorTimeIsAllowed({ weekdayShort: weekday, professorTimeHHMM: professorTime })) continue;
       const comboKey = `${weekday}|${professorTime}`;
