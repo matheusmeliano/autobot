@@ -337,7 +337,7 @@ export function deriveExperimentalClassBookingDisplayStatus(params: {
   if (studentStartNotificationSentAt && attendantStartNotificationSentAt) return "in_progress" as const;
   if (bookingStatus === "scheduled") return "scheduled" as const;
   if (params.hasSchedulingProgress || params.hasLead) {
-    if (params.hasRecurringClassScheduled && !bookingStatus) return "skipped" as const;
+    if (params.hasRecurringClassScheduled) return "skipped" as const;
     return "incomplete" as const;
   }
   return null;
