@@ -188,8 +188,20 @@ function RecurringClassLinkCard({
     if (!isNomeOk) missing.push("nome");
     if (!isTelOk) missing.push("telefone");
     return (
-      <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-[11px] font-semibold text-rose-500/95">
-        Link de matrícula: aguardando {missing.join(" + ")}.
+      <div className="rounded-2xl border border-rose-500/45 bg-rose-500/12 px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/15 text-rose-500">
+            <AlertTriangle className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 space-y-0.5">
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-500/95">
+              Link de matrícula
+            </div>
+            <div className="text-sm font-semibold text-rose-600/95">
+              Aguardando {missing.join(" + ")}.
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
