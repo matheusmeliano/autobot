@@ -323,8 +323,36 @@ function LeadDetails({
   const canOpenRecurringLink = /^https?:\/\//i.test(savedRecurringLink);
   const statusRaw = String(lead.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+  const weekdayLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const weekdayLabelOk =
+    Boolean(weekdayLabelRaw) &&
+    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+      weekdayLabelRaw,
+    );
+  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
+  const stOrFsIsRecurring =
+    statusRaw === "matriculado" ||
+    statusRaw === "aluno" ||
+    statusRaw === "cadastro_recorrente_pendente_plataforma" ||
+    statusRaw === "contrato_coletando_dados" ||
+    statusRaw === "contrato_aguardando_aceite" ||
+    statusRaw === "contrato_assinado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "aluno_recorrente_cadastrado" ||
+    funnelRaw === "cadastro_recorrente_pendente_plataforma" ||
+    funnelRaw === "contrato_coletando_dados" ||
+    funnelRaw === "contrato_aguardando_aceite" ||
+    funnelRaw === "contrato_assinado" ||
+    funnelRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    rcsRaw === "cadastro_plataforma_pendente" ||
+    rcsRaw === "confirmado";
+  const hasAnyRecurringSignalInline =
+    hasRecurringWeekdayOk || weekdayLabelOk || hasRecurringTimeOk || Boolean(rcsRaw) || regStepOk || stOrFsIsRecurring;
   const isMatriculado = statusRaw === "matriculado" || statusRaw === "aluno" || funnelRaw.includes("aluno") || hasRecurring;
-  const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
+  const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && hasAnyRecurringSignalInline;
   const experimentalStatus = String((lead as any)?.experimental_class_status ?? "").trim();
   const draftDate = String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
     String((lead as any)?.experimental_class_professor_date ?? "").trim();
@@ -697,6 +725,7 @@ function ContractDetails({
 
 function BookingDetails({
   lead,
+  activeSection,
   cancellingBookingId,
   savingLessonLinkBookingId,
   markingAttendanceBookingId,
@@ -710,6 +739,7 @@ function BookingDetails({
   onSaveRecurringLink,
 }: {
   lead: AtendimentoLeadListItem;
+  activeSection: SummarySectionId;
   cancellingBookingId: string | null;
   savingLessonLinkBookingId: string | null;
   markingAttendanceBookingId: string | null;
@@ -723,6 +753,7 @@ function BookingDetails({
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
 }) {
   const booking = lead.experimental_class_booking;
+  const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
   const initialSavedRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
   const [recurringLinkDraft, setRecurringLinkDraft] = useState(initialSavedRecurringLink);
   const savedRecurringLink = initialSavedRecurringLink;
@@ -2149,8 +2180,43 @@ function leadHasAnyRecurringProgressSignal(lead: AtendimentoLeadListItem): boole
   const rcsOk = Boolean(String((lead as any)?.recurring_class_status ?? "").trim());
   const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
   const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
+  const st = String(lead.status ?? "").trim().toLowerCase();
+  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const stOrFsOk =
+    st === "aluno" ||
+    st === "matriculado" ||
+    st === "cadastro_recorrente_pendente_plataforma" ||
+    st === "contrato_coletando_dados" ||
+    st === "contrato_aguardando_aceite" ||
+    st === "contrato_assinado" ||
+    st === "matricula_confirmada" ||
+    fs === "aluno_recorrente_cadastrado" ||
+    fs === "cadastro_recorrente_pendente_plataforma" ||
+    fs === "contrato_coletando_dados" ||
+    fs === "contrato_aguardando_aceite" ||
+    fs === "contrato_assinado" ||
+    fs === "matricula_confirmada" ||
+    fs === "matriculado" ||
+    rcsOk;
+  return recWeekdayOk || weekdayLabelOk || recTimeOk || rcsOk || regStepOk || stOrFsOk;
+}
+
+function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
+  const st = String(lead.status ?? "").trim().toLowerCase();
+  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
   return (
-    recWeekdayOk || weekdayLabelOk || recTimeOk || rcsOk || regStepOk || isLeadInAlunosSection(lead)
+    st === "aluno" ||
+    st === "matriculado" ||
+    st === "cadastro_recorrente_pendente_plataforma" ||
+    st === "contrato_coletando_dados" ||
+    st === "contrato_aguardando_aceite" ||
+    st === "contrato_assinado" ||
+    st === "matricula_confirmada" ||
+    fs === "aluno_recorrente_cadastrado" ||
+    fs === "cadastro_recorrente_pendente_plataforma" ||
+    rcs === "cadastro_plataforma_pendente" ||
+    rcs === "confirmado"
   );
 }
 
@@ -2501,6 +2567,7 @@ function leadHasAnyRecurringProgressSignal(lead: AtendimentoLeadListItem): boole
               activeSection === "agendamentos" ? (
                 <BookingDetails
                   lead={selectedLead}
+                  activeSection={activeSection}
                   cancellingBookingId={cancellingBookingId}
                   savingLessonLinkBookingId={savingLessonLinkBookingId}
                   markingAttendanceBookingId={markingAttendanceBookingId}
@@ -2583,6 +2650,7 @@ function leadHasAnyRecurringProgressSignal(lead: AtendimentoLeadListItem): boole
                   {activeSection === "agendamentos" ? (
                     <BookingDetails
                       lead={selectedLead}
+                      activeSection={activeSection}
                       cancellingBookingId={cancellingBookingId}
                       savingLessonLinkBookingId={savingLessonLinkBookingId}
                       markingAttendanceBookingId={markingAttendanceBookingId}
