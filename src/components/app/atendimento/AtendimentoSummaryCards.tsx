@@ -2159,8 +2159,12 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
     const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
     const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
+    const futureExpAttendance = String(futureExp?.attendance_status ?? "").trim().toLowerCase();
     const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
     if (!hasRecurringOk && hasFutureExp) {
+      if (futureExpAttendance === "attended" || futureExpAttendance === "no_show") {
+        return "Aula experimental concluída";
+      }
       const dateLabel = formatAtendimentoDate(futureExp?.lead_date || futureExp?.professor_date);
       const timeLabel = String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
@@ -2169,6 +2173,17 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
     const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
     if (pastMeta) {
+      const pastMetaAttendance = String((pastMeta as any).attendance_status ?? "").trim().toLowerCase();
+      const pastMetaType = String((pastMeta as any).type ?? "").trim().toLowerCase();
+      const isExperimentalMeta =
+        pastMetaType === "experimental" ||
+        pastMetaType.includes("experimental") ||
+        pastMetaType.includes("aula_experimental") ||
+        pastMetaAttendance === "attended" ||
+        pastMetaAttendance === "no_show";
+      if (isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show")) {
+        return "Aula experimental concluída";
+      }
       const dateLabel = formatAtendimentoDate(String((pastMeta as any).date ?? ""));
       const timeLabel = String((pastMeta as any).time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
@@ -2182,6 +2197,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         bookingStatus !== "cancelled",
     );
     if (hasBook) {
+      const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
+      if (bookingAttendance === "attended" || bookingAttendance === "no_show") {
+        return "Aula experimental concluída";
+      }
       const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
       const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
