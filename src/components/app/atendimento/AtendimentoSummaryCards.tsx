@@ -883,8 +883,7 @@ function BookingDetails({
       (lead as any).status === "aluno",
   );
   const showAttendanceCard =
-    !leadIsRecurringAlunoNow &&
-    (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
+    hasStudentNotification || hasAttendantNotification || hasAttendanceStatus;
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
       ? calculateNextRecurringOccurrence({
