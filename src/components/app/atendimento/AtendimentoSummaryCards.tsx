@@ -324,6 +324,7 @@ function LeadDetails({
   const statusRaw = String(lead.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
   const isMatriculado = statusRaw === "matriculado" || statusRaw === "aluno" || funnelRaw.includes("aluno") || hasRecurring;
+  const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
   const experimentalStatus = String((lead as any)?.experimental_class_status ?? "").trim();
   const draftDate = String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
     String((lead as any)?.experimental_class_professor_date ?? "").trim();
@@ -342,6 +343,7 @@ function LeadDetails({
   );
   const showDraftSection =
     !isMatriculado &&
+    !hasRecurringSignalForHideExperimental &&
     !bookingIsCancelled && !bookingWasNoShow && !bookingAttendanceResolved &&
     (
       experimentalStatus === "time_selected" ||
@@ -796,6 +798,7 @@ function BookingDetails({
   );
   const showAttendanceCard =
     !leadIsRecurringAlunoNow &&
+    !hasRecurringSignalForHideExperimental &&
     (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
@@ -1135,7 +1138,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {booking || showIncompleteState ? (
+        {(booking || showIncompleteState) && !hasRecurringSignalForHideExperimental ? (
           <div
             className={[
               showAttendanceCard || hasRecurringClass ? "mt-4" : "",
@@ -2131,6 +2134,26 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     }
   }
 
+function leadHasAnyRecurringProgressSignal(lead: AtendimentoLeadListItem): boolean {
+  const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+  const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+  const weekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const weekdayLabelOk =
+    Boolean(weekdayLabel) &&
+    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+      weekdayLabel,
+    );
+  const recTimeOk =
+    Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+    Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+  const rcsOk = Boolean(String((lead as any)?.recurring_class_status ?? "").trim());
+  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
+  return (
+    recWeekdayOk || weekdayLabelOk || recTimeOk || rcsOk || regStepOk || isLeadInAlunosSection(lead)
+  );
+}
+
   function buildItemMeta(lead: AtendimentoLeadListItem) {
     const booking = lead.experimental_class_booking;
     const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
@@ -2163,6 +2186,13 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
     if (activeSection === "agendamentos") {
       if (hasAnyRecurringSignal || isRecurringContractFormalized(lead)) {
+        if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
+        if (!recWeekdayOk) return "Falta dia recorrente";
+        if (!recTimeOk) return "Falta horário";
+        return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
+      }
+
+      if (leadHasAnyRecurringProgressSignal(lead)) {
         if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
         if (!recWeekdayOk) return "Falta dia recorrente";
         if (!recTimeOk) return "Falta horário";
@@ -2254,7 +2284,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
     const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
     const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
-    if (!hasRecurringBoth && hasFutureExp) {
+    if (!leadHasAnyRecurringProgressSignal(lead) && !hasRecurringBoth && hasFutureExp) {
       const dateLabel = formatAtendimentoDate(futureExp?.lead_date || futureExp?.professor_date);
       const timeLabel = String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
@@ -2262,7 +2292,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     }
 
     const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
-    if (pastMeta) {
+    if (!leadHasAnyRecurringProgressSignal(lead) && pastMeta) {
       const dateLabel = formatAtendimentoDate(String((pastMeta as any).date ?? ""));
       const timeLabel = String((pastMeta as any).time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
@@ -2275,7 +2305,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         bookingIsNotDraft &&
         bookingStatus !== "cancelled",
     );
-    if (hasBook) {
+    if (!leadHasAnyRecurringProgressSignal(lead) && hasBook) {
       const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
       const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
@@ -2392,7 +2422,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const booking = lead.experimental_class_booking ?? null;
                         const bookingId = String(booking?.id ?? "").trim();
                         const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
-                        if (activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard && bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim()) {
+                        if (activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard && !leadHasAnyRecurringProgressSignal(lead) && bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim()) {
                           warnings.push(
                             <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula experimental
