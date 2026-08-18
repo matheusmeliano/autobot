@@ -31,6 +31,15 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
   );
 }
 
+function datePlusNDaysIso(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function getLeadSortTime(row: any) {
   const candidates = [
     row?.last_interaction_at,
@@ -484,12 +493,24 @@ export async function GET(req: Request) {
         : mergedRowExperimentalClassStatus ||
           (existingBooking ? "booked" : cleanDraftTime ? "time_selected" : cleanDraftDate ? "date_selected" : "");
 
+      const recWeekdayRaw = String((row as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
+      const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+      const recWeekdayLabel = String((row as any)?.recurring_class_weekday_label ?? "").trim();
+      const recWeekdayLabelOk =
+        /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+          recWeekdayLabel,
+        );
+      const hasRecWeekdayAny = recWeekdayOk || recWeekdayLabelOk;
+      const recTimeOk =
+        Boolean(String((row as any)?.recurring_class_professor_time ?? "").trim()) ||
+        Boolean(String((row as any)?.recurring_class_lead_time ?? "").trim());
+
       const bookingWithFallback = existingBooking
         ? existingBooking
-        : !isCancelledLead && mergedStatus && (mergedProfessorDate || mergedProfessorTime)
+        : (!isCancelledLead && mergedStatus && (mergedProfessorDate || mergedProfessorTime))
           ? ({
               id: "",
-              status: "draft",
+              status: (hasRecWeekdayAny && recTimeOk) ? "booked" : "draft",
               lesson_link: null,
               student_start_notification_sent_at: null,
               attendant_start_notification_sent_at: null,
@@ -505,18 +526,35 @@ export async function GET(req: Request) {
               lead_start_at: mergedLeadStartAt,
               conversation_id: String((row as any)?.conversation_id ?? ""),
               created_at: String(row.updated_at ?? row.created_at ?? ""),
-              source: "draft",
+              source: (hasRecWeekdayAny && recTimeOk) ? "manual" : "draft",
               draft_stage: mergedStatus,
             } as any)
-          : null;
+          : (hasRecWeekdayAny && recTimeOk)
+            ? ({
+                id: "",
+                status: "booked",
+                lesson_link: null,
+                student_start_notification_sent_at: null,
+                attendant_start_notification_sent_at: null,
+                attendance_status: null,
+                attendance_checked_at: null,
+                professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                professor_date: datePlusNDaysIso(3),
+                professor_time: String((row as any)?.recurring_class_professor_time ?? (row as any)?.recurring_class_lead_time ?? "08:00").trim(),
+                professor_start_at: "",
+                lead_date: datePlusNDaysIso(3),
+                lead_time: String((row as any)?.recurring_class_lead_time ?? (row as any)?.recurring_class_professor_time ?? "08:00").trim(),
+                lead_start_at: "",
+                conversation_id: String((row as any)?.conversation_id ?? ""),
+                created_at: String(row.updated_at ?? row.created_at ?? ""),
+                source: "manual",
+                draft_stage: "",
+              } as any)
+            : null;
 
       const futureExpBooking = futureExperimentalBookingByLeadId.get(leadId) ?? null;
       const latestPastExpBooking = latestBookingByLeadId.get(leadId) ?? null;
-      const recWeekdayRaw = String((row as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
-      const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
-      const recTimeOk =
-        Boolean(String((row as any)?.recurring_class_professor_time ?? "").trim()) ||
-        Boolean(String((row as any)?.recurring_class_lead_time ?? "").trim());
 
       let latestPastClassMeta: { date: string; time: string; startAtMs: number } | null = null;
       if (recWeekdayOk && recTimeOk) {
