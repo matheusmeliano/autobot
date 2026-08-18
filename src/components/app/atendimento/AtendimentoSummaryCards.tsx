@@ -2088,18 +2088,39 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return "Agendamento cancelado";
     }
 
+    const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+    const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+    const recTimeOk =
+      Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+      Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+    const hasRecurringBoth = recWeekdayOk && recTimeOk;
+    const hasAnyRecurringSignal =
+      recWeekdayOk ||
+      recTimeOk ||
+      Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
+      Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim()) ||
+      Number((lead as any)?.recurring_registration_step ?? 0) > 0;
+
     if (activeSection === "agendamentos") {
-      const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
-      if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" && (bookingAttendance === "attended" || bookingAttendance === "no_show")) {
-        return "Aula experimental concluída";
+      if (hasAnyRecurringSignal || isRecurringContractFormalized(lead)) {
+        if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
+        if (!recWeekdayOk) return "Falta dia recorrente";
+        if (!recTimeOk) return "Falta horário";
+        return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
       }
+
+      const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
+      const bookingDone =
+        booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" &&
+        (bookingAttendance === "attended" || bookingAttendance === "no_show");
       const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
       const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
       const futureExpAttendance = String(futureExp?.attendance_status ?? "").trim().toLowerCase();
-      if (futureExp && futureExpStatus !== "cancelled" && (futureExpAttendance === "attended" || futureExpAttendance === "no_show")) {
-        return "Aula experimental concluída";
-      }
+      const futureDone =
+        futureExp && futureExpStatus !== "cancelled" &&
+        (futureExpAttendance === "attended" || futureExpAttendance === "no_show");
       const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
+      let pastDone = false;
       if (pastMeta) {
         const pastMetaAttendance = String((pastMeta as any).attendance_status ?? "").trim().toLowerCase();
         const pastMetaType = String((pastMeta as any).type ?? "").trim().toLowerCase();
@@ -2109,18 +2130,11 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           pastMetaType.includes("aula_experimental") ||
           pastMetaAttendance === "attended" ||
           pastMetaAttendance === "no_show";
-        if (isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show")) {
-          return "Aula experimental concluída";
-        }
+        pastDone = isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show");
       }
+      if (bookingDone || futureDone || pastDone) return "Aula experimental concluída";
     }
 
-    const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-    const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
-    const hasTimeOk =
-      Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-      Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-    const hasRecurring = hasWeekdayOk && hasTimeOk;
     const isAlunoOrMatriculado =
       lead.status === "aluno" ||
       lead.status === "matriculado" ||
@@ -2128,9 +2142,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       lead.status === "cadastro_recorrente_pendente_plataforma" ||
       lead.funnel_stage === "cadastro_recorrente_pendente_plataforma";
     if (isAlunoOrMatriculado) {
-      if (!hasWeekdayOk || !hasTimeOk) {
-        if (!hasWeekdayOk && !hasTimeOk) return "Falta dia e horário recorrentes";
-        if (!hasWeekdayOk) return "Falta dia recorrente";
+      if (!recWeekdayOk || !recTimeOk) {
+        if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
+        if (!recWeekdayOk) return "Falta dia recorrente";
         return "Falta horário recorrente";
       }
       return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
@@ -2177,21 +2191,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return rawDt ? `Criado em: ${rawDt}` : "";
     }
 
-    const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-    const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
-    const recTimeOk =
-      Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-      Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-    const hasRecurringOk = recWeekdayOk && recTimeOk;
-
     const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
     const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
-    const futureExpAttendance = String(futureExp?.attendance_status ?? "").trim().toLowerCase();
     const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
-    if (!hasRecurringOk && hasFutureExp) {
-      if (futureExpAttendance === "attended" || futureExpAttendance === "no_show") {
-        return "Aula experimental concluída";
-      }
+    if (!hasRecurringBoth && hasFutureExp) {
       const dateLabel = formatAtendimentoDate(futureExp?.lead_date || futureExp?.professor_date);
       const timeLabel = String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
@@ -2200,17 +2203,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
     const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
     if (pastMeta) {
-      const pastMetaAttendance = String((pastMeta as any).attendance_status ?? "").trim().toLowerCase();
-      const pastMetaType = String((pastMeta as any).type ?? "").trim().toLowerCase();
-      const isExperimentalMeta =
-        pastMetaType === "experimental" ||
-        pastMetaType.includes("experimental") ||
-        pastMetaType.includes("aula_experimental") ||
-        pastMetaAttendance === "attended" ||
-        pastMetaAttendance === "no_show";
-      if (isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show")) {
-        return "Aula experimental concluída";
-      }
       const dateLabel = formatAtendimentoDate(String((pastMeta as any).date ?? ""));
       const timeLabel = String((pastMeta as any).time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
@@ -2224,29 +2216,19 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         bookingStatus !== "cancelled",
     );
     if (hasBook) {
-      const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
-      if (bookingAttendance === "attended" || bookingAttendance === "no_show") {
-        return "Aula experimental concluída";
-      }
       const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
       const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
       const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-      const prefix = hasRecurringOk ? "Última aula em:" : "Aula em:";
+      const prefix = hasRecurringBoth ? "Última aula em:" : "Aula em:";
       return body ? `${prefix} ${body}` : "";
     }
-    const recBothOk = recWeekdayOk && recTimeOk;
-    if (recBothOk || hasRecurring) {
+    if (hasRecurringBoth) {
       return isRecurringContractFormalized(lead) ? "Falta confirmar pagamento" : "Falta contrato";
     }
-    const isRecorrente =
-      hasWeekdayOk ||
-      hasTimeOk ||
-      Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
-      Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim());
-    if (isRecorrente && (!recWeekdayOk || !recTimeOk)) {
+    if (hasAnyRecurringSignal && (!recWeekdayOk || !recTimeOk)) {
       if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
       if (!recWeekdayOk) return "Falta dia recorrente";
-      return "Falta horário recorrente";
+      return "Falta horário";
     }
     if (hasExpContext && (!hasExpDate || !hasExpTime)) {
       if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
