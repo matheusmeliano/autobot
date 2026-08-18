@@ -445,9 +445,125 @@ export async function GET(req: Request) {
     }
   }
 
+function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "agendamentos" | "contratos", historyEvents: any[] | null): number {
+  const candidates: number[] = [];
+  const addTime = (raw: unknown) => {
+    if (!raw) return;
+    const t = new Date(String(raw)).getTime();
+    if (Number.isFinite(t) && t > 0) candidates.push(t);
+  };
+
+  const leadId = String(row.id ?? "");
+  const st = String(row.status ?? "").trim().toLowerCase();
+  const fs = String(row.funnel_stage ?? "").trim().toLowerCase();
+  const rcs = String(row.recurring_class_status ?? "").trim().toLowerCase();
+  const cs = String(row.contract_status ?? "").trim().toLowerCase();
+
+  if (sectionName === "interessados") {
+    addTime(row.created_at);
+    addTime(row.updated_at);
+    addTime(row.conversation_created_at);
+    addTime(row.conversation?.created_at);
+    if (historyEvents?.length) {
+      for (const ev of historyEvents) {
+        if (String(ev.lead_id ?? "") !== leadId) continue;
+        addTime(ev.created_at);
+      }
+    }
+  }
+
+  if (sectionName === "alunos" || sectionName === "agendamentos") {
+    addTime(row.recurring_class_created_at);
+    addTime(row.recurring_registration_created_at);
+    addTime(row.contract_created_at);
+    if (historyEvents?.length) {
+      for (const ev of historyEvents) {
+        if (String(ev.lead_id ?? "") !== leadId) continue;
+        const eType = String(ev.event_type ?? "").trim().toLowerCase();
+        if (
+          eType === "experimental_class_date_selected" ||
+          eType === "experimental_class_time_selected" ||
+          eType === "experimental_class_scheduled" ||
+          eType === "experimental_class_attendance_confirmed" ||
+          eType === "experimental_class_attendance_follow_up_required" ||
+          eType === "contract_init_requested" ||
+          eType === "contract_field_submitted" ||
+          eType === "contract_finalized"
+        ) {
+          addTime(ev.created_at);
+        }
+      }
+    }
+    // fallback: data em que o lead ficou com status/aluno/etc (se hoje, agora)
+    if (
+      st === "aluno" ||
+      st === "contrato_coletando_dados" ||
+      st === "contrato_aguardando_aceite" ||
+      st === "contrato_assinado" ||
+      st === "matricula_confirmada" ||
+      st === "cadastro_recorrente_pendente_plataforma" ||
+      fs === "aluno_recorrente_cadastrado" ||
+      fs === "cadastro_recorrente_pendente_plataforma" ||
+      fs === "contrato_coletando_dados" ||
+      fs === "contrato_aguardando_aceite" ||
+      fs === "contrato_assinado" ||
+      fs === "matricula_confirmada" ||
+      rcs === "cadastro_plataforma_pendente" ||
+      rcs === "confirmado"
+    ) {
+      addTime(row.updated_at);
+    }
+    addTime(row.created_at);
+  }
+
+  if (sectionName === "contratos") {
+    addTime(row.contract_signed_at);
+    addTime(row.contract_created_at);
+    addTime(row.recurring_class_created_at);
+    if (historyEvents?.length) {
+      for (const ev of historyEvents) {
+        if (String(ev.lead_id ?? "") !== leadId) continue;
+        const eType = String(ev.event_type ?? "").trim().toLowerCase();
+        if (
+          eType === "contract_init_requested" ||
+          eType === "contract_field_submitted" ||
+          eType === "contract_finalized"
+        ) {
+          addTime(ev.created_at);
+        }
+      }
+    }
+    if (
+      st === "contrato_coletando_dados" ||
+      st === "contrato_aguardando_aceite" ||
+      st === "contrato_assinado" ||
+      fs === "contrato_coletando_dados" ||
+      fs === "contrato_aguardando_aceite" ||
+      fs === "contrato_assinado" ||
+      cs === "coletando_dados" ||
+      cs === "aguardando_aceite" ||
+      cs === "assinado"
+    ) {
+      addTime(row.updated_at);
+    }
+    addTime(row.created_at);
+  }
+
+  if (!candidates.length) {
+    const t = new Date(String(row.created_at ?? row.updated_at ?? "")).getTime();
+    return Number.isFinite(t) && t > 0 ? t : Date.now();
+  }
+  // Usamos MINIMO (primeira vez) que entrou.
+  return Math.min(...candidates);
+}
+
   const rows = leadRows
     .map((row) => {
       const leadId = String(row.id ?? "");
+      const interessadosTs = sectionTimestampMs(row, "interessados", historyEvents ?? null);
+      const alunosTs = sectionTimestampMs(row, "alunos", historyEvents ?? null);
+      const agendamentosTs = sectionTimestampMs(row, "agendamentos", historyEvents ?? null);
+      const contratosTs = sectionTimestampMs(row, "contratos", historyEvents ?? null);
       const existingBooking = bookingsByLeadId.get(leadId) ?? null;
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
       const cleanDraftDate = isCancelledLead ? null : draftDateByLeadId.get(leadId) ?? null;
@@ -623,6 +739,10 @@ export async function GET(req: Request) {
         latest_past_class_meta: latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAtByLeadId.get(leadId) ?? null,
         latest_experimental_class_event: latestClassEventByLeadId.get(leadId) ?? null,
+        interessados_entered_at: new Date(interessadosTs).toISOString(),
+        alunos_entered_at: new Date(alunosTs).toISOString(),
+        agendamentos_entered_at: new Date(agendamentosTs).toISOString(),
+        contratos_entered_at: new Date(contratosTs).toISOString(),
       };
     })
     .filter((row) => {

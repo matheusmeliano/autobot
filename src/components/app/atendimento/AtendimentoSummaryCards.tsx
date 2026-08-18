@@ -1348,8 +1348,19 @@ export function AtendimentoSummaryCards({
     return false;
   }
 
-function sortLeadsByCreatedDesc<T extends { created_at?: unknown; updated_at?: unknown }>(items: T[]): T[] {
+function sortLeadsBySectionEnteredDesc<T extends { created_at?: unknown; updated_at?: unknown }>(
+  items: T[],
+  enteredKey: "interessados_entered_at" | "alunos_entered_at" | "agendamentos_entered_at" | "contratos_entered_at",
+): T[] {
   return [...items].sort((a, b) => {
+    const aRaw = (a as any)?.[enteredKey];
+    const bRaw = (b as any)?.[enteredKey];
+    const aEntered = new Date(String(aRaw ?? "")).getTime();
+    const bEntered = new Date(String(bRaw ?? "")).getTime();
+    if (Number.isFinite(aEntered) && Number.isFinite(bEntered) && bEntered !== aEntered) {
+      return bEntered - aEntered;
+    }
+
     const aCreated = new Date(String(a?.created_at ?? "")).getTime();
     const bCreated = new Date(String(b?.created_at ?? "")).getTime();
     const createdDiff = bCreated - aCreated;
@@ -1366,7 +1377,7 @@ function sortLeadsByCreatedDesc<T extends { created_at?: unknown; updated_at?: u
 
   const agendamentoItems = useMemo(
     () =>
-      sortLeadsByCreatedDesc(localLeads.filter((lead) => {
+      sortLeadsBySectionEnteredDesc(localLeads.filter((lead) => {
         // Fallback de garantia TEMPORARIO: forca a presenca desse lead
         // (Livia Silva / 15616098367) na secao Agendamentos.
         // Pode ser removido em deploy posterior (sem impacto).
@@ -1418,7 +1429,7 @@ function sortLeadsByCreatedDesc<T extends { created_at?: unknown; updated_at?: u
         if (alunoByProgress && hasTimeOk) return true;
         if (alunoByProgress && (isRecurringContractFormalized(lead) || (regStepValid && regStepRaw >= 3))) return true;
         return false;
-      })),
+      }), "agendamentos_entered_at"),
     [localLeads],
   );
 function atendimentoContractStatusLabel(contractStatus: string | null | undefined) {
@@ -1446,18 +1457,18 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
   const interessadosItems = useMemo(
     () =>
-      sortLeadsByCreatedDesc(localLeads.filter(
+      sortLeadsBySectionEnteredDesc(localLeads.filter(
         (lead) => !isLeadInAlunosSection(lead),
-      )),
+      ), "interessados_entered_at"),
     [localLeads],
   );
   const alunosItems = useMemo(
-    () => sortLeadsByCreatedDesc(localLeads.filter((lead) => isLeadInAlunosSection(lead))),
+    () => sortLeadsBySectionEnteredDesc(localLeads.filter((lead) => isLeadInAlunosSection(lead)), "alunos_entered_at"),
     [localLeads],
   );
   const contratosItems = useMemo(
     () =>
-      sortLeadsByCreatedDesc(localLeads.filter((lead) => {
+      sortLeadsBySectionEnteredDesc(localLeads.filter((lead) => {
         const st = String(lead.status ?? "").trim().toLowerCase();
         const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
         const cs = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
@@ -1472,7 +1483,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           cs === "aguardando_aceite" ||
           cs === "assinado"
         );
-      })),
+      }), "contratos_entered_at"),
     [localLeads],
   );
   const sections = useMemo(

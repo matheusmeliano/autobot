@@ -132,6 +132,10 @@ export type AtendimentoLeadListItem = AtendimentoLead & {
   latest_past_class_meta?: { date: string; time: string; startAtMs: number } | null;
   latest_experimental_class_cancelled_at: string | null;
   latest_experimental_class_event: string | null;
+  interessados_entered_at?: string | null;
+  alunos_entered_at?: string | null;
+  agendamentos_entered_at?: string | null;
+  contratos_entered_at?: string | null;
 };
 
 export type AtendimentoSummary = {
