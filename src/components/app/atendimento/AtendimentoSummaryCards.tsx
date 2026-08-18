@@ -2088,6 +2088,33 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return "Agendamento cancelado";
     }
 
+    if (activeSection === "agendamentos") {
+      const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
+      if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" && (bookingAttendance === "attended" || bookingAttendance === "no_show")) {
+        return "Aula experimental concluída";
+      }
+      const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
+      const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
+      const futureExpAttendance = String(futureExp?.attendance_status ?? "").trim().toLowerCase();
+      if (futureExp && futureExpStatus !== "cancelled" && (futureExpAttendance === "attended" || futureExpAttendance === "no_show")) {
+        return "Aula experimental concluída";
+      }
+      const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
+      if (pastMeta) {
+        const pastMetaAttendance = String((pastMeta as any).attendance_status ?? "").trim().toLowerCase();
+        const pastMetaType = String((pastMeta as any).type ?? "").trim().toLowerCase();
+        const isExperimentalMeta =
+          pastMetaType === "experimental" ||
+          pastMetaType.includes("experimental") ||
+          pastMetaType.includes("aula_experimental") ||
+          pastMetaAttendance === "attended" ||
+          pastMetaAttendance === "no_show";
+        if (isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show")) {
+          return "Aula experimental concluída";
+        }
+      }
+    }
+
     const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
     const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
     const hasTimeOk =
