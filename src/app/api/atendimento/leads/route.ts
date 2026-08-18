@@ -212,6 +212,7 @@ export async function GET(req: Request) {
 
   const draftDateByLeadId = new Map<string, { professor_date: string; lead_date: string; label?: string | null; at: string } | null>();
   const draftTimeByLeadId = new Map<string, { professor_date: string; professor_time: string; lead_date: string; lead_time: string; professor_start_at: string; lead_start_at: string; at: string } | null>();
+  let allHistoryEvents: any[] | null = null;
 
   if (leadIds.length > 0) {
     const { data: historyEvents, error: historyError } = await admin
@@ -235,6 +236,7 @@ export async function GET(req: Request) {
       return Response.json({ ok: false, error: historyError.message }, { status: 500 });
     }
 
+    allHistoryEvents = (historyEvents ?? []) as any[];
     const lessonLinkByLeadId = new Map<string, string | null>();
     for (const event of historyEvents ?? []) {
       const leadId = String((event as any)?.lead_id ?? "");
@@ -560,10 +562,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
   const rows = leadRows
     .map((row) => {
       const leadId = String(row.id ?? "");
-      const interessadosTs = sectionTimestampMs(row, "interessados", historyEvents ?? null);
-      const alunosTs = sectionTimestampMs(row, "alunos", historyEvents ?? null);
-      const agendamentosTs = sectionTimestampMs(row, "agendamentos", historyEvents ?? null);
-      const contratosTs = sectionTimestampMs(row, "contratos", historyEvents ?? null);
+      const interessadosTs = sectionTimestampMs(row, "interessados", allHistoryEvents);
+      const alunosTs = sectionTimestampMs(row, "alunos", allHistoryEvents);
+      const agendamentosTs = sectionTimestampMs(row, "agendamentos", allHistoryEvents);
+      const contratosTs = sectionTimestampMs(row, "contratos", allHistoryEvents);
       const existingBooking = bookingsByLeadId.get(leadId) ?? null;
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
       const cleanDraftDate = isCancelledLead ? null : draftDateByLeadId.get(leadId) ?? null;
