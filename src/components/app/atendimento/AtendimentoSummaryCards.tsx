@@ -1348,9 +1348,25 @@ export function AtendimentoSummaryCards({
     return false;
   }
 
+function sortLeadsByCreatedDesc<T extends { created_at?: unknown; updated_at?: unknown }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const aCreated = new Date(String(a?.created_at ?? "")).getTime();
+    const bCreated = new Date(String(b?.created_at ?? "")).getTime();
+    const createdDiff = bCreated - aCreated;
+    if (Number.isFinite(createdDiff) && createdDiff !== 0) return createdDiff;
+
+    const aUpdated = new Date(String(a?.updated_at ?? "")).getTime();
+    const bUpdated = new Date(String(b?.updated_at ?? "")).getTime();
+    const updatedDiff = bUpdated - aUpdated;
+    if (Number.isFinite(updatedDiff) && updatedDiff !== 0) return updatedDiff;
+
+    return 0;
+  });
+}
+
   const agendamentoItems = useMemo(
     () =>
-      localLeads.filter((lead) => {
+      sortLeadsByCreatedDesc(localLeads.filter((lead) => {
         // Fallback de garantia TEMPORARIO: forca a presenca desse lead
         // (Livia Silva / 15616098367) na secao Agendamentos.
         // Pode ser removido em deploy posterior (sem impacto).
@@ -1402,7 +1418,7 @@ export function AtendimentoSummaryCards({
         if (alunoByProgress && hasTimeOk) return true;
         if (alunoByProgress && (isRecurringContractFormalized(lead) || (regStepValid && regStepRaw >= 3))) return true;
         return false;
-      }),
+      })),
     [localLeads],
   );
 function atendimentoContractStatusLabel(contractStatus: string | null | undefined) {
@@ -1430,18 +1446,18 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
   const interessadosItems = useMemo(
     () =>
-      localLeads.filter(
+      sortLeadsByCreatedDesc(localLeads.filter(
         (lead) => !isLeadInAlunosSection(lead),
-      ),
+      )),
     [localLeads],
   );
   const alunosItems = useMemo(
-    () => localLeads.filter((lead) => isLeadInAlunosSection(lead)),
+    () => sortLeadsByCreatedDesc(localLeads.filter((lead) => isLeadInAlunosSection(lead))),
     [localLeads],
   );
   const contratosItems = useMemo(
     () =>
-      localLeads.filter((lead) => {
+      sortLeadsByCreatedDesc(localLeads.filter((lead) => {
         const st = String(lead.status ?? "").trim().toLowerCase();
         const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
         const cs = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
@@ -1456,7 +1472,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           cs === "aguardando_aceite" ||
           cs === "assinado"
         );
-      }),
+      })),
     [localLeads],
   );
   const sections = useMemo(
