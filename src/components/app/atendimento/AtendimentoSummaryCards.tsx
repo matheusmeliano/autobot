@@ -1336,12 +1336,48 @@ export function AtendimentoSummaryCards({
     () =>
       localLeads.filter((lead) => {
         if (leadHasExperimentalClassPanelStatus(lead)) return true;
+
+        const st = String(lead.status ?? "").trim().toLowerCase();
+        const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
+        const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+        const alunoByProgress =
+          st === "cadastro_recorrente_pendente_plataforma" ||
+          fs === "cadastro_recorrente_pendente_plataforma" ||
+          st === "contrato_coletando_dados" ||
+          fs === "contrato_coletando_dados" ||
+          st === "contrato_aguardando_aceite" ||
+          fs === "contrato_aguardando_aceite" ||
+          st === "contrato_assinado" ||
+          fs === "contrato_assinado" ||
+          st === "matricula_confirmada" ||
+          fs === "matricula_confirmada" ||
+          rcs === "cadastro_plataforma_pendente" ||
+          rcs === "confirmado" ||
+          st === "aluno" ||
+          fs === "aluno_recorrente_cadastrado";
+
         const recurringWeekdayRaw = String((lead as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
-        const hasWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+        const hasWeekdayRawOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+        const weekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+        const hasWeekdayLabelOk =
+          weekdayLabel &&
+          /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+            weekdayLabel,
+          );
+        const hasWeekdayOk = hasWeekdayRawOk || hasWeekdayLabelOk;
+
         const hasTimeOk =
           Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) ||
           Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
-        return hasWeekdayOk && hasTimeOk;
+
+        const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+        const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
+
+        if (hasWeekdayOk && hasTimeOk) return true;
+        if (alunoByProgress && hasWeekdayOk) return true;
+        if (alunoByProgress && hasTimeOk) return true;
+        if (alunoByProgress && (isRecurringContractFormalized(lead) || (regStepValid && regStepRaw >= 3))) return true;
+        return false;
       }),
     [localLeads],
   );
