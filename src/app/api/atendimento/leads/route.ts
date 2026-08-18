@@ -42,11 +42,11 @@ function datePlusNDaysIso(n: number): string {
 
 function getLeadSortTime(row: any) {
   const candidates = [
-    row?.last_interaction_at,
-    row?.conversation?.last_message_at,
-    row?.conversation?.updated_at,
-    row?.updated_at,
     row?.created_at,
+    row?.updated_at,
+    row?.conversation?.updated_at,
+    row?.conversation?.last_message_at,
+    row?.last_interaction_at,
   ];
 
   for (const candidate of candidates) {
@@ -636,9 +636,19 @@ export async function GET(req: Request) {
     return true;
     })
     .sort((left, right) => {
+      const leftCreated = new Date(String(left.created_at ?? "")).getTime();
+      const rightCreated = new Date(String(right.created_at ?? "")).getTime();
+      const createdDiff = rightCreated - leftCreated;
+      if (Number.isFinite(createdDiff) && createdDiff !== 0) return createdDiff;
+
+      const leftUpdated = new Date(String(left.updated_at ?? "")).getTime();
+      const rightUpdated = new Date(String(right.updated_at ?? "")).getTime();
+      const updatedDiff = rightUpdated - leftUpdated;
+      if (Number.isFinite(updatedDiff) && updatedDiff !== 0) return updatedDiff;
+
       const timeDiff = getLeadSortTime(right) - getLeadSortTime(left);
       if (timeDiff !== 0) return timeDiff;
-      return new Date(String(right.created_at ?? "")).getTime() - new Date(String(left.created_at ?? "")).getTime();
+      return 0;
     });
 
   return Response.json({ ok: true, leads: rows });
