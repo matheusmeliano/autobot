@@ -472,6 +472,12 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         addTime(ev.created_at);
       }
     }
+    if (!candidates.length) {
+      const t = new Date(String(row.created_at ?? row.updated_at ?? "")).getTime();
+      return Number.isFinite(t) && t > 0 ? t : Date.now();
+    }
+    // Interessados: primeira vez que surgiu (mais antigo).
+    return Math.min(...candidates);
   }
 
   if (sectionName === "alunos" || sectionName === "agendamentos") {
@@ -496,7 +502,8 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         }
       }
     }
-    // fallback: data em que o lead ficou com status/aluno/etc (se hoje, agora)
+    // Momento da promocao para aluno/agendamento (ultima atualizacao
+    // que alterou status/funnel/rcs para um valor pertencente a secao).
     if (
       st === "aluno" ||
       st === "contrato_coletando_dados" ||
@@ -515,6 +522,12 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
     ) {
       addTime(row.updated_at);
     }
+    if (!candidates.length) {
+      const t = new Date(String(row.created_at ?? row.updated_at ?? "")).getTime();
+      return Number.isFinite(t) && t > 0 ? t : Date.now();
+    }
+    // Alunos/Agendamentos: quando efetivamente entrou na secao (mais novo).
+    return Math.max(...candidates);
   }
 
   if (sectionName === "contratos") {
@@ -547,14 +560,16 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
     ) {
       addTime(row.updated_at);
     }
+    if (!candidates.length) {
+      const t = new Date(String(row.created_at ?? row.updated_at ?? "")).getTime();
+      return Number.isFinite(t) && t > 0 ? t : Date.now();
+    }
+    // Contratos: quando efetivamente entrou na secao (mais novo).
+    return Math.max(...candidates);
   }
 
-  if (!candidates.length) {
-    const t = new Date(String(row.created_at ?? row.updated_at ?? "")).getTime();
-    return Number.isFinite(t) && t > 0 ? t : Date.now();
-  }
-  // Usamos MINIMO (primeira vez) que entrou.
-  return Math.min(...candidates);
+  const tFallback = new Date(String(row.created_at ?? row.updated_at ?? "")).getTime();
+  return Number.isFinite(tFallback) && tFallback > 0 ? tFallback : Date.now();
 }
 
   const rows = leadRows
