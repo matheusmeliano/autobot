@@ -341,6 +341,7 @@ function LeadDetails({
     (String(booking?.professor_time ?? "").trim() || String(booking?.lead_time ?? "").trim())
   );
   const showDraftSection =
+    !isMatriculado &&
     !bookingIsCancelled && !bookingWasNoShow && !bookingAttendanceResolved &&
     (
       experimentalStatus === "time_selected" ||
@@ -2323,10 +2324,19 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             </div>,
                           );
                         }
+                        const leadStatus = String(lead.status ?? "").trim().toLowerCase();
+                        const leadFunnel = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+                        const isMatriculadoCard =
+                          leadStatus === "aluno" || leadStatus === "matriculado" ||
+                          leadFunnel.includes("aluno") || leadFunnel.includes("matriculado") ||
+                          leadStatus === "cadastro_recorrente_pendente_plataforma" ||
+                          leadFunnel === "cadastro_recorrente_pendente_plataforma" ||
+                          leadFunnel === "contrato_assinado" ||
+                          leadFunnel === "contrato_aguardando_aceite";
                         const booking = lead.experimental_class_booking ?? null;
                         const bookingId = String(booking?.id ?? "").trim();
                         const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
-                        if (bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim()) {
+                        if (!isMatriculadoCard && bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim()) {
                           warnings.push(
                             <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula experimental
