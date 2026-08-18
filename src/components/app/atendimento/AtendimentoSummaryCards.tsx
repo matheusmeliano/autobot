@@ -1021,7 +1021,7 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {activeSection !== "interessados" ? (
+        {activeSection === "agendamentos" ? (
           <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
