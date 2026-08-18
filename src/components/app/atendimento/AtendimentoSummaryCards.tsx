@@ -900,6 +900,7 @@ function BookingDetails({
       (lead as any).status === "aluno",
   );
   const showAttendanceCard =
+    activeSection !== "agendamentos" &&
     !hideExperimentalInfoCompletely &&
     (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
   const nextRecurring =
