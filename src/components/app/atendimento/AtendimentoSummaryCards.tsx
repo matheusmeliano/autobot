@@ -1034,7 +1034,7 @@ function BookingDetails({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                   Link fixo das aulas
                 </div>
-                {canOpenSavedRecurringLink ? (
+                {canOpenSavedRecurringLink && activeSection !== "agendamentos" ? (
                   <a
                     href={savedRecurringLink}
                     target="_blank"
