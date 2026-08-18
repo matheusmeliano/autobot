@@ -143,6 +143,14 @@ function leadHasAnyRecurringProgressSignal(lead: AtendimentoLeadListItem): boole
   return recWeekdayOk || weekdayLabelOk || recTimeOk || rcsOk || regStepOk || stOrFsOk;
 }
 
+function shouldHideExperimentalInfoCompletely(
+  lead: AtendimentoLeadListItem,
+  activeSection: SummarySectionId,
+): boolean {
+  if (activeSection === "interessados") return false;
+  return leadHasAnyRecurringProgressSignal(lead);
+}
+
 function RepescagemBadge({ className = "" }: { className?: string }) {
   return (
     <div
@@ -408,6 +416,7 @@ function LeadDetails({
     hasRecurringWeekdayOk || weekdayLabelOk || hasRecurringTimeOk || Boolean(rcsRaw) || regStepOk || stOrFsIsRecurring;
   const isMatriculado = statusRaw === "matriculado" || statusRaw === "aluno" || funnelRaw.includes("aluno") || hasRecurring;
   const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && hasAnyRecurringSignalInline;
+  const hideExperimentalInfoCompletely = shouldHideExperimentalInfoCompletely(lead, activeSection);
   const experimentalStatus = String((lead as any)?.experimental_class_status ?? "").trim();
   const draftDate = String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
     String((lead as any)?.experimental_class_professor_date ?? "").trim();
@@ -425,6 +434,7 @@ function LeadDetails({
     (String(booking?.professor_time ?? "").trim() || String(booking?.lead_time ?? "").trim())
   );
   const showDraftSection =
+    !hideExperimentalInfoCompletely &&
     !isMatriculado &&
     !hasRecurringSignalForHideExperimental &&
     !bookingIsCancelled && !bookingWasNoShow && !bookingAttendanceResolved &&
@@ -809,6 +819,7 @@ function BookingDetails({
 }) {
   const booking = lead.experimental_class_booking;
   const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
+  const hideExperimentalInfoCompletely = shouldHideExperimentalInfoCompletely(lead, activeSection);
   const initialSavedRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
   const [recurringLinkDraft, setRecurringLinkDraft] = useState(initialSavedRecurringLink);
   const savedRecurringLink = initialSavedRecurringLink;
@@ -889,7 +900,8 @@ function BookingDetails({
       (lead as any).status === "aluno",
   );
   const showAttendanceCard =
-    hasStudentNotification || hasAttendantNotification || hasAttendanceStatus;
+    !hideExperimentalInfoCompletely &&
+    (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
       ? calculateNextRecurringOccurrence({
@@ -933,15 +945,16 @@ function BookingDetails({
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase())
     : "Agendado";
-  const canCancel = derivedStatus === "scheduled" && Boolean(bookingId) && !hasRecurringClass;
+  const canCancel = derivedStatus === "scheduled" && Boolean(bookingId) && !hasRecurringClass && !hideExperimentalInfoCompletely;
   const canEditLessonLink =
-    Boolean(bookingId) && bookingStatus !== "cancelled" && !bookingIsNoShow;
+    Boolean(bookingId) && bookingStatus !== "cancelled" && !bookingIsNoShow && !hideExperimentalInfoCompletely;
   const canSendStudentNotification =
     (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
     Boolean(bookingId) &&
     !hasStudentNotification &&
     !hasAttendantNotification &&
-    !hasRecurringClass;
+    !hasRecurringClass &&
+    !hideExperimentalInfoCompletely;
 
   useEffect(() => {
     setLessonLinkDraft(savedLessonLink);
@@ -1228,7 +1241,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {(booking || showIncompleteState) ? (
+        {!hideExperimentalInfoCompletely && (booking || showIncompleteState) ? (
           <div
             className={[
               showAttendanceCard || hasRecurringClass ? "mt-4" : "",
@@ -2231,6 +2244,26 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     const bookingIsNotDraft = bookingHasId && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
     const latestCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
     const hasLatestCancelledMarker = Boolean(latestCancelledAt && latestCancelledAt !== "null");
+    if (shouldHideExperimentalInfoCompletely(lead, activeSection)) {
+      const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+      const recWeekdayCodeOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+      const recWeekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+      const recWeekdayLabelOk =
+        /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+          recWeekdayLabel,
+        );
+      const recWeekdayOk = recWeekdayCodeOk || recWeekdayLabelOk;
+      const recTimeOk =
+        Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+        Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+      const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
+      const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
+      const paymentStepReached = (regStepValid && regStepRaw >= 10) || isRecurringContractFormalized(lead);
+      if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
+      if (!recWeekdayOk) return "Falta dia recorrente";
+      if (!recTimeOk) return "Falta horário";
+      return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
+    }
     if (
       (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled") ||
       hasLatestCancelledMarker
