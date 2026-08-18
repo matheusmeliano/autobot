@@ -271,9 +271,6 @@ function RecurringClassLinkCard({
           )}
           Copiar
         </button>
-        <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700/80 ml-0.5">
-          <Check className="h-3 w-3" /> salvo
-        </div>
       </div>
     </div>
   );
