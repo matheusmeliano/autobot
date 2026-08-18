@@ -88,6 +88,61 @@ function isBookingAttendanceResolved(booking: unknown) {
   return status === "attended" || status === "no_show";
 }
 
+function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
+  const st = String(lead.status ?? "").trim().toLowerCase();
+  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+  return (
+    st === "aluno" ||
+    st === "matriculado" ||
+    st === "cadastro_recorrente_pendente_plataforma" ||
+    st === "contrato_coletando_dados" ||
+    st === "contrato_aguardando_aceite" ||
+    st === "contrato_assinado" ||
+    st === "matricula_confirmada" ||
+    fs === "aluno_recorrente_cadastrado" ||
+    fs === "cadastro_recorrente_pendente_plataforma" ||
+    rcs === "cadastro_plataforma_pendente" ||
+    rcs === "confirmado"
+  );
+}
+
+function leadHasAnyRecurringProgressSignal(lead: AtendimentoLeadListItem): boolean {
+  const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+  const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+  const weekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const weekdayLabelOk =
+    Boolean(weekdayLabel) &&
+    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+      weekdayLabel,
+    );
+  const recTimeOk =
+    Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+    Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+  const rcsOk = Boolean(String((lead as any)?.recurring_class_status ?? "").trim());
+  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
+  const st = String(lead.status ?? "").trim().toLowerCase();
+  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const stOrFsOk =
+    st === "aluno" ||
+    st === "matriculado" ||
+    st === "cadastro_recorrente_pendente_plataforma" ||
+    st === "contrato_coletando_dados" ||
+    st === "contrato_aguardando_aceite" ||
+    st === "contrato_assinado" ||
+    st === "matricula_confirmada" ||
+    fs === "aluno_recorrente_cadastrado" ||
+    fs === "cadastro_recorrente_pendente_plataforma" ||
+    fs === "contrato_coletando_dados" ||
+    fs === "contrato_aguardando_aceite" ||
+    fs === "contrato_assinado" ||
+    fs === "matricula_confirmada" ||
+    fs === "matriculado" ||
+    rcsOk;
+  return recWeekdayOk || weekdayLabelOk || recTimeOk || rcsOk || regStepOk || stOrFsOk;
+}
+
 function RepescagemBadge({ className = "" }: { className?: string }) {
   return (
     <div
@@ -2164,61 +2219,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       setMarkingAttendanceType(null);
     }
   }
-
-function leadHasAnyRecurringProgressSignal(lead: AtendimentoLeadListItem): boolean {
-  const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-  const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
-  const weekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
-  const weekdayLabelOk =
-    Boolean(weekdayLabel) &&
-    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
-      weekdayLabel,
-    );
-  const recTimeOk =
-    Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-    Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-  const rcsOk = Boolean(String((lead as any)?.recurring_class_status ?? "").trim());
-  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
-  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
-  const st = String(lead.status ?? "").trim().toLowerCase();
-  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
-  const stOrFsOk =
-    st === "aluno" ||
-    st === "matriculado" ||
-    st === "cadastro_recorrente_pendente_plataforma" ||
-    st === "contrato_coletando_dados" ||
-    st === "contrato_aguardando_aceite" ||
-    st === "contrato_assinado" ||
-    st === "matricula_confirmada" ||
-    fs === "aluno_recorrente_cadastrado" ||
-    fs === "cadastro_recorrente_pendente_plataforma" ||
-    fs === "contrato_coletando_dados" ||
-    fs === "contrato_aguardando_aceite" ||
-    fs === "contrato_assinado" ||
-    fs === "matricula_confirmada" ||
-    fs === "matriculado" ||
-    rcsOk;
-  return recWeekdayOk || weekdayLabelOk || recTimeOk || rcsOk || regStepOk || stOrFsOk;
-}
-
-function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
-  const st = String(lead.status ?? "").trim().toLowerCase();
-  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
-  const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
-  return (
-    st === "aluno" ||
-    st === "matriculado" ||
-    st === "cadastro_recorrente_pendente_plataforma" ||
-    st === "contrato_coletando_dados" ||
-    st === "contrato_aguardando_aceite" ||
-    st === "contrato_assinado" ||
-    st === "matricula_confirmada" ||
-    fs === "aluno_recorrente_cadastrado" ||
-    fs === "cadastro_recorrente_pendente_plataforma" ||
-    rcs === "cadastro_plataforma_pendente" ||
-    rcs === "confirmado"
-  );
-}
 
   function buildItemMeta(lead: AtendimentoLeadListItem) {
     const booking = lead.experimental_class_booking;
