@@ -850,12 +850,18 @@ function BookingDetails({
   )
     ? (recurringWeekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")
     : null;
+  const recurringWeekdayLabel = String(lead.recurring_class_weekday_label ?? "").trim();
+  const recurringWeekdayLabelOk =
+    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+      recurringWeekdayLabel,
+    );
   const recurringProfessorTime = String(lead.recurring_class_professor_time ?? "").trim();
   const recurringLeadTimeRaw = String(lead.recurring_class_lead_time ?? "").trim();
   const recurringTime =
     /^\d{2}:\d{2}$/.test(recurringProfessorTime) ? recurringProfessorTime : recurringLeadTimeRaw;
+  const hasRecurringWeekdayAny = Boolean(recurringWeekday) || recurringWeekdayLabelOk;
   const hasRecurringClass = Boolean(
-    recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime),
+    hasRecurringWeekdayAny && /^\d{2}:\d{2}$/.test(recurringTime),
   );
 
   const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
@@ -2233,7 +2239,13 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     }
 
     const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-    const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+    const recWeekdayCodeOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+    const recWeekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+    const recWeekdayLabelOk =
+      /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+        recWeekdayLabel,
+      );
+    const recWeekdayOk = recWeekdayCodeOk || recWeekdayLabelOk;
     const recTimeOk =
       Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
       Boolean(String(lead.recurring_class_lead_time ?? "").trim());
@@ -2242,7 +2254,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       recWeekdayOk ||
       recTimeOk ||
       Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
-      Boolean(String((lead as any)?.recurring_class_weekday_label ?? "").trim()) ||
       Number((lead as any)?.recurring_registration_step ?? 0) > 0;
     const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
     const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
