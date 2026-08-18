@@ -123,9 +123,9 @@ export async function GET(req: Request) {
     let bookingsError: any = null;
 
     const bookingsSelectWithLessonLink =
-      "id, lead_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+      "id, lead_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, created_at, updated_at";
     const bookingsSelectWithoutLessonLink =
-      "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at";
+      "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, created_at, updated_at";
 
     const bookingsWithLessonLinkResult = await admin
       .from("atendimento_experimental_class_bookings")
@@ -161,14 +161,14 @@ export async function GET(req: Request) {
         cancelledLeadBookingIds.add(leadId);
         continue;
       }
-      if (status !== "scheduled") continue;
+      if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
       if (bookingsByLeadId.has(leadId)) continue;
       bookingsByLeadId.set(leadId, {
         ...(booking as any),
         lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
-        student_start_notification_sent_at: null,
-        attendant_start_notification_sent_at: null,
-        attendance_status: null,
+        student_start_notification_sent_at: String((booking as any)?.student_start_notification_sent_at ?? "").trim() || null,
+        attendant_start_notification_sent_at: String((booking as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
+        attendance_status: String((booking as any)?.attendance_status ?? "").trim() || null,
         attendance_checked_at: null,
         professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
@@ -183,9 +183,9 @@ export async function GET(req: Request) {
       const candidate = {
         ...(booking as any),
         lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
-        student_start_notification_sent_at: null,
-        attendant_start_notification_sent_at: null,
-        attendance_status: null,
+        student_start_notification_sent_at: String((booking as any)?.student_start_notification_sent_at ?? "").trim() || null,
+        attendant_start_notification_sent_at: String((booking as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
+        attendance_status: String((booking as any)?.attendance_status ?? "").trim() || null,
         attendance_checked_at: null,
         professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
@@ -391,59 +391,64 @@ export async function GET(req: Request) {
       });
     }
 
+    const updateBookingAttendanceFromEvent = (
+      maps: Array<Map<string, any>>,
+      leadId: string,
+      eventType: string,
+      eventCreatedAt: string | null,
+    ) => {
+      for (const m of maps) {
+        const current = m.get(leadId);
+        if (!current) continue;
+        if (
+          eventType === "experimental_class_student_start_notification_sent" &&
+          !String(current.student_start_notification_sent_at ?? "").trim()
+        ) {
+          m.set(leadId, { ...current, student_start_notification_sent_at: eventCreatedAt });
+          continue;
+        }
+        if (
+          eventType === "experimental_class_attendant_start_notification_sent" &&
+          !String(current.attendant_start_notification_sent_at ?? "").trim()
+        ) {
+          m.set(leadId, { ...current, attendant_start_notification_sent_at: eventCreatedAt });
+          continue;
+        }
+        if (
+          eventType === "experimental_class_attendance_confirmed" &&
+          !String(current.attendance_status ?? "").trim()
+        ) {
+          m.set(leadId, {
+            ...current,
+            attendance_status: "attended",
+            attendance_checked_at: eventCreatedAt,
+          });
+          continue;
+        }
+        if (
+          eventType === "experimental_class_attendance_follow_up_required" &&
+          !String(current.attendance_status ?? "").trim()
+        ) {
+          m.set(leadId, {
+            ...current,
+            attendance_status: "no_show",
+            attendance_checked_at: eventCreatedAt,
+          });
+        }
+      }
+    };
+
     for (const event of historyEvents ?? []) {
       const leadId = String((event as any)?.lead_id ?? "");
       if (!leadId) continue;
-      const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
       const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
       const eventCreatedAt = String((event as any)?.created_at ?? "").trim() || null;
-      const currentBooking = bookingsByLeadId.get(leadId);
-      if (!currentBooking) continue;
-
-      if (
-        eventType === "experimental_class_student_start_notification_sent" &&
-        !String(currentBooking.student_start_notification_sent_at ?? "").trim()
-      ) {
-        bookingsByLeadId.set(leadId, {
-          ...currentBooking,
-          student_start_notification_sent_at: eventCreatedAt,
-        });
-        continue;
-      }
-
-      if (
-        eventType === "experimental_class_attendant_start_notification_sent" &&
-        !String(currentBooking.attendant_start_notification_sent_at ?? "").trim()
-      ) {
-        bookingsByLeadId.set(leadId, {
-          ...currentBooking,
-          attendant_start_notification_sent_at: eventCreatedAt,
-        });
-        continue;
-      }
-
-      if (
-        eventType === "experimental_class_attendance_confirmed" &&
-        !String(currentBooking.attendance_status ?? "").trim()
-      ) {
-        bookingsByLeadId.set(leadId, {
-          ...currentBooking,
-          attendance_status: "attended",
-          attendance_checked_at: eventCreatedAt,
-        });
-        continue;
-      }
-
-      if (
-        eventType === "experimental_class_attendance_follow_up_required" &&
-        !String(currentBooking.attendance_status ?? "").trim()
-      ) {
-        bookingsByLeadId.set(leadId, {
-          ...currentBooking,
-          attendance_status: "no_show",
-          attendance_checked_at: eventCreatedAt,
-        });
-      }
+      updateBookingAttendanceFromEvent(
+        [bookingsByLeadId, latestBookingByLeadId, futureExperimentalBookingByLeadId],
+        leadId,
+        eventType,
+        eventCreatedAt,
+      );
     }
   }
 
@@ -636,6 +641,39 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         Boolean(String((row as any)?.recurring_class_professor_time ?? "").trim()) ||
         Boolean(String((row as any)?.recurring_class_lead_time ?? "").trim());
 
+      let synthStudentNotif: string | null = null;
+      let synthAttendantNotif: string | null = null;
+      let synthAttendance: string | null = null;
+      let synthAttendanceChecked: string | null = null;
+      for (const ev of allHistoryEvents ?? []) {
+        if (String((ev as any)?.lead_id ?? "") !== leadId) continue;
+        const et = String((ev as any)?.event_type ?? "").trim().toLowerCase();
+        const eca = String((ev as any)?.created_at ?? "").trim() || null;
+        if (
+          et === "experimental_class_student_start_notification_sent" &&
+          !synthStudentNotif
+        ) {
+          synthStudentNotif = eca;
+          continue;
+        }
+        if (
+          et === "experimental_class_attendant_start_notification_sent" &&
+          !synthAttendantNotif
+        ) {
+          synthAttendantNotif = eca;
+          continue;
+        }
+        if (et === "experimental_class_attendance_confirmed" && !synthAttendance) {
+          synthAttendance = "attended";
+          synthAttendanceChecked = eca;
+          continue;
+        }
+        if (et === "experimental_class_attendance_follow_up_required" && !synthAttendance) {
+          synthAttendance = "no_show";
+          synthAttendanceChecked = eca;
+        }
+      }
+
       const bookingWithFallback = existingBooking
         ? existingBooking
         : (!isCancelledLead && mergedStatus && (mergedProfessorDate || mergedProfessorTime))
@@ -643,10 +681,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
               id: "",
               status: (hasRecWeekdayAny && recTimeOk) ? "booked" : "draft",
               lesson_link: null,
-              student_start_notification_sent_at: null,
-              attendant_start_notification_sent_at: null,
-              attendance_status: null,
-              attendance_checked_at: null,
+              student_start_notification_sent_at: synthStudentNotif,
+              attendant_start_notification_sent_at: synthAttendantNotif,
+              attendance_status: synthAttendance,
+              attendance_checked_at: synthAttendanceChecked,
               professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
               lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
               professor_date: mergedProfessorDate,
@@ -665,10 +703,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
                 id: "",
                 status: "booked",
                 lesson_link: null,
-                student_start_notification_sent_at: null,
-                attendant_start_notification_sent_at: null,
-                attendance_status: null,
-                attendance_checked_at: null,
+                student_start_notification_sent_at: synthStudentNotif,
+                attendant_start_notification_sent_at: synthAttendantNotif,
+                attendance_status: synthAttendance,
+                attendance_checked_at: synthAttendanceChecked,
                 professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
                 lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
                 professor_date: datePlusNDaysIso(3),
