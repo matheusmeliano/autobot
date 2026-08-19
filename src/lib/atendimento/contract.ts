@@ -181,26 +181,6 @@ export function buildContractHtml(data: ContractData): string {
   <p class="block" style="margin-top: 26px;">Documento simplificado para confirmação eletrônica de matrícula.</p>
 
   <p style="margin-top: 30px; text-align: left;">${dataLocal}.</p>
-
-  <div style="margin-top: 64px; page-break-inside: avoid;">
-    <div class="assinaturas-linha"></div>
-    <p style="text-align: center; margin: 0 0 4px 0; font-size: 12px;">
-      <strong>Aluno(a): ${data.studentFullName}</strong>
-    </p>
-    <p style="text-align: center; margin: 0; font-size: 12px;">
-      Confirmação eletrônica de matrícula
-    </p>
-  </div>
-
-  <div style="margin-top: 56px; page-break-inside: avoid;">
-    <div class="assinaturas-linha"></div>
-    <p style="text-align: center; margin: 0 0 4px 0; font-size: 12px;">
-      <strong>LUCAS BRUM ONLINE MUSIC USA</strong>
-    </p>
-    <p style="text-align: center; margin: 0; font-size: 12px;">
-      Lucas Brum de Castro (professor responsável)
-    </p>
-  </div>
 </body>
 </html>`;
 }
@@ -350,16 +330,6 @@ export async function buildContractPdfBytes(data: ContractData): Promise<Uint8Ar
     align: "left",
     skipAfter: 12,
   });
-
-  addSignatureLine(
-    `Aluno(a): ${data.studentFullName}`,
-    "Confirmação eletrônica de matrícula",
-  );
-
-  addSignatureLine(
-    "LUCAS BRUM ONLINE MUSIC USA",
-    "Lucas Brum de Castro (professor responsável)",
-  );
 
   const arrayBuffer = doc.output("arraybuffer");
   return new Uint8Array(arrayBuffer);
