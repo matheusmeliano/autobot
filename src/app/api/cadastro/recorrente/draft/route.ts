@@ -45,7 +45,7 @@ type DraftPayload = {
   weekdayLabel?: string | null;
   professorTime?: string | null;
   leadTime?: string | null;
-  step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | null;
+  step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | null;
   password?: string | null;
   state?: string | null;
   city?: string | null;
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       } else if (/column.*does not exist|PGRST204|42703/i.test(String(selFull.error?.message ?? ""))) {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf")
+            .select("id, phone, full_name")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
         try {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf")
+            .select("id, phone, full_name")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -115,8 +115,8 @@ export async function GET(req: NextRequest) {
     }
     const stepRaw = (data as any)?.recurring_registration_step;
     const parsedStep =
-      typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 12
-        ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12)
+      typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 6
+        ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6)
         : 0;
     const readStr = (key: string) => {
       const v = (data as any)?.[key];
@@ -128,9 +128,6 @@ export async function GET(req: NextRequest) {
         id: (data as any).id,
         phone: String((data as any).phone ?? ""),
         full_name: readStr("full_name"),
-        cpf: readStr("cpf"),
-        legal_responsible_name: readStr("legal_responsible_name"),
-        legal_responsible_cpf: readStr("legal_responsible_cpf"),
         contract_pdf_url: readStr("contract_pdf_url"),
         contract_signed_at: readStr("contract_signed_at"),
         state: readStr("state"),
@@ -185,7 +182,7 @@ export async function PATCH(req: NextRequest) {
     const hasAnyTime = Boolean(safeProfessorTime || safeLeadTime);
 
     const safeStepRaw =
-      typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 12 ? step : null;
+      typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 6 ? step : null;
 
     const safePassword =
       typeof password === "string" && password.trim().length >= 4 ? password.trim() : null;

@@ -343,14 +343,6 @@ export function buildContractFieldPrompt(
   if (nextField === "full_name" && existing) {
     return `Confirme se seu nome completo está correto:\n\n${existing}\n\nSe estiver correto, basta responder “sim”. Se precisar corrigir, envie o nome completo correto.`;
   }
-  if (nextField === "phone" && existing) {
-    return `Confirme se seu WhatsApp está correto para o contrato:\n\n${existing}\n\nSe estiver correto, basta responder “sim”. Se precisar corrigir, envie o número completo com código do país.`;
-  }
-  if (nextField === "cpf" && existing) {
-    const validation = isValidCPF(existing);
-    const formatted = validation.ok ? validation.formatted : existing;
-    return `Confirme seu CPF para o contrato:\n\n${formatted}\n\nSe estiver correto, basta responder “sim”. Se precisar corrigir, envie o CPF correto (11 dígitos).`;
-  }
   return CONTRACT_FIELD_PROMPTS[nextField];
 }
 

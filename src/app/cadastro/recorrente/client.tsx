@@ -139,36 +139,22 @@ export default function CadastroRecorrenteBody() {
     return String(v ?? "").replace(/\D/g, "");
   }
 
-  function formatCpf(v: string | null | undefined): string {
-    const d = digitsOnly(v).slice(0, 11);
-    if (!d) return "";
-    let out = d.slice(0, 3);
-    if (d.length > 3) out += "." + d.slice(3, 6);
-    if (d.length > 6) out += "." + d.slice(6, 9);
-    if (d.length > 9) out += "-" + d.slice(9, 11);
-    return out;
-  }
-
   function formatPhoneMasked(v: string | null | undefined): string {
     const d = digitsOnly(v).slice(0, 13);
     if (!d) return "";
     if (d.length <= 10) {
-      // (##) ####-####
       let out = "(" + d.slice(0, 2);
       if (d.length > 2) out += ") " + d.slice(2, 6);
       if (d.length > 6) out += "-" + d.slice(6, 10);
       return out;
     }
     if (d.length <= 11) {
-      // (##) #####-####
       return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
     }
-    // +## (##) #####-####
     return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9, 13)}`;
   }
 
   function formatFieldValue(name: string, raw: string | null | undefined): string {
-    if (name === "cpf" || name === "legal_responsible_cpf") return formatCpf(raw);
     if (name === "phone") return formatPhoneMasked(raw);
     return String(raw ?? "");
   }
@@ -176,12 +162,11 @@ export default function CadastroRecorrenteBody() {
   function unformatFieldValue(name: string, val: string | null | undefined): string {
     const s = String(val ?? "").trim();
     if (!s) return "";
-    if (name === "cpf" || name === "legal_responsible_cpf") return digitsOnly(s);
     if (name === "phone") return digitsOnly(s);
     return s;
   }
 
-  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>(0);
+  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6>(0);
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>("");
@@ -222,21 +207,16 @@ export default function CadastroRecorrenteBody() {
     legal_responsible_cpf: null,
   });
   const [contractAllFields, setContractAllFields] = useState<ContractFieldMeta[]>([]);
-  const [contractCurrentFieldIdx, setContractCurrentFieldIdx] = useState<number>(0);
-  const [contractCurrentValue, setContractCurrentValue] = useState<string>("");
-  const [contractFieldError, setContractFieldError] = useState<string>("");
-  const [contractFieldSaving, setContractFieldSaving] = useState<boolean>(false);
   const [contractFinalizing, setContractFinalizing] = useState<boolean>(false);
   const [contractFinalError, setContractFinalError] = useState<string>("");
   const [contractPdfUrl, setContractPdfUrl] = useState<string>("");
   const [contractSignedAt, setContractSignedAt] = useState<string>("");
   const [paymentTab, setPaymentTab] = useState<"menu" | "link" | "deposit" | "pix">("menu");
   const [pixCopied, setPixCopied] = useState<boolean>(false);
-  const lastLoadedContractFieldKey = useRef<string>("__none__");
 
   useEffect(() => {
     if (!submitResult) return;
-    if (!(step >= 4 && step <= 9)) return;
+    if (!(step === 4)) return;
     if (contractAllFields.length > 0) return;
     const tel = phoneField.replace(/\D/g, "").trim();
     if (!tel || tel.length < 10) return;
@@ -269,266 +249,26 @@ export default function CadastroRecorrenteBody() {
         setContractSnapshot(json.snapshot || contractSnapshot);
         setLastSavedFieldValues(json.snapshot || lastSavedFieldValues);
         setContractAllFields(json.allFields || []);
-        const fieldOrderMap: Record<ContractFieldMeta["name"], number> = {
-          full_name: 0, cpf: 1, phone: 2, legal_responsible_name: 3, legal_responsible_cpf: 4,
-        };
-        let startIdx = 0;
-        if (step >= 4 && step <= 8) {
-          startIdx = step - 4;
-        } else {
-          startIdx = json.nextField && typeof fieldOrderMap[json.nextField] === "number"
-            ? fieldOrderMap[json.nextField]
-            : 0;
+        if (json.snapshot) {
+          const snapName = (json.snapshot.full_name || "").trim();
+          if (snapName && !nome.trim()) {
+            setNome(toNomeESobrenome(snapName));
+          }
         }
-        setContractCurrentFieldIdx(startIdx);
-        const allF = json.allFields || [];
-        const initialMeta = allF[startIdx] ?? allF[0];
-        let preVal = "";
-        if (initialMeta && typeof initialMeta.currentValue === "string" && initialMeta.currentValue.trim()) {
-          preVal = String(initialMeta.currentValue).trim();
-        } else if (initialMeta) {
-          preVal = (json.snapshot || contractSnapshot)[initialMeta.name] ??
-            initialMeta.currentValue ??
-            lastSavedFieldValues[initialMeta.name] ??
-            "";
-        }
-        setContractCurrentValue(
-          formatFieldValue(initialMeta?.name ?? "full_name", typeof preVal === "string" ? preVal.trim() : "")
-        );
       } catch (e) {
         setContractInitError(toErrorMessage(e, "Erro ao carregar."));
       } finally {
         setContractInitLoading(false);
       }
     })();
-  }, [step, submitResult, phoneField, submitLeadId, contractAllFields.length, contractSnapshot, lastSavedFieldValues]);
-
-  useEffect(() => {
-    if (contractAllFields.length === 0) return;
-    if (!(step >= 4 && step <= 8)) return;
-    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
-    const targetIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
-    const targetMeta = contractAllFields[targetIdx];
-    if (targetMeta) {
-      setContractCurrentFieldIdx(targetIdx);
-      let pre = "";
-      const snapShot = (contractSnapshot || {}) as Record<string, string | null>;
-      const lastSaved = (lastSavedFieldValues || {}) as Record<string, string | null>;
-      if (typeof targetMeta.currentValue === "string" && targetMeta.currentValue.trim()) {
-        pre = String(targetMeta.currentValue).trim();
-      } else if (snapShot[targetMeta.name] != null && String(snapShot[targetMeta.name] ?? "").trim()) {
-        pre = String(snapShot[targetMeta.name] ?? "").trim();
-      } else if (lastSaved[targetMeta.name] != null && String(lastSaved[targetMeta.name] ?? "").trim()) {
-        pre = String(lastSaved[targetMeta.name] ?? "").trim();
-      }
-      setContractCurrentValue(formatFieldValue(targetMeta.name, pre));
-    }
-  }, [step, contractAllFields, contractSnapshot, lastSavedFieldValues]);
-
-  function contractFieldForStep(
-    s: 4 | 5 | 6 | 7 | 8,
-  ): { stepLabel: string; stepIdx: number } {
-    const map: Record<4 | 5 | 6 | 7 | 8, { stepLabel: string; stepIdx: number }> = {
-      4: { stepLabel: "Nome completo", stepIdx: 0 },
-      5: { stepLabel: "CPF", stepIdx: 1 },
-      6: { stepLabel: "Telefone/WhatsApp", stepIdx: 2 },
-      7: { stepLabel: "Responsável (opcional)", stepIdx: 3 },
-      8: { stepLabel: "CPF resp. legal (opcional)", stepIdx: 4 },
-    };
-    return map[s];
-  }
-
-  async function contractAdvanceField(skip = false) {
-    if (step < 4 || step > 8) return;
-    const tel = phoneField.replace(/\D/g, "").trim();
-    if (contractFieldSaving) return;
-    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
-    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
-    const currentMeta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
-    if (!currentMeta) return;
-    if (!skip && !contractCurrentValue.trim() && !currentMeta.optional) {
-      setContractFieldError("Campo obrigatório.");
-      return;
-    }
-    setContractFieldSaving(true);
-    setContractFieldError("");
-    try {
-      const payloadValue = skip
-        ? ""
-        : unformatFieldValue(currentMeta.name, contractCurrentValue);
-      const res = await fetch("/api/cadastro/recorrente/contract-field-submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          telefone: tel,
-          leadId: contractLeadId || submitLeadId || undefined,
-          field: currentMeta.name,
-          value: payloadValue,
-          skip,
-        }),
-      });
-      const json = (await res.json().catch(() => null)) as
-        | {
-            ok?: boolean;
-            error?: string;
-            code?: string;
-            snapshot?: Record<ContractFieldMeta["name"], string | null>;
-            nextField?: ContractFieldMeta["name"] | null;
-            allFields?: ContractFieldMeta[];
-            skipped?: boolean;
-            savedField?: ContractFieldMeta["name"];
-            savedValue?: string | null;
-          }
-        | null;
-      if (!res.ok || !json?.ok) {
-        setContractFieldError(toErrorMessage(json?.error, "Falha ao salvar. Tente novamente."));
-        return;
-      }
-      setContractSnapshot(json.snapshot || contractSnapshot);
-      setLastSavedFieldValues((prev) => {
-        let next: any = { ...prev };
-        next[currentMeta.name] = json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name];
-        if (step === 7 && skip) {
-          next.legal_responsible_name = "";
-          next.legal_responsible_cpf = "";
-        }
-        return next;
-      });
-      setContractAllFields(json.allFields || contractAllFields);
-      let nextStepBase: 5 | 6 | 7 | 8 | 9 =
-        step === 4 ? 5 : step === 5 ? 6 : step === 6 ? 7 : step === 7 ? 8 : 9;
-      let nextStep: 5 | 6 | 7 | 8 | 9 = nextStepBase;
-      if (step === 7 && skip) nextStep = 9;
-      if (nextStep === 9) {
-        setContractCurrentValue("");
-        goStep(9);
-        return;
-      }
-      const nextFieldIdx = nextStep - 4;
-      setContractCurrentFieldIdx(nextFieldIdx);
-      const nextMeta = (json.allFields || contractAllFields)[nextFieldIdx];
-      if (nextMeta) {
-        let pre = "";
-        if (json.allFields && typeof json.allFields[nextFieldIdx]?.currentValue === "string" && json.allFields[nextFieldIdx].currentValue.trim()) {
-          pre = String(json.allFields[nextFieldIdx].currentValue).trim();
-        } else {
-          pre = (json.snapshot || contractSnapshot)[nextMeta.name] ??
-            nextMeta.currentValue ??
-            lastSavedFieldValues[nextMeta.name] ??
-            "";
-        }
-        setContractCurrentValue(formatFieldValue(nextMeta.name, typeof pre === "string" ? pre.trim() : ""));
-      } else {
-        setContractCurrentValue("");
-      }
-      goStep(nextStep);
-    } finally {
-      setContractFieldSaving(false);
-    }
-  }
-
-  async function contractBackField() {
-    if (step < 4 || step > 8) return;
-    const backTargetStep = Math.max(0, (step as number) - 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
-    if (!(step >= 4 && step <= 8) || backTargetStep < 4) {
-      goStep(backTargetStep);
-      return;
-    }
-    const tel = phoneField.replace(/\D/g, "").trim();
-    if (contractFieldSaving) return;
-    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
-    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
-    const currentMeta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
-    let needSave = !!currentMeta && contractCurrentValue.trim().length > 0;
-    if (currentMeta && contractCurrentValue.trim()) {
-      const snapshotVal =
-        (contractSnapshot && typeof contractSnapshot[currentMeta.name] === "string"
-          ? String(contractSnapshot[currentMeta.name])
-          : "") ||
-        (lastSavedFieldValues && typeof lastSavedFieldValues[currentMeta.name] === "string"
-          ? String(lastSavedFieldValues[currentMeta.name])
-          : "") ||
-        "";
-      const formattedSnapshot = formatFieldValue(currentMeta.name, snapshotVal.trim());
-      if (formattedSnapshot.trim() === contractCurrentValue.trim() || unformatFieldValue(currentMeta.name, formattedSnapshot) === unformatFieldValue(currentMeta.name, contractCurrentValue)) {
-        needSave = false;
-      }
-    }
-    let latestSnapshotFromSave: Record<ContractFieldMeta["name"], string | null> | null = null;
-    let latestAllFieldsFromSave: ContractFieldMeta[] | null = null;
-    if (needSave && currentMeta) {
-      setContractFieldSaving(true);
-      setContractFieldError("");
-      try {
-        const payloadValue = unformatFieldValue(currentMeta.name, contractCurrentValue);
-        const res = await fetch("/api/cadastro/recorrente/contract-field-submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            telefone: tel,
-            leadId: contractLeadId || submitLeadId || undefined,
-            field: currentMeta.name,
-            value: payloadValue,
-            skip: false,
-          }),
-        });
-        const json = (await res.json().catch(() => null)) as
-          | {
-              ok?: boolean;
-              error?: string;
-              code?: string;
-              snapshot?: Record<ContractFieldMeta["name"], string | null>;
-              nextField?: ContractFieldMeta["name"] | null;
-              allFields?: ContractFieldMeta[];
-              savedField?: ContractFieldMeta["name"];
-              savedValue?: string | null;
-            }
-          | null;
-        if (res.ok && json?.ok) {
-          latestSnapshotFromSave = json.snapshot || null;
-          latestAllFieldsFromSave = json.allFields || null;
-          setContractSnapshot(json.snapshot || contractSnapshot);
-          setLastSavedFieldValues((prev) => {
-            let next: any = { ...prev };
-            next[currentMeta.name] = json.savedValue ?? (json.snapshot ?? contractSnapshot)[currentMeta.name];
-            return next;
-          });
-          setContractAllFields(json.allFields || contractAllFields);
-        }
-      } catch {}
-      setContractFieldSaving(false);
-    }
-    const backStepAsContractStep = backTargetStep as 4 | 5 | 6 | 7 | 8;
-    const backTargetIdx = fieldIdxByStep[backStepAsContractStep];
-    const fallbackAllFields = latestAllFieldsFromSave && latestAllFieldsFromSave.length > 0
-      ? latestAllFieldsFromSave
-      : contractAllFields;
-    const backMeta = fallbackAllFields[backTargetIdx];
-    if (backMeta) {
-      let pre = "";
-      const snapShotLocal = latestSnapshotFromSave || contractSnapshot || {} as any;
-      const lastSavedLocal = lastSavedFieldValues || {} as any;
-      if (latestAllFieldsFromSave && typeof latestAllFieldsFromSave[backTargetIdx]?.currentValue === "string" && latestAllFieldsFromSave[backTargetIdx].currentValue.trim()) {
-        pre = String(latestAllFieldsFromSave[backTargetIdx].currentValue).trim();
-      } else if (snapShotLocal && snapShotLocal[backMeta.name] != null && String(snapShotLocal[backMeta.name] ?? "").trim()) {
-        pre = String(snapShotLocal[backMeta.name] ?? "").trim();
-      } else if (lastSavedLocal && lastSavedLocal[backMeta.name] != null && String(lastSavedLocal[backMeta.name] ?? "").trim()) {
-        pre = String(lastSavedLocal[backMeta.name] ?? "").trim();
-      } else if (backMeta.currentValue && String(backMeta.currentValue).trim()) {
-        pre = String(backMeta.currentValue).trim();
-      }
-      setContractCurrentFieldIdx(backTargetIdx);
-      setContractCurrentValue(formatFieldValue(backMeta.name, pre));
-    }
-    goStep(backTargetStep);
-  }
+  }, [step, submitResult, phoneField, submitLeadId, contractAllFields.length, contractSnapshot, lastSavedFieldValues, nome]);
 
   async function saveDraftRecurring(payload: {
     weekday?: RecurringWeekdayKey | null;
     weekdayLabel?: string | null;
     professorTime?: string | null;
     leadTime?: string | null;
-    step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | null;
+    step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | null;
     nomeOverride?: string | null;
     password?: string | null;
     state?: string | null;
@@ -591,23 +331,22 @@ export default function CadastroRecorrenteBody() {
           }
         | null;
       if (!res.ok || !json?.ok) {
-        throw new Error(toErrorMessage(json?.error, "Falha ao gerar o contrato. Tente novamente."));
+        throw new Error(toErrorMessage(json?.error, "Falha ao gerar a confirmação. Tente novamente."));
       }
       setContractPdfUrl(String(json.contract_pdf_url || ""));
       setContractSignedAt(String(json.contract_signed_at || new Date().toISOString()));
-      goStep(10);
+      goStep(5);
     } catch (e) {
-      setContractFinalError(toErrorMessage(e, "Erro ao gerar o contrato."));
+      setContractFinalError(toErrorMessage(e, "Erro ao gerar a confirmação."));
     } finally {
       setContractFinalizing(false);
     }
   }
 
-  function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12) {
+  function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6) {
     setStep(n);
-    if (n === 10) setPaymentTab("menu");
+    if (n === 5) setPaymentTab("menu");
     setSubmitError("");
-    setContractFieldError("");
     setContractFinalError("");
     void saveDraftRecurring({ step: n, password: senha.trim() || null });
     if (typeof window !== "undefined") {
@@ -637,40 +376,13 @@ export default function CadastroRecorrenteBody() {
     if (contractFinalizing) return;
     setContractFinalizing(true);
     await new Promise<void>((r) => setTimeout(r, 700));
-    goStep(11);
+    goStep(6);
     setTimeout(() => setContractFinalizing(false), 250);
   }
 
   useEffect(() => {
-    if (step === 10) setPaymentTab("menu");
-    if (step === 8) {
-      const legalName =
-        typeof contractSnapshot?.legal_responsible_name === "string"
-          ? contractSnapshot.legal_responsible_name
-          : typeof lastSavedFieldValues?.legal_responsible_name === "string"
-          ? lastSavedFieldValues.legal_responsible_name
-          : "";
-      if (!String(legalName ?? "").trim()) {
-        goStep(9);
-      }
-    }
+    if (step === 5) setPaymentTab("menu");
   }, [step]);
-
-  useEffect(() => {
-    if (step < 4 || step > 8) return;
-    if (!contractAllFields.length) return;
-    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
-    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
-    const target = contractAllFields[expectedIdx];
-    if (!target) return;
-    const key = `${step}:${target.name}`;
-    if (lastLoadedContractFieldKey.current === key) return;
-    lastLoadedContractFieldKey.current = key;
-    const preferred =
-      lastSavedFieldValues[target.name] ?? target.currentValue ?? contractSnapshot[target.name] ?? "";
-    const next = formatFieldValue(target.name, typeof preferred === "string" ? preferred.trim() : "");
-    setContractCurrentValue(next);
-  }, [step, contractAllFields, lastSavedFieldValues, contractSnapshot]);
 
   useEffect(() => {
     void (async () => {
@@ -730,9 +442,6 @@ export default function CadastroRecorrenteBody() {
         let restoredLeadFullName = "";
         let restoredLeadPhone = "";
         let restoredLeadId = "";
-        let restoredCpf: string | null = null;
-        let restoredLegalName: string | null = null;
-        let restoredLegalCpf: string | null = null;
         let restoredState: string | null = null;
         let restoredCity: string | null = null;
         let savedCountry: string | null = null;
@@ -742,9 +451,6 @@ export default function CadastroRecorrenteBody() {
           restoredLeadFullName = String(json.lead?.full_name ?? "").trim();
           restoredLeadPhone = String(json.lead?.phone ?? "").replace(/\D/g, "").trim();
           restoredLeadId = String((json.lead as any)?.id ?? "").trim();
-          restoredCpf = (json.lead as any)?.cpf ? String((json.lead as any).cpf) : null;
-          restoredLegalName = (json.lead as any)?.legal_responsible_name ? String((json.lead as any).legal_responsible_name) : null;
-          restoredLegalCpf = (json.lead as any)?.legal_responsible_cpf ? String((json.lead as any).legal_responsible_cpf) : null;
           restoredState = (json.lead as any)?.state ? String((json.lead as any).state) : null;
           restoredCity = (json.lead as any)?.city ? String((json.lead as any).city) : null;
           savedCountry = (json.lead as any)?.country ? String((json.lead as any).country) : null;
@@ -768,10 +474,6 @@ export default function CadastroRecorrenteBody() {
           if (restoredState) setStateField(restoredState);
           if (restoredCity) setCityField(restoredCity);
           if (restoredTimezone) setLeadTimezone(restoredTimezone);
-          if (restoredCpf) {
-            setLastSavedFieldValues((prev) => ({ ...prev, cpf: restoredCpf! }));
-            setContractSnapshot((prev) => ({ ...prev, cpf: restoredCpf! }));
-          }
           if (normalizedLeadFullName) {
             setLastSavedFieldValues((prev) => ({ ...prev, full_name: normalizedLeadFullName! }));
             setContractSnapshot((prev) => ({ ...prev, full_name: normalizedLeadFullName! }));
@@ -779,14 +481,6 @@ export default function CadastroRecorrenteBody() {
           if (restoredLeadPhone) {
             setLastSavedFieldValues((prev) => ({ ...prev, phone: restoredLeadPhone! }));
             setContractSnapshot((prev) => ({ ...prev, phone: restoredLeadPhone! }));
-          }
-          if (restoredLegalName) {
-            setLastSavedFieldValues((prev) => ({ ...prev, legal_responsible_name: restoredLegalName! }));
-            setContractSnapshot((prev) => ({ ...prev, legal_responsible_name: restoredLegalName! }));
-          }
-          if (restoredLegalCpf) {
-            setLastSavedFieldValues((prev) => ({ ...prev, legal_responsible_cpf: restoredLegalCpf! }));
-            setContractSnapshot((prev) => ({ ...prev, legal_responsible_cpf: restoredLegalCpf! }));
           }
 
           const restoredContractPdfUrl = typeof (json.lead as any)?.contract_pdf_url === "string" ? String((json.lead as any).contract_pdf_url).trim() : "";
@@ -839,7 +533,7 @@ export default function CadastroRecorrenteBody() {
           }
         }
 
-        let stepNum: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 = 0;
+        let stepNum: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0;
         let hasPassword = false;
         let savedWeekdayRaw: string = "";
         let savedWeekdayLabel: string = "";
@@ -851,9 +545,10 @@ export default function CadastroRecorrenteBody() {
         if (json?.progress) {
           const prog = json.progress;
           stepNum =
-            typeof prog.step === "number" && prog.step >= 0 && prog.step <= 12
-              ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12)
+            typeof prog.step === "number" && prog.step >= 0 && prog.step <= 6
+              ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6)
               : 0;
+          if (stepNum > 6) stepNum = 0;
           hasPassword = Boolean(prog.has_password);
           savedWeekdayRaw = String(prog.recurring_class_weekday ?? "").trim().toLowerCase();
           savedWeekdayLabel = String(prog.recurring_class_weekday_label ?? "").trim();
@@ -1269,14 +964,9 @@ export default function CadastroRecorrenteBody() {
                 { key: 1, label: "Localização", shortLabel: "Loc" },
                 { key: 2, label: "Dia", shortLabel: "Dia" },
                 { key: 3, label: "Horário", shortLabel: "Hora" },
-                { key: 4, label: "Nome", shortLabel: "Nome" },
-                { key: 5, label: "CPF", shortLabel: "CPF" },
-                { key: 6, label: "Telefone", shortLabel: "Tel" },
-                { key: 7, label: "Resp. Legal", shortLabel: "Resp" },
-                { key: 8, label: "CPF Resp.", shortLabel: "CPF-R" },
-                { key: 9, label: "Revisão", shortLabel: "Rev" },
-                { key: 10, label: "Pagamento", shortLabel: "Pag" },
-                { key: 11, label: "Concluído", shortLabel: "Fim" },
+                { key: 4, label: "Revisão", shortLabel: "Rev" },
+                { key: 5, label: "Pagamento", shortLabel: "Pag" },
+                { key: 6, label: "Concluído", shortLabel: "Fim" },
               ];
               const N = allSteps.length;
               const buildDisplayOrder = (current: number): Array<{ kind: "step"; idx: number } | { kind: "ellipsis" }> => {
@@ -1372,7 +1062,7 @@ export default function CadastroRecorrenteBody() {
                     <div
                       className="h-full bg-gradient-to-r from-indigo-500 to-sky-500 transition-all duration-500 ease-out"
                       style={{
-                        width: `${step === 0 ? 8 : step === 1 ? 17 : step === 2 ? 25 : step === 3 ? 33 : step === 4 ? 42 : step === 5 ? 50 : step === 6 ? 58 : step === 7 ? 67 : step === 8 ? 75 : step === 9 ? 83 : step === 10 ? 92 : 100}%`,
+                        width: `${step === 0 ? 14 : step === 1 ? 28 : step === 2 ? 42 : step === 3 ? 57 : step === 4 ? 71 : step === 5 ? 85 : 100}%`,
                       }}
                     />
                   </div>
@@ -1653,188 +1343,6 @@ export default function CadastroRecorrenteBody() {
           )}
 
           {step === 4 && submitResult && (
-            <section className="space-y-7 mb-10">
-              <div className="text-center">
-                <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                  <svg
-                    className="w-10 h-10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Tudo certo, {firstName}! 🎉</h2>
-                <p className="mt-3 text-lg text-slate-600 leading-snug">Sua aula recorrente foi reservada.</p>
-              </div>
-
-              <div className="max-w-2xl mx-auto">
-                <div className="rounded-3xl bg-white border border-slate-200 shadow-[0_8px_30px_-16px_rgba(15,23,42,0.18)] overflow-hidden">
-                  <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 px-6 sm:px-8 py-5 sm:py-6 flex items-center gap-3 sm:gap-4">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center text-white flex-shrink-0">
-                      <svg className="w-5.5 h-5.5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.22em] text-white/85">Agendamento confirmado</div>
-                      <div className="text-white text-[17px] sm:text-[19px] font-extrabold leading-snug mt-1 break-words">
-                        Sua vaga está garantida ✨
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y divide-slate-100 sm:divide-y-0 sm:divide-x sm:divide-slate-100">
-                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-3 sm:gap-4 sm:gap-4.5">
-                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
-                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500 whitespace-nowrap truncate">Dia da aula</div>
-                        <div className="mt-2 text-[clamp(18px,4.4vw,26px)] sm:text-[26px] font-extrabold text-slate-900 leading-none whitespace-nowrap truncate">{submitResult.weekdayLabel}</div>
-                      </div>
-                    </div>
-                    <div className="px-5 sm:px-6 py-5 sm:py-7 flex items-start sm:items-center gap-3 sm:gap-4 sm:gap-4.5">
-                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
-                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] sm:tracking-[0.18em] text-slate-500 whitespace-nowrap truncate">Horário fixo</div>
-                        <div className="mt-2 text-[clamp(18px,4.4vw,26px)] sm:text-[26px] font-extrabold text-slate-900 tabular-nums leading-none whitespace-nowrap truncate">{submitResult.leadTime}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="max-w-2xl mx-auto mt-7">
-                <p className="text-center text-base text-slate-500 leading-relaxed">Agora vamos <strong className="font-bold text-slate-700">formalizar o contrato</strong>. Responda uma pergunta por vez.</p>
-              </div>
-            </section>
-          )}
-
-          {step >= 4 && step <= 8 && submitResult && (
-            <section className="space-y-7">
-
-              {(contractInitLoading || contractAllFields.length === 0) && !contractInitError && (
-                <div className="py-14 text-center text-slate-500">
-                  {contractInitLoading ? "Preparando suas informações…" : "Carregando seus dados…"}
-                </div>
-              )}
-              {contractInitError && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{toErrorMessage(contractInitError, "Erro desconhecido.")}</div>
-              )}
-
-              {!contractInitLoading && !contractInitError && contractAllFields.length > 0 && contractCurrentFieldIdx >= 0 && (
-                <div className="max-w-2xl mx-auto space-y-6">
-                  {(() => {
-                    const fieldIdxByStep: Record<4 | 5 | 6 | 7 | 8, number> = { 4: 0, 5: 1, 6: 2, 7: 3, 8: 4 };
-                    const expectedIdx = fieldIdxByStep[step as 4 | 5 | 6 | 7 | 8];
-                    const meta = contractAllFields[expectedIdx] ?? contractAllFields[contractCurrentFieldIdx];
-                    if (!meta) return null;
-                    const hasExisting = Boolean(meta.currentValue);
-                    return (
-                      <div className="space-y-7">
-                        <div className="space-y-1">
-                          <h2 className="text-2xl font-bold text-slate-900">
-                            {(() => {
-                              const useO = meta.name === "legal_responsible_name" || meta.name === "legal_responsible_cpf";
-                              const keepCase = meta.name === "cpf" || meta.name === "legal_responsible_cpf";
-                              const verb = hasExisting ? "Confirme" : "Informe";
-                              const pronoun = useO ? "o" : "seu";
-                              const label =
-                                meta.name === "phone"
-                                  ? "WhatsApp"
-                                  : meta.name === "legal_responsible_cpf"
-                                  ? "CPF do responsável"
-                                  : keepCase
-                                  ? meta.label
-                                  : meta.label.toLowerCase();
-                              return `${verb} ${pronoun} ${label}`;
-                            })()}
-                          </h2>
-                          <p className="text-slate-600">
-                            {meta.optional ? (
-                              <>
-                                <strong>Campo opcional</strong>. Você pode pular se preferir.
-                              </>
-                            ) : (
-                              "Campo obrigatório."
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-800 mb-2">
-                            {meta.label}
-                            {meta.optional ? " (opcional)" : ""}
-                          </label>
-                          <input
-                            type="text"
-                            value={contractCurrentValue}
-                            onChange={(e) => setContractCurrentValue(formatFieldValue(meta.name, e.target.value))}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                void contractAdvanceField(false);
-                              }
-                            }}
-                            disabled={contractFieldSaving}
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition disabled:opacity-60 disabled:cursor-not-allowed text-base"
-                            placeholder={
-                              meta.name === "full_name"
-                                ? "Ex: Ana Maria Silva"
-                                : meta.name === "cpf"
-                                ? "Ex: 123.456.789-09"
-                                : meta.name === "phone"
-                                ? "Ex: (65) 99999-9999"
-                                : meta.name === "legal_responsible_name"
-                                ? "Ex: José Carlos Silva (opcional)"
-                                : "Ex: 123.456.789-09 (opcional)"
-                            }
-                          />
-                          {contractFieldError && (
-                            <div className="mt-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200 p-3">{toErrorMessage(contractFieldError, "Erro desconhecido.")}</div>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-1 sm:flex sm:flex-row sm:items-start gap-3 pt-2 w-full">
-                          {meta.optional && (
-                            <button
-                              onClick={() => void contractAdvanceField(true)}
-                              disabled={contractFieldSaving}
-                              className="order-1 sm:order-2 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
-                            >
-                              Pular
-                            </button>
-                          )}
-                          <button
-                            onClick={() => void contractBackField()}
-                            disabled={contractFieldSaving}
-                            className="order-2 sm:order-1 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[180px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
-                          >
-                            Voltar
-                          </button>
-                          <button
-                            onClick={() => void contractAdvanceField(false)}
-                            disabled={contractFieldSaving}
-                            className="order-3 sm:order-3 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
-                          >
-                            {contractFieldSaving ? "Salvando…" : hasExisting ? "Confirmar e avançar" : "Avançar"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </section>
-          )}
-
-          {step === 9 && submitResult && (
             <section className="space-y-7">
               <div className="text-center">
                 <div className="mx-auto w-20 h-20 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
@@ -1844,230 +1352,88 @@ export default function CadastroRecorrenteBody() {
                 </div>
                 <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Revise seus dados</h2>
                 <p className="mt-3 text-lg text-slate-600">
-                  Confirme se as informações abaixo estão corretas para formalizar o contrato.
+                  Confirme se as informações abaixo estão corretas para confirmar a matrícula.
                 </p>
               </div>
-              {contractAllFields.length === 0 && (
-                <div className="py-14 text-center text-slate-500">Carregando seus dados para revisão…</div>
+
+              {contractInitLoading && !contractInitError && (
+                <div className="py-14 text-center text-slate-500">Preparando suas informações…</div>
               )}
-              {contractAllFields.length > 0 && (
+              {contractInitError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 max-w-2xl mx-auto">{toErrorMessage(contractInitError, "Erro desconhecido.")}</div>
+              )}
+
               <div className="rounded-3xl border border-slate-200 bg-white max-w-2xl mx-auto divide-y divide-slate-100">
-                {contractAllFields.map((f, idx) => {
-                  const raw =
-                    lastSavedFieldValues[f.name] ?? f.currentValue ?? contractSnapshot[f.name] ?? null;
-                  const rawVal = typeof raw === "string" ? raw.trim() : raw;
-                  if ((!rawVal || rawVal === "") && f.optional) return null;
-                  const digits = String(rawVal ?? "").replace(/\D/g, "");
-                  let displayVal = rawVal ?? "— não informado —";
-                  if ((f.name === "cpf" || f.name === "legal_responsible_cpf") && digits.length >= 11) {
-                    displayVal = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
-                  } else if (f.name === "phone") {
-                    if (digits.length >= 13) {
-                      displayVal = `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
-                    } else if (digits.length === 11) {
-                      displayVal = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
-                    } else if (digits.length === 10) {
-                      displayVal = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
-                    }
-                  }
-                  return (
-                    <div key={idx} className="px-6 py-4 grid grid-cols-1 sm:grid-cols-[minmax(140px,180px)_1fr] gap-3 sm:gap-5 items-start">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right sm:pt-1">
-                        {f.label}
-                        {f.optional ? " (opcional)" : ""}
-                      </div>
-                      <div className="text-base font-semibold text-slate-900 break-words">
-                        {displayVal}
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-[minmax(140px,180px)_1fr] gap-3 sm:gap-5 items-start">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right sm:pt-1">
+                    Nome completo
+                  </div>
+                  <div className="text-base font-semibold text-slate-900 break-words">
+                    {nome || "— não informado —"}
+                  </div>
+                </div>
+                <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-[minmax(140px,180px)_1fr] gap-3 sm:gap-5 items-start">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right sm:pt-1">
+                    Dia da aula
+                  </div>
+                  <div className="text-base font-semibold text-slate-900 break-words">
+                    {submitResult.weekdayLabel}
+                  </div>
+                </div>
+                <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-[minmax(140px,180px)_1fr] gap-3 sm:gap-5 items-start">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 sm:text-right sm:pt-1">
+                    Horário
+                  </div>
+                  <div className="text-base font-semibold text-slate-900 break-words">
+                    {submitResult.leadTime}
+                  </div>
+                </div>
               </div>
-              )}
 
               {(() => {
-                function fmtCPF(v: string | null): string {
-                  const d = String(v ?? "").replace(/\D/g, "");
-                  if (d.length < 11) return String(v ?? "___.___.___-__").trim() || "___.___.___-__";
-                  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9, 11)}`;
-                }
-                function fmtPhone(v: string | null): string {
-                  const d = String(v ?? "").replace(/\D/g, "");
-                  if (d.length >= 13) return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9, 13)}`;
-                  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
-                  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6, 10)}`;
-                  return String(v ?? "(  ) _________").trim() || "(  ) _________";
-                }
-                function fmtCity(v: string | null): string | null {
-                  const s = String(v ?? "").trim();
-                  return s ? s : null;
-                }
-                function fmtSignedDate(iso: string): string {
-                  const d = new Date(iso);
-                  if (Number.isNaN(d.getTime())) return fmtSignedDate(new Date().toISOString());
-                  const dia = String(d.getDate()).padStart(2, "0");
-                  const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-                  return `${dia} de ${meses[d.getMonth()] ?? ""} de ${String(d.getFullYear())}`;
-                }
-                const CONTRATADA_NOME = "INNOVALAND DESENVOLVIMENTO E PARTICIPAÇÕES LTDA";
-                const CONTRATADA_CNPJ = "63.088.381/0001-22";
-                const PROFESSOR_NOME = "Lucas Brum de Castro";
-
-                const getFieldRaw = (name: "full_name" | "cpf" | "phone" | "legal_responsible_name" | "legal_responsible_cpf") => {
-                  const f = contractAllFields.find((x) => x.name === name);
-                  return (
-                    lastSavedFieldValues[name] ??
-                    f?.currentValue ??
-                    contractSnapshot[name] ??
-                    null
-                  );
-                };
-
-                const studentFullName = String(getFieldRaw("full_name") ?? "ALUNO(A)").trim() || "ALUNO(A)";
-                const studentCPF = fmtCPF(getFieldRaw("cpf"));
-                const studentPhone = fmtPhone(getFieldRaw("phone"));
-                const studentCity = fmtCity((contractSnapshot as any)?.city ?? null);
-                const legalResponsibleNameRaw = String(getFieldRaw("legal_responsible_name") ?? "").trim() || null;
-                const legalResponsibleCPFRaw = String(getFieldRaw("legal_responsible_cpf") ?? "").trim() || null;
-                const hasLegalResponsible = Boolean(legalResponsibleNameRaw && legalResponsibleCPFRaw);
-                const legalResponsibleName = hasLegalResponsible ? legalResponsibleNameRaw : null;
-                const legalResponsibleCPF = hasLegalResponsible ? fmtCPF(legalResponsibleCPFRaw) : null;
-                const signedAtIso = new Date().toISOString();
-                const signedByLabel = hasLegalResponsible ? legalResponsibleName! : studentFullName;
-                const signedByCPF = hasLegalResponsible ? fmtCPF(legalResponsibleCPFRaw) : fmtCPF(getFieldRaw("cpf"));
-                const dataLocal = studentCity ? `${studentCity}, ${fmtSignedDate(signedAtIso)}.` : `${fmtSignedDate(signedAtIso)}.`;
-
-                const p = "text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90";
-                const h2 = "text-[15px] font-bold mb-2 mt-5 text-black";
                 return (
                   <section className="max-w-2xl mx-auto mb-8">
                     <div className="text-center mb-6">
                       <h3 className="text-base sm:text-lg font-bold uppercase tracking-wide text-slate-800">
-                        Prévia completa do contrato
+                        Prévia da confirmação de matrícula
                       </h3>
                       <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                        Revise todo o conteúdo abaixo antes de formalizar. Este é o mesmo texto do PDF gerado após o aceite.
+                        Revise todo o conteúdo abaixo antes de confirmar. Este é o mesmo texto do PDF gerado após o aceite.
                       </p>
                     </div>
                     <article className="rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_-16px_rgba(15,23,42,0.18)] p-6 sm:p-10 font-serif text-slate-900">
-                      <h1 className="text-center text-[16px] sm:text-[18px] font-bold mb-5 leading-snug">
-                        CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS
+                      <h2 className="text-center font-bold">
+                        LUCAS BRUM ONLINE MUSIC USA
                         <br />
-                        AULAS ONLINE DE MÚSICA
-                      </h1>
-
-                      <p className={p}>
-                        <strong>CONTRATADA:</strong> {CONTRATADA_NOME}, inscrita no CNPJ nº {CONTRATADA_CNPJ}, responsável pela marca
-                        Lucas Brum Online Music USA, representada pelo professor {PROFESSOR_NOME}.
+                        CONFIRMAÇÃO DE MATRÍCULA
+                      </h2>
+                      <p className="mt-4 text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        Eu, <b>{nome || "[NOME]"}</b>, confirmo minha matrícula na Lucas Brum Online Music USA para participar de aulas individuais e online de música.
                       </p>
-                      <p className={p}><strong>Aluno(a):</strong> {studentFullName}</p>
-                      <p className={p}><strong>CPF:</strong> {studentCPF}</p>
-                      <p className={p}><strong>Telefone/WhatsApp:</strong> {studentPhone}</p>
-                      {legalResponsibleName && (
-                        <p className={p}><strong>Responsável legal, se menor:</strong> {legalResponsibleName}</p>
-                      )}
-                      {legalResponsibleCPF && (
-                        <p className={p}><strong>CPF do responsável:</strong> {legalResponsibleCPF}</p>
-                      )}
-
-                      <h2 className={h2}>1. OBJETO</h2>
-                      <p className={p}>
-                        A CONTRATADA prestará ao(à) aluno(a) aulas individuais, online e ao vivo de música, em português,
-                        ministradas pelo professor {PROFESSOR_NOME}, com conteúdo adequado ao nível, ao instrumento escolhido
-                        e aos objetivos do(a) aluno(a).
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        <b>Dia da aula:</b> {submitResult.weekdayLabel}
                       </p>
-
-                      <h2 className={h2}>2. PLANO, VALOR E PAGAMENTO</h2>
-                      <p className={p}>
-                        O plano compreende 1 (uma) aula por semana, com duração de 40 (quarenta) minutos, pelo valor mensal
-                        de US$ 119,00 (cento e dezenove dólares). O pagamento será mensal e antecipado, por Stripe, Wise,
-                        Pix, transferência ou outro meio informado pela CONTRATADA.
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        <b>Horário:</b> {submitResult.leadTime}
                       </p>
-
-                      <h2 className={h2}>3. AGENDA, FALTAS E REPOSIÇÕES</h2>
-                      <p className={p}>
-                        As aulas ocorrerão em horário previamente combinado. A remarcação deverá ser solicitada com, no
-                        mínimo, 24 (vinte e quatro) horas de antecedência. Faltas sem aviso prévio não geram reposição.
-                        Problemas técnicos ou de internet que impeçam a aula poderão resultar em reagendamento, mediante
-                        acordo entre as partes.
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        <b>Frequência:</b> 1 aula por semana
                       </p>
-
-                      <h2 className={h2}>4. CANCELAMENTO</h2>
-                      <p className={p}>
-                        O contrato poderá ser cancelado a qualquer momento, sem multa. Os valores já pagos não serão
-                        devolvidos proporcionalmente, pois o horário permanecerá reservado ao(à) aluno(a) durante o
-                        respectivo ciclo mensal.
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        <b>Duração:</b> 40 minutos por aula
                       </p>
-
-                      <h2 className={h2}>5. RESPONSABILIDADES DO(A) ALUNO(A)</h2>
-                      <p className={p}>
-                        O(A) aluno(a) deverá possuir o instrumento musical necessário às aulas, acesso à internet,
-                        câmera, microfone e ambiente adequado. O desenvolvimento dependerá da frequência, dedicação
-                        e prática individual, não havendo garantia de resultado específico.
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        <b>Mensalidade:</b> US$ 119,00
                       </p>
-
-                      <h2 className={h2}>6. MATERIAL DIDÁTICO</h2>
-                      <p className={p}>
-                        Os materiais fornecidos são de uso pessoal do(a) aluno(a) e não poderão ser vendidos,
-                        publicados ou compartilhados sem autorização da CONTRATADA.
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        <b>Plano:</b> Inicialmente previsto para 6 meses, podendo ser cancelado a qualquer momento, sem multa.
                       </p>
-
-                      <h2 className={h2}>7. USO DE IMAGEM</h2>
-                      <p className={p}>
-                        O(A) aluno(a), ou seu responsável legal, autoriza gratuitamente o uso de imagens, vídeos e
-                        trechos das aulas em que apareça para divulgação da Lucas Brum Online Music USA em redes
-                        sociais, site e materiais institucionais. Caso não concorde, deverá informar a CONTRATADA
-                        antes do início das aulas, e esta cláusula será retirada do contrato.
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
+                        <b>Pagamento:</b> A mensalidade de US$ 119,00 será paga pela forma de pagamento selecionada pelo aluno no processo de matrícula.
                       </p>
-
-                      <h2 className={h2}>8. VIGÊNCIA E ACEITE</h2>
-                      <p className={p}>
-                        O contrato terá vigência inicial de 6 (seis) meses, com renovação automática, podendo ser
-                        cancelado conforme a Cláusula 4. A assinatura eletrônica, o aceite por WhatsApp, formulário,
-                        e-mail ou o primeiro pagamento confirmam a concordância com este contrato.
+                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify text-black/90 mt-4">
+                        Documento simplificado para confirmação eletrônica de matrícula.
                       </p>
-
-                      <h2 className={h2}>9. DISPOSIÇÕES FINAIS</h2>
-                      <p className={p}>
-                        Este contrato não gera vínculo empregatício. Eventuais alterações deverão ser acordadas entre
-                        as partes. Fica eleito o foro da comarca de Campo Novo do Parecis/MT para resolver controvérsias,
-                        ressalvadas as hipóteses legais de foro obrigatório.
-                      </p>
-
-                      <p className="mt-6 text-[13px] sm:text-[14px] leading-[1.6] mb-2">
-                        Declaro que li, compreendi e concordo com as condições deste contrato.
-                      </p>
-
-                      <p className="mt-6 text-[13px] sm:text-[14px] leading-[1.6] text-left mb-2">{dataLocal}</p>
-
-                      <div className="mt-14">
-                        <div className="border-t border-black/80 w-[80%] mx-auto mb-2" />
-                        <p className="text-center text-[12px] leading-snug">
-                          <strong>CONTRATADA – Lucas Brum de Castro (professor representante)</strong>
-                        </p>
-                        <p className="text-center text-[12px] leading-snug mt-0.5">
-                          {CONTRATADA_NOME} – CNPJ {CONTRATADA_CNPJ}
-                        </p>
-                      </div>
-
-                      <div className="mt-10">
-                        <div className="border-t border-black/80 w-[80%] mx-auto mb-2" />
-                        {hasLegalResponsible ? (
-                          <>
-                            <p className="text-center text-[12px] leading-snug">
-                              <strong>Responsável legal / Assinatura do(a) aluno(a):</strong> {signedByLabel}
-                            </p>
-                            <p className="text-center text-[12px] leading-snug mt-0.5">CPF: {signedByCPF}</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-center text-[12px] leading-snug">
-                              <strong>Aluno(a):</strong> {signedByLabel}
-                            </p>
-                            <p className="text-center text-[12px] leading-snug mt-0.5">CPF: {signedByCPF}</p>
-                          </>
-                        )}
-                      </div>
                     </article>
                   </section>
                 );
@@ -2076,8 +1442,8 @@ export default function CadastroRecorrenteBody() {
               <div className="rounded-3xl bg-slate-50 border border-slate-200 p-6 max-w-2xl mx-auto text-sm text-slate-700 leading-relaxed space-y-2">
                 <p className="font-semibold text-slate-900 text-base">Declaração de aceite</p>
                 <p>
-                  Declaro que li, compreendi e concordo com as condições do contrato de prestação de serviços educacionais (aulas online de música) da Lucas Brum Online Music USA,
-                  incluindo plano, valor, pagamentos, agenda, faltas, reposições, cancelamento, responsabilidades, material didático, uso de imagem e vigência.
+                  Declaro que li, compreendi e concordo com as condições da confirmação de matrícula da Lucas Brum Online Music USA,
+                  incluindo plano, valor, pagamentos, agenda, faltas, reposições, cancelamento e vigência.
                 </p>
               </div>
 
@@ -2087,19 +1453,7 @@ export default function CadastroRecorrenteBody() {
 
               <div className="grid grid-cols-1 sm:flex sm:flex-row sm:items-start gap-3 pt-2 max-w-2xl mx-auto w-full">
                 <button
-                  onClick={() => {
-                    const legalName =
-                      typeof contractSnapshot?.legal_responsible_name === "string"
-                        ? contractSnapshot.legal_responsible_name
-                        : typeof lastSavedFieldValues?.legal_responsible_name === "string"
-                        ? lastSavedFieldValues.legal_responsible_name
-                        : "";
-                    if (!String(legalName ?? "").trim()) {
-                      goStep(7);
-                    } else {
-                      goStep(8);
-                    }
-                  }}
+                  onClick={() => goStep(3)}
                   disabled={contractFinalizing}
                   className="order-1 sm:order-1 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-7 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate"
                 >
@@ -2110,13 +1464,13 @@ export default function CadastroRecorrenteBody() {
                   disabled={contractFinalizing}
                   className="order-2 sm:order-2 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[300px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate"
                 >
-                  {contractFinalizing ? "Gerando contrato…" : "Sim, formalizar contrato agora"}
+                  {contractFinalizing ? "Confirmando matrícula…" : "Confirmar matrícula"}
                 </button>
               </div>
             </section>
           )}
 
-          {step === 10 && submitResult && (
+          {step === 5 && submitResult && (
             <section className="space-y-7 text-center">
               {paymentTab === "menu" && (
                 <>
@@ -2239,7 +1593,7 @@ export default function CadastroRecorrenteBody() {
 
                   <div className="w-full max-w-2xl mx-auto pt-2">
                     <button
-                      onClick={() => goStep(9)}
+                      onClick={() => goStep(4)}
                       className="order-1 w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-8 sm:min-w-[200px] py-3.5 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition justify-center flex items-center text-sm sm:text-base truncate"
                     >
                       Voltar
@@ -2435,7 +1789,7 @@ export default function CadastroRecorrenteBody() {
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-stretch sm:justify-stretch gap-3 sm:gap-5">
                         <div className="flex-1 rounded-2xl bg-white/70 border border-emerald-200/60 px-5 sm:px-7 py-3 sm:py-5 flex flex-col items-center sm:items-start sm:text-left justify-center gap-1 sm:gap-1.5 min-w-0">
-                          <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700/90">
+                          <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-700/90">
                             Câmbio utilizado
                           </div>
                           <div className="text-lg sm:text-2xl font-black text-slate-800 leading-none whitespace-nowrap overflow-hidden text-ellipsis w-full">
@@ -2536,7 +1890,7 @@ export default function CadastroRecorrenteBody() {
             </section>
           )}
 
-          {step === 11 && submitResult && (
+          {step === 6 && submitResult && (
             <section className="space-y-7 text-center">
               <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
@@ -2560,9 +1914,9 @@ export default function CadastroRecorrenteBody() {
 
               <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 border border-emerald-100 p-8 max-w-2xl mx-auto space-y-5">
                 <div className="text-left">
-                  <div className="text-2xl font-bold text-slate-900">📄 Contrato de prestação de serviços</div>
+                  <div className="text-2xl font-bold text-slate-900">📄 Confirmação de Matrícula</div>
                   <p className="mt-1 text-slate-600">
-                    Clique abaixo para baixar seu contrato completo em PDF.
+                    Clique abaixo para baixar sua confirmação completa em PDF.
                   </p>
                 </div>
                 {contractPdfUrl ? (
@@ -2575,7 +1929,7 @@ export default function CadastroRecorrenteBody() {
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Baixar contrato em PDF
+                    Baixar confirmação em PDF
                   </a>
                 ) : (
                   <div className="rounded-2xl bg-white border border-slate-200 p-5 text-slate-600">

@@ -3005,21 +3005,6 @@ export async function formalizeAndPersistContract(params: {
     effectiveLead.full_name = contractFull || historyFull;
   }
 
-  const contractPhoneRaw = typeof effectiveLead.contract_phone === "string" ? String(effectiveLead.contract_phone).replace(/\D/g, "").trim() : "";
-  const historyPhoneRaw = String(historyByField["phone"] ?? "").replace(/\D/g, "").trim();
-  if (contractPhoneRaw || historyPhoneRaw) {
-    effectiveLead.phone = contractPhoneRaw || historyPhoneRaw;
-  }
-  if (String(historyByField["cpf"] ?? "").trim()) {
-    effectiveLead.cpf = String(historyByField["cpf"] ?? effectiveLead.cpf ?? "");
-  }
-  if (String(historyByField["legal_responsible_name"] ?? "").trim()) {
-    effectiveLead.legal_responsible_name = String(historyByField["legal_responsible_name"] ?? effectiveLead.legal_responsible_name ?? "");
-  }
-  if (String(historyByField["legal_responsible_cpf"] ?? "").trim()) {
-    effectiveLead.legal_responsible_cpf = String(historyByField["legal_responsible_cpf"] ?? effectiveLead.legal_responsible_cpf ?? "");
-  }
-
   const signedAt = new Date().toISOString();
   const contractData = buildContractData({
     lead: effectiveLead as any,
@@ -3071,17 +3056,14 @@ export async function formalizeAndPersistContract(params: {
       leadId,
       conversationId,
       eventType: "contrato_assinado",
-      title: "Contrato formalizado e PDF gerado",
+      title: "Matrícula confirmada e PDF gerado",
       details: {
         contract_pdf_url: publicUrl,
         contract_signed_at: signedAt,
         local_assinatura: formatLocalizedDateSigned(signedAt),
         aluno: contractData.studentFullName,
-        aluno_cpf: contractData.studentCPF,
-        responsavel: contractData.legalResponsibleName,
-        responsavel_cpf: contractData.legalResponsibleCPF,
-        assinante: contractData.signedByLabel,
-        assinante_cpf: contractData.signedByCPF,
+        dia_aula: contractData.classWeekdayLabel,
+        horario_aula: contractData.classTimeLabel,
         storage_path: storagePath,
       },
       actorType: "system",
@@ -3096,7 +3078,7 @@ export async function formalizeAndPersistContract(params: {
         conversation_id: conversationId,
         sender_role: "system",
         content_text:
-          "Contrato de prestação de serviços educacionais – PDF gerado após formalização.",
+          "Confirmação de matrícula – PDF gerado após formalização.",
         media_type: "document",
         media_url: publicUrl,
         mime_type: "application/pdf",

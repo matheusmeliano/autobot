@@ -124,40 +124,11 @@ export async function POST(req: Request) {
         if (v === "") return "";
         return String(v ?? "").trim() || null;
       }
-      if (name === "phone") {
-        const dedicated = typeof (lead as any).contract_phone === "string" ? String((lead as any).contract_phone).replace(/\D/g, "").trim() : "";
-        if (dedicated) return dedicated;
-        const fromHistory = String(historyByField["phone"] ?? "").replace(/\D/g, "").trim();
-        if (fromHistory) return fromHistory;
-        const v = lead.phone;
-        if (v === "") return "";
-        const p = String(v ?? "").replace(/\D/g, "").trim();
-        return p || null;
-      }
-      if (name === "cpf") {
-        const v = lead.cpf;
-        if (v === "") return "";
-        return String(v ?? "").replace(/\D/g, "").trim() || null;
-      }
-      if (name === "legal_responsible_name") {
-        const v = lead.legal_responsible_name;
-        if (v === "") return "";
-        return String(v ?? "").trim() || null;
-      }
-      if (name === "legal_responsible_cpf") {
-        const v = lead.legal_responsible_cpf;
-        if (v === "") return "";
-        return String(v ?? "").replace(/\D/g, "").trim() || null;
-      }
       return null;
     }
 
     const snapshot: Record<ContractFieldName, string | null> = {
       full_name: getRawFieldValue("full_name"),
-      cpf: getRawFieldValue("cpf"),
-      phone: getRawFieldValue("phone"),
-      legal_responsible_name: getRawFieldValue("legal_responsible_name"),
-      legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf"),
     };
 
     const pending: ContractFieldName[] = CONTRACT_FIELD_ORDER.filter(
@@ -165,9 +136,7 @@ export async function POST(req: Request) {
     ) as unknown as ContractFieldName[];
     const next: ContractFieldName | null = pending[0] ?? null;
 
-    const hasLegalResponsibleName = Boolean(String(snapshot.legal_responsible_name ?? "").trim());
     const dynamicOptionalFields: Set<string> = new Set(CONTRACT_OPTIONAL_FIELDS as unknown as Set<string>);
-    if (hasLegalResponsibleName) dynamicOptionalFields.delete("legal_responsible_cpf");
 
     return Response.json({
       ok: true,
@@ -186,6 +155,6 @@ export async function POST(req: Request) {
       })),
     });
   } catch (e: any) {
-    return Response.json({ ok: false, error: toErrorMessage(e, "Falha ao carregar dados do contrato.") }, { status: 500 });
+    return Response.json({ ok: false, error: toErrorMessage(e, "Falha ao carregar dados da confirmação de matrícula.") }, { status: 500 });
   }
 }

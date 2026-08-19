@@ -71,67 +71,36 @@ export const ACTIVE_CAPTURED_FIELD_ORDER = [
 
 export const NUMERIC_ONLY_FIELDS = [
   "phone",
-  "cpf",
-  "legal_responsible_cpf",
 ] as const;
 
 export const CONTRACT_FIELD_ORDER = [
   "full_name",
-  "cpf",
-  "phone",
-  "legal_responsible_name",
-  "legal_responsible_cpf",
 ] as const;
 
 export const CONTRACT_FIELD_LABELS: Record<(typeof CONTRACT_FIELD_ORDER)[number], string> = {
   full_name: "Nome completo",
-  cpf: "CPF",
-  phone: "Telefone/WhatsApp",
-  legal_responsible_name: "Nome completo do responsável",
-  legal_responsible_cpf: "CPF do responsável legal",
 };
 
-export const CONTRACT_OPTIONAL_FIELDS = new Set([
-  "legal_responsible_name",
-  "legal_responsible_cpf",
-] as const);
+export const CONTRACT_OPTIONAL_FIELDS = new Set([] as const);
 
 export const CONTRACT_FIELD_PROMPTS: Record<(typeof CONTRACT_FIELD_ORDER)[number], string> = {
-  full_name: "Para formalizarmos o contrato, confirme seu nome completo.",
-  cpf: "Informe seu CPF.\n\nVocê pode informar com ou sem pontos e traço.\nExemplo: 123.456.789-09",
-  phone:
-    "Confirme o número do seu WhatsApp para o contrato.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\n\nImportante: inclua o código do país no início do número.",
-  legal_responsible_name:
-    "Se você for menor de idade ou precisar de responsável legal, informe o nome completo do responsável.\n\nCaso não se aplique, responda apenas “pular”.",
-  legal_responsible_cpf:
-    "Informe o CPF do responsável legal.\n\nCaso não se aplique, responda apenas “pular”.",
+  full_name: "Para confirmarmos a matrícula, confirme seu nome completo.",
 };
 
 export const CONTRACT_FIELD_SKIP_WORDS = [
   "pular",
   "pulado",
   "pula",
-  "nao",
-  "não",
-  "nao se aplica",
-  "não se aplica",
-  "nao tem",
-  "não tem",
-  "nenhum",
-  "ninguem",
-  "ninguém",
-  "sem responsavel",
-  "sem responsável",
 ] as const;
 
 export const CONTRACT_ACEITE_PROMPT_FIRST =
-  "Perfeito! Agora vamos formalizar o contrato de prestação de serviços. Em seguida você poderá visualizar e baixar o contrato completo em PDF.\n\nResponda “sim” para declarar que leu, compreendeu e concorda com as condições, ou “não” para revisar os dados novamente.";
+  "Perfeito! Agora vamos confirmar sua matrícula. Em seguida você poderá visualizar e baixar a confirmação completa em PDF.\n\nResponda “sim” para declarar que leu, compreendeu e concorda com as condições, ou “não” para revisar os dados novamente.";
 
 export const CONTRACT_ACEITE_PROMPT_RETRY =
-  "Responda apenas “sim” para declarar que leu, compreendeu e concorda com o contrato, ou “não” para revisar os dados novamente.";
+  "Responda apenas “sim” para declarar que leu, compreendeu e concorda com a confirmação de matrícula, ou “não” para revisar os dados novamente.";
 
 export const CONTRACT_SIGNED_SUCCESS_MESSAGE =
-  "Contrato formalizado com sucesso! O PDF com todas as informações e assinaturas foi gerado e está disponível para download.\n\nVocê também pode baixá-lo novamente a qualquer momento no painel do aluno ou entrando em contato com a nossa equipe.";
+  "Matrícula confirmada com sucesso! O PDF com todas as informações foi gerado e está disponível para download.\n\nVocê também pode baixá-lo novamente a qualquer momento no painel do aluno ou entrando em contato com a nossa equipe.";
 
 export const CONTRACT_INVALID_MESSAGE = (fieldLabel: string): string =>
   `Não foi possível validar ${fieldLabel} informado. Responda novamente com os dados corretos.`;

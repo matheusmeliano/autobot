@@ -100,12 +100,7 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
-    const hasLegalResponsibleNameBefore = Boolean(String(lead.legal_responsible_name ?? "").trim());
     const dynamicOptionalFields: Set<string> = new Set(CONTRACT_OPTIONAL_FIELDS as unknown as Set<string>);
-    if (hasLegalResponsibleNameBefore) dynamicOptionalFields.delete("legal_responsible_cpf");
-    if (fieldName === "legal_responsible_name" && !skip && !normalizeContractFieldSkip(rawValue)) {
-      dynamicOptionalFields.delete("legal_responsible_cpf");
-    }
     const optional = dynamicOptionalFields.has(fieldName as any);
     let valueToSave: string | null = null;
     let skipped = false;
@@ -152,20 +147,6 @@ export async function POST(req: Request) {
       contractOnly = true;
       contractCol = "contract_full_name";
       patch = {};
-    } else if (fieldName === "phone") {
-      contractOnly = true;
-      contractCol = "contract_phone";
-      patch = {};
-    } else if (fieldName === "cpf") {
-      patch = { cpf: valueToSave };
-    } else if (fieldName === "legal_responsible_name") {
-      if (skipped) {
-        patch = { legal_responsible_name: null, legal_responsible_cpf: null };
-      } else {
-        patch = { legal_responsible_name: valueToSave };
-      }
-    } else if (fieldName === "legal_responsible_cpf") {
-      patch = { legal_responsible_cpf: valueToSave };
     }
 
     let updatedLead: any = null;
@@ -226,8 +207,8 @@ export async function POST(req: Request) {
         leadId: String(lead.id),
         eventType: "contract_field_updated",
         title: skipped
-          ? `[Contrato] Campo ${CONTRACT_FIELD_LABELS[fieldName as ContractFieldName] ?? fieldName}: pulado (opcional)`
-          : `[Contrato] Campo ${CONTRACT_FIELD_LABELS[fieldName as ContractFieldName] ?? fieldName}: atualizado`,
+          ? `[Confirmação] Campo ${CONTRACT_FIELD_LABELS[fieldName as ContractFieldName] ?? fieldName}: pulado (opcional)`
+          : `[Confirmação] Campo ${CONTRACT_FIELD_LABELS[fieldName as ContractFieldName] ?? fieldName}: atualizado`,
         details: { field: fieldName, value: valueToSave, skipped },
         actorType: "system",
       } as any);
@@ -269,40 +250,11 @@ export async function POST(req: Request) {
         if (v === "") return "";
         return String(v ?? "").trim() || null;
       }
-      if (name === "phone") {
-        const dedicated = typeof (src ?? {}).contract_phone === "string" ? String((src ?? {}).contract_phone).replace(/\D/g, "").trim() : "";
-        if (dedicated) return dedicated;
-        const fromHistory = String(historyByField["phone"] ?? "").replace(/\D/g, "").trim();
-        if (fromHistory) return fromHistory;
-        const v = (src ?? {}).phone ?? obj.phone;
-        if (v === "") return "";
-        const p = String(v ?? "").replace(/\D/g, "").trim();
-        return p || null;
-      }
-      if (name === "cpf") {
-        const v = (src ?? {}).cpf ?? obj.cpf;
-        if (v === "") return "";
-        return String(v ?? "").replace(/\D/g, "").trim() || null;
-      }
-      if (name === "legal_responsible_name") {
-        const v = (src ?? {}).legal_responsible_name ?? obj.legal_responsible_name;
-        if (v === "") return "";
-        return String(v ?? "").trim() || null;
-      }
-      if (name === "legal_responsible_cpf") {
-        const v = (src ?? {}).legal_responsible_cpf ?? obj.legal_responsible_cpf;
-        if (v === "") return "";
-        return String(v ?? "").replace(/\D/g, "").trim() || null;
-      }
       return null;
     }
 
     const snapshot: Record<ContractFieldName, string | null> = {
       full_name: fieldName === "full_name" ? valueToSave : (getRawFieldValue("full_name", updatedLead, lead)),
-      cpf: getRawFieldValue("cpf", updatedLead, lead),
-      phone: fieldName === "phone" ? valueToSave : (getRawFieldValue("phone", updatedLead, lead)),
-      legal_responsible_name: getRawFieldValue("legal_responsible_name", updatedLead, lead),
-      legal_responsible_cpf: getRawFieldValue("legal_responsible_cpf", updatedLead, lead),
     };
 
     const pending: ContractFieldName[] = (CONTRACT_FIELD_ORDER as unknown as readonly ContractFieldName[]).filter(
@@ -310,9 +262,7 @@ export async function POST(req: Request) {
     );
     const nextField: ContractFieldName | null = pending[0] ?? null;
 
-    const hasLegalResponsibleNameAfter = Boolean(String(snapshot.legal_responsible_name ?? "").trim());
     const finalOptionalFields: Set<string> = new Set(CONTRACT_OPTIONAL_FIELDS as unknown as Set<string>);
-    if (hasLegalResponsibleNameAfter) finalOptionalFields.delete("legal_responsible_cpf");
 
     return Response.json({
       ok: true,
