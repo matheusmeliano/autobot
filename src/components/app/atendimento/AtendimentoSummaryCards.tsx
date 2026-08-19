@@ -151,6 +151,32 @@ function shouldHideExperimentalInfoCompletely(
   return leadHasAnyRecurringProgressSignal(lead);
 }
 
+function leadHasMatriculaOrRecurringStageInitiated(lead: AtendimentoLeadListItem): boolean {
+  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
+  const st = String(lead.status ?? "").trim().toLowerCase();
+  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+  const stOrFsOrRcsOk =
+    st === "aluno" ||
+    st === "matriculado" ||
+    st === "cadastro_recorrente_pendente_plataforma" ||
+    st === "contrato_coletando_dados" ||
+    st === "contrato_aguardando_aceite" ||
+    st === "contrato_assinado" ||
+    st === "matricula_confirmada" ||
+    fs === "aluno_recorrente_cadastrado" ||
+    fs === "cadastro_recorrente_pendente_plataforma" ||
+    fs === "contrato_coletando_dados" ||
+    fs === "contrato_aguardando_aceite" ||
+    fs === "contrato_assinado" ||
+    fs === "matricula_confirmada" ||
+    fs === "matriculado" ||
+    rcs === "cadastro_plataforma_pendente" ||
+    rcs === "confirmado";
+  return regStepOk || stOrFsOrRcsOk;
+}
+
 function RepescagemBadge({ className = "" }: { className?: string }) {
   return (
     <div
@@ -1021,7 +1047,7 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {activeSection === "agendamentos" ? (
+        {activeSection === "agendamentos" && leadHasMatriculaOrRecurringStageInitiated(lead) ? (
           <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
