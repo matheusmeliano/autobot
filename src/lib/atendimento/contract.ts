@@ -172,11 +172,8 @@ export function buildContractHtml(data: ContractData): string {
   <p class="block" style="margin-top:4px;"><span class="k"><strong>Horário:</strong></span><strong>${horarioAula}</strong></p>
   <p class="block" style="margin-top:4px;"><span class="k"><strong>Frequência:</strong></span>${data.weeklyFrequency} aula por semana</p>
   <p class="block" style="margin-top:4px;"><span class="k"><strong>Duração:</strong></span>${data.durationMin} minutos por aula</p>
-  <p class="block" style="margin-top:4px;"><span class="k"><strong>Mensalidade:</strong></span><strong>${data.monthlyUsd}</strong></p>
 
   <p class="block"><span class="k"><strong>Plano:</strong></span>Inicialmente previsto para ${data.initialPlannedMonths} meses, podendo ser cancelado a qualquer momento, sem multa.</p>
-
-  <p class="block"><span class="k"><strong>Pagamento:</strong></span>A mensalidade de ${data.monthlyUsd} será paga pela forma de pagamento selecionada pelo aluno no processo de matrícula.</p>
 
   <p class="block" style="margin-top: 26px;">Documento simplificado para confirmação eletrônica de matrícula.</p>
 
@@ -303,19 +300,12 @@ export async function buildContractPdfBytes(data: ContractData): Promise<Uint8Ar
     `${data.durationMin} minutos por aula`,
     { valueBold: false },
   );
-  addKeyValuePair("Mensalidade:", data.monthlyUsd);
 
   yState.y += 6;
 
   addKeyValuePair(
     "Plano:",
     `Inicialmente previsto para ${data.initialPlannedMonths} meses, podendo ser cancelado a qualquer momento, sem multa.`,
-    { valueBold: false },
-  );
-
-  addKeyValuePair(
-    "Pagamento:",
-    `A mensalidade de ${data.monthlyUsd} será paga pela forma de pagamento selecionada pelo aluno no processo de matrícula.`,
     { valueBold: false },
   );
 

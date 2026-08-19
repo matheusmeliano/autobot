@@ -1423,13 +1423,7 @@ export default function CadastroRecorrenteBody() {
                         <b>Duração:</b> 40 minutos por aula
                       </p>
                       <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
-                        <b>Mensalidade:</b> US$ 119,00
-                      </p>
-                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
                         <b>Plano:</b> Inicialmente previsto para 6 meses, podendo ser cancelado a qualquer momento, sem multa.
-                      </p>
-                      <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
-                        <b>Pagamento:</b> A mensalidade de US$ 119,00 será paga pela forma de pagamento selecionada pelo aluno no processo de matrícula.
                       </p>
                       <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify text-black/90 mt-4">
                         Documento simplificado para confirmação eletrônica de matrícula.
