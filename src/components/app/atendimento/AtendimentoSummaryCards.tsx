@@ -177,6 +177,58 @@ function leadHasMatriculaOrRecurringStageInitiated(lead: AtendimentoLeadListItem
   return regStepOk || stOrFsOrRcsOk;
 }
 
+function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
+  const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
+  const recWeekdayCodeOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+  const recWeekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const recWeekdayLabelOk = Boolean(recWeekdayLabel) &&
+    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+      recWeekdayLabel,
+    );
+  const recWeekdayOk = recWeekdayCodeOk || recWeekdayLabelOk;
+  const recTimeOk =
+    Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
+    Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+
+  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
+  const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
+  const registrationStarted = regStepValid && regStepRaw >= 1;
+  const contractStatusRaw = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+  const contractSigned = isRecurringContractFormalized(lead);
+  const contractAwaitingAccept =
+    !contractSigned &&
+    (contractStatusRaw === "aguardando_aceite" ||
+      String(lead.status ?? "").trim().toLowerCase() === "contrato_aguardando_aceite" ||
+      String((lead as any)?.funnel_stage ?? "").trim().toLowerCase() === "contrato_aguardando_aceite");
+  const contractCollectingData =
+    !contractSigned &&
+    !contractAwaitingAccept &&
+    (contractStatusRaw === "coletando_dados" ||
+      String(lead.status ?? "").trim().toLowerCase() === "contrato_coletando_dados" ||
+      String((lead as any)?.funnel_stage ?? "").trim().toLowerCase() === "contrato_coletando_dados" ||
+      (regStepValid && regStepRaw >= 3 && regStepRaw < 10));
+  const paymentStepReached = contractSigned || (regStepValid && regStepRaw >= 10);
+
+  const hasRegistrationBasicData =
+    registrationStarted ||
+    Boolean(String((lead as any)?.recurring_registration_password ?? "").trim()) ||
+    Boolean(String((lead as any)?.student_cpf ?? "").trim()) ||
+    Boolean(String((lead as any)?.legal_responsible_cpf ?? "").trim()) ||
+    Boolean(String((lead as any)?.full_address ?? (lead as any)?.address ?? "").trim());
+
+  if (!hasRegistrationBasicData && !recWeekdayOk && !recTimeOk) {
+    return "Falta concluir o registro inicial na plataforma";
+  }
+  if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
+  if (!recWeekdayOk) return "Falta dia recorrente";
+  if (!recTimeOk) return "Falta horário";
+
+  if (paymentStepReached) return "Falta confirmar pagamento";
+  if (contractAwaitingAccept) return "Falta aceite do contrato";
+  if (contractCollectingData) return "Falta preencher os dados do contrato";
+  return "Falta contrato";
+}
+
 function RepescagemBadge({ className = "" }: { className?: string }) {
   return (
     <div
@@ -2275,24 +2327,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     const latestCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
     const hasLatestCancelledMarker = Boolean(latestCancelledAt && latestCancelledAt !== "null");
     if (shouldHideExperimentalInfoCompletely(lead, activeSection)) {
-      const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
-      const recWeekdayCodeOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
-      const recWeekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
-      const recWeekdayLabelOk =
-        /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
-          recWeekdayLabel,
-        );
-      const recWeekdayOk = recWeekdayCodeOk || recWeekdayLabelOk;
-      const recTimeOk =
-        Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
-        Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-      const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
-      const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
-      const paymentStepReached = (regStepValid && regStepRaw >= 10) || isRecurringContractFormalized(lead);
-      if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
-      if (!recWeekdayOk) return "Falta dia recorrente";
-      if (!recTimeOk) return "Falta horário";
-      return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
+      return buildRecurringMetaForSection(lead);
     }
     if (
       (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled") ||
@@ -2318,23 +2353,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       recTimeOk ||
       Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
       Number((lead as any)?.recurring_registration_step ?? 0) > 0;
-    const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
-    const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
-    const paymentStepReached = (regStepValid && regStepRaw >= 10) || isRecurringContractFormalized(lead);
 
     if (activeSection === "agendamentos") {
-      if (hasAnyRecurringSignal || isRecurringContractFormalized(lead)) {
-        if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
-        if (!recWeekdayOk) return "Falta dia recorrente";
-        if (!recTimeOk) return "Falta horário";
-        return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
-      }
-
-      if (leadHasAnyRecurringProgressSignal(lead)) {
-        if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
-        if (!recWeekdayOk) return "Falta dia recorrente";
-        if (!recTimeOk) return "Falta horário";
-        return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
+      if (hasAnyRecurringSignal || isRecurringContractFormalized(lead) || leadHasAnyRecurringProgressSignal(lead)) {
+        return buildRecurringMetaForSection(lead);
       }
 
       const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
@@ -2370,12 +2392,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       lead.status === "cadastro_recorrente_pendente_plataforma" ||
       lead.funnel_stage === "cadastro_recorrente_pendente_plataforma";
     if (isAlunoOrMatriculado) {
-      if (!recWeekdayOk || !recTimeOk) {
-        if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
-        if (!recWeekdayOk) return "Falta dia recorrente";
-        return "Falta horário recorrente";
-      }
-      return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
+      return buildRecurringMetaForSection(lead);
     }
 
     const expDraftDate = hasLatestCancelledMarker
