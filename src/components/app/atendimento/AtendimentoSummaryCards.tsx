@@ -178,6 +178,18 @@ function leadHasMatriculaOrRecurringStageInitiated(lead: AtendimentoLeadListItem
 }
 
 function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
+  const contractStatusRaw = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+  const contractSignedAt = String((lead as any)?.contract_signed_at ?? "").trim();
+  const contractPdfUrl = String((lead as any)?.contract_pdf_url ?? "").trim();
+  const statusRaw = String(lead.status ?? "").trim().toLowerCase();
+  const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const contractSigned =
+    contractStatusRaw === "assinado" ||
+    (Boolean(contractSignedAt) && contractSignedAt !== "null") ||
+    Boolean(contractPdfUrl) ||
+    statusRaw === "contrato_assinado" ||
+    funnelRaw === "contrato_assinado";
+
   const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
   const recWeekdayCodeOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
   const recWeekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
@@ -193,19 +205,17 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
   const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
   const registrationStarted = regStepValid && regStepRaw >= 1;
-  const contractStatusRaw = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
-  const contractSigned = isRecurringContractFormalized(lead);
   const contractAwaitingAccept =
     !contractSigned &&
     (contractStatusRaw === "aguardando_aceite" ||
-      String(lead.status ?? "").trim().toLowerCase() === "contrato_aguardando_aceite" ||
-      String((lead as any)?.funnel_stage ?? "").trim().toLowerCase() === "contrato_aguardando_aceite");
+      statusRaw === "contrato_aguardando_aceite" ||
+      funnelRaw === "contrato_aguardando_aceite");
   const contractCollectingData =
     !contractSigned &&
     !contractAwaitingAccept &&
     (contractStatusRaw === "coletando_dados" ||
-      String(lead.status ?? "").trim().toLowerCase() === "contrato_coletando_dados" ||
-      String((lead as any)?.funnel_stage ?? "").trim().toLowerCase() === "contrato_coletando_dados" ||
+      statusRaw === "contrato_coletando_dados" ||
+      funnelRaw === "contrato_coletando_dados" ||
       (regStepValid && regStepRaw >= 3 && regStepRaw < 10));
   const paymentStepReached = contractSigned || (regStepValid && regStepRaw >= 10);
 
@@ -2468,12 +2478,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return body ? `${prefix} ${body}` : "";
     }
     if (hasRecurringBoth) {
-      return paymentStepReached ? "Falta confirmar pagamento" : "Falta contrato";
+      return buildRecurringMetaForSection(lead);
     }
     if (hasAnyRecurringSignal && (!recWeekdayOk || !recTimeOk)) {
-      if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
-      if (!recWeekdayOk) return "Falta dia recorrente";
-      return "Falta horário";
+      return buildRecurringMetaForSection(lead);
     }
     if (hasExpContext && (!hasExpDate || !hasExpTime)) {
       if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
