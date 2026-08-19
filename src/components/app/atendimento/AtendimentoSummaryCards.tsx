@@ -456,16 +456,16 @@ function RecurringClassLinkCard({
     if (!isNomeOk) missing.push("nome");
     if (!isTelOk) missing.push("telefone");
     return (
-      <div className="rounded-2xl border border-amber-500/45 bg-amber-500/12 px-4 py-3">
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500">
+          <div className="mt-0.5 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300">
             <AlertTriangle className="h-4 w-4" />
           </div>
           <div className="min-w-0 space-y-0.5">
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-500/95">
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-300">
               Link de matrícula
             </div>
-            <div className="text-sm font-semibold text-amber-600/95">
+            <div className="text-sm font-semibold text-amber-300">
               Aguardando {missing.join(" + ")}.
             </div>
           </div>
