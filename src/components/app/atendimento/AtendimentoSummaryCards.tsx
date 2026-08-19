@@ -2559,7 +2559,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
               />
             </label>
           </div>
-          <div className="overflow-y-auto p-3 pr-1.5 lg:flex-1 lg:min-h-0">
+          <div className="overflow-y-auto p-3 pr-4 lg:flex-1 lg:min-h-0">
             {pagedItems.length ? (
               <div className="space-y-3">
                 {pagedItems.map((lead) => {
