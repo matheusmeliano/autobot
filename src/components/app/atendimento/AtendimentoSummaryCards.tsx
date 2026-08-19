@@ -239,6 +239,123 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   return "Falta contrato";
 }
 
+function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string {
+  const booking = lead.experimental_class_booking;
+  const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+  const bookingHasId = Boolean(String(booking?.id ?? "").trim());
+  const bookingIsNotDraft = bookingHasId && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
+  const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
+  const latestCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
+  const hasLatestCancelledMarker = Boolean(latestCancelledAt && latestCancelledAt !== "null");
+
+  const expDraftDate = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_date ?? "").trim();
+  const expDraftTime = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_time ?? "").trim();
+  const expStatusRaw = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
+  const expStage = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const hasExpDate = Boolean(expDraftDate);
+  const hasExpTime = Boolean(expDraftTime);
+
+  const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
+  const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
+  const futureExpAttendance = String(futureExp?.attendance_status ?? "").trim().toLowerCase();
+  const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
+  const futureExpDateLabel = hasFutureExp
+    ? formatAtendimentoDate(futureExp?.lead_date || futureExp?.professor_date)
+    : "";
+  const futureExpTimeLabel = hasFutureExp
+    ? String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim()
+    : "";
+  const futureExpBody = [futureExpDateLabel, futureExpTimeLabel].filter((v) => v && v !== "-").join(", ");
+
+  const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
+  let pastDone = false;
+  let pastBody = "";
+  if (pastMeta) {
+    const pastMetaAttendance = String((pastMeta as any).attendance_status ?? "").trim().toLowerCase();
+    const pastMetaType = String((pastMeta as any).type ?? "").trim().toLowerCase();
+    const isExperimentalMeta =
+      pastMetaType === "experimental" ||
+      pastMetaType.includes("experimental") ||
+      pastMetaType.includes("aula_experimental") ||
+      pastMetaAttendance === "attended" ||
+      pastMetaAttendance === "no_show";
+    pastDone = isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show");
+    const pastDateLabel = formatAtendimentoDate(String((pastMeta as any).date ?? ""));
+    const pastTimeLabel = String((pastMeta as any).time ?? "").trim();
+    pastBody = [pastDateLabel, pastTimeLabel].filter((v) => v && v !== "-").join(", ");
+  }
+
+  const bookingDateLabel =
+    booking && bookingHasId && bookingIsNotDraft
+      ? formatAtendimentoDate(booking?.lead_date || booking?.professor_date)
+      : "";
+  const bookingTimeLabel =
+    booking && bookingHasId && bookingIsNotDraft
+      ? String(booking?.lead_time ?? booking?.professor_time ?? "").trim()
+      : "";
+  const bookingBody = [bookingDateLabel, bookingTimeLabel].filter((v) => v && v !== "-").join(", ");
+
+  if (hasLatestCancelledMarker || (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled")) {
+    return "Agendamento cancelado";
+  }
+
+  const bookingResolved =
+    booking &&
+    bookingHasId &&
+    bookingIsNotDraft &&
+    bookingStatus !== "cancelled" &&
+    (bookingAttendance === "attended" || bookingAttendance === "no_show");
+  const futureResolved =
+    futureExp &&
+    futureExpStatus !== "cancelled" &&
+    (futureExpAttendance === "attended" || futureExpAttendance === "no_show");
+  if (bookingResolved || futureResolved || pastDone) {
+    return "Aula experimental concluída";
+  }
+
+  if (hasFutureExp && futureExpBody) return `Aula em: ${futureExpBody}`;
+  if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" && bookingBody) {
+    return `Aula em: ${bookingBody}`;
+  }
+  if (pastMeta && pastBody) return `Última aula em: ${pastBody}`;
+
+  if (expStage === "pre_cadastro_concluido" || expStatusRaw === "date_selected" || expStatusRaw === "time_selected") {
+    if (expStatusRaw === "date_selected" && hasExpDate && !hasExpTime) return "Falta horário";
+    if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
+    if (!hasExpDate) return "Falta dia";
+    if (!hasExpTime) return "Falta horário";
+  }
+
+  if (expStage === "aula_experimental_agendada") {
+    if (!hasExpDate && !hasExpTime) return "Agendamento em definição";
+    if (!hasExpDate) return "Falta dia";
+    if (!hasExpTime) return "Falta horário";
+  }
+
+  if (expStage === "aula_experimental_convidada") return "Aguardando confirmação da aula experimental";
+  if (expStage === "metodologia_apresentada") return "Metodologia apresentada";
+  if (expStage === "em_atendimento") return "Em atendimento";
+  if (expStage === "novo_lead") return "Novo interessado";
+
+  if (!hasExpDate && !hasExpTime) {
+    if (hasLatestCancelledMarker) return "Agendamento cancelado";
+    return "";
+  }
+  if (!hasExpDate) return "Falta dia";
+  if (!hasExpTime) return "Falta horário";
+  return "";
+}
+
 function RepescagemBadge({ className = "" }: { className?: string }) {
   return (
     <div
@@ -2330,20 +2447,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   }
 
   function buildItemMeta(lead: AtendimentoLeadListItem) {
-    const booking = lead.experimental_class_booking;
-    const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
-    const bookingHasId = Boolean(String(booking?.id ?? "").trim());
-    const bookingIsNotDraft = bookingHasId && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
-    const latestCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
-    const hasLatestCancelledMarker = Boolean(latestCancelledAt && latestCancelledAt !== "null");
     if (shouldHideExperimentalInfoCompletely(lead, activeSection)) {
       return buildRecurringMetaForSection(lead);
-    }
-    if (
-      (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled") ||
-      hasLatestCancelledMarker
-    ) {
-      return "Agendamento cancelado";
     }
 
     const recWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
@@ -2368,31 +2473,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       if (hasAnyRecurringSignal || isRecurringContractFormalized(lead) || leadHasAnyRecurringProgressSignal(lead)) {
         return buildRecurringMetaForSection(lead);
       }
-
-      const bookingAttendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
-      const bookingDone =
-        booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" &&
-        (bookingAttendance === "attended" || bookingAttendance === "no_show");
-      const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
-      const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
-      const futureExpAttendance = String(futureExp?.attendance_status ?? "").trim().toLowerCase();
-      const futureDone =
-        futureExp && futureExpStatus !== "cancelled" &&
-        (futureExpAttendance === "attended" || futureExpAttendance === "no_show");
-      const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
-      let pastDone = false;
-      if (pastMeta) {
-        const pastMetaAttendance = String((pastMeta as any).attendance_status ?? "").trim().toLowerCase();
-        const pastMetaType = String((pastMeta as any).type ?? "").trim().toLowerCase();
-        const isExperimentalMeta =
-          pastMetaType === "experimental" ||
-          pastMetaType.includes("experimental") ||
-          pastMetaType.includes("aula_experimental") ||
-          pastMetaAttendance === "attended" ||
-          pastMetaAttendance === "no_show";
-        pastDone = isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show");
-      }
-      if (bookingDone || futureDone || pastDone) return "Aula experimental concluída";
+      const experimentalMeta = buildExperimentalMetaForSection(lead);
+      if (experimentalMeta) return experimentalMeta;
     }
 
     const isAlunoOrMatriculado =
@@ -2404,29 +2486,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     if (isAlunoOrMatriculado) {
       return buildRecurringMetaForSection(lead);
     }
-
-    const expDraftDate = hasLatestCancelledMarker
-      ? ""
-      : String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
-        String((lead as any)?.experimental_class_professor_date ?? "").trim();
-    const expDraftTime = hasLatestCancelledMarker
-      ? ""
-      : String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
-        String((lead as any)?.experimental_class_professor_time ?? "").trim();
-    const expStatusRaw = hasLatestCancelledMarker
-      ? ""
-      : String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
-    const expStage = hasLatestCancelledMarker
-      ? ""
-      : String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
-    const hasExpContext =
-      expStatusRaw === "date_selected" ||
-      expStatusRaw === "time_selected" ||
-      ["aula_experimental_convidada", "pre_cadastro_concluido", "aula_experimental_agendada"].includes(expStage) ||
-      Boolean(expDraftDate) ||
-      Boolean(expDraftTime);
-    const hasExpDate = Boolean(expDraftDate);
-    const hasExpTime = Boolean(expDraftTime);
 
     if (activeSection !== "agendamentos") {
       if (activeSection === "contratos") {
@@ -2446,48 +2505,12 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return rawDt ? `Criado em: ${rawDt}` : "";
     }
 
-    const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
-    const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
-    const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
-    if (!leadHasAnyRecurringProgressSignal(lead) && !hasRecurringBoth && hasFutureExp) {
-      const dateLabel = formatAtendimentoDate(futureExp?.lead_date || futureExp?.professor_date);
-      const timeLabel = String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim();
-      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-      return body ? `Aula em: ${body}` : "";
-    }
+    if (hasRecurringBoth) return buildRecurringMetaForSection(lead);
+    if (hasAnyRecurringSignal && (!recWeekdayOk || !recTimeOk)) return buildRecurringMetaForSection(lead);
 
-    const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
-    if (!leadHasAnyRecurringProgressSignal(lead) && pastMeta) {
-      const dateLabel = formatAtendimentoDate(String((pastMeta as any).date ?? ""));
-      const timeLabel = String((pastMeta as any).time ?? "").trim();
-      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-      return body ? `Última aula em: ${body}` : "";
-    }
+    const experimentalMeta = buildExperimentalMetaForSection(lead);
+    if (experimentalMeta) return experimentalMeta;
 
-    const hasBook = Boolean(
-      booking &&
-        bookingHasId &&
-        bookingIsNotDraft &&
-        bookingStatus !== "cancelled",
-    );
-    if (!leadHasAnyRecurringProgressSignal(lead) && hasBook) {
-      const dateLabel = formatAtendimentoDate(booking?.lead_date || booking?.professor_date);
-      const timeLabel = String(booking?.lead_time ?? booking?.professor_time ?? "").trim();
-      const body = [dateLabel, timeLabel].filter((v) => v && v !== "-").join(", ");
-      const prefix = hasRecurringBoth ? "Última aula em:" : "Aula em:";
-      return body ? `${prefix} ${body}` : "";
-    }
-    if (hasRecurringBoth) {
-      return buildRecurringMetaForSection(lead);
-    }
-    if (hasAnyRecurringSignal && (!recWeekdayOk || !recTimeOk)) {
-      return buildRecurringMetaForSection(lead);
-    }
-    if (hasExpContext && (!hasExpDate || !hasExpTime)) {
-      if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
-      if (!hasExpDate) return "Falta dia";
-      return "Falta horário";
-    }
     const rawDtAgend = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
     return rawDtAgend ? `Criado em: ${rawDtAgend}` : "";
   }
