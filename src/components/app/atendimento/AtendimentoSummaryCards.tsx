@@ -2516,8 +2516,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   }
 
   return (
-    <div className="mx-auto w-full px-2 pb-2 pt-1 sm:px-3 sm:pb-3 sm:pt-2 lg:px-4 lg:pb-4 lg:pt-3 2xl:px-6">
-      <div className="flex flex-col gap-6 lg:h-full lg:min-h-0">
+    <div className="flex flex-col gap-6 lg:h-full lg:min-h-0">
       <div className="shrink-0 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {sections.map((section) => {
           const active = section.id === activeSection;
@@ -2866,7 +2865,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
             </div>
           </form>
         </AppModal>
-      </div>
       </div>
     </div>
   );
