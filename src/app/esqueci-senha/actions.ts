@@ -7,25 +7,33 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
 const schema = z.object({
-  email: z.string().trim().regex(EMAIL_REGEX),
   next: z.string().optional(),
 });
 
 export async function forgotPasswordAction(formData: FormData) {
-  const parsed = schema.safeParse({
-    email: formData.get("email"),
-    next: formData.get("next"),
-  });
+  const rawEmail = formData.get("email");
+  const normalizedEmail = String(rawEmail ?? "").trim().toLowerCase();
 
-  if (!parsed.success) {
+  const parts = normalizedEmail.split("@");
+  const localPart = parts[0] ?? "";
+  const domainPart = parts[1] ?? "";
+  const domainSegments = domainPart.split(".");
+  const tld = domainSegments[domainSegments.length - 1] ?? "";
+
+  if (
+    !normalizedEmail ||
+    parts.length !== 2 ||
+    localPart.length === 0 ||
+    domainPart.length === 0 ||
+    domainSegments.length < 2 ||
+    tld.length < 2
+  ) {
     return { ok: false, error: "Email inválido." };
   }
 
-  const normalizedEmail = parsed.data.email.trim().toLowerCase();
-  const requestedNext = String(parsed.data.next ?? "").trim();
+  const parsedNext = schema.safeParse({ next: formData.get("next") });
+  const requestedNext = String(parsedNext.success ? parsedNext.data.next ?? "" : "").trim();
   const safeNext = /^\/(?!\/)/.test(requestedNext) ? requestedNext : "";
 
   const hdrs = await headers();
