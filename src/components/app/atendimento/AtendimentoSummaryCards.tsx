@@ -1242,18 +1242,6 @@ function BookingDetails({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                   Link fixo das aulas
                 </div>
-                {canOpenSavedRecurringLink && activeSection !== "agendamentos" ? (
-                  <a
-                    href={savedRecurringLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
-                    title="Abrir link da aula recorrente"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                    Abrir aula
-                  </a>
-                ) : null}
               </div>
 
               <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
@@ -1492,18 +1480,6 @@ function BookingDetails({
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                 Link da aula
               </div>
-              {effectiveSavedLessonLink ? (
-                <a
-                  href={effectiveSavedLessonLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
-                  title="Abrir link da aula"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                  Abrir aula
-                </a>
-              ) : null}
             </div>
 
             <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
