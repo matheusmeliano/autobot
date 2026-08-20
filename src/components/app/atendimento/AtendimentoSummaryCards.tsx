@@ -1923,8 +1923,29 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
       setLocalLeads((current) => current.filter((item) => item.id !== leadId));
       setLocalSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
-      setActiveSectionSelectedLead(selectedLeadId === leadId ? null : selectedLeadId);
-      setMobileDetailsOpen((current) => (selectedLeadId === leadId ? false : current));
+      {
+        const currentFiltered = filteredItems;
+        const deletedIndex = currentFiltered.findIndex((item) => item.id === leadId);
+        const remainingIds = currentFiltered
+          .filter((item) => item.id !== leadId)
+          .map((item) => item.id);
+        let nextId: string | null = selectedLeadId === leadId ? null : (remainingIds.includes(selectedLeadId ?? "") ? selectedLeadId : null);
+        if (selectedLeadId === leadId || !nextId) {
+          if (deletedIndex >= 0) {
+            if (deletedIndex + 1 < currentFiltered.length) {
+              nextId = currentFiltered[deletedIndex + 1]?.id ?? null;
+            } else if (deletedIndex - 1 >= 0) {
+              nextId = currentFiltered[deletedIndex - 1]?.id ?? null;
+            } else {
+              nextId = remainingIds[0] ?? null;
+            }
+          } else if (!nextId) {
+            nextId = remainingIds[0] ?? null;
+          }
+        }
+        setActiveSectionSelectedLead(nextId);
+        setMobileDetailsOpen((current) => (!nextId ? false : current));
+      }
       modalToast.success(`${Label} excluído com sucesso.`);
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : `Falha ao excluir ${label}.`);
