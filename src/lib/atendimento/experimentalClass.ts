@@ -423,31 +423,41 @@ Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula se
 export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name: string, lessonLink: string) {
   const safeLessonLink = String(lessonLink ?? "").trim();
   const safeFull = String(name ?? "").trim();
-  const safeFirst = safeFull.split(/\s+/)[0] || "o interessado";
-  return `A aula experimental de ${safeFirst} está perto de começar!
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
+  return `${safeFirst}, sua aula experimental já está disponível.
 
-Link da aula: ${safeLessonLink}`;
+Link da aula: ${safeLessonLink}
+
+O professor Lucas Brum já está te aguardando.
+
+Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
 }
 
 export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: string | null | undefined, lessonLink: string | null | undefined) {
   const safeLessonLink = String(lessonLink ?? "").trim();
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
-  return `${safeFirst}, sua aula já está disponível.
+  return `${safeFirst}, sua aula recorrente já está disponível.
 
 Link da aula: ${safeLessonLink}
 
-O professor Lucas Brum já está te aguardando.`;
+O professor Lucas Brum já está te aguardando.
+
+Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
 }
 
 export function buildRecurringClassAttendantStartReminderWhatsAppMessage(name: string | null | undefined, weekdayLabel: string | null | undefined, lessonLink: string | null | undefined) {
   const safeLessonLink = String(lessonLink ?? "").trim();
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "o aluno";
-  const safeWeekday = String(weekdayLabel ?? "semanais").trim() || "semanais";
-  return `A aula recorrente de ${safeFirst} (${safeWeekday}) está perto de começar!
+  void weekdayLabel;
+  return `${safeFirst}, sua aula recorrente já está disponível.
 
-Link da aula: ${safeLessonLink}`;
+Link da aula: ${safeLessonLink}
+
+O professor Lucas Brum já está te aguardando.
+
+Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
 }
 
 export function buildRecurringClassPostEnrollmentAttendantNotification(name: string | null | undefined, weekdayLabel: string | null | undefined, timeLabel: string | null | undefined) {
