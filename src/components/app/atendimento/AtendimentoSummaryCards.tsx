@@ -774,8 +774,6 @@ function LeadDetails({
         </div>
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
-            <Field label="CPF" value={formatCpf(lead.cpf)} copyable copyValue={digitsOnly(lead.cpf)} />
-            <Field label="Origem" value={atendimentoOriginLabel(lead.origin)} />
             <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
             <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
             <Field label="País" value={lead.country} />
@@ -958,21 +956,6 @@ function ContractDetails({
                 label="Data da formalização"
                 value={contractSignedAt ? formatAtendimentoDateTime(contractSignedAt) : null}
               />
-              {(() => {
-                if (!legalRespName && !legalRespCpf) return null;
-                const hasBoth = Boolean(legalRespName && legalRespCpf);
-                const gridClass = hasBoth ? "md:grid-cols-2" : "";
-                return (
-                  <div className={`grid min-w-0 gap-3 ${gridClass}`}>
-                    {legalRespName ? (
-                      <Field label="Responsável legal" value={legalRespName} copyable />
-                    ) : null}
-                    {legalRespCpf ? (
-                      <Field label="CPF do responsável" value={formatCpf(legalRespCpf)} copyable copyValue={digitsOnly(legalRespCpf)} />
-                    ) : null}
-                  </div>
-                );
-              })()}
             </div>
           </div>
         ) : null}

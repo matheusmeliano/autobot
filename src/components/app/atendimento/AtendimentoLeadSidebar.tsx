@@ -36,14 +36,12 @@ export function AtendimentoLeadSidebar({
         <div className="mt-4 grid gap-3">
           <Field label="Nome" value={lead.full_name} />
           <Field label="Telefone" value={lead.phone} />
-          <Field label="CPF" value={lead.cpf} />
           <Field label="E-mail" value={lead.email} />
           <Field label="Cidade" value={lead.city} />
           <Field label="Estado" value={lead.state} />
           <Field label="País" value={lead.country} />
           <Field label="Timezone" value={lead.timezone} />
           <Field label="Melhor horário" value={lead.best_contact_time} />
-          <Field label="Origem" value={lead.origin} />
           <Field label="Status" value={atendimentoStatusLabel(lead.status)} />
           <Field label="Etapa" value={atendimentoStageLabel(lead.funnel_stage)} />
           <Field label="Criado em" value={formatAtendimentoDateTime(lead.created_at)} />

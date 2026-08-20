@@ -336,14 +336,12 @@ export function AtendimentoLeadList({
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <Field label="Nome" value={profileLead.full_name} />
             <Field label="Telefone" value={profileLead.phone} />
-            <Field label="CPF" value={profileLead.cpf} />
             <Field label="E-mail" value={profileLead.email} />
             <Field label="Cidade" value={profileLead.city} />
             <Field label="Estado" value={profileLead.state} />
             <Field label="País" value={profileLead.country} />
             <Field label="Timezone" value={profileLead.timezone} />
             <Field label="Melhor horário" value={profileLead.best_contact_time} />
-            <Field label="Origem" value={profileLead.origin} />
             <Field label="Status" value={atendimentoStatusLabel(profileLead.status)} />
             <Field label="Etapa" value={atendimentoStageLabel(profileLead.funnel_stage)} />
             <Field label="Criado em" value={formatAtendimentoDateTime(profileLead.created_at)} />
