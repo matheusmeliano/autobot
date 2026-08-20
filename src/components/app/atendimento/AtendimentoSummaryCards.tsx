@@ -13,7 +13,7 @@ import {
   calculatePastRecurringOccurrences,
 } from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
-import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime, formatAtendimentoLocationName } from "@/lib/atendimento/utils";
+import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime, formatAtendimentoLocationName, leadMatchesSearchQuery, suggestClosestName } from "@/lib/atendimento/utils";
 
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
 const PANEL_PAGE_SIZE = 10;
@@ -1856,16 +1856,20 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const activeSectionData = sections.find((section) => section.id === activeSection) ?? sections[0];
   const activeItems = activeSectionData?.items ?? [];
   const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return activeItems;
-    return activeItems.filter((lead) =>
-      [lead.full_name, lead.phone, lead.cpf].some((value) =>
-        String(value ?? "")
-          .toLowerCase()
-          .includes(normalizedQuery),
-      ),
-    );
+    const q = query.trim();
+    if (!q) return activeItems;
+    return activeItems.filter((lead) => leadMatchesSearchQuery(lead, q));
   }, [activeItems, query]);
+  const didYouMeanSuggestions = useMemo(() => {
+    const q = query.trim();
+    if (!q) return [];
+    if (filteredItems.length > 0) return [];
+    const phoneOnly = q.replace(/\D+/g, "");
+    if (phoneOnly.length >= 2 && phoneOnly.length === q.replace(/\s+/g, "").length) {
+      return [];
+    }
+    return suggestClosestName(q, activeItems, { minSimilarity: 0.68, maxSuggestions: 2 });
+  }, [query, filteredItems, activeItems]);
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredItems.length / PANEL_PAGE_SIZE)), [filteredItems.length]);
   const pagedItems = useMemo(() => {
     const start = (page - 1) * PANEL_PAGE_SIZE;
@@ -2609,8 +2613,31 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                 })}
               </div>
             ) : (
-              <div className="flex min-h-40 items-center justify-center px-4 text-center text-sm text-[var(--app-text-45)]">
-                {query.trim() ? "Nenhum resultado encontrado para a busca." : activeSectionData.emptyMessage}
+              <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-4 py-6 text-center text-sm text-[var(--app-text-45)]">
+                <div>
+                  {query.trim() ? "Nenhum resultado encontrado para a busca." : activeSectionData.emptyMessage}
+                </div>
+                {didYouMeanSuggestions.length > 0 ? (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                      Você quis dizer:
+                    </span>
+                    {didYouMeanSuggestions.map((suggestion) => (
+                      <button
+                        key={`${suggestion.id}-${suggestion.name}`}
+                        type="button"
+                        onClick={() => {
+                          setSelectedLeadId(suggestion.id);
+                          setQuery("");
+                          setPage(1);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+                      >
+                        {suggestion.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

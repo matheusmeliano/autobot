@@ -6,7 +6,7 @@ import { AppModal } from "@/components/app/AppModal";
 import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFileGallery";
 import { AtendimentoPresenceBadge } from "@/components/app/atendimento/AtendimentoPresenceBadge";
 import type { AtendimentoFileRecord, AtendimentoLeadListItem } from "@/lib/atendimento/types";
-import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
+import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime, leadMatchesSearchQuery, suggestClosestName } from "@/lib/atendimento/utils";
 
 const PAGE_SIZE = 3;
 
@@ -82,11 +82,26 @@ export function AtendimentoLeadList({
   const userChangedPageRef = useRef(false);
 
   const orderedLeads = useMemo(() => sortLeadsByRecentActivity(leads), [leads]);
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(orderedLeads.length / PAGE_SIZE)), [orderedLeads.length]);
+  const filteredLeads = useMemo(() => {
+    const q = query.trim();
+    if (!q) return orderedLeads;
+    return orderedLeads.filter((lead) => leadMatchesSearchQuery(lead, q));
+  }, [orderedLeads, query]);
+  const didYouMeanSuggestions = useMemo(() => {
+    const q = query.trim();
+    if (!q) return [];
+    if (filteredLeads.length > 0) return [];
+    const phoneOnly = q.replace(/\D+/g, "");
+    if (phoneOnly.length >= 2 && phoneOnly.length === q.replace(/\s+/g, "").length) {
+      return [];
+    }
+    return suggestClosestName(q, orderedLeads, { minSimilarity: 0.68, maxSuggestions: 2 });
+  }, [query, filteredLeads, orderedLeads]);
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE)), [filteredLeads.length]);
   const onlineLeadIdsSet = useMemo(() => new Set(onlineLeadIds), [onlineLeadIds]);
 
   useEffect(() => {
-    const nextTopLeadId = String(orderedLeads[0]?.id ?? "").trim() || null;
+    const nextTopLeadId = String(filteredLeads[0]?.id ?? "").trim() || null;
     const previousTopLeadId = previousTopLeadIdRef.current;
 
     if (userChangedPageRef.current && previousTopLeadId && nextTopLeadId && previousTopLeadId !== nextTopLeadId) {
@@ -95,7 +110,7 @@ export function AtendimentoLeadList({
     }
 
     previousTopLeadIdRef.current = nextTopLeadId;
-  }, [orderedLeads]);
+  }, [filteredLeads]);
 
   useEffect(() => {
     setPage((current) => {
@@ -107,8 +122,8 @@ export function AtendimentoLeadList({
 
   const pagedLeads = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return orderedLeads.slice(start, start + PAGE_SIZE);
-  }, [orderedLeads, page]);
+    return filteredLeads.slice(start, start + PAGE_SIZE);
+  }, [filteredLeads, page]);
 
   useLayoutEffect(() => {
     if (!onListHeightChange) return;
@@ -278,8 +293,28 @@ export function AtendimentoLeadList({
             })}
           </div>
         ) : (
-          <div className="flex h-full min-h-56 items-center justify-center px-6 text-center text-sm text-[var(--app-text-45)]">
-            Nenhum atendimento encontrado com os filtros atuais.
+          <div className="flex h-full min-h-56 flex-col items-center justify-center gap-3 px-6 py-6 text-center text-sm text-[var(--app-text-45)]">
+            <div>Nenhum atendimento encontrado com os filtros atuais.</div>
+            {didYouMeanSuggestions.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Você quis dizer:
+                </span>
+                {didYouMeanSuggestions.map((suggestion) => (
+                  <button
+                    key={`${suggestion.id}-${suggestion.name}`}
+                    type="button"
+                    onClick={() => {
+                      onQueryChange("");
+                      onSelectLead(suggestion.id);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+                  >
+                    {suggestion.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
       </div>

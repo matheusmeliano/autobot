@@ -82,3 +82,122 @@ export function formatAtendimentoLocationName(value: unknown) {
     });
   return words.join(" ");
 }
+
+export function normalizePhoneDigits(value: unknown): string {
+  return String(value ?? "").replace(/\D+/g, "");
+}
+
+export function normalizeNameForSearch(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const prev = new Array(b.length + 1).fill(0).map((_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const curr = new Array(b.length + 1).fill(0);
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        curr[j - 1] + 1,
+        prev[j] + 1,
+        prev[j - 1] + cost,
+      );
+    }
+    prev.splice(0, prev.length, ...curr);
+  }
+  return prev[b.length];
+}
+
+export function suggestClosestName(
+  searchQuery: string,
+  candidates: Array<{ id: string; full_name: string | null | undefined }>,
+  options?: { minSimilarity?: number; maxSuggestions?: number },
+): Array<{ id: string; name: string }> {
+  const safeQuery = normalizeNameForSearch(searchQuery);
+  if (safeQuery.length < 3) return [];
+  const minSimilarity = options?.minSimilarity ?? 0.7;
+  const maxSuggestions = options?.maxSuggestions ?? 2;
+  const scored: Array<{ id: string; name: string; score: number }> = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const name = String(candidate.full_name ?? "").trim();
+    if (!name) continue;
+    const key = `${candidate.id}::${name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const normName = normalizeNameForSearch(name);
+    if (!normName) continue;
+    let best = 0;
+    const queryTokens = safeQuery.split(/\s+/).filter(Boolean);
+    const nameTokens = normName.split(/\s+/).filter(Boolean);
+    const queryLen = safeQuery.length;
+    const nameLen = normName.length;
+    const maxLen = Math.max(queryLen, nameLen);
+    const wholeDistance = levenshteinDistance(safeQuery, normName);
+    const wholeSim = maxLen === 0 ? 0 : 1 - wholeDistance / maxLen;
+    best = Math.max(best, wholeSim);
+    if (safeQuery.length >= 4 && normName.includes(safeQuery)) best = Math.max(best, 0.95);
+    if (nameLen >= 4 && safeQuery.startsWith(normName)) best = Math.max(best, 0.95);
+    if (queryTokens.length && nameTokens.length) {
+      let tokenMatches = 0;
+      for (const qt of queryTokens) {
+        if (qt.length < 3) continue;
+        for (const nt of nameTokens) {
+          const tokMax = Math.max(qt.length, nt.length);
+          const tokDist = levenshteinDistance(qt, nt);
+          const tokSim = tokMax === 0 ? 0 : 1 - tokDist / tokMax;
+          if (tokSim >= 0.78) {
+            tokenMatches++;
+            best = Math.max(best, tokSim);
+            break;
+          }
+        }
+      }
+      if (tokenMatches === queryTokens.filter((t) => t.length >= 3).length && queryTokens.length) {
+        best = Math.max(best, 0.93);
+      }
+    }
+    if (best >= minSimilarity) {
+      scored.push({ id: candidate.id, name, score: best });
+    }
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, maxSuggestions).map(({ id, name }) => ({ id, name }));
+}
+
+export function leadMatchesSearchQuery(
+  lead: { full_name?: string | null; phone?: string | null },
+  rawQuery: string,
+): boolean {
+  const q = String(rawQuery ?? "").trim();
+  if (!q) return true;
+  const phoneQ = normalizePhoneDigits(q);
+  const nameQ = normalizeNameForSearch(q);
+
+  if (phoneQ.length >= 2) {
+    const leadPhone = normalizePhoneDigits(lead.phone);
+    if (leadPhone && (leadPhone.includes(phoneQ) || phoneQ.includes(leadPhone))) {
+      return true;
+    }
+  }
+
+  const name = normalizeNameForSearch(lead.full_name);
+  if (nameQ) {
+    if (name && name.includes(nameQ)) return true;
+    const qTokens = nameQ.split(/\s+/).filter(Boolean);
+    const nameTokens = name.split(/\s+/).filter(Boolean);
+    if (qTokens.length && nameTokens.length) {
+      const every = qTokens.every((qt) => nameTokens.some((nt) => nt.includes(qt) || qt.includes(nt)));
+      if (every) return true;
+    }
+  }
+
+  return false;
+}
