@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Eye, EyeOff, Key, Pencil, Trash2, X } from "lucide-react";
-import { isGlobalAdminEmail } from "@/lib/auth/admin";
+import { isProtectedAdminOrUserEmail } from "@/lib/auth/admin";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
@@ -85,7 +85,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const [showPassword, setShowPassword] = useState(false);
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
 
-  const isSelfAdmin = (email: string) => isGlobalAdminEmail(email);
+  const isSelfAdmin = (email: string) => isProtectedAdminOrUserEmail(email);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

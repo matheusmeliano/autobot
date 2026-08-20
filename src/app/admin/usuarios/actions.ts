@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
-import { isGlobalAdminEmail } from "@/lib/auth/admin";
+import { isGlobalAdminEmail, isProtectedAdminOrUserEmail } from "@/lib/auth/admin";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { normalizePlan } from "@/lib/plans";
 
@@ -58,7 +58,7 @@ export async function updateUserAdminAction(input: unknown) {
   const plano = normalizePlan(payload.plano);
 
   const { data: target } = await supabase.auth.admin.getUserById(payload.id);
-  if (isGlobalAdminEmail(target.user?.email)) {
+  if (isProtectedAdminOrUserEmail(target.user?.email)) {
     return { ok: false as const, error: "Não é possível editar este admin." };
   }
   if (isAtendimentoOnlyAccessScope(await getTargetProfileScope(supabase, payload.id))) {
@@ -167,7 +167,7 @@ export async function deleteUserAdminAction(id: string) {
     };
   }
   const { data: target } = await supabase.auth.admin.getUserById(id);
-  if (isGlobalAdminEmail(target.user?.email)) {
+  if (isProtectedAdminOrUserEmail(target.user?.email)) {
     return { ok: false as const, error: "Não é possível excluir este admin." };
   }
   if (isAtendimentoOnlyAccessScope(await getTargetProfileScope(supabase, id))) {
