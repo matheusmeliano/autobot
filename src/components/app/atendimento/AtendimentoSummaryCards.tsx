@@ -2627,9 +2627,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         key={`${suggestion.id}-${suggestion.name}`}
                         type="button"
                         onClick={() => {
-                          setSelectedLeadId(suggestion.id);
+                          setActiveSectionSelectedLead(suggestion.id);
                           setQuery("");
                           setPage(1);
+                          setMobileDetailsOpen(true);
                         }}
                         className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
                       >
