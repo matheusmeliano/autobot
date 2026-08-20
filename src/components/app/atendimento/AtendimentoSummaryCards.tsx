@@ -1963,14 +1963,19 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     const targetSection = sectionsNow.find((s) => s.id === activeSection) ?? sectionsNow[0];
     const targetItems = targetSection?.items ?? [];
     setSelectedLeadIdBySection((current) => {
-      const existingForSection = Object.prototype.hasOwnProperty.call(current, activeSection)
-        ? current[activeSection] ?? null
-        : null;
-      if (existingForSection && targetItems.some((lead) => lead.id === existingForSection)) {
+      const hasKeyForSection = Object.prototype.hasOwnProperty.call(current, activeSection);
+      const existingForSection = hasKeyForSection ? current[activeSection] ?? null : null;
+      if (hasKeyForSection && existingForSection && targetItems.some((lead) => lead.id === existingForSection)) {
+        return current;
+      }
+      if (hasKeyForSection && existingForSection === null) {
         return current;
       }
       if (!targetItems.length) {
         return { ...current, [activeSection]: null };
+      }
+      if (hasKeyForSection) {
+        return current;
       }
       const firstId = targetItems[0]?.id;
       return { ...current, [activeSection]: typeof firstId === "string" && firstId ? firstId : null };
@@ -2003,19 +2008,31 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     if (lastProcessedRefreshNonceRef.current === refreshNonce) return;
     lastProcessedRefreshNonceRef.current = refreshNonce;
     const sectionsNow = sectionsRef.current;
-    setSelectedLeadIdBySection({});
-    const target = sectionsNow.find((s) => s.id === activeSection) ?? sectionsNow[0];
-    const items = target?.items ?? [];
-    if (!items.length) {
-      return;
-    }
     setQuery("");
     setPage(1);
-    const firstId = items[0]?.id;
-    if (typeof firstId === "string" && firstId) {
-      setSelectedLeadIdBySection((current) => ({ ...current, [activeSection]: firstId }));
-    }
-  }, [refreshNonce, activeSection]);
+    setSelectedLeadIdBySection((current) => {
+      const next: Partial<Record<SummarySectionId, string | null>> = { ...current };
+      for (const section of sectionsNow) {
+        const sectionId = section.id;
+        const sectionItems = section.items ?? [];
+        const hasKey = Object.prototype.hasOwnProperty.call(next, sectionId);
+        const existing = hasKey ? next[sectionId] ?? null : null;
+        if (hasKey && existing && sectionItems.some((lead) => lead.id === existing)) {
+          continue;
+        }
+        if (!sectionItems.length) {
+          next[sectionId] = hasKey ? (existing === null ? null : next[sectionId] ?? null) : null;
+          continue;
+        }
+        if (hasKey) {
+          continue;
+        }
+        const firstId = sectionItems[0]?.id;
+        next[sectionId] = typeof firstId === "string" && firstId ? firstId : null;
+      }
+      return next;
+    });
+  }, [refreshNonce]);
 
   useEffect(() => {
     if (!selectedLead) {
