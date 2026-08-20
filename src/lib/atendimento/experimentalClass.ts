@@ -435,13 +435,9 @@ export function buildExperimentalClassAttendantStartReminderWhatsAppMessage(name
   const safeLessonLink = String(lessonLink ?? "").trim();
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
-  return `${safeFirst}, sua aula experimental já está disponível.
+  return `Aviso: aula experimental de ${safeFirst} inicia em 5 minutos.
 
-Link da aula: ${safeLessonLink}
-
-O professor Lucas Brum já está te aguardando.
-
-Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
+Link da aula: ${safeLessonLink}`;
 }
 
 export function buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage(name: string, lessonLink: string) {
