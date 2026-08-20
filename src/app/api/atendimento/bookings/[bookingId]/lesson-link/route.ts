@@ -197,6 +197,77 @@ export async function POST(
         source: "table",
       };
     }
+  } else if (!resolvedBooking && !tableUnavailable) {
+    const nowIso = new Date().toISOString();
+    const insertPayloadBase: Record<string, unknown> = {
+      id: normalizedBookingId,
+      lead_id: leadId,
+      conversation_id: conversationId || null,
+      status: String(responseBooking.status ?? "scheduled").trim() || "scheduled",
+      professor_timezone: String(responseBooking.professor_timezone ?? "").trim(),
+      lead_timezone: String(responseBooking.lead_timezone ?? "").trim(),
+      professor_date: String(responseBooking.professor_date ?? "").trim(),
+      professor_time: String(responseBooking.professor_time ?? "").trim(),
+      professor_start_at: String(responseBooking.professor_start_at ?? "").trim(),
+      lead_date: String(responseBooking.lead_date ?? "").trim(),
+      lead_time: String(responseBooking.lead_time ?? "").trim(),
+      lead_start_at: String(responseBooking.lead_start_at ?? "").trim(),
+      updated_at: nowIso,
+      created_at: String(responseBooking.created_at ?? nowIso),
+    };
+    let inserted: Record<string, unknown> | null = null;
+
+    if (!lessonLinkColumnUnavailable) {
+      try {
+        const { data: insertWithLink, error: insertWithLinkError } = await admin
+          .from("atendimento_experimental_class_bookings")
+          .insert({ ...insertPayloadBase, lesson_link: lessonLink })
+          .select(
+            "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at",
+          )
+          .maybeSingle();
+        if (!insertWithLinkError && insertWithLink) {
+          inserted = insertWithLink as Record<string, unknown>;
+        } else if (insertWithLinkError && isExperimentalClassBookingsLessonLinkColumnUnavailable(insertWithLinkError)) {
+          lessonLinkColumnUnavailable = true;
+        } else if (insertWithLinkError) {
+          throw insertWithLinkError;
+        }
+      } catch (insertError) {
+        if (
+          insertError instanceof Error &&
+          !isExperimentalClassBookingsLessonLinkColumnUnavailable(insertError)
+        ) {
+          throw insertError;
+        }
+        lessonLinkColumnUnavailable = true;
+      }
+    }
+
+    if (!inserted && !lessonLinkColumnUnavailable) {
+      try {
+        const { data: insertNoLink, error: insertNoLinkError } = await admin
+          .from("atendimento_experimental_class_bookings")
+          .insert(insertPayloadBase)
+          .select(
+            "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at",
+          )
+          .maybeSingle();
+        if (!insertNoLinkError && insertNoLink) {
+          inserted = insertNoLink as Record<string, unknown>;
+        }
+      } catch (_e) {
+        inserted = null;
+      }
+    }
+
+    if (inserted) {
+      responseBooking = {
+        ...inserted,
+        lesson_link: lessonLink,
+        source: "table",
+      };
+    }
   }
 
   await appendHistoryEvent({

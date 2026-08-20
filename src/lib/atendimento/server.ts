@@ -1380,10 +1380,18 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       ) {
         bookingsByLeadId.set(leadId, { ...currentBooking, attendant_start_notification_sent_at: eventCreatedAt });
       }
-      if (eventType === "experimental_class_link_updated" && !String(currentBooking.lesson_link ?? "").trim()) {
-        const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
-        const link = String(details.lesson_link ?? "").trim() || null;
-        if (link) bookingsByLeadId.set(leadId, { ...currentBooking, lesson_link: link });
+    }
+
+    // Step 5b: Sobrescreve SEMPRE lesson_link dos bookings com o valor mais novo do history
+    // (evita race condition onde link foi adicionado APÓS booking ser mergeado da tabela)
+    for (const [leadId, latestLink] of latestLessonLinkByLeadId.entries()) {
+      const currentBooking = bookingsByLeadId.get(leadId);
+      if (!currentBooking) continue;
+      const cleanLatest = String(latestLink ?? "").trim();
+      if (!cleanLatest) continue;
+      const currentLink = String(currentBooking.lesson_link ?? "").trim();
+      if (currentLink !== cleanLatest) {
+        bookingsByLeadId.set(leadId, { ...currentBooking, lesson_link: cleanLatest });
       }
     }
   }
@@ -1395,11 +1403,8 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     if (cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId)) continue;
     if (bookingsByLeadId.has(leadId)) continue;
 
-    const stage = String(row?.funnel_stage ?? "").trim().toLowerCase();
-    const statusLead = String(row?.status ?? "").trim().toLowerCase();
     const professorStart = String(row?.experimental_class_professor_start_at ?? "").trim();
     if (!professorStart) continue;
-    if (!stage.startsWith("aula_experimental") && !statusLead.startsWith("aula_experimental")) continue;
 
     bookingsByLeadId.set(leadId, {
       id: `draft-${leadId}`,
