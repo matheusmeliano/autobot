@@ -2513,7 +2513,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   setQuery(event.target.value);
                   setPage(1);
                 }}
-                placeholder="Pesquisar por nome, telefone ou CPF"
+                placeholder="Pesquise por nome e telefone."
                 className="w-full bg-transparent text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)]"
               />
             </label>
