@@ -403,9 +403,7 @@ export function buildExperimentalClassAttendantWhatsAppMessage(name: string) {
   const safeFirst = safeFull.split(/\s+/)[0] || "o interessado";
   return `Você recebeu um novo agendamento de aula experimental para ${safeFirst}.
 
-Acesse o link abaixo e adicione o link da aula ao interessado.
-
-${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
+Ana já está adicionando o link da aula ao interessado.`;
 }
 
 export function buildExperimentalClassRegisteredAttendantWhatsAppMessage(name: string) {
@@ -413,7 +411,7 @@ export function buildExperimentalClassRegisteredAttendantWhatsAppMessage(name: s
   const safeFirst = safeFull.split(/\s+/)[0] || "o interessado";
   return `Novo agendamento de aula experimental confirmado para ${safeFirst}.
 
-Acesse o painel para conferir detalhes e garantir que o link da aula esteja adicionado.
+Acesse o link abaixo e adicione o link da aula ao interessado.
 
 ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
