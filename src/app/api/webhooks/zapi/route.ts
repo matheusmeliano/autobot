@@ -34,9 +34,11 @@ import {
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
   buildExperimentalClassFinalChatMessages,
+  buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
   buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
   EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
   EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE,
@@ -5487,6 +5489,12 @@ export async function POST(req: Request) {
                       message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
                     });
                   } catch (_e) {}
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+                      message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
+                    });
+                  } catch (_e) {}
                 }
 
                 return Response.json({
@@ -5987,6 +5995,12 @@ export async function POST(req: Request) {
                 await sendAtendimentoWhatsAppText({
                   phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
                   message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+                  message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
                 });
               } catch (_e) {}
             }

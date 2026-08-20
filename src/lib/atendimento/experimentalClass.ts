@@ -29,6 +29,7 @@ function professorTimeIsAllowed({ weekdayShort, professorTimeHHMM }: { weekdaySh
 
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
+export const EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9949-5594";
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
 export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 export const RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
@@ -407,6 +408,16 @@ Acesse o link abaixo e adicione o link da aula ao interessado.
 ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 
+export function buildExperimentalClassRegisteredAttendantWhatsAppMessage(name: string) {
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "o interessado";
+  return `Novo agendamento de aula experimental confirmado para ${safeFirst}.
+
+Acesse o painel para conferir detalhes e garantir que o link da aula esteja adicionado.
+
+${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
+}
+
 export function buildExperimentalClassStudentLessonReadyWhatsAppMessage(name: string, lessonLink: string) {
   const safeLessonLink = String(lessonLink ?? "").trim();
   const safeFull = String(name ?? "").trim();
@@ -431,6 +442,17 @@ Link da aula: ${safeLessonLink}
 O professor Lucas Brum já está te aguardando.
 
 Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
+}
+
+export function buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage(name: string, lessonLink: string) {
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
+  return `Aviso: aula experimental de ${safeFirst} inicia em 5 minutos.
+
+Link da aula: ${safeLessonLink}
+
+Acompanhe o atendimento e certifique-se de que tudo ocorra bem.`;
 }
 
 export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: string | null | undefined, lessonLink: string | null | undefined) {
@@ -460,6 +482,18 @@ O professor Lucas Brum já está te aguardando.
 Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
 }
 
+export function buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage(name: string | null | undefined, weekdayLabel: string | null | undefined, lessonLink: string | null | undefined) {
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
+  const safeWeekday = String(weekdayLabel ?? "").trim() || "hoje";
+  return `Aviso: aula recorrente de ${safeFirst} (${safeWeekday}) inicia em 5 minutos.
+
+Link da aula: ${safeLessonLink}
+
+Acompanhe o atendimento e certifique-se de que tudo ocorra bem.`;
+}
+
 export function buildRecurringClassPostEnrollmentAttendantNotification(name: string | null | undefined, weekdayLabel: string | null | undefined, timeLabel: string | null | undefined) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Novo aluno";
@@ -472,6 +506,21 @@ Dia: ${safeWeekday}
 Horário: ${safeTime}
 
 Acesse o painel para adicionar o link da aula recorrente:
+${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
+}
+
+export function buildRecurringClassPostEnrollmentRegisteredAttendantNotification(name: string | null | undefined, weekdayLabel: string | null | undefined, timeLabel: string | null | undefined) {
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Novo aluno";
+  const safeWeekday = String(weekdayLabel ?? "").trim() || "horário fixo";
+  const safeTime = String(timeLabel ?? "").trim() || "a confirmar";
+  return `Nova matrícula confirmada — aula recorrente cadastrada.
+
+Aluno: ${safeFirst}
+Dia: ${safeWeekday}
+Horário: ${safeTime}
+
+Acesse o painel para conferir:
 ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 

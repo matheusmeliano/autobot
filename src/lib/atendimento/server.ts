@@ -18,11 +18,15 @@ import {
 } from "@/lib/atendimento/contract";
 import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
+  buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildRecurringClassAttendantStartReminderWhatsAppMessage,
+  buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage,
+  buildRecurringClassPostEnrollmentRegisteredAttendantNotification,
   buildRecurringClassStudentLessonReadyWhatsAppMessage,
   calculateNextRecurringOccurrence,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_WEEKDAY_LABELS_PT_BR,
@@ -1191,6 +1195,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   const cancelledByHistoryLeadIds = new Set<string>();
   const sentStudentBookingIds = new Set<string>();
   const sentAttendantBookingIds = new Set<string>();
+  const sentRegisteredAttendantBookingIds = new Set<string>();
   const latestLessonLinkByLeadId = new Map<string, string | null>();
 
   // Step 1: Tabela real de bookings
@@ -1291,6 +1296,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
           "experimental_class_link_updated",
           "experimental_class_student_start_notification_sent",
           "experimental_class_attendant_start_notification_sent",
+          "experimental_class_registered_attendant_start_notification_sent",
         ])
         .order("created_at", { ascending: false });
       if (!r.error) historyEvents = (r.data as any[]) ?? [];
@@ -1325,6 +1331,10 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       }
       if (eventType === "experimental_class_attendant_start_notification_sent") {
         if (bookingIdFromDetails) sentAttendantBookingIds.add(bookingIdFromDetails);
+        continue;
+      }
+      if (eventType === "experimental_class_registered_attendant_start_notification_sent") {
+        if (bookingIdFromDetails) sentRegisteredAttendantBookingIds.add(bookingIdFromDetails);
         continue;
       }
 
@@ -1451,6 +1461,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
 
   let studentSent = 0;
   let attendantSent = 0;
+  let registeredAttendantSent = 0;
   let missingLessonLink = 0;
   let missingStudentPhone = 0;
 
@@ -1522,10 +1533,12 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     const cachedAttendantSent =
       sentAttendantBookingIds.has(bookingId) ||
       Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
+    const cachedRegisteredAttendantSent = sentRegisteredAttendantBookingIds.has(bookingId);
 
     const studentDue = leadStartAtMs <= nowMs;
     const attendantDue =
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
+    const registeredAttendantDue = attendantDue;
 
     if (attendantDue && !cachedAttendantSent) {
       try {
@@ -1563,6 +1576,46 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
           details: {
             booking_id: bookingId,
             phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: professorStartAtRaw,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+    }
+
+    if (registeredAttendantDue && !cachedRegisteredAttendantSent) {
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          message: buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
+        });
+
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_registered_attendant_start_notification_sent",
+          title: "Lembrete de inicio da aula experimental enviado ao atendente cadastrado",
+          details: {
+            booking_id: bookingId,
+            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: professorStartAtRaw,
+          },
+          actorType: "system",
+        });
+        sentRegisteredAttendantBookingIds.add(bookingId);
+        registeredAttendantSent += 1;
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_registered_attendant_start_notification_failed",
+          title: "Falha ao enviar lembrete de inicio da aula experimental ao atendente cadastrado",
+          details: {
+            booking_id: bookingId,
+            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
             lesson_link: lessonLink,
             start_at: professorStartAtRaw,
             error: error instanceof Error ? error.message : String(error),
@@ -1680,6 +1733,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
 
   let studentSent = 0;
   let attendantSent = 0;
+  let registeredAttendantSent = 0;
   let missingLessonLink = 0;
   let missingStudentPhone = 0;
   let missingRecurringMeta = 0;
@@ -1697,6 +1751,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
         .in("event_type", [
           "recurring_class_attendant_start_notification_sent",
           "recurring_class_student_start_notification_sent",
+          "recurring_class_registered_attendant_start_notification_sent",
         ])
         .order("created_at", { ascending: false })
         .limit(2000);
@@ -1772,6 +1827,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const attendantOccurrenceAlreadySent = existingSentSet.has(
       `recurring_class_attendant_start_notification_sent|${thisProfessorOccurrenceKey}`,
     );
+    const registeredAttendantOccurrenceAlreadySent = existingSentSet.has(
+      `recurring_class_registered_attendant_start_notification_sent|${thisProfessorOccurrenceKey}`,
+    );
 
     const cachedStudentSent =
       studentOccurrenceAlreadySent ||
@@ -1779,6 +1837,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const cachedAttendantSent =
       attendantOccurrenceAlreadySent ||
       Boolean(String(row?.recurring_class_attendant_start_notification_sent_at ?? "").trim());
+    const cachedRegisteredAttendantSent = registeredAttendantOccurrenceAlreadySent;
 
     const studentDue = leadStartAtMs <= nowMs;
     const attendantDue =
@@ -1832,6 +1891,49 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           title: "Falha ao enviar lembrete de inicio da aula recorrente ao atendente",
           details: {
             phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: occurrence.professorStartAt,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+    }
+
+    if (attendantDue && !cachedRegisteredAttendantSent) {
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          message: buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage(
+            leadFullName,
+            weekdayLabel,
+            lessonLink,
+          ),
+        });
+        await appendHistoryEvent({
+          leadId,
+          conversationId: null,
+          eventType: "recurring_class_registered_attendant_start_notification_sent",
+          title: "Lembrete de inicio da aula recorrente enviado ao atendente cadastrado",
+          details: {
+            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+            lesson_link: lessonLink,
+            start_at: occurrence.professorStartAt,
+            weekday: weekdayRaw,
+            professor_time: professorTimeHHMM,
+            source: "cron_recurring_class",
+          },
+          actorType: "system",
+        });
+        registeredAttendantSent += 1;
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId: null,
+          eventType: "recurring_class_registered_attendant_start_notification_failed",
+          title: "Falha ao enviar lembrete de inicio da aula recorrente ao atendente cadastrado",
+          details: {
+            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
             lesson_link: lessonLink,
             start_at: occurrence.professorStartAt,
             error: error instanceof Error ? error.message : String(error),
@@ -3074,6 +3176,48 @@ export async function formalizeAndPersistContract(params: {
       actorType: "system",
     });
   } catch (_e) {}
+
+  try {
+    const firstName = contractData.studentFullName.trim().split(/\s+/)[0] || contractData.studentFullName || "Aluno";
+    await sendAtendimentoWhatsAppText({
+      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+      message: buildRecurringClassPostEnrollmentRegisteredAttendantNotification(
+        firstName,
+        contractData.classWeekdayLabel || "-",
+        contractData.classTimeLabel || "-",
+      ),
+    });
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "recurring_class_registered_attendant_post_enrollment_notification_sent",
+      title: "Notificação de matrícula recorrente confirmada enviada ao atendente cadastrado",
+      details: {
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        aluno: contractData.studentFullName,
+        dia_aula: contractData.classWeekdayLabel,
+        horario_aula: contractData.classTimeLabel,
+      },
+      actorType: "system",
+    });
+  } catch (error) {
+    try {
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "recurring_class_registered_attendant_post_enrollment_notification_failed",
+        title: "Falha ao enviar notificação de matrícula recorrente confirmada ao atendente cadastrado",
+        details: {
+          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          aluno: contractData.studentFullName,
+          dia_aula: contractData.classWeekdayLabel,
+          horario_aula: contractData.classTimeLabel,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        actorType: "system",
+      });
+    } catch (_e) {}
+  }
 
   try {
     await admin

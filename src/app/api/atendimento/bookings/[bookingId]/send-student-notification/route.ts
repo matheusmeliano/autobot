@@ -5,8 +5,10 @@ import {
 } from "@/lib/atendimento/server";
 import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
+  buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -313,6 +315,50 @@ export async function POST(
         start_at: professorStartAtRaw || null,
         manually_triggered: true,
         was_already_sent: attendantNotificationAlreadySent,
+      },
+      actorType: "attendant",
+      actorEmail: auth.user.email,
+    });
+  }
+
+  let registeredAttendantSendFailedError: string | null = null;
+  try {
+    await sendAtendimentoWhatsAppText({
+      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+      message: buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
+    });
+  } catch (error) {
+    registeredAttendantSendFailedError = error instanceof Error ? error.message : String(error);
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "experimental_class_registered_attendant_start_notification_failed",
+      title: "Falha ao disparar manualmente o lembrete do inicio da aula experimental ao atendente cadastrado",
+      details: {
+        booking_id: normalizedBookingId,
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        lesson_link: lessonLink,
+        start_at: professorStartAtRaw || null,
+        manually_triggered: true,
+        error: registeredAttendantSendFailedError,
+      },
+      actorType: "attendant",
+      actorEmail: auth.user.email,
+    });
+  }
+
+  if (!registeredAttendantSendFailedError) {
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "experimental_class_registered_attendant_start_notification_sent",
+      title: "Lembrete de inicio da aula experimental disparado manualmente ao atendente cadastrado",
+      details: {
+        booking_id: normalizedBookingId,
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        lesson_link: lessonLink,
+        start_at: professorStartAtRaw || null,
+        manually_triggered: true,
       },
       actorType: "attendant",
       actorEmail: auth.user.email,

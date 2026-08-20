@@ -35,9 +35,11 @@ import {
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
+  buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
   buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
@@ -2501,6 +2503,36 @@ export async function POST(req: Request) {
           title: "Falha ao notificar o atendente sobre novo agendamento de aula experimental",
           details: {
             phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
+        });
+
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_registered_attendant_notification_sent",
+          title: "Atendente cadastrado notificado sobre novo agendamento de aula experimental",
+          details: {
+            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          },
+          actorType: "system",
+        });
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          conversationId,
+          eventType: "experimental_class_registered_attendant_notification_failed",
+          title: "Falha ao notificar o atendente cadastrado sobre novo agendamento de aula experimental",
+          details: {
+            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
             error: error instanceof Error ? error.message : String(error),
           },
           actorType: "system",
