@@ -13,8 +13,10 @@ import {
 } from "@/lib/auth/access";
 import { ensureAtendimentoLeadForAuthenticatedUser } from "@/lib/atendimento/server";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 const schema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().regex(EMAIL_REGEX),
   password: z.string().min(8),
   name: z.string().min(2).optional(),
 });

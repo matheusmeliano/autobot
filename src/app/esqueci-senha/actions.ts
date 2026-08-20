@@ -7,8 +7,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 const schema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().regex(EMAIL_REGEX),
   next: z.string().optional(),
 });
 
