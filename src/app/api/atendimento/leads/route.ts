@@ -220,6 +220,13 @@ export async function GET(req: Request) {
     funnel_stage: string | null;
     status: string | null;
   }>();
+  const contractMetaByLeadId = new Map<string, {
+    contract_signed_at: string | null;
+    contract_status: "assinado" | "aguardando_aceite" | "coletando_dados" | string | null;
+    contract_pdf_url: string | null;
+    funnel_stage: string | null;
+    status: string | null;
+  }>();
   let allHistoryEvents: any[] | null = null;
 
   if (leadIds.length > 0) {
@@ -321,6 +328,51 @@ export async function GET(req: Request) {
             payment_rejected_at: candidateRejectedAt,
             funnel_stage: candidateStage,
             status: candidateLeadStatus,
+          });
+        }
+      }
+      const CONTRACT_PRIORITY: Record<string, number> = {
+        coletando_dados: 5, aguardando_aceite: 10, assinado: 20,
+      };
+      const existingContract = contractMetaByLeadId.get(leadId);
+      const existingContractRank =
+        CONTRACT_PRIORITY[String(existingContract?.contract_status ?? "").toLowerCase()] ?? 0;
+      let candidateContractStatus: string | null = null;
+      let candidateContractSignedAt: string | null = null;
+      let candidateContractPdf: string | null = null;
+      let candidateContractStage: string | null = null;
+      let candidateContractLeadStatus: string | null = null;
+      if (eventType === "contrato_assinado") {
+        candidateContractStatus = "assinado";
+        candidateContractStage = "contrato_assinado";
+        candidateContractLeadStatus = "contrato_assinado";
+        candidateContractSignedAt =
+          (typeof details?.contract_signed_at === "string"
+            ? String(details.contract_signed_at).trim()
+            : "") ||
+          (typeof details?.signed_at === "string" ? String(details.signed_at).trim() : "") ||
+          eca ||
+          null;
+        candidateContractPdf =
+          typeof details?.contract_pdf_url === "string"
+            ? String(details.contract_pdf_url).trim()
+            : null;
+      } else if (eventType === "contrato_aguardando_aceite") {
+        candidateContractStatus = "aguardando_aceite";
+        candidateContractStage = "contrato_aguardando_aceite";
+      } else if (eventType === "contrato_coletando_dados") {
+        candidateContractStatus = "coletando_dados";
+        candidateContractStage = "contrato_coletando_dados";
+      }
+      if (candidateContractStatus) {
+        const cRank = CONTRACT_PRIORITY[String(candidateContractStatus).toLowerCase()] ?? 0;
+        if (!existingContract || cRank > existingContractRank) {
+          contractMetaByLeadId.set(leadId, {
+            contract_status: candidateContractStatus,
+            contract_signed_at: candidateContractSignedAt,
+            contract_pdf_url: candidateContractPdf,
+            funnel_stage: candidateContractStage,
+            status: candidateContractLeadStatus,
           });
         }
       }
@@ -886,13 +938,58 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const finalConfirmedAt = rowConfirmedAt || (useHistoryFallback ? histMeta!.payment_confirmed_at : null);
       const finalRejectedAt = rowRejectedAt || (useHistoryFallback ? histMeta!.payment_rejected_at : null);
 
+      const CONTRACT_RANK_META: Record<string, number> = {
+        coletando_dados: 5, aguardando_aceite: 10, assinado: 20,
+        contrato_coletando_dados: 5, contrato_aguardando_aceite: 10, contrato_assinado: 20,
+      };
+      const rowContractStatus = String((row as any)?.contract_status ?? "").trim().toLowerCase();
+      const rowContractSignedAt = String((row as any)?.contract_signed_at ?? "").trim() || null;
+      const rowContractPdf = String((row as any)?.contract_pdf_url ?? "").trim() || null;
+      const rowContractFunnel = String((row as any)?.funnel_stage ?? "").trim().toLowerCase();
+      const rowContractLeadStatus = String((row as any)?.status ?? "").trim().toLowerCase();
+      const histContract = contractMetaByLeadId.get(leadId) ?? null;
+      const rowContractRank =
+        (CONTRACT_RANK_META[rowContractStatus] ?? 0) +
+        (CONTRACT_RANK_META[rowContractFunnel] ?? 0) +
+        (CONTRACT_RANK_META[rowContractLeadStatus] ?? 0);
+      const histContractRank = histContract?.contract_status
+        ? (CONTRACT_RANK_META[String(histContract.contract_status).toLowerCase()] ?? 0) +
+          (CONTRACT_RANK_META[String(histContract.funnel_stage ?? "").toLowerCase()] ?? 0) +
+          (CONTRACT_RANK_META[String(histContract.status ?? "").toLowerCase()] ?? 0)
+        : 0;
+      const useContractHistoryFallback = !!(
+        histContract &&
+        (rowContractRank < histContractRank || (!rowContractStatus && histContract.contract_status))
+      );
+      const finalContractStatus = useContractHistoryFallback
+        ? histContract!.contract_status
+        : rowContractStatus || null;
+      const finalContractSignedAt =
+        rowContractSignedAt || (useContractHistoryFallback ? histContract!.contract_signed_at : null);
+      const finalContractPdfUrl =
+        rowContractPdf || (useContractHistoryFallback ? histContract!.contract_pdf_url : null);
+      const finalContractFunnel =
+        useContractHistoryFallback && histContract!.funnel_stage
+          ? histContract!.funnel_stage
+          : rowFunnelStage || String((row as any)?.funnel_stage ?? "") || null;
+      const finalContractLeadStatus =
+        useContractHistoryFallback && histContract!.status
+          ? histContract!.status
+          : rowLeadStatus || String((row as any)?.status ?? "") || null;
+
+      const finalFunnel = finalFunnelStage || finalContractFunnel || null;
+      const finalStatus = finalLeadStatus || finalContractLeadStatus || null;
+
       return {
         ...row,
         payment_status: finalPaymentStatus,
         payment_confirmed_at: finalConfirmedAt,
         payment_rejected_at: finalRejectedAt,
-        funnel_stage: finalFunnelStage || String((row as any)?.funnel_stage ?? "") || null,
-        status: finalLeadStatus || String((row as any)?.status ?? "") || null,
+        contract_status: finalContractStatus || String((row as any)?.contract_status ?? "") || null,
+        contract_signed_at: finalContractSignedAt,
+        contract_pdf_url: finalContractPdfUrl || String((row as any)?.contract_pdf_url ?? "") || null,
+        funnel_stage: finalFunnel || String((row as any)?.funnel_stage ?? "") || null,
+        status: finalStatus || String((row as any)?.status ?? "") || null,
         enrollment_number:
           String((row as any)?.enrollment_number ?? "").trim() ||
           enrollmentNumberByHistory.get(leadId) ||

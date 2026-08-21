@@ -3237,27 +3237,6 @@ export async function formalizeAndPersistContract(params: {
     leadPatch.enrollment_number = enrollmentNumber;
   }
 
-  const runPatchFormalize = async (p: Record<string, unknown>): Promise<{ ok: boolean; error?: any }> => {
-    const { error } = await admin
-      .from("atendimento_leads")
-      .update(p)
-      .eq("id", leadId);
-    if (!error) return { ok: true };
-    const code = String((error as any)?.code ?? "").trim();
-    if (code === "42703" || extractUndefinedColumnName((error as any)?.message) !== null) {
-      const stripped = stripUndefinedColumnFromPatch(p, error);
-      if (stripped.next) {
-        if (Object.keys(stripped.next).length === 0) return { ok: true };
-        return runPatchFormalize(stripped.next);
-      }
-    }
-    return { ok: false, error };
-  };
-  const patchFormalize = await runPatchFormalize(leadPatch);
-  if (!patchFormalize.ok) {
-    return { ok: false, error: (patchFormalize as any).error?.message ?? "Falha ao formalizar contrato." };
-  }
-
   if (enrollmentNumber) {
     try {
       await appendHistoryEvent({
@@ -3293,6 +3272,27 @@ export async function formalizeAndPersistContract(params: {
       actorType: "system",
     });
   } catch (_e) {}
+
+  const runPatchFormalize = async (p: Record<string, unknown>): Promise<{ ok: boolean; error?: any }> => {
+    const { error } = await admin
+      .from("atendimento_leads")
+      .update(p)
+      .eq("id", leadId);
+    if (!error) return { ok: true };
+    const code = String((error as any)?.code ?? "").trim();
+    if (code === "42703" || extractUndefinedColumnName((error as any)?.message) !== null) {
+      const stripped = stripUndefinedColumnFromPatch(p, error);
+      if (stripped.next) {
+        if (Object.keys(stripped.next).length === 0) return { ok: true };
+        return runPatchFormalize(stripped.next);
+      }
+    }
+    return { ok: false, error };
+  };
+  const patchFormalize = await runPatchFormalize(leadPatch);
+  if (!patchFormalize.ok) {
+    return { ok: false, error: (patchFormalize as any).error?.message ?? "Falha ao formalizar contrato." };
+  }
 
   try {
     const firstName = contractData.studentFullName.trim().split(/\s+/)[0] || contractData.studentFullName || "Aluno";
