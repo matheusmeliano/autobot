@@ -916,20 +916,20 @@ function LeadDetails({
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {showPaymentActions || paymentConfirmed || paymentRejected ? (
-          <div className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
-            <div className="flex flex-col min-[600px]:flex-row flex-wrap items-center gap-3 min-[600px]:justify-between min-[600px]:items-center min-h-[56px]">
-              <div className="flex min-h-[40px] items-center justify-center">
+          <div className="mb-4 w-full rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+            <div className="flex w-full flex-col gap-3 items-center sm:flex-row sm:justify-between sm:items-center">
+              <div className="w-full sm:w-auto flex items-center justify-center sm:justify-start">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
                   Pagamento da matrícula
                 </div>
               </div>
               {showPaymentActions ? (
-                <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="w-full sm:w-auto flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => onConfirmPayment?.(lead)}
                     disabled={Boolean(loadingPayment)}
-                    className="inline-flex h-[44px] items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
                     {loadingPayment && loadingPaymentAction === "confirm" ? "Confirmando…" : "Sim — Pagamento OK"}
@@ -938,7 +938,7 @@ function LeadDetails({
                     type="button"
                     onClick={() => onRejectPayment?.(lead)}
                     disabled={Boolean(loadingPayment)}
-                    className="inline-flex h-[44px] items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <XCircle className="h-4 w-4 shrink-0" />
                     {loadingPayment && loadingPaymentAction === "reject" ? "Atualizando…" : "Não — Não pagou"}
