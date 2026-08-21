@@ -810,7 +810,12 @@ function LeadDetails({
   const showPaymentActions =
     onConfirmPayment &&
     onRejectPayment &&
-    (paymentPendingConfirmation || paymentRejected);
+    (paymentPendingConfirmation || paymentRejected || paymentConfirmed);
+
+  const paymentAlreadyConfirmed = Boolean(paymentConfirmed);
+
+  const confirmBtnDisabled = Boolean(loadingPayment) || paymentAlreadyConfirmed;
+  const rejectBtnDisabled = Boolean(loadingPayment) || paymentAlreadyConfirmed;
 
   const contractDownloadHref = contractPdfUrl
     ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(lead.full_name ?? lead.phone ?? lead.id).replace(/\s+/g, "_")}.pdf`)}`
@@ -928,7 +933,7 @@ function LeadDetails({
                   <button
                     type="button"
                     onClick={() => onConfirmPayment?.(lead)}
-                    disabled={Boolean(loadingPayment)}
+                    disabled={confirmBtnDisabled}
                     className="inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-3 sm:px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -939,7 +944,7 @@ function LeadDetails({
                   <button
                     type="button"
                     onClick={() => onRejectPayment?.(lead)}
-                    disabled={Boolean(loadingPayment)}
+                    disabled={rejectBtnDisabled}
                     className="inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 sm:px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <XCircle className="h-4 w-4 shrink-0" />

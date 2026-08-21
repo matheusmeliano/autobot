@@ -3603,6 +3603,18 @@ export async function confirmLeadRecurringPayment(params: {
     .eq("id", String(leadId))
     .maybeSingle();
   if (leadErr || !lead) return { ok: false, error: leadErr?.message ?? "Lead não encontrado." };
+
+  const payStatusNow = String((lead as any).payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String((lead as any).payment_confirmed_at ?? "").trim();
+  const alreadyConfirmed =
+    payStatusNow === "confirmado" ||
+    payStatusNow === "matriculado" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    String((lead as any).status ?? "").trim() === "matriculado" ||
+    String((lead as any).status ?? "").trim() === "matricula_confirmada" ||
+    String((lead as any).funnel_stage ?? "").trim() === "matriculado" ||
+    String((lead as any).funnel_stage ?? "").trim() === "matricula_confirmada";
+
   const now = new Date().toISOString();
   const patch: any = {
     payment_status: "confirmado",
@@ -3627,18 +3639,32 @@ export async function confirmLeadRecurringPayment(params: {
   }
 
   try {
-    await appendHistoryEvent({
-      leadId,
-      eventType: "recurring_payment_confirmed",
-      title: "Pagamento marcado como Sim (confirmado)",
-      details: {
-        enrollment_number: (lead as any).enrollment_number || null,
-        confirmed_at: now,
-        confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
-      },
-      actorType,
-    });
+    if (!alreadyConfirmed) {
+      await appendHistoryEvent({
+        leadId,
+        eventType: "recurring_payment_confirmed",
+        title: "Pagamento marcado como Sim (confirmado)",
+        details: {
+          enrollment_number: (lead as any).enrollment_number || null,
+          confirmed_at: now,
+          confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
+          idempotent: false,
+        },
+        actorType,
+      });
+    }
   } catch {}
+
+  if (alreadyConfirmed) {
+    try {
+      await ensureStudentAuthUserCreatedForLead({ admin, leadId, lead });
+    } catch {}
+    return {
+      ok: true,
+      confirmed_at: payConfirmedAtRaw || now,
+      idempotent: true,
+    };
+  }
 
   let applied = false;
   const runPatch = async (p: any) => {
@@ -3737,6 +3763,26 @@ export async function rejectLeadRecurringPayment(params: {
     .eq("id", String(leadId))
     .maybeSingle();
   if (leadErr || !lead) return { ok: false, error: leadErr?.message ?? "Lead não encontrado." };
+
+  const payStatusNow = String((lead as any).payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String((lead as any).payment_confirmed_at ?? "").trim();
+  const alreadyConfirmed =
+    payStatusNow === "confirmado" ||
+    payStatusNow === "matriculado" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    String((lead as any).status ?? "").trim() === "matriculado" ||
+    String((lead as any).status ?? "").trim() === "matricula_confirmada" ||
+    String((lead as any).funnel_stage ?? "").trim() === "matriculado" ||
+    String((lead as any).funnel_stage ?? "").trim() === "matricula_confirmada";
+
+  if (alreadyConfirmed) {
+    return {
+      ok: false,
+      blocked: true,
+      error: "Pagamento já foi confirmado anteriormente e não pode ser alterado.",
+    };
+  }
+
   const now = new Date().toISOString();
   const patch: any = {
     payment_status: "nao_realizado",

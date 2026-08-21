@@ -75,9 +75,10 @@ export async function POST(
       });
     }
     if (!result?.ok) {
+      const blocked = Boolean(result?.blocked);
       return Response.json(
-        { ok: false, error: toErrorMessage(result?.error, "Falha ao atualizar pagamento.") },
-        { status: 500 },
+        { ok: false, blocked, error: toErrorMessage(result?.error, "Falha ao atualizar pagamento.") },
+        { status: blocked ? 409 : 500 },
       );
     }
     try {
