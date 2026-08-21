@@ -1983,6 +1983,31 @@ export function AtendimentoSummaryCards({
           }
           if (payload?.booking) {
             patch.experimental_class_booking = payload.booking;
+            const bk = payload.booking as Record<string, unknown>;
+            const bkProfessorDate = String(bk.professor_date ?? professorDate ?? "").trim();
+            const bkProfessorTime = String(bk.professor_time ?? professorTime ?? "").trim();
+            const bkLeadDate = String(bk.lead_date ?? leadDate ?? bkProfessorDate ?? "").trim();
+            const bkLeadTime = String(bk.lead_time ?? leadTime ?? bkProfessorTime ?? "").trim();
+            if (bkLeadDate) patch.experimental_class_lead_date = bkLeadDate;
+            if (bkLeadTime) patch.experimental_class_lead_time = bkLeadTime;
+            if (bkProfessorDate) patch.experimental_class_professor_date = bkProfessorDate;
+            if (bkProfessorTime) patch.experimental_class_professor_time = bkProfessorTime;
+            if (bkLeadDate || bkLeadTime || bkProfessorDate || bkProfessorTime) {
+              const bkIdOk = String(bk.id ?? "fallback").trim() || "fallback";
+              patch.future_experimental_class_booking = {
+                id: bkIdOk,
+                status: String(bk.status ?? "scheduled").trim() || "scheduled",
+                lead_date: bkLeadDate || null,
+                lead_time: bkLeadTime || null,
+                professor_date: bkProfessorDate || null,
+                professor_time: bkProfessorTime || null,
+                lesson_link: String(bk.lesson_link ?? preservedLessonLink ?? "").trim() || null,
+                lead_timezone: String(bk.lead_timezone ?? leadTimezone ?? "").trim() || null,
+                professor_timezone: String(bk.professor_timezone ?? professorTimezone ?? "").trim() || null,
+                attendance_status: String(bk.attendance_status ?? "").trim() || null,
+                created_at: String(bk.created_at ?? new Date().toISOString()).trim(),
+              };
+            }
             if (!patch.funnel_stage || String(patch.funnel_stage).trim() === "") {
               patch.funnel_stage = "aula_experimental_agendada";
             }
