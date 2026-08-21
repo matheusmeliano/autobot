@@ -717,11 +717,13 @@ function LeadDetails({
     ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(lead.full_name ?? lead.phone ?? lead.id).replace(/\s+/g, "_")}.pdf`)}`
     : "";
 
+  const enrollmentNumberOk = String(lead.enrollment_number ?? "").trim();
+
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
               className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
               title={lead.phone || "Interessado sem telefone"}
@@ -744,6 +746,28 @@ function LeadDetails({
               <Copy className="h-3.5 w-3.5 shrink-0" />
               Copiar
             </button>
+            {enrollmentNumberOk ? (
+              <div
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
+                <span className="truncate">Matrícula N° {enrollmentNumberOk}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toCopy = String(enrollmentNumberOk ?? "").trim();
+                    if (!toCopy) return;
+                    navigator.clipboard
+                      ?.writeText(toCopy)
+                      .then(() => modalToast.success("Número de matrícula copiado."))
+                      .catch(() => modalToast.error("Não foi possível copiar a matrícula."));
+                  }}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2 py-1 text-[10px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  title="Copiar matrícula"
+                >
+                  <Copy className="h-3 w-3 shrink-0" />
+                  Copiar
+                </button>
+              </div>
+            ) : null}
           </div>
           {isLeadRepescagem(lead) ? (
             <div className="mt-2">
@@ -908,12 +932,13 @@ function ContractDetails({
   const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
   const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
   const hasRecurring = recurringWeekdayOk && recurringTimeOk;
+  const enrollmentNumberOk = String(lead.enrollment_number ?? "").trim();
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
               className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
               title={lead.phone || "Lead sem telefone"}
@@ -937,6 +962,27 @@ function ContractDetails({
                 <Copy className="h-3.5 w-3.5 shrink-0" />
                 Copiar
               </button>
+            ) : null}
+            {enrollmentNumberOk ? (
+              <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
+                <span className="truncate">Matrícula N° {enrollmentNumberOk}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toCopy = String(enrollmentNumberOk ?? "").trim();
+                    if (!toCopy) return;
+                    navigator.clipboard
+                      ?.writeText(toCopy)
+                      .then(() => modalToast.success("Número de matrícula copiado."))
+                      .catch(() => modalToast.error("Não foi possível copiar a matrícula."));
+                  }}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2 py-1 text-[10px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  title="Copiar matrícula"
+                >
+                  <Copy className="h-3 w-3 shrink-0" />
+                  Copiar
+                </button>
+              </div>
             ) : null}
           </div>
         </div>
@@ -1189,11 +1235,13 @@ function BookingDetails({
     setLessonLinkDraft(savedLessonLink);
   }, [savedLessonLink, bookingId]);
 
+  const enrollmentNumberOk = String(lead.enrollment_number ?? "").trim();
+
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
       <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
               className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
               title={lead.phone || "Agendamento"}
@@ -1216,6 +1264,27 @@ function BookingDetails({
               <Copy className="h-3.5 w-3.5 shrink-0" />
               Copiar
             </button>
+            {enrollmentNumberOk ? (
+              <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
+                <span className="truncate">Matrícula N° {enrollmentNumberOk}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toCopy = String(enrollmentNumberOk ?? "").trim();
+                    if (!toCopy) return;
+                    navigator.clipboard
+                      ?.writeText(toCopy)
+                      .then(() => modalToast.success("Número de matrícula copiado."))
+                      .catch(() => modalToast.error("Não foi possível copiar a matrícula."));
+                  }}
+                  className="inline-flex items-center justify-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2 py-1 text-[10px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  title="Copiar matrícula"
+                >
+                  <Copy className="h-3 w-3 shrink-0" />
+                  Copiar
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {null /* Banner link da aula recorrente: REMOVIDO solicitacao usuario */}

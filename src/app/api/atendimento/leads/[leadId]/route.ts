@@ -759,6 +759,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       timezone: String((updated as any).timezone ?? "").trim() || null,
       funnel_stage: String((updated as any).funnel_stage ?? safeFunnelStage ?? "").trim() || null,
       experimental_class_status: String((updated as any).experimental_class_status ?? safeExpStatus ?? "").trim() || null,
+      enrollment_number: String((updated as any).enrollment_number ?? "").trim() || null,
       updated_at: String((updated as any).updated_at ?? new Date().toISOString()),
     },
   });

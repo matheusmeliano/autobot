@@ -778,6 +778,7 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
 
       return {
         ...row,
+        enrollment_number: String((row as any)?.enrollment_number ?? "").trim() || null,
         experimental_class_professor_date: mergedProfessorDate || null,
         experimental_class_lead_date: mergedLeadDate || null,
         experimental_class_professor_time: mergedProfessorTime || null,
