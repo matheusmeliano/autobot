@@ -726,6 +726,9 @@ function LeadDetails({
   const contractStatusRaw = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
   const contractPdfUrl = String((lead as any)?.contract_pdf_url ?? "").trim();
   const contractSignedAt = String((lead as any)?.contract_signed_at ?? "").trim();
+  const contractSigned =
+    (Boolean(contractSignedAt) && contractSignedAt !== "null") ||
+    contractStatusRaw === "assinado";
   const legalRespName = String((lead as any)?.legal_responsible_name ?? "").trim();
   const legalRespCpf = String((lead as any)?.legal_responsible_cpf ?? "").trim();
   const hasContractSection = Boolean(

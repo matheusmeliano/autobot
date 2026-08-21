@@ -269,10 +269,8 @@ export async function POST(req: Request) {
         enrollmentNumber || null,
       );
       await sendAtendimentoWhatsAppText({
-        toPhone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
-        contentText: attendantMsg,
-        leadId: finalLeadId,
-        silentFail: true,
+        phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
+        message: attendantMsg,
       });
       try {
         await appendHistoryEvent({

@@ -2504,7 +2504,7 @@ export async function appendHistoryEvent(params: {
   eventType: string;
   title: string;
   details?: Record<string, unknown> | null;
-  actorType: "bot" | "lead" | "attendant" | "system";
+  actorType: "bot" | "lead" | "attendant" | "system" | "student";
   actorEmail?: string | null;
 }) {
   const admin = createSupabaseAdminClient();
@@ -3416,7 +3416,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
     const { data: existing } = await admin.auth.admin.listUsers({
       perPage: 5,
     });
-    let match = null;
+    let match: any = null;
     if (Array.isArray((existing as any)?.users)) {
       for (const u of (existing as any).users) {
         const uEmail = String(u.email ?? "").toLowerCase();
@@ -3431,8 +3431,8 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
         }
       }
     }
-    if (match?.id) {
-      userId = String(match.id);
+    if (match && typeof match === "object" && "id" in match) {
+      userId = String((match as any).id);
       try {
         await admin.auth.admin.updateUserById(userId, {
           password: studentPassword,
