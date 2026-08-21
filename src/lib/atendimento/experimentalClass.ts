@@ -941,12 +941,15 @@ export const RECURRING_WEEKDAY_SHORT_LABELS: Record<RecurringWeekdayKey, string>
 };
 
 export type RecurringWeekdayOption = {
-  id: RecurringWeekdayKey;
+  id: string;
   weekday: RecurringWeekdayKey;
   label: string;
   shortLabel: string;
   displayLabel: string;
   slotCount: number;
+  professorDate: string;
+  weekIndex: 0 | 1;
+  weekLabel: string;
 };
 
 export type RecurringWeekdayTimeOption = {
@@ -955,6 +958,8 @@ export type RecurringWeekdayTimeOption = {
   professorTime: string;
   leadTime: string;
   displayLabel: string;
+  professorDate: string;
+  professorStartAtIso: string;
 };
 
 function firstOnlyNameForRecurring(full: string | null | undefined): string {
@@ -1012,7 +1017,7 @@ export function listRecurringWeekdayAvailability(params: {
 }) {
   const now = params.now ?? new Date();
   const lookAheadWeeks = Number.isFinite(Number(params.lookAheadWeeks))
-    ? Math.max(1, Number(params.lookAheadWeeks))
+    ? Math.max(2, Number(params.lookAheadWeeks))
     : 4;
   const leadTimeZone = String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
@@ -1024,50 +1029,20 @@ export function listRecurringWeekdayAvailability(params: {
       const d = new Date(iso);
       const ms = d.getTime();
       if (!Number.isFinite(ms)) return null;
-      const weekday = weekdayInTimeZone(d, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
-      const hh = new Intl.DateTimeFormat("en-GB", {
-        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }).formatToParts(d);
-      const hour = hh.find((p) => p.type === "hour")?.value ?? "";
-      const minute = hh.find((p) => p.type === "minute")?.value ?? "";
-      const timeKey = `${hour}:${minute}`;
-      return { weekday, timeKey, ms };
+      return { dateIso: iso, ms };
     })
-    .filter((x): x is { weekday: string; timeKey: string; ms: number } => Boolean(x));
-
-  const blockedCombos = new Set<string>();
-  for (const b of booked) {
-    blockedCombos.add(`${b.weekday}|${b.timeKey}`);
-    for (let w = 1; w < lookAheadWeeks; w++) {
-      const futureMs = b.ms + w * 7 * 24 * 60 * 60 * 1000;
-      if (futureMs > now.getTime() - 24 * 60 * 60 * 1000) {
-        const future = new Date(futureMs);
-        const weekdayF = weekdayInTimeZone(future, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
-        const hh = new Intl.DateTimeFormat("en-GB", {
-          timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-          hour: "2-digit",
-          minute: "2-digit",
-          hourCycle: "h23",
-        }).formatToParts(future);
-        const hourF = hh.find((p) => p.type === "hour")?.value ?? "";
-        const minuteF = hh.find((p) => p.type === "minute")?.value ?? "";
-        const timeKeyF = `${hourF}:${minuteF}`;
-        blockedCombos.add(`${weekdayF}|${timeKeyF}`);
-      }
-    }
-  }
+    .filter((x): x is { dateIso: string; ms: number } => Boolean(x));
+  const blockedExactStarts = new Set<string>(booked.map((b) => b.dateIso));
 
   const weekdayOrder: RecurringWeekdayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
-  const optionsByWeekday = new Map<RecurringWeekdayKey, RecurringWeekdayTimeOption[]>();
+  const optionsByWeekdayDate = new Map<string, RecurringWeekdayTimeOption[]>();
+  const metaByWeekdayDate = new Map<
+    string,
+    { weekday: RecurringWeekdayKey; professorDate: string; weekIndex: 0 | 1; weekLabel: string }
+  >();
 
-  function nextProfessorDateSameWeek(targetWeekday: RecurringWeekdayKey): {
-    date: string;
-    isSameWeekAsToday: boolean;
-  } {
-    const todayLocal = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
+  function startOfProfessorWeek(d: Date): string {
+    const todayLocal = localDateInTimeZone(d, ATENDIMENTO_PROFESSOR_TIME_ZONE);
     const todayNoonUtc = zonedDateTimeToUtcIso({
       date: todayLocal,
       time: "12:00",
@@ -1076,66 +1051,101 @@ export function listRecurringWeekdayAvailability(params: {
     const todayWeekday = weekdayInTimeZone(todayNoonUtc, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
     const order: Array<RecurringWeekdayKey | "sun"> = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
     const todayIdx = order.indexOf(todayWeekday as any);
-    const targetIdx = order.indexOf(targetWeekday);
-    const rawDiff = targetIdx - todayIdx;
-    // isSameWeekAsToday: dia NAO cai na semana que vem.
-    // rawDiff >= 0 -> target ainda esta nesta semana (hoje ou futuro).
-    // rawDiff < 0 -> target ja passou nesta semana, proxima ocorrencia eh na proxima semana.
-    const isSameWeekAsToday = rawDiff >= 0;
-    const diff = isSameWeekAsToday ? rawDiff : rawDiff + 7;
-    return {
-      date: addDaysToLocalDate(todayLocal, diff),
-      isSameWeekAsToday,
-    };
+    const monLocal = addDaysToLocalDate(todayLocal, -Math.max(0, todayIdx));
+    return monLocal;
   }
 
-  for (const weekday of weekdayOrder) {
-    const nextInfo = nextProfessorDateSameWeek(weekday);
-    // REGRA: Se a proxima ocorrencia deste weekday cai APENAS na semana QUE VEM
-    // (ou seja, o weekday ja passou nesta semana), OCULTAMOS da lista.
-    // Mostramos somente dias que ainda estao disponiveis NA SEMANA ATUAL.
-    if (!nextInfo.isSameWeekAsToday) continue;
+  const mondayThisWeek = startOfProfessorWeek(now);
+  const weeksToEmit: Array<{ mondayLocal: string; index: 0 | 1; label: string }> = [
+    { mondayLocal: mondayThisWeek, index: 0, label: "Semana atual" },
+    { mondayLocal: addDaysToLocalDate(mondayThisWeek, 7), index: 1, label: "Próxima semana" },
+  ];
+  const orderIdx: Array<RecurringWeekdayKey | "sun"> = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
-    const slots: RecurringWeekdayTimeOption[] = [];
-    const professorDate = nextInfo.date;
-    for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
-      if (!professorTimeIsAllowed({ weekdayShort: weekday, professorTimeHHMM: professorTime })) continue;
-      const comboKey = `${weekday}|${professorTime}`;
-      if (blockedCombos.has(comboKey)) continue;
+  for (const week of weeksToEmit) {
+    for (const weekday of weekdayOrder) {
+      const wdIdx = orderIdx.indexOf(weekday);
+      const professorDate = addDaysToLocalDate(week.mondayLocal, wdIdx);
+      const slots: RecurringWeekdayTimeOption[] = [];
+      for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
+        if (!professorTimeIsAllowed({ weekdayShort: weekday, professorTimeHHMM: professorTime })) continue;
+        const professorStartAt = zonedDateTimeToUtcIso({
+          date: professorDate,
+          time: professorTime,
+          timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        });
+        const startMs = new Date(professorStartAt).getTime();
+        if (!Number.isFinite(startMs) || startMs <= now.getTime()) continue;
+        if (blockedExactStarts.has(professorStartAt)) continue;
 
-      const professorStartAt = zonedDateTimeToUtcIso({
-        date: professorDate,
-        time: professorTime,
+        slots.push({
+          id: `${professorDate}|${weekday}|${professorTime}`,
+          weekday,
+          professorTime,
+          professorDate,
+          professorStartAtIso: professorStartAt,
+          leadTime: formatTimeInTimeZone(professorStartAt, leadTimeZone),
+          displayLabel: formatTimeInTimeZone(professorStartAt, leadTimeZone),
+        });
+      }
+      if (slots.length > 0) {
+        const key = `${professorDate}|${weekday}`;
+        optionsByWeekdayDate.set(key, slots);
+        metaByWeekdayDate.set(key, {
+          weekday,
+          professorDate,
+          weekIndex: week.index,
+          weekLabel: week.label,
+        });
+      }
+    }
+  }
+
+  const entries = Array.from(metaByWeekdayDate.entries())
+    .map(([key, meta]) => ({ key, meta }))
+    .sort((a, b) => {
+      const wa = a.meta.weekIndex;
+      const wb = b.meta.weekIndex;
+      if (wa !== wb) return wa - wb;
+      const da = new Date(zonedDateTimeToUtcIso({ date: a.meta.professorDate, time: "12:00", timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE })).getTime();
+      const db = new Date(zonedDateTimeToUtcIso({ date: b.meta.professorDate, time: "12:00", timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE })).getTime();
+      return da - db;
+    });
+
+  const dates: RecurringWeekdayOption[] = entries.map(({ key, meta }) => {
+    const slots = optionsByWeekdayDate.get(key) ?? [];
+    const formattedDate = (() => {
+      const noonUtc = zonedDateTimeToUtcIso({
+        date: meta.professorDate,
+        time: "12:00",
         timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       });
-      const startMs = new Date(professorStartAt).getTime();
-      if (!Number.isFinite(startMs) || startMs <= now.getTime()) continue;
+      const pt = new Intl.DateTimeFormat("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      }).format(new Date(noonUtc));
+      return pt;
+    })();
+    return {
+      id: key,
+      weekday: meta.weekday,
+      professorDate: meta.professorDate,
+      weekIndex: meta.weekIndex,
+      weekLabel: meta.weekLabel,
+      label: RECURRING_WEEKDAY_LABELS_PT_BR[meta.weekday],
+      shortLabel: RECURRING_WEEKDAY_SHORT_LABELS[meta.weekday],
+      displayLabel: `${RECURRING_WEEKDAY_LABELS_PT_BR[meta.weekday]} (${formattedDate})`,
+      slotCount: slots.length,
+    };
+  });
 
-      slots.push({
-        id: `${weekday}|${professorTime}`,
-        weekday,
-        professorTime,
-        leadTime: formatTimeInTimeZone(professorStartAt, leadTimeZone),
-        displayLabel: formatTimeInTimeZone(professorStartAt, leadTimeZone),
-      });
-    }
-    if (slots.length > 0) {
-      optionsByWeekday.set(weekday, slots);
-    }
+  const slotsByWeekdayDate: Record<string, RecurringWeekdayTimeOption[]> = {};
+  for (const [key, value] of optionsByWeekdayDate.entries()) {
+    slotsByWeekdayDate[key] = value;
   }
 
-  const dates: RecurringWeekdayOption[] = weekdayOrder
-    .filter((wd) => (optionsByWeekday.get(wd) ?? []).length > 0)
-    .map((wd) => ({
-      id: wd,
-      weekday: wd,
-      label: RECURRING_WEEKDAY_LABELS_PT_BR[wd],
-      shortLabel: RECURRING_WEEKDAY_SHORT_LABELS[wd],
-      displayLabel: RECURRING_WEEKDAY_LABELS_PT_BR[wd],
-      slotCount: (optionsByWeekday.get(wd) ?? []).length,
-    }));
-
-  return { dates, slotsByWeekday: optionsByWeekday };
+  return { dates, slotsByWeekdayDate, slotsByWeekday: slotsByWeekdayDate };
 }
 
 export function findRecurringWeekdayOption(input: string, options: RecurringWeekdayOption[]): RecurringWeekdayOption | null {

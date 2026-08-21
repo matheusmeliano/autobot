@@ -59,11 +59,11 @@ export async function GET(req: NextRequest) {
       now: new Date(nowIso),
       leadTimeZone: tzRaw,
       bookedProfessorStartAts: bookedStarts,
-      lookAheadWeeks: 6,
+      lookAheadWeeks: 2,
     });
 
     const slotsObj: Record<string, unknown> = {};
-    for (const [key, value] of result.slotsByWeekday.entries()) {
+    for (const [key, value] of (result.slotsByWeekdayDate ?? result.slotsByWeekday ?? new Map()).entries()) {
       slotsObj[key] = Array.isArray(value) ? value : [];
     }
 
@@ -71,6 +71,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       dates: result.dates,
       slotsByWeekday: slotsObj,
+      slotsByWeekdayDate: slotsObj,
       timeZone: tzRaw,
       generatedAt: nowIso,
     });

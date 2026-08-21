@@ -46,6 +46,8 @@ type SubmitPayload = {
   professorTime: string;
   leadTime?: string | null;
   weekdayLabel?: string | null;
+  professorDate?: string | null;
+  professorStartAt?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -62,6 +64,8 @@ export async function POST(req: NextRequest) {
       professorTime,
       leadTime,
       weekdayLabel,
+      professorDate,
+      professorStartAt,
     } = rawBody as SubmitPayload;
 
     const safePhoneDigits = String(telefone ?? "").replace(/\D/g, "").trim();
@@ -131,6 +135,12 @@ export async function POST(req: NextRequest) {
       RECURRING_WEEKDAY_LABELS_PT_BR[weekday as keyof typeof RECURRING_WEEKDAY_LABELS_PT_BR] ||
       "";
     const nowIso = new Date().toISOString();
+    const safeProfessorDate = /^\d{4}-\d{2}-\d{2}$/.test(String(professorDate ?? "").trim())
+      ? String(professorDate!).trim()
+      : null;
+    const safeProfessorStartAt = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(String(professorStartAt ?? "").trim())
+      ? String(professorStartAt!).trim()
+      : null;
 
     const patchFull: Record<string, unknown> = {
       recurring_class_status: "confirmado",
@@ -147,6 +157,8 @@ export async function POST(req: NextRequest) {
       ...(safeNome ? { full_name: safeNome } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
       ...(String(senha ?? "").trim() ? { recurring_registration_password: String(senha ?? "").trim() } : {}),
+      ...(safeProfessorDate ? { recurring_class_professor_date: safeProfessorDate } : {}),
+      ...(safeProfessorStartAt ? { recurring_class_first_class_at: safeProfessorStartAt } : {}),
     };
 
     const patchMinimalGuaranteed: Record<string, unknown> = {
@@ -158,6 +170,7 @@ export async function POST(req: NextRequest) {
       updated_at: nowIso,
       ...(safeNome ? { full_name: safeNome } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
+      ...(safeProfessorStartAt ? { recurring_class_first_class_at: safeProfessorStartAt } : {}),
     };
 
     let appliedPatch: "full" | "minimal" = "minimal";
@@ -210,6 +223,8 @@ export async function POST(req: NextRequest) {
             weekday_label: safeWeekdayLabel,
             professor_time: String(professorTime ?? ""),
             lead_time: String(leadTime ?? String(professorTime ?? "")),
+            professor_date: safeProfessorDate,
+            professor_start_at: safeProfessorStartAt,
             applied_patch: appliedPatch,
             full_patch_error: fullPatchError,
             source: "cadastro_recorrente_plataforma",

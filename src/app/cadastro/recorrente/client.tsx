@@ -8,12 +8,15 @@ import { resolveStudentTimezone } from "../../../lib/timezone";
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
 type RecurringWeekdayOption = {
-  id: RecurringWeekdayKey;
+  id: string;
   weekday: RecurringWeekdayKey;
   label: string;
   shortLabel: string;
   displayLabel: string;
   slotCount: number;
+  professorDate: string;
+  weekIndex?: 0 | 1 | number;
+  weekLabel?: string;
 };
 
 type RecurringWeekdayTimeOption = {
@@ -22,12 +25,15 @@ type RecurringWeekdayTimeOption = {
   professorTime: string;
   leadTime: string;
   displayLabel: string;
+  professorDate?: string;
+  professorStartAtIso?: string;
 };
 
 type AvailabilityResponse = {
   ok: boolean;
   dates: RecurringWeekdayOption[];
-  slotsByWeekday: Record<RecurringWeekdayKey, RecurringWeekdayTimeOption[]>;
+  slotsByWeekday: Record<string, RecurringWeekdayTimeOption[]>;
+  slotsByWeekdayDate?: Record<string, RecurringWeekdayTimeOption[]>;
   timeZone: string;
   generatedAt?: string;
   error?: string;
@@ -181,7 +187,7 @@ export default function CadastroRecorrenteBody() {
   const [availLoading, setAvailLoading] = useState<boolean>(false);
   const [availError, setAvailError] = useState<string>("");
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
-  const [selectedWeekday, setSelectedWeekday] = useState<RecurringWeekdayKey | null>(null);
+  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
   const [selectedTimeOpt, setSelectedTimeOpt] = useState<RecurringWeekdayTimeOption | null>(null);
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
@@ -612,7 +618,6 @@ export default function CadastroRecorrenteBody() {
             const isWd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(savedWeekdayRaw);
             if (isWd) {
               resolvedWeekday = savedWeekdayRaw as RecurringWeekdayKey;
-              setSelectedWeekday(resolvedWeekday);
             }
           }
           if (hasPassword) {
@@ -650,8 +655,26 @@ export default function CadastroRecorrenteBody() {
                 const j = (await r.json().catch(() => null)) as AvailabilityResponse | null;
                 if (r.ok && j?.ok) {
                   setAvailability(j);
-                  const w = resolvedWeekday;
-                  const arr = w ? j?.slotsByWeekday?.[w] ?? [] : [];
+                  const slotsMap = j.slotsByWeekdayDate ?? j.slotsByWeekday ?? {};
+                  const dayCandidates = (j.dates ?? []).filter((d) => d.weekday === resolvedWeekday);
+                  let targetDayId: string | null = null;
+                  if (dayCandidates.length === 1) {
+                    targetDayId = dayCandidates[0].id;
+                  } else if (dayCandidates.length > 1) {
+                    const matchingByLabel = dayCandidates.find(
+                      (d) =>
+                        (savedWeekdayLabel &&
+                          (d.displayLabel === savedWeekdayLabel || d.label === savedWeekdayLabel)) ||
+                        false,
+                    );
+                    targetDayId = (matchingByLabel ?? dayCandidates[0])?.id ?? null;
+                  }
+                  if (targetDayId) {
+                    setSelectedDayId(targetDayId);
+                  }
+                  const arr: RecurringWeekdayTimeOption[] = targetDayId
+                    ? slotsMap[targetDayId] ?? []
+                    : [];
                   const targetTime = savedProfessorTime;
                   const targetLeadT = savedLeadTime;
                   const opt =
@@ -666,10 +689,10 @@ export default function CadastroRecorrenteBody() {
                   if (opt) {
                     setSelectedTimeOpt(opt as any);
                     if (stepNum >= 4) {
-                      const lbl = savedWeekdayLabel || w || "";
+                      const lbl = savedWeekdayLabel || resolvedWeekday || "";
                       const leadT = targetLeadT || targetTime;
                       setSubmitResult({
-                        weekday: w || "fri",
+                        weekday: resolvedWeekday || "fri",
                         weekdayLabel: lbl,
                         professorTime: targetTime,
                         leadTime: leadT,
@@ -701,15 +724,18 @@ export default function CadastroRecorrenteBody() {
   }, [availability]);
 
   const availableTimesForSelected = useMemo<RecurringWeekdayTimeOption[]>(() => {
-    if (!availability?.slotsByWeekday || !selectedWeekday) return [];
-    const arr = availability.slotsByWeekday[selectedWeekday];
+    if (!availability || !selectedDayId) return [];
+    const slotsMap = availability.slotsByWeekdayDate ?? availability.slotsByWeekday ?? {};
+    const arr = slotsMap[selectedDayId];
     return Array.isArray(arr) ? arr : [];
-  }, [availability, selectedWeekday]);
+  }, [availability, selectedDayId]);
 
-  const selectedWeekdayLabel = useMemo(() => {
-    const opt = availableWeekdays.find((d) => d.weekday === selectedWeekday);
-    return opt?.displayLabel || opt?.label || "";
-  }, [availableWeekdays, selectedWeekday]);
+  const selectedDayOption = useMemo<RecurringWeekdayOption | null>(() => {
+    return availableWeekdays.find((d) => d.id === selectedDayId) ?? null;
+  }, [availableWeekdays, selectedDayId]);
+
+  const selectedWeekday = selectedDayOption?.weekday ?? null;
+  const selectedWeekdayLabel = selectedDayOption?.displayLabel || selectedDayOption?.label || "";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -891,11 +917,11 @@ export default function CadastroRecorrenteBody() {
   }
 
   function handleAdvance2() {
-    if (!selectedWeekday) return;
+    if (!selectedDayId || !selectedWeekday) return;
     (async () => {
       setDraftSaving("weekday");
       try {
-        const opt = availableWeekdays.find((d) => d.weekday === selectedWeekday);
+        const opt = availableWeekdays.find((d) => d.id === selectedDayId);
         await saveDraftRecurring({
           weekday: selectedWeekday,
           weekdayLabel: opt?.displayLabel || opt?.label || null,
@@ -908,13 +934,13 @@ export default function CadastroRecorrenteBody() {
   }
 
   async function handleSubmitFinal() {
-    if (!selectedWeekday || !selectedTimeOpt) return;
+    if (!selectedDayId || !selectedWeekday || !selectedTimeOpt) return;
     setSubmitLoading(true);
     setSubmitError("");
     try {
       setDraftSaving("time");
       try {
-        const opt = availableWeekdays.find((d) => d.weekday === selectedWeekday);
+        const opt = availableWeekdays.find((d) => d.id === selectedDayId);
         await saveDraftRecurring({
           weekday: selectedWeekday,
           weekdayLabel: opt?.displayLabel || opt?.label || selectedWeekdayLabel || null,
@@ -935,6 +961,8 @@ export default function CadastroRecorrenteBody() {
           weekdayLabel: selectedWeekdayLabel || null,
           professorTime: selectedTimeOpt.professorTime,
           leadTime: selectedTimeOpt.leadTime || selectedTimeOpt.displayLabel,
+          professorDate: selectedDayOption?.professorDate || null,
+          professorStartAt: selectedTimeOpt.professorStartAtIso || null,
         }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -1266,45 +1294,70 @@ export default function CadastroRecorrenteBody() {
                 </div>
               )}
               {!availLoading && !availError && availableWeekdays.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {availableWeekdays.map((day) => {
-                    const selected = selectedWeekday === day.weekday;
-                    return (
-                      <button
-                        key={day.id}
-                        onClick={() => setSelectedWeekday(day.weekday)}
-                        className={
-                          "text-left rounded-2xl border p-5 transition focus:outline-none " +
-                          (selected
-                            ? "border-indigo-500 bg-indigo-50 ring-4 ring-indigo-100 shadow-md"
-                            : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50")
-                        }
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-xl font-bold text-slate-900">{day.displayLabel}</div>
-                            <div className="mt-1 text-sm text-slate-500">
-                              {day.slotCount} horário(s) disponível(is)
+                <div className="space-y-8">
+                  {(() => {
+                    const groups = new Map<string | number, RecurringWeekdayOption[]>();
+                    for (const d of availableWeekdays) {
+                      const key = d.weekIndex ?? 0;
+                      if (!groups.has(key)) groups.set(key, []);
+                      groups.get(key)!.push(d);
+                    }
+                    const order = Array.from(groups.keys()).sort((a, b) => (a as number) - (b as number));
+                    return order.map((weekIdx) => {
+                      const items = groups.get(weekIdx) ?? [];
+                      const label = items[0]?.weekLabel ?? (weekIdx === 0 ? "Semana atual" : "Próxima semana");
+                      return (
+                        <div key={String(weekIdx)} className="space-y-4">
+                          <div className="flex items-center gap-3">
+                            <div className="shrink-0 rounded-full bg-indigo-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
+                              {label}
                             </div>
+                            <div className="h-px flex-1 bg-slate-200/80" />
                           </div>
-                          <div
-                            className={
-                              "w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 " +
-                              (selected ? "border-indigo-600 bg-indigo-600" : "border-slate-300")
-                            }
-                          >
-                            {selected && <span className="text-white text-xs font-bold" />}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {items.map((day) => {
+                              const selected = selectedDayId === day.id;
+                              return (
+                                <button
+                                  key={day.id}
+                                  onClick={() => setSelectedDayId(day.id)}
+                                  className={
+                                    "text-left rounded-2xl border p-5 transition focus:outline-none " +
+                                    (selected
+                                      ? "border-indigo-500 bg-indigo-50 ring-4 ring-indigo-100 shadow-md"
+                                      : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50")
+                                  }
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="text-xl font-bold text-slate-900 break-words">{day.displayLabel}</div>
+                                      <div className="mt-1 text-sm text-slate-500">
+                                        {day.slotCount} horário(s) disponível(is)
+                                      </div>
+                                    </div>
+                                    <div
+                                      className={
+                                        "w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 " +
+                                        (selected ? "border-indigo-600 bg-indigo-600" : "border-slate-300")
+                                      }
+                                    >
+                                      {selected && <span className="text-white text-xs font-bold" />}
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
-                      </button>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full">
                 <button
                   onClick={handleAdvance2}
-                  disabled={!selectedWeekday}
+                  disabled={!selectedDayId || !selectedWeekday}
                   className="w-full shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-10 sm:min-w-[240px] py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-sm sm:text-base truncate order-2 sm:order-2 sm:justify-self-end"
                 >
                   Avançar
