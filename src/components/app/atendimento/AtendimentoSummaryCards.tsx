@@ -813,9 +813,10 @@ function LeadDetails({
     (paymentPendingConfirmation || paymentRejected || paymentConfirmed);
 
   const paymentAlreadyConfirmed = Boolean(paymentConfirmed);
+  const paymentAlreadyRejected = Boolean(paymentRejected);
 
   const confirmBtnDisabled = Boolean(loadingPayment) || paymentAlreadyConfirmed;
-  const rejectBtnDisabled = Boolean(loadingPayment) || paymentAlreadyConfirmed;
+  const rejectBtnDisabled = Boolean(loadingPayment) || paymentAlreadyConfirmed || paymentAlreadyRejected;
 
   const contractDownloadHref = contractPdfUrl
     ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(lead.full_name ?? lead.phone ?? lead.id).replace(/\s+/g, "_")}.pdf`)}`

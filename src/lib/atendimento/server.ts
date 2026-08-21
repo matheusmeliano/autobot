@@ -3766,6 +3766,7 @@ export async function rejectLeadRecurringPayment(params: {
 
   const payStatusNow = String((lead as any).payment_status ?? "").trim().toLowerCase();
   const payConfirmedAtRaw = String((lead as any).payment_confirmed_at ?? "").trim();
+  const payRejectedAtRaw = String((lead as any).payment_rejected_at ?? "").trim();
   const alreadyConfirmed =
     payStatusNow === "confirmado" ||
     payStatusNow === "matriculado" ||
@@ -3774,12 +3775,26 @@ export async function rejectLeadRecurringPayment(params: {
     String((lead as any).status ?? "").trim() === "matricula_confirmada" ||
     String((lead as any).funnel_stage ?? "").trim() === "matriculado" ||
     String((lead as any).funnel_stage ?? "").trim() === "matricula_confirmada";
+  const alreadyRejected =
+    !alreadyConfirmed &&
+    (payStatusNow === "nao_realizado" ||
+      Boolean(payRejectedAtRaw && payRejectedAtRaw !== "null") ||
+      String((lead as any).status ?? "").trim() === "pagamento_nao_realizado" ||
+      String((lead as any).funnel_stage ?? "").trim() === "pagamento_nao_realizado");
 
   if (alreadyConfirmed) {
     return {
       ok: false,
       blocked: true,
       error: "Pagamento já foi confirmado anteriormente e não pode ser alterado.",
+    };
+  }
+
+  if (alreadyRejected) {
+    return {
+      ok: true,
+      idempotent: true,
+      rejected_at: payRejectedAtRaw || new Date().toISOString(),
     };
   }
 
