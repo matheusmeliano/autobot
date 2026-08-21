@@ -155,20 +155,227 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
         : String(stateRaw).trim() || null;
 
   const countryRaw = parsed.data.country;
-  const safeCountry =
-    countryRaw === undefined
-      ? undefined
-      : countryRaw === null
-        ? null
-        : String(countryRaw).trim() || null;
+  let safeCountry: undefined | null | string = undefined;
+  if (countryRaw === undefined) {
+    safeCountry = undefined;
+  } else if (countryRaw === null) {
+    safeCountry = null;
+  } else {
+    safeCountry = String(countryRaw).trim() || null;
+  }
 
   const timezoneRaw = parsed.data.timezone;
-  const safeTimezone =
-    timezoneRaw === undefined
-      ? undefined
-      : timezoneRaw === null
-        ? null
-        : String(timezoneRaw).trim() || null;
+  let safeTimezone: undefined | null | string = undefined;
+  if (timezoneRaw === undefined) {
+    safeTimezone = undefined;
+  } else if (timezoneRaw === null) {
+    safeTimezone = null;
+  } else {
+    safeTimezone = String(timezoneRaw).trim() || null;
+  }
+
+  function normalizeLocationKey(value: unknown): string {
+    return String(value ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "")
+      .trim();
+  }
+
+  const hasCityOrStateIncoming =
+    (safeCity !== undefined && safeCity !== null) ||
+    (safeState !== undefined && safeState !== null);
+
+  if (hasCityOrStateIncoming) {
+    const normState = normalizeLocationKey(safeState ?? "");
+    const normCity = normalizeLocationKey(safeCity ?? "");
+
+    let derivedCountry = "Brasil";
+    if (normState) {
+      if (
+        normState.includes("florida") ||
+        normState === "fl" ||
+        normCity.includes("miami") ||
+        normCity.includes("orlando")
+      ) {
+        derivedCountry = "Estados Unidos";
+      } else if (
+        normState.includes("portugal") ||
+        normState === "pt" ||
+        normCity.includes("lisboa") ||
+        normCity.includes("lisbon") ||
+        normCity.includes("porto")
+      ) {
+        derivedCountry = "Portugal";
+      } else if (
+        normState.includes("espanha") ||
+        normState.includes("spain") ||
+        normState === "es" ||
+        normCity.includes("madrid") ||
+        normCity.includes("barcelona")
+      ) {
+        derivedCountry = "Espanha";
+      } else if (
+        normState.includes("paraguai") ||
+        normState.includes("paraguay") ||
+        normState === "py" ||
+        normCity.includes("asuncion") ||
+        normCity.includes("assunca")
+      ) {
+        derivedCountry = "Paraguai";
+      } else if (
+        normState.includes("argentina") ||
+        normState === "ar" ||
+        normCity.includes("buenosaires") ||
+        normCity.includes("buenos aires")
+      ) {
+        derivedCountry = "Argentina";
+      }
+    } else if (normCity) {
+      if (normCity.includes("miami") || normCity.includes("orlando") || normCity.includes("newyork")) {
+        derivedCountry = "Estados Unidos";
+      } else if (normCity.includes("lisboa") || normCity.includes("lisbon") || normCity.includes("porto")) {
+        derivedCountry = "Portugal";
+      } else if (normCity.includes("madrid") || normCity.includes("barcelona")) {
+        derivedCountry = "Espanha";
+      } else if (normCity.includes("asuncion") || normCity.includes("assunca")) {
+        derivedCountry = "Paraguai";
+      } else if (normCity.includes("buenosaires")) {
+        derivedCountry = "Argentina";
+      }
+    }
+
+    const brStateToTimezone: Record<string, string> = {
+      ac: "America/Rio_Branco",
+      al: "America/Maceio",
+      ap: "America/Belem",
+      am: "America/Manaus",
+      ba: "America/Bahia",
+      ce: "America/Fortaleza",
+      df: "America/Sao_Paulo",
+      es: "America/Sao_Paulo",
+      go: "America/Sao_Paulo",
+      ma: "America/Sao_Paulo",
+      mt: "America/Cuiaba",
+      ms: "America/Campo_Grande",
+      mg: "America/Sao_Paulo",
+      pa: "America/Belem",
+      pb: "America/Fortaleza",
+      pr: "America/Sao_Paulo",
+      pe: "America/Recife",
+      pi: "America/Fortaleza",
+      rj: "America/Sao_Paulo",
+      rn: "America/Fortaleza",
+      rs: "America/Sao_Paulo",
+      ro: "America/Porto_Velho",
+      rr: "America/Boa_Vista",
+      sc: "America/Sao_Paulo",
+      sp: "America/Sao_Paulo",
+      se: "America/Maceio",
+      to: "America/Araguaina",
+    };
+
+    const brStateByNameToCode: Record<string, string> = {
+      acre: "ac",
+      alagoas: "al",
+      amapa: "ap",
+      amazonas: "am",
+      bahia: "ba",
+      ceara: "ce",
+      distritofederal: "df",
+      espiritosanto: "es",
+      goias: "go",
+      maranhao: "ma",
+      matogrosso: "mt",
+      matogrossodosul: "ms",
+      minasgerais: "mg",
+      para: "pa",
+      paraiba: "pb",
+      parana: "pr",
+      pernambuco: "pe",
+      piaui: "pi",
+      riodejaneiro: "rj",
+      riograndedonorte: "rn",
+      riograndedosul: "rs",
+      rondonia: "ro",
+      roraima: "rr",
+      santacatarina: "sc",
+      saopaulo: "sp",
+      sergipe: "se",
+      tocantins: "to",
+    };
+
+    let derivedTimezone = "America/Cuiaba";
+    const normCountry = normalizeLocationKey(derivedCountry);
+
+    if (normCountry === "estadosunidos") {
+      if (normCity.includes("miami") || normState === "fl" || normState.includes("florida")) {
+        derivedTimezone = "America/New_York";
+      } else if (normCity.includes("losangeles") || normState === "ca" || normState.includes("california")) {
+        derivedTimezone = "America/Los_Angeles";
+      } else if (normCity.includes("chicago") || normState === "il" || normState.includes("illinois")) {
+        derivedTimezone = "America/Chicago";
+      } else if (normCity.includes("newyork") || normState === "ny" || normState.includes("novaiorque")) {
+        derivedTimezone = "America/New_York";
+      } else if (normCity.includes("seattle") || normState === "wa" || normState.includes("washington")) {
+        derivedTimezone = "America/Los_Angeles";
+      } else {
+        derivedTimezone = "America/New_York";
+      }
+    } else if (normCountry === "portugal") {
+      derivedTimezone = "Europe/Lisbon";
+    } else if (normCountry === "espanha") {
+      derivedTimezone = "Europe/Madrid";
+    } else if (normCountry === "paraguai") {
+      derivedTimezone = "America/Asuncion";
+    } else if (normCountry === "argentina") {
+      derivedTimezone = "America/Argentina/Buenos_Aires";
+    } else {
+      let stateCode = normState.length === 2 ? normState : "";
+      if (!stateCode && normState) {
+        stateCode = brStateByNameToCode[normState] ?? "";
+      }
+      if (stateCode && brStateToTimezone[stateCode]) {
+        derivedTimezone = brStateToTimezone[stateCode];
+      } else if (normCity.includes("saopaulo") || normCity.includes("sao paulo") || normCity.includes("campinas") || normCity.includes("ribeirao")) {
+        derivedTimezone = "America/Sao_Paulo";
+      } else if (normCity.includes("riodejaneiro") || normCity.includes("rio de janeiro") || normCity.includes("nit")) {
+        derivedTimezone = "America/Sao_Paulo";
+      } else if (normCity.includes("cuiaba")) {
+        derivedTimezone = "America/Cuiaba";
+      } else if (normCity.includes("campogrande")) {
+        derivedTimezone = "America/Campo_Grande";
+      } else if (normCity.includes("manaus")) {
+        derivedTimezone = "America/Manaus";
+      } else if (normCity.includes("belem") || normCity.includes("anapolis") || normCity.includes("palmas")) {
+        derivedTimezone = "America/Belem";
+      } else if (normCity.includes("recife") || normCity.includes("fortaleza") || normCity.includes("salvador") || normCity.includes("maceio") || normCity.includes("natal") || normCity.includes("joaopessoa") || normCity.includes("teresina")) {
+        derivedTimezone = "America/Fortaleza";
+      } else if (normCity.includes("portoalegre") || normCity.includes("curitiba") || normCity.includes("florianopolis") || normCity.includes("joinville") || normCity.includes("blumenau")) {
+        derivedTimezone = "America/Sao_Paulo";
+      } else if (normCity.includes("belohorizonte") || normCity.includes("juizdefora") || normCity.includes("uberlandia")) {
+        derivedTimezone = "America/Sao_Paulo";
+      } else if (normCity.includes("brasilia")) {
+        derivedTimezone = "America/Sao_Paulo";
+      } else if (normCity.includes("portovelho")) {
+        derivedTimezone = "America/Porto_Velho";
+      } else if (normCity.includes("riobranco")) {
+        derivedTimezone = "America/Rio_Branco";
+      } else if (normCity.includes("boa vista") || normCity.includes("boavista")) {
+        derivedTimezone = "America/Boa_Vista";
+      } else if (normCity.includes("palmas") || normCity.includes("araguaina")) {
+        derivedTimezone = "America/Araguaina";
+      }
+    }
+
+    if (safeCountry === undefined && derivedCountry) {
+      safeCountry = derivedCountry;
+    }
+    if (safeTimezone === undefined && derivedTimezone) {
+      safeTimezone = derivedTimezone;
+    }
+  }
 
   const admin = createSupabaseAdminClient();
   const updateData: Record<string, unknown> = {};

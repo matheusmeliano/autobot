@@ -430,7 +430,7 @@ function formatCpf(v: string | null | undefined): string {
 }
 
 type LeadNameValues = { full_name: string };
-type LeadLocationValues = { city: string; state: string; country: string; timezone: string };
+type LeadLocationValues = { city: string; state: string };
 
 function RecurringClassLinkCard({
   lead,
@@ -1620,26 +1620,22 @@ export function AtendimentoSummaryCards({
   });
 
   const leadLocationForm = useForm<LeadLocationValues>({
-    defaultValues: { city: "", state: "", country: "", timezone: "" },
+    defaultValues: { city: "", state: "" },
   });
 
   function openEditLeadLocation(lead: AtendimentoLeadListItem) {
     setEditingLocationLead(lead);
     setIsEditLeadLocationOpen(true);
-    const defaultCountry = String(lead.country ?? "").trim() || "Brasil";
-    const defaultTimezone = String(lead.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
     leadLocationForm.reset({
       city: String(lead.city ?? "").trim(),
       state: String(lead.state ?? "").trim(),
-      country: defaultCountry,
-      timezone: defaultTimezone,
     });
   }
 
   function closeEditLeadLocation() {
     setIsEditLeadLocationOpen(false);
     setEditingLocationLead(null);
-    leadLocationForm.reset({ city: "", state: "", country: "", timezone: "" });
+    leadLocationForm.reset({ city: "", state: "" });
   }
 
   const saveLeadLocationForm = leadLocationForm.handleSubmit(async (values) => {
@@ -1656,13 +1652,9 @@ export function AtendimentoSummaryCards({
     }
     try {
       setSavingLeadLocationLeadId(leadId);
-      const countryFinal = String(values.country ?? "").trim() || "Brasil";
-      const timezoneFinal = String(values.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
       const body = {
         city: cityRaw,
         state: stateRaw,
-        country: countryFinal,
-        timezone: timezoneFinal,
       };
       const response = await fetch(`/api/atendimento/leads/${leadId}`, {
         method: "PATCH",
@@ -1691,8 +1683,12 @@ export function AtendimentoSummaryCards({
 
       const newCity = String(payload?.lead?.city ?? cityRaw).trim() || null;
       const newState = String(payload?.lead?.state ?? stateRaw).trim() || null;
-      const newCountry = String(payload?.lead?.country ?? countryFinal).trim() || null;
-      const newTimezone = String(payload?.lead?.timezone ?? timezoneFinal).trim() || null;
+      const newCountry = payload?.lead?.country !== undefined && payload?.lead?.country !== null
+        ? String(payload.lead.country).trim() || null
+        : null;
+      const newTimezone = payload?.lead?.timezone !== undefined && payload?.lead?.timezone !== null
+        ? String(payload.lead.timezone).trim() || null
+        : null;
       const newUpdatedAt = String(payload?.lead?.updated_at ?? editingLocationLead?.updated_at ?? new Date().toISOString());
 
       setLocalLeads((current) =>
@@ -3058,35 +3054,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold text-white/60">País</label>
-                <input
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder="Ex.: Brasil"
-                  maxLength={120}
-                  {...leadLocationForm.register("country", { required: false, maxLength: 120 })}
-                />
-                <div className="mt-1 text-[11px] text-white/40">
-                  Preenchido automaticamente com base na edição.
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-white/60">Fuso horário</label>
-                <input
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder="Ex.: America/Cuiaba"
-                  maxLength={120}
-                  {...leadLocationForm.register("timezone", { required: false, maxLength: 120 })}
-                />
-                <div className="mt-1 text-[11px] text-white/40">
-                  Preenchido automaticamente com base na edição.
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/55">
-              Ao salvar, cidade e estado editados serão persistidos e os campos país e fuso também serão salvos.
+            <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/55">
+              Com base no estado e cidade informados, o sistema identifica automaticamente o país e o fuso horário e os registra.
             </div>
 
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
