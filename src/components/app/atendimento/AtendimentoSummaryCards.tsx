@@ -573,7 +573,6 @@ function LeadDetails({
   onDelete,
   onEditName,
   onEditLocation,
-  onEditExperimental,
   savingRecurringLink,
   onSaveRecurringLink,
 }: {
@@ -584,7 +583,6 @@ function LeadDetails({
   onDelete: () => void;
   onEditName: (lead: AtendimentoLeadListItem) => void;
   onEditLocation?: (lead: AtendimentoLeadListItem) => void;
-  onEditExperimental?: (lead: AtendimentoLeadListItem) => void;
   savingRecurringLink: boolean;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
 }) {
@@ -771,16 +769,6 @@ function LeadDetails({
             >
               <Pencil className="h-4 w-4 shrink-0" />
               Editar
-            </button>
-          ) : null}
-          {showDelete && onEditExperimental ? (
-            <button
-              type="button"
-              onClick={() => void onEditExperimental(lead)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <CalendarDays className="h-4 w-4 shrink-0" />
-              Editar aula experimental
             </button>
           ) : null}
           {showDelete ? (
@@ -1024,6 +1012,7 @@ function BookingDetails({
   onMarkAttendance,
   onSendStudentNotification,
   onSaveRecurringLink,
+  onEditExperimental,
 }: {
   lead: AtendimentoLeadListItem;
   activeSection: SummarySectionId;
@@ -1038,6 +1027,7 @@ function BookingDetails({
   onMarkAttendance: (lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") => Promise<void>;
   onSendStudentNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
+  onEditExperimental?: (lead: AtendimentoLeadListItem) => void;
 }) {
   const booking = lead.experimental_class_booking;
   const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
@@ -1238,6 +1228,20 @@ function BookingDetails({
           >
             <Trash2 className="h-4 w-4 shrink-0" />
             {cancellingBookingId === bookingId ? "Cancelando..." : "Cancelar agendamento"}
+          </button>
+        ) : null}
+
+        {activeSection === "agendamentos" &&
+        onEditExperimental &&
+        !hasRecurringClass &&
+        !hideExperimentalInfoCompletely ? (
+          <button
+            type="button"
+            onClick={() => void onEditExperimental(lead)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            Editar
           </button>
         ) : null}
       </div>
@@ -3075,6 +3079,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   onMarkAttendance={handleMarkAttendance}
                   onSendStudentNotification={handleSendStudentNotification}
                   onSaveRecurringLink={handleSaveRecurringLink}
+                  onEditExperimental={(l) => openEditExperimental(l)}
                 />
               ) : activeSection === "contratos" ? (
                 <ContractDetails lead={selectedLead} />
@@ -3087,7 +3092,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   onDelete={() => handleDeleteLead(selectedLead)}
                   onEditName={(l) => openEditLeadName(l)}
                   onEditLocation={(l) => openEditLeadLocation(l)}
-                  onEditExperimental={(l) => openEditExperimental(l)}
                   savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                   onSaveRecurringLink={handleSaveRecurringLink}
                 />
