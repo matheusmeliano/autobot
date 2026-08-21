@@ -213,6 +213,13 @@ export async function GET(req: Request) {
   const draftDateByLeadId = new Map<string, { professor_date: string; lead_date: string; label?: string | null; at: string } | null>();
   const draftTimeByLeadId = new Map<string, { professor_date: string; professor_time: string; lead_date: string; lead_time: string; professor_start_at: string; lead_start_at: string; at: string } | null>();
   const enrollmentNumberByHistory = new Map<string, string | null>();
+  const paymentMetaByLeadId = new Map<string, {
+    payment_status: "confirmado" | "nao_realizado" | "pendente_confirmacao" | null;
+    payment_confirmed_at: string | null;
+    payment_rejected_at: string | null;
+    funnel_stage: string | null;
+    status: string | null;
+  }>();
   let allHistoryEvents: any[] | null = null;
 
   if (leadIds.length > 0) {
@@ -232,6 +239,11 @@ export async function GET(req: Request) {
         "experimental_class_attendance_follow_up_required",
         "enrollment_number_generated",
         "contrato_assinado",
+        "recurring_payment_confirmed",
+        "recurring_payment_rejected",
+        "recurring_payment_intent_registered",
+        "attendant_clicked_payment_sim",
+        "attendant_clicked_payment_nao",
       ])
       .order("created_at", { ascending: false });
 
@@ -264,6 +276,53 @@ export async function GET(req: Request) {
       }
       if (eventType.startsWith("experimental_class_") && !latestClassEventByLeadId.has(leadId)) {
         latestClassEventByLeadId.set(leadId, eventType);
+      }
+      const PAYMENT_PRIORITY: Record<string, number> = {
+        confirmado: 100,
+        nao_realizado: 50,
+        pendente_confirmacao: 10,
+      };
+      const existingPayment = paymentMetaByLeadId.get(leadId);
+      const existingRank = existingPayment?.payment_status
+        ? PAYMENT_PRIORITY[existingPayment.payment_status] ?? 0
+        : 0;
+      let candidateStatus: "confirmado" | "nao_realizado" | "pendente_confirmacao" | null = null;
+      let candidateConfirmedAt: string | null = null;
+      let candidateRejectedAt: string | null = null;
+      let candidateStage: string | null = null;
+      let candidateLeadStatus: string | null = null;
+      if (eventType === "recurring_payment_confirmed" || eventType === "attendant_clicked_payment_sim") {
+        candidateStatus = "confirmado";
+        candidateStage = "matriculado";
+        candidateLeadStatus = "matriculado";
+        candidateConfirmedAt =
+          (typeof details?.confirmed_at === "string" ? String(details.confirmed_at).trim() : "") ||
+          eca ||
+          null;
+      } else if (eventType === "recurring_payment_rejected" || eventType === "attendant_clicked_payment_nao") {
+        candidateStatus = "nao_realizado";
+        candidateStage = "pagamento_nao_realizado";
+        candidateLeadStatus = "pagamento_nao_realizado";
+        candidateRejectedAt =
+          (typeof details?.rejected_at === "string" ? String(details.rejected_at).trim() : "") ||
+          eca ||
+          null;
+      } else if (eventType === "recurring_payment_intent_registered") {
+        candidateStatus = "pendente_confirmacao";
+        candidateStage = "pagamento_pendente_confirmacao";
+        candidateLeadStatus = "pagamento_pendente_confirmacao";
+      }
+      if (candidateStatus) {
+        const candidateRank = PAYMENT_PRIORITY[candidateStatus] ?? 0;
+        if (!existingPayment || candidateRank > existingRank) {
+          paymentMetaByLeadId.set(leadId, {
+            payment_status: candidateStatus,
+            payment_confirmed_at: candidateConfirmedAt,
+            payment_rejected_at: candidateRejectedAt,
+            funnel_stage: candidateStage,
+            status: candidateLeadStatus,
+          });
+        }
       }
     }
     for (const event of historyEvents ?? []) {
@@ -790,8 +849,50 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         }
       }
 
+      const PAYMENT_RANK_META: Record<string, number> = {
+        contrato_coletando_dados: 4, contrato_aguardando_aceite: 6, contrato_assinado: 8,
+        pagamento_pendente_confirmacao: 20, pagamento_nao_realizado: 30,
+        pendente_confirmacao: 20, nao_realizado: 30, confirmado: 40, matriculado: 50,
+        coletando_dados: 4, aguardando_aceite: 6, assinado: 8,
+      };
+      const rowPaymentStatus = String((row as any)?.payment_status ?? "").trim().toLowerCase();
+      const rowFunnelStage = String((row as any)?.funnel_stage ?? "").trim().toLowerCase();
+      const rowLeadStatus = String((row as any)?.status ?? "").trim().toLowerCase();
+      const rowConfirmedAt = String((row as any)?.payment_confirmed_at ?? "").trim() || null;
+      const rowRejectedAt = String((row as any)?.payment_rejected_at ?? "").trim() || null;
+      const histMeta = paymentMetaByLeadId.get(leadId) ?? null;
+      const rowRank =
+        (PAYMENT_RANK_META[rowPaymentStatus] ?? 0) +
+        (PAYMENT_RANK_META[rowFunnelStage] ?? 0) +
+        (PAYMENT_RANK_META[rowLeadStatus] ?? 0);
+      const histRank = histMeta?.payment_status
+        ? (PAYMENT_RANK_META[histMeta.payment_status] ?? 0) +
+          (PAYMENT_RANK_META[String(histMeta.funnel_stage ?? "").toLowerCase()] ?? 0) +
+          (PAYMENT_RANK_META[String(histMeta.status ?? "").toLowerCase()] ?? 0)
+        : 0;
+      const useHistoryFallback = !!(
+        histMeta &&
+        (rowRank < histRank || (!rowPaymentStatus && histMeta.payment_status))
+      );
+      const finalPaymentStatus = useHistoryFallback
+        ? histMeta!.payment_status
+        : rowPaymentStatus || null;
+      const finalFunnelStage = useHistoryFallback && histMeta!.funnel_stage
+        ? histMeta!.funnel_stage
+        : rowFunnelStage || null;
+      const finalLeadStatus = useHistoryFallback && histMeta!.status
+        ? histMeta!.status
+        : rowLeadStatus || null;
+      const finalConfirmedAt = rowConfirmedAt || (useHistoryFallback ? histMeta!.payment_confirmed_at : null);
+      const finalRejectedAt = rowRejectedAt || (useHistoryFallback ? histMeta!.payment_rejected_at : null);
+
       return {
         ...row,
+        payment_status: finalPaymentStatus,
+        payment_confirmed_at: finalConfirmedAt,
+        payment_rejected_at: finalRejectedAt,
+        funnel_stage: finalFunnelStage || String((row as any)?.funnel_stage ?? "") || null,
+        status: finalLeadStatus || String((row as any)?.status ?? "") || null,
         enrollment_number:
           String((row as any)?.enrollment_number ?? "").trim() ||
           enrollmentNumberByHistory.get(leadId) ||

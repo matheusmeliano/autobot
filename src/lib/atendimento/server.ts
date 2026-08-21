@@ -3624,6 +3624,20 @@ export async function confirmLeadRecurringPayment(params: {
     patch.status = "matriculado";
   }
 
+  try {
+    await appendHistoryEvent({
+      leadId,
+      eventType: "recurring_payment_confirmed",
+      title: "Pagamento marcado como Sim (confirmado)",
+      details: {
+        enrollment_number: (lead as any).enrollment_number || null,
+        confirmed_at: now,
+        confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
+      },
+      actorType,
+    });
+  } catch {}
+
   let applied = false;
   const runPatch = async (p: any) => {
     const { error } = await admin
@@ -3704,20 +3718,6 @@ export async function confirmLeadRecurringPayment(params: {
     }
   } catch {}
 
-  try {
-    await appendHistoryEvent({
-      leadId,
-      eventType: "recurring_payment_confirmed",
-      title: "Pagamento marcado como Sim (confirmado)",
-      details: {
-        enrollment_number: (lead as any).enrollment_number || null,
-        confirmed_at: now,
-        confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
-      },
-      actorType,
-    });
-  } catch {}
-
   return { ok: true, confirmed_at: now };
 }
 
@@ -3758,6 +3758,21 @@ export async function rejectLeadRecurringPayment(params: {
     patch.status = "pagamento_nao_realizado";
   }
 
+  try {
+    await appendHistoryEvent({
+      leadId,
+      eventType: "recurring_payment_rejected",
+      title: "Pagamento marcado como Não (não realizado)",
+      details: {
+        enrollment_number: (lead as any).enrollment_number || null,
+        rejected_at: now,
+        rejected_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
+        reason: reason ? String(reason).trim() : null,
+      },
+      actorType,
+    });
+  } catch {}
+
   const runPatch = async (p: any): Promise<{ ok: boolean; error?: any }> => {
     const { error } = await admin
       .from("atendimento_leads")
@@ -3778,20 +3793,6 @@ export async function rejectLeadRecurringPayment(params: {
   if (!patchRes.ok) {
     return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };
   }
-  try {
-    await appendHistoryEvent({
-      leadId,
-      eventType: "recurring_payment_rejected",
-      title: "Pagamento marcado como Não (não realizado)",
-      details: {
-        enrollment_number: (lead as any).enrollment_number || null,
-        rejected_at: now,
-        rejected_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
-        reason: reason ? String(reason).trim() : null,
-      },
-      actorType,
-    });
-  } catch {}
   return { ok: true, rejected_at: now };
 }
 
@@ -3864,6 +3865,20 @@ export async function triggerRecurringPaymentIntentIfNeeded(params: {
     patch.enrollment_number = enrollmentNumber;
   }
 
+  try {
+    await appendHistoryEvent({
+      leadId,
+      eventType: "recurring_payment_intent_registered",
+      title: "Intenção de pagamento registrada (pagamento pendente)",
+      details: {
+        enrollment_number: enrollmentNumber || null,
+        triggered_from: triggeredFrom,
+        pending_since: now,
+      },
+      actorType: "system",
+    });
+  } catch {}
+
   const runPatch = async (p: any): Promise<{ ok: boolean; error?: any }> => {
     const { error } = await admin
       .from("atendimento_leads")
@@ -3884,20 +3899,6 @@ export async function triggerRecurringPaymentIntentIfNeeded(params: {
   if (!patchRes.ok) {
     return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };
   }
-
-  try {
-    await appendHistoryEvent({
-      leadId,
-      eventType: "recurring_payment_intent_registered",
-      title: "Intenção de pagamento registrada (pagamento pendente)",
-      details: {
-        enrollment_number: enrollmentNumber || null,
-        triggered_from: triggeredFrom,
-        pending_since: now,
-      },
-      actorType: "system",
-    });
-  } catch {}
 
   try {
     const attendantMsg = buildRecurringPaymentPendingConfirmationAttendantNotification(
