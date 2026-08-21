@@ -103,6 +103,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   const schema = z.object({
     full_name: z.string().trim().max(160).nullable().optional(),
     recurring_class_link: z.string().trim().max(500).nullable().optional(),
+    city: z.string().trim().max(160).nullable().optional(),
+    state: z.string().trim().max(160).nullable().optional(),
+    country: z.string().trim().max(120).nullable().optional(),
+    timezone: z.string().trim().max(120).nullable().optional(),
   });
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -134,10 +138,46 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     }
   }
 
+  const cityRaw = parsed.data.city;
+  const safeCity =
+    cityRaw === undefined
+      ? undefined
+      : cityRaw === null
+        ? null
+        : String(cityRaw).trim() || null;
+
+  const stateRaw = parsed.data.state;
+  const safeState =
+    stateRaw === undefined
+      ? undefined
+      : stateRaw === null
+        ? null
+        : String(stateRaw).trim() || null;
+
+  const countryRaw = parsed.data.country;
+  const safeCountry =
+    countryRaw === undefined
+      ? undefined
+      : countryRaw === null
+        ? null
+        : String(countryRaw).trim() || null;
+
+  const timezoneRaw = parsed.data.timezone;
+  const safeTimezone =
+    timezoneRaw === undefined
+      ? undefined
+      : timezoneRaw === null
+        ? null
+        : String(timezoneRaw).trim() || null;
+
   const admin = createSupabaseAdminClient();
   const updateData: Record<string, unknown> = {};
   if (safeFullName !== undefined) updateData.full_name = safeFullName;
   if (safeRecurringLink !== undefined) updateData.recurring_class_link = safeRecurringLink;
+  if (safeCity !== undefined) updateData.city = safeCity;
+  if (safeState !== undefined) updateData.state = safeState;
+  if (safeCountry !== undefined) updateData.country = safeCountry;
+  if (safeTimezone !== undefined) updateData.timezone = safeTimezone;
 
   if (Object.keys(updateData).length === 0) {
     return Response.json({ ok: true, lead: null });
@@ -148,7 +188,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     .update(updateData)
     .eq("id", leadId)
     .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-    .select("id, full_name, recurring_class_link, updated_at")
+    .select("id, full_name, recurring_class_link, city, state, country, timezone, updated_at")
     .maybeSingle();
 
   if (error) {
@@ -164,6 +204,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       id: String(updated.id ?? ""),
       full_name: String((updated as any).full_name ?? "").trim() || null,
       recurring_class_link: String((updated as any).recurring_class_link ?? "").trim() || null,
+      city: String((updated as any).city ?? "").trim() || null,
+      state: String((updated as any).state ?? "").trim() || null,
+      country: String((updated as any).country ?? "").trim() || null,
+      timezone: String((updated as any).timezone ?? "").trim() || null,
       updated_at: String((updated as any).updated_at ?? new Date().toISOString()),
     },
   });

@@ -430,6 +430,7 @@ function formatCpf(v: string | null | undefined): string {
 }
 
 type LeadNameValues = { full_name: string };
+type LeadLocationValues = { city: string; state: string; country: string; timezone: string };
 
 function RecurringClassLinkCard({
   lead,
@@ -562,6 +563,7 @@ function LeadDetails({
   deleting,
   onDelete,
   onEditName,
+  onEditLocation,
   savingRecurringLink,
   onSaveRecurringLink,
 }: {
@@ -571,6 +573,7 @@ function LeadDetails({
   deleting: boolean;
   onDelete: () => void;
   onEditName: (lead: AtendimentoLeadListItem) => void;
+  onEditLocation?: (lead: AtendimentoLeadListItem) => void;
   savingRecurringLink: boolean;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
 }) {
@@ -747,6 +750,16 @@ function LeadDetails({
             >
               <Pencil className="h-4 w-4 shrink-0" />
               {hasName ? "Alterar nome" : "Adicionar nome"}
+            </button>
+          ) : null}
+          {showDelete && onEditLocation ? (
+            <button
+              type="button"
+              onClick={() => void onEditLocation(lead)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Pencil className="h-4 w-4 shrink-0" />
+              Editar
             </button>
           ) : null}
           {showDelete ? (
@@ -1539,6 +1552,9 @@ export function AtendimentoSummaryCards({
   const [isEditLeadNameOpen, setIsEditLeadNameOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<AtendimentoLeadListItem | null>(null);
   const [savingLeadNameLeadId, setSavingLeadNameLeadId] = useState<string | null>(null);
+  const [isEditLeadLocationOpen, setIsEditLeadLocationOpen] = useState(false);
+  const [editingLocationLead, setEditingLocationLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [savingLeadLocationLeadId, setSavingLeadLocationLeadId] = useState<string | null>(null);
 
   const leadNameForm = useForm<LeadNameValues>({
     defaultValues: { full_name: "" },
@@ -1600,6 +1616,106 @@ export function AtendimentoSummaryCards({
       modalToast.error(error instanceof Error ? error.message : "Falha ao salvar o nome do interessado.");
     } finally {
       setSavingLeadNameLeadId(null);
+    }
+  });
+
+  const leadLocationForm = useForm<LeadLocationValues>({
+    defaultValues: { city: "", state: "", country: "", timezone: "" },
+  });
+
+  function openEditLeadLocation(lead: AtendimentoLeadListItem) {
+    setEditingLocationLead(lead);
+    setIsEditLeadLocationOpen(true);
+    const defaultCountry = String(lead.country ?? "").trim() || "Brasil";
+    const defaultTimezone = String(lead.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+    leadLocationForm.reset({
+      city: String(lead.city ?? "").trim(),
+      state: String(lead.state ?? "").trim(),
+      country: defaultCountry,
+      timezone: defaultTimezone,
+    });
+  }
+
+  function closeEditLeadLocation() {
+    setIsEditLeadLocationOpen(false);
+    setEditingLocationLead(null);
+    leadLocationForm.reset({ city: "", state: "", country: "", timezone: "" });
+  }
+
+  const saveLeadLocationForm = leadLocationForm.handleSubmit(async (values) => {
+    const leadId = String(editingLocationLead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para editar localização.");
+      return;
+    }
+    const cityRaw = String(values.city ?? "").trim();
+    const stateRaw = String(values.state ?? "").trim();
+    if (!cityRaw || !stateRaw) {
+      modalToast.error("Informe a cidade e o estado para salvar.");
+      return;
+    }
+    try {
+      setSavingLeadLocationLeadId(leadId);
+      const countryFinal = String(values.country ?? "").trim() || "Brasil";
+      const timezoneFinal = String(values.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+      const body = {
+        city: cityRaw,
+        state: stateRaw,
+        country: countryFinal,
+        timezone: timezoneFinal,
+      };
+      const response = await fetch(`/api/atendimento/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            lead?: {
+              id?: string;
+              city?: string | null;
+              state?: string | null;
+              country?: string | null;
+              timezone?: string | null;
+              updated_at?: string;
+            } | null;
+          }
+        | null;
+
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao salvar localização.");
+        return;
+      }
+
+      const newCity = String(payload?.lead?.city ?? cityRaw).trim() || null;
+      const newState = String(payload?.lead?.state ?? stateRaw).trim() || null;
+      const newCountry = String(payload?.lead?.country ?? countryFinal).trim() || null;
+      const newTimezone = String(payload?.lead?.timezone ?? timezoneFinal).trim() || null;
+      const newUpdatedAt = String(payload?.lead?.updated_at ?? editingLocationLead?.updated_at ?? new Date().toISOString());
+
+      setLocalLeads((current) =>
+        current.map((item) =>
+          item.id === leadId
+            ? {
+                ...item,
+                city: newCity,
+                state: newState,
+                country: newCountry,
+                timezone: newTimezone,
+                updated_at: newUpdatedAt,
+              }
+            : item,
+        ),
+      );
+
+      modalToast.success("Cidade e estado atualizados. País e fuso foram salvos.");
+      closeEditLeadLocation();
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao salvar localização.");
+    } finally {
+      setSavingLeadLocationLeadId(null);
     }
   });
 
@@ -2735,6 +2851,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   deleting={deletingLeadId === selectedLead.id}
                   onDelete={() => handleDeleteLead(selectedLead)}
                   onEditName={(l) => openEditLeadName(l)}
+                  onEditLocation={(l) => openEditLeadLocation(l)}
                   savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                   onSaveRecurringLink={handleSaveRecurringLink}
                 />
@@ -2818,6 +2935,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       deleting={deletingLeadId === selectedLead.id}
                       onDelete={() => handleDeleteLead(selectedLead)}
                       onEditName={(l) => openEditLeadName(l)}
+                      onEditLocation={(l) => openEditLeadLocation(l)}
                       savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                       onSaveRecurringLink={handleSaveRecurringLink}
                     />
@@ -2886,6 +3004,105 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                 className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
               >
                 {leadNameForm.formState.isSubmitting || savingLeadNameLeadId !== null ? "Salvando..." : "Salvar nome"}
+              </button>
+            </div>
+          </form>
+        </AppModal>
+
+        <AppModal
+          open={isEditLeadLocationOpen}
+          onClose={closeEditLeadLocation}
+          size="md"
+          zIndexClass="z-[500]"
+          fullScreenOnMobile
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white/90">
+                Editar localização do interessado
+              </div>
+              <div className="mt-1 truncate text-xs text-white/55">
+                {editingLocationLead?.phone || editingLocationLead?.full_name || "Lead selecionado"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeEditLeadLocation}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <form onSubmit={saveLeadLocationForm} className="mt-5 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-white/60">Cidade</label>
+                <input
+                  autoFocus
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  placeholder="Ex.: Cuiabá"
+                  maxLength={160}
+                  {...leadLocationForm.register("city", { required: true, maxLength: 160 })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/60">Estado</label>
+                <input
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  placeholder="Ex.: Mato Grosso ou MT"
+                  maxLength={160}
+                  {...leadLocationForm.register("state", { required: true, maxLength: 160 })}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-white/60">País</label>
+                <input
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  placeholder="Ex.: Brasil"
+                  maxLength={120}
+                  {...leadLocationForm.register("country", { required: false, maxLength: 120 })}
+                />
+                <div className="mt-1 text-[11px] text-white/40">
+                  Preenchido automaticamente com base na edição.
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/60">Fuso horário</label>
+                <input
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  placeholder="Ex.: America/Cuiaba"
+                  maxLength={120}
+                  {...leadLocationForm.register("timezone", { required: false, maxLength: 120 })}
+                />
+                <div className="mt-1 text-[11px] text-white/40">
+                  Preenchido automaticamente com base na edição.
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/55">
+              Ao salvar, cidade e estado editados serão persistidos e os campos país e fuso também serão salvos.
+            </div>
+
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={closeEditLeadLocation}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={leadLocationForm.formState.isSubmitting || savingLeadLocationLeadId !== null}
+                className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+              >
+                {leadLocationForm.formState.isSubmitting || savingLeadLocationLeadId !== null ? "Salvando..." : "Salvar localização"}
               </button>
             </div>
           </form>
