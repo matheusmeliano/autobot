@@ -915,7 +915,7 @@ function LeadDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {showPaymentActions || paymentConfirmed || paymentRejected ? (
+        {showPaymentActions || paymentConfirmed || paymentRejected || paymentPendingConfirmation ? (
           <div className="mb-3 w-full overflow-visible rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
             <div className="flex w-full flex-col gap-3 items-stretch sm:flex-row sm:justify-between sm:items-center">
               <div className="w-full sm:w-auto flex items-center justify-center sm:justify-start">
@@ -3839,6 +3839,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       onEditLocation={(l) => openEditLeadLocation(l)}
                       savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                       onSaveRecurringLink={handleSaveRecurringLink}
+                      loadingPayment={loadingPaymentLeadId === selectedLead.id}
+                      loadingPaymentAction={loadingPaymentLeadId === selectedLead.id ? loadingPaymentAction : null}
+                      onConfirmPayment={(l) => handlePaymentAction(l, "confirm")}
+                      onRejectPayment={(l) => handlePaymentAction(l, "reject")}
                     />
                   )}
                 </div>
