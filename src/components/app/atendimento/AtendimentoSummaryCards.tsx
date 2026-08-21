@@ -329,6 +329,21 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
   }
   if (pastMeta && pastBody) return `Última aula em: ${pastBody}`;
 
+  const cityOk = Boolean(String((lead as any)?.city ?? "").trim());
+  const stateOk = Boolean(String((lead as any)?.state ?? "").trim());
+  const countryOk = Boolean(String((lead as any)?.country ?? "").trim());
+  const timezoneOk = Boolean(String((lead as any)?.timezone ?? "").trim());
+  const localizacaoCompleta = cityOk && stateOk && countryOk && timezoneOk;
+  const bookingAtivaNaoCancelada =
+    booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled";
+  const nenhumaExperimentalAgendadaOuResolvida =
+    !hasFutureExp && !bookingAtivaNaoCancelada && !pastDone;
+  if (localizacaoCompleta && nenhumaExperimentalAgendadaOuResolvida) {
+    if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
+    if (!hasExpDate) return "Falta dia";
+    if (!hasExpTime) return "Falta horário";
+  }
+
   if (expStage === "pre_cadastro_concluido" || expStatusRaw === "date_selected" || expStatusRaw === "time_selected") {
     if (expStatusRaw === "date_selected" && hasExpDate && !hasExpTime) return "Falta horário";
     if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
@@ -2043,6 +2058,35 @@ function sortLeadsBySectionEnteredDesc<T extends { created_at?: unknown; updated
         // (ou seja, ja interagiu com o link de matricula e foi promovido)
         // SEMPRE aparece na secao AGENDAMENTOS tambem.
         if (isLeadInAlunosSection(lead)) return true;
+
+        const cityRaw = String((lead as any)?.city ?? "").trim();
+        const stateRaw = String((lead as any)?.state ?? "").trim();
+        const countryRaw = String((lead as any)?.country ?? "").trim();
+        const timezoneRaw = String((lead as any)?.timezone ?? "").trim();
+        if (cityRaw && stateRaw && countryRaw && timezoneRaw) {
+          const bk = lead.experimental_class_booking;
+          const bkStatus = String(bk?.status ?? "").trim().toLowerCase();
+          const bkHasId = Boolean(String(bk?.id ?? "").trim());
+          const bkNotDraft = bkHasId && String(bk?.source ?? "draft").trim().toLowerCase() !== "draft";
+          const bkAtiva = bk && bkHasId && bkNotDraft && bkStatus !== "cancelled";
+          const fExp = (lead as any)?.future_experimental_class_booking ?? null;
+          const fExpStatus = String(fExp?.status ?? "").trim().toLowerCase();
+          const hasFExp = Boolean(fExp && fExpStatus !== "cancelled");
+          const pm = (lead as any)?.latest_past_class_meta ?? null;
+          let pDone = false;
+          if (pm) {
+            const pma = String((pm as any).attendance_status ?? "").trim().toLowerCase();
+            const pmt = String((pm as any).type ?? "").trim().toLowerCase();
+            const isExp =
+              pmt === "experimental" ||
+              pmt.includes("experimental") ||
+              pmt.includes("aula_experimental") ||
+              pma === "attended" ||
+              pma === "no_show";
+            pDone = isExp && (pma === "attended" || pma === "no_show");
+          }
+          if (!hasFExp && !bkAtiva && !pDone) return true;
+        }
 
         const st = String(lead.status ?? "").trim().toLowerCase();
         const fs = String(lead.funnel_stage ?? "").trim().toLowerCase();
