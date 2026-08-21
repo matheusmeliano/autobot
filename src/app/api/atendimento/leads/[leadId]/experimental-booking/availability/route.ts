@@ -16,73 +16,60 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
       return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
     }
     const supabase = createSupabaseAdminClient();
-    const leadRes = await supabase
+
+    const { data: leadExists, error: leadErr } = await supabase
       .from("atendimento_leads")
-      .select("id,assigned_user_email,timezone,country,city,state")
+      .select("id, assigned_user_email, timezone, country, city, state")
       .eq("id", leadId)
-      .limit(1)
+      .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
       .maybeSingle();
-    if (leadRes.error) {
-      console.error("[experimental-booking-availability-get-lead]", leadRes.error);
-      return Response.json({ ok: false, error: "db_error" }, { status: 500 });
+    if (leadErr) {
+      console.error("[experimental-booking-availability-get-lead]", leadErr);
+      return Response.json({ ok: false, error: leadErr.message }, { status: 500 });
     }
-    const leadRow = leadRes.data as
-      | {
-          id: string;
-          assigned_user_email: string | null;
-          timezone: string | null;
-          country: string | null;
-          city: string | null;
-          state: string | null;
-        }
-      | null;
-    if (!leadRow) {
+    if (!leadExists?.id) {
       return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
     }
-    if (String(leadRow.assigned_user_email ?? "").trim() !== "atendimento.usa.music@gmail.com") {
-      return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
-    }
 
-    const leadTimeZoneRaw = String(leadRow.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+    const leadTimeZoneRaw =
+      String((leadExists as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
-    const bookedRes = await supabase
+    const { data: currentActiveRows, error: curErr } = await supabase
       .from("atendimento_experimental_class_bookings")
-      .select("id,professor_start_at")
-      .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-      .eq("status", "scheduled")
-      .not("professor_start_at", "is", null);
-    if (bookedRes.error) {
-      console.error("[experimental-booking-availability-get-booked]", bookedRes.error);
-      return Response.json({ ok: false, error: "db_error" }, { status: 500 });
-    }
-    const allBookedRows = (Array.isArray(bookedRes.data) ? bookedRes.data : []) as Array<{
-      id: string;
-      professor_start_at: string | null;
-    }>;
-
-    const existingBookingRes = await supabase
-      .from("atendimento_experimental_class_bookings")
-      .select("id")
+      .select("id, status")
       .eq("lead_id", leadId)
-      .eq("status", "scheduled")
-      .limit(5)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (curErr) {
+      console.error("[experimental-booking-availability-get-current]", curErr);
+      return Response.json({ ok: false, error: curErr.message }, { status: 500 });
+    }
     const currentBookingIds = new Set<string>();
-    if (!existingBookingRes.error && existingBookingRes.data) {
-      const rows = (Array.isArray(existingBookingRes.data)
-        ? existingBookingRes.data
-        : [existingBookingRes.data]) as Array<{ id: string }>;
-      for (const r of rows) {
-        if (r?.id) currentBookingIds.add(String(r.id));
+    for (const r of Array.isArray(currentActiveRows) ? currentActiveRows : []) {
+      const status = String((r as any)?.status ?? "").trim().toLowerCase();
+      if (status !== "cancelled" && (r as any)?.id) {
+        currentBookingIds.add(String((r as any).id));
       }
     }
 
+    const { data: allBookedRows, error: bookedErr } = await supabase
+      .from("atendimento_experimental_class_bookings")
+      .select("id, professor_start_at, status")
+      .not("professor_start_at", "is", null);
+    if (bookedErr) {
+      console.error("[experimental-booking-availability-get-booked]", bookedErr);
+      return Response.json({ ok: false, error: bookedErr.message }, { status: 500 });
+    }
+
     const bookedAts: string[] = [];
-    for (const row of allBookedRows) {
-      if (!row?.professor_start_at) continue;
-      if (row?.id && currentBookingIds.has(String(row.id))) continue;
-      const value = String(row.professor_start_at).trim();
-      if (value) bookedAts.push(value);
+    for (const row of Array.isArray(allBookedRows) ? allBookedRows : []) {
+      const r = row as any;
+      const startAt = String(r?.professor_start_at ?? "").trim();
+      if (!startAt) continue;
+      const status = String(r?.status ?? "").trim().toLowerCase();
+      if (status === "cancelled") continue;
+      if (r?.id && currentBookingIds.has(String(r.id))) continue;
+      bookedAts.push(startAt);
     }
 
     const availability = listExperimentalClassAvailability({
