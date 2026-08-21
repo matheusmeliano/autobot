@@ -518,6 +518,48 @@ Acesse o painel para conferir:
 ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 
+export function buildRecurringPaymentPendingConfirmationAttendantNotification(
+  name: string | null | undefined,
+  enrollmentNumber: string | null | undefined,
+) {
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Novo aluno";
+  const safeEnrollment =
+    String(enrollmentNumber ?? "").trim() || "Nº de matrícula pendente";
+  return `Alerta: Pagamento pendente de confirmação 🔔
+
+O aluno clicou em Finalizar Matrícula.
+Confira o pagamento na plataforma e marque Sim ou Não no card Pagamento da seção Alunos.
+
+Aluno: ${safeFirst}
+Matrícula: ${safeEnrollment}
+
+Acessar painel:
+${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
+}
+
+export function buildRecurringPaymentConfirmedStudentWelcomeMessage(
+  name: string | null | undefined,
+  dashboardLink: string | null | undefined,
+) {
+  const safeFull = String(name ?? "").trim();
+  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
+  const safeDashboard =
+    String(dashboardLink ?? "").trim() || "https://www.autobot.business/login";
+  return `Parabéns, ${safeFirst}! 🎉
+
+Seu pagamento foi confirmado e sua matrícula está oficialmente concluída na Lucas Brum Online Music USA.
+
+A partir de agora, você já pode acessar o seu Painel do Aluno, onde poderá consultar seus dados de matrícula e acompanhar as informações das suas aulas.
+
+Acesse seu painel:
+${safeDashboard}
+
+Para entrar, utilize o WhatsApp/e-mail e a senha cadastrados durante a matrícula.
+
+Seja muito bem-vindo(a)! 🎶`;
+}
+
 export function buildExperimentalClassPostAttendanceWhatsAppMessages(name?: string | null) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "";

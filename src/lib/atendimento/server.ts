@@ -17,6 +17,8 @@ import {
   formatLocalizedDateSigned,
 } from "@/lib/atendimento/contract";
 import {
+  ATENDIMENTO_STAGE_ORDER,
+  ATENDIMENTO_STATUS_ORDER,
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
@@ -24,6 +26,7 @@ import {
   buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildRecurringClassPostEnrollmentRegisteredAttendantNotification,
   buildRecurringClassStudentLessonReadyWhatsAppMessage,
+  buildRecurringPaymentConfirmedStudentWelcomeMessage,
   calculateNextRecurringOccurrence,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
@@ -3149,31 +3152,57 @@ export async function formalizeAndPersistContract(params: {
     typeof (lead as any).enrollment_number === "string" &&
     String((lead as any).enrollment_number).trim().length > 0;
   const contractDataAny = contractData as any;
-  const advanceToMatriculado =
-    existingEnrollment ||
-    Boolean(contractDataAny?.paymentConfirmed) ||
-    Boolean(contractDataAny?.origin === "contract_finalize_payment") ||
-    Boolean(
+  const currentPaymentStatus = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const paymentExplicitlyConfirmed =
+    currentPaymentStatus === "confirmado" ||
+    Boolean(contractDataAny?.paymentStatus === "confirmado") ||
+    Boolean(contractDataAny?.paymentConfirmed === true);
+  const advanceToPaymentPendingConfirmation =
+    !paymentExplicitlyConfirmed &&
+    (Boolean(
       (lead as any)?.recurring_registration_step &&
         Number((lead as any).recurring_registration_step) >= 10,
-    );
+    ) ||
+      Boolean(contractDataAny?.origin === "contract_finalize_payment"));
 
-  if (advanceToMatriculado) {
+  if (paymentExplicitlyConfirmed || existingEnrollment) {
     if (funnel !== "matriculado" && funnel !== "encerrado") {
       leadPatch.funnel_stage = "matriculado";
     }
     if (status !== "matriculado" && status !== "encerrado" && status !== "aluno") {
       leadPatch.status = "matriculado";
     }
+  } else if (advanceToPaymentPendingConfirmation) {
+    const currentStageIdx = ATENDIMENTO_STAGE_ORDER.indexOf(
+      (funnel as (typeof ATENDIMENTO_STAGE_ORDER)[number]) ??
+        ("" as (typeof ATENDIMENTO_STAGE_ORDER)[number]),
+    );
+    const currentStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(
+      (status as (typeof ATENDIMENTO_STATUS_ORDER)[number]) ??
+        ("" as (typeof ATENDIMENTO_STATUS_ORDER)[number]),
+    );
+    const targetStageIdx = ATENDIMENTO_STAGE_ORDER.indexOf("pagamento_pendente_confirmacao");
+    const targetStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf("pagamento_pendente_confirmacao");
+    if (targetStageIdx >= 0 && (currentStageIdx < 0 || currentStageIdx < targetStageIdx)) {
+      leadPatch.funnel_stage = "pagamento_pendente_confirmacao";
+    }
+    if (targetStatusIdx >= 0 && (currentStatusIdx < 0 || currentStatusIdx < targetStatusIdx)) {
+      leadPatch.status = "pagamento_pendente_confirmacao";
+    }
   } else {
-    if (funnel !== "contrato_assinado" && funnel !== "matriculado" && funnel !== "encerrado") {
+    if (funnel !== "contrato_assinado" && funnel !== "matriculado" && funnel !== "encerrado"
+        && funnel !== "pagamento_pendente_confirmacao" && funnel !== "pagamento_nao_realizado"
+        && funnel !== "matricula_confirmada") {
       leadPatch.funnel_stage = "contrato_assinado";
     }
     if (
       status !== "contrato_assinado" &&
       status !== "matriculado" &&
       status !== "encerrado" &&
-      status !== "aluno"
+      status !== "aluno" &&
+      status !== "pagamento_pendente_confirmacao" &&
+      status !== "pagamento_nao_realizado" &&
+      status !== "matricula_confirmada"
     ) {
       leadPatch.status = "contrato_assinado";
     }
@@ -3326,4 +3355,404 @@ export async function formalizeAndPersistContract(params: {
     contract_pdf_url: publicUrl,
     contract_html_snapshot: htmlSnapshot,
   };
+}
+
+function buildSyntheticStudentEmail(phoneDigits: string) {
+  const clean = String(phoneDigits ?? "").replace(/\D/g, "").trim();
+  const tail = clean.slice(-10) || clean;
+  if (!tail) return null;
+  return `tel.${tail}@aluno.autobot.business`;
+}
+
+function extractStudentPasswordFromLead(lead: any) {
+  const candidates = [
+    (lead as any)?.recurring_registration_password,
+    (lead as any)?.signup_password_raw_temp,
+    (lead as any)?.password,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim().length >= 6) return c.trim();
+  }
+  return null;
+}
+
+async function isStudentLoginPhoneMatch(admin: ReturnType<typeof createSupabaseAdminClient>, phone: string, studentPhone?: string | null) {
+  const dig = (s: unknown) => String(s ?? "").replace(/\D/g, "");
+  const refDig = dig(studentPhone ?? "");
+  if (!refDig) return false;
+  const cmp = dig(phone);
+  if (!cmp) return false;
+  return cmp.includes(refDig) || refDig.includes(cmp);
+}
+
+export async function ensureStudentAuthUserCreatedForLead(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  lead: any;
+  dashboardLink?: string | null;
+}) {
+  const { admin, leadId, lead } = params;
+  if (!lead?.id) return { ok: false, created: false, userId: null, email: null };
+  const rawPhone = String(lead.phone ?? (lead as any)?.telefone ?? "").trim();
+  const phoneDigits = rawPhone.replace(/\D/g, "");
+  const studentEmailFromLead =
+    typeof (lead as any)?.student_email === "string" &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String((lead as any).student_email).trim())
+      ? String((lead as any).student_email).trim()
+      : typeof (lead as any)?.email === "string" &&
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String((lead as any).email).trim())
+        ? String((lead as any).email).trim()
+        : null;
+  const studentPassword = extractStudentPasswordFromLead(lead);
+  if (!studentPassword) return { ok: false, created: false, userId: null, email: studentEmailFromLead };
+
+  let email = studentEmailFromLead || buildSyntheticStudentEmail(phoneDigits);
+  if (!email) return { ok: false, created: false, userId: null, email: null };
+  const fullName =
+    typeof lead.full_name === "string" && lead.full_name.trim()
+      ? lead.full_name.trim()
+      : "Aluno(a) Lucas Brum Online Music USA";
+
+  let userId: string | null = null;
+  let created = false;
+  try {
+    const { data: existing } = await admin.auth.admin.listUsers({
+      perPage: 5,
+    });
+    let match = null;
+    if (Array.isArray((existing as any)?.users)) {
+      for (const u of (existing as any).users) {
+        const uEmail = String(u.email ?? "").toLowerCase();
+        const uPhone = String(u.phone ?? u.phone_number ?? "").trim();
+        if (uEmail && uEmail === email.toLowerCase()) {
+          match = u;
+          break;
+        }
+        if (phoneDigits && (await isStudentLoginPhoneMatch(admin, uPhone, phoneDigits))) {
+          match = u;
+          break;
+        }
+      }
+    }
+    if (match?.id) {
+      userId = String(match.id);
+      try {
+        await admin.auth.admin.updateUserById(userId, {
+          password: studentPassword,
+        });
+      } catch {}
+    } else {
+      const { data } = await admin.auth.admin.createUser({
+        email,
+        password: studentPassword,
+        email_confirm: true,
+        phone: phoneDigits ? `+${phoneDigits}` : undefined,
+        phone_confirm: true,
+        user_metadata: {
+          lead_id: leadId,
+          student_phone_digits: phoneDigits || null,
+          full_name: fullName,
+          origin: "aluno_matricula_recorrente",
+        },
+        app_metadata: {
+          access_scope: "app",
+        },
+      });
+      userId = (data as any)?.user?.id ? String((data as any).user.id) : null;
+      created = !!userId;
+    }
+  } catch (e) {
+    try {
+      await appendHistoryEvent({
+        leadId,
+        eventType: "student_auth_user_creation_failed",
+        title: "Falha ao criar usuário Painel do Aluno",
+        details: {
+          error: e instanceof Error ? e.message : String(e),
+          email,
+        },
+        actorType: "system",
+      });
+    } catch {}
+    return { ok: false, created: false, userId: null, email };
+  }
+
+  if (userId) {
+    try {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("user_id, access_scope, email, phone")
+        .eq("user_id", String(userId))
+        .maybeSingle();
+      if ((profile as any)?.user_id) {
+        await admin
+          .from("profiles")
+          .update({
+            access_scope: (profile as any).access_scope || "app",
+            email: email,
+            phone: phoneDigits ? phoneDigits : (profile as any).phone,
+            full_name: fullName,
+          })
+          .eq("user_id", String(userId));
+      } else {
+        try {
+          await admin.from("profiles").insert({
+            user_id: userId,
+            access_scope: "app",
+            email,
+            phone: phoneDigits ? phoneDigits : null,
+            full_name: fullName,
+          });
+        } catch (insErr) {
+          const code = String((insErr as any)?.code ?? "").trim();
+          const msg = String((insErr as any)?.message ?? "").toLowerCase();
+          const ignore = code === "42703" || msg.includes("column") && msg.includes("does not exist");
+          if (!ignore) {
+            try {
+              await appendHistoryEvent({
+                leadId,
+                eventType: "student_auth_profile_insert_failed",
+                title: "Falha ao gravar perfil do Painel do Aluno (colunas incompatíveis, ignorar)",
+                details: {
+                  error: insErr instanceof Error ? insErr.message : String(insErr),
+                  user_id: userId,
+                },
+                actorType: "system",
+              });
+            } catch {}
+          }
+        }
+      }
+      try {
+        await appendHistoryEvent({
+          leadId,
+          eventType: "student_auth_user_created",
+          title: "Usuário Painel do Aluno criado",
+          details: {
+            user_id: userId,
+            email,
+            phone_digits: phoneDigits || null,
+            created,
+          },
+          actorType: "system",
+        });
+      } catch {}
+    } catch {}
+  }
+  return { ok: !!userId, created, userId, email };
+}
+
+export async function confirmLeadRecurringPayment(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  actorType?: "system" | "attendant" | "student";
+  attendantEmail?: string | null;
+}) {
+  const { admin, leadId, actorType = "attendant", attendantEmail = null } = params;
+  const { data: lead, error: leadErr } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("id", String(leadId))
+    .maybeSingle();
+  if (leadErr || !lead) return { ok: false, error: leadErr?.message ?? "Lead não encontrado." };
+  const now = new Date().toISOString();
+  const patch: any = {
+    payment_status: "confirmado",
+    payment_confirmed_at: now,
+    updated_at: now,
+  };
+  const currentStage = String((lead as any).funnel_stage ?? "");
+  const currentStatus = String((lead as any).status ?? "");
+  const stageIdx = ATENDIMENTO_STAGE_ORDER.indexOf(
+    currentStage as (typeof ATENDIMENTO_STAGE_ORDER)[number],
+  );
+  const statusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(
+    currentStatus as (typeof ATENDIMENTO_STATUS_ORDER)[number],
+  );
+  const targetStageIdx = ATENDIMENTO_STAGE_ORDER.indexOf("matriculado");
+  const targetStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf("matriculado");
+  if (targetStageIdx >= 0 && (stageIdx < 0 || stageIdx < targetStageIdx)) {
+    patch.funnel_stage = "matriculado";
+  }
+  if (targetStatusIdx >= 0 && (statusIdx < 0 || statusIdx < targetStatusIdx)) {
+    patch.status = "matriculado";
+  }
+
+  let applied = false;
+  const runPatch = async (p: any) => {
+    const { error } = await admin
+      .from("atendimento_leads")
+      .update(p)
+      .eq("id", String(leadId));
+    if (!error) {
+      applied = true;
+      return { ok: true };
+    }
+    const code = String((error as any)?.code ?? "").trim();
+    if (code === "42703") {
+      const msg = String(error.message ?? "").toLowerCase();
+      const m = /column "([^"]+)" does not exist/.exec(msg);
+      const col = m ? m[1] : null;
+      if (col && p[col] !== undefined) {
+        const next: any = { ...p };
+        delete next[col];
+        if (Object.keys(next).length === 0) {
+          applied = true;
+          return { ok: true };
+        }
+        return runPatch(next);
+      }
+    }
+    return { ok: false, error };
+  };
+  const patchRes = await runPatch(patch);
+  if (!patchRes.ok && !applied) {
+    return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };
+  }
+
+  try {
+    await ensureStudentAuthUserCreatedForLead({
+      admin,
+      leadId,
+      lead,
+    });
+  } catch {}
+
+  try {
+    const fullName = String((lead as any).full_name ?? "").trim();
+    const firstName = fullName.split(/\s+/)[0] || fullName || null;
+    const studentMsg = buildRecurringPaymentConfirmedStudentWelcomeMessage(
+      firstName,
+      "https://www.autobot.business/login",
+    );
+    const studentPhone = String((lead as any).phone ?? (lead as any)?.telefone ?? "").trim();
+    if (studentPhone && studentPhone.replace(/\D/g, "").length >= 10) {
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: studentPhone,
+          message: studentMsg,
+          baseUrl: undefined as any,
+        });
+        try {
+          await appendHistoryEvent({
+            leadId,
+            eventType: "recurring_payment_confirmed_welcome_whatsapp_sent",
+            title: "Notificação de boas-vindas enviada (pagamento confirmado)",
+            details: {
+              enrollment_number: (lead as any).enrollment_number || null,
+              student_phone: studentPhone,
+            },
+            actorType: "system",
+          });
+        } catch {}
+      } catch (e) {
+        try {
+          await appendHistoryEvent({
+            leadId,
+            eventType: "recurring_payment_confirmed_welcome_whatsapp_failed",
+            title: "Falha ao enviar notificação de boas-vindas",
+            details: {
+              error: e instanceof Error ? e.message : String(e),
+              student_phone: studentPhone,
+            },
+            actorType: "system",
+          });
+        } catch {}
+      }
+    }
+  } catch {}
+
+  try {
+    await appendHistoryEvent({
+      leadId,
+      eventType: "recurring_payment_confirmed",
+      title: "Pagamento marcado como Sim (confirmado)",
+      details: {
+        enrollment_number: (lead as any).enrollment_number || null,
+        confirmed_at: now,
+        confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
+      },
+      actorType,
+    });
+  } catch {}
+
+  return { ok: true, confirmed_at: now };
+}
+
+export async function rejectLeadRecurringPayment(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  reason?: string | null;
+  actorType?: "system" | "attendant";
+  attendantEmail?: string | null;
+}) {
+  const { admin, leadId, reason = null, actorType = "attendant", attendantEmail = null } = params;
+  const { data: lead, error: leadErr } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("id", String(leadId))
+    .maybeSingle();
+  if (leadErr || !lead) return { ok: false, error: leadErr?.message ?? "Lead não encontrado." };
+  const now = new Date().toISOString();
+  const patch: any = {
+    payment_status: "nao_realizado",
+    payment_rejected_at: now,
+    updated_at: now,
+  };
+  const currentStage = String((lead as any).funnel_stage ?? "");
+  const currentStatus = String((lead as any).status ?? "");
+  const stageIdx = ATENDIMENTO_STAGE_ORDER.indexOf(
+    currentStage as (typeof ATENDIMENTO_STAGE_ORDER)[number],
+  );
+  const statusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(
+    currentStatus as (typeof ATENDIMENTO_STATUS_ORDER)[number],
+  );
+  const targetStageIdx = ATENDIMENTO_STAGE_ORDER.indexOf("pagamento_nao_realizado");
+  const targetStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf("pagamento_nao_realizado");
+  if (targetStageIdx >= 0 && (stageIdx < 0 || stageIdx < targetStageIdx)) {
+    patch.funnel_stage = "pagamento_nao_realizado";
+  }
+  if (targetStatusIdx >= 0 && (statusIdx < 0 || statusIdx < targetStatusIdx)) {
+    patch.status = "pagamento_nao_realizado";
+  }
+
+  const runPatch = async (p: any): Promise<{ ok: boolean; error?: any }> => {
+    const { error } = await admin
+      .from("atendimento_leads")
+      .update(p)
+      .eq("id", String(leadId));
+    if (!error) return { ok: true };
+    const code = String((error as any)?.code ?? "").trim();
+    if (code === "42703") {
+      const msg = String(error.message ?? "").toLowerCase();
+      const m = /column "([^"]+)" does not exist/.exec(msg);
+      const col = m ? m[1] : null;
+      if (col && p[col] !== undefined) {
+        const next: any = { ...p };
+        delete next[col];
+        if (Object.keys(next).length === 0) return { ok: true };
+        return runPatch(next);
+      }
+    }
+    return { ok: false, error };
+  };
+  const patchRes = await runPatch(patch);
+  if (!patchRes.ok) {
+    return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };
+  }
+  try {
+    await appendHistoryEvent({
+      leadId,
+      eventType: "recurring_payment_rejected",
+      title: "Pagamento marcado como Não (não realizado)",
+      details: {
+        enrollment_number: (lead as any).enrollment_number || null,
+        rejected_at: now,
+        rejected_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
+        reason: reason ? String(reason).trim() : null,
+      },
+      actorType,
+    });
+  } catch {}
+  return { ok: true, rejected_at: now };
 }

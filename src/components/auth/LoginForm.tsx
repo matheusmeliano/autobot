@@ -9,8 +9,10 @@ import { loginAction } from "@/app/login/actions";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { modalToast } from "@/lib/modalToast";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 type FormValues = {
-  email: string;
+  login: string;
   password: string;
 };
 
@@ -25,7 +27,7 @@ export function LoginForm() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { email: "", password: "" },
+    defaultValues: { login: "", password: "" },
   });
   const next = String(searchParams?.get("next") ?? "");
   const safeNext = /^\/(?!\/)/.test(next) ? next : "";
@@ -61,7 +63,7 @@ export function LoginForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     const formData = new FormData();
-    formData.append("email", values.email);
+    formData.append("login", values.login);
     formData.append("password", values.password);
     if (safeNext) {
       formData.append("next", safeNext);
@@ -93,25 +95,27 @@ export function LoginForm() {
     >
       <form onSubmit={onSubmit} className="space-y-3">
         <div>
-          <label className="text-xs font-semibold text-white/60">Email</label>
+          <label className="text-xs font-semibold text-white/60">E-mail ou WhatsApp</label>
           <input
-            type="email"
-            autoComplete="email"
+            type="text"
+            autoComplete="username"
             className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
-            placeholder="voce@empresa.com"
+            placeholder="voce@email.com ou (11) 9XXXX-XXXX"
             style={{ backgroundColor: "#0b1220" }}
-            {...register("email", {
-              required: "Informe seu e-mail.",
+            {...register("login", {
+              required: "Informe seu e-mail ou WhatsApp.",
               validate: (value) => {
                 const v = String(value ?? "").trim();
-                if (!v) return "Informe seu e-mail.";
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Informe um e-mail válido.";
-                return true;
+                if (!v) return "Informe seu e-mail ou WhatsApp.";
+                if (EMAIL_REGEX.test(v)) return true;
+                const digits = v.replace(/\D/g, "");
+                if (digits.length >= 10) return true;
+                return "Informe um e-mail válido ou um WhatsApp com DDD.";
               },
             })}
           />
-          {errors.email?.message ? (
-            <div className="mt-2 text-xs font-medium text-rose-300">{errors.email.message}</div>
+          {errors.login?.message ? (
+            <div className="mt-2 text-xs font-medium text-rose-300">{errors.login.message}</div>
           ) : null}
         </div>
 

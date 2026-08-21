@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertTriangle, CalendarDays, Check, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, CheckCircle2, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Save, Search, Trash2, X, XCircle, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -92,6 +92,7 @@ function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
   const st = String(lead.status ?? "").trim().toLowerCase();
   const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
   const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+  const ps = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
   return (
     st === "aluno" ||
     st === "matriculado" ||
@@ -100,10 +101,17 @@ function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
     st === "contrato_aguardando_aceite" ||
     st === "contrato_assinado" ||
     st === "matricula_confirmada" ||
+    st === "pagamento_pendente_confirmacao" ||
+    st === "pagamento_nao_realizado" ||
     fs === "aluno_recorrente_cadastrado" ||
     fs === "cadastro_recorrente_pendente_plataforma" ||
+    fs === "pagamento_pendente_confirmacao" ||
+    fs === "pagamento_nao_realizado" ||
     rcs === "cadastro_plataforma_pendente" ||
-    rcs === "confirmado"
+    rcs === "confirmado" ||
+    ps === "pendente_confirmacao" ||
+    ps === "nao_realizado" ||
+    ps === "confirmado"
   );
 }
 
@@ -221,6 +229,24 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
 
   const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
   const rcsCadastroPendente = rcsRaw === "cadastro_plataforma_pendente" || rcsRaw === "confirmado";
+  const paymentStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const paymentConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const paymentRejectedAtRaw = String((lead as any)?.payment_rejected_at ?? "").trim();
+  const paymentPendingConfirmation =
+    paymentStatusRaw === "pendente_confirmacao" ||
+    statusRaw === "pagamento_pendente_confirmacao" ||
+    funnelRaw === "pagamento_pendente_confirmacao";
+  const paymentRejected =
+    paymentStatusRaw === "nao_realizado" ||
+    statusRaw === "pagamento_nao_realizado" ||
+    funnelRaw === "pagamento_nao_realizado";
+  const paymentConfirmed =
+    paymentStatusRaw === "confirmado" ||
+    Boolean(paymentConfirmedAtRaw && paymentConfirmedAtRaw !== "null") ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "matricula_confirmada" ||
+    statusRaw === "matriculado" ||
+    funnelRaw === "matriculado";
 
   const hasRegistrationBasicData =
     registrationStarted ||
@@ -237,6 +263,9 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   if (!recWeekdayOk) return "Falta dia recorrente";
   if (!recTimeOk) return "Falta horário";
 
+  if (paymentConfirmed) return "Matrícula concluída";
+  if (paymentPendingConfirmation) return "Aguardando confirmação de pagamento";
+  if (paymentRejected) return "Pagamento não realizado";
   if (paymentStepReached) return "Falta confirmar pagamento";
   if (contractAwaitingAccept) return "Falta aceite do contrato";
   if (contractCollectingData) return "Falta preencher os dados do contrato";
@@ -586,6 +615,10 @@ function LeadDetails({
   onEditLocation,
   savingRecurringLink,
   onSaveRecurringLink,
+  loadingPayment,
+  loadingPaymentAction,
+  onConfirmPayment,
+  onRejectPayment,
 }: {
   lead: AtendimentoLeadListItem;
   activeSection: SummarySectionId;
@@ -596,6 +629,10 @@ function LeadDetails({
   onEditLocation?: (lead: AtendimentoLeadListItem) => void;
   savingRecurringLink: boolean;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
+  loadingPayment?: boolean;
+  loadingPaymentAction?: "confirm" | "reject" | null;
+  onConfirmPayment?: (lead: AtendimentoLeadListItem) => void;
+  onRejectPayment?: (lead: AtendimentoLeadListItem) => void;
 }) {
   const hasName = Boolean(String(lead.full_name ?? "").trim());
   const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
@@ -718,6 +755,42 @@ function LeadDetails({
     if (contractStatusRaw === "coletando_dados") return "bg-sky-500/15 text-sky-200 border-sky-500/30";
     return "bg-[var(--app-card)] text-[var(--app-text-70)] border-[var(--app-border)]";
   })();
+
+  const paymentStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const paymentConfirmedAt = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const paymentRejectedAt = String((lead as any)?.payment_rejected_at ?? "").trim();
+  const paymentPendingConfirmation =
+    paymentStatusRaw === "pendente_confirmacao" ||
+    statusRaw === "pagamento_pendente_confirmacao" ||
+    funnelRaw === "pagamento_pendente_confirmacao" ||
+    (contractSigned && !paymentConfirmedAt && !paymentRejectedAt && regStepOk && regStepRaw >= 10);
+  const paymentRejected =
+    paymentStatusRaw === "nao_realizado" ||
+    statusRaw === "pagamento_nao_realizado" ||
+    funnelRaw === "pagamento_nao_realizado";
+  const paymentConfirmed =
+    paymentStatusRaw === "confirmado" ||
+    Boolean(paymentConfirmedAt && paymentConfirmedAt !== "null") ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "matricula_confirmada" ||
+    statusRaw === "matriculado" ||
+    funnelRaw === "matriculado";
+  const showPaymentActions =
+    onConfirmPayment &&
+    onRejectPayment &&
+    (paymentPendingConfirmation || paymentRejected || (contractSigned && regStepOk && regStepRaw >= 10));
+
+  const paymentBadgeTone = (() => {
+    if (paymentConfirmed) return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
+    if (paymentRejected) return "bg-red-500/15 text-red-200 border-red-500/30";
+    return "bg-amber-400/15 text-amber-100 border-amber-500/30";
+  })();
+  const paymentBadgeLabel = (() => {
+    if (paymentConfirmed) return "Pagamento confirmado";
+    if (paymentRejected) return "Pagamento não realizado";
+    return "Aguardando confirmação";
+  })();
+
   const contractDownloadHref = contractPdfUrl
     ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(lead.full_name ?? lead.phone ?? lead.id).replace(/\s+/g, "_")}.pdf`)}`
     : "";
@@ -835,6 +908,53 @@ function LeadDetails({
             <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
             <Field label="País" value={lead.country} />
             <Field label="Fuso" value={lead.timezone} />
+          </div>
+        ) : null}
+
+        {showPaymentActions || paymentConfirmed ? (
+          <div className="mt-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
+                  Pagamento da matrícula
+                </div>
+                <div className="mt-2">
+                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${paymentBadgeTone}`}>
+                    {paymentBadgeLabel}
+                  </span>
+                </div>
+              </div>
+              {showPaymentActions ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 min-[600px]:mt-0">
+                  <button
+                    type="button"
+                    onClick={() => onConfirmPayment?.(lead)}
+                    disabled={Boolean(loadingPayment)}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    {loadingPayment && loadingPaymentAction === "confirm" ? "Confirmando…" : "Sim — Pagamento OK"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRejectPayment?.(lead)}
+                    disabled={Boolean(loadingPayment)}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <XCircle className="h-4 w-4 shrink-0" />
+                    {loadingPayment && loadingPaymentAction === "reject" ? "Atualizando…" : "Não — Não pagou"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              {paymentConfirmedAt && paymentConfirmedAt !== "null" ? (
+                <Field label="Confirmado em" value={formatAtendimentoDateTime(paymentConfirmedAt)} />
+              ) : null}
+              {paymentRejectedAt && paymentRejectedAt !== "null" ? (
+                <Field label="Marcado em" value={formatAtendimentoDateTime(paymentRejectedAt)} />
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -2563,9 +2683,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
   const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
   const [markingAttendanceType, setMarkingAttendanceType] = useState<"attended" | "no_show" | null>(null);
-  const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] =
-    useState<string | null>(null);
+  const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] = useState<string | null>(null);
   const [savingRecurringLinkLeadId, setSavingRecurringLinkLeadId] = useState<string | null>(null);
+  const [loadingPaymentLeadId, setLoadingPaymentLeadId] = useState<string | null>(null);
+  const [loadingPaymentAction, setLoadingPaymentAction] = useState<"confirm" | "reject" | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
@@ -3153,6 +3274,64 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     }
   }
 
+  async function handlePaymentAction(
+    lead: AtendimentoLeadListItem,
+    action: "confirm" | "reject",
+  ) {
+    const leadId = String(lead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para atualizar pagamento.");
+      return;
+    }
+    try {
+      setLoadingPaymentLeadId(leadId);
+      setLoadingPaymentAction(action);
+      const response = await fetch(`/api/atendimento/leads/${leadId}/payment-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; confirmed_at?: string | null; rejected_at?: string | null }
+        | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao atualizar pagamento.");
+        return;
+      }
+      const now = new Date().toISOString();
+      setLocalLeads((current) =>
+        current.map((item) => {
+          if (item.id !== leadId) return item;
+          const next: any = { ...item, updated_at: now };
+          if (action === "confirm") {
+            next.payment_status = "confirmado";
+            next.payment_confirmed_at = payload?.confirmed_at || now;
+            next.payment_rejected_at = null;
+            const st = String(item.status ?? "").trim();
+            const fs = String((item as any).funnel_stage ?? "").trim();
+            const stTarget = "matriculado";
+            const fsTarget = "matriculado";
+            if (st !== "aluno" && st !== stTarget && st !== "encerrado") next.status = stTarget;
+            if (fs !== fsTarget && fs !== "encerrado") next.funnel_stage = fsTarget;
+          } else {
+            next.payment_status = "nao_realizado";
+            next.payment_rejected_at = payload?.rejected_at || now;
+            next.payment_confirmed_at = null;
+            next.status = "pagamento_nao_realizado";
+            next.funnel_stage = "pagamento_nao_realizado";
+          }
+          return next as AtendimentoLeadListItem;
+        }),
+      );
+      modalToast.success(action === "confirm" ? "Pagamento confirmado." : "Pagamento marcado como não realizado.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao atualizar pagamento.");
+    } finally {
+      setLoadingPaymentLeadId(null);
+      setLoadingPaymentAction(null);
+    }
+  }
+
   async function handleMarkAttendance(lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") {
     const booking = lead.experimental_class_booking;
     const bookingId = String(booking?.id ?? "").trim();
@@ -3549,6 +3728,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   onEditLocation={(l) => openEditLeadLocation(l)}
                   savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                   onSaveRecurringLink={handleSaveRecurringLink}
+                  loadingPayment={loadingPaymentLeadId === selectedLead.id}
+                  loadingPaymentAction={loadingPaymentLeadId === selectedLead.id ? loadingPaymentAction : null}
+                  onConfirmPayment={(l) => handlePaymentAction(l, "confirm")}
+                  onRejectPayment={(l) => handlePaymentAction(l, "reject")}
                 />
               )
             ) : (

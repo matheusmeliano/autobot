@@ -1,5 +1,17 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { appendHistoryEvent, findLeadByPhone, formalizeAndPersistContract, syncConversationPreview } from "@/lib/atendimento/server";
+import {
+  appendHistoryEvent,
+  findLeadByPhone,
+  formalizeAndPersistContract,
+  sendAtendimentoWhatsAppText,
+  syncConversationPreview,
+} from "@/lib/atendimento/server";
+import {
+  ATENDIMENTO_STAGE_ORDER,
+  ATENDIMENTO_STATUS_ORDER,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  buildRecurringPaymentPendingConfirmationAttendantNotification,
+} from "@/lib/atendimento/experimentalClass";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -185,12 +197,52 @@ export async function POST(req: Request) {
     }
 
     try {
-      const baseUpdate: any = { contract_status: "aguardando_aceite" };
+      const existingStage = String((lead as any)?.funnel_stage ?? "").trim() as
+        | (typeof ATENDIMENTO_STAGE_ORDER)[number]
+        | "";
+      const existingStatus = String((lead as any)?.status ?? "").trim() as
+        | (typeof ATENDIMENTO_STATUS_ORDER)[number]
+        | "";
+      const currentStageIdx = existingStage
+        ? ATENDIMENTO_STAGE_ORDER.indexOf(existingStage)
+        : -1;
+      const currentStatusIdx = existingStatus
+        ? ATENDIMENTO_STATUS_ORDER.indexOf(existingStatus)
+        : -1;
+      const targetStage = "pagamento_pendente_confirmacao" as const;
+      const targetStatus = "pagamento_pendente_confirmacao" as const;
+      const targetStageIdx = ATENDIMENTO_STAGE_ORDER.indexOf(targetStage);
+      const targetStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(targetStatus);
+      const baseUpdate: any = {
+        contract_status: "aguardando_aceite",
+        payment_status: "pendente_confirmacao",
+        payment_confirmed_at: null,
+        payment_rejected_at: null,
+      };
+      if (targetStageIdx >= 0 && (currentStageIdx < 0 || currentStageIdx < targetStageIdx)) {
+        baseUpdate.funnel_stage = targetStage;
+      }
+      if (targetStatusIdx >= 0 && (currentStatusIdx < 0 || currentStatusIdx < targetStatusIdx)) {
+        baseUpdate.status = targetStatus;
+      }
       if (enrollmentNumber) baseUpdate.enrollment_number = enrollmentNumber;
       await admin
         .from("atendimento_leads")
         .update(baseUpdate)
         .eq("id", String(lead.id));
+      try {
+        await appendHistoryEvent({
+          leadId: finalLeadId,
+          eventType: "recurring_payment_pending_confirmation",
+          title: "Pagamento pendente de confirmação (Finalizar Matrícula)",
+          details: {
+            enrollment_number: enrollmentNumber || null,
+            triggered_from: "contract_finalize_finalizar_matricula",
+            pending_since: new Date().toISOString(),
+          },
+          actorType: "system",
+        });
+      } catch {}
     } catch {}
 
     const result: any = await (formalizeAndPersistContract as any)({
@@ -213,6 +265,31 @@ export async function POST(req: Request) {
           });
         } catch {}
       }
+    } catch {}
+
+    try {
+      const attendantMsg = buildRecurringPaymentPendingConfirmationAttendantNotification(
+        String((lead as any)?.full_name ?? null),
+        enrollmentNumber || null,
+      );
+      await sendAtendimentoWhatsAppText({
+        toPhone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        contentText: attendantMsg,
+        leadId: finalLeadId,
+        silentFail: true,
+      });
+      try {
+        await appendHistoryEvent({
+          leadId: finalLeadId,
+          eventType: "attendant_payment_pending_confirmation_sent",
+          title: "Notificação atendente: Pagamento pendente enviada",
+          details: {
+            enrollment_number: enrollmentNumber || null,
+            attendant_phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          },
+          actorType: "system",
+        });
+      } catch {}
     } catch {}
 
     return Response.json({
