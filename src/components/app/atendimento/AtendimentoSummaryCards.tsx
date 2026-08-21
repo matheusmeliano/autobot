@@ -2336,7 +2336,48 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   }, [summary]);
 
   useEffect(() => {
-    setLocalLeads(leads);
+    setLocalLeads((current) => {
+      if (!Array.isArray(current) || current.length === 0) return leads;
+      const byId = new Map<string, AtendimentoLeadListItem>();
+      for (const item of current) {
+        const key = String(item?.id ?? "").trim();
+        if (key) byId.set(key, item);
+      }
+      return leads.map((inc) => {
+        const key = String(inc?.id ?? "").trim();
+        if (!key) return inc;
+        const prev = byId.get(key);
+        if (!prev) return inc;
+        const prevUpd = new Date(String((prev as any)?.updated_at ?? "")).getTime();
+        const incUpd = new Date(String((inc as any)?.updated_at ?? "")).getTime();
+        const localIsNewer = Number.isFinite(prevUpd) && Number.isFinite(incUpd) && prevUpd >= incUpd;
+        if (!localIsNewer) return inc;
+        const prevExpBooking = (prev as any)?.experimental_class_booking ?? null;
+        const incExpBooking = (inc as any)?.experimental_class_booking ?? null;
+        const prevHasExp = Boolean(prevExpBooking && String(prevExpBooking?.id ?? "").trim() && String(prevExpBooking?.lead_date ?? prevExpBooking?.professor_date ?? "").trim());
+        const incHasExp = Boolean(incExpBooking && String(incExpBooking?.id ?? "").trim() && String(incExpBooking?.lead_date ?? incExpBooking?.professor_date ?? "").trim());
+        const prevExpLeadDate = String((prev as any)?.experimental_class_lead_date ?? "").trim();
+        const incExpLeadDate = String((inc as any)?.experimental_class_lead_date ?? "").trim();
+        const prevFutureExp = (prev as any)?.future_experimental_class_booking ?? null;
+        const merged: any = { ...prev, ...inc };
+        if (prevHasExp && !incHasExp) {
+          merged.experimental_class_booking = prevExpBooking;
+        }
+        if (prevExpLeadDate && !incExpLeadDate) {
+          merged.experimental_class_lead_date = prevExpLeadDate;
+          const prevExpLeadTime = String((prev as any)?.experimental_class_lead_time ?? "").trim();
+          if (prevExpLeadTime) merged.experimental_class_lead_time = prevExpLeadTime;
+          const prevExpProfDate = String((prev as any)?.experimental_class_professor_date ?? "").trim();
+          if (prevExpProfDate) merged.experimental_class_professor_date = prevExpProfDate;
+          const prevExpProfTime = String((prev as any)?.experimental_class_professor_time ?? "").trim();
+          if (prevExpProfTime) merged.experimental_class_professor_time = prevExpProfTime;
+        }
+        if (prevFutureExp && !((inc as any)?.future_experimental_class_booking)) {
+          merged.future_experimental_class_booking = prevFutureExp;
+        }
+        return merged as AtendimentoLeadListItem;
+      });
+    });
   }, [leads]);
 
   async function handleDeleteLead(lead: AtendimentoLeadListItem) {
