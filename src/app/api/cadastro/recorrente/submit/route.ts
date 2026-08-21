@@ -170,35 +170,93 @@ export async function POST(req: NextRequest) {
       updated_at: nowIso,
       ...(safeNome ? { full_name: safeNome } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
-      ...(safeProfessorStartAt ? { recurring_class_first_class_at: safeProfessorStartAt } : {}),
     };
+
+    function extractCol(msg: unknown): string | null {
+      if (!msg) return null;
+      const s = String(msg).toLowerCase();
+      const m1 = /column "([^"]+)" does not exist/.exec(s);
+      if (m1 && m1[1]) return m1[1];
+      const m2 = /could not find the '([^']+)' column/.exec(s);
+      if (m2 && m2[1]) return m2[1];
+      return null;
+    }
+    const BLACKLIST = new Set([
+      "payment_confirmed_at","payment_rejected_at","contract_signed_at","contract_pdf_url",
+      "recurring_registration_step","contract_status","payment_status","enrollment_number",
+      "recurring_class_professor_date","recurring_class_first_class_at",
+      "recurring_class_weekday_label","recurring_class_professor_time","recurring_class_lead_time",
+      "recurring_class_created_at","recurring_registration_password",
+    ]);
+    function stripPatch(p: Record<string, unknown>, err: unknown): Record<string, unknown> | null {
+      const c = extractCol((err as any)?.message || String(err ?? ""));
+      if (c && p[c] !== undefined) {
+        const n = { ...p }; delete n[c]; return n;
+      }
+      for (const s of BLACKLIST) if (p[s] !== undefined) { const n = { ...p }; delete n[s]; return n; }
+      return null;
+    }
 
     let appliedPatch: "full" | "minimal" = "minimal";
     let fullPatchError: string | null = null;
-    try {
-      const { error: errFull } = await admin
-        .from("atendimento_leads")
-        .update(patchFull as any)
-        .eq("id", String(lead.id));
-      if (errFull) throw errFull;
-      appliedPatch = "full";
-    } catch (e1) {
-      appliedPatch = "minimal";
-      fullPatchError = toErrorMessage(e1, "");
-      try {
-        const { error: errMin } = await admin
-          .from("atendimento_leads")
-          .update(patchMinimalGuaranteed as any)
-          .eq("id", String(lead.id));
-        if (errMin) throw errMin;
-      } catch (e2) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: toErrorMessage(e2, "Erro ao atualizar lead."),
-          },
-          { status: 500 },
-        );
+    {
+      let p: Record<string, unknown> | null = { ...patchFull };
+      let ok = false;
+      while (p !== null) {
+        try {
+          const { error: errFull } = await admin
+            .from("atendimento_leads")
+            .update(p as any)
+            .eq("id", String(lead.id));
+          if (errFull) throw errFull;
+          appliedPatch = "full";
+          ok = true;
+          break;
+        } catch (e1) {
+          const msg = toErrorMessage(e1, "");
+          const code = String((e1 as any)?.code ?? "");
+          if (code === "42703" || extractCol(msg) !== null) {
+            const next = stripPatch(p, e1);
+            if (next === null) { p = null; break; }
+            p = next;
+            continue;
+          }
+          fullPatchError = msg;
+          break;
+        }
+      }
+      if (!ok) {
+        appliedPatch = "minimal";
+        let q: Record<string, unknown> | null = { ...patchMinimalGuaranteed };
+        let okMin = false;
+        while (q !== null) {
+          try {
+            const { error: errMin } = await admin
+              .from("atendimento_leads")
+              .update(q as any)
+              .eq("id", String(lead.id));
+            if (errMin) throw errMin;
+            okMin = true; break;
+          } catch (e2) {
+            const msg = toErrorMessage(e2, "");
+            const code = String((e2 as any)?.code ?? "");
+            if (code === "42703" || extractCol(msg) !== null) {
+              const next = stripPatch(q, e2);
+              if (next === null) { q = null; break; }
+              q = next; continue;
+            }
+            return NextResponse.json(
+              { ok: false, error: toErrorMessage(e2, "Erro ao atualizar lead.") },
+              { status: 500 },
+            );
+          }
+        }
+        if (!okMin) {
+          return NextResponse.json(
+            { ok: false, error: "Erro ao atualizar lead." },
+            { status: 500 },
+          );
+        }
       }
     }
 

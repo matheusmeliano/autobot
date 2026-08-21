@@ -3556,6 +3556,8 @@ const SUSPECT_MISSING_COLUMNS_BL = [
   "contract_status",
   "payment_status",
   "enrollment_number",
+  "recurring_class_professor_date",
+  "recurring_class_first_class_at",
 ] as const;
 
 function extractUndefinedColumnName(raw: unknown): string | null {
