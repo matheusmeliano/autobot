@@ -812,17 +812,6 @@ function LeadDetails({
     onRejectPayment &&
     (paymentPendingConfirmation || paymentRejected);
 
-  const paymentBadgeTone = (() => {
-    if (paymentConfirmed) return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
-    if (paymentRejected) return "bg-red-500/15 text-red-200 border-red-500/30";
-    return "bg-amber-400/15 text-amber-100 border-amber-500/30";
-  })();
-  const paymentBadgeLabel = (() => {
-    if (paymentConfirmed) return "Pagamento confirmado";
-    if (paymentRejected) return "Pagamento não realizado";
-    return "Aguardando confirmação";
-  })();
-
   const contractDownloadHref = contractPdfUrl
     ? `${contractPdfUrl}${contractPdfUrl.includes("?") ? "&" : "?"}download=${encodeURIComponent(`contrato_${String(lead.full_name ?? lead.phone ?? lead.id).replace(/\s+/g, "_")}.pdf`)}`
     : "";
@@ -932,11 +921,6 @@ function LeadDetails({
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
                   Pagamento da matrícula
-                </div>
-                <div className="mt-2">
-                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${paymentBadgeTone}`}>
-                    {paymentBadgeLabel}
-                  </span>
                 </div>
               </div>
               {showPaymentActions ? (
