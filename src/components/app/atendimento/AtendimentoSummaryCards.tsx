@@ -3034,22 +3034,22 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           <form onSubmit={saveLeadLocationForm} className="mt-5 space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-semibold text-white/60">Cidade</label>
-                <input
-                  autoFocus
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder="Ex.: Cuiabá"
-                  maxLength={160}
-                  {...leadLocationForm.register("city", { required: true, maxLength: 160 })}
-                />
-              </div>
-              <div>
                 <label className="text-xs font-semibold text-white/60">Estado</label>
                 <input
+                  autoFocus
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
                   placeholder="Ex.: Mato Grosso ou MT"
                   maxLength={160}
                   {...leadLocationForm.register("state", { required: true, maxLength: 160 })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/60">Cidade</label>
+                <input
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  placeholder="Ex.: Cuiabá"
+                  maxLength={160}
+                  {...leadLocationForm.register("city", { required: true, maxLength: 160 })}
                 />
               </div>
             </div>

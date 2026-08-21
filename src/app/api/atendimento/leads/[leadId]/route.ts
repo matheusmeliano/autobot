@@ -191,60 +191,117 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     const normState = normalizeLocationKey(safeState ?? "");
     const normCity = normalizeLocationKey(safeCity ?? "");
 
-    let derivedCountry = "Brasil";
-    if (normState) {
-      if (
-        normState.includes("florida") ||
-        normState === "fl" ||
-        normCity.includes("miami") ||
-        normCity.includes("orlando")
-      ) {
-        derivedCountry = "Estados Unidos";
-      } else if (
-        normState.includes("portugal") ||
-        normState === "pt" ||
-        normCity.includes("lisboa") ||
-        normCity.includes("lisbon") ||
-        normCity.includes("porto")
-      ) {
-        derivedCountry = "Portugal";
-      } else if (
-        normState.includes("espanha") ||
-        normState.includes("spain") ||
-        normState === "es" ||
-        normCity.includes("madrid") ||
-        normCity.includes("barcelona")
-      ) {
-        derivedCountry = "Espanha";
-      } else if (
-        normState.includes("paraguai") ||
-        normState.includes("paraguay") ||
-        normState === "py" ||
-        normCity.includes("asuncion") ||
-        normCity.includes("assunca")
-      ) {
-        derivedCountry = "Paraguai";
-      } else if (
-        normState.includes("argentina") ||
-        normState === "ar" ||
-        normCity.includes("buenosaires") ||
-        normCity.includes("buenos aires")
-      ) {
-        derivedCountry = "Argentina";
-      }
-    } else if (normCity) {
-      if (normCity.includes("miami") || normCity.includes("orlando") || normCity.includes("newyork")) {
-        derivedCountry = "Estados Unidos";
-      } else if (normCity.includes("lisboa") || normCity.includes("lisbon") || normCity.includes("porto")) {
-        derivedCountry = "Portugal";
-      } else if (normCity.includes("madrid") || normCity.includes("barcelona")) {
-        derivedCountry = "Espanha";
-      } else if (normCity.includes("asuncion") || normCity.includes("assunca")) {
-        derivedCountry = "Paraguai";
-      } else if (normCity.includes("buenosaires")) {
-        derivedCountry = "Argentina";
-      }
-    }
+    const usStateCodes = new Set<string>([
+      "al","ak","az","ar","ca","co","ct","de","fl","ga","hi","id","il","in","ia","ks","ky","la","me","md","ma","mi","mn","ms","mo","mt","ne","nv","nh","nj","nm","ny","nc","nd","oh","ok","or","pa","ri","sc","sd","tn","tx","ut","vt","va","wa","wv","wi","wy","dc",
+    ]);
+
+    const usStateNameToCode: Record<string, string> = {
+      alabama: "al",
+      alaska: "ak",
+      arizona: "az",
+      arkansas: "ar",
+      california: "ca",
+      colorado: "co",
+      connecticut: "ct",
+      delaware: "de",
+      florida: "fl",
+      georgia: "ga",
+      hawaii: "hi",
+      idaho: "id",
+      illinois: "il",
+      indiana: "in",
+      iowa: "ia",
+      kansas: "ks",
+      kentucky: "ky",
+      louisiana: "la",
+      maine: "me",
+      maryland: "md",
+      massachusetts: "ma",
+      michigan: "mi",
+      minnesota: "mn",
+      mississippi: "ms",
+      missouri: "mo",
+      montana: "mt",
+      nebraska: "ne",
+      nevada: "nv",
+      newhampshire: "nh",
+      newjersey: "nj",
+      newmexico: "nm",
+      newyork: "ny",
+      northcarolina: "nc",
+      northdakota: "nd",
+      ohio: "oh",
+      oklahoma: "ok",
+      oregon: "or",
+      pennsylvania: "pa",
+      rhodeisland: "ri",
+      southcarolina: "sc",
+      southdakota: "sd",
+      tennessee: "tn",
+      texas: "tx",
+      utah: "ut",
+      vermont: "vt",
+      virginia: "va",
+      washington: "wa",
+      westvirginia: "wv",
+      wisconsin: "wi",
+      wyoming: "wy",
+      districtofcolumbia: "dc",
+    };
+
+    const usStateCodeToTimezone: Record<string, string> = {
+      al: "America/Chicago",
+      ak: "America/Anchorage",
+      az: "America/Phoenix",
+      ar: "America/Chicago",
+      ca: "America/Los_Angeles",
+      co: "America/Denver",
+      ct: "America/New_York",
+      de: "America/New_York",
+      fl: "America/New_York",
+      ga: "America/New_York",
+      hi: "Pacific/Honolulu",
+      id: "America/Boise",
+      il: "America/Chicago",
+      in: "America/Indiana/Indianapolis",
+      ia: "America/Chicago",
+      ks: "America/Chicago",
+      ky: "America/New_York",
+      la: "America/Chicago",
+      me: "America/New_York",
+      md: "America/New_York",
+      ma: "America/New_York",
+      mi: "America/Detroit",
+      mn: "America/Chicago",
+      ms: "America/Chicago",
+      mo: "America/Chicago",
+      mt: "America/Denver",
+      ne: "America/Chicago",
+      nv: "America/Los_Angeles",
+      nh: "America/New_York",
+      nj: "America/New_York",
+      nm: "America/Denver",
+      ny: "America/New_York",
+      nc: "America/New_York",
+      nd: "America/Chicago",
+      oh: "America/New_York",
+      ok: "America/Chicago",
+      or: "America/Los_Angeles",
+      pa: "America/New_York",
+      ri: "America/New_York",
+      sc: "America/New_York",
+      sd: "America/Chicago",
+      tn: "America/Chicago",
+      tx: "America/Chicago",
+      ut: "America/Denver",
+      vt: "America/New_York",
+      va: "America/New_York",
+      wa: "America/Los_Angeles",
+      wv: "America/New_York",
+      wi: "America/Chicago",
+      wy: "America/Denver",
+      dc: "America/New_York",
+    };
 
     const brStateToTimezone: Record<string, string> = {
       ac: "America/Rio_Branco",
@@ -306,66 +363,280 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       tocantins: "to",
     };
 
-    let derivedTimezone = "America/Cuiaba";
+    let usCode = normState.length === 2 ? (usStateCodes.has(normState) ? normState : "") : "";
+    if (!usCode && normState) {
+      usCode = usStateNameToCode[normState] ?? "";
+    }
+
+    let brCode = normState.length === 2 ? (brStateByNameToCode[normState] ? normState : "") : "";
+    if (!brCode && normState) {
+      brCode = brStateByNameToCode[normState] ?? "";
+    }
+
+    let derivedCountry: string | null = null;
+    let derivedTimezone: string | null = null;
+
+    if (usCode) {
+      derivedCountry = "Estados Unidos";
+      derivedTimezone = usStateCodeToTimezone[usCode] ?? "America/New_York";
+    } else if (brCode) {
+      derivedCountry = "Brasil";
+      derivedTimezone = brStateToTimezone[brCode] ?? "America/Cuiaba";
+    } else {
+      if (normState) {
+        if (
+          normState.includes("florida") ||
+          normState.includes("california") ||
+          normState.includes("texas") ||
+          normState.includes("newyork") ||
+          normState.includes("washington") ||
+          normState.includes("illinois") ||
+          normState.includes("pensilvania") ||
+          normState.includes("pennsylvania") ||
+          normState.includes("ohio") ||
+          normState.includes("georgia") ||
+          normState.includes("northcarolina") ||
+          normState.includes("michigan") ||
+          normState.includes("newjersey") ||
+          normState.includes("virginia") ||
+          normState.includes("arizona") ||
+          normState.includes("massachusetts") ||
+          normState.includes("tennessee") ||
+          normState.includes("indiana") ||
+          normState.includes("missouri") ||
+          normState.includes("maryland") ||
+          normState.includes("wisconsin") ||
+          normState.includes("colorado") ||
+          normState.includes("minnesota") ||
+          normState.includes("southcarolina") ||
+          normState.includes("alabama") ||
+          normState.includes("louisiana") ||
+          normState.includes("kentucky") ||
+          normState.includes("oregon") ||
+          normState.includes("oklahoma") ||
+          normState.includes("connecticut") ||
+          normState.includes("nevada") ||
+          normState.includes("arkansas") ||
+          normState.includes("mississippi") ||
+          normState.includes("kansas") ||
+          normState.includes("newmexico") ||
+          normState.includes("nebraska") ||
+          normState.includes("westvirginia") ||
+          normState.includes("idaho") ||
+          normState.includes("hawaii") ||
+          normState.includes("newhampshire") ||
+          normState.includes("maine") ||
+          normState.includes("rhodeisland") ||
+          normState.includes("delaware") ||
+          normState.includes("southdakota") ||
+          normState.includes("northdakota") ||
+          normState.includes("montana") ||
+          normState.includes("vermont") ||
+          normState.includes("wyoming") ||
+          normState.includes("alaska")
+        ) {
+          derivedCountry = "Estados Unidos";
+        } else if (
+          normState.includes("portugal") ||
+          normCity.includes("lisboa") ||
+          normCity.includes("lisbon") ||
+          normCity.includes("porto")
+        ) {
+          derivedCountry = "Portugal";
+          derivedTimezone = "Europe/Lisbon";
+        } else if (
+          normState.includes("espanha") ||
+          normState.includes("spain") ||
+          normCity.includes("madrid") ||
+          normCity.includes("barcelona")
+        ) {
+          derivedCountry = "Espanha";
+          derivedTimezone = "Europe/Madrid";
+        } else if (
+          normState.includes("paraguai") ||
+          normState.includes("paraguay") ||
+          normCity.includes("asuncion") ||
+          normCity.includes("assunca")
+        ) {
+          derivedCountry = "Paraguai";
+          derivedTimezone = "America/Asuncion";
+        } else if (
+          normState.includes("argentina") ||
+          normCity.includes("buenosaires")
+        ) {
+          derivedCountry = "Argentina";
+          derivedTimezone = "America/Argentina/Buenos_Aires";
+        }
+      }
+
+      if (!derivedCountry && normCity) {
+        if (
+          normCity.includes("miami") ||
+          normCity.includes("orlando") ||
+          normCity.includes("newyork") ||
+          normCity.includes("losangeles") ||
+          normCity.includes("lasvegas") ||
+          normCity.includes("sanfrancisco") ||
+          normCity.includes("sandiego") ||
+          normCity.includes("chicago") ||
+          normCity.includes("houston") ||
+          normCity.includes("dallas") ||
+          normCity.includes("austin") ||
+          normCity.includes("seattle") ||
+          normCity.includes("boston") ||
+          normCity.includes("philadelphia") ||
+          normCity.includes("phoenix") ||
+          normCity.includes("denver") ||
+          normCity.includes("atlanta") ||
+          normCity.includes("detroit") ||
+          normCity.includes("washington") ||
+          normCity.includes("portland") ||
+          normCity.includes("saltlakecity")
+        ) {
+          derivedCountry = "Estados Unidos";
+        } else if (
+          normCity.includes("lisboa") ||
+          normCity.includes("lisbon") ||
+          normCity.includes("porto")
+        ) {
+          derivedCountry = "Portugal";
+          derivedTimezone = "Europe/Lisbon";
+        } else if (normCity.includes("madrid") || normCity.includes("barcelona")) {
+          derivedCountry = "Espanha";
+          derivedTimezone = "Europe/Madrid";
+        } else if (normCity.includes("asuncion") || normCity.includes("assunca")) {
+          derivedCountry = "Paraguai";
+          derivedTimezone = "America/Asuncion";
+        } else if (normCity.includes("buenosaires")) {
+          derivedCountry = "Argentina";
+          derivedTimezone = "America/Argentina/Buenos_Aires";
+        }
+      }
+    }
+
+    if (!derivedCountry) {
+      derivedCountry = "Brasil";
+    }
     const normCountry = normalizeLocationKey(derivedCountry);
 
-    if (normCountry === "estadosunidos") {
-      if (normCity.includes("miami") || normState === "fl" || normState.includes("florida")) {
-        derivedTimezone = "America/New_York";
-      } else if (normCity.includes("losangeles") || normState === "ca" || normState.includes("california")) {
-        derivedTimezone = "America/Los_Angeles";
-      } else if (normCity.includes("chicago") || normState === "il" || normState.includes("illinois")) {
-        derivedTimezone = "America/Chicago";
-      } else if (normCity.includes("newyork") || normState === "ny" || normState.includes("novaiorque")) {
-        derivedTimezone = "America/New_York";
-      } else if (normCity.includes("seattle") || normState === "wa" || normState.includes("washington")) {
-        derivedTimezone = "America/Los_Angeles";
+    if (!derivedTimezone) {
+      if (normCountry === "estadosunidos") {
+        if (
+          normCity.includes("miami") ||
+          normState === "fl" ||
+          normState.includes("florida") ||
+          normCity.includes("newyork") ||
+          normState === "ny" ||
+          normState.includes("newyork") ||
+          normCity.includes("boston") ||
+          normCity.includes("philadelphia") ||
+          normCity.includes("washington") ||
+          normCity.includes("atlanta")
+        ) {
+          derivedTimezone = "America/New_York";
+        } else if (
+          normCity.includes("losangeles") ||
+          normState === "ca" ||
+          normState.includes("california") ||
+          normCity.includes("lasvegas") ||
+          normCity.includes("sanfrancisco") ||
+          normCity.includes("sandiego") ||
+          normCity.includes("seattle") ||
+          normCity.includes("portland") ||
+          normState === "wa" ||
+          normState.includes("washington") ||
+          normState === "nv" ||
+          normState.includes("nevada") ||
+          normState === "or" ||
+          normState.includes("oregon")
+        ) {
+          derivedTimezone = "America/Los_Angeles";
+        } else if (
+          normCity.includes("chicago") ||
+          normState === "il" ||
+          normState.includes("illinois") ||
+          normCity.includes("houston") ||
+          normCity.includes("dallas") ||
+          normCity.includes("austin") ||
+          normState === "tx" ||
+          normState.includes("texas")
+        ) {
+          derivedTimezone = "America/Chicago";
+        } else if (
+          normCity.includes("denver") ||
+          normState === "co" ||
+          normState.includes("colorado") ||
+          normCity.includes("phoenix") ||
+          normState === "az" ||
+          normState.includes("arizona") ||
+          normCity.includes("saltlakecity")
+        ) {
+          derivedTimezone = "America/Denver";
+        } else if (normCity.includes("honolulu") || normState === "hi" || normState.includes("hawaii")) {
+          derivedTimezone = "Pacific/Honolulu";
+        } else if (normCity.includes("anchorage") || normState === "ak" || normState.includes("alaska")) {
+          derivedTimezone = "America/Anchorage";
+        } else {
+          derivedTimezone = "America/New_York";
+        }
+      } else if (normCountry === "portugal") {
+        derivedTimezone = "Europe/Lisbon";
+      } else if (normCountry === "espanha") {
+        derivedTimezone = "Europe/Madrid";
+      } else if (normCountry === "paraguai") {
+        derivedTimezone = "America/Asuncion";
+      } else if (normCountry === "argentina") {
+        derivedTimezone = "America/Argentina/Buenos_Aires";
       } else {
-        derivedTimezone = "America/New_York";
-      }
-    } else if (normCountry === "portugal") {
-      derivedTimezone = "Europe/Lisbon";
-    } else if (normCountry === "espanha") {
-      derivedTimezone = "Europe/Madrid";
-    } else if (normCountry === "paraguai") {
-      derivedTimezone = "America/Asuncion";
-    } else if (normCountry === "argentina") {
-      derivedTimezone = "America/Argentina/Buenos_Aires";
-    } else {
-      let stateCode = normState.length === 2 ? normState : "";
-      if (!stateCode && normState) {
-        stateCode = brStateByNameToCode[normState] ?? "";
-      }
-      if (stateCode && brStateToTimezone[stateCode]) {
-        derivedTimezone = brStateToTimezone[stateCode];
-      } else if (normCity.includes("saopaulo") || normCity.includes("sao paulo") || normCity.includes("campinas") || normCity.includes("ribeirao")) {
-        derivedTimezone = "America/Sao_Paulo";
-      } else if (normCity.includes("riodejaneiro") || normCity.includes("rio de janeiro") || normCity.includes("nit")) {
-        derivedTimezone = "America/Sao_Paulo";
-      } else if (normCity.includes("cuiaba")) {
-        derivedTimezone = "America/Cuiaba";
-      } else if (normCity.includes("campogrande")) {
-        derivedTimezone = "America/Campo_Grande";
-      } else if (normCity.includes("manaus")) {
-        derivedTimezone = "America/Manaus";
-      } else if (normCity.includes("belem") || normCity.includes("anapolis") || normCity.includes("palmas")) {
-        derivedTimezone = "America/Belem";
-      } else if (normCity.includes("recife") || normCity.includes("fortaleza") || normCity.includes("salvador") || normCity.includes("maceio") || normCity.includes("natal") || normCity.includes("joaopessoa") || normCity.includes("teresina")) {
-        derivedTimezone = "America/Fortaleza";
-      } else if (normCity.includes("portoalegre") || normCity.includes("curitiba") || normCity.includes("florianopolis") || normCity.includes("joinville") || normCity.includes("blumenau")) {
-        derivedTimezone = "America/Sao_Paulo";
-      } else if (normCity.includes("belohorizonte") || normCity.includes("juizdefora") || normCity.includes("uberlandia")) {
-        derivedTimezone = "America/Sao_Paulo";
-      } else if (normCity.includes("brasilia")) {
-        derivedTimezone = "America/Sao_Paulo";
-      } else if (normCity.includes("portovelho")) {
-        derivedTimezone = "America/Porto_Velho";
-      } else if (normCity.includes("riobranco")) {
-        derivedTimezone = "America/Rio_Branco";
-      } else if (normCity.includes("boa vista") || normCity.includes("boavista")) {
-        derivedTimezone = "America/Boa_Vista";
-      } else if (normCity.includes("palmas") || normCity.includes("araguaina")) {
-        derivedTimezone = "America/Araguaina";
+        if (normCity.includes("saopaulo") || normCity.includes("sao paulo") || normCity.includes("campinas") || normCity.includes("ribeirao")) {
+          derivedTimezone = "America/Sao_Paulo";
+        } else if (normCity.includes("riodejaneiro") || normCity.includes("rio de janeiro") || normCity.includes("nit")) {
+          derivedTimezone = "America/Sao_Paulo";
+        } else if (normCity.includes("cuiaba")) {
+          derivedTimezone = "America/Cuiaba";
+        } else if (normCity.includes("campogrande")) {
+          derivedTimezone = "America/Campo_Grande";
+        } else if (normCity.includes("manaus")) {
+          derivedTimezone = "America/Manaus";
+        } else if (normCity.includes("belem") || normCity.includes("anapolis")) {
+          derivedTimezone = "America/Belem";
+        } else if (
+          normCity.includes("recife") ||
+          normCity.includes("fortaleza") ||
+          normCity.includes("salvador") ||
+          normCity.includes("maceio") ||
+          normCity.includes("natal") ||
+          normCity.includes("joaopessoa") ||
+          normCity.includes("teresina")
+        ) {
+          derivedTimezone = "America/Fortaleza";
+        } else if (
+          normCity.includes("portoalegre") ||
+          normCity.includes("curitiba") ||
+          normCity.includes("florianopolis") ||
+          normCity.includes("joinville") ||
+          normCity.includes("blumenau")
+        ) {
+          derivedTimezone = "America/Sao_Paulo";
+        } else if (
+          normCity.includes("belohorizonte") ||
+          normCity.includes("juizdefora") ||
+          normCity.includes("uberlandia")
+        ) {
+          derivedTimezone = "America/Sao_Paulo";
+        } else if (normCity.includes("brasilia")) {
+          derivedTimezone = "America/Sao_Paulo";
+        } else if (normCity.includes("portovelho")) {
+          derivedTimezone = "America/Porto_Velho";
+        } else if (normCity.includes("riobranco")) {
+          derivedTimezone = "America/Rio_Branco";
+        } else if (normCity.includes("boa vista") || normCity.includes("boavista")) {
+          derivedTimezone = "America/Boa_Vista";
+        } else if (normCity.includes("palmas") || normCity.includes("araguaina")) {
+          derivedTimezone = "America/Araguaina";
+        } else {
+          derivedTimezone = "America/Cuiaba";
+        }
       }
     }
 
