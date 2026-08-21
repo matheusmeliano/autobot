@@ -25,6 +25,7 @@ import {
   buildRecurringClassPostEnrollmentRegisteredAttendantNotification,
   buildRecurringClassStudentLessonReadyWhatsAppMessage,
   buildRecurringPaymentConfirmedStudentWelcomeMessage,
+  buildRecurringPaymentPendingConfirmationAttendantNotification,
   calculateNextRecurringOccurrence,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
@@ -3767,4 +3768,162 @@ export async function rejectLeadRecurringPayment(params: {
     });
   } catch {}
   return { ok: true, rejected_at: now };
+}
+
+export async function triggerRecurringPaymentIntentIfNeeded(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  triggeredFrom:
+    | "contract_finalize_step6_entry"
+    | "contract_finalize_finalizar_matricula"
+    | "draft_step6_entry"
+    | "whatsapp_bot_contract_signed";
+  enrollmentNumber?: string | null;
+}) {
+  const { admin, leadId, triggeredFrom } = params;
+  let enrollmentNumber = String(params.enrollmentNumber ?? "").trim() || null;
+
+  const { data: lead, error: leadErr } = await admin
+    .from("atendimento_leads")
+    .select("*")
+    .eq("id", String(leadId))
+    .maybeSingle();
+  if (leadErr || !lead) return { ok: false, error: leadErr?.message ?? "Lead não encontrado." };
+
+  const paymentStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const paymentAlreadyResolved =
+    paymentStatusRaw === "pendente_confirmacao" ||
+    paymentStatusRaw === "nao_realizado" ||
+    paymentStatusRaw === "confirmado";
+
+  if (!enrollmentNumber) {
+    enrollmentNumber = String((lead as any)?.enrollment_number ?? "").trim() || null;
+  }
+
+  if (paymentAlreadyResolved) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: "pagamento_ja_resolvido",
+      current_payment_status: paymentStatusRaw,
+    };
+  }
+
+  const now = new Date().toISOString();
+  const currentStage = String((lead as any)?.funnel_stage ?? "");
+  const currentStatus = String((lead as any)?.status ?? "");
+  const stageIdx = ATENDIMENTO_STAGE_ORDER.indexOf(
+    currentStage as (typeof ATENDIMENTO_STAGE_ORDER)[number],
+  );
+  const statusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(
+    currentStatus as (typeof ATENDIMENTO_STATUS_ORDER)[number],
+  );
+  const targetStage = "pagamento_pendente_confirmacao" as const;
+  const targetStatus = "pagamento_pendente_confirmacao" as const;
+  const targetStageIdx = ATENDIMENTO_STAGE_ORDER.indexOf(targetStage);
+  const targetStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(targetStatus);
+
+  const patch: any = {
+    payment_status: "pendente_confirmacao",
+    payment_confirmed_at: null,
+    payment_rejected_at: null,
+    updated_at: now,
+  };
+  if (targetStageIdx >= 0 && (stageIdx < 0 || stageIdx < targetStageIdx)) {
+    patch.funnel_stage = targetStage;
+  }
+  if (targetStatusIdx >= 0 && (statusIdx < 0 || statusIdx < targetStatusIdx)) {
+    patch.status = targetStatus;
+  }
+  if (enrollmentNumber) {
+    patch.enrollment_number = enrollmentNumber;
+  }
+
+  const runPatch = async (p: any): Promise<{ ok: boolean; error?: any }> => {
+    const { error } = await admin
+      .from("atendimento_leads")
+      .update(p)
+      .eq("id", String(leadId));
+    if (!error) return { ok: true };
+    const code = String((error as any)?.code ?? "").trim();
+    if (code === "42703") {
+      const msg = String(error.message ?? "").toLowerCase();
+      const m = /column "([^"]+)" does not exist/.exec(msg);
+      const col = m ? m[1] : null;
+      if (col && p[col] !== undefined) {
+        const next: any = { ...p };
+        delete next[col];
+        if (Object.keys(next).length === 0) return { ok: true };
+        return runPatch(next);
+      }
+    }
+    return { ok: false, error };
+  };
+  const patchRes = await runPatch(patch);
+  if (!patchRes.ok) {
+    return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };
+  }
+
+  try {
+    await appendHistoryEvent({
+      leadId,
+      eventType: "recurring_payment_intent_registered",
+      title: "Intenção de pagamento registrada (pagamento pendente)",
+      details: {
+        enrollment_number: enrollmentNumber || null,
+        triggered_from: triggeredFrom,
+        pending_since: now,
+      },
+      actorType: "system",
+    });
+  } catch {}
+
+  try {
+    const attendantMsg = buildRecurringPaymentPendingConfirmationAttendantNotification(
+      String((lead as any)?.full_name ?? null),
+      enrollmentNumber || null,
+    );
+    await sendAtendimentoWhatsAppText({
+      phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
+      message: attendantMsg,
+    });
+    try {
+      await appendHistoryEvent({
+        leadId,
+        eventType: "attendant_payment_pending_confirmation_sent",
+        title: "Notificação atendente: Pagamento pendente enviada",
+        details: {
+          enrollment_number: enrollmentNumber || null,
+          attendant_phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
+          triggered_from: triggeredFrom,
+        },
+        actorType: "system",
+      });
+    } catch {}
+  } catch {}
+
+  try {
+    const { data: conversations } = await admin
+      .from("atendimento_conversations")
+      .select("id")
+      .eq("lead_id", String(leadId))
+      .eq("channel", "whatsapp")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if ((conversations as any)?.id) {
+      try {
+        await syncConversationPreview({
+          conversationId: String((conversations as any).id),
+        });
+      } catch {}
+    }
+  } catch {}
+
+  return {
+    ok: true,
+    triggered: true,
+    enrollment_number: enrollmentNumber,
+    pending_since: now,
+  };
 }

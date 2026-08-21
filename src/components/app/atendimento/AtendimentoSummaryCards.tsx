@@ -259,12 +259,6 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
       statusRaw === "contrato_coletando_dados" ||
       funnelRaw === "contrato_coletando_dados" ||
       (regStepValid && regStepRaw >= 3 && regStepRaw < 5));
-  const paymentStepReached =
-    contractSigned ||
-    (regStepValid && regStepRaw >= 6) ||
-    paymentStatusRaw === "pendente_confirmacao" ||
-    paymentStatusRaw === "nao_realizado" ||
-    paymentStatusRaw === "confirmado";
 
   const hasRegistrationBasicData =
     registrationStarted ||
@@ -293,11 +287,11 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   if (paymentConfirmed) return "Matrícula concluída";
   if (paymentPendingConfirmation) return "Aguardando confirmação de pagamento";
   if (paymentRejected) return "Pagamento não realizado";
-  if (paymentStepReached) return "Falta confirmar pagamento";
   if (
-    contractAwaitingAccept ||
-    contractCollectingData ||
-    !contractSigned
+    !paymentPendingConfirmation &&
+    !paymentRejected &&
+    !paymentConfirmed &&
+    (contractAwaitingAccept || contractCollectingData || !contractSigned)
   ) {
     return "Falta confirmar contrato simplificado";
   }
@@ -798,7 +792,7 @@ function LeadDetails({
     paymentStatusRaw === "pendente_confirmacao" ||
     statusRaw === "pagamento_pendente_confirmacao" ||
     funnelRaw === "pagamento_pendente_confirmacao" ||
-    (contractSigned && !paymentConfirmedAt && !paymentRejectedAt && regStepOk && regStepRaw >= 10);
+    (contractSigned && !paymentConfirmedAt && !paymentRejectedAt && regStepOk && regStepRaw >= 6);
   const paymentRejected =
     paymentStatusRaw === "nao_realizado" ||
     statusRaw === "pagamento_nao_realizado" ||
@@ -813,7 +807,7 @@ function LeadDetails({
   const showPaymentActions =
     onConfirmPayment &&
     onRejectPayment &&
-    (paymentPendingConfirmation || paymentRejected || (contractSigned && regStepOk && regStepRaw >= 10));
+    (paymentPendingConfirmation || paymentRejected);
 
   const paymentBadgeTone = (() => {
     if (paymentConfirmed) return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";

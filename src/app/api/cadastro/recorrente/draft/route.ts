@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { findLeadByPhone } from "@/lib/atendimento/server";
+import { findLeadByPhone, triggerRecurringPaymentIntentIfNeeded } from "@/lib/atendimento/server";
 import { ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER } from "@/lib/atendimento/constants";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
 
@@ -410,6 +410,23 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ ok: false, error: msg }, { status: 500 });
       }
     }
+
+    try {
+      if (safeStepRaw !== null && safeStepRaw >= 6) {
+        const paymentRawNow = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+        const paymentAlready =
+          paymentRawNow === "pendente_confirmacao" ||
+          paymentRawNow === "nao_realizado" ||
+          paymentRawNow === "confirmado";
+        if (!paymentAlready) {
+          await triggerRecurringPaymentIntentIfNeeded({
+            admin,
+            leadId: String(lead.id),
+            triggeredFrom: "draft_step6_entry",
+          }).catch(() => {});
+        }
+      }
+    } catch {}
 
     try {
       const { data: convRow } = await admin
