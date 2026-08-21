@@ -1938,6 +1938,83 @@ export function AtendimentoSummaryCards({
       const professorTime = String(selectedSlot.professorTime ?? "").trim();
       const leadDate = String(selectedSlot.leadDate ?? selectedDate.leadDate ?? professorDate).slice(0, 10);
       const leadTime = String(selectedSlot.leadTime ?? selectedSlot.displayLabel ?? professorTime).trim();
+      let leadStartAtIso = "";
+      let professorStartAtIso = "";
+      try {
+        const safeBuild = (d: string, t: string, tz: string) => {
+          const dm = `${String(d ?? "").slice(0, 10)}`;
+          const tm = `${String(t ?? "").trim()}`;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dm) || !/^\d{1,2}:\d{2}(:\d{2})?$/.test(tm)) return "";
+          try {
+            const z = (globalThis as any).Intl?.DateTimeFormat
+              ? { timeZone: tz }
+              : (void 0 as any);
+            if (!z) return "";
+            const ymd = dm.split("-");
+            const hhmm = tm.split(":");
+            const iso = new Date(
+              Date.UTC(
+                Number(ymd[0] ?? 0),
+                Number(ymd[1] ?? 1) - 1,
+                Number(ymd[2] ?? 1),
+                Number(hhmm[0] ?? 0),
+                Number(hhmm[1] ?? 0),
+                Number(hhmm[2] ?? 0),
+                0,
+              ),
+            );
+            if (!Number.isFinite(iso.getTime())) return "";
+            const utcIso = iso.toISOString();
+            if (!tz || tz === "UTC" || tz === "Etc/UTC") return utcIso;
+            if (typeof Intl !== "undefined" && typeof Intl.DateTimeFormat === "function") {
+              const parts = new Intl.DateTimeFormat("en-US", {
+                timeZone: tz,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+              }).formatToParts(iso);
+              const map: Record<string, string> = {};
+              for (const p of parts as any[]) {
+                const tp = String(p?.type ?? "");
+                const vl = String(p?.value ?? "");
+                if (tp && vl) map[tp] = vl;
+              }
+              const y = map.year;
+              const mo = map.month;
+              const da = map.day;
+              const hr = map.hour === "24" ? "00" : map.hour;
+              const mi = map.minute;
+              const se = map.second || "00";
+              if (y && mo && da && hr && mi) {
+                const asLocal = new Date(
+                  Date.UTC(Number(y), Number(mo) - 1, Number(da), Number(hr), Number(mi), Number(se), 0),
+                );
+                const offMs = asLocal.getTime() - iso.getTime();
+                const offsetMinutes = Math.round(offMs / 60000);
+                if (Number.isFinite(offsetMinutes)) {
+                  const newMs = iso.getTime() - offMs;
+                  const result = new Date(newMs);
+                  if (Number.isFinite(result.getTime())) {
+                    return result.toISOString();
+                  }
+                }
+              }
+            }
+            return utcIso;
+          } catch {
+            return "";
+          }
+        };
+        leadStartAtIso = safeBuild(leadDate, leadTime, leadTimezone);
+        professorStartAtIso = safeBuild(professorDate, professorTime, professorTimezone);
+      } catch {
+        leadStartAtIso = "";
+        professorStartAtIso = "";
+      }
 
       const body: Record<string, unknown> = {
         status: "scheduled",
@@ -1978,41 +2055,30 @@ export function AtendimentoSummaryCards({
         current.map((item) => {
           if (item.id !== leadId) return item;
           const patch: any = { ...item };
-          if (payload?.lead_update) {
-            if (payload.lead_update.funnel_stage !== undefined) {
-              const raw = String(payload.lead_update.funnel_stage ?? "").trim();
-              patch.funnel_stage = raw ? raw : (item as any).funnel_stage;
-            }
-            if (payload.lead_update.experimental_class_status !== undefined) {
-              const raw2 = String(payload.lead_update.experimental_class_status ?? "").trim();
-              patch.experimental_class_status = raw2 ? raw2 : (item as any).experimental_class_status;
-            }
-            if (payload.lead_update.updated_at) {
-              patch.updated_at = String(payload.lead_update.updated_at);
-            }
-            if ((payload.lead_update as any).experimental_class_lead_date) {
-              const v = String((payload.lead_update as any).experimental_class_lead_date ?? "").trim();
-              if (v) patch.experimental_class_lead_date = v;
-            }
-            if ((payload.lead_update as any).experimental_class_lead_time) {
-              const v = String((payload.lead_update as any).experimental_class_lead_time ?? "").trim();
-              if (v) patch.experimental_class_lead_time = v;
-            }
-            if ((payload.lead_update as any).experimental_class_professor_date) {
-              const v = String((payload.lead_update as any).experimental_class_professor_date ?? "").trim();
-              if (v) patch.experimental_class_professor_date = v;
-            }
-            if ((payload.lead_update as any).experimental_class_professor_time) {
-              const v = String((payload.lead_update as any).experimental_class_professor_time ?? "").trim();
-              if (v) patch.experimental_class_professor_time = v;
-            }
-            if ((payload.lead_update as any).experimental_class_lead_start_at) {
-              const v = String((payload.lead_update as any).experimental_class_lead_start_at ?? "").trim();
-              if (v) patch.experimental_class_lead_start_at = v;
-            }
-            if ((payload.lead_update as any).experimental_class_professor_start_at) {
-              const v = String((payload.lead_update as any).experimental_class_professor_start_at ?? "").trim();
-              if (v) patch.experimental_class_professor_start_at = v;
+          const applyLeadUpdateField = (targetKey: keyof any, srcKey: string) => {
+            const v1 = String((payload?.lead_update as any)?.[srcKey] ?? "").trim();
+            if (v1) (patch as any)[targetKey] = v1;
+          };
+          applyLeadUpdateField("funnel_stage", "funnel_stage");
+          applyLeadUpdateField("experimental_class_status", "experimental_class_status");
+          applyLeadUpdateField("updated_at", "updated_at");
+          applyLeadUpdateField("experimental_class_lead_date", "experimental_class_lead_date");
+          applyLeadUpdateField("experimental_class_lead_time", "experimental_class_lead_time");
+          applyLeadUpdateField("experimental_class_professor_date", "experimental_class_professor_date");
+          applyLeadUpdateField("experimental_class_professor_time", "experimental_class_professor_time");
+          applyLeadUpdateField("experimental_class_lead_start_at", "experimental_class_lead_start_at");
+          applyLeadUpdateField("experimental_class_professor_start_at", "experimental_class_professor_start_at");
+          const fallbacks = [
+            ["experimental_class_lead_date", leadDate],
+            ["experimental_class_lead_time", leadTime],
+            ["experimental_class_professor_date", professorDate],
+            ["experimental_class_professor_time", professorTime],
+            ["experimental_class_lead_start_at", leadStartAtIso],
+            ["experimental_class_professor_start_at", professorStartAtIso],
+          ] as const;
+          for (const [k, v] of fallbacks) {
+            if (!String((patch as any)?.[k] ?? "").trim() && String(v ?? "").trim()) {
+              (patch as any)[k] = v;
             }
           }
           if (payload?.booking) {
@@ -2022,10 +2088,14 @@ export function AtendimentoSummaryCards({
             const bkProfessorTime = String(bk.professor_time ?? professorTime ?? "").trim();
             const bkLeadDate = String(bk.lead_date ?? leadDate ?? bkProfessorDate ?? "").trim();
             const bkLeadTime = String(bk.lead_time ?? leadTime ?? bkProfessorTime ?? "").trim();
-            if (bkLeadDate) patch.experimental_class_lead_date = bkLeadDate;
-            if (bkLeadTime) patch.experimental_class_lead_time = bkLeadTime;
-            if (bkProfessorDate) patch.experimental_class_professor_date = bkProfessorDate;
-            if (bkProfessorTime) patch.experimental_class_professor_time = bkProfessorTime;
+            if (bkLeadDate && !String(patch.experimental_class_lead_date ?? "").trim()) patch.experimental_class_lead_date = bkLeadDate;
+            if (bkLeadTime && !String(patch.experimental_class_lead_time ?? "").trim()) patch.experimental_class_lead_time = bkLeadTime;
+            if (bkProfessorDate && !String(patch.experimental_class_professor_date ?? "").trim()) patch.experimental_class_professor_date = bkProfessorDate;
+            if (bkProfessorTime && !String(patch.experimental_class_professor_time ?? "").trim()) patch.experimental_class_professor_time = bkProfessorTime;
+            const bkLeadStartAt = String(bk.lead_start_at ?? "").trim();
+            const bkProfessorStartAt = String(bk.professor_start_at ?? "").trim();
+            if (bkLeadStartAt && !String(patch.experimental_class_lead_start_at ?? "").trim()) patch.experimental_class_lead_start_at = bkLeadStartAt;
+            if (bkProfessorStartAt && !String(patch.experimental_class_professor_start_at ?? "").trim()) patch.experimental_class_professor_start_at = bkProfessorStartAt;
             if (bkLeadDate || bkLeadTime || bkProfessorDate || bkProfessorTime) {
               const bkIdOk = String(bk.id ?? "fallback").trim() || "fallback";
               patch.future_experimental_class_booking = {
@@ -2048,10 +2118,95 @@ export function AtendimentoSummaryCards({
             if (!patch.experimental_class_status || String(patch.experimental_class_status).trim() === "") {
               patch.experimental_class_status = "scheduled";
             }
+          } else {
+            if (!patch.funnel_stage || String(patch.funnel_stage).trim() === "") patch.funnel_stage = "aula_experimental_agendada";
+            if (!patch.experimental_class_status || String(patch.experimental_class_status).trim() === "") patch.experimental_class_status = "scheduled";
+            const hasAny =
+              String(patch.experimental_class_lead_date ?? "").trim() ||
+              String(patch.experimental_class_lead_time ?? "").trim() ||
+              String(patch.experimental_class_professor_date ?? "").trim() ||
+              String(patch.experimental_class_professor_time ?? "").trim();
+            if (hasAny && !patch.future_experimental_class_booking) {
+              patch.future_experimental_class_booking = {
+                id: "fallback",
+                status: "scheduled",
+                lead_date: String(patch.experimental_class_lead_date ?? "").trim() || null,
+                lead_time: String(patch.experimental_class_lead_time ?? "").trim() || null,
+                professor_date: String(patch.experimental_class_professor_date ?? "").trim() || null,
+                professor_time: String(patch.experimental_class_professor_time ?? "").trim() || null,
+                lesson_link: String(preservedLessonLink ?? "").trim() || null,
+                lead_timezone: String(leadTimezone ?? "").trim() || null,
+                professor_timezone: String(professorTimezone ?? "").trim() || null,
+                attendance_status: null,
+                created_at: new Date().toISOString(),
+              };
+              if (!patch.experimental_class_booking) {
+                patch.experimental_class_booking = { ...patch.future_experimental_class_booking };
+              }
+            }
           }
+          if (!String(patch.updated_at ?? "").trim()) patch.updated_at = new Date().toISOString();
           return patch as AtendimentoLeadListItem;
         }),
       );
+
+      try {
+        const fresh = await fetch(`/api/atendimento/leads/${leadId}?skipEvents=1`, { cache: "no-store" })
+          .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+          .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+        if (fresh?.ok && fresh.lead?.id) {
+          setLocalLeads((current) =>
+            current.map((item) => {
+              if (item.id !== leadId) return item;
+              const prior = { ...item } as Record<string, unknown>;
+              const incoming = { ...(fresh.lead as Record<string, unknown>) };
+              const merged: Record<string, unknown> = { ...prior, ...incoming };
+              const keepLocalIfIncomingEmpty = [
+                "experimental_class_lead_date",
+                "experimental_class_lead_time",
+                "experimental_class_professor_date",
+                "experimental_class_professor_time",
+                "experimental_class_lead_start_at",
+                "experimental_class_professor_start_at",
+                "experimental_class_status",
+                "funnel_stage",
+              ];
+              for (const k of keepLocalIfIncomingEmpty) {
+                const incV = String((incoming as any)?.[k] ?? "").trim();
+                const locV = String((prior as any)?.[k] ?? "").trim();
+                if (!incV && locV) (merged as any)[k] = locV;
+              }
+              if (
+                !merged.experimental_class_booking &&
+                prior.experimental_class_booking
+              ) {
+                merged.experimental_class_booking = prior.experimental_class_booking;
+              }
+              if (
+                !merged.future_experimental_class_booking &&
+                prior.future_experimental_class_booking
+              ) {
+                merged.future_experimental_class_booking = prior.future_experimental_class_booking;
+              }
+              if (
+                !String((merged as any).funnel_stage ?? "").trim() &&
+                String((prior as any).funnel_stage ?? "").trim()
+              ) {
+                (merged as any).funnel_stage = (prior as any).funnel_stage;
+              }
+              if (
+                !String((merged as any).experimental_class_status ?? "").trim() &&
+                String((prior as any).experimental_class_status ?? "").trim()
+              ) {
+                (merged as any).experimental_class_status = (prior as any).experimental_class_status;
+              }
+              return merged as AtendimentoLeadListItem;
+            }),
+          );
+        }
+      } catch {
+        // ignore fresh refetch error (optimistic patch already applied)
+      }
 
       modalToast.success("Aula experimental atualizada.");
       closeEditExperimental();
@@ -2383,6 +2538,33 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         const prev = byId.get(key);
         if (!prev) return inc;
         const merged: any = { ...prev, ...inc };
+        const KEEP_LOCALLY_IF_INCOMING_EMPTY: Array<
+          | "experimental_class_lead_date"
+          | "experimental_class_lead_time"
+          | "experimental_class_professor_date"
+          | "experimental_class_professor_time"
+          | "experimental_class_lead_start_at"
+          | "experimental_class_professor_start_at"
+          | "experimental_class_status"
+          | "funnel_stage"
+        > = [
+          "experimental_class_lead_date",
+          "experimental_class_lead_time",
+          "experimental_class_professor_date",
+          "experimental_class_professor_time",
+          "experimental_class_lead_start_at",
+          "experimental_class_professor_start_at",
+          "experimental_class_status",
+          "funnel_stage",
+        ];
+        for (const k of KEEP_LOCALLY_IF_INCOMING_EMPTY) {
+          const locV = String((prev as any)?.[k] ?? "").trim();
+          const incV = String((inc as any)?.[k] ?? "").trim();
+          if (locV && !incV) {
+            (merged as any)[k] = locV;
+          }
+        }
+
         const prevExpBooking = (prev as any)?.experimental_class_booking ?? null;
         const incExpBooking = (inc as any)?.experimental_class_booking ?? null;
         const prevHasExp = Boolean(
@@ -2408,19 +2590,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           const prevDate = String(prevExpBooking?.lead_date ?? prevExpBooking?.professor_date ?? "").trim();
           if (!incDate && prevDate) merged.experimental_class_booking = prevExpBooking;
         }
-
-        const prevExpLeadDate = String((prev as any)?.experimental_class_lead_date ?? "").trim();
-        const incExpLeadDate = String((inc as any)?.experimental_class_lead_date ?? "").trim();
-        const prevExpLeadTime = String((prev as any)?.experimental_class_lead_time ?? "").trim();
-        const incExpLeadTime = String((inc as any)?.experimental_class_lead_time ?? "").trim();
-        const prevExpProfDate = String((prev as any)?.experimental_class_professor_date ?? "").trim();
-        const incExpProfDate = String((inc as any)?.experimental_class_professor_date ?? "").trim();
-        const prevExpProfTime = String((prev as any)?.experimental_class_professor_time ?? "").trim();
-        const incExpProfTime = String((inc as any)?.experimental_class_professor_time ?? "").trim();
-        if (prevExpLeadDate && !incExpLeadDate) merged.experimental_class_lead_date = prevExpLeadDate;
-        if (prevExpLeadTime && !incExpLeadTime) merged.experimental_class_lead_time = prevExpLeadTime;
-        if (prevExpProfDate && !incExpProfDate) merged.experimental_class_professor_date = prevExpProfDate;
-        if (prevExpProfTime && !incExpProfTime) merged.experimental_class_professor_time = prevExpProfTime;
 
         const prevFutureExp = (prev as any)?.future_experimental_class_booking ?? null;
         const incFutureExp = (inc as any)?.future_experimental_class_booking ?? null;

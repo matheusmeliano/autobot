@@ -276,7 +276,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
 
     let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null } | null = null;
     {
-      const fullUpdateData = {
+      const fullUpdateData: Record<string, any> = {
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
         experimental_class_lead_date: safeLeadDate,
@@ -287,11 +287,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         experimental_class_professor_start_at: professorStartAt,
       };
       const selectFull = "id, funnel_stage, experimental_class_status, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at";
-      const safeUpdateData = {
-        funnel_stage: "aula_experimental_agendada",
-        experimental_class_status: safeStatus,
-      };
-      const selectSafe = "id, funnel_stage, experimental_class_status, updated_at";
+      const COLUMNS_42703_BLACKLIST_PREFIXES = ["experimental_class_status"];
+      const blacklistKey = (k: string) => COLUMNS_42703_BLACKLIST_PREFIXES.some((p) => String(k).toLowerCase() === String(p).toLowerCase());
       const fallback = () => ({
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
@@ -303,58 +300,100 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         experimental_class_lead_start_at: leadStartAt,
         experimental_class_professor_start_at: professorStartAt,
       });
-      try {
-        const { data: leadUpd, error: leadUpdErr } = await admin
-          .from("atendimento_leads")
-          .update(fullUpdateData as any)
-          .eq("id", leadId)
-          .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-          .select(selectFull)
-          .maybeSingle();
-        if (!leadUpdErr && leadUpd) {
-          leadUpdate = {
-            funnel_stage: String((leadUpd as any).funnel_stage ?? "aula_experimental_agendada").trim() || null,
-            experimental_class_status: String((leadUpd as any).experimental_class_status ?? safeStatus).trim() || null,
-            updated_at: String((leadUpd as any).updated_at ?? new Date().toISOString()),
-            experimental_class_lead_date: String((leadUpd as any).experimental_class_lead_date ?? safeLeadDate ?? "").trim() || safeLeadDate,
-            experimental_class_lead_time: String((leadUpd as any).experimental_class_lead_time ?? safeLeadTime ?? "").trim() || safeLeadTime,
-            experimental_class_professor_date: String((leadUpd as any).experimental_class_professor_date ?? safeProfessorDate ?? "").trim() || safeProfessorDate,
-            experimental_class_professor_time: String((leadUpd as any).experimental_class_professor_time ?? safeProfessorTime ?? "").trim() || safeProfessorTime,
-            experimental_class_lead_start_at: String((leadUpd as any).experimental_class_lead_start_at ?? leadStartAt ?? "").trim() || leadStartAt,
-            experimental_class_professor_start_at: String((leadUpd as any).experimental_class_professor_start_at ?? professorStartAt ?? "").trim() || professorStartAt,
-          };
-        } else if (leadUpdErr && (isUndefinedColumnError(leadUpdErr) || isUndefinedRelationError(leadUpdErr))) {
-          try {
-            const { data: safeUpd, error: safeErr } = await admin
-              .from("atendimento_leads")
-              .update(safeUpdateData as any)
-              .eq("id", leadId)
-              .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-              .select(selectSafe)
-              .maybeSingle();
-            if (!safeErr) {
-              leadUpdate = {
-                funnel_stage: String((safeUpd as any)?.funnel_stage ?? "aula_experimental_agendada").trim() || null,
-                experimental_class_status: String((safeUpd as any)?.experimental_class_status ?? safeStatus).trim() || null,
-                updated_at: String((safeUpd as any)?.updated_at ?? new Date().toISOString()),
-                experimental_class_lead_date: safeLeadDate,
-                experimental_class_lead_time: safeLeadTime,
-                experimental_class_professor_date: safeProfessorDate,
-                experimental_class_professor_time: safeProfessorTime,
-                experimental_class_lead_start_at: leadStartAt,
-                experimental_class_professor_start_at: professorStartAt,
-              };
-            } else {
-              leadUpdate = fallback();
-            }
-          } catch {
-            leadUpdate = fallback();
+      type LeadRun = { err: any | null; data: any | null };
+      async function attempt(updateData: Record<string, any>, select: string): Promise<LeadRun> {
+        try {
+          const { data, error } = await admin
+            .from("atendimento_leads")
+            .update(updateData)
+            .eq("id", leadId)
+            .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+            .select(select)
+            .maybeSingle();
+          return { err: error ?? null, data: data ?? null };
+        } catch (e) {
+          return { err: e, data: null };
+        }
+      }
+      function runOkToLeadUpdate(leadRow: any) {
+        return {
+          funnel_stage: String((leadRow as any).funnel_stage ?? "aula_experimental_agendada").trim() || null,
+          experimental_class_status: String((leadRow as any).experimental_class_status ?? safeStatus).trim() || null,
+          updated_at: String((leadRow as any).updated_at ?? new Date().toISOString()),
+          experimental_class_lead_date: String((leadRow as any).experimental_class_lead_date ?? safeLeadDate ?? "").trim() || safeLeadDate,
+          experimental_class_lead_time: String((leadRow as any).experimental_class_lead_time ?? safeLeadTime ?? "").trim() || safeLeadTime,
+          experimental_class_professor_date: String((leadRow as any).experimental_class_professor_date ?? safeProfessorDate ?? "").trim() || safeProfessorDate,
+          experimental_class_professor_time: String((leadRow as any).experimental_class_professor_time ?? safeProfessorTime ?? "").trim() || safeProfessorTime,
+          experimental_class_lead_start_at: String((leadRow as any).experimental_class_lead_start_at ?? leadStartAt ?? "").trim() || leadStartAt,
+          experimental_class_professor_start_at: String((leadRow as any).experimental_class_professor_start_at ?? professorStartAt ?? "").trim() || professorStartAt,
+        };
+      }
+      function nextUpdateAfterColumnError(lastUpdate: Record<string, any>): Record<string, any> | null {
+        const keys = Object.keys(lastUpdate);
+        let strippedAny = false;
+        const next: Record<string, any> = {};
+        for (const k of keys) {
+          if (blacklistKey(k)) {
+            strippedAny = true;
+            continue;
           }
-        } else if (leadUpdErr) {
+          next[k] = lastUpdate[k];
+        }
+        return strippedAny && Object.keys(next).length > 0 ? next : null;
+      }
+      let pendingUpdate: Record<string, any> | null = fullUpdateData;
+      let pendingSelect: string = selectFull;
+      let run: LeadRun | null = null;
+      let attempts = 0;
+      while (pendingUpdate && attempts < 5) {
+        attempts += 1;
+        run = await attempt(pendingUpdate, pendingSelect);
+        if (!run.err && run.data) {
+          leadUpdate = runOkToLeadUpdate(run.data);
+          break;
+        }
+        if (run.err && isUndefinedColumnError(run.err)) {
+          const nextUpdate = nextUpdateAfterColumnError(pendingUpdate);
+          pendingUpdate = nextUpdate;
+          if (!pendingUpdate) break;
+          const selectKeys = pendingSelect.split(",").map((s) => s.trim()).filter(Boolean);
+          const nextSelect = selectKeys.filter((k) => !blacklistKey(k)).join(", ");
+          pendingSelect = nextSelect || "id, updated_at";
+          continue;
+        }
+        if (run.err && (isUndefinedRelationError(run.err) || String((run.err as any)?.code ?? "") === "23502")) {
+          const nextUpdate = nextUpdateAfterColumnError(pendingUpdate);
+          pendingUpdate = nextUpdate;
+          if (!pendingUpdate) break;
+          const selectKeys = pendingSelect.split(",").map((s) => s.trim()).filter(Boolean);
+          const nextSelect = selectKeys.filter((k) => !blacklistKey(k)).join(", ");
+          pendingSelect = nextSelect || "id, updated_at";
+          continue;
+        }
+        break;
+      }
+      if (!leadUpdate) {
+        try {
+          const { data: fb } = await (admin
+            .from("atendimento_leads")
+            .select("id, updated_at, funnel_stage")
+            .eq("id", leadId)
+            .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+            .maybeSingle()) as any;
+          leadUpdate = {
+            funnel_stage: String((fb as any)?.funnel_stage ?? "aula_experimental_agendada").trim() || null,
+            experimental_class_status: safeStatus,
+            updated_at: String((fb as any)?.updated_at ?? new Date().toISOString()),
+            experimental_class_lead_date: safeLeadDate,
+            experimental_class_lead_time: safeLeadTime,
+            experimental_class_professor_date: safeProfessorDate,
+            experimental_class_professor_time: safeProfessorTime,
+            experimental_class_lead_start_at: leadStartAt,
+            experimental_class_professor_start_at: professorStartAt,
+          };
+        } catch {
           leadUpdate = fallback();
         }
-      } catch {
-        leadUpdate = fallback();
       }
     }
 
