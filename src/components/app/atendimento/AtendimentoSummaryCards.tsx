@@ -3472,7 +3472,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       Clique em um dia acima para ver os horários disponíveis.
                     </div>
                   ) : (
-                    () => {
+                    ((() => {
                       const selectedDate = (experimentalAvailability?.dates ?? []).find(
                         (d) => String(d?.id ?? "") === selectedExperimentalDateId,
                       );
@@ -3512,7 +3512,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           })}
                         </div>
                       );
-                    }()
+                    })())
                   )}
                 </div>
 
