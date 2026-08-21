@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { requireAtendimentoUser, appendHistoryEvent, sendAtendimentoWhatsAppText } from "@/lib/atendimento/server";
+import {
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  buildExperimentalClassAttendantWhatsAppMessage,
+  buildExperimentalClassRegisteredAttendantWhatsAppMessage,
+  buildExperimentalClassStudentWhatsAppMessages,
+} from "@/lib/atendimento/experimentalClass";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -98,7 +105,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
 
     const { data: leadExists, error: leadErr } = await admin
       .from("atendimento_leads")
-      .select("id, assigned_user_email")
+      .select("id, full_name, phone, assigned_user_email, city, state, country, timezone")
       .eq("id", leadId)
       .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
       .maybeSingle();
@@ -109,6 +116,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     if (!leadExists?.id) {
       return Response.json({ ok: false, error: "not_found" }, { status: 404 });
     }
+
+    const firstNameFromLead = (lead: { full_name?: string | null }) => {
+      const clean = String(lead.full_name ?? "").trim().replace(/\s+/g, " ");
+      if (!clean) return "";
+      return clean.split(" ")[0] ?? "";
+    };
+    const firstName = firstNameFromLead(leadExists as { full_name?: string | null }) || "Aluno";
 
     let currentActive: any[] | null = null;
     try {
@@ -301,6 +315,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     try {
       await admin.from("atendimento_history_events").insert({
         lead_id: leadId,
+        event_type: "experimental_class_scheduled",
+        assigned_user_email: "atendimento.usa.music@gmail.com",
+        details: {
+          booking_id: bookingOut?.id ? String(bookingOut.id) : null,
+          status: safeStatus,
+          professor_date: safeProfessorDate,
+          professor_time: safeProfessorTime,
+          professor_timezone: safeProfessorTz,
+          lead_date: safeLeadDate,
+          lead_time: safeLeadTime,
+          lead_timezone: safeLeadTz,
+          professor_start_at: professorStartAt,
+          lead_start_at: leadStartAt,
+          lesson_link: safeLessonLink,
+          source: "painel_atendimento_edit_experimental",
+        },
+      });
+    } catch {
+      // ignore
+    }
+
+    try {
+      await admin.from("atendimento_history_events").insert({
+        lead_id: leadId,
         event_type: "experimental_class_edited_by_attendant",
         assigned_user_email: "atendimento.usa.music@gmail.com",
         details: {
@@ -314,6 +352,88 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       });
     } catch {
       // ignore
+    }
+
+    const bookingIdForHistory = bookingOut?.id ? String(bookingOut.id) : `draft-${leadId}`;
+    const studentPhone = String((leadExists as any)?.phone ?? "").trim();
+    if (studentPhone) {
+      try {
+        for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
+          await sendAtendimentoWhatsAppText({
+            phone: studentPhone,
+            message: m,
+          });
+        }
+      } catch (error) {
+        await appendHistoryEvent({
+          leadId,
+          eventType: "experimental_class_student_notification_failed",
+          title: "Falha ao notificar o aluno sobre novo agendamento de aula experimental",
+          details: {
+            phone: studentPhone,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          actorType: "system",
+        });
+      }
+    }
+
+    try {
+      await sendAtendimentoWhatsAppText({
+        phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+        message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
+      });
+      await appendHistoryEvent({
+        leadId,
+        eventType: "experimental_class_attendant_notification_sent",
+        title: "Atendente notificado sobre novo agendamento de aula experimental",
+        details: {
+          booking_id: bookingIdForHistory,
+          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+        },
+        actorType: "system",
+      });
+    } catch (error) {
+      await appendHistoryEvent({
+        leadId,
+        eventType: "experimental_class_attendant_notification_failed",
+        title: "Falha ao notificar o atendente sobre novo agendamento de aula experimental",
+        details: {
+          booking_id: bookingIdForHistory,
+          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        actorType: "system",
+      });
+    }
+
+    try {
+      await sendAtendimentoWhatsAppText({
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
+      });
+      await appendHistoryEvent({
+        leadId,
+        eventType: "experimental_class_registered_attendant_notification_sent",
+        title: "Atendente cadastrado notificado sobre novo agendamento de aula experimental",
+        details: {
+          booking_id: bookingIdForHistory,
+          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        },
+        actorType: "system",
+      });
+    } catch (error) {
+      await appendHistoryEvent({
+        leadId,
+        eventType: "experimental_class_registered_attendant_notification_failed",
+        title: "Falha ao notificar o atendente cadastrado sobre novo agendamento de aula experimental",
+        details: {
+          booking_id: bookingIdForHistory,
+          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        actorType: "system",
+      });
     }
 
     return Response.json({

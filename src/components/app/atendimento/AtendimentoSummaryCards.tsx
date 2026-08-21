@@ -1072,6 +1072,12 @@ function BookingDetails({
     String(booking?.attendance_status ?? "").trim() === "attended" ||
     String(booking?.attendance_status ?? "").trim() === "no_show";
   const attendanceStatus = booking?.attendance_status ?? null;
+  const hasValidExperimentalDateTime = Boolean(
+    booking &&
+      (String(booking?.professor_start_at ?? "").trim() ||
+        (String(booking?.professor_date ?? "").trim() && String(booking?.professor_time ?? "").trim()) ||
+        (String(booking?.lead_date ?? "").trim() && String(booking?.lead_time ?? "").trim())),
+  );
 
   const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
   const recurringWeekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
@@ -1118,9 +1124,11 @@ function BookingDetails({
       (lead as any).status === "aluno",
   );
   const showAttendanceCard =
-    activeSection !== "agendamentos" &&
     !hideExperimentalInfoCompletely &&
-    (hasStudentNotification || hasAttendantNotification || hasAttendanceStatus);
+    (hasStudentNotification ||
+      hasAttendantNotification ||
+      hasAttendanceStatus ||
+      hasValidExperimentalDateTime);
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
       ? calculateNextRecurringOccurrence({
