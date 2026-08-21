@@ -3237,33 +3237,25 @@ export async function formalizeAndPersistContract(params: {
     leadPatch.enrollment_number = enrollmentNumber;
   }
 
-  const { error: updateErr } = await admin
-    .from("atendimento_leads")
-    .update(leadPatch)
-    .eq("id", leadId);
-  if (updateErr) {
-    const code = String((updateErr as any)?.code ?? "").trim();
-    const msg = String(updateErr.message ?? "").toLowerCase();
-    const missingCol =
-      code === "42703" ||
-      (msg.includes("column") && msg.includes("does not exist"));
-    if (!missingCol) return { ok: false, error: updateErr.message };
-    const fallbackPatch: Record<string, unknown> = { ...leadPatch };
-    for (const k of Object.keys(fallbackPatch)) {
-      const lower = String(k).toLowerCase();
-      if (lower.startsWith("experimental_class_")) delete fallbackPatch[k];
-      if (lower === "enrollment_number") delete fallbackPatch[k];
-      if (lower === "contract_html_snapshot") delete fallbackPatch[k];
+  const runPatchFormalize = async (p: Record<string, unknown>): Promise<{ ok: boolean; error?: any }> => {
+    const { error } = await admin
+      .from("atendimento_leads")
+      .update(p)
+      .eq("id", leadId);
+    if (!error) return { ok: true };
+    const code = String((error as any)?.code ?? "").trim();
+    if (code === "42703" || extractUndefinedColumnName((error as any)?.message) !== null) {
+      const stripped = stripUndefinedColumnFromPatch(p, error);
+      if (stripped.next) {
+        if (Object.keys(stripped.next).length === 0) return { ok: true };
+        return runPatchFormalize(stripped.next);
+      }
     }
-    try {
-      const { error: fbErr } = await admin
-        .from("atendimento_leads")
-        .update(fallbackPatch)
-        .eq("id", leadId);
-      if (fbErr) return { ok: false, error: fbErr.message };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
-    }
+    return { ok: false, error };
+  };
+  const patchFormalize = await runPatchFormalize(leadPatch);
+  if (!patchFormalize.ok) {
+    return { ok: false, error: (patchFormalize as any).error?.message ?? "Falha ao formalizar contrato." };
   }
 
   if (enrollmentNumber) {
@@ -3555,6 +3547,47 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
   return { ok: !!userId, created, userId, email };
 }
 
+const SUSPECT_MISSING_COLUMNS_BL = [
+  "payment_confirmed_at",
+  "payment_rejected_at",
+  "contract_signed_at",
+  "contract_pdf_url",
+  "recurring_registration_step",
+  "contract_status",
+  "payment_status",
+  "enrollment_number",
+] as const;
+
+function extractUndefinedColumnName(raw: unknown): string | null {
+  if (!raw) return null;
+  const msg = String(raw).toLowerCase();
+  const m1 = /column "([^"]+)" does not exist/.exec(msg);
+  if (m1 && m1[1]) return m1[1];
+  const m2 = /could not find the '([^']+)' column/.exec(msg);
+  if (m2 && m2[1]) return m2[1];
+  return null;
+}
+
+function stripUndefinedColumnFromPatch(patchObj: Record<string, unknown>, error: unknown): {
+  next: Record<string, unknown> | null;
+  stripped: string | null;
+} {
+  const col = extractUndefinedColumnName((error as any)?.message || String(error ?? ""));
+  if (col && patchObj[col] !== undefined) {
+    const next = { ...patchObj };
+    delete next[col];
+    return { next, stripped: col };
+  }
+  for (const sus of SUSPECT_MISSING_COLUMNS_BL) {
+    if (patchObj[sus] !== undefined) {
+      const next = { ...patchObj };
+      delete next[sus];
+      return { next, stripped: sus };
+    }
+  }
+  return { next: null, stripped: null };
+}
+
 export async function confirmLeadRecurringPayment(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -3602,18 +3635,14 @@ export async function confirmLeadRecurringPayment(params: {
       return { ok: true };
     }
     const code = String((error as any)?.code ?? "").trim();
-    if (code === "42703") {
-      const msg = String(error.message ?? "").toLowerCase();
-      const m = /column "([^"]+)" does not exist/.exec(msg);
-      const col = m ? m[1] : null;
-      if (col && p[col] !== undefined) {
-        const next: any = { ...p };
-        delete next[col];
-        if (Object.keys(next).length === 0) {
+    if (code === "42703" || extractUndefinedColumnName((error as any)?.message) !== null) {
+      const stripped = stripUndefinedColumnFromPatch(p, error);
+      if (stripped.next) {
+        if (Object.keys(stripped.next).length === 0) {
           applied = true;
           return { ok: true };
         }
-        return runPatch(next);
+        return runPatch(stripped.next);
       }
     }
     return { ok: false, error };
@@ -3736,15 +3765,11 @@ export async function rejectLeadRecurringPayment(params: {
       .eq("id", String(leadId));
     if (!error) return { ok: true };
     const code = String((error as any)?.code ?? "").trim();
-    if (code === "42703") {
-      const msg = String(error.message ?? "").toLowerCase();
-      const m = /column "([^"]+)" does not exist/.exec(msg);
-      const col = m ? m[1] : null;
-      if (col && p[col] !== undefined) {
-        const next: any = { ...p };
-        delete next[col];
-        if (Object.keys(next).length === 0) return { ok: true };
-        return runPatch(next);
+    if (code === "42703" || extractUndefinedColumnName((error as any)?.message) !== null) {
+      const stripped = stripUndefinedColumnFromPatch(p, error);
+      if (stripped.next) {
+        if (Object.keys(stripped.next).length === 0) return { ok: true };
+        return runPatch(stripped.next);
       }
     }
     return { ok: false, error };
@@ -3846,15 +3871,11 @@ export async function triggerRecurringPaymentIntentIfNeeded(params: {
       .eq("id", String(leadId));
     if (!error) return { ok: true };
     const code = String((error as any)?.code ?? "").trim();
-    if (code === "42703") {
-      const msg = String(error.message ?? "").toLowerCase();
-      const m = /column "([^"]+)" does not exist/.exec(msg);
-      const col = m ? m[1] : null;
-      if (col && p[col] !== undefined) {
-        const next: any = { ...p };
-        delete next[col];
-        if (Object.keys(next).length === 0) return { ok: true };
-        return runPatch(next);
+    if (code === "42703" || extractUndefinedColumnName((error as any)?.message) !== null) {
+      const stripped = stripUndefinedColumnFromPatch(p, error);
+      if (stripped.next) {
+        if (Object.keys(stripped.next).length === 0) return { ok: true };
+        return runPatch(stripped.next);
       }
     }
     return { ok: false, error };
