@@ -3176,7 +3176,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       onDelete={() => handleDeleteLead(selectedLead)}
                       onEditName={(l) => openEditLeadName(l)}
                       onEditLocation={(l) => openEditLeadLocation(l)}
-                      onEditExperimental={(l) => openEditExperimental(l)}
                       savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                       onSaveRecurringLink={handleSaveRecurringLink}
                     />
