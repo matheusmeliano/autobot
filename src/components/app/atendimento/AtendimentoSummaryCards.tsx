@@ -749,7 +749,7 @@ function LeadDetails({
             {enrollmentNumberOk ? (
               <div
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
-                <span className="truncate">Matrícula N° {enrollmentNumberOk}</span>
+                <span className="truncate">N° da matrícula: {enrollmentNumberOk}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -965,7 +965,7 @@ function ContractDetails({
             ) : null}
             {enrollmentNumberOk ? (
               <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
-                <span className="truncate">Matrícula N° {enrollmentNumberOk}</span>
+                <span className="truncate">N° da matrícula: {enrollmentNumberOk}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -1266,7 +1266,7 @@ function BookingDetails({
             </button>
             {enrollmentNumberOk ? (
               <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
-                <span className="truncate">Matrícula N° {enrollmentNumberOk}</span>
+                <span className="truncate">N° da matrícula: {enrollmentNumberOk}</span>
                 <button
                   type="button"
                   onClick={() => {

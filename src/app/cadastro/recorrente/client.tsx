@@ -1954,7 +1954,7 @@ export default function CadastroRecorrenteBody() {
                 </p>
                 {enrollmentNumber && (
                   <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-sky-500/35 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-700">
-                    <span>Matrícula N°</span>
+                    <span>N° da matrícula:</span>
                     <span className="font-black tracking-tight">{enrollmentNumber}</span>
                     <button
                       type="button"
