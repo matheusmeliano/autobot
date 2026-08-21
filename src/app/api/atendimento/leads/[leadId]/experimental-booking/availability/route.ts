@@ -92,7 +92,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     });
 
     const slotsByDate: Record<string, any[]> = {};
-    availability.slotsByDate.forEach((value, key) => {
+    availability.slotsByProfessorDate.forEach((value, key) => {
       slotsByDate[String(key)] = value;
     });
 
