@@ -107,6 +107,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     state: z.string().trim().max(160).nullable().optional(),
     country: z.string().trim().max(120).nullable().optional(),
     timezone: z.string().trim().max(120).nullable().optional(),
+    funnel_stage: z.string().trim().max(120).nullable().optional(),
+    experimental_class_status: z.string().trim().max(120).nullable().optional(),
   });
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -648,6 +650,26 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     }
   }
 
+  const funnelStageRaw = parsed.data.funnel_stage;
+  let safeFunnelStage: undefined | null | string = undefined;
+  if (funnelStageRaw === undefined) {
+    safeFunnelStage = undefined;
+  } else if (funnelStageRaw === null) {
+    safeFunnelStage = null;
+  } else {
+    safeFunnelStage = String(funnelStageRaw).trim() || null;
+  }
+
+  const expStatusRaw = parsed.data.experimental_class_status;
+  let safeExpStatus: undefined | null | string = undefined;
+  if (expStatusRaw === undefined) {
+    safeExpStatus = undefined;
+  } else if (expStatusRaw === null) {
+    safeExpStatus = null;
+  } else {
+    safeExpStatus = String(expStatusRaw).trim() || null;
+  }
+
   const admin = createSupabaseAdminClient();
   const updateData: Record<string, unknown> = {};
   if (safeFullName !== undefined) updateData.full_name = safeFullName;
@@ -656,6 +678,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   if (safeState !== undefined) updateData.state = safeState;
   if (safeCountry !== undefined) updateData.country = safeCountry;
   if (safeTimezone !== undefined) updateData.timezone = safeTimezone;
+  if (safeFunnelStage !== undefined) updateData.funnel_stage = safeFunnelStage;
+  if (safeExpStatus !== undefined) updateData.experimental_class_status = safeExpStatus;
 
   if (Object.keys(updateData).length === 0) {
     return Response.json({ ok: true, lead: null });
@@ -666,7 +690,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     .update(updateData)
     .eq("id", leadId)
     .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-    .select("id, full_name, recurring_class_link, city, state, country, timezone, updated_at")
+    .select("id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, updated_at")
     .maybeSingle();
 
   if (error) {
@@ -686,6 +710,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       state: String((updated as any).state ?? "").trim() || null,
       country: String((updated as any).country ?? "").trim() || null,
       timezone: String((updated as any).timezone ?? "").trim() || null,
+      funnel_stage: String((updated as any).funnel_stage ?? "").trim() || null,
+      experimental_class_status: String((updated as any).experimental_class_status ?? "").trim() || null,
       updated_at: String((updated as any).updated_at ?? new Date().toISOString()),
     },
   });

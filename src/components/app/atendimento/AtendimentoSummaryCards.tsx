@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertTriangle, Check, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -431,6 +431,15 @@ function formatCpf(v: string | null | undefined): string {
 
 type LeadNameValues = { full_name: string };
 type LeadLocationValues = { city: string; state: string };
+type ExperimentalBookingValues = {
+  professor_date: string;
+  professor_time: string;
+  lead_date: string;
+  lead_time: string;
+  lesson_link: string;
+  professor_timezone: string;
+  lead_timezone: string;
+};
 
 function RecurringClassLinkCard({
   lead,
@@ -564,6 +573,7 @@ function LeadDetails({
   onDelete,
   onEditName,
   onEditLocation,
+  onEditExperimental,
   savingRecurringLink,
   onSaveRecurringLink,
 }: {
@@ -574,6 +584,7 @@ function LeadDetails({
   onDelete: () => void;
   onEditName: (lead: AtendimentoLeadListItem) => void;
   onEditLocation?: (lead: AtendimentoLeadListItem) => void;
+  onEditExperimental?: (lead: AtendimentoLeadListItem) => void;
   savingRecurringLink: boolean;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
 }) {
@@ -760,6 +771,16 @@ function LeadDetails({
             >
               <Pencil className="h-4 w-4 shrink-0" />
               Editar
+            </button>
+          ) : null}
+          {showDelete && onEditExperimental ? (
+            <button
+              type="button"
+              onClick={() => void onEditExperimental(lead)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <CalendarDays className="h-4 w-4 shrink-0" />
+              Editar aula experimental
             </button>
           ) : null}
           {showDelete ? (
@@ -1555,6 +1576,9 @@ export function AtendimentoSummaryCards({
   const [isEditLeadLocationOpen, setIsEditLeadLocationOpen] = useState(false);
   const [editingLocationLead, setEditingLocationLead] = useState<AtendimentoLeadListItem | null>(null);
   const [savingLeadLocationLeadId, setSavingLeadLocationLeadId] = useState<string | null>(null);
+  const [isEditExperimentalOpen, setIsEditExperimentalOpen] = useState(false);
+  const [editingExperimentalLead, setEditingExperimentalLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [savingExperimentalLeadId, setSavingExperimentalLeadId] = useState<string | null>(null);
 
   const leadNameForm = useForm<LeadNameValues>({
     defaultValues: { full_name: "" },
@@ -1671,6 +1695,8 @@ export function AtendimentoSummaryCards({
               state?: string | null;
               country?: string | null;
               timezone?: string | null;
+              funnel_stage?: string | null;
+              experimental_class_status?: string | null;
               updated_at?: string;
             } | null;
           }
@@ -1691,6 +1717,58 @@ export function AtendimentoSummaryCards({
         : null;
       const newUpdatedAt = String(payload?.lead?.updated_at ?? editingLocationLead?.updated_at ?? new Date().toISOString());
 
+      let newFunnelStage: string | null =
+        String((editingLocationLead as any)?.funnel_stage ?? "").trim() || null;
+      let newExpStatus: string | null =
+        String((editingLocationLead as any)?.experimental_class_status ?? "").trim() || null;
+
+      const currentFunnel = String((editingLocationLead as any)?.funnel_stage ?? "").trim().toLowerCase();
+      const currentStatus = String((editingLocationLead as any)?.status ?? "").trim().toLowerCase();
+      const hasBooking = Boolean((editingLocationLead as any)?.experimental_class_booking?.id);
+      const advancedStages = [
+        "aula_experimental_agendada",
+        "aula_experimental_convidada",
+        "matricula_confirmada",
+        "matriculado",
+        "contrato_coletando_dados",
+        "contrato_aguardando_aceite",
+        "contrato_assinado",
+        "cadastro_recorrente_pendente_plataforma",
+        "aluno_recorrente_cadastrado",
+        "repescagem",
+      ];
+      const advancedStatus = ["matriculado", "aluno", "contrato_coletando_dados", "contrato_assinado", "matricula_confirmada"];
+
+      if (
+        !hasBooking &&
+        !advancedStages.includes(currentFunnel) &&
+        !advancedStatus.includes(currentStatus)
+      ) {
+        try {
+          const fResp = await fetch(`/api/atendimento/leads/${leadId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ funnel_stage: "pre_cadastro_concluido" }),
+          });
+          const fPayload = (await fResp.json().catch(() => null)) as
+            | {
+                ok?: boolean;
+                error?: string;
+                lead?: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string } | null;
+              }
+            | null;
+          if (fResp.ok && fPayload?.ok) {
+            newFunnelStage = String(fPayload.lead?.funnel_stage ?? "pre_cadastro_concluido").trim() || "pre_cadastro_concluido";
+            newExpStatus =
+              fPayload.lead?.experimental_class_status !== undefined && fPayload.lead?.experimental_class_status !== null
+                ? String(fPayload.lead.experimental_class_status).trim() || null
+                : null;
+          }
+        } catch {
+          newFunnelStage = "pre_cadastro_concluido";
+        }
+      }
+
       setLocalLeads((current) =>
         current.map((item) =>
           item.id === leadId
@@ -1700,18 +1778,177 @@ export function AtendimentoSummaryCards({
                 state: newState,
                 country: newCountry,
                 timezone: newTimezone,
+                funnel_stage: newFunnelStage,
+                experimental_class_status: newExpStatus,
                 updated_at: newUpdatedAt,
               }
             : item,
         ),
       );
 
-      modalToast.success("Cidade e estado atualizados. País e fuso foram salvos.");
+      modalToast.success(
+        newFunnelStage === "pre_cadastro_concluido"
+          ? "Localização atualizada. Interessado foi adicionado automaticamente em Agendamentos > Aula Experimental."
+          : "Cidade e estado atualizados. País e fuso foram salvos.",
+      );
       closeEditLeadLocation();
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao salvar localização.");
     } finally {
       setSavingLeadLocationLeadId(null);
+    }
+  });
+
+  const experimentalBookingForm = useForm<ExperimentalBookingValues>({
+    defaultValues: {
+      professor_date: "",
+      professor_time: "",
+      lead_date: "",
+      lead_time: "",
+      lesson_link: "",
+      professor_timezone: "America/Cuiaba",
+      lead_timezone: "America/Cuiaba",
+    },
+  });
+
+  function openEditExperimental(lead: AtendimentoLeadListItem) {
+    setEditingExperimentalLead(lead);
+    const booking = (lead as any)?.experimental_class_booking as any;
+    const professorTimezone =
+      String(booking?.professor_timezone ?? "America/Cuiaba").trim() || "America/Cuiaba";
+    const leadTimezone =
+      String(lead.timezone ?? booking?.lead_timezone ?? "America/Cuiaba").trim() || "America/Cuiaba";
+
+    experimentalBookingForm.reset({
+      professor_date: String(booking?.professor_date ?? "").slice(0, 10),
+      professor_time: String(booking?.professor_time ?? "").trim(),
+      lead_date: String(booking?.lead_date ?? "").slice(0, 10),
+      lead_time: String(booking?.lead_time ?? "").trim(),
+      lesson_link: String(booking?.lesson_link ?? "").trim(),
+      professor_timezone: professorTimezone,
+      lead_timezone: leadTimezone,
+    });
+    setIsEditExperimentalOpen(true);
+  }
+
+  function closeEditExperimental() {
+    setIsEditExperimentalOpen(false);
+    setEditingExperimentalLead(null);
+    experimentalBookingForm.reset({
+      professor_date: "",
+      professor_time: "",
+      lead_date: "",
+      lead_time: "",
+      lesson_link: "",
+      professor_timezone: "America/Cuiaba",
+      lead_timezone: "America/Cuiaba",
+    });
+  }
+
+  const saveExperimentalBookingForm = experimentalBookingForm.handleSubmit(async (values) => {
+    const leadId = String(editingExperimentalLead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para editar aula experimental.");
+      return;
+    }
+
+    const professorDateRaw = String(values.professor_date ?? "").trim();
+    const professorTimeRaw = String(values.professor_time ?? "").trim();
+    const leadDateRaw = String(values.lead_date ?? "").trim();
+    const leadTimeRaw = String(values.lead_time ?? "").trim();
+    const lessonLink = String(values.lesson_link ?? "").trim();
+    const professorTimezone = String(values.professor_timezone ?? "").trim() || "America/Cuiaba";
+    const leadTimezone = String(values.lead_timezone ?? "").trim() || "America/Cuiaba";
+
+    if (!professorDateRaw) {
+      modalToast.error("Informe a data da aula para o professor.");
+      return;
+    }
+    if (!professorTimeRaw) {
+      modalToast.error("Informe o horário da aula para o professor.");
+      return;
+    }
+    if (!/^\d{2}:\d{2}$/.test(professorTimeRaw)) {
+      modalToast.error("Horário do professor deve estar no formato HH:MM (ex: 14:30).");
+      return;
+    }
+    if (leadDateRaw && leadTimeRaw && !/^\d{2}:\d{2}$/.test(leadTimeRaw)) {
+      modalToast.error("Horário do aluno deve estar no formato HH:MM (ex: 14:30).");
+      return;
+    }
+    if (!lessonLink) {
+      modalToast.error("Informe o link da sala de aula.");
+      return;
+    }
+
+    try {
+      setSavingExperimentalLeadId(leadId);
+      const body: Record<string, unknown> = {
+        status: "scheduled",
+        lesson_link: lessonLink,
+        professor_date: professorDateRaw,
+        professor_time: professorTimeRaw,
+        lead_date: leadDateRaw || professorDateRaw,
+        lead_time: leadTimeRaw || professorTimeRaw,
+        professor_timezone: professorTimezone,
+        lead_timezone: leadTimezone,
+      };
+      const response = await fetch(`/api/atendimento/leads/${leadId}/experimental-booking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            booking?: Record<string, unknown> | null;
+            lead_update?: {
+              funnel_stage?: string | null;
+              experimental_class_status?: string | null;
+              updated_at?: string;
+            } | null;
+          }
+        | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao salvar a aula experimental.");
+        return;
+      }
+
+      setLocalLeads((current) =>
+        current.map((item) => {
+          if (item.id !== leadId) return item;
+          const patch: any = { ...item };
+          if (payload?.lead_update) {
+            if (payload.lead_update.funnel_stage !== undefined) {
+              patch.funnel_stage = String(payload.lead_update.funnel_stage ?? "").trim() || null;
+            }
+            if (payload.lead_update.experimental_class_status !== undefined) {
+              patch.experimental_class_status = String(payload.lead_update.experimental_class_status ?? "").trim() || null;
+            }
+            if (payload.lead_update.updated_at) {
+              patch.updated_at = String(payload.lead_update.updated_at);
+            }
+          }
+          if (payload?.booking) {
+            patch.experimental_class_booking = payload.booking;
+            if (!patch.funnel_stage || String(patch.funnel_stage).trim() === "") {
+              patch.funnel_stage = "aula_experimental_agendada";
+            }
+            if (!patch.experimental_class_status || String(patch.experimental_class_status).trim() === "") {
+              patch.experimental_class_status = "scheduled";
+            }
+          }
+          return patch;
+        }),
+      );
+
+      modalToast.success("Aula experimental atualizada.");
+      closeEditExperimental();
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao salvar a aula experimental.");
+    } finally {
+      setSavingExperimentalLeadId(null);
     }
   });
 
@@ -2848,6 +3085,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   onDelete={() => handleDeleteLead(selectedLead)}
                   onEditName={(l) => openEditLeadName(l)}
                   onEditLocation={(l) => openEditLeadLocation(l)}
+                  onEditExperimental={(l) => openEditExperimental(l)}
                   savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                   onSaveRecurringLink={handleSaveRecurringLink}
                 />
@@ -2932,6 +3170,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       onDelete={() => handleDeleteLead(selectedLead)}
                       onEditName={(l) => openEditLeadName(l)}
                       onEditLocation={(l) => openEditLeadLocation(l)}
+                      onEditExperimental={(l) => openEditExperimental(l)}
                       savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                       onSaveRecurringLink={handleSaveRecurringLink}
                     />
@@ -3072,6 +3311,125 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                 className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
               >
                 {leadLocationForm.formState.isSubmitting || savingLeadLocationLeadId !== null ? "Salvando..." : "Salvar localização"}
+              </button>
+            </div>
+          </form>
+        </AppModal>
+
+        <AppModal
+          open={isEditExperimentalOpen}
+          onClose={closeEditExperimental}
+          size="md"
+          zIndexClass="z-[500]"
+          fullScreenOnMobile
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white/90">
+                Editar aula experimental
+              </div>
+              <div className="mt-1 truncate text-xs text-white/55">
+                {editingExperimentalLead?.phone || editingExperimentalLead?.full_name || "Lead selecionado"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeEditExperimental}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <form onSubmit={saveExperimentalBookingForm} className="mt-5 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-white/60">Data (horário do professor)</label>
+                <input
+                  type="date"
+                  autoFocus
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  {...experimentalBookingForm.register("professor_date", { required: true })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/60">Horário (horário do professor)</label>
+                <input
+                  type="time"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  {...experimentalBookingForm.register("professor_time", { required: true })}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-white/60">Data (horário do aluno)</label>
+                <input
+                  type="date"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  {...experimentalBookingForm.register("lead_date")}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/60">Horário (horário do aluno)</label>
+                <input
+                  type="time"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  {...experimentalBookingForm.register("lead_time")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-white/60">Link da sala de aula</label>
+              <input
+                type="url"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder="Ex.: https://meet.google.com/..."
+                maxLength={500}
+                {...experimentalBookingForm.register("lesson_link", { required: true, maxLength: 500 })}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-white/60">Fuso do professor</label>
+                <input
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  placeholder="Ex.: America/Cuiaba"
+                  maxLength={120}
+                  {...experimentalBookingForm.register("professor_timezone", { required: true, maxLength: 120 })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/60">Fuso do aluno</label>
+                <input
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                  placeholder="Ex.: America/Cuiaba"
+                  maxLength={120}
+                  {...experimentalBookingForm.register("lead_timezone", { required: true, maxLength: 120 })}
+                />
+              </div>
+            </div>
+
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={closeEditExperimental}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={experimentalBookingForm.formState.isSubmitting || savingExperimentalLeadId !== null}
+                className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+              >
+                {experimentalBookingForm.formState.isSubmitting || savingExperimentalLeadId !== null
+                  ? "Salvando..."
+                  : "Salvar aula experimental"}
               </button>
             </div>
           </form>
