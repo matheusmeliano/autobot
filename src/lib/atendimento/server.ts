@@ -3135,6 +3135,25 @@ export async function formalizeAndPersistContract(params: {
     .getPublicUrl(String(uploadData?.path ?? storagePath));
   const publicUrl = String(publicUrlData?.publicUrl ?? "").trim() || null;
 
+  const funnel = String((lead as any).funnel_stage ?? "").trim();
+  const status = String((lead as any).status ?? "").trim();
+  const existingEnrollment =
+    typeof (lead as any).enrollment_number === "string" &&
+    String((lead as any).enrollment_number).trim().length > 0;
+  const contractDataAny = contractData as any;
+  const currentPaymentStatus = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const paymentExplicitlyConfirmed =
+    currentPaymentStatus === "confirmado" ||
+    Boolean(contractDataAny?.paymentStatus === "confirmado") ||
+    Boolean(contractDataAny?.paymentConfirmed === true);
+  const advanceToPaymentPendingConfirmation =
+    !paymentExplicitlyConfirmed &&
+    (Boolean(
+      (lead as any)?.recurring_registration_step &&
+        Number((lead as any).recurring_registration_step) >= 10,
+    ) ||
+      Boolean(contractDataAny?.origin === "contract_finalize_payment"));
+
   const leadPatch: Record<string, unknown> = {
     contract_status: "assinado",
     contract_signed_at: signedAt,
@@ -3157,25 +3176,6 @@ export async function formalizeAndPersistContract(params: {
         ? ((lead as any).payment_rejected_at ?? signedAt)
         : null,
   };
-
-  const funnel = String((lead as any).funnel_stage ?? "").trim();
-  const status = String((lead as any).status ?? "").trim();
-  const existingEnrollment =
-    typeof (lead as any).enrollment_number === "string" &&
-    String((lead as any).enrollment_number).trim().length > 0;
-  const contractDataAny = contractData as any;
-  const currentPaymentStatus = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
-  const paymentExplicitlyConfirmed =
-    currentPaymentStatus === "confirmado" ||
-    Boolean(contractDataAny?.paymentStatus === "confirmado") ||
-    Boolean(contractDataAny?.paymentConfirmed === true);
-  const advanceToPaymentPendingConfirmation =
-    !paymentExplicitlyConfirmed &&
-    (Boolean(
-      (lead as any)?.recurring_registration_step &&
-        Number((lead as any).recurring_registration_step) >= 10,
-    ) ||
-      Boolean(contractDataAny?.origin === "contract_finalize_payment"));
 
   if (paymentExplicitlyConfirmed || existingEnrollment) {
     if (funnel !== "matriculado" && funnel !== "encerrado") {
