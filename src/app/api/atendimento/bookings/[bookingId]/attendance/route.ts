@@ -8,6 +8,10 @@ import {
   buildExperimentalClassPostAttendanceWhatsAppMessages,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  ATENDIMENTO_STAGE_ORDER,
+  ATENDIMENTO_STATUS_ORDER,
+} from "@/lib/atendimento/constants";
 
 async function insertAttendanceBotTextMessage(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
@@ -285,8 +289,22 @@ export async function POST(
   let nextLeadStatus = currentLeadStatus;
 
   if (attendance === "attended") {
-    nextLeadFunnelStage = "matricula_pendente";
-    nextLeadStatus = "matricula_pendente";
+    const targetFunnel = "matricula_pendente";
+    const targetStatus = "matricula_pendente";
+    const currentFunnelIdx = ATENDIMENTO_STAGE_ORDER.indexOf(
+      String(currentLeadFunnelStage ?? "") as (typeof ATENDIMENTO_STAGE_ORDER)[number],
+    );
+    const targetFunnelIdx = ATENDIMENTO_STAGE_ORDER.indexOf(targetFunnel);
+    const currentStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(
+      String(currentLeadStatus ?? "") as (typeof ATENDIMENTO_STATUS_ORDER)[number],
+    );
+    const targetStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(targetStatus);
+    if (targetFunnelIdx >= 0 && (currentFunnelIdx < 0 || currentFunnelIdx < targetFunnelIdx)) {
+      nextLeadFunnelStage = targetFunnel;
+    }
+    if (targetStatusIdx >= 0 && (currentStatusIdx < 0 || currentStatusIdx < targetStatusIdx)) {
+      nextLeadStatus = targetStatus;
+    }
   } else if (attendance === "no_show") {
     nextLeadFunnelStage = "repescagem";
     nextLeadStatus = "repescagem";

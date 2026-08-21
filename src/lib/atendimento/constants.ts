@@ -37,7 +37,9 @@ export const ATENDIMENTO_STAGE_ORDER = [
   "contrato_aguardando_aceite",
   "contrato_assinado",
   "aluno_recorrente_cadastrado",
+  "matricula_confirmada",
   "matriculado",
+  "repescagem",
   "encerrado",
 ] as const;
 
@@ -50,8 +52,11 @@ export const ATENDIMENTO_STATUS_ORDER = [
   "contrato_coletando_dados",
   "contrato_aguardando_aceite",
   "contrato_assinado",
+  "aluno_recorrente_cadastrado",
+  "matricula_confirmada",
   "matriculado",
   "aluno",
+  "repescagem",
   "encerrado",
 ] as const;
 
@@ -170,7 +175,10 @@ export const STAGE_LABELS: Record<string, string> = {
   contrato_coletando_dados: "Contrato: Coletando Dados",
   contrato_aguardando_aceite: "Contrato: Aguardando Aceite",
   contrato_assinado: "Contrato Assinado",
+  aluno_recorrente_cadastrado: "Aluno Recorrente Cadastrado",
+  matricula_confirmada: "Matrícula Confirmada",
   matriculado: "Matriculado",
+  repescagem: "Repescagem",
   encerrado: "Encerrado",
 };
 
@@ -183,6 +191,10 @@ export const STATUS_LABELS: Record<string, string> = {
   contrato_coletando_dados: "Contrato: Coletando Dados",
   contrato_aguardando_aceite: "Contrato: Aguardando Aceite",
   contrato_assinado: "Contrato Assinado",
+  aluno_recorrente_cadastrado: "Aluno Recorrente Cadastrado",
+  matricula_confirmada: "Matrícula Confirmada",
   matriculado: "Matriculado",
+  aluno: "Aluno",
+  repescagem: "Repescagem",
   encerrado: "Encerrado",
 };

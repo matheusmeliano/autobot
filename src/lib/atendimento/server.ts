@@ -3144,12 +3144,39 @@ export async function formalizeAndPersistContract(params: {
   };
 
   const funnel = String((lead as any).funnel_stage ?? "").trim();
-  if (funnel !== "contrato_assinado" && funnel !== "matriculado" && funnel !== "encerrado") {
-    leadPatch.funnel_stage = "contrato_assinado";
-  }
   const status = String((lead as any).status ?? "").trim();
-  if (status !== "contrato_assinado" && status !== "matriculado" && status !== "encerrado") {
-    leadPatch.status = "contrato_assinado";
+  const existingEnrollment =
+    typeof (lead as any).enrollment_number === "string" &&
+    String((lead as any).enrollment_number).trim().length > 0;
+  const contractDataAny = contractData as any;
+  const advanceToMatriculado =
+    existingEnrollment ||
+    Boolean(contractDataAny?.paymentConfirmed) ||
+    Boolean(contractDataAny?.origin === "contract_finalize_payment") ||
+    Boolean(
+      (lead as any)?.recurring_registration_step &&
+        Number((lead as any).recurring_registration_step) >= 10,
+    );
+
+  if (advanceToMatriculado) {
+    if (funnel !== "matriculado" && funnel !== "encerrado") {
+      leadPatch.funnel_stage = "matriculado";
+    }
+    if (status !== "matriculado" && status !== "encerrado" && status !== "aluno") {
+      leadPatch.status = "matriculado";
+    }
+  } else {
+    if (funnel !== "contrato_assinado" && funnel !== "matriculado" && funnel !== "encerrado") {
+      leadPatch.funnel_stage = "contrato_assinado";
+    }
+    if (
+      status !== "contrato_assinado" &&
+      status !== "matriculado" &&
+      status !== "encerrado" &&
+      status !== "aluno"
+    ) {
+      leadPatch.status = "contrato_assinado";
+    }
   }
 
   let enrollmentNumber =

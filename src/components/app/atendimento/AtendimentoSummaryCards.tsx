@@ -219,8 +219,12 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
       (regStepValid && regStepRaw >= 3 && regStepRaw < 10));
   const paymentStepReached = contractSigned || (regStepValid && regStepRaw >= 10);
 
+  const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+  const rcsCadastroPendente = rcsRaw === "cadastro_plataforma_pendente" || rcsRaw === "confirmado";
+
   const hasRegistrationBasicData =
     registrationStarted ||
+    rcsCadastroPendente ||
     Boolean(String((lead as any)?.recurring_registration_password ?? "").trim()) ||
     Boolean(String((lead as any)?.student_cpf ?? "").trim()) ||
     Boolean(String((lead as any)?.legal_responsible_cpf ?? "").trim()) ||
@@ -319,7 +323,8 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
     futureExp &&
     futureExpStatus !== "cancelled" &&
     (futureExpAttendance === "attended" || futureExpAttendance === "no_show");
-  if (bookingResolved || futureResolved || pastDone) {
+  const recurringInitiated = leadHasAnyRecurringProgressSignal(lead);
+  if (!recurringInitiated && (bookingResolved || futureResolved || pastDone)) {
     return "Aula experimental concluída";
   }
 
@@ -3280,38 +3285,33 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
       Number((lead as any)?.recurring_registration_step ?? 0) > 0;
 
+    const recurringProgress = leadHasAnyRecurringProgressSignal(lead);
+    if (recurringProgress) return buildRecurringMetaForSection(lead);
+
     if (activeSection === "agendamentos") {
-      if (hasAnyRecurringSignal || isRecurringContractFormalized(lead) || leadHasAnyRecurringProgressSignal(lead)) {
+      if (hasAnyRecurringSignal || isRecurringContractFormalized(lead)) {
         return buildRecurringMetaForSection(lead);
       }
       const experimentalMeta = buildExperimentalMetaForSection(lead);
       if (experimentalMeta) return experimentalMeta;
     }
 
-    const isAlunoOrMatriculado =
-      lead.status === "aluno" ||
-      lead.status === "matriculado" ||
-      (lead as any).funnel_stage === "aluno_recorrente_cadastrado" ||
-      lead.status === "cadastro_recorrente_pendente_plataforma" ||
-      lead.funnel_stage === "cadastro_recorrente_pendente_plataforma";
-    if (isAlunoOrMatriculado) {
-      return buildRecurringMetaForSection(lead);
+    if (activeSection === "contratos") {
+      const signedAt = String((lead as any)?.contract_signed_at ?? "").trim();
+      const status = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+      const hasRecurringContract =
+        (status && status !== "nao_iniciado") ||
+        Boolean(signedAt) ||
+        hasAnyRecurringSignal ||
+        recurringProgress;
+      if (hasRecurringContract) {
+        return buildRecurringMetaForSection(lead);
+      }
+      return "";
     }
 
     if (activeSection !== "agendamentos") {
-      if (activeSection === "contratos") {
-        const signedAt = String((lead as any)?.contract_signed_at ?? "").trim();
-        if (signedAt) {
-          const dt = formatAtendimentoDateTime(signedAt);
-          return dt ? `Criado em: ${dt}` : "";
-        }
-        const status = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
-        if (status && status !== "nao_iniciado") {
-          const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
-          return rawDt ? `Criado em: ${rawDt}` : "";
-        }
-        return "";
-      }
+      if (hasRecurringBoth || hasAnyRecurringSignal) return buildRecurringMetaForSection(lead);
       const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
       return rawDt ? `Criado em: ${rawDt}` : "";
     }
