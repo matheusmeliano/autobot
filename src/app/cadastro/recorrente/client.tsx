@@ -1458,7 +1458,7 @@ export default function CadastroRecorrenteBody() {
                   disabled={contractFinalizing}
                   className="order-2 sm:order-2 w-full sm:flex-1 shrink-0 min-w-0 whitespace-nowrap rounded-2xl px-5 sm:px-9 sm:min-w-[300px] py-3.5 bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base justify-center flex items-center truncate"
                 >
-                  {contractFinalizing ? "Confirmando matrícula…" : "Aceitar declaração"}
+                  {contractFinalizing ? "Confirmando..." : "Confirmar e avançar"}
                 </button>
               </div>
             </section>
