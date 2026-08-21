@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser } from "@/lib/auth/server";
+import { requireAtendimentoUser } from "@/lib/atendimento/server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,16 +24,16 @@ function safeIsoDate(date: string, time: string, timezone: string): string | nul
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ leadId: string }> }) {
   try {
     const leadIdRaw = (await params).leadId;
     const leadId = String(leadIdRaw ?? "").trim();
     if (!leadId) {
-      return NextResponse.json({ ok: false, error: "lead_missing" }, { status: 400 });
+      return Response.json({ ok: false, error: "lead_missing" }, { status: 400 });
     }
     const auth = await requireAtendimentoUser();
     if (!auth?.ok) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
     }
 
     const schema = z.object({
@@ -52,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
     const json = (await req.json().catch(() => null)) as unknown;
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, error: "invalid_payload" }, { status: 400 });
+      return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
 
     const safeStatus = parsed.data.status ?? "scheduled";
@@ -94,10 +93,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
       .maybeSingle();
 
     if (leadErr) {
-      return NextResponse.json({ ok: false, error: leadErr.message }, { status: 500 });
+      return Response.json({ ok: false, error: leadErr.message }, { status: 500 });
     }
     if (!leadExists?.id) {
-      return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+      return Response.json({ ok: false, error: "not_found" }, { status: 404 });
     }
 
     const { data: currentActive, error: curErr } = await admin
@@ -108,7 +107,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
       .limit(20);
 
     if (curErr) {
-      return NextResponse.json({ ok: false, error: curErr.message }, { status: 500 });
+      return Response.json({ ok: false, error: curErr.message }, { status: 500 });
     }
 
     const activeId =
@@ -141,7 +140,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
         .select("*")
         .maybeSingle();
       if (error) {
-        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        return Response.json({ ok: false, error: error.message }, { status: 500 });
       }
       bookingOut = data ? (data as Record<string, unknown>) : null;
     } else {
@@ -160,7 +159,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
             .order("created_at", { ascending: false })
             .limit(1);
           if (ex2Err) {
-            return NextResponse.json({ ok: false, error: ex2Err.message }, { status: 500 });
+            return Response.json({ ok: false, error: ex2Err.message }, { status: 500 });
           }
           const firstId = (existing ?? [])[0]?.id ?? null;
           if (firstId) {
@@ -172,14 +171,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
               .select("*")
               .maybeSingle();
             if (updErr) {
-              return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+              return Response.json({ ok: false, error: updErr.message }, { status: 500 });
             }
             bookingOut = upd2 ? (upd2 as Record<string, unknown>) : null;
           } else {
-            return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+            return Response.json({ ok: false, error: error.message }, { status: 500 });
           }
         } else {
-          return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+          return Response.json({ ok: false, error: error.message }, { status: 500 });
         }
       } else {
         bookingOut = data ? (data as Record<string, unknown>) : null;
@@ -231,13 +230,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
       // ignore
     }
 
-    return NextResponse.json({
+    return Response.json({
       ok: true,
       booking: bookingOut,
       lead_update: leadUpdate,
     });
   } catch (error) {
-    return NextResponse.json(
+    return Response.json(
       { ok: false, error: error instanceof Error ? error.message : "internal_error" },
       { status: 500 },
     );
