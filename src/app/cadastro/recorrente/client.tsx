@@ -429,14 +429,6 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
-  async function finalizarMatriculaStep9() {
-    if (contractFinalizing) return;
-    setContractFinalizing(true);
-    await new Promise<void>((r) => setTimeout(r, 700));
-    goStep(6);
-    setTimeout(() => setContractFinalizing(false), 250);
-  }
-
   useEffect(() => {
     if (step === 5) setPaymentTab("menu");
   }, [step]);
