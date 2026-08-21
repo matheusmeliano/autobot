@@ -16,6 +16,13 @@ function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   );
 }
 
+function isUndefinedColumnError(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  if (code === "42703") return true;
+  const msg = String(error instanceof Error ? error.message : (error as any)?.message ?? "").toLowerCase();
+  return msg.includes("column") && msg.includes("does not exist");
+}
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -685,16 +692,56 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     return Response.json({ ok: true, lead: null });
   }
 
-  const { data: updated, error } = await admin
-    .from("atendimento_leads")
-    .update(updateData)
-    .eq("id", leadId)
-    .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-    .select("id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, updated_at")
-    .maybeSingle();
+  const selectFull = "id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, updated_at";
+  const selectSafe = "id, full_name, recurring_class_link, city, state, country, timezone, updated_at";
 
-  if (error) {
-    return Response.json({ ok: false, error: error.message }, { status: 500 });
+  let updated: any = null;
+  let runErr: any = null;
+  {
+    const { data: d1, error: e1 } = await admin
+      .from("atendimento_leads")
+      .update(updateData)
+      .eq("id", leadId)
+      .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+      .select(selectFull)
+      .maybeSingle();
+    if (!e1 && d1) {
+      updated = d1;
+    } else if (e1 && isUndefinedColumnError(e1)) {
+      const strippedUpdate: Record<string, unknown> = {};
+      for (const k of Object.keys(updateData)) {
+        if (k.startsWith("experimental_class_")) continue;
+        strippedUpdate[k] = updateData[k];
+      }
+      if (Object.keys(strippedUpdate).length === 0) {
+        const { data: fallbackLead } = await admin
+          .from("atendimento_leads")
+          .select(selectSafe)
+          .eq("id", leadId)
+          .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+          .maybeSingle();
+        updated = fallbackLead ?? null;
+      } else {
+        const { data: d2, error: e2 } = await admin
+          .from("atendimento_leads")
+          .update(strippedUpdate)
+          .eq("id", leadId)
+          .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+          .select(selectSafe)
+          .maybeSingle();
+        if (!e2) {
+          updated = d2 ?? null;
+        } else {
+          runErr = e2;
+        }
+      }
+    } else {
+      runErr = e1;
+    }
+  }
+
+  if (runErr) {
+    return Response.json({ ok: false, error: runErr.message }, { status: 500 });
   }
   if (!updated?.id) {
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
@@ -710,8 +757,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       state: String((updated as any).state ?? "").trim() || null,
       country: String((updated as any).country ?? "").trim() || null,
       timezone: String((updated as any).timezone ?? "").trim() || null,
-      funnel_stage: String((updated as any).funnel_stage ?? "").trim() || null,
-      experimental_class_status: String((updated as any).experimental_class_status ?? "").trim() || null,
+      funnel_stage: String((updated as any).funnel_stage ?? safeFunnelStage ?? "").trim() || null,
+      experimental_class_status: String((updated as any).experimental_class_status ?? safeExpStatus ?? "").trim() || null,
       updated_at: String((updated as any).updated_at ?? new Date().toISOString()),
     },
   });

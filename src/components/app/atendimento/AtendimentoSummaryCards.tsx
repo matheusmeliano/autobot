@@ -1125,10 +1125,12 @@ function BookingDetails({
   );
   const showAttendanceCard =
     !hideExperimentalInfoCompletely &&
-    (hasStudentNotification ||
-      hasAttendantNotification ||
-      hasAttendanceStatus ||
-      hasValidExperimentalDateTime);
+    (activeSection === "agendamentos"
+      ? hasStudentNotification || hasAttendantNotification || hasAttendanceStatus
+      : hasStudentNotification ||
+        hasAttendantNotification ||
+        hasAttendanceStatus ||
+        hasValidExperimentalDateTime);
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
       ? calculateNextRecurringOccurrence({
