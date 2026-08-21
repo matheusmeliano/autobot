@@ -3152,11 +3152,66 @@ export async function formalizeAndPersistContract(params: {
     leadPatch.status = "contrato_assinado";
   }
 
+  let enrollmentNumber =
+    typeof (lead as any).enrollment_number === "string"
+      ? String((lead as any).enrollment_number).trim()
+      : "";
+  if (!enrollmentNumber) {
+    enrollmentNumber = (() => {
+      const year = String(new Date().getUTCFullYear());
+      const tail = Math.random().toString(36).replace(/[^a-z0-9]/g, "").slice(0, 3).toUpperCase().padEnd(3, "X");
+      const ts = String(Date.now()).slice(-6);
+      return `LB${year}${ts}0${tail}`;
+    })();
+  }
+  if (enrollmentNumber) {
+    leadPatch.enrollment_number = enrollmentNumber;
+  }
+
   const { error: updateErr } = await admin
     .from("atendimento_leads")
     .update(leadPatch)
     .eq("id", leadId);
-  if (updateErr) return { ok: false, error: updateErr.message };
+  if (updateErr) {
+    const code = String((updateErr as any)?.code ?? "").trim();
+    const msg = String(updateErr.message ?? "").toLowerCase();
+    const missingCol =
+      code === "42703" ||
+      (msg.includes("column") && msg.includes("does not exist"));
+    if (!missingCol) return { ok: false, error: updateErr.message };
+    const fallbackPatch: Record<string, unknown> = { ...leadPatch };
+    for (const k of Object.keys(fallbackPatch)) {
+      const lower = String(k).toLowerCase();
+      if (lower.startsWith("experimental_class_")) delete fallbackPatch[k];
+      if (lower === "enrollment_number") delete fallbackPatch[k];
+      if (lower === "contract_html_snapshot") delete fallbackPatch[k];
+    }
+    try {
+      const { error: fbErr } = await admin
+        .from("atendimento_leads")
+        .update(fallbackPatch)
+        .eq("id", leadId);
+      if (fbErr) return { ok: false, error: fbErr.message };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  if (enrollmentNumber) {
+    try {
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "enrollment_number_generated",
+        title: "Número de matrícula gerado",
+        details: {
+          enrollment_number: enrollmentNumber,
+          gerado_em: signedAt,
+        },
+        actorType: "system",
+      });
+    } catch (_e) {}
+  }
 
   try {
     await appendHistoryEvent({
@@ -3172,6 +3227,7 @@ export async function formalizeAndPersistContract(params: {
         dia_aula: contractData.classWeekdayLabel,
         horario_aula: contractData.classTimeLabel,
         storage_path: storagePath,
+        enrollment_number: enrollmentNumber || null,
       },
       actorType: "system",
     });

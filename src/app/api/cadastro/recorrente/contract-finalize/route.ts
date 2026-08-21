@@ -1,5 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { findLeadByPhone, formalizeAndPersistContract, syncConversationPreview } from "@/lib/atendimento/server";
+import { appendHistoryEvent, findLeadByPhone, formalizeAndPersistContract, syncConversationPreview } from "@/lib/atendimento/server";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -154,20 +154,25 @@ export async function POST(req: Request) {
           if (!updErr) {
             applied = true;
           } else if (isUndefinedColumnError(updErr)) {
-            try {
-              const alternateUpdate: any = {
-                funnel_stage: lead?.funnel_stage ?? "matriculado",
-                recurring_class_status: lead?.recurring_class_status ?? "confirmado",
-              };
-              await admin.from("atendimento_leads").update(alternateUpdate).eq("id", finalLeadId);
-              applied = true;
-            } catch {}
+            applied = true;
           }
         } catch (err) {
           if (isUndefinedColumnError(err)) {
             applied = true;
           }
         }
+        try {
+          await appendHistoryEvent({
+            leadId: finalLeadId,
+            eventType: "enrollment_number_generated",
+            title: "Número de matrícula gerado",
+            details: {
+              enrollment_number: enrollmentNumber,
+              gerado_em: new Date().toISOString(),
+            },
+            actorType: "system",
+          });
+        } catch {}
       }
       if (!enrollmentNumber) {
         enrollmentNumber = buildEnrollmentNumber({

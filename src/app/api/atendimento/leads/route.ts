@@ -212,6 +212,7 @@ export async function GET(req: Request) {
 
   const draftDateByLeadId = new Map<string, { professor_date: string; lead_date: string; label?: string | null; at: string } | null>();
   const draftTimeByLeadId = new Map<string, { professor_date: string; professor_time: string; lead_date: string; lead_time: string; professor_start_at: string; lead_start_at: string; at: string } | null>();
+  const enrollmentNumberByHistory = new Map<string, string | null>();
   let allHistoryEvents: any[] | null = null;
 
   if (leadIds.length > 0) {
@@ -229,6 +230,8 @@ export async function GET(req: Request) {
         "experimental_class_attendant_start_notification_sent",
         "experimental_class_attendance_confirmed",
         "experimental_class_attendance_follow_up_required",
+        "enrollment_number_generated",
+        "contrato_assinado",
       ])
       .order("created_at", { ascending: false });
 
@@ -242,10 +245,21 @@ export async function GET(req: Request) {
       const leadId = String((event as any)?.lead_id ?? "");
       if (!leadId) continue;
       const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+      const eca = String((event as any)?.created_at ?? "").trim() || null;
+      const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+      if (!enrollmentNumberByHistory.has(leadId)) {
+        const fromDetails = typeof details?.enrollment_number === "string" ? String(details.enrollment_number).trim() : "";
+        if (fromDetails) {
+          enrollmentNumberByHistory.set(leadId, fromDetails);
+        } else if (eventType === "enrollment_number_generated") {
+          const v = String((event as any)?.enrollment_number ?? details?.value ?? "").trim();
+          if (v) enrollmentNumberByHistory.set(leadId, v);
+        }
+      }
       if (eventType === "experimental_class_cancelled") {
         cancelledByHistoryLeadIds.add(leadId);
         if (!cancelledAtByLeadId.has(leadId)) {
-          cancelledAtByLeadId.set(leadId, String((event as any)?.created_at ?? "").trim());
+          cancelledAtByLeadId.set(leadId, String(eca ?? "").trim());
         }
       }
       if (eventType.startsWith("experimental_class_") && !latestClassEventByLeadId.has(leadId)) {
@@ -778,7 +792,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
 
       return {
         ...row,
-        enrollment_number: String((row as any)?.enrollment_number ?? "").trim() || null,
+        enrollment_number:
+          String((row as any)?.enrollment_number ?? "").trim() ||
+          enrollmentNumberByHistory.get(leadId) ||
+          null,
         experimental_class_professor_date: mergedProfessorDate || null,
         experimental_class_lead_date: mergedLeadDate || null,
         experimental_class_professor_time: mergedProfessorTime || null,

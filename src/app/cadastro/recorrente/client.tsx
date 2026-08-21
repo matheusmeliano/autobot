@@ -211,6 +211,7 @@ export default function CadastroRecorrenteBody() {
   const [contractFinalError, setContractFinalError] = useState<string>("");
   const [contractPdfUrl, setContractPdfUrl] = useState<string>("");
   const [contractSignedAt, setContractSignedAt] = useState<string>("");
+  const [enrollmentNumber, setEnrollmentNumber] = useState<string>("");
   const [paymentTab, setPaymentTab] = useState<"menu" | "link" | "deposit" | "pix">("menu");
   const [pixCopied, setPixCopied] = useState<boolean>(false);
 
@@ -327,6 +328,7 @@ export default function CadastroRecorrenteBody() {
             error?: string;
             contract_pdf_url?: string | null;
             contract_signed_at?: string | null;
+            enrollment_number?: string | null;
             leadId?: string;
           }
         | null;
@@ -335,12 +337,67 @@ export default function CadastroRecorrenteBody() {
       }
       setContractPdfUrl(String(json.contract_pdf_url || ""));
       setContractSignedAt(String(json.contract_signed_at || new Date().toISOString()));
+      if (typeof json.enrollment_number === "string" && json.enrollment_number.trim()) {
+        setEnrollmentNumber(String(json.enrollment_number).trim());
+      }
       goStep(5);
     } catch (e) {
       setContractFinalError(toErrorMessage(e, "Erro ao gerar a confirmação."));
     } finally {
       setContractFinalizing(false);
     }
+  }
+
+  async function finalizarMatriculaStep9() {
+    if (contractFinalizing) return;
+    if (!enrollmentNumber) {
+      const tel = phoneField.replace(/\D/g, "").trim();
+      setContractFinalizing(true);
+      setContractFinalError("");
+      try {
+        const res = await fetch("/api/cadastro/recorrente/contract-finalize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            telefone: tel,
+            leadId: contractLeadId || submitLeadId || undefined,
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | {
+              ok?: boolean;
+              error?: string;
+              contract_pdf_url?: string | null;
+              contract_signed_at?: string | null;
+              enrollment_number?: string | null;
+              leadId?: string;
+            }
+          | null;
+        if (res.ok && json?.ok) {
+          setContractPdfUrl(String(json.contract_pdf_url || ""));
+          setContractSignedAt(String(json.contract_signed_at || new Date().toISOString()));
+          if (typeof json.enrollment_number === "string" && json.enrollment_number.trim()) {
+            setEnrollmentNumber(String(json.enrollment_number).trim());
+          }
+          if (typeof json.leadId === "string" && json.leadId.trim()) {
+            const lid = String(json.leadId).trim();
+            if (!contractLeadId) setContractLeadId(lid);
+            if (!submitLeadId) setSubmitLeadId(lid);
+          }
+        } else if (!res.ok) {
+          setContractFinalError(toErrorMessage(json?.error, "Falha ao finalizar a matrícula. Tente novamente."));
+          setContractFinalizing(false);
+          return;
+        }
+      } catch (e) {
+        setContractFinalError(toErrorMessage(e, "Erro ao finalizar a matrícula. Tente novamente."));
+      } finally {
+      }
+    }
+    setContractFinalizing(true);
+    await new Promise<void>((r) => setTimeout(r, 700));
+    goStep(6);
+    setTimeout(() => setContractFinalizing(false), 250);
   }
 
   function goStep(n: 0 | 1 | 2 | 3 | 4 | 5 | 6) {
@@ -485,11 +542,15 @@ export default function CadastroRecorrenteBody() {
 
           const restoredContractPdfUrl = typeof (json.lead as any)?.contract_pdf_url === "string" ? String((json.lead as any).contract_pdf_url).trim() : "";
           const restoredContractSignedAt = typeof (json.lead as any)?.contract_signed_at === "string" ? String((json.lead as any).contract_signed_at).trim() : "";
+          const restoredEnrollmentNumber = typeof (json.lead as any)?.enrollment_number === "string" ? String((json.lead as any).enrollment_number).trim() : "";
           if (restoredContractPdfUrl) {
             setContractPdfUrl(restoredContractPdfUrl);
           }
           if (restoredContractSignedAt) {
             setContractSignedAt(restoredContractSignedAt);
+          }
+          if (restoredEnrollmentNumber) {
+            setEnrollmentNumber(restoredEnrollmentNumber);
           }
 
           const hasLoc = Boolean(restoredState || restoredCity);
@@ -1899,6 +1960,34 @@ export default function CadastroRecorrenteBody() {
                 <p className="mt-4 text-base text-slate-500">
                   Aulas todas as <strong>{submitResult.weekdayLabel}</strong> às <strong>{submitResult.leadTime}</strong>.
                 </p>
+                {enrollmentNumber && (
+                  <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-sky-500/35 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-700">
+                    <span>Matrícula N°</span>
+                    <span className="font-black tracking-tight">{enrollmentNumber}</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          if (navigator?.clipboard?.writeText) {
+                            await navigator.clipboard.writeText(enrollmentNumber);
+                          } else {
+                            const ta = document.createElement("textarea");
+                            ta.value = enrollmentNumber;
+                            ta.style.position = "fixed";
+                            ta.style.opacity = "0";
+                            document.body.appendChild(ta);
+                            ta.select();
+                            try { document.execCommand("copy"); } catch {}
+                            document.body.removeChild(ta);
+                          }
+                        } catch {}
+                      }}
+                      className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold border border-sky-500/40 bg-white hover:bg-sky-50 text-sky-700 transition"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                )}
                 {contractSignedAt && (
                   <p className="mt-2 text-sm text-slate-500">
                     Formalizado em: {new Date(contractSignedAt).toLocaleString("pt-BR")}
