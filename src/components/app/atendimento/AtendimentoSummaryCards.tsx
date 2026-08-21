@@ -933,7 +933,7 @@ function LeadDetails({
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
                     <span className="shrink-0">
-                      {loadingPayment && loadingPaymentAction === "confirm" ? "Confirmando…" : "Sim — Pagamento OK"}
+                      {loadingPayment && loadingPaymentAction === "confirm" ? "Confirmando…" : "Pagamento realizado"}
                     </span>
                   </button>
                   <button
@@ -944,7 +944,7 @@ function LeadDetails({
                   >
                     <XCircle className="h-4 w-4 shrink-0" />
                     <span className="shrink-0">
-                      {loadingPayment && loadingPaymentAction === "reject" ? "Atualizando…" : "Não — Não pagou"}
+                      {loadingPayment && loadingPaymentAction === "reject" ? "Atualizando…" : "Pagamento não realizado"}
                     </span>
                   </button>
                 </div>
