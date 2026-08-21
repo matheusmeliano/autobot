@@ -431,15 +431,6 @@ function formatCpf(v: string | null | undefined): string {
 
 type LeadNameValues = { full_name: string };
 type LeadLocationValues = { city: string; state: string };
-type ExperimentalBookingValues = {
-  professor_date: string;
-  professor_time: string;
-  lead_date: string;
-  lead_time: string;
-  lesson_link: string;
-  professor_timezone: string;
-  lead_timezone: string;
-};
 
 function RecurringClassLinkCard({
   lead,
@@ -1583,6 +1574,14 @@ export function AtendimentoSummaryCards({
   const [isEditExperimentalOpen, setIsEditExperimentalOpen] = useState(false);
   const [editingExperimentalLead, setEditingExperimentalLead] = useState<AtendimentoLeadListItem | null>(null);
   const [savingExperimentalLeadId, setSavingExperimentalLeadId] = useState<string | null>(null);
+  const [loadingExperimentalAvailability, setLoadingExperimentalAvailability] = useState<boolean>(false);
+  const [experimentalAvailability, setExperimentalAvailability] = useState<{
+    dates: any[];
+    slotsByDate: Record<string, any[]>;
+    lead_timezone: string;
+  } | null>(null);
+  const [selectedExperimentalDateId, setSelectedExperimentalDateId] = useState<string | null>(null);
+  const [selectedExperimentalSlotId, setSelectedExperimentalSlotId] = useState<string | null>(null);
 
   const leadNameForm = useForm<LeadNameValues>({
     defaultValues: { full_name: "" },
@@ -1803,100 +1802,131 @@ export function AtendimentoSummaryCards({
     }
   });
 
-  const experimentalBookingForm = useForm<ExperimentalBookingValues>({
-    defaultValues: {
-      professor_date: "",
-      professor_time: "",
-      lead_date: "",
-      lead_time: "",
-      lesson_link: "",
-      professor_timezone: "America/Cuiaba",
-      lead_timezone: "America/Cuiaba",
-    },
-  });
-
   function openEditExperimental(lead: AtendimentoLeadListItem) {
     setEditingExperimentalLead(lead);
-    const booking = (lead as any)?.experimental_class_booking as any;
-    const professorTimezone =
-      String(booking?.professor_timezone ?? "America/Cuiaba").trim() || "America/Cuiaba";
-    const leadTimezone =
-      String(lead.timezone ?? booking?.lead_timezone ?? "America/Cuiaba").trim() || "America/Cuiaba";
-
-    experimentalBookingForm.reset({
-      professor_date: String(booking?.professor_date ?? "").slice(0, 10),
-      professor_time: String(booking?.professor_time ?? "").trim(),
-      lead_date: String(booking?.lead_date ?? "").slice(0, 10),
-      lead_time: String(booking?.lead_time ?? "").trim(),
-      lesson_link: String(booking?.lesson_link ?? "").trim(),
-      professor_timezone: professorTimezone,
-      lead_timezone: leadTimezone,
-    });
+    setSelectedExperimentalDateId(null);
+    setSelectedExperimentalSlotId(null);
+    setExperimentalAvailability(null);
     setIsEditExperimentalOpen(true);
+    void (async () => {
+      try {
+        setLoadingExperimentalAvailability(true);
+        const resp = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}/experimental-booking/availability`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        const json = (await resp.json().catch(() => null)) as any;
+        if (resp.ok && json?.ok) {
+          const dates = Array.isArray(json.dates) ? (json.dates as any[]) : [];
+          const slotsByDate =
+            json.slotsByDate && typeof json.slotsByDate === "object"
+              ? (json.slotsByDate as Record<string, any[]>)
+              : {};
+          const lead_timezone =
+            String(json.lead_timezone ?? lead.timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+            ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          setExperimentalAvailability({
+            dates,
+            slotsByDate,
+            lead_timezone,
+          });
+          const booking = (lead as any)?.experimental_class_booking as any;
+          const pDate = String(booking?.professor_date ?? "").slice(0, 10);
+          const pTime = String(booking?.professor_time ?? "").trim();
+          if (pDate && pTime) {
+            const slotId = `${pDate}|${pTime}`;
+            const maybeSlots = Array.isArray(slotsByDate?.[pDate]) ? (slotsByDate[pDate] as any[]) : [];
+            const maybeDate = dates.find((d) => String(d?.id ?? d?.professorDate ?? "") === pDate);
+            if (maybeDate) {
+              setSelectedExperimentalDateId(String(maybeDate.id));
+            }
+            if (maybeSlots.length && maybeSlots.some((s) => String(s?.id ?? "") === slotId)) {
+              setSelectedExperimentalSlotId(slotId);
+            }
+          }
+        } else {
+          const err = json?.error ? String(json.error) : "Falha ao carregar dias disponíveis.";
+          modalToast.error(err);
+        }
+      } catch (e) {
+        modalToast.error(e instanceof Error ? e.message : "Falha ao carregar disponibilidade.");
+      } finally {
+        setLoadingExperimentalAvailability(false);
+      }
+    })();
   }
 
   function closeEditExperimental() {
     setIsEditExperimentalOpen(false);
     setEditingExperimentalLead(null);
-    experimentalBookingForm.reset({
-      professor_date: "",
-      professor_time: "",
-      lead_date: "",
-      lead_time: "",
-      lesson_link: "",
-      professor_timezone: "America/Cuiaba",
-      lead_timezone: "America/Cuiaba",
-    });
+    setExperimentalAvailability(null);
+    setSelectedExperimentalDateId(null);
+    setSelectedExperimentalSlotId(null);
   }
 
-  const saveExperimentalBookingForm = experimentalBookingForm.handleSubmit(async (values) => {
+  async function saveExperimentalBooking() {
     const leadId = String(editingExperimentalLead?.id ?? "").trim();
     if (!leadId) {
       modalToast.error("Lead indisponível para editar aula experimental.");
       return;
     }
-
-    const professorDateRaw = String(values.professor_date ?? "").trim();
-    const professorTimeRaw = String(values.professor_time ?? "").trim();
-    const leadDateRaw = String(values.lead_date ?? "").trim();
-    const leadTimeRaw = String(values.lead_time ?? "").trim();
-    const lessonLink = String(values.lesson_link ?? "").trim();
-    const professorTimezone = String(values.professor_timezone ?? "").trim() || "America/Cuiaba";
-    const leadTimezone = String(values.lead_timezone ?? "").trim() || "America/Cuiaba";
-
-    if (!professorDateRaw) {
-      modalToast.error("Informe a data da aula para o professor.");
+    const dates = experimentalAvailability?.dates ?? [];
+    const slotsByDate = experimentalAvailability?.slotsByDate ?? {};
+    if (!dates.length) {
+      modalToast.error("Não há dias disponíveis para agendamento.");
       return;
     }
-    if (!professorTimeRaw) {
-      modalToast.error("Informe o horário da aula para o professor.");
+    if (!selectedExperimentalDateId) {
+      modalToast.error("Selecione um dia disponível.");
       return;
     }
-    if (!/^\d{2}:\d{2}$/.test(professorTimeRaw)) {
-      modalToast.error("Horário do professor deve estar no formato HH:MM (ex: 14:30).");
+    const selectedDate = dates.find((d) => String(d?.id ?? "") === selectedExperimentalDateId);
+    if (!selectedDate) {
+      modalToast.error("Dia selecionado não está mais disponível.");
       return;
     }
-    if (leadDateRaw && leadTimeRaw && !/^\d{2}:\d{2}$/.test(leadTimeRaw)) {
-      modalToast.error("Horário do aluno deve estar no formato HH:MM (ex: 14:30).");
+    if (!selectedExperimentalSlotId) {
+      modalToast.error("Selecione um horário disponível.");
       return;
     }
-    if (!lessonLink) {
-      modalToast.error("Informe o link da sala de aula.");
+    const daySlots = Array.isArray(slotsByDate[String(selectedDate.professorDate ?? selectedDate.id ?? "")])
+      ? (slotsByDate[String(selectedDate.professorDate ?? selectedDate.id ?? "")] as any[])
+      : [];
+    const selectedSlot = daySlots.find((s) => String(s?.id ?? "") === selectedExperimentalSlotId);
+    if (!selectedSlot) {
+      modalToast.error("Horário selecionado não está mais disponível.");
       return;
     }
 
     try {
       setSavingExperimentalLeadId(leadId);
+      const existingBooking = (editingExperimentalLead as any)?.experimental_class_booking as any;
+      const preservedLessonLink = String(existingBooking?.lesson_link ?? "").trim();
+      const professorTimezone =
+        String(existingBooking?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+        ATENDIMENTO_PROFESSOR_TIME_ZONE;
+      const leadTimezone =
+        String(experimentalAvailability?.lead_timezone ?? editingExperimentalLead?.timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+        ATENDIMENTO_PROFESSOR_TIME_ZONE;
+
+      const professorDate = String(selectedSlot.professorDate ?? selectedDate.professorDate ?? "").slice(0, 10);
+      const professorTime = String(selectedSlot.professorTime ?? "").trim();
+      const leadDate = String(selectedSlot.leadDate ?? selectedDate.leadDate ?? professorDate).slice(0, 10);
+      const leadTime = String(selectedSlot.leadTime ?? selectedSlot.displayLabel ?? professorTime).trim();
+
       const body: Record<string, unknown> = {
         status: "scheduled",
-        lesson_link: lessonLink,
-        professor_date: professorDateRaw,
-        professor_time: professorTimeRaw,
-        lead_date: leadDateRaw || professorDateRaw,
-        lead_time: leadTimeRaw || professorTimeRaw,
+        professor_date: professorDate,
+        professor_time: professorTime,
+        lead_date: leadDate,
+        lead_time: leadTime,
         professor_timezone: professorTimezone,
         lead_timezone: leadTimezone,
       };
+      if (preservedLessonLink) {
+        body.lesson_link = preservedLessonLink;
+      }
+
       const response = await fetch(`/api/atendimento/leads/${leadId}/experimental-booking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1956,7 +1986,7 @@ export function AtendimentoSummaryCards({
     } finally {
       setSavingExperimentalLeadId(null);
     }
-  });
+  }
 
   function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
     const st = String(lead.status ?? "").trim().toLowerCase();
@@ -3347,77 +3377,156 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
             </button>
           </div>
 
-          <form onSubmit={saveExperimentalBookingForm} className="mt-5 space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold text-white/60">Data (horário do professor)</label>
-                <input
-                  type="date"
-                  autoFocus
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  {...experimentalBookingForm.register("professor_date", { required: true })}
-                />
+          <div className="mt-5 space-y-4">
+            {loadingExperimentalAvailability ? (
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-8 text-sm text-white/70">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando disponibilidade...
               </div>
-              <div>
-                <label className="text-xs font-semibold text-white/60">Horário (horário do professor)</label>
-                <input
-                  type="time"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  {...experimentalBookingForm.register("professor_time", { required: true })}
-                />
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-semibold text-white/80">
+                      Dias disponíveis
+                      {experimentalAvailability?.dates?.length ? (
+                        <span className="ml-2 font-normal text-white/40">
+                          ({String(experimentalAvailability.dates.length)})
+                        </span>
+                      ) : null}
+                    </label>
+                    <div className="text-[11px] text-white/45">
+                      Fuso: {String(experimentalAvailability?.lead_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
+                    </div>
+                  </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold text-white/60">Data (horário do aluno)</label>
-                <input
-                  type="date"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  {...experimentalBookingForm.register("lead_date")}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-white/60">Horário (horário do aluno)</label>
-                <input
-                  type="time"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  {...experimentalBookingForm.register("lead_time")}
-                />
-              </div>
-            </div>
+                  {!experimentalAvailability?.dates?.length ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-white/55">
+                      No momento, não há dias disponíveis para aula experimental até o fim do mês atual.
+                      O bot de agendamento naturalmente já não liberaria mais horários também.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                      {experimentalAvailability.dates.map((dateOption) => {
+                        const dateId = String(dateOption?.id ?? "");
+                        if (!dateId) return null;
+                        const dayLabel = String(dateOption?.dayLabel ?? dateId).slice(0, 6);
+                        const displayLabel = String(dateOption?.displayLabel ?? "").trim();
+                        const slotCount = Number(dateOption?.slotCount ?? 0);
+                        const isSelected = selectedExperimentalDateId === dateId;
+                        return (
+                          <button
+                            key={dateId}
+                            type="button"
+                            onClick={() => {
+                              setSelectedExperimentalDateId(dateId);
+                              setSelectedExperimentalSlotId(null);
+                            }}
+                            className={
+                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition " +
+                              (isSelected
+                                ? "border-white/90 bg-white text-black shadow-md"
+                                : "border-white/10 bg-white/[0.03] text-white/85 hover:border-white/25 hover:bg-white/[0.06]")
+                            }
+                          >
+                            <div className="text-[11px] uppercase tracking-wide text-white/50">
+                              {displayLabel ? displayLabel.split(",")[0] ?? "Dia" : "Dia"}
+                            </div>
+                            <div className={
+                              "text-lg font-black leading-none " +
+                              (isSelected ? "text-black" : "text-white/95")
+                            }>
+                              {dayLabel}
+                            </div>
+                            <div className={
+                              "text-[10px] font-semibold " +
+                              (isSelected ? "text-black/70" : "text-white/45")
+                            }>
+                              {slotCount > 0
+                                ? `${slotCount} ${slotCount === 1 ? "horário" : "horários"}`
+                                : "—"}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
-            <div>
-              <label className="text-xs font-semibold text-white/60">Link da sala de aula</label>
-              <input
-                type="url"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                placeholder="Ex.: https://meet.google.com/..."
-                maxLength={500}
-                {...experimentalBookingForm.register("lesson_link", { required: true, maxLength: 500 })}
-              />
-            </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-white/80">
+                    Horários disponíveis
+                    {selectedExperimentalDateId ? (
+                      <span className="ml-2 font-normal text-white/40">
+                        (dia selecionado)
+                      </span>
+                    ) : (
+                      <span className="ml-2 font-normal text-white/40">
+                        (selecione um dia primeiro)
+                      </span>
+                    )}
+                  </label>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold text-white/60">Fuso do professor</label>
-                <input
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder="Ex.: America/Cuiaba"
-                  maxLength={120}
-                  {...experimentalBookingForm.register("professor_timezone", { required: true, maxLength: 120 })}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-white/60">Fuso do aluno</label>
-                <input
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
-                  placeholder="Ex.: America/Cuiaba"
-                  maxLength={120}
-                  {...experimentalBookingForm.register("lead_timezone", { required: true, maxLength: 120 })}
-                />
-              </div>
-            </div>
+                  {!selectedExperimentalDateId ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-white/55">
+                      Clique em um dia acima para ver os horários disponíveis.
+                    </div>
+                  ) : (
+                    () => {
+                      const selectedDate = (experimentalAvailability?.dates ?? []).find(
+                        (d) => String(d?.id ?? "") === selectedExperimentalDateId,
+                      );
+                      const keyForSlots = String(selectedDate?.professorDate ?? selectedDate?.id ?? "");
+                      const slots = Array.isArray(experimentalAvailability?.slotsByDate?.[keyForSlots])
+                        ? (experimentalAvailability!.slotsByDate[keyForSlots] as any[])
+                        : [];
+                      if (!slots.length) {
+                        return (
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-white/55">
+                            Não há horários livres para este dia. Selecione outro dia disponível.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                          {slots.map((slot) => {
+                            const slotId = String(slot?.id ?? "");
+                            if (!slotId) return null;
+                            const label = String(slot?.displayLabel ?? slot?.leadTime ?? "").trim();
+                            const isSelected = selectedExperimentalSlotId === slotId;
+                            return (
+                              <button
+                                key={slotId}
+                                type="button"
+                                onClick={() => setSelectedExperimentalSlotId(slotId)}
+                                className={
+                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-black transition " +
+                                  (isSelected
+                                    ? "border-white/90 bg-white text-black shadow"
+                                    : "border-white/10 bg-white/[0.03] text-white/90 hover:border-white/25 hover:bg-white/[0.06]")
+                                }
+                              >
+                                {label || "Horário"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    }()
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/55 space-y-1">
+                  <div>
+                    Os horários já são exibidos no <span className="text-white/85 font-semibold">fuso horário do aluno</span>,
+                    calculados automaticamente com base no estado e cidade registrados no sistema.
+                  </div>
+                  <div>
+                    O link da sala de aula, se já cadastrado, é preservado automaticamente ao salvar.
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <button
@@ -3428,16 +3537,28 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                 Cancelar
               </button>
               <button
-                type="submit"
-                disabled={experimentalBookingForm.formState.isSubmitting || savingExperimentalLeadId !== null}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+                type="button"
+                disabled={
+                  loadingExperimentalAvailability ||
+                  savingExperimentalLeadId !== null ||
+                  !experimentalAvailability?.dates?.length ||
+                  !selectedExperimentalDateId ||
+                  !selectedExperimentalSlotId
+                }
+                onClick={() => void saveExperimentalBooking()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {experimentalBookingForm.formState.isSubmitting || savingExperimentalLeadId !== null
-                  ? "Salvando..."
-                  : "Salvar aula experimental"}
+                {savingExperimentalLeadId !== null ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar aula experimental"
+                )}
               </button>
             </div>
-          </form>
+          </div>
         </AppModal>
       </div>
     </div>
