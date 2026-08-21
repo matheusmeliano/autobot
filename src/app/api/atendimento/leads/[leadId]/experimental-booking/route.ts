@@ -452,9 +452,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       } catch (error) {
         await appendHistoryEvent({
           leadId,
-          eventType: "experimental_class_student_notification_failed",
-          title: "Falha ao notificar o aluno sobre novo agendamento de aula experimental",
+          eventType: "experimental_class_whatsapp_confirmation_failed",
+          title: "Falha ao enviar a confirmação da aula experimental no WhatsApp",
           details: {
+            booking_id: bookingIdForHistory,
             phone: studentPhone,
             error: error instanceof Error ? error.message : String(error),
           },
