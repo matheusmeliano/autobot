@@ -3469,25 +3469,25 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             className={
                               "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition " +
                               (isSelected
-                                ? "border-amber-300 bg-amber-300 text-black shadow-md"
+                                ? "border-amber-500/60 bg-amber-500/20 text-amber-200 shadow-md"
                                 : "border-white/10 bg-white/[0.03] text-white/85 hover:border-white/25 hover:bg-white/[0.06]")
                             }
                           >
                             <div className={
                               "text-[11px] uppercase tracking-wide " +
-                              (isSelected ? "text-black/70" : "text-white/50")
+                              (isSelected ? "text-amber-300/90" : "text-white/50")
                             }>
                               {displayLabel ? displayLabel.split(",")[0] ?? "Dia" : "Dia"}
                             </div>
                             <div className={
                               "text-lg font-black leading-none " +
-                              (isSelected ? "text-black" : "text-white/95")
+                              (isSelected ? "text-amber-100" : "text-white/95")
                             }>
                               {dayLabel}
                             </div>
                             <div className={
                               "text-[10px] font-semibold " +
-                              (isSelected ? "text-black/70" : "text-white/45")
+                              (isSelected ? "text-amber-300/80" : "text-white/45")
                             }>
                               {slotCount > 0
                                 ? `${slotCount} ${slotCount === 1 ? "horário" : "horários"}`
@@ -3549,7 +3549,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                                 className={
                                   "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-black transition " +
                                   (isSelected
-                                    ? "border-amber-300 bg-amber-300 text-black shadow"
+                                    ? "border-amber-500/60 bg-amber-500/20 text-amber-100 shadow"
                                     : "border-white/10 bg-white/[0.03] text-white/90 hover:border-white/25 hover:bg-white/[0.06]")
                                 }
                               >
