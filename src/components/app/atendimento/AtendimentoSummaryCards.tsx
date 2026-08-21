@@ -214,6 +214,11 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
   const registrationStarted = regStepValid && regStepRaw >= 1;
 
+  const stateRaw = String((lead as any)?.state ?? "").trim();
+  const cityRaw = String((lead as any)?.city ?? "").trim();
+  const locationOk = Boolean(stateRaw) && Boolean(cityRaw);
+  const locationStepReached = regStepValid && regStepRaw >= 1;
+
   const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
   const rcsCadastroPendente = rcsRaw === "cadastro_plataforma_pendente" || rcsRaw === "confirmado";
   const paymentStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
@@ -271,6 +276,15 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
 
   if (!hasRegistrationBasicData && !recWeekdayOk && !recTimeOk) {
     return "Falta concluir o registro inicial na plataforma";
+  }
+  const inAdvancedStage =
+    contractSigned || paymentConfirmed || paymentPendingConfirmation || paymentRejected;
+  if (
+    !inAdvancedStage &&
+    !locationOk &&
+    (locationStepReached || (!recWeekdayOk && !recTimeOk))
+  ) {
+    return "Falta estado e cidade";
   }
   if (!recWeekdayOk && !recTimeOk) return "Falta dia e horário recorrentes";
   if (!recWeekdayOk) return "Falta dia recorrente";
