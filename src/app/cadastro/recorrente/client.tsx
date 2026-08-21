@@ -1352,7 +1352,7 @@ export default function CadastroRecorrenteBody() {
                 </div>
                 <h2 className="mt-5 text-3xl font-extrabold text-slate-900">Revise seus dados</h2>
                 <p className="mt-3 text-lg text-slate-600">
-                  Confirme se as informações abaixo estão corretas para confirmar a matrícula.
+                  Confirme se as informações abaixo estão corretas.
                 </p>
               </div>
 
