@@ -2765,6 +2765,15 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           | "experimental_class_professor_start_at"
           | "experimental_class_status"
           | "funnel_stage"
+          | "status"
+          | "contract_status"
+          | "contract_signed_at"
+          | "contract_pdf_url"
+          | "recurring_registration_step"
+          | "payment_status"
+          | "payment_confirmed_at"
+          | "payment_rejected_at"
+          | "enrollment_number"
         > = [
           "experimental_class_lead_date",
           "experimental_class_lead_time",
@@ -2774,12 +2783,68 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           "experimental_class_professor_start_at",
           "experimental_class_status",
           "funnel_stage",
+          "status",
+          "contract_status",
+          "contract_signed_at",
+          "contract_pdf_url",
+          "recurring_registration_step",
+          "payment_status",
+          "payment_confirmed_at",
+          "payment_rejected_at",
+          "enrollment_number",
         ];
+        const NON_EMPTY_STR = (v: unknown) => typeof v === "string" && v.trim().length > 0;
         for (const k of KEEP_LOCALLY_IF_INCOMING_EMPTY) {
-          const locV = String((prev as any)?.[k] ?? "").trim();
-          const incV = String((inc as any)?.[k] ?? "").trim();
-          if (locV && !incV) {
+          const locV = (prev as any)?.[k];
+          const incV = (inc as any)?.[k];
+          const locValid = NON_EMPTY_STR(locV) || (typeof locV === "number" && !Number.isNaN(locV));
+          const incValid = NON_EMPTY_STR(incV) || (typeof incV === "number" && !Number.isNaN(incV));
+          if (locValid && !incValid) {
             (merged as any)[k] = locV;
+          }
+        }
+        const FORWARD_ONLY_PAYMENT: Array<"payment_status" | "status" | "funnel_stage" | "contract_status"> = [
+          "payment_status",
+          "status",
+          "funnel_stage",
+          "contract_status",
+        ];
+        const PAYMENT_RANK: Record<string, number> = {
+          pendente_confirmacao: 20,
+          nao_realizado: 30,
+          confirmado: 40,
+          pagamento_pendente_confirmacao: 20,
+          pagamento_nao_realizado: 30,
+          contrato_coletando_dados: 4,
+          contrato_aguardando_aceite: 6,
+          contrato_assinado: 8,
+          matriculado: 50,
+          coletando_dados: 4,
+          aguardando_aceite: 6,
+          assinado: 8,
+        };
+        const rankOf = (raw: unknown) => {
+          const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+          return s ? PAYMENT_RANK[s] ?? 0 : 0;
+        };
+        for (const k of FORWARD_ONLY_PAYMENT) {
+          const locRank = rankOf((prev as any)?.[k]);
+          const incRank = rankOf((inc as any)?.[k]);
+          if (locRank > 0 && incRank > 0 && locRank > incRank) {
+            (merged as any)[k] = (prev as any)?.[k];
+          }
+        }
+        if (!NON_EMPTY_STR((prev as any)?.updated_at) && !NON_EMPTY_STR((inc as any)?.updated_at)) {
+          // ok
+        } else {
+          const prevUpd = NON_EMPTY_STR((prev as any)?.updated_at)
+            ? new Date(String((prev as any).updated_at)).getTime()
+            : 0;
+          const incUpd = NON_EMPTY_STR((inc as any)?.updated_at)
+            ? new Date(String((inc as any).updated_at)).getTime()
+            : 0;
+          if (prevUpd > incUpd) {
+            merged.updated_at = (prev as any).updated_at;
           }
         }
 
