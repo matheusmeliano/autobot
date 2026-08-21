@@ -3469,11 +3469,14 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             className={
                               "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition " +
                               (isSelected
-                                ? "border-white/90 bg-white text-black shadow-md"
+                                ? "border-amber-300 bg-amber-300 text-black shadow-md"
                                 : "border-white/10 bg-white/[0.03] text-white/85 hover:border-white/25 hover:bg-white/[0.06]")
                             }
                           >
-                            <div className="text-[11px] uppercase tracking-wide text-white/50">
+                            <div className={
+                              "text-[11px] uppercase tracking-wide " +
+                              (isSelected ? "text-black/70" : "text-white/50")
+                            }>
                               {displayLabel ? displayLabel.split(",")[0] ?? "Dia" : "Dia"}
                             </div>
                             <div className={
@@ -3546,7 +3549,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                                 className={
                                   "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-black transition " +
                                   (isSelected
-                                    ? "border-white/90 bg-white text-black shadow"
+                                    ? "border-amber-300 bg-amber-300 text-black shadow"
                                     : "border-white/10 bg-white/[0.03] text-white/90 hover:border-white/25 hover:bg-white/[0.06]")
                                 }
                               >
