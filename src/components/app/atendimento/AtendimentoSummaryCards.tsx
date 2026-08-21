@@ -1772,16 +1772,16 @@ export function AtendimentoSummaryCards({
       setLocalLeads((current) =>
         current.map((item) =>
           item.id === leadId
-            ? {
+            ? ({
                 ...item,
                 city: newCity,
                 state: newState,
                 country: newCountry,
                 timezone: newTimezone,
-                funnel_stage: newFunnelStage,
-                experimental_class_status: newExpStatus,
+                funnel_stage: newFunnelStage ?? (item as any).funnel_stage,
+                experimental_class_status: newExpStatus ?? (item as any).experimental_class_status,
                 updated_at: newUpdatedAt,
-              }
+              } as AtendimentoLeadListItem)
             : item,
         ),
       );
@@ -1921,10 +1921,12 @@ export function AtendimentoSummaryCards({
           const patch: any = { ...item };
           if (payload?.lead_update) {
             if (payload.lead_update.funnel_stage !== undefined) {
-              patch.funnel_stage = String(payload.lead_update.funnel_stage ?? "").trim() || null;
+              const raw = String(payload.lead_update.funnel_stage ?? "").trim();
+              patch.funnel_stage = raw ? raw : (item as any).funnel_stage;
             }
             if (payload.lead_update.experimental_class_status !== undefined) {
-              patch.experimental_class_status = String(payload.lead_update.experimental_class_status ?? "").trim() || null;
+              const raw2 = String(payload.lead_update.experimental_class_status ?? "").trim();
+              patch.experimental_class_status = raw2 ? raw2 : (item as any).experimental_class_status;
             }
             if (payload.lead_update.updated_at) {
               patch.updated_at = String(payload.lead_update.updated_at);
@@ -1939,7 +1941,7 @@ export function AtendimentoSummaryCards({
               patch.experimental_class_status = "scheduled";
             }
           }
-          return patch;
+          return patch as AtendimentoLeadListItem;
         }),
       );
 
