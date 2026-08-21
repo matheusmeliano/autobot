@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
 import {
   ATENDIMENTO_FILES_BUCKET,
   ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES,
@@ -39,7 +39,6 @@ import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionS
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
-const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+55 65 9985-1142";
 const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
 const ATENDIMENTO_DAILY_SUMMARY_TRIGGER_HOUR = 20;

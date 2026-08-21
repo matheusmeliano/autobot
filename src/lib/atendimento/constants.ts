@@ -1,6 +1,8 @@
 export const ATENDIMENTO_EMAIL = "atendimento.usa.music@gmail.com";
 export const ATENDIMENTO_PUBLIC_LINK_SLUG = "lucas-brum-online-music-usa";
 
+export const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+55 65 9985-1142";
+
 export const ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10: readonly string[] = [];
 
 export const OWNER_PERSONAL_PRIVATE_PHONE_SUFFIXES_10: readonly string[] = [];

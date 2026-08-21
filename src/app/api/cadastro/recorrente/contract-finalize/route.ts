@@ -6,12 +6,8 @@ import {
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
 } from "@/lib/atendimento/server";
-import {
-  ATENDIMENTO_STAGE_ORDER,
-  ATENDIMENTO_STATUS_ORDER,
-  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-  buildRecurringPaymentPendingConfirmationAttendantNotification,
-} from "@/lib/atendimento/experimentalClass";
+import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER } from "@/lib/atendimento/constants";
+import { buildRecurringPaymentPendingConfirmationAttendantNotification } from "@/lib/atendimento/experimentalClass";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -273,7 +269,7 @@ export async function POST(req: Request) {
         enrollmentNumber || null,
       );
       await sendAtendimentoWhatsAppText({
-        toPhone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        toPhone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
         contentText: attendantMsg,
         leadId: finalLeadId,
         silentFail: true,
@@ -285,7 +281,7 @@ export async function POST(req: Request) {
           title: "Notificação atendente: Pagamento pendente enviada",
           details: {
             enrollment_number: enrollmentNumber || null,
-            attendant_phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+            attendant_phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
           },
           actorType: "system",
         });
