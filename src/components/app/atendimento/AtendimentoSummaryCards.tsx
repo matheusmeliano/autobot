@@ -1980,6 +1980,30 @@ export function AtendimentoSummaryCards({
             if (payload.lead_update.updated_at) {
               patch.updated_at = String(payload.lead_update.updated_at);
             }
+            if ((payload.lead_update as any).experimental_class_lead_date) {
+              const v = String((payload.lead_update as any).experimental_class_lead_date ?? "").trim();
+              if (v) patch.experimental_class_lead_date = v;
+            }
+            if ((payload.lead_update as any).experimental_class_lead_time) {
+              const v = String((payload.lead_update as any).experimental_class_lead_time ?? "").trim();
+              if (v) patch.experimental_class_lead_time = v;
+            }
+            if ((payload.lead_update as any).experimental_class_professor_date) {
+              const v = String((payload.lead_update as any).experimental_class_professor_date ?? "").trim();
+              if (v) patch.experimental_class_professor_date = v;
+            }
+            if ((payload.lead_update as any).experimental_class_professor_time) {
+              const v = String((payload.lead_update as any).experimental_class_professor_time ?? "").trim();
+              if (v) patch.experimental_class_professor_time = v;
+            }
+            if ((payload.lead_update as any).experimental_class_lead_start_at) {
+              const v = String((payload.lead_update as any).experimental_class_lead_start_at ?? "").trim();
+              if (v) patch.experimental_class_lead_start_at = v;
+            }
+            if ((payload.lead_update as any).experimental_class_professor_start_at) {
+              const v = String((payload.lead_update as any).experimental_class_professor_start_at ?? "").trim();
+              if (v) patch.experimental_class_professor_start_at = v;
+            }
           }
           if (payload?.booking) {
             patch.experimental_class_booking = payload.booking;
@@ -2348,33 +2372,76 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         if (!key) return inc;
         const prev = byId.get(key);
         if (!prev) return inc;
-        const prevUpd = new Date(String((prev as any)?.updated_at ?? "")).getTime();
-        const incUpd = new Date(String((inc as any)?.updated_at ?? "")).getTime();
-        const localIsNewer = Number.isFinite(prevUpd) && Number.isFinite(incUpd) && prevUpd >= incUpd;
-        if (!localIsNewer) return inc;
+        const merged: any = { ...prev, ...inc };
         const prevExpBooking = (prev as any)?.experimental_class_booking ?? null;
         const incExpBooking = (inc as any)?.experimental_class_booking ?? null;
-        const prevHasExp = Boolean(prevExpBooking && String(prevExpBooking?.id ?? "").trim() && String(prevExpBooking?.lead_date ?? prevExpBooking?.professor_date ?? "").trim());
-        const incHasExp = Boolean(incExpBooking && String(incExpBooking?.id ?? "").trim() && String(incExpBooking?.lead_date ?? incExpBooking?.professor_date ?? "").trim());
-        const prevExpLeadDate = String((prev as any)?.experimental_class_lead_date ?? "").trim();
-        const incExpLeadDate = String((inc as any)?.experimental_class_lead_date ?? "").trim();
-        const prevFutureExp = (prev as any)?.future_experimental_class_booking ?? null;
-        const merged: any = { ...prev, ...inc };
+        const prevHasExp = Boolean(
+          prevExpBooking &&
+            (
+              String(prevExpBooking?.lead_date ?? prevExpBooking?.professor_date ?? "").trim() ||
+              String(prevExpBooking?.lead_time ?? prevExpBooking?.professor_time ?? "").trim() ||
+              (String(prevExpBooking?.id ?? "").trim() && String(prevExpBooking?.status ?? "").trim())
+            ),
+        );
+        const incHasExp = Boolean(
+          incExpBooking &&
+            (
+              String(incExpBooking?.lead_date ?? incExpBooking?.professor_date ?? "").trim() ||
+              String(incExpBooking?.lead_time ?? incExpBooking?.professor_time ?? "").trim() ||
+              (String(incExpBooking?.id ?? "").trim() && String(incExpBooking?.status ?? "").trim() && String(incExpBooking?.id ?? "").trim() !== "fallback")
+            ),
+        );
         if (prevHasExp && !incHasExp) {
           merged.experimental_class_booking = prevExpBooking;
+        } else if (prevExpBooking && incExpBooking) {
+          const incDate = String(incExpBooking?.lead_date ?? incExpBooking?.professor_date ?? "").trim();
+          const prevDate = String(prevExpBooking?.lead_date ?? prevExpBooking?.professor_date ?? "").trim();
+          if (!incDate && prevDate) merged.experimental_class_booking = prevExpBooking;
         }
-        if (prevExpLeadDate && !incExpLeadDate) {
-          merged.experimental_class_lead_date = prevExpLeadDate;
-          const prevExpLeadTime = String((prev as any)?.experimental_class_lead_time ?? "").trim();
-          if (prevExpLeadTime) merged.experimental_class_lead_time = prevExpLeadTime;
-          const prevExpProfDate = String((prev as any)?.experimental_class_professor_date ?? "").trim();
-          if (prevExpProfDate) merged.experimental_class_professor_date = prevExpProfDate;
-          const prevExpProfTime = String((prev as any)?.experimental_class_professor_time ?? "").trim();
-          if (prevExpProfTime) merged.experimental_class_professor_time = prevExpProfTime;
+
+        const prevExpLeadDate = String((prev as any)?.experimental_class_lead_date ?? "").trim();
+        const incExpLeadDate = String((inc as any)?.experimental_class_lead_date ?? "").trim();
+        const prevExpLeadTime = String((prev as any)?.experimental_class_lead_time ?? "").trim();
+        const incExpLeadTime = String((inc as any)?.experimental_class_lead_time ?? "").trim();
+        const prevExpProfDate = String((prev as any)?.experimental_class_professor_date ?? "").trim();
+        const incExpProfDate = String((inc as any)?.experimental_class_professor_date ?? "").trim();
+        const prevExpProfTime = String((prev as any)?.experimental_class_professor_time ?? "").trim();
+        const incExpProfTime = String((inc as any)?.experimental_class_professor_time ?? "").trim();
+        if (prevExpLeadDate && !incExpLeadDate) merged.experimental_class_lead_date = prevExpLeadDate;
+        if (prevExpLeadTime && !incExpLeadTime) merged.experimental_class_lead_time = prevExpLeadTime;
+        if (prevExpProfDate && !incExpProfDate) merged.experimental_class_professor_date = prevExpProfDate;
+        if (prevExpProfTime && !incExpProfTime) merged.experimental_class_professor_time = prevExpProfTime;
+
+        const prevFutureExp = (prev as any)?.future_experimental_class_booking ?? null;
+        const incFutureExp = (inc as any)?.future_experimental_class_booking ?? null;
+        const prevFutureHasDate = Boolean(
+          prevFutureExp &&
+            (
+              String(prevFutureExp?.lead_date ?? prevFutureExp?.professor_date ?? "").trim() ||
+              String(prevFutureExp?.lead_time ?? prevFutureExp?.professor_time ?? "").trim()
+            ),
+        );
+        const incFutureHasDate = Boolean(
+          incFutureExp &&
+            (
+              String(incFutureExp?.lead_date ?? incFutureExp?.professor_date ?? "").trim() ||
+              String(incFutureExp?.lead_time ?? incFutureExp?.professor_time ?? "").trim()
+            ),
+        );
+        if (prevFutureHasDate && !incFutureHasDate) merged.future_experimental_class_booking = prevFutureExp;
+
+        const prevStage = String((prev as any)?.funnel_stage ?? "").trim();
+        const incStage = String((inc as any)?.funnel_stage ?? "").trim();
+        if (
+          prevStage === "aula_experimental_agendada" &&
+          (incStage === "" || incStage === "novo_lead" || incStage === "em_atendimento" || incStage === "pre_cadastro_concluido")
+        ) {
+          merged.funnel_stage = prevStage;
         }
-        if (prevFutureExp && !((inc as any)?.future_experimental_class_booking)) {
-          merged.future_experimental_class_booking = prevFutureExp;
-        }
+        const prevExpStatus = String((prev as any)?.experimental_class_status ?? "").trim();
+        const incExpStatus = String((inc as any)?.experimental_class_status ?? "").trim();
+        if (prevExpStatus === "scheduled" && !incExpStatus) merged.experimental_class_status = prevExpStatus;
+
         return merged as AtendimentoLeadListItem;
       });
     });

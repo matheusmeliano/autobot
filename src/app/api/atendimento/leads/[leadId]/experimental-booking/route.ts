@@ -253,23 +253,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       }
     }
 
-    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string } | null = null;
+    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null } | null = null;
     try {
       const { data: leadUpd, error: leadUpdErr } = await admin
         .from("atendimento_leads")
         .update({
           funnel_stage: "aula_experimental_agendada",
           experimental_class_status: safeStatus,
+          experimental_class_lead_date: safeLeadDate,
+          experimental_class_lead_time: safeLeadTime,
+          experimental_class_professor_date: safeProfessorDate,
+          experimental_class_professor_time: safeProfessorTime,
+          experimental_class_lead_start_at: leadStartAt,
+          experimental_class_professor_start_at: professorStartAt,
         })
         .eq("id", leadId)
         .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-        .select("id, funnel_stage, experimental_class_status, updated_at")
+        .select("id, funnel_stage, experimental_class_status, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at")
         .maybeSingle();
       if (!leadUpdErr && leadUpd) {
         leadUpdate = {
           funnel_stage: String((leadUpd as any).funnel_stage ?? "aula_experimental_agendada").trim() || null,
           experimental_class_status: String((leadUpd as any).experimental_class_status ?? safeStatus).trim() || null,
           updated_at: String((leadUpd as any).updated_at ?? new Date().toISOString()),
+          experimental_class_lead_date: String((leadUpd as any).experimental_class_lead_date ?? safeLeadDate ?? "").trim() || safeLeadDate,
+          experimental_class_lead_time: String((leadUpd as any).experimental_class_lead_time ?? safeLeadTime ?? "").trim() || safeLeadTime,
+          experimental_class_professor_date: String((leadUpd as any).experimental_class_professor_date ?? safeProfessorDate ?? "").trim() || safeProfessorDate,
+          experimental_class_professor_time: String((leadUpd as any).experimental_class_professor_time ?? safeProfessorTime ?? "").trim() || safeProfessorTime,
+          experimental_class_lead_start_at: String((leadUpd as any).experimental_class_lead_start_at ?? leadStartAt ?? "").trim() || leadStartAt,
+          experimental_class_professor_start_at: String((leadUpd as any).experimental_class_professor_start_at ?? professorStartAt ?? "").trim() || professorStartAt,
         };
       }
     } catch {
@@ -277,6 +289,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
         updated_at: new Date().toISOString(),
+        experimental_class_lead_date: safeLeadDate,
+        experimental_class_lead_time: safeLeadTime,
+        experimental_class_professor_date: safeProfessorDate,
+        experimental_class_professor_time: safeProfessorTime,
+        experimental_class_lead_start_at: leadStartAt,
+        experimental_class_professor_start_at: professorStartAt,
       };
     }
 
