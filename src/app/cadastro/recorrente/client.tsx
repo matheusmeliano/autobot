@@ -1436,8 +1436,8 @@ export default function CadastroRecorrenteBody() {
               <div className="rounded-3xl bg-slate-50 border border-slate-200 p-6 max-w-2xl mx-auto text-sm text-slate-700 leading-relaxed space-y-2">
                 <p className="font-semibold text-slate-900 text-base">Declaração de aceite</p>
                 <p>
-                  Declaro que li, compreendi e concordo com as condições da confirmação de matrícula da Lucas Brum Online Music USA,
-                  incluindo plano, valor, pagamentos, agenda, faltas, reposições, cancelamento e vigência.
+                  Declaro que li, compreendi e concordo com as condições apresentadas nesta confirmação de matrícula da Lucas Brum Online Music USA,
+                  incluindo dia e horário das aulas, frequência, duração e condições do plano.
                 </p>
               </div>
 
