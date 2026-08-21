@@ -294,8 +294,13 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   if (paymentPendingConfirmation) return "Aguardando confirmação de pagamento";
   if (paymentRejected) return "Pagamento não realizado";
   if (paymentStepReached) return "Falta confirmar pagamento";
-  if (contractAwaitingAccept) return "Falta aceite do contrato";
-  if (contractCollectingData) return "Falta preencher os dados do contrato";
+  if (
+    contractAwaitingAccept ||
+    contractCollectingData ||
+    !contractSigned
+  ) {
+    return "Falta confirmar contrato simplificado";
+  }
   return "Falta contrato";
 }
 
