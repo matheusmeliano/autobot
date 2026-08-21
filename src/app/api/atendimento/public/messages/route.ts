@@ -1162,12 +1162,15 @@ export async function POST(req: Request) {
         /\b(nao|não|revisar|rever|corrigir|nao concordo|não concordo)\b/.test(normalizedResp);
 
       if (isYes) {
+        const currentStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
+        const nextStep = Number.isFinite(currentStepRaw) && currentStepRaw > 6 ? currentStepRaw : 6;
         await admin
           .from("atendimento_leads")
           .update({
             contract_status: "aguardando_aceite",
             funnel_stage: "contrato_aguardando_aceite",
             status: "contrato_aguardando_aceite",
+            recurring_registration_step: nextStep,
             updated_at: nowIso,
           })
           .eq("id", String(lead.id));

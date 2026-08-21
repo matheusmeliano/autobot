@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findLeadByPhone } from "@/lib/atendimento/server";
+import { ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER } from "@/lib/atendimento/constants";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
@@ -266,6 +267,46 @@ export async function PATCH(req: NextRequest) {
     const currentStatus = String((lead as any)?.status ?? "").trim().toLowerCase();
     const currentFunnel = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
     const currentRcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+    const currentContractStatus = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+    const existingContractSignedAtRaw = String((lead as any)?.contract_signed_at ?? "").trim();
+    const existingContractPdfUrl = String((lead as any)?.contract_pdf_url ?? "").trim();
+    const existingPaymentStatus = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+    const isContractFormallySignedAlready =
+      currentContractStatus === "assinado" ||
+      Boolean(existingContractSignedAtRaw && existingContractSignedAtRaw !== "null") ||
+      Boolean(existingContractPdfUrl);
+    const currentStageIdx = ATENDIMENTO_STAGE_ORDER.indexOf(
+      (currentFunnel as (typeof ATENDIMENTO_STAGE_ORDER)[number]) ??
+        ("" as (typeof ATENDIMENTO_STAGE_ORDER)[number]),
+    );
+    const currentStatusIdx = ATENDIMENTO_STATUS_ORDER.indexOf(
+      (currentStatus as (typeof ATENDIMENTO_STATUS_ORDER)[number]) ??
+        ("" as (typeof ATENDIMENTO_STATUS_ORDER)[number]),
+    );
+
+    function applyForwardOnlyFunnelAndStatus(target: { funnel?: (typeof ATENDIMENTO_STAGE_ORDER)[number] | null; status?: (typeof ATENDIMENTO_STATUS_ORDER)[number] | null; contractStatus?: "coletando_dados" | "aguardando_aceite" | "assinado" | null }) {
+      if (target.funnel) {
+        const idx = ATENDIMENTO_STAGE_ORDER.indexOf(target.funnel);
+        if (idx >= 0 && (currentStageIdx < 0 || currentStageIdx < idx)) {
+          patch.funnel_stage = target.funnel;
+        }
+      }
+      if (target.status) {
+        const idx = ATENDIMENTO_STATUS_ORDER.indexOf(target.status);
+        if (idx >= 0 && (currentStatusIdx < 0 || currentStatusIdx < idx)) {
+          patch.status = target.status;
+        }
+      }
+      if (target.contractStatus) {
+        const cs = currentContractStatus;
+        const rank: Record<string, number> = { coletando_dados: 1, aguardando_aceite: 2, assinado: 3 };
+        const cur = rank[cs] ?? 0;
+        const tgt = rank[target.contractStatus] ?? 0;
+        if (tgt > cur) {
+          patch.contract_status = target.contractStatus;
+        }
+      }
+    }
 
     function shouldPromoteToAlunosSection(): boolean {
       const stChain = new Set([
@@ -328,6 +369,18 @@ export async function PATCH(req: NextRequest) {
 
     if (safeStepRaw !== null) {
       patch.recurring_registration_step = safeStepRaw;
+    }
+
+    if (isContractFormallySignedAlready) {
+      applyForwardOnlyFunnelAndStatus({ funnel: "contrato_assinado", status: "contrato_assinado", contractStatus: "assinado" });
+    } else if (existingPaymentStatus === "pendente_confirmacao" || existingPaymentStatus === "nao_realizado" || existingPaymentStatus === "confirmado") {
+      // Pagamento já tem estado definido: não retroceder contrato
+    } else if (safeStepRaw !== null && safeStepRaw >= 6) {
+      applyForwardOnlyFunnelAndStatus({ funnel: "contrato_assinado", status: "contrato_assinado", contractStatus: "assinado" });
+    } else if (safeStepRaw !== null && safeStepRaw >= 5) {
+      applyForwardOnlyFunnelAndStatus({ funnel: "contrato_aguardando_aceite", status: "contrato_aguardando_aceite", contractStatus: "aguardando_aceite" });
+    } else if (safeStepRaw !== null && safeStepRaw >= 3) {
+      applyForwardOnlyFunnelAndStatus({ funnel: "contrato_coletando_dados", status: "contrato_coletando_dados", contractStatus: "coletando_dados" });
     }
 
     if (safePassword) {

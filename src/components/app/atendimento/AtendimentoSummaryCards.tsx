@@ -213,19 +213,6 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   const regStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
   const regStepValid = Number.isFinite(regStepRaw) && regStepRaw >= 0 && regStepRaw <= 12;
   const registrationStarted = regStepValid && regStepRaw >= 1;
-  const contractAwaitingAccept =
-    !contractSigned &&
-    (contractStatusRaw === "aguardando_aceite" ||
-      statusRaw === "contrato_aguardando_aceite" ||
-      funnelRaw === "contrato_aguardando_aceite");
-  const contractCollectingData =
-    !contractSigned &&
-    !contractAwaitingAccept &&
-    (contractStatusRaw === "coletando_dados" ||
-      statusRaw === "contrato_coletando_dados" ||
-      funnelRaw === "contrato_coletando_dados" ||
-      (regStepValid && regStepRaw >= 3 && regStepRaw < 10));
-  const paymentStepReached = contractSigned || (regStepValid && regStepRaw >= 10);
 
   const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
   const rcsCadastroPendente = rcsRaw === "cadastro_plataforma_pendente" || rcsRaw === "confirmado";
@@ -247,6 +234,32 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
     funnelRaw === "matricula_confirmada" ||
     statusRaw === "matriculado" ||
     funnelRaw === "matriculado";
+
+  const contractAwaitingAccept =
+    !contractSigned &&
+    !paymentPendingConfirmation &&
+    !paymentRejected &&
+    !paymentConfirmed &&
+    (contractStatusRaw === "aguardando_aceite" ||
+      statusRaw === "contrato_aguardando_aceite" ||
+      funnelRaw === "contrato_aguardando_aceite" ||
+      (regStepValid && regStepRaw >= 5 && regStepRaw < 6));
+  const contractCollectingData =
+    !contractSigned &&
+    !contractAwaitingAccept &&
+    !paymentPendingConfirmation &&
+    !paymentRejected &&
+    !paymentConfirmed &&
+    (contractStatusRaw === "coletando_dados" ||
+      statusRaw === "contrato_coletando_dados" ||
+      funnelRaw === "contrato_coletando_dados" ||
+      (regStepValid && regStepRaw >= 3 && regStepRaw < 5));
+  const paymentStepReached =
+    contractSigned ||
+    (regStepValid && regStepRaw >= 6) ||
+    paymentStatusRaw === "pendente_confirmacao" ||
+    paymentStatusRaw === "nao_realizado" ||
+    paymentStatusRaw === "confirmado";
 
   const hasRegistrationBasicData =
     registrationStarted ||
