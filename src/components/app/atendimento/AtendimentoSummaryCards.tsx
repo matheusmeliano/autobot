@@ -897,25 +897,8 @@ function LeadDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        <div className="mb-4">
-          <RecurringClassLinkCard
-            lead={lead}
-            activeSection={activeSection}
-            savingThisLead={savingRecurringLink}
-            onSaveRecurringLink={onSaveRecurringLink}
-          />
-        </div>
-        {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
-          <div className="grid min-w-0 gap-3 md:grid-cols-2">
-            <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
-            <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
-            <Field label="País" value={lead.country} />
-            <Field label="Fuso" value={lead.timezone} />
-          </div>
-        ) : null}
-
-        {showPaymentActions || paymentConfirmed ? (
-          <div className="mt-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+        {showPaymentActions || paymentConfirmed || paymentRejected ? (
+          <div className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
@@ -958,6 +941,23 @@ function LeadDetails({
                 <Field label="Marcado em" value={formatAtendimentoDateTime(paymentRejectedAt)} />
               ) : null}
             </div>
+          </div>
+        ) : null}
+
+        <div className="mb-4">
+          <RecurringClassLinkCard
+            lead={lead}
+            activeSection={activeSection}
+            savingThisLead={savingRecurringLink}
+            onSaveRecurringLink={onSaveRecurringLink}
+          />
+        </div>
+        {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
+          <div className="grid min-w-0 gap-3 md:grid-cols-2">
+            <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
+            <Field label="Estado" value={formatAtendimentoLocationName(lead.state)} />
+            <Field label="País" value={lead.country} />
+            <Field label="Fuso" value={lead.timezone} />
           </div>
         ) : null}
 

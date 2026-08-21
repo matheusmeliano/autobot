@@ -3141,6 +3141,21 @@ export async function formalizeAndPersistContract(params: {
     contract_pdf_url: publicUrl,
     contract_html_snapshot: htmlSnapshot,
     updated_at: signedAt,
+    payment_status:
+      currentPaymentStatus === "confirmado" ||
+      currentPaymentStatus === "nao_realizado"
+        ? (lead as any).payment_status
+        : "pendente_confirmacao",
+    payment_confirmed_at:
+      currentPaymentStatus === "confirmado"
+        ? ((lead as any).payment_confirmed_at ?? signedAt)
+        : currentPaymentStatus === "nao_realizado"
+          ? null
+          : null,
+    payment_rejected_at:
+      currentPaymentStatus === "nao_realizado"
+        ? ((lead as any).payment_rejected_at ?? signedAt)
+        : null,
   };
 
   const funnel = String((lead as any).funnel_stage ?? "").trim();
