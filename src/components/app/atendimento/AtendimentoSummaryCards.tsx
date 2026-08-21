@@ -227,7 +227,9 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
   const paymentPendingConfirmation =
     paymentStatusRaw === "pendente_confirmacao" ||
     statusRaw === "pagamento_pendente_confirmacao" ||
-    funnelRaw === "pagamento_pendente_confirmacao";
+    funnelRaw === "pagamento_pendente_confirmacao" ||
+    (contractSigned && !paymentConfirmedAtRaw && !paymentRejectedAtRaw && regStepValid && regStepRaw >= 5) ||
+    (!paymentStatusRaw && regStepValid && regStepRaw >= 5 && !paymentConfirmedAtRaw && !paymentRejectedAtRaw);
   const paymentRejected =
     paymentStatusRaw === "nao_realizado" ||
     statusRaw === "pagamento_nao_realizado" ||
@@ -248,7 +250,7 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
     (contractStatusRaw === "aguardando_aceite" ||
       statusRaw === "contrato_aguardando_aceite" ||
       funnelRaw === "contrato_aguardando_aceite" ||
-      (regStepValid && regStepRaw >= 5 && regStepRaw < 6));
+      (regStepValid && regStepRaw >= 4 && regStepRaw < 5));
   const contractCollectingData =
     !contractSigned &&
     !contractAwaitingAccept &&
@@ -258,7 +260,7 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
     (contractStatusRaw === "coletando_dados" ||
       statusRaw === "contrato_coletando_dados" ||
       funnelRaw === "contrato_coletando_dados" ||
-      (regStepValid && regStepRaw >= 3 && regStepRaw < 5));
+      (regStepValid && regStepRaw >= 2 && regStepRaw < 4));
 
   const hasRegistrationBasicData =
     registrationStarted ||
@@ -792,7 +794,8 @@ function LeadDetails({
     paymentStatusRaw === "pendente_confirmacao" ||
     statusRaw === "pagamento_pendente_confirmacao" ||
     funnelRaw === "pagamento_pendente_confirmacao" ||
-    (contractSigned && !paymentConfirmedAt && !paymentRejectedAt && regStepOk && regStepRaw >= 6);
+    (contractSigned && !paymentConfirmedAt && !paymentRejectedAt && regStepOk && regStepRaw >= 5) ||
+    (!paymentStatusRaw && !paymentConfirmedAt && !paymentRejectedAt && regStepOk && regStepRaw >= 5);
   const paymentRejected =
     paymentStatusRaw === "nao_realizado" ||
     statusRaw === "pagamento_nao_realizado" ||

@@ -54,6 +54,7 @@ import {
   getAuthenticatedAtendimentoConversationAccess,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
+  triggerRecurringPaymentIntentIfNeeded,
 } from "@/lib/atendimento/server";
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
@@ -1163,17 +1164,31 @@ export async function POST(req: Request) {
 
       if (isYes) {
         const currentStepRaw = Number((lead as any)?.recurring_registration_step ?? 0);
-        const nextStep = Number.isFinite(currentStepRaw) && currentStepRaw > 6 ? currentStepRaw : 6;
+        const nextStep = Number.isFinite(currentStepRaw) && currentStepRaw > 5 ? currentStepRaw : 5;
         await admin
           .from("atendimento_leads")
           .update({
-            contract_status: "aguardando_aceite",
-            funnel_stage: "contrato_aguardando_aceite",
-            status: "contrato_aguardando_aceite",
+            contract_status: "assinado",
+            funnel_stage: "contrato_assinado",
+            status: "contrato_assinado",
             recurring_registration_step: nextStep,
             updated_at: nowIso,
           })
           .eq("id", String(lead.id));
+        try {
+          const payRawNow = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+          const payAlready =
+            payRawNow === "pendente_confirmacao" ||
+            payRawNow === "nao_realizado" ||
+            payRawNow === "confirmado";
+          if (!payAlready) {
+            await triggerRecurringPaymentIntentIfNeeded({
+              admin,
+              leadId: String(lead.id),
+              triggeredFrom: "whatsapp_bot_contract_signed",
+            }).catch(() => {});
+          }
+        } catch {}
 
         const formalizado = await formalizeAndPersistContract({
           admin,

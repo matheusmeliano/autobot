@@ -375,11 +375,11 @@ export async function PATCH(req: NextRequest) {
       applyForwardOnlyFunnelAndStatus({ funnel: "contrato_assinado", status: "contrato_assinado", contractStatus: "assinado" });
     } else if (existingPaymentStatus === "pendente_confirmacao" || existingPaymentStatus === "nao_realizado" || existingPaymentStatus === "confirmado") {
       // Pagamento já tem estado definido: não retroceder contrato
-    } else if (safeStepRaw !== null && safeStepRaw >= 6) {
-      applyForwardOnlyFunnelAndStatus({ funnel: "contrato_assinado", status: "contrato_assinado", contractStatus: "assinado" });
     } else if (safeStepRaw !== null && safeStepRaw >= 5) {
+      applyForwardOnlyFunnelAndStatus({ funnel: "contrato_assinado", status: "contrato_assinado", contractStatus: "assinado" });
+    } else if (safeStepRaw !== null && safeStepRaw >= 4) {
       applyForwardOnlyFunnelAndStatus({ funnel: "contrato_aguardando_aceite", status: "contrato_aguardando_aceite", contractStatus: "aguardando_aceite" });
-    } else if (safeStepRaw !== null && safeStepRaw >= 3) {
+    } else if (safeStepRaw !== null && safeStepRaw >= 2) {
       applyForwardOnlyFunnelAndStatus({ funnel: "contrato_coletando_dados", status: "contrato_coletando_dados", contractStatus: "coletando_dados" });
     }
 
@@ -412,7 +412,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     try {
-      if (safeStepRaw !== null && safeStepRaw >= 6) {
+      if (safeStepRaw !== null && safeStepRaw >= 5) {
         const paymentRawNow = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
         const paymentAlready =
           paymentRawNow === "pendente_confirmacao" ||
