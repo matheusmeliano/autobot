@@ -62,8 +62,9 @@ export async function GET(req: NextRequest) {
       lookAheadWeeks: 2,
     });
 
+    const slotsMap = (result.slotsByWeekdayDate ?? result.slotsByWeekday ?? {}) as Record<string, unknown>;
     const slotsObj: Record<string, unknown> = {};
-    for (const [key, value] of (result.slotsByWeekdayDate ?? result.slotsByWeekday ?? new Map()).entries()) {
+    for (const [key, value] of Object.entries(slotsMap)) {
       slotsObj[key] = Array.isArray(value) ? value : [];
     }
 
