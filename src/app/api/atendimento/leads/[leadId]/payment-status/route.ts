@@ -37,7 +37,11 @@ export async function POST(
   ctx: { params: Promise<{ leadId: string }> },
 ) {
   try {
-    const { email } = await requireAtendimentoUser();
+    const auth = await requireAtendimentoUser();
+    if (!auth.ok || !auth.user) {
+      return Response.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+    }
+    const email = auth.user.email || null;
     const params = await ctx.params;
     const leadId = String(params.leadId ?? "").trim();
     if (!leadId) {

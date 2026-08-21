@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
 import {
   ATENDIMENTO_FILES_BUCKET,
   ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES,
@@ -17,8 +17,6 @@ import {
   formatLocalizedDateSigned,
 } from "@/lib/atendimento/contract";
 import {
-  ATENDIMENTO_STAGE_ORDER,
-  ATENDIMENTO_STATUS_ORDER,
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
