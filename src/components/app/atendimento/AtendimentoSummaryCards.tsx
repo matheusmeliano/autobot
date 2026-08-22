@@ -3856,9 +3856,16 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           </div>
                         );
                       })()}
-                      <div className="mt-1 text-xs text-[var(--app-text-55)]">
-                        {buildItemMeta(lead)}
-                      </div>
+                      {(() => {
+                        const meta = buildItemMeta(lead);
+                        if (!meta) return null;
+                        const isAulaEm = /^Aula em:/.test(meta);
+                        return (
+                          <div className={`mt-1 text-xs ${isAulaEm ? "text-emerald-500" : "text-[var(--app-text-55)]"}`}>
+                            {meta}
+                          </div>
+                        );
+                      })()}
                       {isLeadRepescagem(lead) ? (
                         <div className="mt-2">
                           <RepescagemBadge />
