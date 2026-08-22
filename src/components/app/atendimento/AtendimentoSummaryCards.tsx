@@ -3692,7 +3692,28 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const faltaEstadoCidade = !stateRaw || !cityRaw;
                         const faltaDiaHoraRecorrente = !hasWeekdayOk || !hasTimeOk;
 
-                        if (!isMatriculadoCard && (faltaEstadoCidade || faltaDiaHoraRecorrente || (hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim()))) {
+                        const showRecLink =
+                          hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim();
+                        const showExpLink = (() => {
+                          const booking = lead.experimental_class_booking ?? null;
+                          const bookingId = String(booking?.id ?? "").trim();
+                          const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+                          return (
+                            bookingId &&
+                            bookingStatus &&
+                            bookingStatus !== "cancelled" &&
+                            !String((booking as any)?.lesson_link ?? "").trim()
+                          );
+                        })();
+
+                        const recLinkSections = ["alunos", "agendamentos"];
+                        const expLinkSections = ["interessados", "agendamentos"];
+
+                        if (
+                          !isMatriculadoCard &&
+                          showRecLink &&
+                          recLinkSections.includes(activeSection)
+                        ) {
                           warnings.push(
                             <div key="rec-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula recorrente
@@ -3700,18 +3721,18 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           );
                         }
 
-                        const booking = lead.experimental_class_booking ?? null;
-                        const bookingId = String(booking?.id ?? "").trim();
-                        const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
-                        const hasBookingWithoutLink =
-                          bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim();
-                        if (!isMatriculadoCard && hasBookingWithoutLink) {
+                        if (
+                          !isMatriculadoCard &&
+                          showExpLink &&
+                          expLinkSections.includes(activeSection)
+                        ) {
                           warnings.push(
                             <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula experimental
                             </div>,
                           );
                         }
+
                         return warnings.length ? warnings : null;
                       })()}
                       {activeSection === "interessados" ? (() => {
