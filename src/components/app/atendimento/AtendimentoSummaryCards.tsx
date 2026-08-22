@@ -3697,7 +3697,16 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const booking = lead.experimental_class_booking ?? null;
                         const bookingId = String(booking?.id ?? "").trim();
                         const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
-                        if (activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard && !leadHasAnyRecurringProgressSignal(lead) && bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim()) {
+                        const stateRaw = String((lead as any)?.state ?? "").trim();
+                        const cityRaw = String((lead as any)?.city ?? "").trim();
+                        const faltaEstadoCidade = !stateRaw || !cityRaw;
+                        const showMissingExpLinkStage = faltaEstadoCidade && activeSection !== "interessados" && activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard;
+                        const hasBookingWithoutLink =
+                          bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim();
+                        if (
+                          activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard &&
+                          (hasBookingWithoutLink || showMissingExpLinkStage)
+                        ) {
                           warnings.push(
                             <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula experimental
