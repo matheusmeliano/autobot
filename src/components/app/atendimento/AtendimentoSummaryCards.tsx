@@ -3744,6 +3744,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       })() : null}
                       {(() => {
                         if (activeSection === "agendamentos") return null;
+                        if (shouldHideExperimentalInfoCompletely(lead, activeSection)) return null;
+                        if (leadHasAnyRecurringProgressSignal(lead)) return null;
                         const stateRaw = String((lead as any)?.state ?? "").trim();
                         const cityRaw = String((lead as any)?.city ?? "").trim();
                         if (!stateRaw || !cityRaw) return null;
