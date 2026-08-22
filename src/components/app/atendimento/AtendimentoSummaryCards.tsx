@@ -2750,7 +2750,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       }
       setShowAddLeadModal(false);
       setAddLeadPhoneInput("");
-      modalToast?.({ title: "Número adicionado", kind: "success", description: "O contato foi incluído com sucesso na aba Interessados." });
+      modalToast.success("O contato foi incluído com sucesso na aba Interessados.", "Número adicionado");
     } catch {
       setAddLeadError("Erro de conexão. Tente novamente.");
     } finally {
