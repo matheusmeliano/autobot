@@ -3585,8 +3585,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
     if (activeSection !== "agendamentos") {
       if (hasRecurringBoth || hasAnyRecurringSignal) return buildRecurringMetaForSection(lead);
-      const experimentalMeta = buildExperimentalMetaForSection(lead);
-      if (experimentalMeta) return experimentalMeta;
       const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
       return rawDt ? `Criado em: ${rawDt}` : "";
     }
@@ -3744,6 +3742,24 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           </div>
                         );
                       })() : null}
+                      {(() => {
+                        const experimentalMeta = buildExperimentalMetaForSection(lead);
+                        if (!experimentalMeta) return null;
+                        const isScheduledStage =
+                          /^Falta dia/.test(experimentalMeta) ||
+                          /^Falta horário/.test(experimentalMeta) ||
+                          /^Falta dia e horário/.test(experimentalMeta) ||
+                          /^Aula em:/.test(experimentalMeta) ||
+                          /^Aguardando confirmação da aula experimental/.test(experimentalMeta) ||
+                          /^Agendamento em definição/.test(experimentalMeta) ||
+                          /^Agendamento cancelado/.test(experimentalMeta);
+                        if (!isScheduledStage) return null;
+                        return (
+                          <div className="mt-1 text-xs text-[var(--app-text-55)]">
+                            {experimentalMeta}
+                          </div>
+                        );
+                      })()}
                       <div className="mt-1 text-xs text-[var(--app-text-55)]">
                         {buildItemMeta(lead)}
                       </div>
