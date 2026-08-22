@@ -391,16 +391,11 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
   }
   if (pastMeta && pastBody) return `Última aula em: ${pastBody}`;
 
-  const cityOk = Boolean(String((lead as any)?.city ?? "").trim());
-  const stateOk = Boolean(String((lead as any)?.state ?? "").trim());
-  const countryOk = Boolean(String((lead as any)?.country ?? "").trim());
-  const timezoneOk = Boolean(String((lead as any)?.timezone ?? "").trim());
-  const localizacaoCompleta = cityOk && stateOk && countryOk && timezoneOk;
   const bookingAtivaNaoCancelada =
     booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled";
   const nenhumaExperimentalAgendadaOuResolvida =
     !hasFutureExp && !bookingAtivaNaoCancelada && !pastDone;
-  if (localizacaoCompleta && nenhumaExperimentalAgendadaOuResolvida) {
+  if (nenhumaExperimentalAgendadaOuResolvida && expStage !== "metodologia_apresentada") {
     if (!hasExpDate && !hasExpTime) return "Falta dia e horário";
     if (!hasExpDate) return "Falta dia";
     if (!hasExpTime) return "Falta horário";
@@ -426,7 +421,7 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
 
   if (!hasExpDate && !hasExpTime) {
     if (hasLatestCancelledMarker) return "Agendamento cancelado";
-    return "";
+    return "Falta dia e horário";
   }
   if (!hasExpDate) return "Falta dia";
   if (!hasExpTime) return "Falta horário";
