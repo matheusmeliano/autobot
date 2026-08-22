@@ -154,7 +154,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       .from("atendimento_leads")
       .select("id, full_name, phone, assigned_user_email, city, state, country, timezone")
       .eq("id", leadId)
-      .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
       .maybeSingle();
 
     if (leadErr) {
@@ -162,6 +161,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     }
     if (!leadExists?.id) {
       return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+    }
+
+    let leadConversationId: string | null = null;
+    try {
+      const convRes = await admin
+        .from("atendimento_conversations")
+        .select("id")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!convRes.error && convRes.data?.id) {
+        leadConversationId = String(convRes.data.id);
+      }
+    } catch {
     }
 
     const firstNameFromLead = (lead: { full_name?: string | null }) => {
@@ -229,6 +243,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     insertOrUpdateData.professor_start_at = professorStartAt;
     insertOrUpdateData.lead_start_at = leadStartAt;
     insertOrUpdateData.updated_at = new Date().toISOString();
+    if (leadConversationId) insertOrUpdateData.conversation_id = leadConversationId;
     if (safeLessonLink !== undefined) insertOrUpdateData.lesson_link = safeLessonLink;
     if (safeAttendance !== undefined) insertOrUpdateData.attendance_status = safeAttendance;
 
@@ -435,7 +450,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
             .from("atendimento_leads")
             .select("id, updated_at, funnel_stage")
             .eq("id", leadId)
-            .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
             .maybeSingle()) as any;
           leadUpdate = {
             funnel_stage: String((fb as any)?.funnel_stage ?? "aula_experimental_agendada").trim() || null,
