@@ -3585,6 +3585,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
     if (activeSection !== "agendamentos") {
       if (hasRecurringBoth || hasAnyRecurringSignal) return buildRecurringMetaForSection(lead);
+      const experimentalMeta = buildExperimentalMetaForSection(lead);
+      if (experimentalMeta) return experimentalMeta;
       const rawDt = formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at);
       return rawDt ? `Criado em: ${rawDt}` : "";
     }
