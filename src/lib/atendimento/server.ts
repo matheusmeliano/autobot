@@ -1076,7 +1076,7 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
 
   const { data: existingRun, error: existingRunError } = await admin
     .from("atendimento_daily_summary_runs")
-    .select("summary_date, sent_at, attempt_count")
+    .select("summary_date, sent_at, attempt_count, leads_count")
     .eq("summary_date", summaryDate)
     .maybeSingle();
 
@@ -1084,33 +1084,36 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
     throw new Error(existingRunError.message || "Falha ao consultar o resumo diario do atendimento.");
   }
 
-  if (existingRun?.sent_at) {
+  const previousLeadsCount = Number((existingRun as any)?.leads_count ?? 0) || 0;
+  const previousSentAt = existingRun?.sent_at ? String(existingRun.sent_at).trim() : null;
+  const previousSentWithZero = previousSentAt && previousLeadsCount <= 0;
+
+  if (previousSentAt && !previousSentWithZero) {
     return {
       ok: true as const,
       skipped: true as const,
       reason: "already_sent",
       summaryDate,
-      leadsCount: Number((existingRun as any)?.leads_count ?? 0) || null,
+      leadsCount: previousLeadsCount || null,
     };
   }
 
   const nextAttemptCount = Number((existingRun as any)?.attempt_count ?? 0) + 1;
-  const leasePayload = {
+  const leasePayload: Record<string, unknown> = {
     summary_date: summaryDate,
     timezone: ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE,
     sent_at: null,
     last_attempt_at: nowIso,
     attempt_count: nextAttemptCount,
     last_error: null,
+    leads_count: existingRun && !previousSentWithZero ? (existingRun as any).leads_count ?? null : null,
   };
 
   if (existingRun?.summary_date) {
-    const { error: updateLeaseError } = await admin
-      .from("atendimento_daily_summary_runs")
-      .update(leasePayload)
-      .eq("summary_date", summaryDate)
-      .is("sent_at", null);
-
+    const matchFilter = previousSentWithZero
+      ? admin.from("atendimento_daily_summary_runs").update(leasePayload).eq("summary_date", summaryDate).eq("sent_at", previousSentAt as string)
+      : admin.from("atendimento_daily_summary_runs").update(leasePayload).eq("summary_date", summaryDate).is("sent_at", null);
+    const { error: updateLeaseError } = await matchFilter;
     if (updateLeaseError) {
       throw new Error(updateLeaseError.message || "Falha ao atualizar a tentativa do resumo diario do atendimento.");
     }
@@ -1146,6 +1149,26 @@ export async function sendAtendimentoDailyLeadSummary(now = new Date()) {
       })
       .eq("summary_date", summaryDate);
     throw error;
+  }
+
+  if (leadsCount <= 0) {
+    try {
+      await admin
+        .from("atendimento_daily_summary_runs")
+        .update({
+          last_attempt_at: nowIso,
+          last_error: "skip_zero_leads_do_not_notify",
+          attempt_count: nextAttemptCount,
+        })
+        .eq("summary_date", summaryDate);
+    } catch {}
+    return {
+      ok: true as const,
+      skipped: true as const,
+      reason: "zero_leads_skip_send",
+      summaryDate,
+      leadsCount: 0,
+    };
   }
 
   try {
