@@ -522,8 +522,7 @@ export function buildRecurringPaymentPendingConfirmationAttendantNotification(
   name: string | null | undefined,
   enrollmentNumber: string | null | undefined,
 ) {
-  const safeFull = String(name ?? "").trim();
-  const safeFirst = safeFull.split(/\s+/)[0] || "Novo aluno";
+  const safeFull = String(name ?? "").trim() || "Novo aluno";
   const safeEnrollment =
     String(enrollmentNumber ?? "").trim() || "Nº de matrícula";
   return `Alerta: Pagamento pendente de confirmação 🔔
@@ -532,7 +531,7 @@ Um aluno avançou para a etapa de pagamento!
 
 Confira no aplicativo se o pagamento foi recebido e, em seguida, registre na plataforma a confirmação, marcando Sim ou Não.
 
-Aluno: ${safeFirst}
+Aluno: ${safeFull}
 Matrícula: ${safeEnrollment}
 
 Acessar painel:
