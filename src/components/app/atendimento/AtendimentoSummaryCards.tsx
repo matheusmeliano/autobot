@@ -57,6 +57,27 @@ function leadHasExperimentalClassPanelStatus(lead: AtendimentoLeadListItem) {
   return true;
 }
 
+function leadHasAnyExperimentalVinculo(lead: AtendimentoLeadListItem) {
+  const booking = lead.experimental_class_booking ?? null;
+  const bookingId = String(booking?.id ?? "").trim();
+  const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+  if (bookingId && bookingStatus !== "cancelled") return true;
+
+  const flatBookingId = String((lead as any)?.experimental_class_booking_id ?? "").trim();
+  const flatStatus = String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
+  const flatLeadDate = String((lead as any)?.experimental_class_lead_date ?? "").trim();
+  const flatLeadTime = String((lead as any)?.experimental_class_lead_time ?? "").trim();
+  const flatProfDate = String((lead as any)?.experimental_class_professor_date ?? "").trim();
+  const flatProfTime = String((lead as any)?.experimental_class_professor_time ?? "").trim();
+  const flatLeadStart = String((lead as any)?.experimental_class_lead_start_at ?? "").trim();
+  const flatProfStart = String((lead as any)?.experimental_class_professor_start_at ?? "").trim();
+  if (flatBookingId && flatStatus !== "cancelled") return true;
+  if (flatLeadDate || flatLeadTime || flatProfDate || flatProfTime || flatLeadStart || flatProfStart) {
+    if (flatStatus !== "cancelled") return true;
+  }
+  return leadHasExperimentalClassPanelStatus(lead);
+}
+
 function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
   if (!lead) return false;
   const stage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
@@ -3730,20 +3751,36 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
               <div className="space-y-3">
                 {pagedItems.map((lead) => {
                   const active = lead.id === selectedLead?.id;
+                  const showJumpToAgendamento =
+                    activeSection === "interessados" && leadHasAnyExperimentalVinculo(lead);
                   return (
                     <button
                       key={lead.id}
                       type="button"
                       onClick={() => handleSelectLead(lead)}
                       className={[
-                        "w-full rounded-2xl border px-4 py-3 text-left transition",
+                        "relative w-full rounded-2xl border px-4 py-3 text-left transition",
                         active
                           ? "border-[var(--app-border)] bg-[var(--app-card)] lg:border-yellow-500/30 lg:bg-yellow-500/10"
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
+                      {showJumpToAgendamento ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setActiveSection("agendamentos");
+                            handleSelectLead(lead);
+                          }}
+                          className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-2 py-1.5 text-[11px] font-semibold text-[var(--app-text-65)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+                          title="Ver em agendamento"
+                        >
+                          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                        </button>
+                      ) : null}
                       <div
-                        className="truncate text-sm font-semibold text-[var(--app-text-85)]"
+                        className="pr-10 truncate text-sm font-semibold text-[var(--app-text-85)]"
                         title={lead.phone || lead.full_name || "Interessado sem telefone"}
                       >
                         {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
