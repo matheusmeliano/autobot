@@ -3115,30 +3115,6 @@ export async function POST(req: Request) {
             });
           } else if (isYesNuclear) {
             const leadTz = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
-            try {
-              const updatePatch: Record<string, unknown> = {
-                funnel_stage: "cadastro_recorrente_pendente_plataforma",
-                status: "aluno",
-                updated_at: nowIso,
-              };
-              try {
-                const _testErr = await admin
-                  .from("atendimento_leads")
-                  .update({
-                    ...updatePatch,
-                    recurring_class_status: "cadastro_plataforma_pendente",
-                  } as any)
-                  .eq("id", leadId);
-                void _testErr;
-              } catch (_e) {
-                try {
-                  await admin
-                    .from("atendimento_leads")
-                    .update(updatePatch)
-                    .eq("id", leadId);
-                } catch (_e2) {}
-              }
-            } catch (_e) {}
             const safeFirstName = leadFirstName || leadFullNameRaw || "Aluno(a)";
             const safeFullNameForLink = leadFullNameRaw || safeFirstName || "Aluno(a)";
             const baseUrl = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
@@ -3796,18 +3772,10 @@ export async function POST(req: Request) {
           }
 
           if (isYes) {
-            nextLeadFunnel = "cadastro_recorrente_pendente_plataforma";
-            nextLeadStatus = "aluno";
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
             const leadTzGeneral = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
             try {
-              try {
-                await admin
-                  .from("atendimento_leads")
-                  .update({ recurring_class_status: "cadastro_plataforma_pendente" } as any)
-                  .eq("id", leadId);
-              } catch (_e) {}
               const safeFirstGeneral = leadFirstName || String((lead as any)?.full_name ?? "") || "Aluno(a)";
               const safeFullGeneral = String((lead as any)?.full_name ?? "").trim() || safeFirstGeneral || "Aluno(a)";
               const baseUrlGeneral = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";

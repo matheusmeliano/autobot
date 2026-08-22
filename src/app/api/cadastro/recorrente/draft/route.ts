@@ -321,11 +321,9 @@ export async function PATCH(req: NextRequest) {
       if (stChain.has(currentStatus) || stChain.has(currentFunnel)) return false;
       if (currentRcs === "confirmado" || currentRcs === "cadastro_plataforma_pendente") return false;
 
-      // Se for interessado:
-      //   - salvou senha OU salvou dia/horário OU avançou step (>=1) → promover
+      // REGRA GERAL: só promove para Alunos APÓS concluir a etapa de REGISTRO (e-mail + senha).
+      // Acessar link, informar dia/horário ou avançar steps parciais NÃO são suficientes.
       if (safePassword) return true;
-      if (validWeekday || safeProfessorTime || safeLeadTime) return true;
-      if (safeStepRaw !== null && safeStepRaw >= 1) return true;
       return false;
     }
 
