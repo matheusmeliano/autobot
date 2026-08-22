@@ -87,6 +87,7 @@ export async function GET(req: Request) {
   const leadIds = leadRows.map((row) => String(row.id ?? "")).filter(Boolean);
   const conversationsByLeadId = new Map<string, any>();
   const bookingsByLeadId = new Map<string, any>();
+  const bookingsById = new Map<string, any>();
   const latestBookingByLeadId = new Map<string, any>();
   const futureExperimentalBookingByLeadId = new Map<string, any>();
   const cancelledLeadBookingIds = new Set<string>();
@@ -162,8 +163,7 @@ export async function GET(req: Request) {
         continue;
       }
       if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
-      if (bookingsByLeadId.has(leadId)) continue;
-      bookingsByLeadId.set(leadId, {
+      const candidate = {
         ...(booking as any),
         lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
         student_start_notification_sent_at: String((booking as any)?.student_start_notification_sent_at ?? "").trim() || null,
@@ -172,7 +172,24 @@ export async function GET(req: Request) {
         attendance_checked_at: null,
         professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
-      });
+      };
+      if (bookingsByLeadId.has(leadId)) continue;
+      bookingsByLeadId.set(leadId, candidate);
+    }
+    for (const booking of bookings ?? []) {
+      const id = String((booking as any)?.id ?? "");
+      if (id) {
+        bookingsById.set(id, {
+          ...(booking as any),
+          lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
+          student_start_notification_sent_at: String((booking as any)?.student_start_notification_sent_at ?? "").trim() || null,
+          attendant_start_notification_sent_at: String((booking as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
+          attendance_status: String((booking as any)?.attendance_status ?? "").trim() || null,
+          attendance_checked_at: null,
+          professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          source: "table",
+        });
+      }
     }
 
     for (const booking of bookings ?? []) {
@@ -709,7 +726,16 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const alunosTs = sectionTimestampMs(row, "alunos", allHistoryEvents);
       const agendamentosTs = sectionTimestampMs(row, "agendamentos", allHistoryEvents);
       const contratosTs = sectionTimestampMs(row, "contratos", allHistoryEvents);
-      const existingBooking = bookingsByLeadId.get(leadId) ?? null;
+      const preferredBookingId = String((row as any)?.experimental_class_booking_id ?? "").trim();
+      const preferredBooking = (() => {
+        if (!preferredBookingId) return null;
+        const b = bookingsById.get(preferredBookingId) ?? null;
+        if (!b) return null;
+        const s = String(b.status ?? "").trim().toLowerCase();
+        if (s === "cancelled") return null;
+        return b;
+      })();
+      const existingBooking = preferredBooking ?? bookingsByLeadId.get(leadId) ?? null;
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
       const cleanDraftDate = isCancelledLead ? null : draftDateByLeadId.get(leadId) ?? null;
       const cleanDraftTime = isCancelledLead ? null : draftTimeByLeadId.get(leadId) ?? null;

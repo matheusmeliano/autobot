@@ -198,13 +198,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     }
 
     const activeId =
-      (currentActive ?? []).find(
-        (r) => String(r.status ?? "").trim().toLowerCase() !== "cancelled",
-      )?.id ?? null;
+      ((currentActive ?? [])
+        .filter((r) => String(r.status ?? "").trim().toLowerCase() !== "cancelled")
+        .sort((a, b) => {
+          const at = new Date(String((a as any).created_at ?? "")).getTime();
+          const bt = new Date(String((b as any).created_at ?? "")).getTime();
+          return bt - at;
+        })?.[0]?.id ?? null) as string | null;
+
+    try {
+      await admin
+        .from("atendimento_experimental_class_bookings")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("lead_id", leadId)
+        .eq("status", "scheduled")
+        .neq("id", activeId ?? "00000000-0000-0000-0000-000000000000");
+    } catch {
+    }
 
     const insertOrUpdateData: Record<string, unknown> = {};
     insertOrUpdateData.lead_id = leadId;
     insertOrUpdateData.status = safeStatus;
+    insertOrUpdateData.source = "manual";
     insertOrUpdateData.professor_date = safeProfessorDate;
     insertOrUpdateData.professor_time = safeProfessorTime;
     insertOrUpdateData.lead_date = safeLeadDate ?? safeProfessorDate;
@@ -213,6 +228,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     insertOrUpdateData.lead_timezone = safeLeadTz;
     insertOrUpdateData.professor_start_at = professorStartAt;
     insertOrUpdateData.lead_start_at = leadStartAt;
+    insertOrUpdateData.updated_at = new Date().toISOString();
     if (safeLessonLink !== undefined) insertOrUpdateData.lesson_link = safeLessonLink;
     if (safeAttendance !== undefined) insertOrUpdateData.attendance_status = safeAttendance;
 
@@ -314,22 +330,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       }
     }
 
-    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null } | null = null;
+    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null; experimental_class_booking_id?: string | null; experimental_class_link?: string | null } | null = null;
     {
+      const bookingIdStr = bookingOut?.id != null ? String(bookingOut.id) : null;
       const fullUpdateData: Record<string, any> = {
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
+        experimental_class_booking_id: bookingIdStr,
         experimental_class_lead_date: safeLeadDate,
         experimental_class_lead_time: safeLeadTime,
         experimental_class_professor_date: safeProfessorDate,
         experimental_class_professor_time: safeProfessorTime,
         experimental_class_lead_start_at: leadStartAt,
         experimental_class_professor_start_at: professorStartAt,
+        ...(safeLessonLink ? { experimental_class_link: safeLessonLink } : {}),
+        updated_at: new Date().toISOString(),
       };
-      const selectFull = "id, funnel_stage, experimental_class_status, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at";
+      const selectFull = "id, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at";
       const fallback = () => ({
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
+        experimental_class_booking_id: bookingIdStr,
+        experimental_class_link: safeLessonLink || null,
         updated_at: new Date().toISOString(),
         experimental_class_lead_date: safeLeadDate,
         experimental_class_lead_time: safeLeadTime,
@@ -345,7 +367,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
             .from("atendimento_leads")
             .update(updateData)
             .eq("id", leadId)
-            .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
             .select(select)
             .maybeSingle();
           return { err: error ?? null, data: data ?? null };
@@ -357,6 +378,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         return {
           funnel_stage: String((leadRow as any).funnel_stage ?? "aula_experimental_agendada").trim() || null,
           experimental_class_status: String((leadRow as any).experimental_class_status ?? safeStatus).trim() || null,
+          experimental_class_booking_id: String((leadRow as any).experimental_class_booking_id ?? bookingIdStr ?? "").trim() || bookingIdStr,
+          experimental_class_link: String((leadRow as any).experimental_class_link ?? safeLessonLink ?? "").trim() || safeLessonLink || null,
           updated_at: String((leadRow as any).updated_at ?? new Date().toISOString()),
           experimental_class_lead_date: String((leadRow as any).experimental_class_lead_date ?? safeLeadDate ?? "").trim() || safeLeadDate,
           experimental_class_lead_time: String((leadRow as any).experimental_class_lead_time ?? safeLeadTime ?? "").trim() || safeLeadTime,
