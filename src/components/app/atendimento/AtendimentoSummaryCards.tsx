@@ -3712,7 +3712,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const expLinkSections = ["interessados", "agendamentos"];
 
                         if (
-                          !isMatriculadoCard &&
                           showRecLink &&
                           recLinkSections.includes(activeSection)
                         ) {
