@@ -44,6 +44,7 @@ import {
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
+  resolveExperimentalClassAssignedProfessorPhone,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
@@ -2497,9 +2498,17 @@ export async function POST(req: Request) {
         });
       }
 
+      const assignedPublicProfessorPhone =
+        resolveExperimentalClassAssignedProfessorPhone({
+          bookingAssignedPhone: String((bookingReservation.booking as any)?.assigned_professor_phone ?? "").trim(),
+          bookingAssignedName: String((bookingReservation.booking as any)?.assigned_professor_name ?? "").trim(),
+          flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+          flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+        })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
+
       try {
         await sendAtendimentoWhatsAppText({
-          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          phone: assignedPublicProfessorPhone,
           message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
         });
 
@@ -2509,7 +2518,7 @@ export async function POST(req: Request) {
           eventType: "experimental_class_attendant_notification_sent",
           title: "Atendente notificado sobre novo agendamento de aula experimental",
           details: {
-            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            phone: assignedPublicProfessorPhone,
           },
           actorType: "system",
         });
@@ -2520,7 +2529,7 @@ export async function POST(req: Request) {
           eventType: "experimental_class_attendant_notification_failed",
           title: "Falha ao notificar o atendente sobre novo agendamento de aula experimental",
           details: {
-            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            phone: assignedPublicProfessorPhone,
             error: error instanceof Error ? error.message : String(error),
           },
           actorType: "system",

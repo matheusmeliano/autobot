@@ -1,0 +1,140 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { createSupabaseRouteAdmin } from "@/lib/supabase/admin";
+import {
+  extractUndefinedColumnName,
+  STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_ALLOWLIST,
+  stripUndefinedColumnFromPatch,
+} from "@/lib/strip-undefined-column";
+
+const EXPERIMENTAL_PROFESSOR_ALLOWLIST = [
+  { name: "Lucas Brum", phone: "+55 65 9807-9407" },
+  { name: "Nathan Camargo", phone: "+55 65 9952-0166" },
+];
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
+  try {
+    const auth = await requireAtendimentoUser();
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error ?? "Não autorizado." }, { status: 401 });
+    }
+
+    const { leadId } = await params;
+    const safeLeadId = String(leadId ?? "").trim();
+    if (!safeLeadId) {
+      return NextResponse.json({ ok: false, error: "Lead inválido." }, { status: 400 });
+    }
+
+    const admin = createSupabaseRouteAdmin();
+
+    const body = (await req.json().catch(() => null)) as {
+      professor_name?: string | null;
+      professor_phone?: string | null;
+    } | null;
+    const professorNameRaw = String(body?.professor_name ?? "").trim();
+    const professorPhoneRaw = String(body?.professor_phone ?? "").trim();
+
+    const match = EXPERIMENTAL_PROFESSOR_ALLOWLIST.find(
+      (p) => p.phone === professorPhoneRaw && p.name === professorNameRaw,
+    );
+    if (!match) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Professor inválido. Selecione um dos professores autorizados: Lucas Brum (+55 65 9807-9407) ou Nathan Camargo (+55 65 9952-0166).",
+        },
+        { status: 400 },
+      );
+    }
+
+    const { data: leadExists, error: leadErr } = await admin
+      .from("atendimento_leads")
+      .select("id, experimental_class_booking_id, updated_at")
+      .eq("id", safeLeadId)
+      .maybeSingle();
+    if (leadErr) throw leadErr;
+    if (!leadExists) {
+      return NextResponse.json({ ok: false, error: "Interessado não encontrado." }, { status: 404 });
+    }
+
+    const bookingId = String((leadExists as any)?.experimental_class_booking_id ?? "").trim();
+    const updatedAt = new Date().toISOString();
+
+    if (bookingId) {
+      const bookingPatch = {
+        assigned_professor_name: match.name,
+        assigned_professor_phone: match.phone,
+        updated_at: updatedAt,
+      };
+      const suspectListForBookings = [
+        ...STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_ALLOWLIST,
+        "assigned_professor_name",
+        "assigned_professor_phone",
+      ];
+      try {
+        await (async function attemptBooking(currentPatch: Record<string, any>): Promise<{ ok: boolean }> {
+          if (!Object.keys(currentPatch).length) return { ok: true };
+          const { error } = await admin
+            .from("atendimento_experimental_class_bookings")
+            .update(currentPatch)
+            .eq("id", bookingId);
+          if (!error) return { ok: true };
+          const missing = extractUndefinedColumnName(error);
+          if (!missing) return { ok: true };
+          return attemptBooking(stripUndefinedColumnFromPatch(currentPatch, missing, suspectListForBookings));
+        })(bookingPatch as Record<string, any>);
+      } catch {
+      }
+    }
+
+    const leadPatch = {
+      experimental_class_professor_name: match.name,
+      experimental_class_professor_phone: match.phone,
+      updated_at: updatedAt,
+    };
+    const suspectListForLeads = [
+      ...STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_ALLOWLIST,
+      "experimental_class_professor_name",
+      "experimental_class_professor_phone",
+    ];
+    const mergedAfterLead = await (async function attemptLead(currentPatch: Record<string, any>): Promise<any> {
+      if (!Object.keys(currentPatch).length) return leadExists;
+      const { data, error } = await admin
+        .from("atendimento_leads")
+        .update(currentPatch)
+        .eq("id", safeLeadId)
+        .select(
+          "id, experimental_class_booking_id, experimental_class_professor_name, experimental_class_professor_phone, updated_at",
+        )
+        .maybeSingle();
+      if (!error) return data ?? leadExists;
+      const missing = extractUndefinedColumnName(error);
+      if (!missing) return leadExists;
+      return attemptLead(stripUndefinedColumnFromPatch(currentPatch, missing, suspectListForLeads));
+    })(leadPatch as Record<string, any>);
+
+    const persistedName = String(
+      (mergedAfterLead as any)?.experimental_class_professor_name ?? match.name,
+    ).trim();
+    const persistedPhone = String(
+      (mergedAfterLead as any)?.experimental_class_professor_phone ?? match.phone,
+    ).trim();
+
+    return NextResponse.json({
+      ok: true,
+      assigned_professor: { name: persistedName, phone: persistedPhone },
+      lead: mergedAfterLead ?? leadExists,
+    });
+  } catch (error) {
+    console.error("[experimental-booking/assign-professor] error", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Falha ao vincular professor à aula experimental.",
+      },
+      { status: 500 },
+    );
+  }
+}

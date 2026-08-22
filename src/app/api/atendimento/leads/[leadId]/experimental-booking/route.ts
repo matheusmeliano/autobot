@@ -7,6 +7,7 @@ import {
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
+  resolveExperimentalClassAssignedProfessorPhone,
 } from "@/lib/atendimento/experimentalClass";
 
 export const dynamic = "force-dynamic";
@@ -535,9 +536,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       }
     }
 
+    const assignedBookingProfessorPhone =
+      resolveExperimentalClassAssignedProfessorPhone({
+        bookingAssignedPhone: String((bookingOut as any)?.assigned_professor_phone ?? "").trim(),
+        bookingAssignedName: String((bookingOut as any)?.assigned_professor_name ?? "").trim(),
+        flatAssignedPhone: String((leadExists as any)?.experimental_class_professor_phone ?? "").trim(),
+        flatAssignedName: String((leadExists as any)?.experimental_class_professor_name ?? "").trim(),
+      })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
+
     try {
       await sendAtendimentoWhatsAppText({
-        phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+        phone: assignedBookingProfessorPhone,
         message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
       });
       await appendHistoryEvent({
@@ -546,7 +555,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         title: "Atendente notificado sobre novo agendamento de aula experimental",
         details: {
           booking_id: bookingIdForHistory,
-          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          phone: assignedBookingProfessorPhone,
         },
         actorType: "system",
       });
@@ -557,7 +566,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         title: "Falha ao notificar o atendente sobre novo agendamento de aula experimental",
         details: {
           booking_id: bookingIdForHistory,
-          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          phone: assignedBookingProfessorPhone,
           error: error instanceof Error ? error.message : String(error),
         },
         actorType: "system",

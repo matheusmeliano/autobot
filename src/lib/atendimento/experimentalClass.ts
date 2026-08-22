@@ -30,6 +30,39 @@ function professorTimeIsAllowed({ weekdayShort, professorTimeHHMM }: { weekdaySh
 export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
 export const EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9949-5594";
+export const EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST = [
+  { name: "Lucas Brum", phone: "+55 65 9807-9407", short: "9807-9407" },
+  { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
+] as const;
+
+export function resolveExperimentalClassAssignedProfessorPhone(input: {
+  bookingAssignedPhone?: string | null;
+  bookingAssignedName?: string | null;
+  flatAssignedPhone?: string | null;
+  flatAssignedName?: string | null;
+}): { name: string; phone: string } | null {
+  const candidates: Array<{ name?: string | null; phone?: string | null }> = [
+    { name: input.bookingAssignedName, phone: input.bookingAssignedPhone },
+    { name: input.flatAssignedName, phone: input.flatAssignedPhone },
+  ];
+  for (const c of candidates) {
+    const name = String(c.name ?? "").trim();
+    const phone = String(c.phone ?? "").trim();
+    if (!name || !phone) continue;
+    const match = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find(
+      (p) => String(p.phone) === phone && String(p.name) === name,
+    );
+    if (match) return { name: match.name, phone: match.phone };
+  }
+  for (const c of candidates) {
+    const phone = String(c.phone ?? "").trim();
+    if (!phone) continue;
+    const match = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find((p) => String(p.phone) === phone);
+    if (match) return { name: match.name, phone: match.phone };
+  }
+  return null;
+}
+
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
 export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 export const RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;

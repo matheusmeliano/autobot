@@ -9,6 +9,7 @@ import {
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  resolveExperimentalClassAssignedProfessorPhone,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -255,10 +256,18 @@ export async function POST(
     );
   }
 
+  const assignedProfessorNotificationPhone =
+    resolveExperimentalClassAssignedProfessorPhone({
+      bookingAssignedPhone: String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim(),
+      bookingAssignedName: String((resolvedBooking as any)?.assigned_professor_name ?? "").trim(),
+      flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+      flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+    })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
+
   let attendantSendFailedError: string | null = null;
   try {
     await sendAtendimentoWhatsAppText({
-      phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+      phone: assignedProfessorNotificationPhone,
       message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
     });
   } catch (error) {
@@ -270,7 +279,7 @@ export async function POST(
       title: "Falha ao disparar manualmente o lembrete do inicio da aula experimental ao atendente",
       details: {
         booking_id: normalizedBookingId,
-        phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+        phone: assignedProfessorNotificationPhone,
         lesson_link: lessonLink,
         start_at: professorStartAtRaw || null,
         manually_triggered: true,
@@ -310,7 +319,7 @@ export async function POST(
         : "Lembrete de inicio da aula experimental disparado manualmente ao atendente",
       details: {
         booking_id: normalizedBookingId,
-        phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+        phone: assignedProfessorNotificationPhone,
         lesson_link: lessonLink,
         start_at: professorStartAtRaw || null,
         manually_triggered: true,

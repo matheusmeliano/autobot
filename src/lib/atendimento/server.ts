@@ -32,6 +32,7 @@ import {
   EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_WEEKDAY_LABELS_PT_BR,
+  resolveExperimentalClassAssignedProfessorPhone,
   type RecurringWeekdayKey,
 } from "@/lib/atendimento/experimentalClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
@@ -1565,9 +1566,16 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     const registeredAttendantDue = attendantDue;
 
     if (attendantDue && !cachedAttendantSent) {
+      const assignedCronProfessorPhone =
+        resolveExperimentalClassAssignedProfessorPhone({
+          bookingAssignedPhone: String((booking as any)?.assigned_professor_phone ?? "").trim(),
+          bookingAssignedName: String((booking as any)?.assigned_professor_name ?? "").trim(),
+          flatAssignedPhone: String(lead?.experimental_class_professor_phone ?? "").trim(),
+          flatAssignedName: String(lead?.experimental_class_professor_name ?? "").trim(),
+        })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
       try {
         await sendAtendimentoWhatsAppText({
-          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          phone: assignedCronProfessorPhone,
           message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
         });
 
@@ -1578,7 +1586,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
           title: "Lembrete de inicio da aula experimental enviado ao atendente",
           details: {
             booking_id: bookingId,
-            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            phone: assignedCronProfessorPhone,
             lesson_link: lessonLink,
             start_at: professorStartAtRaw,
           },
@@ -1599,7 +1607,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
           title: "Falha ao enviar lembrete de inicio da aula experimental ao atendente",
           details: {
             booking_id: bookingId,
-            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            phone: assignedCronProfessorPhone,
             lesson_link: lessonLink,
             start_at: professorStartAtRaw,
             error: error instanceof Error ? error.message : String(error),

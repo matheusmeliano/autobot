@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertTriangle, CalendarDays, Check, CheckCircle2, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Plus, Save, Search, Trash2, X, XCircle, Zap } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Plus, Save, Search, Trash2, X, XCircle, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -108,6 +108,32 @@ function isBookingAttendanceResolved(booking: unknown) {
   const status = String((booking as any)?.attendance_status ?? "").trim().toLowerCase();
   return status === "attended" || status === "no_show";
 }
+
+const EXPERIMENTAL_PROFESSOR_OPTIONS = [
+  { name: "Lucas Brum", phone: "+55 65 9807-9407", short: "9807-9407" },
+  { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
+];
+
+function experimentalClassBookingAssignedProfessor(lead: AtendimentoLeadListItem): {
+  name: string;
+  phone: string;
+} | null {
+  const booking = lead.experimental_class_booking as any;
+  const bookingName = String(booking?.assigned_professor_name ?? "").trim();
+  const bookingPhone = String(booking?.assigned_professor_phone ?? "").trim();
+  if (bookingName && bookingPhone) {
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === bookingPhone && p.name === bookingName);
+    if (match) return match;
+  }
+  const flatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
+  const flatPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+  if (flatName && flatPhone) {
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone && p.name === flatName);
+    if (match) return match;
+  }
+  return null;
+}
+
 
 function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
   const st = String(lead.status ?? "").trim().toLowerCase();
@@ -1259,6 +1285,8 @@ function BookingDetails({
   onSendStudentNotification,
   onSaveRecurringLink,
   onEditExperimental,
+  assigningProfessor,
+  onAssignProfessor,
 }: {
   lead: AtendimentoLeadListItem;
   activeSection: SummarySectionId;
@@ -1274,8 +1302,12 @@ function BookingDetails({
   onSendStudentNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
   onEditExperimental?: (lead: AtendimentoLeadListItem) => void;
+  assigningProfessor: boolean;
+  onAssignProfessor: (
+    lead: AtendimentoLeadListItem, professor: { name: string; phone: string }) => Promise<void>;
 }) {
   const booking = lead.experimental_class_booking;
+  const [assignProfessorDropdownOpen, setAssignProfessorDropdownOpen] = useState(false);
   const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
   const hideExperimentalInfoCompletely = shouldHideExperimentalInfoCompletely(lead, activeSection);
   const initialSavedRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
@@ -1748,34 +1780,109 @@ function BookingDetails({
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                 Aula experimental
               </div>
-              {hasAttendanceStatus || bookingStatus === "cancelled" ? (
-                <div
-                  className={[
-                    "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
-                    bookingStatus === "cancelled"
-                      ? "bg-red-500/15 text-red-200"
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                {activeSection === "agendamentos" && !hideExperimentalInfoCompletely && Boolean(booking || showIncompleteState) ? (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setAssignProfessorDropdownOpen((v) => !v)}
+                      onBlur={() => {
+                        setTimeout(() => setAssignProfessorDropdownOpen(false), 180);
+                      }}
+                      disabled={assigningProfessor}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                      title={(() => {
+                        const assigned = experimentalClassBookingAssignedProfessor(lead);
+                        return assigned
+                          ? `Professor vinculado: ${assigned.name} (${assigned.short})`
+                          : "Selecionar professor responsável pela aula experimental";
+                      })()}
+                    >
+                      {assigningProfessor ? (
+                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                      )}
+                      {(() => {
+                        const assigned = experimentalClassBookingAssignedProfessor(lead);
+                        return assigned
+                          ? `${assigned.name} (${assigned.short})`
+                          : "Selecionar professor";
+                      })()}
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                    </button>
+                    {assignProfessorDropdownOpen ? (
+                      <div className="absolute right-0 top-full z-[380] mt-2 w-[280px] overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-3)] p-2 shadow-2xl">
+                        {EXPERIMENTAL_PROFESSOR_OPTIONS.map((opt) => {
+                          const assigned = experimentalClassBookingAssignedProfessor(lead);
+                          const isActive = assigned?.phone === opt.phone && assigned?.name === opt.name;
+                          return (
+                            <button
+                              key={opt.phone}
+                              type="button"
+                              disabled={assigningProfessor}
+                              onClick={() => {
+                                setAssignProfessorDropdownOpen(false);
+                                void onAssignProfessor(lead, { name: opt.name, phone: opt.phone });
+                              }}
+                              className={[
+                                "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
+                                isActive
+                                  ? "bg-yellow-500/15"
+                                  : "hover:bg-[var(--app-hover)]",
+                                "disabled:cursor-not-allowed disabled:opacity-60",
+                              ].join(" ")}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                                  {opt.name}
+                                </div>
+                                <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--app-text-55)]">
+                                  {opt.phone}
+                                </div>
+                              </div>
+                              {isActive ? (
+                                <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-yellow-200">
+                                  <Check className="h-3 w-3 shrink-0" />
+                                  Atual
+                                </div>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {hasAttendanceStatus || bookingStatus === "cancelled" ? (
+                  <div
+                    className={[
+                      "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                      bookingStatus === "cancelled"
+                        ? "bg-red-500/15 text-red-200"
+                        : attendanceStatus === "attended"
+                          ? "bg-emerald-500/15 text-emerald-200"
+                          : "bg-amber-400/15 text-amber-200",
+                    ].join(" ")}
+                  >
+                    {bookingStatus === "cancelled"
+                      ? "Cancelado"
                       : attendanceStatus === "attended"
-                      ? "bg-emerald-500/15 text-emerald-200"
-                      : "bg-amber-400/15 text-amber-200",
-                  ].join(" ")}
-                >
-                  {bookingStatus === "cancelled"
-                    ? "Cancelado"
-                    : attendanceStatus === "attended"
-                    ? "Concluído"
-                    : attendanceStatus === "no_show"
-                    ? "Não compareceu"
-                    : experimentalClassBookingDisplayStatusLabel(derivedStatus)}
-                </div>
-              ) : derivedStatus === "skipped" ? (
-                <div className="inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-100">
-                  {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
-                </div>
-              ) : (
-                <div className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)]">
-                  {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
-                </div>
-              )}
+                        ? "Concluído"
+                        : attendanceStatus === "no_show"
+                          ? "Não compareceu"
+                          : experimentalClassBookingDisplayStatusLabel(derivedStatus)}
+                  </div>
+                ) : derivedStatus === "skipped" ? (
+                  <div className="inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-100">
+                    {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
+                  </div>
+                ) : (
+                  <div className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)]">
+                    {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
@@ -2764,6 +2871,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const [markingAttendanceType, setMarkingAttendanceType] = useState<"attended" | "no_show" | null>(null);
   const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] = useState<string | null>(null);
   const [savingRecurringLinkLeadId, setSavingRecurringLinkLeadId] = useState<string | null>(null);
+  const [assigningProfessorLeadId, setAssigningProfessorLeadId] = useState<string | null>(null);
   const [loadingPaymentLeadId, setLoadingPaymentLeadId] = useState<string | null>(null);
   const [loadingPaymentAction, setLoadingPaymentAction] = useState<"confirm" | "reject" | null>(null);
   const [query, setQuery] = useState("");
@@ -3338,6 +3446,75 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       modalToast.error(error instanceof Error ? error.message : "Falha ao disparar a notificação.");
     } finally {
       setSendingStudentNotificationBookingId(null);
+    }
+  }
+
+  async function handleAssignProfessor(
+    lead: AtendimentoLeadListItem,
+    professor: { name: string; phone: string },
+  ) {
+    const leadId = String(lead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Interessado indisponível para vincular professor.");
+      return;
+    }
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find(
+      (p) => p.phone === professor.phone && p.name === professor.name,
+    );
+    if (!match) {
+      modalToast.error("Professor inválido.");
+      return;
+    }
+
+    try {
+      setAssigningProfessorLeadId(leadId);
+
+      const res = await fetch(`/api/atendimento/leads/${leadId}/experimental-booking/assign-professor`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ professor_name: match.name, professor_phone: match.phone }),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            assigned_professor?: { name: string; phone: string } | null;
+            lead?: Record<string, unknown> | null;
+          }
+        | null;
+      if (!res.ok || !payload?.ok || !payload.assigned_professor) {
+        modalToast.error(payload?.error ?? "Falha ao vincular professor.");
+        return;
+      }
+
+      const assigned = payload.assigned_professor;
+      const persistedBooking = lead.experimental_class_booking
+        ? ({
+            ...(lead.experimental_class_booking as Record<string, unknown>),
+            assigned_professor_name: assigned.name,
+            assigned_professor_phone: assigned.phone,
+          } as AtendimentoLeadListItem["experimental_class_booking"])
+        : null;
+
+      const mergedFlat: AtendimentoLeadListItem = {
+        ...lead,
+        ...(payload.lead ? (payload.lead as Partial<AtendimentoLeadListItem>) : null),
+        experimental_class_booking: persistedBooking,
+      } as AtendimentoLeadListItem;
+      (mergedFlat as any).experimental_class_professor_name = assigned.name;
+      (mergedFlat as any).experimental_class_professor_phone = assigned.phone;
+
+      setLocalLeads((current) =>
+        current.map((item) => (item.id === leadId ? mergedFlat : item)),
+      );
+
+      modalToast.success(
+        `Aula experimental vinculada ao professor ${assigned.name} (${assigned.phone}).`,
+      );
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao vincular professor.");
+    } finally {
+      setAssigningProfessorLeadId(null);
     }
   }
 
@@ -4023,6 +4200,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   onSendStudentNotification={handleSendStudentNotification}
                   onSaveRecurringLink={handleSaveRecurringLink}
                   onEditExperimental={(l) => openEditExperimental(l)}
+                  assigningProfessor={assigningProfessorLeadId === selectedLead.id}
+                  onAssignProfessor={handleAssignProfessor}
                 />
               ) : activeSection === "contratos" ? (
                 <ContractDetails lead={selectedLead} />
@@ -4111,6 +4290,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       onMarkAttendance={handleMarkAttendance}
                       onSendStudentNotification={handleSendStudentNotification}
                       onSaveRecurringLink={handleSaveRecurringLink}
+                      assigningProfessor={assigningProfessorLeadId === selectedLead.id}
+                      onAssignProfessor={handleAssignProfessor}
                     />
                   ) : activeSection === "contratos" ? (
                     <ContractDetails lead={selectedLead} />

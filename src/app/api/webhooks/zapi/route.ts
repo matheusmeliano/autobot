@@ -52,6 +52,7 @@ import {
   findExperimentalClassDateOption as findRecurringCalendarDateOption,
   findExperimentalClassTimeOption as findRecurringCalendarTimeOption,
   listExperimentalClassAvailability as listRecurringCalendarAvailability,
+  resolveExperimentalClassAssignedProfessorPhone,
 } from "@/lib/atendimento/experimentalClass";
 import {
   appendHistoryEvent,
@@ -5461,9 +5462,17 @@ export async function POST(req: Request) {
                     conversationId,
                     insertIntoConversation: true,
                   });
+                  const zapiFallbackBookingRef = (booking as any) ?? (already as any) ?? null;
+                  const zapiFallbackAssignedPhone =
+                    resolveExperimentalClassAssignedProfessorPhone({
+                      bookingAssignedPhone: String(zapiFallbackBookingRef?.assigned_professor_phone ?? "").trim(),
+                      bookingAssignedName: String(zapiFallbackBookingRef?.assigned_professor_name ?? "").trim(),
+                      flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+                      flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+                    })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
                   try {
                     await sendAtendimentoWhatsAppText({
-                      phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+                      phone: zapiFallbackAssignedPhone,
                       message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
                     });
                   } catch (_e) {}
@@ -5969,9 +5978,17 @@ export async function POST(req: Request) {
                 conversationId,
                 insertIntoConversation: true,
               });
+              const zapiBookedBookingRef = (booking as any) ?? null;
+              const zapiBookedAssignedPhone =
+                resolveExperimentalClassAssignedProfessorPhone({
+                  bookingAssignedPhone: String(zapiBookedBookingRef?.assigned_professor_phone ?? "").trim(),
+                  bookingAssignedName: String(zapiBookedBookingRef?.assigned_professor_name ?? "").trim(),
+                  flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+                  flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+                })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
               try {
                 await sendAtendimentoWhatsAppText({
-                  phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+                  phone: zapiBookedAssignedPhone,
                   message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
                 });
               } catch (_e) {}
