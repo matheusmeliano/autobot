@@ -555,9 +555,7 @@ A partir de agora, você já pode acessar o seu Painel do Aluno, onde poderá co
 Acesse seu painel:
 ${safeDashboard}
 
-Para entrar, utilize o WhatsApp/e-mail e a senha cadastrados durante a matrícula.
-
-Seja muito bem-vindo(a)! 🎶`;
+Para entrar, utilize o WhatsApp/e-mail e a senha cadastrados durante a matrícula.`;
 }
 
 export function buildExperimentalClassPostAttendanceWhatsAppMessages(name?: string | null) {
