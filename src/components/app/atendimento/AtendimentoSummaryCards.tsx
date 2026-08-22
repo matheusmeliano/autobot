@@ -3743,6 +3743,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         );
                       })() : null}
                       {(() => {
+                        if (activeSection === "agendamentos") return null;
+                        const stateRaw = String((lead as any)?.state ?? "").trim();
+                        const cityRaw = String((lead as any)?.city ?? "").trim();
+                        if (!stateRaw || !cityRaw) return null;
                         const experimentalMeta = buildExperimentalMetaForSection(lead);
                         if (!experimentalMeta) return null;
                         const isScheduledStage =
