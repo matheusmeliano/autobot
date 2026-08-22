@@ -424,7 +424,7 @@ export function buildExperimentalClassStudentLessonReadyWhatsAppMessage(name: st
 
 Link da aula: ${safeLessonLink}
 
-O professor Lucas Brum já está te aguardando.
+O professor já está te aguardando.
 
 Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
 }
@@ -459,7 +459,7 @@ export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: strin
 
 Link da aula: ${safeLessonLink}
 
-O professor Lucas Brum já está te aguardando.
+O professor já está te aguardando.
 
 Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
 }
