@@ -72,8 +72,8 @@ function stripUndefinedColumnFromPatch(patchObj: Record<string, unknown>, error:
 function safeIsoDate(date: string, time: string, timezone: string): string | null {
   const d = String(date ?? "").trim().slice(0, 10);
   const t = String(time ?? "").trim();
-  if (!d || !/^\d{2}:\d{2}$/.test(t)) return null;
-  const isoLike = `${d}T${t}:00`;
+  if (!d || !/^\d{1,2}:\d{2}(:\d{2})?$/.test(t)) return null;
+  const isoLike = `${d}T${t.includes(":") && t.split(":").length === 2 ? `${t}:00` : t}`;
   try {
     const dt = new Date(isoLike);
     if (Number.isNaN(dt.getTime())) return null;

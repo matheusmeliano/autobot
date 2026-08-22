@@ -1741,11 +1741,20 @@ function BookingDetails({
             <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
               <Field
                 label="Dia"
-                value={formatAtendimentoDate(booking?.lead_date || booking?.professor_date)}
+                value={formatAtendimentoDate(
+                  String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+                  String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
+                  booking?.lead_date ||
+                  booking?.professor_date,
+                )}
               />
               <Field
                 label="Horário"
-                value={atendimentoTimeLabel(booking?.lead_time ?? booking?.professor_time ?? null)}
+                value={atendimentoTimeLabel(
+                  String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+                  String((lead as any)?.experimental_class_professor_time ?? "").trim() ||
+                  (booking?.lead_time ?? booking?.professor_time ?? null),
+                )}
               />
             </div>
           </div>
