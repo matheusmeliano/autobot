@@ -29,6 +29,46 @@ function isUndefinedColumnError(err: unknown): boolean {
   return msg.includes("column") && msg.includes("does not exist");
 }
 
+const SUSPECT_MISSING_COLUMNS_BL = [
+  "experimental_class_status",
+  "experimental_class_lead_date",
+  "experimental_class_lead_time",
+  "experimental_class_professor_date",
+  "experimental_class_professor_time",
+  "experimental_class_lead_start_at",
+  "experimental_class_professor_start_at",
+] as const;
+
+function extractUndefinedColumnName(raw: unknown): string | null {
+  if (!raw) return null;
+  const msg = String(raw).toLowerCase();
+  const m1 = /column "([^"]+)" does not exist/.exec(msg);
+  if (m1 && m1[1]) return m1[1];
+  const m2 = /could not find the '([^']+)' column/.exec(msg);
+  if (m2 && m2[1]) return m2[1];
+  return null;
+}
+
+function stripUndefinedColumnFromPatch(patchObj: Record<string, unknown>, error: unknown): {
+  next: Record<string, unknown> | null;
+  stripped: string | null;
+} {
+  const col = extractUndefinedColumnName((error as any)?.message || String(error ?? ""));
+  if (col && patchObj[col] !== undefined) {
+    const next = { ...patchObj };
+    delete next[col];
+    return { next, stripped: col };
+  }
+  for (const sus of SUSPECT_MISSING_COLUMNS_BL) {
+    if (patchObj[sus] !== undefined) {
+      const next = { ...patchObj };
+      delete next[sus];
+      return { next, stripped: sus };
+    }
+  }
+  return { next: null, stripped: null };
+}
+
 function safeIsoDate(date: string, time: string, timezone: string): string | null {
   const d = String(date ?? "").trim().slice(0, 10);
   const t = String(time ?? "").trim();
@@ -287,8 +327,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         experimental_class_professor_start_at: professorStartAt,
       };
       const selectFull = "id, funnel_stage, experimental_class_status, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at";
-      const COLUMNS_42703_BLACKLIST_PREFIXES = ["experimental_class_status"];
-      const blacklistKey = (k: string) => COLUMNS_42703_BLACKLIST_PREFIXES.some((p) => String(k).toLowerCase() === String(p).toLowerCase());
       const fallback = () => ({
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
@@ -328,49 +366,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           experimental_class_professor_start_at: String((leadRow as any).experimental_class_professor_start_at ?? professorStartAt ?? "").trim() || professorStartAt,
         };
       }
-      function nextUpdateAfterColumnError(lastUpdate: Record<string, any>): Record<string, any> | null {
-        const keys = Object.keys(lastUpdate);
-        let strippedAny = false;
-        const next: Record<string, any> = {};
-        for (const k of keys) {
-          if (blacklistKey(k)) {
-            strippedAny = true;
-            continue;
-          }
-          next[k] = lastUpdate[k];
-        }
-        return strippedAny && Object.keys(next).length > 0 ? next : null;
+      function stripColumnFromSelect(selectStr: string, columnName: string): string {
+        const keys = selectStr.split(",").map((s) => s.trim()).filter(Boolean);
+        const filtered = keys.filter((k) => k.toLowerCase() !== columnName.toLowerCase());
+        return filtered.length > 0 ? filtered.join(", ") : "id, updated_at";
       }
       let pendingUpdate: Record<string, any> | null = fullUpdateData;
       let pendingSelect: string = selectFull;
       let run: LeadRun | null = null;
       let attempts = 0;
-      while (pendingUpdate && attempts < 5) {
+      let okAppliedEmpty = false;
+      while (pendingUpdate && attempts < 10) {
         attempts += 1;
         run = await attempt(pendingUpdate, pendingSelect);
         if (!run.err && run.data) {
           leadUpdate = runOkToLeadUpdate(run.data);
           break;
         }
-        if (run.err && isUndefinedColumnError(run.err)) {
-          const nextUpdate = nextUpdateAfterColumnError(pendingUpdate);
-          pendingUpdate = nextUpdate;
-          if (!pendingUpdate) break;
-          const selectKeys = pendingSelect.split(",").map((s) => s.trim()).filter(Boolean);
-          const nextSelect = selectKeys.filter((k) => !blacklistKey(k)).join(", ");
-          pendingSelect = nextSelect || "id, updated_at";
-          continue;
-        }
-        if (run.err && (isUndefinedRelationError(run.err) || String((run.err as any)?.code ?? "") === "23502")) {
-          const nextUpdate = nextUpdateAfterColumnError(pendingUpdate);
-          pendingUpdate = nextUpdate;
-          if (!pendingUpdate) break;
-          const selectKeys = pendingSelect.split(",").map((s) => s.trim()).filter(Boolean);
-          const nextSelect = selectKeys.filter((k) => !blacklistKey(k)).join(", ");
-          pendingSelect = nextSelect || "id, updated_at";
-          continue;
+        const errMsg = run?.err;
+        const code = String((errMsg as any)?.code ?? "").trim();
+        const is42703 = code === "42703" || isUndefinedColumnError(errMsg);
+        const is42P01 = code === "42P01" || isUndefinedRelationError(errMsg) || code === "23502";
+        if (is42703 || is42P01) {
+          const stripped = stripUndefinedColumnFromPatch(pendingUpdate, errMsg);
+          if (stripped.next) {
+            if (Object.keys(stripped.next).length === 0) {
+              okAppliedEmpty = true;
+              break;
+            }
+            pendingUpdate = stripped.next;
+            if (stripped.stripped) {
+              pendingSelect = stripColumnFromSelect(pendingSelect, stripped.stripped);
+            }
+            continue;
+          }
         }
         break;
+      }
+      if (okAppliedEmpty) {
+        leadUpdate = fallback();
       }
       if (!leadUpdate) {
         try {
