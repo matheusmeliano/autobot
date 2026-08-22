@@ -2773,6 +2773,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const [addLeadPhoneInput, setAddLeadPhoneInput] = useState("");
   const [addingLead, setAddingLead] = useState(false);
   const [addLeadError, setAddLeadError] = useState("");
+  const listScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const selectedCardRefById = useRef<Map<string, HTMLButtonElement | null>>(new Map());
 
   async function handleAddLeadSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2841,6 +2843,17 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     }
     return filteredItems[0] ?? null;
   })();
+
+  useEffect(() => {
+    const id = String(selectedLead?.id ?? "").trim();
+    if (!id) return;
+    const card = selectedCardRefById.current.get(id);
+    if (!card) return;
+    try {
+      card.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    } catch {
+    }
+  }, [selectedLead?.id, activeSection, query, page, pagedItems.length]);
 
   useEffect(() => {
     setLocalSummary(summary);
@@ -3757,7 +3770,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
               />
             </label>
           </div>
-          <div className="overflow-y-auto p-3 pr-3 lg:flex-1 lg:min-h-0">
+          <div className="overflow-y-auto p-3 pr-3 lg:flex-1 lg:min-h-0" ref={listScrollContainerRef}>
             {pagedItems.length ? (
               <div className="space-y-3">
                 {pagedItems.map((lead) => {
@@ -3767,6 +3780,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   return (
                     <button
                       key={lead.id}
+                      ref={(el) => {
+                        selectedCardRefById.current.set(lead.id, el);
+                      }}
                       type="button"
                       onClick={() => handleSelectLead(lead)}
                       className={[
