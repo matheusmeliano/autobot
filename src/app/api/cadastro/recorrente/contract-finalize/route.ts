@@ -211,6 +211,7 @@ export async function POST(req: Request) {
     const result: any = await (formalizeAndPersistContract as any)({
       admin,
       leadId: String(lead.id),
+      enrollmentNumber: enrollmentNumber || null,
     });
 
     try {

@@ -3088,12 +3088,14 @@ export async function formalizeAndPersistContract(params: {
   admin?: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
   conversationId?: string | null;
+  enrollmentNumber?: string | null;
 }) {
   const admin = params.admin ?? createSupabaseAdminClient();
   const leadId = String(params.leadId ?? "").trim();
   const conversationId = params.conversationId
     ? String(params.conversationId).trim() || null
     : null;
+  const preferredEnrollmentNumber = String(params.enrollmentNumber ?? "").trim() || null;
 
   const { data: lead, error: leadErr } = await admin
     .from("atendimento_leads")
@@ -3245,9 +3247,26 @@ export async function formalizeAndPersistContract(params: {
   }
 
   let enrollmentNumber =
-    typeof (lead as any).enrollment_number === "string"
+    preferredEnrollmentNumber ??
+    (typeof (lead as any).enrollment_number === "string"
       ? String((lead as any).enrollment_number).trim()
-      : "";
+      : "");
+  if (!enrollmentNumber) {
+    try {
+      const { data: histRow } = await admin
+        .from("atendimento_history_events")
+        .select("id, event_type, details, created_at")
+        .eq("lead_id", leadId)
+        .eq("event_type", "enrollment_number_generated")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle() as any;
+      if (histRow && typeof (histRow as any)?.details === "object" && (histRow as any).details != null) {
+        const maybe = String(((histRow as any).details as any)?.enrollment_number ?? "").trim();
+        if (maybe) enrollmentNumber = maybe;
+      }
+    } catch {}
+  }
   if (!enrollmentNumber) {
     enrollmentNumber = (() => {
       const year = String(new Date().getUTCFullYear());
@@ -3260,7 +3279,7 @@ export async function formalizeAndPersistContract(params: {
     leadPatch.enrollment_number = enrollmentNumber;
   }
 
-  if (enrollmentNumber) {
+  if (enrollmentNumber && !preferredEnrollmentNumber && !(typeof (lead as any).enrollment_number === "string" && String((lead as any).enrollment_number).trim().length > 0)) {
     try {
       await appendHistoryEvent({
         leadId,
@@ -3382,6 +3401,7 @@ export async function formalizeAndPersistContract(params: {
     contract_signed_at: signedAt,
     contract_pdf_url: publicUrl,
     contract_html_snapshot: htmlSnapshot,
+    enrollment_number: enrollmentNumber || null,
   };
 }
 
@@ -3910,6 +3930,22 @@ export async function triggerRecurringPaymentIntentIfNeeded(params: {
 
   if (!enrollmentNumber) {
     enrollmentNumber = String((lead as any)?.enrollment_number ?? "").trim() || null;
+  }
+  if (!enrollmentNumber) {
+    try {
+      const { data: histRows } = await admin
+        .from("atendimento_history_events")
+        .select("id, event_type, details, created_at")
+        .eq("lead_id", String(leadId))
+        .eq("event_type", "enrollment_number_generated")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle() as any;
+      if (histRows && histRows != null && typeof (histRows as any)?.details === "object" && (histRows as any).details != null) {
+        const maybeEnroll = String(((histRows as any).details as any)?.enrollment_number ?? "").trim();
+        if (maybeEnroll) enrollmentNumber = maybeEnroll;
+      }
+    } catch {}
   }
 
   if (paymentAlreadyResolved) {
