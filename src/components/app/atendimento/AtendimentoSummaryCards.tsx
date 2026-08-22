@@ -3691,29 +3691,21 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const cityRaw = String((lead as any)?.city ?? "").trim();
                         const faltaEstadoCidade = !stateRaw || !cityRaw;
                         const faltaDiaHoraRecorrente = !hasWeekdayOk || !hasTimeOk;
-                        const showMissingRecLinkStage =
-                          !isMatriculadoCard &&
-                          (faltaEstadoCidade || faltaDiaHoraRecorrente || (hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim()));
-                        if (
-                          activeSection !== "alunos" && activeSection !== "contratos" && activeSection !== "interessados" &&
-                          showMissingRecLinkStage
-                        ) {
+
+                        if (!isMatriculadoCard && (faltaEstadoCidade || faltaDiaHoraRecorrente || (hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim()))) {
                           warnings.push(
                             <div key="rec-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula recorrente
                             </div>,
                           );
                         }
+
                         const booking = lead.experimental_class_booking ?? null;
                         const bookingId = String(booking?.id ?? "").trim();
                         const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
-                        const showMissingExpLinkStage = faltaEstadoCidade && activeSection !== "interessados" && activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard;
                         const hasBookingWithoutLink =
                           bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim();
-                        if (
-                          activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard &&
-                          (hasBookingWithoutLink || showMissingExpLinkStage)
-                        ) {
+                        if (!isMatriculadoCard && (faltaEstadoCidade || hasBookingWithoutLink)) {
                           warnings.push(
                             <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula experimental
