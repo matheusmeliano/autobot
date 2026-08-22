@@ -3705,7 +3705,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
                         const hasBookingWithoutLink =
                           bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim();
-                        if (!isMatriculadoCard && (faltaEstadoCidade || hasBookingWithoutLink)) {
+                        if (!isMatriculadoCard && hasBookingWithoutLink) {
                           warnings.push(
                             <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula experimental
