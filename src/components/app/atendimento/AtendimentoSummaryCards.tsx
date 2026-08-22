@@ -3678,13 +3678,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const hasTimeOk =
                           Boolean(String(lead.recurring_class_professor_time ?? "").trim()) ||
                           Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-                        if (hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim()) {
-                          warnings.push(
-                            <div key="rec-link" className="mt-1 text-[11px] font-semibold text-amber-300">
-                              Adicione link da aula recorrente
-                            </div>,
-                          );
-                        }
                         const leadStatus = String(lead.status ?? "").trim().toLowerCase();
                         const leadFunnel = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
                         const isMatriculadoCard =
@@ -3694,12 +3687,26 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           leadFunnel === "cadastro_recorrente_pendente_plataforma" ||
                           leadFunnel === "contrato_assinado" ||
                           leadFunnel === "contrato_aguardando_aceite";
-                        const booking = lead.experimental_class_booking ?? null;
-                        const bookingId = String(booking?.id ?? "").trim();
-                        const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
                         const stateRaw = String((lead as any)?.state ?? "").trim();
                         const cityRaw = String((lead as any)?.city ?? "").trim();
                         const faltaEstadoCidade = !stateRaw || !cityRaw;
+                        const faltaDiaHoraRecorrente = !hasWeekdayOk || !hasTimeOk;
+                        const showMissingRecLinkStage =
+                          !isMatriculadoCard &&
+                          (faltaEstadoCidade || faltaDiaHoraRecorrente || (hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim()));
+                        if (
+                          activeSection !== "alunos" && activeSection !== "contratos" && activeSection !== "interessados" &&
+                          showMissingRecLinkStage
+                        ) {
+                          warnings.push(
+                            <div key="rec-link" className="mt-1 text-[11px] font-semibold text-amber-300">
+                              Adicione link da aula recorrente
+                            </div>,
+                          );
+                        }
+                        const booking = lead.experimental_class_booking ?? null;
+                        const bookingId = String(booking?.id ?? "").trim();
+                        const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
                         const showMissingExpLinkStage = faltaEstadoCidade && activeSection !== "interessados" && activeSection !== "alunos" && activeSection !== "contratos" && !isMatriculadoCard;
                         const hasBookingWithoutLink =
                           bookingId && bookingStatus && bookingStatus !== "cancelled" && !String(booking?.lesson_link ?? "").trim();
