@@ -3688,7 +3688,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const faltaDiaHoraRecorrente = !hasWeekdayOk || !hasTimeOk;
 
                         const showRecLink =
-                          hasWeekdayOk && hasTimeOk && !String((lead as any).recurring_class_link ?? "").trim();
+                          !String((lead as any).recurring_class_link ?? "").trim();
                         const showExpLink = (() => {
                           const booking = lead.experimental_class_booking ?? null;
                           const bookingId = String(booking?.id ?? "").trim();
