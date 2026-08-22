@@ -358,13 +358,29 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
 
   const bookingDateLabel =
     booking && bookingHasId && bookingIsNotDraft
-      ? formatAtendimentoDate(booking?.lead_date || booking?.professor_date)
+      ? formatAtendimentoDate(
+          String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+          String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
+          booking?.lead_date ||
+          booking?.professor_date,
+        )
       : "";
   const bookingTimeLabel =
     booking && bookingHasId && bookingIsNotDraft
-      ? String(booking?.lead_time ?? booking?.professor_time ?? "").trim()
+      ? String(
+          String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+          String((lead as any)?.experimental_class_professor_time ?? "").trim() ||
+          (booking?.lead_time ?? booking?.professor_time ?? ""),
+        ).trim()
       : "";
   const bookingBody = [bookingDateLabel, bookingTimeLabel].filter((v) => v && v !== "-").join(", ");
+
+  const flatExpActiveBody = [
+    formatAtendimentoDate(expDraftDate),
+    atendimentoTimeLabel(expDraftTime || null),
+  ]
+    .filter((v) => v && v !== "-")
+    .join(", ");
 
   if (hasLatestCancelledMarker || (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled")) {
     return "Agendamento cancelado";
@@ -386,6 +402,9 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
   }
 
   if (hasFutureExp && futureExpBody) return `Aula em: ${futureExpBody}`;
+  if (flatExpActiveBody) {
+    return `Aula em: ${flatExpActiveBody}`;
+  }
   if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" && bookingBody) {
     return `Aula em: ${bookingBody}`;
   }
