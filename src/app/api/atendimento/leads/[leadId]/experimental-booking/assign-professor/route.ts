@@ -1,17 +1,51 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
-import { createSupabaseRouteAdmin } from "@/lib/supabase/admin";
-import {
-  extractUndefinedColumnName,
-  STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_ALLOWLIST,
-  stripUndefinedColumnFromPatch,
-} from "@/lib/strip-undefined-column";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const EXPERIMENTAL_PROFESSOR_ALLOWLIST = [
   { name: "Lucas Brum", phone: "+55 65 9807-9407" },
   { name: "Nathan Camargo", phone: "+55 65 9952-0166" },
 ];
+
+const STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_ALLOWLIST = [
+  "experimental_class_status",
+  "experimental_class_lead_date",
+  "experimental_class_lead_time",
+  "experimental_class_professor_date",
+  "experimental_class_professor_time",
+  "experimental_class_lead_start_at",
+  "experimental_class_professor_start_at",
+] as const;
+
+function extractUndefinedColumnName(raw: unknown): string | null {
+  if (!raw) return null;
+  const msg = String(raw).toLowerCase();
+  const m1 = /column "([^"]+)" does not exist/.exec(msg);
+  if (m1 && m1[1]) return m1[1];
+  const m2 = /could not find the '([^']+)' column/.exec(msg);
+  if (m2 && m2[1]) return m2[1];
+  return null;
+}
+
+function stripUndefinedColumnFromPatch(
+  patchObj: Record<string, unknown>,
+  missingColName: string | null,
+  suspectAllowlist: ReadonlyArray<string>,
+): Record<string, unknown> {
+  const next = { ...patchObj };
+  if (missingColName && next[missingColName] !== undefined) {
+    delete next[missingColName];
+    return next;
+  }
+  for (const sus of suspectAllowlist) {
+    if (next[sus] !== undefined) {
+      delete next[sus];
+      return next;
+    }
+  }
+  return next;
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
   try {
@@ -26,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
       return NextResponse.json({ ok: false, error: "Lead inválido." }, { status: 400 });
     }
 
-    const admin = createSupabaseRouteAdmin();
+    const admin = createSupabaseAdminClient();
 
     const body = (await req.json().catch(() => null)) as {
       professor_name?: string | null;
