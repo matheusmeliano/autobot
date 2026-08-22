@@ -3687,8 +3687,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const faltaEstadoCidade = !stateRaw || !cityRaw;
                         const faltaDiaHoraRecorrente = !hasWeekdayOk || !hasTimeOk;
 
-                        const showRecLink =
-                          !String((lead as any).recurring_class_link ?? "").trim();
+                        const hasRecurringPassword = Boolean(String((lead as any).recurring_registration_password ?? "").trim());
+                        const classifiedAsAluno = isLeadInAlunosSection(lead);
+                        const recorrenteRealmenteIniciado = hasRecurringPassword || classifiedAsAluno;
+
                         const showExpLink = (() => {
                           const booking = lead.experimental_class_booking ?? null;
                           const bookingId = String(booking?.id ?? "").trim();
@@ -3700,6 +3702,11 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             !String((booking as any)?.lesson_link ?? "").trim()
                           );
                         })();
+
+                        const showRecLink =
+                          recorrenteRealmenteIniciado &&
+                          !showExpLink &&
+                          !String((lead as any).recurring_class_link ?? "").trim();
 
                         const recLinkSections = ["alunos", "agendamentos"];
                         const expLinkSections = ["interessados", "agendamentos"];
