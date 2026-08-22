@@ -3849,8 +3849,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           /^Agendamento cancelado/.test(experimentalMeta) ||
                           /^Aula experimental concluída/.test(experimentalMeta);
                         if (!isScheduledStage) return null;
+                        const isAulaEm = /^Aula em:/.test(experimentalMeta);
                         return (
-                          <div className="mt-1 text-xs text-[var(--app-text-55)]">
+                          <div className={`mt-1 text-xs ${isAulaEm ? "text-emerald-500" : "text-[var(--app-text-55)]"}`}>
                             {experimentalMeta}
                           </div>
                         );
