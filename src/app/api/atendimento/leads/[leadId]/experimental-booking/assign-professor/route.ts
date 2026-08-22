@@ -50,8 +50,8 @@ function stripUndefinedColumnFromPatch(
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
   try {
     const auth = await requireAtendimentoUser();
-    if (!auth.ok) {
-      return NextResponse.json({ ok: false, error: auth.error ?? "Não autorizado." }, { status: 401 });
+    if (!auth?.ok) {
+      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
     }
 
     const { leadId } = await params;
