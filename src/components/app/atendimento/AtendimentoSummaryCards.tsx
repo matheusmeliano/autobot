@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertTriangle, CalendarDays, Check, CheckCircle2, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Save, Search, Trash2, X, XCircle, Zap } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, CheckCircle2, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Plus, Save, Search, Trash2, X, XCircle, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -2719,6 +2719,44 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [addLeadPhoneInput, setAddLeadPhoneInput] = useState("");
+  const [addingLead, setAddingLead] = useState(false);
+  const [addLeadError, setAddLeadError] = useState("");
+
+  async function handleAddLeadSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const phone = addLeadPhoneInput.trim();
+    if (!phone) return;
+    setAddLeadError("");
+    setAddingLead(true);
+    try {
+      const res = await fetch("/api/atendimento/leads/criar-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        setAddLeadError(String(json?.error ?? "Não foi possível cadastrar o número."));
+        return;
+      }
+      const createdLead = json.lead as AtendimentoLeadListItem | undefined;
+      if (createdLead?.id) {
+        setLocalLeads((prev) => {
+          if (prev.some((l) => String(l.id) === String(createdLead!.id))) return prev;
+          return [createdLead!, ...prev];
+        });
+      }
+      setShowAddLeadModal(false);
+      setAddLeadPhoneInput("");
+      modalToast?.({ title: "Número adicionado", kind: "success", description: "O contato foi incluído com sucesso na aba Interessados." });
+    } catch {
+      setAddLeadError("Erro de conexão. Tente novamente.");
+    } finally {
+      setAddingLead(false);
+    }
+  }
 
   const activeSectionData = sections.find((section) => section.id === activeSection) ?? sections[0];
   const activeItems = activeSectionData?.items ?? [];
@@ -3629,7 +3667,23 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:flex lg:h-full lg:w-[320px] lg:min-w-[320px] lg:flex-col">
           <div className="shrink-0 border-b border-[var(--app-border)] px-4 py-4">
-            <div className="text-sm font-semibold text-[var(--app-text-85)]">{activeSectionData.label}</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-[var(--app-text-85)]">{activeSectionData.label}</div>
+              {activeSection === "interessados" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddLeadError("");
+                    setAddLeadPhoneInput("");
+                    setShowAddLeadModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1.5 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] active:bg-[var(--app-hover)]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar
+                </button>
+              ) : null}
+            </div>
             <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
               <Search className="h-4 w-4 text-[var(--app-text-45)]" />
               <input
@@ -4328,6 +4382,73 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
               </button>
             </div>
           </div>
+        </AppModal>
+
+        <AppModal
+          open={showAddLeadModal}
+          onClose={() => setShowAddLeadModal(false)}
+          size="md"
+          zIndexClass="z-[500]"
+        >
+          <form onSubmit={handleAddLeadSubmit} className="space-y-5">
+            <div>
+              <div className="text-base font-semibold text-[var(--app-text-85)]">
+                Adicionar novo interessado
+              </div>
+              <div className="mt-1 text-xs text-[var(--app-text-55)]">
+                Informe o número de WhatsApp. O contato será criado sem nome com o status
+                &quot;Aguardando nome&quot; e entrará no fluxo antecipado da aula experimental.
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="add-lead-phone"
+                className="block text-xs font-semibold text-[var(--app-text-70)]"
+              >
+                Número de WhatsApp
+              </label>
+              <input
+                id="add-lead-phone"
+                autoFocus
+                value={addLeadPhoneInput}
+                onChange={(e) => setAddLeadPhoneInput(e.target.value)}
+                placeholder="Ex: 556599851142 ou (65) 9985-1142"
+                className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-yellow-500/40"
+              />
+              {addLeadError ? (
+                <div className="text-xs font-semibold text-red-400">{addLeadError}</div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={addingLead}
+                onClick={() => setShowAddLeadModal(false)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60 sm:w-auto"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={addingLead || !addLeadPhoneInput.trim()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              >
+                {addingLead ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Adicionando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Adicionar
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </AppModal>
       </div>
     </div>
