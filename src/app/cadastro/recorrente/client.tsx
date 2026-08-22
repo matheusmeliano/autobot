@@ -1930,12 +1930,12 @@ export default function CadastroRecorrenteBody() {
                     <div className="rounded-3xl border-2 border-emerald-200 bg-white p-5 sm:p-6 flex flex-col shadow-sm">
                       <div className="text-sm font-bold uppercase tracking-wider text-emerald-800 mb-3">PIX Copia e Cola</div>
                       <div className="w-full rounded-2xl bg-slate-50 border border-slate-200 p-3 sm:p-4 break-all font-mono text-[11px] sm:text-xs leading-relaxed text-slate-800 select-all">
-                        00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406595.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***63043C96
+                        00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406500.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***63043407
                       </div>
                       <button
                         onClick={async () => {
                           try {
-                            const code = "00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406595.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***63043C96";
+                            const code = "00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406500.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***63043407";
                             if (navigator?.clipboard?.writeText) {
                               await navigator.clipboard.writeText(code);
                             }
