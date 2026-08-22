@@ -2712,8 +2712,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const [selectedLeadIdBySection, setSelectedLeadIdBySection] = useState<
     Partial<Record<SummarySectionId, string | null>>
   >({});
-  function setActiveSectionSelectedLead(id: string | null) {
-    setSelectedLeadIdBySection((current) => ({ ...current, [activeSection]: id }));
+  function setActiveSectionSelectedLead(id: string | null, targetSection?: SummarySectionId) {
+    const section = targetSection ?? activeSection;
+    setSelectedLeadIdBySection((current) => ({ ...current, [section]: id }));
   }
   const selectedLeadId: string | null = selectedLeadIdBySection[activeSection] ?? null;
   const queryParamsInitializedRef = useRef(false);
@@ -2829,7 +2830,17 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     const start = (page - 1) * PANEL_PAGE_SIZE;
     return filteredItems.slice(start, start + PANEL_PAGE_SIZE);
   }, [filteredItems, page]);
-  const selectedLead = filteredItems.find((lead) => lead.id === selectedLeadId) ?? filteredItems[0] ?? null;
+  const selectedLead = (() => {
+    const direct = filteredItems.find((lead) => lead.id === selectedLeadId);
+    if (direct) return direct;
+    if (selectedLeadId) {
+      for (const section of sections) {
+        const cross = section.items.find((lead) => lead.id === selectedLeadId);
+        if (cross) return cross;
+      }
+    }
+    return filteredItems[0] ?? null;
+  })();
 
   useEffect(() => {
     setLocalSummary(summary);
@@ -3770,8 +3781,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
+                            setActiveSectionSelectedLead(lead.id, "agendamentos");
                             setActiveSection("agendamentos");
-                            handleSelectLead(lead);
+                            setMobileDetailsOpen(true);
                           }}
                           className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-2 py-1.5 text-[11px] font-semibold text-[var(--app-text-65)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
                           title="Ver em agendamento"
