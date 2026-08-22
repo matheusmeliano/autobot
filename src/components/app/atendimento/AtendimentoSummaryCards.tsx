@@ -3708,7 +3708,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           !showExpLink &&
                           !String((lead as any).recurring_class_link ?? "").trim();
 
-                        const recLinkSections = ["alunos", "agendamentos"];
+                        const recLinkSections = ["alunos", "agendamentos", "contratos"];
                         const expLinkSections = ["interessados", "agendamentos"];
 
                         if (
