@@ -418,8 +418,8 @@ async function countAtendimentoDailyExperimentalClassBookings(params: {
 }) {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
-    .from("atendimento_experimental_class_bookings")
-    .select("id, lead_id")
+    .from("atendimento_leads")
+    .select("id")
     .gte("created_at", params.rangeStartIso)
     .lt("created_at", params.rangeEndIso);
 
@@ -428,19 +428,19 @@ async function countAtendimentoDailyExperimentalClassBookings(params: {
     const message = String((error as any)?.message ?? "");
     if (
       code === "42P01" ||
-      /relation .*atendimento_experimental_class_bookings.* does not exist/i.test(message)
+      /relation .*atendimento_leads.* does not exist/i.test(message)
     ) {
       return 0;
     }
-    throw new Error(error.message || "Falha ao contar agendamentos do dia para o resumo diario.");
+    throw new Error(error.message || "Falha ao contar novos interessados do dia para o resumo diario.");
   }
 
-  const uniqueLeadIds = new Set<string>();
+  const uniqueIds = new Set<string>();
   for (const row of (data ?? []) as any[]) {
-    const leadId = String(row?.lead_id ?? "").trim();
-    if (leadId) uniqueLeadIds.add(leadId);
+    const id = String(row?.id ?? "").trim();
+    if (id) uniqueIds.add(id);
   }
-  return uniqueLeadIds.size;
+  return uniqueIds.size;
 }
 
 /** @deprecated Notificacao offline de nova mensagem DESATIVADA por pedido do usuario (nao enviar mais). Funcao mantida apenas para compilacao, retorna string vazia. */
