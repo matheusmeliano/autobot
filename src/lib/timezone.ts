@@ -911,6 +911,46 @@ export function resolveTimeZoneFromStateInput(params: {
 
   const phoneCountry = inferTimeZoneFromPhoneCountryCode(params.phone)?.country ?? null;
 
+  const matchingRules = CITY_TIME_ZONE_RULES.filter((rule) =>
+    rule.stateKeywords?.some((keyword) => candidateMatchesKeyword(candidates, keyword)),
+  );
+
+  const preferredRules = phoneCountry
+    ? matchingRules.filter((rule) => rule.country === phoneCountry)
+    : matchingRules;
+  const selectedRule = preferredRules[0] ?? matchingRules[0] ?? null;
+  if (selectedRule) {
+    let matchedKeywordLabel = "";
+    for (const rule of matchingRules) {
+      for (const keyword of rule.stateKeywords ?? []) {
+        if (candidateMatchesKeyword(candidates, keyword)) {
+          matchedKeywordLabel = keyword;
+          break;
+        }
+      }
+      if (matchedKeywordLabel) break;
+    }
+
+    if (selectedRule.country === "US" && matchedKeywordLabel) {
+      const usCanonical = lookupUsStateByCandidate(matchedKeywordLabel);
+      if (usCanonical) {
+        return {
+          state: usCanonical.fullName,
+          normalizedState: normalizeLocationText(usCanonical.fullName),
+          timeZone: selectedRule.timeZone,
+          country: "US" as const,
+        } satisfies StateTimeZoneResolution;
+      }
+    }
+
+    return {
+      state: (matchedKeywordLabel || rawState).replace(/\s+/g, " ").trim(),
+      normalizedState: matchedKeywordLabel ? normalizeLocationText(matchedKeywordLabel) : candidates[0] ?? "",
+      timeZone: selectedRule.timeZone,
+      country: selectedRule.country,
+    } satisfies StateTimeZoneResolution;
+  }
+
   for (const candidate of candidates) {
     const usLookup = lookupUsStateByCandidate(candidate);
     if (usLookup) {
@@ -924,47 +964,7 @@ export function resolveTimeZoneFromStateInput(params: {
     }
   }
 
-  const matchingRules = CITY_TIME_ZONE_RULES.filter((rule) =>
-    rule.stateKeywords?.some((keyword) => candidateMatchesKeyword(candidates, keyword)),
-  );
-
-  if (!matchingRules.length) return null;
-
-  const preferredRules = phoneCountry
-    ? matchingRules.filter((rule) => rule.country === phoneCountry)
-    : matchingRules;
-  const selectedRule = preferredRules[0] ?? matchingRules[0] ?? null;
-  if (!selectedRule) return null;
-
-  let matchedKeywordLabel = "";
-  for (const rule of matchingRules) {
-    for (const keyword of rule.stateKeywords ?? []) {
-      if (candidateMatchesKeyword(candidates, keyword)) {
-        matchedKeywordLabel = keyword;
-        break;
-      }
-    }
-    if (matchedKeywordLabel) break;
-  }
-
-  if (selectedRule.country === "US" && matchedKeywordLabel) {
-    const usCanonical = lookupUsStateByCandidate(matchedKeywordLabel);
-    if (usCanonical) {
-      return {
-        state: usCanonical.fullName,
-        normalizedState: normalizeLocationText(usCanonical.fullName),
-        timeZone: selectedRule.timeZone,
-        country: "US" as const,
-      } satisfies StateTimeZoneResolution;
-    }
-  }
-
-  return {
-    state: (matchedKeywordLabel || rawState).replace(/\s+/g, " ").trim(),
-    normalizedState: matchedKeywordLabel ? normalizeLocationText(matchedKeywordLabel) : candidates[0] ?? "",
-    timeZone: selectedRule.timeZone,
-    country: selectedRule.country,
-  } satisfies StateTimeZoneResolution;
+  return null;
 }
 
 export function resolveTimeZoneFromCityInput(params: {
@@ -984,9 +984,31 @@ export function resolveTimeZoneFromCityInput(params: {
   const stateCandidates = rawState ? extractLocationCandidates(rawState) : [];
   if (!cityCandidates.length) return null;
 
+  const phoneCountry = inferTimeZoneFromPhoneCountryCode(params.phone)?.country ?? null;
+
   const usStateFromRaw = rawState ? lookupUsStateByCandidate(rawState) : null;
+  const brStateFromRaw: { country: "BR"; normalizedState: string } | null = (() => {
+    if (!rawState) return null;
+    for (const rule of CITY_TIME_ZONE_RULES.filter((r) => r.country === "BR")) {
+      for (const kw of rule.stateKeywords ?? []) {
+        if (candidateMatchesKeyword(stateCandidates, kw)) {
+          return { country: "BR", normalizedState: kw };
+        }
+      }
+    }
+    return null;
+  })();
+  const explicitStateCountry: "BR" | "US" | null = usStateFromRaw
+    ? "US"
+    : brStateFromRaw
+      ? "BR"
+      : null;
 
   for (const rule of CITY_TIME_ZONE_RULES) {
+    if (explicitStateCountry && rule.country !== explicitStateCountry) continue;
+    if (phoneCountry && rule.country !== phoneCountry) {
+      if (explicitStateCountry ? explicitStateCountry === phoneCountry : true) continue;
+    }
     const matchesCity = rule.keywords.some((keyword) => candidateMatchesKeyword(cityCandidates, keyword));
     const matchesState =
       !stateCandidates.length || !rule.stateKeywords?.length
@@ -1049,11 +1071,12 @@ export function resolveTimeZoneFromCityInput(params: {
       })
     : null;
   if (stateResolution) {
+    if (explicitStateCountry && stateResolution.country !== explicitStateCountry) return null;
     const resolvedStateUs = stateResolution.country === "US" ? lookupUsStateByCandidate(stateResolution.state) : null;
     return {
-      city: rawCity?.replace(/\s+/g, " ").trim() || null,
+      city: null,
       state: resolvedStateUs ? resolvedStateUs.fullName : stateResolution.state,
-      normalizedCity: cityCandidates[0] ?? null,
+      normalizedCity: null,
       normalizedState: resolvedStateUs
         ? normalizeLocationText(resolvedStateUs.fullName)
         : stateResolution.normalizedState,
@@ -1066,6 +1089,7 @@ export function resolveTimeZoneFromCityInput(params: {
   if (!phoneFallback) return null;
 
   const finalStateFromRawUs = rawState ? lookupUsStateByCandidate(rawState) : null;
+  if (explicitStateCountry && finalStateFromRawUs && explicitStateCountry !== "US") return null;
   const finalPhoneFallbackState = finalStateFromRawUs
     ? finalStateFromRawUs.fullName
     : rawState?.replace(/\s+/g, " ").trim() || null;

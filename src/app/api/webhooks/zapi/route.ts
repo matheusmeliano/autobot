@@ -679,11 +679,17 @@ function isValidCityInput(raw: string): { valid: boolean; reason?: string } {
 
 function cityResolutionIsReliable(
   resolution: ReturnType<typeof resolveTimeZoneFromCityInput> | null,
+  params?: { stateSoFarCountry?: "BR" | "US" | null },
 ): resolution is NonNullable<ReturnType<typeof resolveTimeZoneFromCityInput>> {
   if (!resolution) return false;
-  if (resolution.source === "city_match") return true;
-  if (resolution.source === "state_match") return true;
-  return false;
+  if (resolution.source !== "city_match") return false;
+  if (!String(resolution.city ?? "").trim()) return false;
+  const city = String(resolution.city ?? "").trim().toLowerCase();
+  const state = String(resolution.state ?? "").trim().toLowerCase();
+  if (city === state) return false;
+  const stateCountry = params?.stateSoFarCountry ?? null;
+  if (stateCountry && resolution.country && stateCountry !== resolution.country) return false;
+  return true;
 }
 
 const SUPPORT_FINAL_MESSAGE = `Não foi possível concluir este agendamento.
@@ -5013,16 +5019,20 @@ export async function POST(req: Request) {
         const wantsCityStage = expectedField === "city" || (!expectedField && nextMissingField === "city");
         if (wantsCityStage && hasStateValidated && !hasCityValidated && !hasReachedPostCityStage) {
           const stateSoFar = String((lead as any)?.state ?? "").trim();
+          const stateSoFarCountryRaw = stateSoFar
+            ? resolveTimeZoneFromStateInput({ state: stateSoFar, phone: normalizedPhoneOnly })
+            : null;
+          const stateSoFarCountry = stateSoFarCountryRaw?.country ?? null;
           const inputCheck = isValidCityInput(inboundContent);
           const rawResolved = inputCheck.valid
             ? resolveTimeZoneFromCityInput({
                 city: inboundContent,
                 state: stateSoFar || null,
                 phone: normalizedPhoneOnly,
-                allowPhoneCountryFallback: true,
+                allowPhoneCountryFallback: false,
               })
             : null;
-          const resolved = cityResolutionIsReliable(rawResolved) ? rawResolved : null;
+          const resolved = cityResolutionIsReliable(rawResolved, { stateSoFarCountry }) ? rawResolved : null;
           const resolvedCityValue = String(resolved?.city ?? "").trim();
           if (resolved && !resolvedCityValue) {
             void appendHistoryEvent({
