@@ -1813,7 +1813,7 @@ function BookingDetails({
                       <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
                     </button>
                     {assignProfessorDropdownOpen ? (
-                      <div className="absolute right-0 top-full z-[380] mt-2 w-[280px] overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-3)] p-2 shadow-2xl">
+                      <div className="absolute right-0 top-full z-[380] mt-2 w-[280px] overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-2 shadow-2xl ring-1 ring-black/40">
                         {EXPERIMENTAL_PROFESSOR_OPTIONS.map((opt) => {
                           const assigned = experimentalClassBookingAssignedProfessor(lead);
                           const isActive = assigned?.phone === opt.phone && assigned?.name === opt.name;
