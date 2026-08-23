@@ -1392,11 +1392,6 @@ function BookingDetails({
     hasRecurringWeekdayAny && /^\d{2}:\d{2}$/.test(recurringTime),
   );
 
-  const experimentalBlockMissingLink =
-    !effectiveSavedLessonLink && !hasRecurringClass && !hideExperimentalInfoCompletely;
-  const experimentalBlockMissingProfessor =
-    !Boolean(assignedProfessor) && !hasRecurringClass && !hideExperimentalInfoCompletely;
-
   const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
     bookingStatus: booking?.status,
     studentStartNotificationSentAt: booking?.student_start_notification_sent_at,
@@ -1556,49 +1551,27 @@ function BookingDetails({
             !hideExperimentalInfoCompletely;
           if (!canShowDisabledOrEnabled) return null;
           return (
-            <>
-              {experimentalBlockMissingLink || experimentalBlockMissingProfessor ? (
-                <div className="flex w-full flex-col gap-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3">
-                  {experimentalBlockMissingLink ? (
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0 text-amber-300" />
-                      <div className="text-[11px] font-semibold leading-tight text-amber-100">
-                        Link da aula experimental não adicionado.
-                      </div>
-                    </div>
-                  ) : null}
-                  {experimentalBlockMissingProfessor ? (
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0 text-amber-300" />
-                      <div className="text-[11px] font-semibold leading-tight text-amber-100">
-                        Professor responsável não selecionado.
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => void onSendStudentNotification(lead)}
-                disabled={!canSendStudentNotification || isSendingStudentNotification}
-                title={(() => {
-                  if (!effectiveSavedLessonLink && !assignedProfessor) {
-                    return "Adicione o link da aula e selecione o professor antes de disparar.";
-                  }
-                  if (!effectiveSavedLessonLink) {
-                    return "Adicione o link da aula experimental antes de disparar a notificação.";
-                  }
-                  if (!assignedProfessor) {
-                    return "Selecione o professor responsável por esta aula antes de disparar.";
-                  }
-                  return "Disparar notificações agora";
-                })()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Zap className="h-4 w-4 shrink-0" />
-                {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => void onSendStudentNotification(lead)}
+              disabled={!canSendStudentNotification || isSendingStudentNotification}
+              title={(() => {
+                if (!effectiveSavedLessonLink && !assignedProfessor) {
+                  return "Adicione o link da aula e selecione o professor antes de disparar.";
+                }
+                if (!effectiveSavedLessonLink) {
+                  return "Adicione o link da aula experimental antes de disparar a notificação.";
+                }
+                if (!assignedProfessor) {
+                  return "Selecione o professor responsável por esta aula antes de disparar.";
+                }
+                return "Disparar notificações agora";
+              })()}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Zap className="h-4 w-4 shrink-0" />
+              {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
+            </button>
           );
         })()}
 
@@ -1628,36 +1601,18 @@ function BookingDetails({
                 : "Cancelar este agendamento de aula experimental.";
 
             return (
-              <>
-                {cancelMissingProfessor ? (
-                  <div className="w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-xs text-amber-200 min-[1176px]:w-auto">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-                      <div className="flex flex-col gap-0.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200/80">
-                          Cancelamento bloqueado
-                        </div>
-                        <div className="leading-snug">
-                          Selecione o professor responsável por esta aula
-                          experimental antes de cancelar o agendamento.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => void onCancelBooking(lead)}
-                  disabled={cancelDisabled}
-                  title={cancelTitle}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Trash2 className="h-4 w-4 shrink-0" />
-                  {cancellingBookingId === bookingId
-                    ? "Cancelando..."
-                    : "Cancelar agendamento"}
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => void onCancelBooking(lead)}
+                disabled={cancelDisabled}
+                title={cancelTitle}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                {cancellingBookingId === bookingId
+                  ? "Cancelando..."
+                  : "Cancelar agendamento"}
+              </button>
             );
           })()
         ) : null}
