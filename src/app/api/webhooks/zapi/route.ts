@@ -52,6 +52,7 @@ import {
   findExperimentalClassTimeOption as findRecurringCalendarTimeOption,
   listExperimentalClassAvailability as listRecurringCalendarAvailability,
   resolveExperimentalClassAssignedProfessorPhone,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
 } from "@/lib/atendimento/experimentalClass";
 import {
   appendHistoryEvent,
@@ -5469,7 +5470,7 @@ export async function POST(req: Request) {
                       flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
                       flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
                     });
-                  if (zapiFallbackResolved) {
+                  if (zapiFallbackResolved && zapiFallbackResolved.phone !== EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE) {
                     try {
                       await sendAtendimentoWhatsAppText({
                         phone: zapiFallbackResolved.phone,
@@ -5987,7 +5988,7 @@ export async function POST(req: Request) {
                   flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
                   flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
                 });
-              if (zapiBookedResolved) {
+              if (zapiBookedResolved && zapiBookedResolved.phone !== EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE) {
                 try {
                   await sendAtendimentoWhatsAppText({
                     phone: zapiBookedResolved.phone,

@@ -39,6 +39,7 @@ import {
   buildExperimentalClassStudentWhatsAppMessages,
   buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
@@ -2504,7 +2505,7 @@ export async function POST(req: Request) {
         flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
       });
 
-      if (resolvedPublicProfessor) {
+      if (resolvedPublicProfessor && resolvedPublicProfessor.phone !== EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE) {
         try {
           await sendAtendimentoWhatsAppText({
             phone: resolvedPublicProfessor.phone,
