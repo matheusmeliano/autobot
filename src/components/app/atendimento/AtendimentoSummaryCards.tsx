@@ -1814,8 +1814,8 @@ function BookingDetails({
                     </button>
                     {assignProfessorDropdownOpen ? (
                       <div
-                        className="absolute right-0 top-full z-[380] mt-2 w-[280px] overflow-hidden rounded-2xl border border-[var(--app-border)] p-2 shadow-2xl"
-                        style={{ backgroundColor: "#0f172a", opacity: 1, backdropFilter: "none" }}
+                        className="absolute right-0 top-full z-[380] mt-2 flex w-[280px] flex-col gap-1.5 overflow-hidden rounded-2xl border border-[var(--app-border)] p-2 shadow-2xl"
+                        style={{ backgroundColor: "var(--app-solid-surface-2)", opacity: 1, backdropFilter: "none" }}
                       >
                         {EXPERIMENTAL_PROFESSOR_OPTIONS.map((opt) => {
                           const assigned = experimentalClassBookingAssignedProfessor(lead);
@@ -1832,8 +1832,8 @@ function BookingDetails({
                               className={[
                                 "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
                                 isActive
-                                  ? "bg-yellow-500/15"
-                                  : "hover:bg-[var(--app-hover)]",
+                                  ? "bg-[var(--app-warning-bg)]"
+                                  : "bg-[var(--app-solid-surface)] hover:bg-[var(--app-active)]",
                                 "disabled:cursor-not-allowed disabled:opacity-60",
                               ].join(" ")}
                             >
