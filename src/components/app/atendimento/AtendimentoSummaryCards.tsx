@@ -1565,7 +1565,7 @@ function BookingDetails({
                 if (!assignedProfessor) {
                   return "Selecione o professor responsável antes de disparar agora.";
                 }
-                return "Disparar notificações agora";
+                return "Disparar notificações agora.";
               })()}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
