@@ -1781,21 +1781,21 @@ function BookingDetails({
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                 Aula experimental
               </div>
-              <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="ml-auto flex w-full flex-wrap items-center gap-2 min-[600px]:w-auto min-[600px]:justify-end">
                 {activeSection === "agendamentos" && !hideExperimentalInfoCompletely && Boolean(booking || showIncompleteState) ? (
                   <>
                     {(() => {
                       const assigned = experimentalClassBookingAssignedProfessor(lead);
                       if (assigned) return null;
                       return (
-                        <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 sm:px-3 sm:py-1 sm:text-[11px]">
+                        <div className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 min-[600px]:w-auto min-[600px]:px-3 min-[600px]:py-1 min-[600px]:text-[11px]">
                           <AlertTriangle className="h-3 w-3 shrink-0" />
                           <span className="hidden sm:inline">Escolha o professor</span>
                           <span className="sm:hidden">Escolha professor</span>
                         </div>
                       );
                     })()}
-                    <div className="relative">
+                    <div className="relative w-full min-[600px]:w-auto">
                     <button
                       type="button"
                       onClick={() => setAssignProfessorDropdownOpen((v) => !v)}
@@ -1803,7 +1803,7 @@ function BookingDetails({
                         setTimeout(() => setAssignProfessorDropdownOpen(false), 180);
                       }}
                       disabled={assigningProfessor}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
                       title={(() => {
                         const assigned = experimentalClassBookingAssignedProfessor(lead);
                         return assigned
@@ -1874,7 +1874,7 @@ function BookingDetails({
                 {hasAttendanceStatus || bookingStatus === "cancelled" ? (
                   <div
                     className={[
-                      "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                      "inline-flex w-full shrink-0 items-center justify-center rounded-full px-3 py-1 text-xs font-semibold min-[600px]:w-auto min-[600px]:justify-start",
                       bookingStatus === "cancelled"
                         ? "bg-red-500/15 text-red-200"
                         : attendanceStatus === "attended"
@@ -1891,11 +1891,11 @@ function BookingDetails({
                           : experimentalClassBookingDisplayStatusLabel(derivedStatus)}
                   </div>
                 ) : derivedStatus === "skipped" ? (
-                  <div className="inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-100">
+                  <div className="inline-flex w-full shrink-0 items-center justify-center rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-100 min-[600px]:w-auto min-[600px]:justify-start">
                     {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
                   </div>
                 ) : (
-                  <div className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)]">
+                  <div className="inline-flex w-full shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-xs font-semibold text-[var(--app-text-85)] min-[600px]:w-auto min-[600px]:justify-start">
                     {experimentalClassBookingDisplayStatusLabel(derivedStatus)}
                   </div>
                 )}
