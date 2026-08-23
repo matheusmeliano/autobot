@@ -1,5 +1,6 @@
 import { requireAtendimentoUser, appendHistoryEvent } from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { resolveExperimentalClassAssignedProfessorPhone } from "@/lib/atendimento/experimentalClass";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -89,7 +90,7 @@ export async function POST(
   const { data: booking, error: bookingError } = await admin
     .from("atendimento_experimental_class_bookings")
     .select(
-      "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone",
+      "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone",
     )
     .eq("id", normalizedBookingId)
     .maybeSingle();
@@ -105,7 +106,7 @@ export async function POST(
     const query = admin
       .from("atendimento_experimental_class_bookings")
       .select(
-        "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, lead_timezone, professor_timezone, created_at",
+        "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, lead_timezone, professor_timezone, created_at, assigned_professor_name, assigned_professor_phone",
       )
       .eq("lead_id", String(payload.leadId))
       .order("updated_at", { ascending: false })
@@ -154,7 +155,9 @@ export async function POST(
 
   const { data: lead, error: leadError } = await admin
     .from("atendimento_leads")
-    .select("id, status, funnel_stage, experimental_class_booking_id")
+    .select(
+      "id, status, funnel_stage, experimental_class_booking_id, experimental_class_professor_name, experimental_class_professor_phone",
+    )
     .eq("id", resolvedLeadId)
     .maybeSingle();
 
@@ -164,6 +167,24 @@ export async function POST(
 
   if (!lead?.id) {
     return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
+  }
+
+  const resolvedAssignedProfessor = resolveExperimentalClassAssignedProfessorPhone({
+    bookingAssignedPhone: String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim(),
+    bookingAssignedName: String((resolvedBooking as any)?.assigned_professor_name ?? "").trim(),
+    flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+    flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+  });
+  if (!resolvedAssignedProfessor) {
+    return Response.json(
+      {
+        ok: false,
+        error: "missing_experimental_professor_for_cancel",
+        message:
+          "Selecione o professor responsável por esta aula experimental antes de cancelar o agendamento.",
+      },
+      { status: 409 },
+    );
   }
 
   // 1) EXCLUIR o booking em si (regra nova: cancelar = excluir o agendamento)

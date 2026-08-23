@@ -1617,15 +1617,49 @@ function BookingDetails({
         ) : null}
 
         {canCancel ? (
-          <button
-            type="button"
-            onClick={() => void onCancelBooking(lead)}
-            disabled={cancellingBookingId === bookingId}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Trash2 className="h-4 w-4 shrink-0" />
-            {cancellingBookingId === bookingId ? "Cancelando..." : "Cancelar agendamento"}
-          </button>
+          (() => {
+            const cancelMissingProfessor = !Boolean(assignedProfessor);
+            const cancelDisabled =
+              cancellingBookingId === bookingId || cancelMissingProfessor;
+            const cancelTitle = cancelMissingProfessor
+              ? "Selecione o professor responsável por esta aula experimental antes de cancelar o agendamento."
+              : cancellingBookingId === bookingId
+                ? "Cancelando agendamento..."
+                : "Cancelar este agendamento de aula experimental.";
+
+            return (
+              <>
+                {cancelMissingProfessor ? (
+                  <div className="w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-xs text-amber-200 min-[1176px]:w-auto">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                      <div className="flex flex-col gap-0.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200/80">
+                          Cancelamento bloqueado
+                        </div>
+                        <div className="leading-snug">
+                          Selecione o professor responsável por esta aula
+                          experimental antes de cancelar o agendamento.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void onCancelBooking(lead)}
+                  disabled={cancelDisabled}
+                  title={cancelTitle}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" />
+                  {cancellingBookingId === bookingId
+                    ? "Cancelando..."
+                    : "Cancelar agendamento"}
+                </button>
+              </>
+            );
+          })()
         ) : null}
       </div>
 
@@ -3391,6 +3425,20 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return;
     }
 
+    const isRecurringClass =
+      leadHasAnyRecurringProgressSignal(lead) || leadHasMatriculaOrRecurringStageInitiated(lead);
+    const isExperimental = !isRecurringClass;
+
+    if (isExperimental) {
+      const assigned = experimentalClassBookingAssignedProfessor(lead);
+      if (!assigned) {
+        modalToast.error(
+          "Selecione o professor responsável por esta aula experimental antes de cancelar o agendamento.",
+        );
+        return;
+      }
+    }
+
     if (!window.confirm("Deseja realmente cancelar este agendamento?")) {
       return;
     }
@@ -3416,11 +3464,18 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null; lead?: Record<string, unknown> | null }
+        | { ok?: boolean; error?: string; message?: string | null; booking?: Record<string, unknown> | null; lead?: Record<string, unknown> | null }
         | null;
 
       if (!response.ok || !payload?.ok) {
-        modalToast.error(payload?.error ?? "Falha ao cancelar agendamento.");
+        if (payload?.error === "missing_experimental_professor_for_cancel") {
+          modalToast.error(
+            payload?.message ??
+              "Selecione o professor responsável por esta aula experimental antes de cancelar o agendamento.",
+          );
+        } else {
+          modalToast.error(payload?.error ?? "Falha ao cancelar agendamento.");
+        }
         return;
       }
 
