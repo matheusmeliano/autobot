@@ -1,6 +1,5 @@
-import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { requireAtendimentoUser, appendHistoryEvent } from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -13,6 +12,50 @@ function isExperimentalClassBookingsTableUnavailable(error: unknown) {
       message,
     )
   );
+}
+
+const BOOKING_UNDO__SUSPECT_MISSING_FLAT_COLS = [
+  "experimental_class_booking_id",
+  "experimental_class_status",
+  "experimental_class_lead_date",
+  "experimental_class_lead_time",
+  "experimental_class_professor_date",
+  "experimental_class_professor_time",
+  "experimental_class_lead_start_at",
+  "experimental_class_professor_start_at",
+  "experimental_class_link",
+  "latest_experimental_class_cancelled_at",
+  "experimental_class_professor_name",
+  "experimental_class_professor_phone",
+] as const;
+
+function extractUndefinedColumnName(raw: unknown): string | null {
+  if (!raw) return null;
+  const msg = String(raw).toLowerCase();
+  const m1 = /column "([^"]+)" does not exist/.exec(msg);
+  if (m1 && m1[1]) return m1[1];
+  const m2 = /could not find the '([^']+)' column/.exec(msg);
+  if (m2 && m2[1]) return m2[1];
+  return null;
+}
+function stripUndefinedColumnFromPatch(patchObj: Record<string, unknown>, error: unknown): {
+  next: Record<string, unknown> | null;
+  stripped: string | null;
+} {
+  const col = extractUndefinedColumnName((error as any)?.message || String(error ?? ""));
+  if (col && patchObj[col] !== undefined) {
+    const next = { ...patchObj };
+    delete next[col];
+    return { next, stripped: col };
+  }
+  for (const sus of BOOKING_UNDO__SUSPECT_MISSING_FLAT_COLS) {
+    if (patchObj[sus] !== undefined) {
+      const next = { ...patchObj };
+      delete next[sus];
+      return { next, stripped: sus };
+    }
+  }
+  return { next: null, stripped: null };
 }
 
 export async function POST(
@@ -39,8 +82,6 @@ export async function POST(
         professorStartAt?: string | null;
         leadDate?: string | null;
         leadTime?: string | null;
-        leadTimeZone?: string | null;
-        professorTimeZone?: string | null;
       }
     | null;
 
@@ -113,9 +154,8 @@ export async function POST(
 
   const { data: lead, error: leadError } = await admin
     .from("atendimento_leads")
-    .select("id, auth_user_id")
+    .select("id, status, funnel_stage, experimental_class_booking_id")
     .eq("id", resolvedLeadId)
-    .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
     .maybeSingle();
 
   if (leadError) {
@@ -123,107 +163,117 @@ export async function POST(
   }
 
   if (!lead?.id) {
-    return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+    return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
   }
 
-  const authUserId = String((lead as { auth_user_id?: string | null }).auth_user_id ?? "").trim();
-  const [{ data: conversations, error: conversationsError }, profileResult] = await Promise.all([
-    admin.from("atendimento_conversations").select("id").eq("lead_id", resolvedLeadId),
-    authUserId
-      ? admin
-          .from("profiles")
-          .select("access_scope")
-          .eq("user_id", authUserId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-  ]);
+  // 1) EXCLUIR o booking em si (regra nova: cancelar = excluir o agendamento)
+  let deletedBookingId: string | null = resolvedBooking ? String((resolvedBooking as any).id ?? "").trim() : null;
+  const currentBookingId = String((lead as any)?.experimental_class_booking_id ?? "").trim();
 
-  if (conversationsError) {
-    return Response.json({ ok: false, error: conversationsError.message }, { status: 500 });
-  }
-  if (profileResult.error) {
-    return Response.json({ ok: false, error: profileResult.error.message }, { status: 500 });
-  }
-
-  const conversationIds = (conversations ?? [])
-    .map((row) => String((row as { id?: string | null }).id ?? "").trim())
-    .filter(Boolean);
-
-  const deleteMessagesPromise =
-    conversationIds.length > 0
-      ? admin
-          .from("atendimento_messages")
-          .delete()
-          .in("conversation_id", conversationIds)
-      : Promise.resolve({ error: null });
-  const [messagesResult, eventsResult, capturedFieldsResult] = await Promise.all([
-    deleteMessagesPromise,
-    admin.from("atendimento_history_events").delete().eq("lead_id", resolvedLeadId),
-    admin.from("atendimento_captured_fields").delete().eq("lead_id", resolvedLeadId),
-  ]);
-
-  if (messagesResult.error) {
-    return Response.json({ ok: false, error: messagesResult.error.message }, { status: 500 });
-  }
-  const { error: eventsError } = eventsResult;
-  if (eventsError) {
-    return Response.json({ ok: false, error: eventsError.message }, { status: 500 });
-  }
-  const { error: capturedFieldsError } = capturedFieldsResult;
-  if (capturedFieldsError) {
-    return Response.json({ ok: false, error: capturedFieldsError.message }, { status: 500 });
+  if (resolvedBooking && !tableUnavailable) {
+    const targetId = String((resolvedBooking as any).id ?? "").trim();
+    if (targetId) {
+      const { error: delBookingErr } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .delete()
+        .eq("id", targetId);
+      if (delBookingErr && !isExperimentalClassBookingsTableUnavailable(delBookingErr)) {
+        return Response.json({ ok: false, error: delBookingErr.message }, { status: 500 });
+      }
+      deletedBookingId = targetId;
+    }
   }
 
-  {
-    const bookingsDelete = await admin
+  // 2) Limpar TODAS as colunas flat experimentais (data/horario/id/link/cancelled_at/professor)
+  //    e reverter o funil do lead para Falta dia e horario (agendamento deixou de existir)
+  let leadPatch: Record<string, unknown> = {
+    experimental_class_booking_id: null,
+    experimental_class_status: null,
+    experimental_class_lead_date: null,
+    experimental_class_lead_time: null,
+    experimental_class_professor_date: null,
+    experimental_class_professor_time: null,
+    experimental_class_lead_start_at: null,
+    experimental_class_professor_start_at: null,
+    experimental_class_link: null,
+    latest_experimental_class_cancelled_at: null,
+    experimental_class_professor_name: null,
+    experimental_class_professor_phone: null,
+    status: "aguardando_aula_experimental",
+    funnel_stage: "aula_experimental_antecipada",
+  };
+
+  let finalLeadUpdated: Record<string, unknown> | null = null;
+  let retries = 0;
+  while (retries < 12) {
+    const { data: updRow, error: updErr } = await admin
+      .from("atendimento_leads")
+      .update(leadPatch)
+      .eq("id", resolvedLeadId)
+      .select("id")
+      .maybeSingle();
+    if (!updErr) {
+      finalLeadUpdated = (updRow as Record<string, unknown> | null) ?? { id: resolvedLeadId };
+      break;
+    }
+    const stripped = stripUndefinedColumnFromPatch(leadPatch, updErr);
+    if (!stripped.next || stripped.stripped === null) {
+      return Response.json({ ok: false, error: updErr.message }, { status: 500 });
+    }
+    leadPatch = stripped.next;
+    retries++;
+  }
+
+  // 3) Se o booking deletado ERA o apontado por experimental_class_booking_id e ainda existem
+  //    outros bookings vinculados, remover também o resto (garante exclusao do agendamento completo)
+  if (!tableUnavailable && currentBookingId && currentBookingId === (deletedBookingId ?? "")) {
+    const { error: delAllErr } = await admin
       .from("atendimento_experimental_class_bookings")
       .delete()
       .eq("lead_id", resolvedLeadId);
-    if (
-      bookingsDelete.error &&
-      !isExperimentalClassBookingsTableUnavailable(bookingsDelete.error)
-    ) {
-      return Response.json({ ok: false, error: bookingsDelete.error.message }, { status: 500 });
+    if (delAllErr && !isExperimentalClassBookingsTableUnavailable(delAllErr)) {
+      // nao bloqueia o fluxo, o booking principal ja foi apagado
     }
   }
 
-  const { error: conversationsDeleteError } = await admin
-    .from("atendimento_conversations")
-    .delete()
-    .eq("lead_id", resolvedLeadId);
-  if (conversationsDeleteError) {
-    return Response.json(
-      { ok: false, error: conversationsDeleteError.message },
-      { status: 500 },
-    );
-  }
-
-  const { error: leadDeleteError } = await admin
-    .from("atendimento_leads")
-    .delete()
-    .eq("id", resolvedLeadId);
-  if (leadDeleteError) {
-    return Response.json({ ok: false, error: leadDeleteError.message }, { status: 500 });
-  }
-
-  if (
-    authUserId &&
-    isAtendimentoOnlyAccessScope(normalizeAccessScope((profileResult.data as any)?.access_scope))
-  ) {
-    const { error: deleteAuthUserError } = await admin.auth.admin.deleteUser(authUserId);
-    if (deleteAuthUserError) {
-      return Response.json({ ok: false, error: deleteAuthUserError.message }, { status: 500 });
-    }
+  // 4) appendHistoryEvent confirmando cancelamento/exclusao
+  try {
+    await appendHistoryEvent({
+      admin,
+      leadId: resolvedLeadId,
+      conversationId: null,
+      eventType: "experimental_class_cancelled",
+      details: {
+        booking_id: deletedBookingId ?? normalizedBookingId,
+        action: "deleted_and_unlinked",
+        status_before: "scheduled",
+        status_after: null,
+        lead_date_before: String(
+          (resolvedBooking as any)?.lead_date ?? payload?.leadDate ?? "",
+        ).trim() || null,
+        lead_time_before: String(
+          (resolvedBooking as any)?.lead_time ?? payload?.leadTime ?? "",
+        ).trim() || null,
+        professor_date_before: String(
+          (resolvedBooking as any)?.professor_date ?? payload?.professorDate ?? "",
+        ).trim() || null,
+        professor_time_before: String(
+          (resolvedBooking as any)?.professor_time ?? payload?.professorTime ?? "",
+        ).trim() || null,
+      },
+    });
+  } catch {
+    // history nao bloqueia sucesso do cancelamento
   }
 
   return Response.json({
     ok: true,
-    deleted_lead: true,
-    lead_id: resolvedLeadId,
-    booking: {
-      id: normalizedBookingId,
-      status: "cancelled",
-      lead_id: resolvedLeadId,
+    booking_deleted: true,
+    booking_id: deletedBookingId ?? normalizedBookingId,
+    lead: {
+      ...finalLeadUpdated,
+      status_after_undo: leadPatch.status,
+      funnel_stage_after_undo: leadPatch.funnel_stage,
     },
   });
 }

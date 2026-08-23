@@ -3362,7 +3362,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null }
+        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null; lead?: Record<string, unknown> | null }
         | null;
 
       if (!response.ok || !payload?.ok) {
@@ -3370,15 +3370,40 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         return;
       }
 
-      setLocalLeads((current) => current.filter((item) => item.id !== lead.id));
+      setLocalLeads((current) =>
+        current.map((item) => {
+          if (item.id !== lead.id) return item;
+          const nextLead: AtendimentoLeadListItem = {
+            ...item,
+            experimental_class_booking: null,
+            future_experimental_class_booking: null,
+            latest_experimental_class_cancelled_at: null,
+            latest_experimental_class_event: null,
+            latest_past_class_meta: null,
+            status: "aguardando_aula_experimental",
+            funnel_stage: "aula_experimental_antecipada",
+            experimental_class_status: null,
+            experimental_class_lead_date: null,
+            experimental_class_lead_time: null,
+            experimental_class_professor_date: null,
+            experimental_class_professor_time: null,
+            experimental_class_lead_start_at: null,
+            experimental_class_professor_start_at: null,
+            experimental_class_booking_id: null,
+            experimental_class_link: null,
+            experimental_class_professor_name: null,
+            experimental_class_professor_phone: null,
+          } as unknown as AtendimentoLeadListItem;
+          return nextLead;
+        }),
+      );
       setLocalSummary((current) => ({
         ...current,
         aulasExperimentaisAgendadas: Math.max(0, current.aulasExperimentaisAgendadas - 1),
-        totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1),
       }));
       setActiveSectionSelectedLead(selectedLeadId === lead.id ? null : selectedLeadId);
       setMobileDetailsOpen((current) => (selectedLeadId === lead.id ? false : current));
-      modalToast.success("Agendamento cancelado e interessado removido.");
+      modalToast.success("Agendamento excluído. Contato retornou para a aba Interessados.");
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao cancelar agendamento.");
     } finally {
