@@ -2582,7 +2582,7 @@ export async function maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPend
       .eq("event_type", REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_NOTICE_EVENT_TYPE);
     if (already && already > 0) return { ok: true, deduped: true };
     const message = buildExperimentalClassRegisteredAttendantWhatsAppMessage(
-      String(params.leadName ?? "").trim() || null,
+      String(params.leadName ?? "").trim(),
     );
     await sendAtendimentoWhatsAppText({
       phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
@@ -4083,27 +4083,34 @@ export async function triggerRecurringPaymentIntentIfNeeded(params: {
   }
 
   try {
-    const attendantMsg = buildRecurringPaymentPendingConfirmationAttendantNotification(
-      String((lead as any)?.full_name ?? null),
-      enrollmentNumber || null,
-    );
-    await sendAtendimentoWhatsAppText({
-      phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
-      message: attendantMsg,
-    });
-    try {
-      await appendHistoryEvent({
-        leadId,
-        eventType: "attendant_payment_pending_confirmation_sent",
-        title: "Notificação atendente: Pagamento pendente enviada",
-        details: {
-          enrollment_number: enrollmentNumber || null,
-          attendant_phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
-          triggered_from: triggeredFrom,
-        },
-        actorType: "system",
+    const { count: alreadySent } = await admin
+      .from("atendimento_history_events")
+      .select("id", { count: "exact", head: true })
+      .eq("lead_id", leadId)
+      .eq("event_type", "attendant_payment_pending_confirmation_sent");
+    if (!alreadySent || alreadySent <= 0) {
+      const attendantMsg = buildRecurringPaymentPendingConfirmationAttendantNotification(
+        String((lead as any)?.full_name ?? null),
+        enrollmentNumber || null,
+      );
+      await sendAtendimentoWhatsAppText({
+        phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
+        message: attendantMsg,
       });
-    } catch {}
+      try {
+        await appendHistoryEvent({
+          leadId,
+          eventType: "attendant_payment_pending_confirmation_sent",
+          title: "Notificação atendente: Pagamento pendente enviada",
+          details: {
+            enrollment_number: enrollmentNumber || null,
+            attendant_phone: ATENDIMENTO_DAILY_SUMMARY_PHONE,
+            triggered_from: triggeredFrom,
+          },
+          actorType: "system",
+        });
+      } catch {}
+    }
   } catch {}
 
   try {
