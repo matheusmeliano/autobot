@@ -1488,6 +1488,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   let attendantSent = 0;
   let registeredAttendantSent = 0;
   let missingLessonLink = 0;
+  let missingProfessor = 0;
   let missingStudentPhone = 0;
 
   async function setBookingNotificationSentAt(params: {
@@ -1552,6 +1553,17 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       continue;
     }
 
+    const resolvedProfessor = resolveExperimentalClassAssignedProfessorPhone({
+      bookingAssignedPhone: String((booking as any)?.assigned_professor_phone ?? "").trim(),
+      bookingAssignedName: String((booking as any)?.assigned_professor_name ?? "").trim(),
+      flatAssignedPhone: String(lead?.experimental_class_professor_phone ?? "").trim(),
+      flatAssignedName: String(lead?.experimental_class_professor_name ?? "").trim(),
+    });
+    if (!resolvedProfessor) {
+      missingProfessor += 1;
+      continue;
+    }
+
     const cachedStudentSent =
       sentStudentBookingIds.has(bookingId) ||
       Boolean(String((booking as any)?.student_start_notification_sent_at ?? "").trim());
@@ -1566,13 +1578,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     const registeredAttendantDue = attendantDue;
 
     if (attendantDue && !cachedAttendantSent) {
-      const assignedCronProfessorPhone =
-        resolveExperimentalClassAssignedProfessorPhone({
-          bookingAssignedPhone: String((booking as any)?.assigned_professor_phone ?? "").trim(),
-          bookingAssignedName: String((booking as any)?.assigned_professor_name ?? "").trim(),
-          flatAssignedPhone: String(lead?.experimental_class_professor_phone ?? "").trim(),
-          flatAssignedName: String(lead?.experimental_class_professor_name ?? "").trim(),
-        })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
+      const assignedCronProfessorPhone = resolvedProfessor.phone;
       try {
         await sendAtendimentoWhatsAppText({
           phone: assignedCronProfessorPhone,
@@ -1715,6 +1721,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     studentSent,
     attendantSent,
     missingLessonLink,
+    missingProfessor,
     missingStudentPhone,
   };
 }
