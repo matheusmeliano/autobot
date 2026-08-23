@@ -1361,6 +1361,7 @@ function BookingDetails({
   const hasAttendantNotification = Boolean(
     String(booking?.attendant_start_notification_sent_at ?? "").trim(),
   );
+  const professorLockedByDisparo = hasStudentNotification || hasAttendantNotification;
   const hasAttendanceStatus =
     String(booking?.attendance_status ?? "").trim() === "attended" ||
     String(booking?.attendance_status ?? "").trim() === "no_show";
@@ -1858,13 +1859,21 @@ function BookingDetails({
                     <div className="relative w-full min-[600px]:w-auto">
                     <button
                       type="button"
-                      onClick={() => setAssignProfessorDropdownOpen((v) => !v)}
+                      onClick={() => {
+                        if (professorLockedByDisparo) {
+                          modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                          return;
+                        }
+                        setAssignProfessorDropdownOpen((v) => !v);
+                      }}
                       onBlur={() => {
                         setTimeout(() => setAssignProfessorDropdownOpen(false), 180);
                       }}
-                      disabled={assigningProfessor}
+                      disabled={assigningProfessor || professorLockedByDisparo}
                       className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
                       title={(() => {
+                        if (professorLockedByDisparo)
+                          return "Professor não pode ser alterado após o disparo ser realizado.";
                         const assigned = experimentalClassBookingAssignedProfessor(lead);
                         return assigned
                           ? `Professor vinculado: ${assigned.name} (${assigned.short})`
@@ -1892,12 +1901,18 @@ function BookingDetails({
                         {EXPERIMENTAL_PROFESSOR_OPTIONS.map((opt) => {
                           const assigned = experimentalClassBookingAssignedProfessor(lead);
                           const isActive = assigned?.phone === opt.phone && assigned?.name === opt.name;
+                          const optionDisabled = assigningProfessor || professorLockedByDisparo;
                           return (
                             <button
                               key={opt.phone}
                               type="button"
-                              disabled={assigningProfessor}
+                              disabled={optionDisabled}
                               onClick={() => {
+                                if (professorLockedByDisparo) {
+                                  modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                  setAssignProfessorDropdownOpen(false);
+                                  return;
+                                }
                                 setAssignProfessorDropdownOpen(false);
                                 void onAssignProfessor(lead, { name: opt.name, phone: opt.phone });
                               }}
@@ -1908,6 +1923,11 @@ function BookingDetails({
                                   : "bg-[#23232a] hover:bg-[#2a2a32]",
                                 "disabled:cursor-not-allowed disabled:opacity-60",
                               ].join(" ")}
+                              title={
+                                professorLockedByDisparo
+                                  ? "Professor não pode ser alterado após o disparo ser realizado."
+                                  : ""
+                              }
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">

@@ -97,6 +97,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     const updatedAt = new Date().toISOString();
 
     if (bookingId) {
+      const { data: existingBooking } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .select(
+          "id, student_start_notification_sent_at, attendant_start_notification_sent_at",
+        )
+        .eq("id", bookingId)
+        .maybeSingle();
+      const studentSent =
+        Boolean(existingBooking) &&
+        Boolean(String((existingBooking as any)?.student_start_notification_sent_at ?? "").trim());
+      const attendantSent =
+        Boolean(existingBooking) &&
+        Boolean(String((existingBooking as any)?.attendant_start_notification_sent_at ?? "").trim());
+      if (studentSent || attendantSent) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "Professor não pode ser alterado após o disparo ser realizado.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    if (bookingId) {
       const bookingPatch = {
         assigned_professor_name: match.name,
         assigned_professor_phone: match.phone,
