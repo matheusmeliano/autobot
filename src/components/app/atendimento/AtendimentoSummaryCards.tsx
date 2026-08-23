@@ -1342,9 +1342,14 @@ function BookingDetails({
   const bookingIsCancelled = bookingStatus === "cancelled";
   const bookingIsNoShow = String(booking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
   const [lessonLinkDraft, setLessonLinkDraft] = useState(String(booking?.lesson_link ?? "").trim());
-  const savedLessonLink = String(booking?.lesson_link ?? "").trim();
+  const savedLessonLink = String(
+    booking?.lesson_link ?? (lead as any)?.experimental_class_link ?? "",
+  ).trim();
   const effectiveLessonLinkDraft = bookingIsNoShow ? "" : lessonLinkDraft;
   const effectiveSavedLessonLink = bookingIsNoShow ? "" : savedLessonLink;
+  const assignedProfessor = experimentalClassBookingAssignedProfessor(lead);
+  const experimentalBlockMissingLink = !effectiveSavedLessonLink && !hasRecurringClass && !hideExperimentalInfoCompletely;
+  const experimentalBlockMissingProfessor = !Boolean(assignedProfessor) && !hasRecurringClass && !hideExperimentalInfoCompletely;
   const isSavingLessonLink = savingLessonLinkBookingId === bookingId;
   const isMarkingAttendance = markingAttendanceBookingId === bookingId;
   const isMarkingAttendanceAttended = isMarkingAttendance && markingAttendanceType === "attended";
@@ -1473,7 +1478,9 @@ function BookingDetails({
     !hasStudentNotification &&
     !hasAttendantNotification &&
     !hasRecurringClass &&
-    !hideExperimentalInfoCompletely;
+    !hideExperimentalInfoCompletely &&
+    Boolean(effectiveSavedLessonLink) &&
+    Boolean(assignedProfessor);
 
   useEffect(() => {
     setLessonLinkDraft(savedLessonLink);
@@ -1536,17 +1543,61 @@ function BookingDetails({
           {null /* Aviso link da aula recorrente: REMOVIDO do painel lateral solicitacao usuario */}
         </div>
 
-        {canSendStudentNotification ? (
-          <button
-            type="button"
-            onClick={() => void onSendStudentNotification(lead)}
-            disabled={isSendingStudentNotification}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Zap className="h-4 w-4 shrink-0" />
-            {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
-          </button>
-        ) : null}
+        {(() => {
+          const canShowDisabledOrEnabled =
+            (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
+            Boolean(bookingId) &&
+            !hasStudentNotification &&
+            !hasAttendantNotification &&
+            !hasRecurringClass &&
+            !hideExperimentalInfoCompletely;
+          if (!canShowDisabledOrEnabled) return null;
+          return (
+            <>
+              {experimentalBlockMissingLink || experimentalBlockMissingProfessor ? (
+                <div className="flex w-full flex-col gap-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3">
+                  {experimentalBlockMissingLink ? (
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0 text-amber-300" />
+                      <div className="text-[11px] font-semibold leading-tight text-amber-100">
+                        Link da aula experimental não adicionado.
+                      </div>
+                    </div>
+                  ) : null}
+                  {experimentalBlockMissingProfessor ? (
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0 text-amber-300" />
+                      <div className="text-[11px] font-semibold leading-tight text-amber-100">
+                        Professor responsável não selecionado.
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void onSendStudentNotification(lead)}
+                disabled={!canSendStudentNotification || isSendingStudentNotification}
+                title={(() => {
+                  if (!effectiveSavedLessonLink && !assignedProfessor) {
+                    return "Adicione o link da aula e selecione o professor antes de disparar.";
+                  }
+                  if (!effectiveSavedLessonLink) {
+                    return "Adicione o link da aula experimental antes de disparar a notificação.";
+                  }
+                  if (!assignedProfessor) {
+                    return "Selecione o professor responsável por esta aula antes de disparar.";
+                  }
+                  return "Disparar notificações agora";
+                })()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Zap className="h-4 w-4 shrink-0" />
+                {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
+              </button>
+            </>
+          );
+        })()}
 
         {activeSection === "agendamentos" &&
         onEditExperimental &&
@@ -3420,6 +3471,28 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return;
     }
 
+    const isRecurringClass = leadHasRecurringClassInline(lead) || leadHasMatriculaOrRecurringStageInitiated(lead);
+    const isExperimental = !isRecurringClass;
+
+    if (isExperimental) {
+      const linkOk = Boolean(
+        String((lead as any)?.experimental_class_link ?? booking?.lesson_link ?? "").trim(),
+      );
+      const assigned = experimentalClassBookingAssignedProfessor(lead);
+      if (!linkOk && !assigned) {
+        modalToast.error("Adicione o link da aula e selecione o professor antes de disparar.");
+        return;
+      }
+      if (!linkOk) {
+        modalToast.error("Adicione o link da aula experimental antes de disparar a notificação.");
+        return;
+      }
+      if (!assigned) {
+        modalToast.error("Selecione o professor responsável por esta aula experimental antes de disparar.");
+        return;
+      }
+    }
+
     try {
       setSendingStudentNotificationBookingId(bookingId);
 
@@ -3441,6 +3514,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       if (!response.ok || !payload?.ok || !payload.booking) {
         if (payload?.error === "missing_lesson_link") {
           modalToast.error("Cadastre o link da aula antes de disparar a notificação.");
+        } else if (payload?.error === "missing_experimental_professor") {
+          modalToast.error("Selecione o professor responsável por esta aula antes de disparar.");
         } else if (payload?.error === "missing_lead_phone") {
           modalToast.error("Telefone do aluno não encontrado.");
         } else {

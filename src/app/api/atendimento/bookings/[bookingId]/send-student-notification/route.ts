@@ -93,7 +93,7 @@ export async function POST(
   const bookingWithLessonLinkResult = await admin
     .from("atendimento_experimental_class_bookings")
     .select(
-      "id, lead_id, conversation_id, status, lesson_link, professor_start_at, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at",
+      "id, lead_id, conversation_id, status, lesson_link, professor_start_at, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, assigned_professor_name, assigned_professor_phone",
     )
     .eq("id", normalizedBookingId)
     .maybeSingle();
@@ -102,7 +102,7 @@ export async function POST(
     const bookingWithoutLessonLinkResult = await admin
       .from("atendimento_experimental_class_bookings")
       .select(
-        "id, lead_id, conversation_id, status, professor_start_at, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at",
+        "id, lead_id, conversation_id, status, professor_start_at, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, assigned_professor_name, assigned_professor_phone",
       )
       .eq("id", normalizedBookingId)
       .maybeSingle();
@@ -137,7 +137,7 @@ export async function POST(
 
   const { data: lead, error: leadError } = await admin
     .from("atendimento_leads")
-    .select("id, full_name, phone")
+    .select("id, full_name, phone, experimental_class_link, experimental_class_professor_name, experimental_class_professor_phone")
     .eq("id", leadId)
     .maybeSingle();
 
@@ -173,6 +173,19 @@ export async function POST(
   if (!lessonLink) {
     return Response.json(
       { ok: false, error: "missing_lesson_link" },
+      { status: 409 },
+    );
+  }
+
+  const resolvedAssignedProfessor = resolveExperimentalClassAssignedProfessorPhone({
+    bookingAssignedPhone: String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim(),
+    bookingAssignedName: String((resolvedBooking as any)?.assigned_professor_name ?? "").trim(),
+    flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+    flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+  });
+  if (!resolvedAssignedProfessor || !String(resolvedAssignedProfessor.phone ?? "").trim()) {
+    return Response.json(
+      { ok: false, error: "missing_experimental_professor" },
       { status: 409 },
     );
   }
