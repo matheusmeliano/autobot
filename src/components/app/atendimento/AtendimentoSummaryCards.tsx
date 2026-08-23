@@ -4371,7 +4371,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           activeSection={activeSection}
                           savingThisLead={savingRecurringLinkLeadId === lead.id}
                           onSaveRecurringLink={handleSaveRecurringLink}
-                          onEditPassword={openEditLeadPassword}
                         />
                       </div>
                     </button>
