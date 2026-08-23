@@ -1783,7 +1783,19 @@ function BookingDetails({
               </div>
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 {activeSection === "agendamentos" && !hideExperimentalInfoCompletely && Boolean(booking || showIncompleteState) ? (
-                  <div className="relative">
+                  <>
+                    {(() => {
+                      const assigned = experimentalClassBookingAssignedProfessor(lead);
+                      if (assigned) return null;
+                      return (
+                        <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 sm:px-3 sm:py-1 sm:text-[11px]">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          <span className="hidden sm:inline">Escolha o professor</span>
+                          <span className="sm:hidden">Escolha professor</span>
+                        </div>
+                      );
+                    })()}
+                    <div className="relative">
                     <button
                       type="button"
                       onClick={() => setAssignProfessorDropdownOpen((v) => !v)}
@@ -1857,6 +1869,7 @@ function BookingDetails({
                       </div>
                     ) : null}
                   </div>
+                  </>
                 ) : null}
                 {hasAttendanceStatus || bookingStatus === "cancelled" ? (
                   <div
