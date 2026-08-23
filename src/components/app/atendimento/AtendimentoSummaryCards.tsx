@@ -4102,6 +4102,12 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   const active = lead.id === selectedLead?.id;
                   const showJumpToAgendamento =
                     activeSection === "interessados" && leadHasAnyExperimentalVinculo(lead);
+                  const showAgendamentoMissingProfessorIcon = (() => {
+                    if (activeSection !== "agendamentos") return false;
+                    if (leadHasAnyRecurringProgressSignal(lead) || leadHasMatriculaOrRecurringStageInitiated(lead)) return false;
+                    const assigned = experimentalClassBookingAssignedProfessor(lead);
+                    return !assigned;
+                  })();
                   return (
                     <button
                       key={lead.id}
@@ -4131,6 +4137,14 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         >
                           <CalendarDays className="h-3.5 w-3.5 shrink-0" />
                         </button>
+                      ) : null}
+                      {showAgendamentoMissingProfessorIcon ? (
+                        <div
+                          className="absolute right-3 top-3 inline-flex items-center"
+                          title="Selecione o professor responsável antes de disparar agora."
+                        >
+                          <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />
+                        </div>
                       ) : null}
                       <div
                         className="pr-10 truncate text-sm font-semibold text-[var(--app-text-85)]"
