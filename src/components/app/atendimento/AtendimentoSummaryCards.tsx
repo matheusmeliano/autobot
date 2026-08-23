@@ -1348,8 +1348,6 @@ function BookingDetails({
   const effectiveLessonLinkDraft = bookingIsNoShow ? "" : lessonLinkDraft;
   const effectiveSavedLessonLink = bookingIsNoShow ? "" : savedLessonLink;
   const assignedProfessor = experimentalClassBookingAssignedProfessor(lead);
-  const experimentalBlockMissingLink = !effectiveSavedLessonLink && !hasRecurringClass && !hideExperimentalInfoCompletely;
-  const experimentalBlockMissingProfessor = !Boolean(assignedProfessor) && !hasRecurringClass && !hideExperimentalInfoCompletely;
   const isSavingLessonLink = savingLessonLinkBookingId === bookingId;
   const isMarkingAttendance = markingAttendanceBookingId === bookingId;
   const isMarkingAttendanceAttended = isMarkingAttendance && markingAttendanceType === "attended";
@@ -1393,6 +1391,11 @@ function BookingDetails({
   const hasRecurringClass = Boolean(
     hasRecurringWeekdayAny && /^\d{2}:\d{2}$/.test(recurringTime),
   );
+
+  const experimentalBlockMissingLink =
+    !effectiveSavedLessonLink && !hasRecurringClass && !hideExperimentalInfoCompletely;
+  const experimentalBlockMissingProfessor =
+    !Boolean(assignedProfessor) && !hasRecurringClass && !hideExperimentalInfoCompletely;
 
   const derivedStatus = deriveExperimentalClassBookingDisplayStatus({
     bookingStatus: booking?.status,
@@ -3471,7 +3474,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       return;
     }
 
-    const isRecurringClass = leadHasRecurringClassInline(lead) || leadHasMatriculaOrRecurringStageInitiated(lead);
+    const isRecurringClass =
+      leadHasAnyRecurringProgressSignal(lead) || leadHasMatriculaOrRecurringStageInitiated(lead);
     const isExperimental = !isRecurringClass;
 
     if (isExperimental) {
