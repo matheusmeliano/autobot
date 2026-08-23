@@ -4759,7 +4759,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                 maxLength={64}
               />
               <div className="mt-2 text-[11px] text-white/45">
-                Essa é a senha que o aluno usa para retomar a matrícula caso acesse o link por outro dispositivo.
+                Essa é a senha que o aluno usa para retomar a matrícula caso ele tenha esquecido a senha.
               </div>
             </div>
 
