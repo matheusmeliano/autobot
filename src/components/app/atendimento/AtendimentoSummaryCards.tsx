@@ -1815,7 +1815,7 @@ function BookingDetails({
                     {assignProfessorDropdownOpen ? (
                       <div
                         className="absolute right-0 top-full z-[380] mt-2 flex w-[280px] flex-col gap-1.5 overflow-hidden rounded-2xl border border-[var(--app-border)] p-2 shadow-2xl"
-                        style={{ backgroundColor: "#0a0a0a", opacity: 1, backdropFilter: "none" }}
+                        style={{ backgroundColor: "#18181b", opacity: 1, backdropFilter: "none" }}
                       >
                         {EXPERIMENTAL_PROFESSOR_OPTIONS.map((opt) => {
                           const assigned = experimentalClassBookingAssignedProfessor(lead);
@@ -1833,7 +1833,7 @@ function BookingDetails({
                                 "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
                                 isActive
                                   ? "bg-[var(--app-warning-bg)]"
-                                  : "bg-[#141414] hover:bg-[#1a1a1a]",
+                                  : "bg-[#23232a] hover:bg-[#2a2a32]",
                                 "disabled:cursor-not-allowed disabled:opacity-60",
                               ].join(" ")}
                             >
