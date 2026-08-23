@@ -51,6 +51,7 @@ import {
   findLeadByPhone,
   formalizeAndPersistContract,
   getAuthenticatedAtendimentoConversationAccess,
+  maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
   triggerRecurringPaymentIntentIfNeeded,
@@ -2502,36 +2503,6 @@ export async function POST(req: Request) {
         flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
         flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
       });
-
-      try {
-        await sendAtendimentoWhatsAppText({
-          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-          message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
-        });
-
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_registered_attendant_notification_sent",
-          title: "Atendente cadastrado notificado sobre novo agendamento de aula experimental",
-          details: {
-            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-          },
-          actorType: "system",
-        });
-      } catch (error) {
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_registered_attendant_notification_failed",
-          title: "Falha ao notificar o atendente cadastrado sobre novo agendamento de aula experimental",
-          details: {
-            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
-        });
-      }
 
       await syncConversationPreview({
         conversationId,

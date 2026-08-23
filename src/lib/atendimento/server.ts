@@ -19,6 +19,7 @@ import {
 import {
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage,
+  buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildRecurringClassAttendantStartReminderWhatsAppMessage,
   buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage,
@@ -2510,6 +2511,12 @@ export async function ensureInitialBotConversationFlow(params: {
       details: { funnel_stage: "aula_experimental_convidada" },
       actorType: "bot",
     });
+
+    void maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime({
+      leadId: params.leadId,
+      leadName: String((params as any)?.leadName ?? (params as any)?.fullName ?? "").trim() || null,
+      conversationId: params.conversationId,
+    });
   }
 
   await syncConversationPreview({
@@ -2556,6 +2563,44 @@ export async function appendHistoryEvent(params: {
     actor_type: params.actorType,
     actor_email: params.actorEmail ?? null,
   });
+}
+
+const REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_NOTICE_EVENT_TYPE =
+  "registered_attendant_experimental_lead_first_pending_daytime_notice_sent";
+
+export async function maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime(params: {
+  leadId: string;
+  leadName: string | null | undefined;
+  conversationId?: string | null;
+}) {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { count: already } = await admin
+      .from("atendimento_history_events")
+      .select("id", { count: "exact", head: true })
+      .eq("lead_id", params.leadId)
+      .eq("event_type", REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_NOTICE_EVENT_TYPE);
+    if (already && already > 0) return { ok: true, deduped: true };
+    const message = buildExperimentalClassRegisteredAttendantWhatsAppMessage(
+      String(params.leadName ?? "").trim() || null,
+    );
+    await sendAtendimentoWhatsAppText({
+      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+      message,
+    });
+    await appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId ?? null,
+      eventType: REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_NOTICE_EVENT_TYPE,
+      title:
+        "Atendente cadastrado avisado sobre novo interessado em aula experimental (Falta dia e horário)",
+      details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE },
+      actorType: "system",
+    });
+    return { ok: true, sent: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function upsertAtendimentoPresenceSession(params: {

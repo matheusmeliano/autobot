@@ -1,6 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser } from "@/lib/atendimento/server";
-import { ensureAtendimentoPublicLink, findLeadByPhone } from "@/lib/atendimento/server";
+import { requireAtendimentoUser, appendHistoryEvent, findLeadByPhone, ensureAtendimentoPublicLink, maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime } from "@/lib/atendimento/server";
 import { makeConversationSessionSlug } from "@/lib/atendimento/utils";
 import { ATENDIMENTO_EMAIL } from "@/lib/atendimento/constants";
 
@@ -83,6 +82,12 @@ export async function POST(req: Request) {
     })
     .select("*")
     .maybeSingle();
+
+  void maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime({
+    leadId: String(createdLead.id),
+    leadName: null,
+    conversationId: null,
+  });
 
   return Response.json({ ok: true, lead: createdLead });
 }

@@ -57,6 +57,7 @@ import {
   ensureWhatsAppLeadAndConversation,
   findLeadByPhone,
   hasAnyBotMessage,
+  maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime,
   sendAtendimentoWhatsAppText,
   sendAtendimentoWhatsAppTextBatch,
   syncConversationPreview,
@@ -5199,6 +5200,12 @@ export async function POST(req: Request) {
             actorType: "system",
           });
 
+          void maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime({
+            leadId,
+            leadName: String((lead as any)?.full_name ?? "").trim() || null,
+            conversationId,
+          });
+
           const introMsgs = buildExperimentalClassDatePromptMessages(
             String((lead as any)?.full_name ?? "").trim() || null,
           );
@@ -5468,12 +5475,6 @@ export async function POST(req: Request) {
                       flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
                       flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
                     });
-                  try {
-                    await sendAtendimentoWhatsAppText({
-                      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-                      message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
-                    });
-                  } catch (_e) {}
                 }
 
                 return Response.json({
@@ -5978,12 +5979,6 @@ export async function POST(req: Request) {
                   flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
                   flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
                 });
-              try {
-                await sendAtendimentoWhatsAppText({
-                  phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-                  message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
-                });
-              } catch (_e) {}
             }
           }
 

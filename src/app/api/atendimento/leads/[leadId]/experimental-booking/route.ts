@@ -542,35 +542,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         flatAssignedName: String((leadExists as any)?.experimental_class_professor_name ?? "").trim(),
       });
 
-    try {
-      await sendAtendimentoWhatsAppText({
-        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-        message: buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName),
-      });
-      await appendHistoryEvent({
-        leadId,
-        eventType: "experimental_class_registered_attendant_notification_sent",
-        title: "Atendente cadastrado notificado sobre novo agendamento de aula experimental",
-        details: {
-          booking_id: bookingIdForHistory,
-          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-        },
-        actorType: "system",
-      });
-    } catch (error) {
-      await appendHistoryEvent({
-        leadId,
-        eventType: "experimental_class_registered_attendant_notification_failed",
-        title: "Falha ao notificar o atendente cadastrado sobre novo agendamento de aula experimental",
-        details: {
-          booking_id: bookingIdForHistory,
-          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        actorType: "system",
-      });
-    }
-
     return Response.json({
       ok: true,
       booking: bookingOut,
