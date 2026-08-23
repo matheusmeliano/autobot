@@ -384,7 +384,12 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
   const futureExpTimeLabel = hasFutureExp
     ? String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim()
     : "";
-  const futureExpBody = [futureExpDateLabel, futureExpTimeLabel].filter((v) => v && v !== "-").join(", ");
+  const futureExpBothOk =
+    Boolean(futureExpDateLabel) &&
+    futureExpDateLabel !== "-" &&
+    Boolean(futureExpTimeLabel) &&
+    futureExpTimeLabel !== "-";
+  const futureExpBody = futureExpBothOk ? [futureExpDateLabel, futureExpTimeLabel].join(", ") : "";
 
   const pastMeta = (lead as any)?.latest_past_class_meta ?? null;
   let pastDone = false;
@@ -401,7 +406,12 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
     pastDone = isExperimentalMeta && (pastMetaAttendance === "attended" || pastMetaAttendance === "no_show");
     const pastDateLabel = formatAtendimentoDate(String((pastMeta as any).date ?? ""));
     const pastTimeLabel = String((pastMeta as any).time ?? "").trim();
-    pastBody = [pastDateLabel, pastTimeLabel].filter((v) => v && v !== "-").join(", ");
+    const pastBothOk =
+      Boolean(pastDateLabel) &&
+      pastDateLabel !== "-" &&
+      Boolean(pastTimeLabel) &&
+      pastTimeLabel !== "-";
+    pastBody = pastBothOk ? [pastDateLabel, pastTimeLabel].join(", ") : "";
   }
 
   const bookingDateLabel =
@@ -421,14 +431,21 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
           (booking?.lead_time ?? booking?.professor_time ?? ""),
         ).trim()
       : "";
-  const bookingBody = [bookingDateLabel, bookingTimeLabel].filter((v) => v && v !== "-").join(", ");
+  const bookingBothOk =
+    Boolean(bookingDateLabel) &&
+    bookingDateLabel !== "-" &&
+    Boolean(bookingTimeLabel) &&
+    bookingTimeLabel !== "-";
+  const bookingBody = bookingBothOk ? [bookingDateLabel, bookingTimeLabel].join(", ") : "";
 
-  const flatExpActiveBody = [
-    formatAtendimentoDate(expDraftDate),
-    atendimentoTimeLabel(expDraftTime || null),
-  ]
-    .filter((v) => v && v !== "-")
-    .join(", ");
+  const flatExpDateFormatted = formatAtendimentoDate(expDraftDate);
+  const flatExpTimeFormatted = atendimentoTimeLabel(expDraftTime || null);
+  const flatExpBothOk =
+    Boolean(flatExpDateFormatted) &&
+    flatExpDateFormatted !== "-" &&
+    Boolean(flatExpTimeFormatted) &&
+    flatExpTimeFormatted !== "-";
+  const flatExpActiveBody = flatExpBothOk ? [flatExpDateFormatted, flatExpTimeFormatted].join(", ") : "";
 
   if (hasLatestCancelledMarker || (bookingHasId && bookingIsNotDraft && bookingStatus === "cancelled")) {
     return "Agendamento cancelado";
