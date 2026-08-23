@@ -239,10 +239,10 @@ export async function POST(
   // 4) appendHistoryEvent confirmando cancelamento/exclusao
   try {
     await appendHistoryEvent({
-      admin,
       leadId: resolvedLeadId,
       conversationId: null,
       eventType: "experimental_class_cancelled",
+      title: "Agendamento experimental excluído",
       details: {
         booking_id: deletedBookingId ?? normalizedBookingId,
         action: "deleted_and_unlinked",
@@ -261,6 +261,8 @@ export async function POST(
           (resolvedBooking as any)?.professor_time ?? payload?.professorTime ?? "",
         ).trim() || null,
       },
+      actorType: "attendant",
+      actorEmail: String(auth.user?.email ?? "").trim() || null,
     });
   } catch {
     // history nao bloqueia sucesso do cancelamento
