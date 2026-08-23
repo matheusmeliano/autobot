@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser, appendHistoryEvent, sendAtendimentoWhatsAppText } from "@/lib/atendimento/server";
 import {
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
