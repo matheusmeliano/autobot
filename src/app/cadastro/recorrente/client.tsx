@@ -220,6 +220,10 @@ export default function CadastroRecorrenteBody() {
   const [enrollmentNumber, setEnrollmentNumber] = useState<string>("");
   const [paymentTab, setPaymentTab] = useState<"menu" | "link" | "deposit" | "pix">("menu");
   const [pixCopied, setPixCopied] = useState<boolean>(false);
+  const [showResumeScreen, setShowResumeScreen] = useState<boolean>(false);
+  const [resumePassword, setResumePassword] = useState<string>("");
+  const [resumeLoading, setResumeLoading] = useState<boolean>(false);
+  const [resumeError, setResumeError] = useState<string>("");
 
   useEffect(() => {
     if (!submitResult) return;
@@ -622,7 +626,14 @@ export default function CadastroRecorrenteBody() {
           }
           if (hasPassword) {
             setHasPasswordInitial(true);
-            if (stepNum >= 1) setSenha("••••••••");
+            const userKnowsRealPassword =
+              senha.trim().length >= 4 && !/^[•·*]{4,}$/.test(senha.trim());
+            if (!userKnowsRealPassword) {
+              setShowResumeScreen(true);
+              setSenha("");
+            } else {
+              if (stepNum >= 1) setSenha(senha.trim());
+            }
           }
           if (stepNum >= 3 && resolvedWeekday && savedProfessorTime) {
             const finalLeadTime = savedLeadTime || savedProfessorTime;
@@ -989,6 +1000,182 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
+  async function handleResumeAttempt() {
+    if (resumeLoading) return;
+    const pwd = resumePassword.trim();
+    if (pwd.length < 4) {
+      setResumeError("Informe sua senha para continuar.");
+      return;
+    }
+    setResumeLoading(true);
+    setResumeError("");
+    try {
+      const telefone = phoneField.replace(/\D/g, "").trim();
+      const res = await fetch("/api/cadastro/recorrente/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefone, senha: pwd }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            resume?: boolean;
+            error?: string;
+            blocked?: boolean;
+            lead?: any;
+            progress?: any;
+          }
+        | null;
+      if (json?.blocked === true) {
+        setAccessBlocked(true);
+        setAccessBlockedMessage(
+          String(json?.error ?? "").trim() ||
+            "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+        );
+        return;
+      }
+      if (!res.ok || !json?.ok) {
+        const msg = String(json?.error ?? "").trim() || "Senha incorreta. Tente novamente.";
+        setResumeError(msg);
+        return;
+      }
+      const prog = json.progress ?? null;
+      const leadData = json.lead ?? null;
+      let stepNum: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 1;
+      let savedWeekdayRaw = "";
+      let savedWeekdayLabel = "";
+      let savedProfessorTime = "";
+      let savedLeadTime = "";
+      let resolvedWeekday: RecurringWeekdayKey | null = null;
+      let savedSubmitResult: any = null;
+      if (prog) {
+        stepNum =
+          typeof prog.step === "number" && prog.step >= 0 && prog.step <= 6
+            ? (prog.step as 0 | 1 | 2 | 3 | 4 | 5 | 6)
+            : 1;
+        if (stepNum < 1) stepNum = 1;
+        if (stepNum > 6) stepNum = 1;
+        setHasPasswordInitial(true);
+        setSenha(pwd);
+        savedWeekdayRaw = String(prog.recurring_class_weekday ?? "").trim().toLowerCase();
+        savedWeekdayLabel = String(prog.recurring_class_weekday_label ?? "").trim();
+        savedProfessorTime = String(prog.recurring_class_professor_time ?? "").trim();
+        savedLeadTime = String(prog.recurring_class_lead_time ?? "").trim();
+        if (savedWeekdayRaw) {
+          const isWd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(savedWeekdayRaw);
+          if (isWd) resolvedWeekday = savedWeekdayRaw as RecurringWeekdayKey;
+        }
+        if (leadData) {
+          const restoredName = toNomeESobrenome(String(leadData.full_name ?? "").trim());
+          if (restoredName) {
+            setNome(restoredName);
+            setLastSavedFieldValues((prev) => ({ ...prev, full_name: restoredName! }));
+            setContractSnapshot((prev) => ({ ...prev, full_name: restoredName! }));
+          }
+          const lid = String(leadData.id ?? "").trim();
+          if (lid) {
+            setSubmitLeadId(lid);
+            setContractLeadId(lid);
+          }
+          if (leadData.state) setStateField(String(leadData.state));
+          if (leadData.city) setCityField(String(leadData.city));
+          if (leadData.timezone) setLeadTimezone(String(leadData.timezone));
+        }
+        if (stepNum >= 3 && resolvedWeekday && savedProfessorTime) {
+          const finalLeadTime = savedLeadTime || savedProfessorTime;
+          const finalLabel = savedWeekdayLabel || savedWeekdayRaw;
+          savedSubmitResult = {
+            weekday: resolvedWeekday,
+            weekdayLabel: finalLabel,
+            professorTime: savedProfessorTime,
+            leadTime: finalLeadTime,
+          };
+          if (stepNum >= 4) {
+            setSubmitResult(savedSubmitResult);
+          }
+          if (stepNum >= 2) {
+            void (async () => {
+              try {
+                const tzBrowser =
+                  typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+                    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                    : "";
+                const tzLead = leadData?.timezone || leadTimezone;
+                const params = new URLSearchParams();
+                if (tzLead) params.set("lead_timezone", tzLead);
+                if (tzBrowser) params.set("timezone", tzBrowser);
+                const qs = params.toString();
+                const url = qs
+                  ? `/api/cadastro/recorrente/availability?${qs}`
+                  : `/api/cadastro/recorrente/availability`;
+                const r = await fetch(url, { method: "GET" });
+                const j = (await r.json().catch(() => null)) as AvailabilityResponse | null;
+                if (r.ok && j?.ok) {
+                  setAvailability(j);
+                  const slotsMap = j.slotsByWeekdayDate ?? j.slotsByWeekday ?? {};
+                  const dayCandidates = (j.dates ?? []).filter((d) => d.weekday === resolvedWeekday);
+                  let targetDayId: string | null = null;
+                  if (dayCandidates.length === 1) {
+                    targetDayId = dayCandidates[0].id;
+                  } else if (dayCandidates.length > 1) {
+                    const matchingByLabel = dayCandidates.find(
+                      (d) =>
+                        (savedWeekdayLabel &&
+                          (d.displayLabel === savedWeekdayLabel || d.label === savedWeekdayLabel)) ||
+                        false,
+                    );
+                    targetDayId = (matchingByLabel ?? dayCandidates[0])?.id ?? null;
+                  }
+                  if (targetDayId) setSelectedDayId(targetDayId);
+                  const arr: RecurringWeekdayTimeOption[] = targetDayId
+                    ? slotsMap[targetDayId] ?? []
+                    : [];
+                  const targetTime = savedProfessorTime;
+                  const targetLeadT = savedLeadTime;
+                  const opt =
+                    (targetTime
+                      ? arr.find(
+                          (s: any) =>
+                            String(s.professorTime ?? "").trim() === targetTime ||
+                            String(s.leadTime ?? "").trim() === targetLeadT ||
+                            String(s.displayLabel ?? "").trim() === targetLeadT,
+                        )
+                      : null) || null;
+                  if (opt) {
+                    setSelectedTimeOpt(opt as any);
+                    if (stepNum >= 4) {
+                      const lbl = savedWeekdayLabel || resolvedWeekday || "";
+                      const leadT = targetLeadT || targetTime;
+                      setSubmitResult({
+                        weekday: resolvedWeekday || "fri",
+                        weekdayLabel: lbl,
+                        professorTime: targetTime,
+                        leadTime: leadT,
+                      } as any);
+                    }
+                  }
+                }
+              } catch {}
+            })();
+          }
+        }
+      }
+      setShowResumeScreen(false);
+      setResumePassword("");
+      void saveDraftRecurring({ step: stepNum, password: pwd }).catch(() => {});
+      setTimeout(() => {
+        setStep(stepNum);
+        if (typeof window !== "undefined") {
+          try { window.scrollTo({ top: 0, left: 0, behavior: "smooth" }); } catch { window.scrollTo(0, 0); }
+        }
+      }, 0);
+    } catch (e) {
+      setResumeError(toErrorMessage(e, "Falha ao validar a senha. Tente novamente."));
+    } finally {
+      setResumeLoading(false);
+    }
+  }
+
   if (accessBlocked) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-red-50 via-white to-rose-50 py-10 px-4 sm:px-6 flex items-center justify-center">
@@ -1017,6 +1204,103 @@ export default function CadastroRecorrenteBody() {
                 "Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp."}
             </p>
             <div className="mt-8 pt-7 border-t border-slate-100 text-xs text-slate-500 leading-relaxed">
+              © {new Date().getFullYear()} Lucas Brum Online Music USA. Todos os direitos reservados.
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (showResumeScreen && !initialDataLoading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 py-10 px-4 sm:px-6 flex items-center justify-center">
+        <div className="mx-auto max-w-xl w-full">
+          <div className="bg-white rounded-3xl shadow-xl shadow-indigo-100/50 border border-slate-100 p-6 sm:p-10">
+            <div className="text-center mb-6">
+              <div className="mx-auto w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center mb-4">
+                <svg
+                  className="w-8 h-8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  />
+                </svg>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                Retome sua matrícula
+              </h1>
+              <p className="mt-4 text-slate-600 text-base leading-relaxed">
+                Você já acessou este link de matrícula por outro dispositivo. Para continuar, insira sua senha abaixo e retome a matrícula da etapa em que parou.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Seu telefone (WhatsApp)
+                </label>
+                <input
+                  type="text"
+                  value={phoneField}
+                  readOnly
+                  className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-600 outline-none cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Sua senha
+                </label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={resumePassword}
+                  onChange={(e) => {
+                    setResumePassword(e.target.value);
+                    setResumeError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleResumeAttempt();
+                    }
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
+                  placeholder="Digite sua senha"
+                  minLength={4}
+                />
+              </div>
+              {resumeError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 leading-relaxed">
+                  {resumeError}
+                </div>
+              ) : null}
+              <div className="grid grid-cols-1 gap-3 pt-2 w-full">
+                <button
+                  onClick={() => void handleResumeAttempt()}
+                  disabled={resumeLoading || resumePassword.trim().length < 4}
+                  className="w-full sm:w-auto sm:ml-auto rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
+                >
+                  {resumeLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-20" />
+                        <path d="M22 12a10 10 0 01-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                      Validando...
+                    </span>
+                  ) : (
+                    "Continuar matrícula"
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="mt-8 pt-6 border-t border-slate-100 text-xs text-slate-500 leading-relaxed text-center">
               © {new Date().getFullYear()} Lucas Brum Online Music USA. Todos os direitos reservados.
             </div>
           </div>
