@@ -567,7 +567,7 @@ Confira no aplicativo se o pagamento foi recebido e, em seguida, registre na pla
 Aluno: ${safeFull}
 Matrícula: ${safeEnrollment}
 
-Acessar painel:
+Acesse o painel:
 ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 
