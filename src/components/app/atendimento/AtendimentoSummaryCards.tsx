@@ -109,7 +109,7 @@ function isBookingAttendanceResolved(booking: unknown) {
   return status === "attended" || status === "no_show";
 }
 
-const EXPERIMENTAL_PROFESSOR_OPTIONS = [
+const EXPERIMENTAL_PROFESSOR_OPTIONS: Array<{ name: string; phone: string; short: string }> = [
   { name: "Lucas Brum", phone: "+55 65 9807-9407", short: "9807-9407" },
   { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
 ];
@@ -117,6 +117,7 @@ const EXPERIMENTAL_PROFESSOR_OPTIONS = [
 function experimentalClassBookingAssignedProfessor(lead: AtendimentoLeadListItem): {
   name: string;
   phone: string;
+  short: string;
 } | null {
   const booking = lead.experimental_class_booking as any;
   const bookingName = String(booking?.assigned_professor_name ?? "").trim();
@@ -3493,7 +3494,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
             ...(lead.experimental_class_booking as Record<string, unknown>),
             assigned_professor_name: assigned.name,
             assigned_professor_phone: assigned.phone,
-          } as AtendimentoLeadListItem["experimental_class_booking"])
+          } as unknown as AtendimentoLeadListItem["experimental_class_booking"])
         : null;
 
       const mergedFlat: AtendimentoLeadListItem = {

@@ -5462,7 +5462,7 @@ export async function POST(req: Request) {
                     conversationId,
                     insertIntoConversation: true,
                   });
-                  const zapiFallbackBookingRef = (booking as any) ?? (already as any) ?? null;
+                  const zapiFallbackBookingRef = (already as any) ?? null;
                   const zapiFallbackAssignedPhone =
                     resolveExperimentalClassAssignedProfessorPhone({
                       bookingAssignedPhone: String(zapiFallbackBookingRef?.assigned_professor_phone ?? "").trim(),
