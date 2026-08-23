@@ -3,8 +3,6 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser, appendHistoryEvent, sendAtendimentoWhatsAppText } from "@/lib/atendimento/server";
 import {
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
-  buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
   resolveExperimentalClassAssignedProfessorPhone,
@@ -543,37 +541,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         flatAssignedPhone: String((leadExists as any)?.experimental_class_professor_phone ?? "").trim(),
         flatAssignedName: String((leadExists as any)?.experimental_class_professor_name ?? "").trim(),
       });
-
-    if (assignedBookingResolved && assignedBookingResolved.phone !== EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE) {
-      try {
-        await sendAtendimentoWhatsAppText({
-          phone: assignedBookingResolved.phone,
-          message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
-        });
-        await appendHistoryEvent({
-          leadId,
-          eventType: "experimental_class_attendant_notification_sent",
-          title: "Atendente notificado sobre novo agendamento de aula experimental",
-          details: {
-            booking_id: bookingIdForHistory,
-            phone: assignedBookingResolved.phone,
-          },
-          actorType: "system",
-        });
-      } catch (error) {
-        await appendHistoryEvent({
-          leadId,
-          eventType: "experimental_class_attendant_notification_failed",
-          title: "Falha ao notificar o atendente sobre novo agendamento de aula experimental",
-          details: {
-            booking_id: bookingIdForHistory,
-            phone: assignedBookingResolved.phone,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
-        });
-      }
-    }
 
     try {
       await sendAtendimentoWhatsAppText({

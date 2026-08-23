@@ -32,14 +32,12 @@ import {
   NUMERIC_ONLY_FIELDS,
 } from "@/lib/atendimento/constants";
 import {
-  buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
   buildExperimentalClassDatesMessages,
   buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
   buildExperimentalClassTimesMessages,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
@@ -2504,38 +2502,6 @@ export async function POST(req: Request) {
         flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
         flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
       });
-
-      if (resolvedPublicProfessor && resolvedPublicProfessor.phone !== EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE) {
-        try {
-          await sendAtendimentoWhatsAppText({
-            phone: resolvedPublicProfessor.phone,
-            message: buildExperimentalClassAttendantWhatsAppMessage(firstName),
-          });
-
-          await appendHistoryEvent({
-            leadId,
-            conversationId,
-            eventType: "experimental_class_attendant_notification_sent",
-            title: "Atendente notificado sobre novo agendamento de aula experimental",
-            details: {
-              phone: resolvedPublicProfessor.phone,
-            },
-            actorType: "system",
-          });
-        } catch (error) {
-          await appendHistoryEvent({
-            leadId,
-            conversationId,
-            eventType: "experimental_class_attendant_notification_failed",
-            title: "Falha ao notificar o atendente sobre novo agendamento de aula experimental",
-            details: {
-              phone: resolvedPublicProfessor.phone,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            actorType: "system",
-          });
-        }
-      }
 
       try {
         await sendAtendimentoWhatsAppText({
