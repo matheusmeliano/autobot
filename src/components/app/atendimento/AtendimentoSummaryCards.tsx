@@ -593,11 +593,13 @@ function RecurringClassLinkCard({
   activeSection,
   savingThisLead,
   onSaveRecurringLink,
+  onEditPassword,
 }: {
   lead: AtendimentoLeadListItem;
   activeSection: SummarySectionId;
   savingThisLead: boolean;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
+  onEditPassword?: (lead: AtendimentoLeadListItem) => void;
 }) {
   if (activeSection !== "interessados" && activeSection !== "alunos") return null;
   const nomeStr = String(lead.full_name ?? "").trim();
@@ -648,8 +650,23 @@ function RecurringClassLinkCard({
 
   return (
     <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 space-y-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/95">
-        Link de matrícula
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/95">
+          Link de matrícula
+        </div>
+        {onEditPassword && (
+          <button
+            type="button"
+            onClick={(ev) => {
+              if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+              onEditPassword(lead);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-500/20 hover:text-emerald-100"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Editar senha
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -726,6 +743,7 @@ function LeadDetails({
   loadingPaymentAction,
   onConfirmPayment,
   onRejectPayment,
+  onEditPassword,
 }: {
   lead: AtendimentoLeadListItem;
   activeSection: SummarySectionId;
@@ -740,6 +758,7 @@ function LeadDetails({
   loadingPaymentAction?: "confirm" | "reject" | null;
   onConfirmPayment?: (lead: AtendimentoLeadListItem) => void;
   onRejectPayment?: (lead: AtendimentoLeadListItem) => void;
+  onEditPassword?: (lead: AtendimentoLeadListItem) => void;
 }) {
   const hasName = Boolean(String(lead.full_name ?? "").trim());
   const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
@@ -1060,6 +1079,7 @@ function LeadDetails({
             activeSection={activeSection}
             savingThisLead={savingRecurringLink}
             onSaveRecurringLink={onSaveRecurringLink}
+            onEditPassword={onEditPassword}
           />
         </div>
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
@@ -2075,6 +2095,10 @@ export function AtendimentoSummaryCards({
   const [isEditExperimentalOpen, setIsEditExperimentalOpen] = useState(false);
   const [editingExperimentalLead, setEditingExperimentalLead] = useState<AtendimentoLeadListItem | null>(null);
   const [savingExperimentalLeadId, setSavingExperimentalLeadId] = useState<string | null>(null);
+  const [isEditLeadPasswordOpen, setIsEditLeadPasswordOpen] = useState(false);
+  const [editingPasswordLead, setEditingPasswordLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [newPasswordDraft, setNewPasswordDraft] = useState<string>("");
+  const [savingLeadPasswordLeadId, setSavingLeadPasswordLeadId] = useState<string | null>(null);
   const [loadingExperimentalAvailability, setLoadingExperimentalAvailability] = useState<boolean>(false);
   const [experimentalAvailability, setExperimentalAvailability] = useState<{
     dates: any[];
@@ -2302,6 +2326,52 @@ export function AtendimentoSummaryCards({
       setSavingLeadLocationLeadId(null);
     }
   });
+
+  function openEditLeadPassword(lead: AtendimentoLeadListItem) {
+    setEditingPasswordLead(lead);
+    setNewPasswordDraft("");
+    setIsEditLeadPasswordOpen(true);
+  }
+
+  function closeEditLeadPassword() {
+    setIsEditLeadPasswordOpen(false);
+    setEditingPasswordLead(null);
+    setNewPasswordDraft("");
+  }
+
+  async function saveLeadPasswordSubmit() {
+    const leadId = String(editingPasswordLead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para alterar a senha.");
+      return;
+    }
+    const pwd = newPasswordDraft.trim();
+    if (pwd.length < 4) {
+      modalToast.error("A nova senha deve ter no mínimo 4 caracteres.");
+      return;
+    }
+    try {
+      setSavingLeadPasswordLeadId(leadId);
+      const response = await fetch(`/api/atendimento/leads/${leadId}/recurring-password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_password: pwd }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao alterar a senha.");
+        return;
+      }
+      modalToast.success("Senha de matrícula atualizada.");
+      closeEditLeadPassword();
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao alterar a senha.");
+    } finally {
+      setSavingLeadPasswordLeadId(null);
+    }
+  }
 
   function openEditExperimental(lead: AtendimentoLeadListItem) {
     setEditingExperimentalLead(lead);
@@ -4301,6 +4371,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           activeSection={activeSection}
                           savingThisLead={savingRecurringLinkLeadId === lead.id}
                           onSaveRecurringLink={handleSaveRecurringLink}
+                          onEditPassword={openEditLeadPassword}
                         />
                       </div>
                     </button>
@@ -4402,6 +4473,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   loadingPaymentAction={loadingPaymentLeadId === selectedLead.id ? loadingPaymentAction : null}
                   onConfirmPayment={(l) => handlePaymentAction(l, "confirm")}
                   onRejectPayment={(l) => handlePaymentAction(l, "reject")}
+                  onEditPassword={(l) => openEditLeadPassword(l)}
                 />
               )
             ) : (
@@ -4492,6 +4564,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       loadingPaymentAction={loadingPaymentLeadId === selectedLead.id ? loadingPaymentAction : null}
                       onConfirmPayment={(l) => handlePaymentAction(l, "confirm")}
                       onRejectPayment={(l) => handlePaymentAction(l, "reject")}
+                      onEditPassword={(l) => openEditLeadPassword(l)}
                     />
                   )}
                 </div>
@@ -4630,6 +4703,88 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                 className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
               >
                 {leadLocationForm.formState.isSubmitting || savingLeadLocationLeadId !== null ? "Salvando..." : "Salvar localização"}
+              </button>
+            </div>
+          </form>
+        </AppModal>
+
+        <AppModal
+          open={isEditLeadPasswordOpen}
+          onClose={closeEditLeadPassword}
+          size="md"
+          zIndexClass="z-[500]"
+          fullScreenOnMobile
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white/90">
+                Editar senha de matrícula
+              </div>
+              <div className="mt-1 truncate text-xs text-white/55">
+                {editingPasswordLead?.phone || editingPasswordLead?.full_name || "Lead selecionado"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeEditLeadPassword}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveLeadPasswordSubmit();
+            }}
+            className="mt-5 space-y-3"
+          >
+            <div>
+              <label className="text-xs font-semibold text-white/60">Nova senha</label>
+              <input
+                autoFocus
+                type="text"
+                value={newPasswordDraft}
+                onChange={(e) => setNewPasswordDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void saveLeadPasswordSubmit();
+                  }
+                }}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder="Mínimo 4 caracteres"
+                minLength={4}
+                maxLength={64}
+              />
+              <div className="mt-2 text-[11px] text-white/45">
+                Essa é a senha que o aluno usa para retomar a matrícula caso acesse o link por outro dispositivo.
+              </div>
+            </div>
+
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={closeEditLeadPassword}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingLeadPasswordLeadId !== null || newPasswordDraft.trim().length < 4}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+              >
+                {savingLeadPasswordLeadId !== null ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar senha"
+                )}
               </button>
             </div>
           </form>
