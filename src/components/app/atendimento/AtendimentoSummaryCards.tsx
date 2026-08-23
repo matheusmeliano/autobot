@@ -1563,7 +1563,7 @@ function BookingDetails({
                   return "Adicione o link da aula experimental antes de disparar a notificação.";
                 }
                 if (!assignedProfessor) {
-                  return "Selecione o professor responsável por esta aula antes de disparar.";
+                  return "Selecione o professor responsável antes de disparar agora.";
                 }
                 return "Disparar notificações agora";
               })()}
@@ -1595,7 +1595,7 @@ function BookingDetails({
             const cancelDisabled =
               cancellingBookingId === bookingId || cancelMissingProfessor;
             const cancelTitle = cancelMissingProfessor
-              ? "Selecione o professor responsável por esta aula experimental antes de cancelar o agendamento."
+              ? "Selecione o professor responsável antes de cancelar o agendamento."
               : cancellingBookingId === bookingId
                 ? "Cancelando agendamento..."
                 : "Cancelar este agendamento de aula experimental.";
@@ -3388,7 +3388,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       const assigned = experimentalClassBookingAssignedProfessor(lead);
       if (!assigned) {
         modalToast.error(
-          "Selecione o professor responsável por esta aula experimental antes de cancelar o agendamento.",
+          "Selecione o professor responsável antes de cancelar o agendamento.",
         );
         return;
       }
@@ -3426,7 +3426,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         if (payload?.error === "missing_experimental_professor_for_cancel") {
           modalToast.error(
             payload?.message ??
-              "Selecione o professor responsável por esta aula experimental antes de cancelar o agendamento.",
+              "Selecione o professor responsável antes de cancelar o agendamento.",
           );
         } else {
           modalToast.error(payload?.error ?? "Falha ao cancelar agendamento.");
@@ -3502,7 +3502,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         return;
       }
       if (!assigned) {
-        modalToast.error("Selecione o professor responsável por esta aula experimental antes de disparar.");
+        modalToast.error("Selecione o professor responsável antes de disparar agora.");
         return;
       }
     }
