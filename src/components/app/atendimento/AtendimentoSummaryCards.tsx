@@ -1301,7 +1301,7 @@ function LeadDetails({
                   Pagamento da matrícula
                 </div>
               </div>
-              {showPaymentActions ? (
+              {showPaymentActions && !paymentConfirmed && !paymentRejected ? (
                 <div className="w-full sm:w-auto flex flex-col sm:flex-row flex-nowrap items-stretch sm:items-center justify-stretch sm:justify-end gap-2">
                   <button
                     type="button"
