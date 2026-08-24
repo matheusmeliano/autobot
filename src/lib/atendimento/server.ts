@@ -3479,7 +3479,7 @@ function extractStudentPasswordFromLead(lead: any) {
     (lead as any)?.password,
   ];
   for (const c of candidates) {
-    if (typeof c === "string" && c.trim().length >= 6) return c.trim();
+    if (typeof c === "string" && c.trim().length >= 4) return c.trim();
   }
   return null;
 }
