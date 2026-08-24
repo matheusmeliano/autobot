@@ -1523,7 +1523,7 @@ function ContractDetails({
         </div>
       </div>
 
-      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 space-y-4">
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pl-2 pr-2 space-y-4">
         {hasRecurring ? (
           <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
