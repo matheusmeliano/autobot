@@ -1290,7 +1290,7 @@ function LeadDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
-        {showPaymentActions || paymentConfirmed || paymentRejected || paymentPendingConfirmation ? (
+        {showPaymentActions && !paymentConfirmed && !paymentRejected ? (
           <div
             className="mb-3 w-full overflow-visible rounded-2xl border border-[var(--app-border)] p-4"
             style={{ backgroundColor: "#181b20" }}
