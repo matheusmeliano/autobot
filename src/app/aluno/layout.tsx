@@ -17,11 +17,13 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default async function AlunoPortalLayout({
-  children,
-}: {
+export default async function AlunoPortalLayout(props: {
   children: ReactNode;
+  searchParams?: Promise<{ lead?: string | null | undefined } | null | undefined>;
 }) {
+  const { children } = props;
+  const searchParams = props?.searchParams ? await props.searchParams : null;
+  const leadParamId = String(searchParams?.lead ?? "").trim();
   const supabase = await createSupabaseServerClient();
   const {
     data: { session },
@@ -48,6 +50,11 @@ export default async function AlunoPortalLayout({
           }
         } catch {}
       }
+    }
+    if (!nextPath && leadParamId) {
+      const qs = new URLSearchParams();
+      qs.set("lead", leadParamId);
+      nextPath = `/aluno?${qs.toString()}`;
     }
     if (nextPath) {
       redirect(`/login?next=${encodeURIComponent(nextPath)}`);

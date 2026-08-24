@@ -62,7 +62,12 @@ function isPaymentConfirmed(lead: any) {
   );
 }
 
-export default async function AlunoPortalPage() {
+export default async function AlunoPortalPage(props: {
+  searchParams?: Promise<{ lead?: string | null | undefined } | null | undefined>;
+}) {
+  const searchParams = props?.searchParams ? await props.searchParams : null;
+  const leadParamId = String(searchParams?.lead ?? "").trim();
+
   const supabase = await createSupabaseServerClient();
   const admin = createSupabaseAdminClient();
 
@@ -94,7 +99,16 @@ export default async function AlunoPortalPage() {
 
   let lead: any = null;
 
-  if (userLeadId) {
+  if (leadParamId) {
+    const { data } = await admin
+      .from("atendimento_leads")
+      .select("*")
+      .eq("id", leadParamId)
+      .maybeSingle();
+    lead = data ?? null;
+  }
+
+  if (!lead && userLeadId) {
     const { data } = await admin
       .from("atendimento_leads")
       .select("*")

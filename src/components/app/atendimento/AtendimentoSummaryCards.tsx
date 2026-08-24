@@ -660,9 +660,12 @@ function RecurringClassLinkCard({
     funnelRaw === "matricula_confirmada";
 
   if (isMatriculaConcluida) {
+    const alunoQs = new URLSearchParams();
+    alunoQs.set("lead", String(lead.id ?? "").trim());
+    const alunoRel = `/aluno?${alunoQs.toString()}`;
     const alunoPortalLink = baseOrigin
-      ? new URL("/aluno", baseOrigin).toString()
-      : "https://www.autobot.business/aluno";
+      ? new URL(alunoRel, baseOrigin).toString()
+      : `https://www.autobot.business${alunoRel}`;
 
     return (
       <div className="rounded-2xl border border-blue-500/25 bg-blue-500/10 px-4 py-3 space-y-3">
