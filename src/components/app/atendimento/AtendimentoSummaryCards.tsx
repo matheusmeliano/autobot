@@ -673,6 +673,19 @@ function RecurringClassLinkCard({
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
             Painel do Aluno
           </div>
+          {onEditPassword && (
+            <button
+              type="button"
+              onClick={(ev) => {
+                if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                onEditPassword(lead);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/25 bg-sky-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-sky-200 transition hover:bg-sky-500/20 hover:text-sky-100"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Editar senha
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
