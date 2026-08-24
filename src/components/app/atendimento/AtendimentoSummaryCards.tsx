@@ -1328,24 +1328,25 @@ function LeadDetails({
                 </div>
               ) : null}
             </div>
-            {(() => {
-              const hasConf = !!(paymentConfirmedAt && paymentConfirmedAt !== "null");
-              const hasRej = !!(paymentRejectedAt && paymentRejectedAt !== "null");
-              const count = (hasConf ? 1 : 0) + (hasRej ? 1 : 0);
-              if (count === 0) return null;
-              return (
-                <div className={`mt-4 grid min-w-0 gap-3 ${count >= 2 ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
-                  {hasConf ? (
-                    <Field label="Confirmado em" value={formatAtendimentoDateTime(paymentConfirmedAt)} />
-                  ) : null}
-                  {hasRej ? (
-                    <Field label="Marcado em" value={formatAtendimentoDateTime(paymentRejectedAt)} />
-                  ) : null}
-                </div>
-              );
-            })()}
           </div>
         ) : null}
+
+        {(() => {
+          const hasConf = !!(paymentConfirmedAt && paymentConfirmedAt !== "null");
+          const hasRej = !!(paymentRejectedAt && paymentRejectedAt !== "null");
+          const count = (hasConf ? 1 : 0) + (hasRej ? 1 : 0);
+          if (count === 0) return null;
+          return (
+            <div className={`mb-3 grid min-w-0 gap-3 ${count >= 2 ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
+              {hasConf ? (
+                <Field label="Confirmado em" value={formatAtendimentoDateTime(paymentConfirmedAt)} />
+              ) : null}
+              {hasRej ? (
+                <Field label="Marcado em" value={formatAtendimentoDateTime(paymentRejectedAt)} />
+              ) : null}
+            </div>
+          );
+        })()}
 
         <div className="mb-4">
           <RecurringClassLinkCard
