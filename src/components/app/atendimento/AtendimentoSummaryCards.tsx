@@ -594,14 +594,17 @@ function RecurringClassLinkCard({
   savingThisLead,
   onSaveRecurringLink,
   onEditPassword,
+  context,
 }: {
   lead: AtendimentoLeadListItem;
   activeSection: SummarySectionId;
   savingThisLead: boolean;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
   onEditPassword?: (lead: AtendimentoLeadListItem) => void;
+  context?: "details" | "list";
 }) {
   if (activeSection !== "interessados" && activeSection !== "alunos") return null;
+  const isDetails = context === "details";
   const nomeStr = String(lead.full_name ?? "").trim();
   const telStr = String(lead.phone ?? "").replace(/\D/g, "").trim();
   const partes = nomeStr.split(/\s+/).filter(Boolean);
@@ -667,7 +670,7 @@ function RecurringClassLinkCard({
       ? new URL(alunoRel, baseOrigin).toString()
       : `https://www.autobot.business${alunoRel}`;
 
-    return (
+    const painelAlunoCard = (
       <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
@@ -746,6 +749,96 @@ function RecurringClassLinkCard({
         </div>
       </div>
     );
+
+    if (isDetails) {
+      const linkMatriculaCard = (
+        <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/95">
+              Link de matrícula
+            </div>
+            {onEditPassword && (
+              <button
+                type="button"
+                onClick={(ev) => {
+                  if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                  onEditPassword(lead);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-500/20 hover:text-emerald-100"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Editar senha
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={async (ev) => {
+                if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                try {
+                  window.open(urlEncoded, "_blank", "noopener,noreferrer");
+                } catch {}
+              }}
+              disabled={savingThisLead}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-500 active:bg-emerald-500 disabled:opacity-60"
+            >
+              {savingThisLead ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
+              )}
+              Abrir
+            </button>
+            <button
+              type="button"
+              onClick={async (ev) => {
+                if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                try {
+                  if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
+                    await (navigator as any).clipboard.writeText(urlEncoded);
+                    modalToast.success("Link de matrícula copiado.");
+                  } else {
+                    try {
+                      const ta = document.createElement("textarea");
+                      ta.value = urlEncoded;
+                      ta.style.position = "fixed";
+                      ta.style.opacity = "0";
+                      document.body.appendChild(ta);
+                      ta.select();
+                      document.execCommand("copy");
+                      document.body.removeChild(ta);
+                      modalToast.success("Link de matrícula copiado.");
+                    } catch {
+                      prompt("Copie o link de matrícula:", urlEncoded);
+                    }
+                  }
+                } catch (e) {
+                  modalToast.error(e instanceof Error ? e.message : "Falha ao copiar o link.");
+                }
+              }}
+              disabled={savingThisLead}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+            >
+              {savingThisLead ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+              Copiar
+            </button>
+          </div>
+        </div>
+      );
+      return (
+        <>
+          {painelAlunoCard}
+          {linkMatriculaCard}
+        </>
+      );
+    }
+
+    return painelAlunoCard;
   }
 
   const finalLink = urlEncoded;
@@ -1182,6 +1275,7 @@ function LeadDetails({
             savingThisLead={savingRecurringLink}
             onSaveRecurringLink={onSaveRecurringLink}
             onEditPassword={onEditPassword}
+            context="details"
           />
         </div>
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
@@ -4473,6 +4567,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           activeSection={activeSection}
                           savingThisLead={savingRecurringLinkLeadId === lead.id}
                           onSaveRecurringLink={handleSaveRecurringLink}
+                          context="list"
                         />
                       </div>
                     </button>
