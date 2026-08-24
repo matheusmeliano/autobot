@@ -3547,6 +3547,12 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
       try {
         await admin.auth.admin.updateUserById(userId, {
           password: studentPassword,
+          app_metadata: {
+            ...(match && typeof match === "object" && "app_metadata" in match && (match as any).app_metadata && typeof (match as any).app_metadata === "object"
+              ? (match as any).app_metadata
+              : {}),
+            access_scope: "aluno",
+          },
         });
       } catch {}
     } else {
@@ -3563,7 +3569,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
           origin: "aluno_matricula_recorrente",
         },
         app_metadata: {
-          access_scope: "app",
+          access_scope: "aluno",
         },
       });
       userId = (data as any)?.user?.id ? String((data as any).user.id) : null;
@@ -3596,7 +3602,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
         await admin
           .from("profiles")
           .update({
-            access_scope: (profile as any).access_scope || "app",
+            access_scope: "aluno",
             email: email,
             phone: phoneDigits ? phoneDigits : (profile as any).phone,
             full_name: fullName,
@@ -3606,7 +3612,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
         try {
           await admin.from("profiles").insert({
             user_id: userId,
-            access_scope: "app",
+            access_scope: "aluno",
             email,
             phone: phoneDigits ? phoneDigits : null,
             full_name: fullName,
@@ -3810,7 +3816,7 @@ export async function confirmLeadRecurringPayment(params: {
     const firstName = fullName.split(/\s+/)[0] || fullName || null;
     const studentMsg = buildRecurringPaymentConfirmedStudentWelcomeMessage(
       firstName,
-      "https://www.autobot.business/login",
+      "https://www.autobot.business/aluno",
     );
     const studentPhone = String((lead as any).phone ?? (lead as any)?.telefone ?? "").trim();
     if (studentPhone && studentPhone.replace(/\D/g, "").length >= 10) {
