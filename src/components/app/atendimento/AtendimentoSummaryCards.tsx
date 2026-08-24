@@ -1289,7 +1289,7 @@ function LeadDetails({
         </div>
       </div>
 
-      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-3">
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {showPaymentActions && !paymentConfirmed && !paymentRejected ? (
           <div
             className="mb-3 w-full overflow-visible rounded-2xl border border-[var(--app-border)] p-4"
@@ -1916,7 +1916,7 @@ function BookingDetails({
         ) : null}
       </div>
 
-      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-3">
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {activeSection === "agendamentos" && leadHasMatriculaOrRecurringStageInitiated(lead) ? (
           <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
             <div>
@@ -4428,7 +4428,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         })}
       </div>
 
-      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pr-3">
+      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pr-1">
         <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] lg:flex lg:h-full lg:w-[320px] lg:min-w-[320px] lg:flex-col">
           <div className="shrink-0 border-b border-[var(--app-border)] px-4 py-4">
@@ -4462,7 +4462,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
               />
             </label>
           </div>
-          <div className="overflow-y-auto p-3 pr-5 lg:flex-1 lg:min-h-0" ref={listScrollContainerRef}>
+          <div className="overflow-y-auto p-3 pr-4 lg:flex-1 lg:min-h-0" ref={listScrollContainerRef}>
             {pagedItems.length ? (
               <div className="space-y-3">
                 {pagedItems.map((lead) => {
