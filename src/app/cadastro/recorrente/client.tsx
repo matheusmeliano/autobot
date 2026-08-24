@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { inferCountry } from "../../../lib/atendimento/experimentalClass";
 import { resolveStudentTimezone } from "../../../lib/timezone";
+import { AppModal } from "@/components/app/AppModal";
+import { Info, X } from "lucide-react";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
@@ -224,6 +226,7 @@ export default function CadastroRecorrenteBody() {
   const [resumePassword, setResumePassword] = useState<string>("");
   const [resumeLoading, setResumeLoading] = useState<boolean>(false);
   const [resumeError, setResumeError] = useState<string>("");
+  const [showPlanoInfo, setShowPlanoInfo] = useState<boolean>(false);
 
   useEffect(() => {
     if (!submitResult) return;
@@ -1437,53 +1440,78 @@ export default function CadastroRecorrenteBody() {
           </div>
 
           {step === 0 && (
-            <section className="space-y-7">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">Crie sua conta</h2>
-                <p className="mt-1 text-slate-600">Preencha os dados abaixo para prosseguir.</p>
-                {initialDataLoading && (
-                  <p className="mt-2 text-xs text-slate-500">Sincronizando seus dados...</p>
-                )}
-              </div>
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-2">
-                    E-mail (seu WhatsApp)
-                  </label>
-                  <input
-                    type="text"
-                    value={phoneField}
-                    onChange={(e) => setPhoneField(e.target.value)}
-                    readOnly
-                    className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-600 outline-none cursor-not-allowed"
-                    placeholder="Telefone identificador"
-                  />
-                  <p className="mt-2 text-xs text-slate-500">
-                    Esse valor é preenchido automaticamente com seu WhatsApp.
-                  </p>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowPlanoInfo(true)}
+                className="w-full rounded-2xl border border-indigo-500/25 bg-indigo-500/10 px-4 py-3 flex items-center justify-between gap-3 hover:bg-indigo-500/15 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white inline-flex items-center justify-center shrink-0">
+                    <Info className="h-4 w-4" aria-hidden="true" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-semibold text-slate-900">
+                      Informações do plano contratado
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      Clique para ver valores, formas de pagamento e o que está incluso.
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-2">Crie uma senha</label>
-                  <input
-                    type="password"
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
-                    placeholder="Mínimo 4 caracteres"
-                    minLength={4}
-                  />
+                <div className="rounded-xl border border-indigo-500/25 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 shrink-0">
+                  Ver detalhes
                 </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 pt-2 w-full">
-                <button
-                  onClick={handleAdvance0}
-                  disabled={!canAdvanceFromStep0()}
-                  className="w-full sm:w-auto sm:ml-auto rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
-                >
-                  Avançar
-                </button>
-              </div>
-            </section>
+              </button>
+
+              <section className="space-y-7">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Crie sua conta</h2>
+                  <p className="mt-1 text-slate-600">Preencha os dados abaixo para prosseguir.</p>
+                  {initialDataLoading && (
+                    <p className="mt-2 text-xs text-slate-500">Sincronizando seus dados...</p>
+                  )}
+                </div>
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-800 mb-2">
+                      E-mail (seu WhatsApp)
+                    </label>
+                    <input
+                      type="text"
+                      value={phoneField}
+                      onChange={(e) => setPhoneField(e.target.value)}
+                      readOnly
+                      className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-600 outline-none cursor-not-allowed"
+                      placeholder="Telefone identificador"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">
+                      Esse valor é preenchido automaticamente com seu WhatsApp.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-800 mb-2">Crie uma senha</label>
+                    <input
+                      type="password"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                      placeholder="Mínimo 4 caracteres"
+                      minLength={4}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 pt-2 w-full">
+                  <button
+                    onClick={handleAdvance0}
+                    disabled={!canAdvanceFromStep0()}
+                    className="w-full sm:w-auto sm:ml-auto rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
+                  >
+                    Avançar
+                  </button>
+                </div>
+              </section>
+            </>
           )}
 
           {step === 1 && (
@@ -2361,6 +2389,74 @@ export default function CadastroRecorrenteBody() {
           © {new Date().getFullYear()} Lucas Brum Online Music USA. Todos os direitos reservados.
         </footer>
       </div>
+
+      <AppModal
+        open={showPlanoInfo}
+        onClose={() => setShowPlanoInfo(false)}
+        size="lg"
+        position="center"
+        fullScreenOnMobile={true}
+      >
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">Informações do plano</h3>
+            <p className="mt-1 text-sm text-slate-600">Detalhes do modelo contratado e formas de pagamento.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowPlanoInfo(false)}
+            className="shrink-0 inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="space-y-5 text-slate-700 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-800">
+            Você está prestes a contratar o Modelo Individual, com aulas online ao vivo e ensino totalmente personalizado de acordo com seu nível e objetivos.
+          </p>
+          <p className="text-slate-800">
+            O plano inclui 1 aula por semana e acompanhamento contínuo durante todo o processo.
+          </p>
+
+          <div className="pt-1">
+            <p className="text-sm font-bold uppercase tracking-wider text-slate-900 mb-3">
+              Formas de pagamento
+            </p>
+            <ul className="space-y-4">
+              <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 sm:px-5 py-4">
+                <div className="text-sm font-bold text-slate-900 mb-1">Cartão de crédito</div>
+                <p className="text-slate-700">
+                  US$ 116,00 por mês, mantendo esse mesmo valor nas mensalidades seguintes.
+                </p>
+              </li>
+              <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 sm:px-5 py-4">
+                <div className="text-sm font-bold text-slate-900 mb-1">Depósito bancário</div>
+                <p className="text-slate-700">
+                  US$ 100,00 no primeiro mês. A partir do segundo mês, a mensalidade passa a ser de US$ 119,00.
+                </p>
+              </li>
+              <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 sm:px-5 py-4">
+                <div className="text-sm font-bold text-slate-900 mb-1">Pix</div>
+                <p className="text-slate-700">
+                  US$ 100,00 ou R$ 500,00 no primeiro mês, considerando a cotação de US$ 1,00 = R$ 5,00. A partir do segundo mês, a mensalidade passa a ser de US$ 119,00.
+                </p>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="pt-6 mt-5 border-t border-slate-200 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowPlanoInfo(false)}
+            className="w-full sm:w-auto rounded-2xl px-6 py-3 bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
+          >
+            Entendi
+          </button>
+        </div>
+      </AppModal>
     </main>
   );
 }
