@@ -110,6 +110,39 @@ export default function CadastroRecorrenteBody() {
   const initialPhoneParam = decodeURIComponent(String(sp.get("telefone") ?? "").trim()) || "";
   const initialLeadIdParam = String(sp.get("id") ?? "").trim() || "";
 
+  function getCadastroRecorrenteStorageKey(rawPhone: string): string {
+    const tel = String(rawPhone ?? "").replace(/\D/g, "").trim();
+    return `autobot:cadastro_recorrente:senha:${tel || "generic"}`;
+  }
+
+  function safeReadSavedPassword(rawPhone: string): string {
+    if (typeof window === "undefined") return "";
+    try {
+      const key = getCadastroRecorrenteStorageKey(rawPhone);
+      const v = window.localStorage.getItem(key);
+      if (typeof v !== "string") return "";
+      const pwd = v.trim();
+      if (pwd.length < 4) return "";
+      if (/^[•·*]{4,}$/.test(pwd)) return "";
+      return pwd;
+    } catch {
+      return "";
+    }
+  }
+
+  function safeWriteSavedPassword(rawPhone: string, pwdRaw: string): void {
+    if (typeof window === "undefined") return;
+    try {
+      const pwd = String(pwdRaw ?? "").trim();
+      const key = getCadastroRecorrenteStorageKey(rawPhone);
+      if (pwd.length >= 4 && !/^[•·*]{4,}$/.test(pwd)) {
+        window.localStorage.setItem(key, pwd);
+      } else {
+        window.localStorage.removeItem(key);
+      }
+    } catch {}
+  }
+
   function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
     if (raw === null || raw === undefined) return fallback;
     if (typeof raw === "string") {
@@ -177,7 +210,7 @@ export default function CadastroRecorrenteBody() {
   const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6>(0);
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
-  const [senha, setSenha] = useState<string>("");
+  const [senha, setSenha] = useState<string>(() => safeReadSavedPassword(initialPhoneParam));
   const [hasPasswordInitial, setHasPasswordInitial] = useState<boolean>(false);
   const [stateField, setStateField] = useState<string>("");
   const [cityField, setCityField] = useState<string>("");
@@ -227,6 +260,12 @@ export default function CadastroRecorrenteBody() {
   const [resumeLoading, setResumeLoading] = useState<boolean>(false);
   const [resumeError, setResumeError] = useState<string>("");
   const [showPlanoInfo, setShowPlanoInfo] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      safeWriteSavedPassword(phoneField, senha);
+    } catch {}
+  }, [senha, phoneField]);
 
   useEffect(() => {
     if (!submitResult) return;
