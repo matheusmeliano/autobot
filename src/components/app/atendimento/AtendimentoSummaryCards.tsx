@@ -676,7 +676,7 @@ function RecurringClassLinkCard({
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
             Painel do Aluno
           </div>
-          {onEditPassword && (
+          {onEditPassword && !isDetails && (
             <button
               type="button"
               onClick={(ev) => {
@@ -757,19 +757,6 @@ function RecurringClassLinkCard({
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/95">
               Link de matrícula
             </div>
-            {onEditPassword && (
-              <button
-                type="button"
-                onClick={(ev) => {
-                  if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-                  onEditPassword(lead);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-500/20 hover:text-emerald-100"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Editar senha
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -830,10 +817,31 @@ function RecurringClassLinkCard({
           </div>
         </div>
       );
+      const senhaUnicaCard = onEditPassword ? (
+        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-55)]">
+              Senha do aluno
+            </div>
+            <button
+              type="button"
+              onClick={(ev) => {
+                if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                onEditPassword(lead);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Editar senha
+            </button>
+          </div>
+        </div>
+      ) : null;
       return (
         <>
           {painelAlunoCard}
           {linkMatriculaCard}
+          {senhaUnicaCard}
         </>
       );
     }
