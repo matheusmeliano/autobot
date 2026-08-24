@@ -34,6 +34,7 @@ import {
   RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_WEEKDAY_LABELS_PT_BR,
   resolveExperimentalClassAssignedProfessorPhone,
+  getExperimentalClassInternalStaffPhoneNumbers,
   type RecurringWeekdayKey,
 } from "@/lib/atendimento/experimentalClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
@@ -478,9 +479,10 @@ async function sendZapiText(params: {
   const normalizedPhone = normalizePhone(params.phone);
 
   const internalNotificationPhones = new Set(
-    [ATENDIMENTO_DAILY_SUMMARY_PHONE, EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE].map((value) =>
-      normalizePhoneDigitsOnly(value),
-    ),
+    [
+      ATENDIMENTO_DAILY_SUMMARY_PHONE,
+      ...getExperimentalClassInternalStaffPhoneNumbers(),
+    ].map((value) => normalizePhoneDigitsOnly(value)),
   );
   const destDigits = normalizePhoneDigitsOnly(normalizedPhone);
   const isInternalNotificationPhone = destDigits && internalNotificationPhones.has(destDigits);
@@ -848,9 +850,10 @@ export async function sendAtendimentoWhatsAppText(params: {
 
   const normalizedDest = normalizePhoneDigitsOnly(params.phone);
   const internalNotificationPhones = new Set(
-    [ATENDIMENTO_DAILY_SUMMARY_PHONE, EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE].map((value) =>
-      normalizePhoneDigitsOnly(value),
-    ),
+    [
+      ATENDIMENTO_DAILY_SUMMARY_PHONE,
+      ...getExperimentalClassInternalStaffPhoneNumbers(),
+    ].map((value) => normalizePhoneDigitsOnly(value)),
   );
 
   if (normalizedDest && !internalNotificationPhones.has(normalizedDest)) {

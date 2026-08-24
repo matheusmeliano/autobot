@@ -35,6 +35,14 @@ export const EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST = [
   { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
 ] as const;
 
+export function getExperimentalClassInternalStaffPhoneNumbers(): string[] {
+  return [
+    EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+    EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+    ...EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.map((p) => p.phone),
+  ];
+}
+
 export function resolveExperimentalClassAssignedProfessorPhone(input: {
   bookingAssignedPhone?: string | null;
   bookingAssignedName?: string | null;
