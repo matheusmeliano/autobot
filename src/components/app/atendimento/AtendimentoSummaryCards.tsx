@@ -1289,7 +1289,7 @@ function LeadDetails({
         </div>
       </div>
 
-      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-2">
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {showPaymentActions && !paymentConfirmed && !paymentRejected ? (
           <div
             className="mb-3 w-full overflow-visible rounded-2xl border border-[var(--app-border)] p-4"
@@ -1523,7 +1523,7 @@ function ContractDetails({
         </div>
       </div>
 
-      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pl-2 pr-2 space-y-4">
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 space-y-4">
         {hasRecurring ? (
           <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
@@ -1916,7 +1916,7 @@ function BookingDetails({
         ) : null}
       </div>
 
-      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-2">
+      <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {activeSection === "agendamentos" && leadHasMatriculaOrRecurringStageInitiated(lead) ? (
           <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
             <div>
@@ -4519,7 +4519,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       >
                         {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
                       </div>
-                      <div className="mt-1 space-y-1">
                       {(() => {
                         const warnings: JSX.Element[] = [];
                         const recurringWeekdayRaw = String(lead.recurring_class_weekday ?? "").trim().toLowerCase();
@@ -4570,7 +4569,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           recLinkSections.includes(activeSection)
                         ) {
                           warnings.push(
-                            <div key="rec-link" className="text-[11px] font-semibold text-amber-300">
+                            <div key="rec-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula recorrente
                             </div>,
                           );
@@ -4582,7 +4581,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           expLinkSections.includes(activeSection)
                         ) {
                           warnings.push(
-                            <div key="exp-link" className="text-[11px] font-semibold text-amber-300">
+                            <div key="exp-link" className="mt-1 text-[11px] font-semibold text-amber-300">
                               Adicione link da aula experimental
                             </div>,
                           );
@@ -4597,7 +4596,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         let label = "Falta estado e cidade";
                         if (stateRaw && !cityRaw) label = "Falta cidade";
                         return (
-                          <div className="text-xs text-[var(--app-text-55)]">
+                          <div className="mt-1 text-xs text-[var(--app-text-55)]">
                             {label}
                           </div>
                         );
@@ -4623,7 +4622,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         if (!isScheduledStage) return null;
                         const isAulaEm = /^Aula em:/.test(experimentalMeta);
                         return (
-                          <div className={`text-xs ${isAulaEm ? "text-emerald-500" : "text-[var(--app-text-55)]"}`}>
+                          <div className={`mt-1 text-xs ${isAulaEm ? "text-emerald-500" : "text-[var(--app-text-55)]"}`}>
                             {experimentalMeta}
                           </div>
                         );
@@ -4633,17 +4632,16 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         if (!meta) return null;
                         const isAulaEm = /^Aula em:/.test(meta);
                         return (
-                          <div className={`text-xs ${isAulaEm ? "text-emerald-500" : "text-[var(--app-text-55)]"}`}>
+                          <div className={`mt-1 text-xs ${isAulaEm ? "text-emerald-500" : "text-[var(--app-text-55)]"}`}>
                             {meta}
                           </div>
                         );
                       })()}
                       {isLeadRepescagem(lead) ? (
-                        <div className="mt-1">
+                        <div className="mt-2">
                           <RepescagemBadge />
                         </div>
                       ) : null}
-                      </div>
                       <div className="mt-3">
                         <RecurringClassLinkCard
                           lead={lead}

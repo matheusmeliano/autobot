@@ -202,6 +202,7 @@ export async function POST(
         .from("atendimento_experimental_class_bookings")
         .update({
           student_start_notification_sent_at: sentAtIso,
+          attendant_start_notification_sent_at: sentAtIso,
           updated_at: sentAtIso,
         })
         .eq("id", String((resolvedBooking as any).id));
@@ -340,17 +341,6 @@ export async function POST(
       actorType: "attendant",
       actorEmail: auth.user.email,
     });
-    if (resolvedBooking && String((resolvedBooking as any)?.id ?? "").trim()) {
-      try {
-        await admin
-          .from("atendimento_experimental_class_bookings")
-          .update({
-            attendant_start_notification_sent_at: sentAtIso,
-            updated_at: sentAtIso,
-          })
-          .eq("id", String((resolvedBooking as any).id));
-      } catch (_e) {}
-    }
   }
 
   let registeredAttendantSendFailedError: string | null = null;
@@ -395,17 +385,6 @@ export async function POST(
       actorType: "attendant",
       actorEmail: auth.user.email,
     });
-    if (resolvedBooking && String((resolvedBooking as any)?.id ?? "").trim()) {
-      try {
-        await admin
-          .from("atendimento_experimental_class_bookings")
-          .update({
-            registered_attendant_start_notification_sent_at: sentAtIso,
-            updated_at: sentAtIso,
-          })
-          .eq("id", String((resolvedBooking as any).id));
-      } catch (_e) {}
-    }
   }
 
   const responseBooking = {
@@ -415,7 +394,7 @@ export async function POST(
     conversation_id: conversationId,
     lesson_link: lessonLink,
     student_start_notification_sent_at: sentAtIso,
-    attendant_start_notification_sent_at: !attendantSendFailedError ? sentAtIso : null,
+    attendant_start_notification_sent_at: sentAtIso,
     status: bookingStatus,
   };
 
