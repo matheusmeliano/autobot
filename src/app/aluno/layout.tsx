@@ -17,28 +17,61 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default async function AlunoPortalLayout(props: {
+function extractLeadParamFromRawPath(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const safe = String(raw);
+  try {
+    const qIdx = safe.indexOf("?");
+    const search = qIdx >= 0 ? safe.slice(qIdx + 1) : "";
+    if (!search) return null;
+    const usp = new URLSearchParams(search);
+    const v = usp.get("lead");
+    return typeof v === "string" && v.trim() ? v.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function AlunoPortalLayout({
+  children,
+}: {
   children: ReactNode;
-  searchParams?: Promise<{ lead?: string | null | undefined } | null | undefined>;
 }) {
-  const { children } = props;
-  const searchParams = props?.searchParams ? await props.searchParams : null;
-  const leadParamId = String(searchParams?.lead ?? "").trim();
+  const hdrs = await headers();
+  const pathCandidates = [
+    hdrs.get("x-invoke-path"),
+    hdrs.get("x-matched-path"),
+    hdrs.get("next-url"),
+    hdrs.get("x-next-url"),
+    hdrs.get("x-original-uri"),
+    hdrs.get("x-forwarded-uri"),
+  ];
+  let leadParamId: string | null = null;
+  for (const raw of pathCandidates) {
+    const extracted = extractLeadParamFromRawPath(raw);
+    if (extracted) {
+      leadParamId = extracted;
+      break;
+    }
+  }
+  if (!leadParamId) {
+    const referer = hdrs.get("referer");
+    if (referer) {
+      try {
+        const refUrl = new URL(referer);
+        if (refUrl.pathname.startsWith("/aluno")) {
+          leadParamId = extractLeadParamFromRawPath(`${refUrl.pathname}${refUrl.search}`);
+        }
+      } catch {}
+    }
+  }
   const supabase = await createSupabaseServerClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   if (!session?.user) {
-    const hdrs = await headers();
-    const candidates = [
-      hdrs.get("x-invoke-path"),
-      hdrs.get("x-matched-path"),
-      hdrs.get("next-url"),
-      hdrs.get("x-next-url"),
-      hdrs.get("x-original-uri"),
-      hdrs.get("x-forwarded-uri"),
-    ];
+    const candidates = [...pathCandidates];
     let nextPath = candidates.find((value) => typeof value === "string" && value.startsWith("/")) ?? "";
     if (!nextPath) {
       const referer = hdrs.get("referer");
