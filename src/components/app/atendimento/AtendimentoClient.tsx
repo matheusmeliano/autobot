@@ -178,7 +178,7 @@ export function AtendimentoClient() {
   }, [loadPanelLeads, loadSummary]);
 
   return (
-    <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 bg-[var(--app-bg)]">
+    <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 bg-[var(--app-bg)] app-scroll-container scroll-gutter-y">
       <div className="shrink-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 lg:px-5 lg:py-3.5">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
