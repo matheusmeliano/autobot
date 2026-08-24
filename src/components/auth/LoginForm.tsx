@@ -16,7 +16,7 @@ type FormValues = {
   password: string;
 };
 
-export function LoginForm() {
+export function LoginForm({ initialLogin }: { initialLogin?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -25,6 +25,7 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: { login: "", password: "" },
@@ -46,6 +47,12 @@ export function LoginForm() {
       router.replace("/login");
     }
   }, [router, searchParams]);
+
+  useEffect(() => {
+    const safe = String(initialLogin ?? "").trim();
+    if (!safe) return;
+    reset({ login: safe, password: "" });
+  }, [initialLogin, reset]);
 
   useEffect(() => {
     if (didShowLinkNotice.current) return;
