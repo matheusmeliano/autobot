@@ -11,8 +11,8 @@ export default function AlunoChangePasswordCard() {
     kind: "success" | "error";
     text: string;
   } | null>(null);
-  const [busy, setBusy] = useTransition()[1];
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const busy = isPending;
 
   async function onSubmit(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
