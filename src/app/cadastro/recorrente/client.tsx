@@ -1444,7 +1444,7 @@ export default function CadastroRecorrenteBody() {
               <button
                 type="button"
                 onClick={() => setShowPlanoInfo(true)}
-                className="w-full rounded-2xl border border-indigo-500/25 bg-indigo-500/10 px-4 py-3 flex items-center justify-between gap-3 hover:bg-indigo-500/15 transition"
+                className="w-full rounded-2xl border border-indigo-500/25 bg-indigo-500/10 px-4 py-3 flex items-center justify-between gap-3 hover:bg-indigo-500/15 transition mb-8"
               >
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white inline-flex items-center justify-center shrink-0">
