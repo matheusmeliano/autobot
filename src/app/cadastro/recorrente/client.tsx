@@ -2415,10 +2415,10 @@ export default function CadastroRecorrenteBody() {
 
         <div className="space-y-5 text-slate-700 text-sm sm:text-base leading-relaxed">
           <p className="text-slate-800">
-            Você está prestes a contratar o Modelo Individual, com aulas online ao vivo e ensino totalmente personalizado de acordo com seu nível e objetivos.
+            Você está prestes a contratar o <span className="font-bold text-slate-900">Modelo Individual</span>, com aulas online ao vivo e ensino totalmente personalizado de acordo com seu nível e objetivos.
           </p>
           <p className="text-slate-800">
-            O plano inclui 1 aula por semana e acompanhamento contínuo durante todo o processo.
+            O plano inclui <span className="font-bold text-slate-900">1 aula por semana</span> e acompanhamento contínuo durante todo o processo.
           </p>
 
           <div className="pt-1">
