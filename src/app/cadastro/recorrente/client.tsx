@@ -2396,6 +2396,7 @@ export default function CadastroRecorrenteBody() {
         size="lg"
         position="center"
         fullScreenOnMobile={true}
+        panelClassName="bg-white border-slate-100"
       >
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
@@ -2421,25 +2422,25 @@ export default function CadastroRecorrenteBody() {
           </p>
 
           <div className="pt-1">
-            <p className="text-sm font-bold uppercase tracking-wider text-slate-900 mb-3">
+            <p className="text-sm font-bold uppercase tracking-wider text-indigo-700 mb-3">
               Formas de pagamento
             </p>
             <ul className="space-y-4">
-              <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 sm:px-5 py-4">
-                <div className="text-sm font-bold text-slate-900 mb-1">Cartão de crédito</div>
+              <li className="rounded-2xl border border-indigo-500/15 bg-indigo-500/5 px-4 sm:px-5 py-4">
+                <div className="text-sm font-bold text-indigo-900 mb-1">Cartão de crédito</div>
                 <p className="text-slate-700">
                   US$ 116,00 por mês, mantendo esse mesmo valor nas mensalidades seguintes.
                 </p>
               </li>
-              <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 sm:px-5 py-4">
-                <div className="text-sm font-bold text-slate-900 mb-1">Depósito bancário</div>
+              <li className="rounded-2xl border border-sky-500/15 bg-sky-500/5 px-4 sm:px-5 py-4">
+                <div className="text-sm font-bold text-sky-900 mb-1">Depósito bancário</div>
                 <p className="text-slate-700">
                   US$ 100,00 no primeiro mês. A partir do segundo mês, a mensalidade passa a ser de US$ 119,00.
                 </p>
               </li>
-              <li className="rounded-2xl border border-slate-200 bg-slate-50 px-4 sm:px-5 py-4">
-                <div className="text-sm font-bold text-slate-900 mb-1">Pix</div>
-                <p className="text-slate-700">
+              <li className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 sm:px-5 py-4">
+                <div className="text-sm font-bold text-emerald-800 mb-1">Pix</div>
+                <p className="text-slate-800">
                   US$ 100,00 ou R$ 500,00 no primeiro mês, considerando a cotação de US$ 1,00 = R$ 5,00. A partir do segundo mês, a mensalidade passa a ser de US$ 119,00.
                 </p>
               </li>
@@ -2447,7 +2448,7 @@ export default function CadastroRecorrenteBody() {
           </div>
         </div>
 
-        <div className="pt-6 mt-5 border-t border-slate-200 flex justify-end">
+        <div className="pt-6 mt-5 border-t border-slate-100 flex justify-end">
           <button
             type="button"
             onClick={() => setShowPlanoInfo(false)}
