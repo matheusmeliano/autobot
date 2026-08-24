@@ -683,10 +683,10 @@ function RecurringClassLinkCard({
                 if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
                 onEditPassword(lead);
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/25 bg-sky-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-sky-200 transition hover:bg-sky-500/20 hover:text-sky-100"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Pencil className="h-3.5 w-3.5" />
-              Editar senha
+              <Pencil className="h-4 w-4 shrink-0" />
+              Editar
             </button>
           )}
         </div>
@@ -767,10 +767,10 @@ function RecurringClassLinkCard({
                   if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
                   onEditPassword(lead);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Pencil className="h-3.5 w-3.5" />
-                Editar senha
+                <Pencil className="h-4 w-4 shrink-0" />
+                Editar
               </button>
             </div>
           )}
@@ -932,10 +932,10 @@ function RecurringClassLinkCard({
               if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
               onEditPassword(lead);
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-500/20 hover:text-emerald-100"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Pencil className="h-3.5 w-3.5" />
-            Editar senha
+            <Pencil className="h-4 w-4 shrink-0" />
+            Editar
           </button>
         )}
       </div>
