@@ -1963,7 +1963,7 @@ export default function CadastroRecorrenteBody() {
                           </div>
                         </div>
                         <div className="sm:text-right sm:shrink-0 self-start sm:self-center">
-                          <div className="text-2xl sm:text-3xl font-black text-emerald-700 leading-none">R$ 595,00</div>
+                          <div className="text-2xl sm:text-3xl font-black text-emerald-700 leading-none">R$ 500,00</div>
                           <div className="text-xs sm:text-sm text-slate-500 mt-1">US$ 1,00 = R$ 5,00</div>
                         </div>
                       </div>
@@ -2217,7 +2217,7 @@ export default function CadastroRecorrenteBody() {
                             Total a pagar
                           </div>
                           <div className="text-2xl sm:text-4xl font-black tracking-tight leading-none whitespace-nowrap overflow-hidden text-ellipsis w-full">
-                            R$ 595,00
+                            R$ 500,00
                           </div>
                         </div>
                       </div>
