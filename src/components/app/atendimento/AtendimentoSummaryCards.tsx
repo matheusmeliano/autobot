@@ -756,6 +756,29 @@ function RecurringClassLinkCard({
           className="rounded-2xl border border-[var(--app-border)] overflow-hidden"
           style={{ backgroundColor: "#181b20" }}
         >
+          {onEditPassword && (
+            <div className="px-4 py-3 flex items-center justify-between gap-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-55)]">
+                Senha do aluno
+              </div>
+              <button
+                type="button"
+                onClick={(ev) => {
+                  if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                  onEditPassword(lead);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Editar senha
+              </button>
+            </div>
+          )}
+
+          {onEditPassword && (
+            <div className="h-px w-full bg-[var(--app-border)]" />
+          )}
+
           <div className="px-4 py-3 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
@@ -887,28 +910,6 @@ function RecurringClassLinkCard({
               </button>
             </div>
           </div>
-
-          {onEditPassword && (
-            <>
-              <div className="h-px w-full bg-[var(--app-border)]" />
-              <div className="px-4 py-3 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-55)]">
-                  Senha do aluno
-                </div>
-                <button
-                  type="button"
-                  onClick={(ev) => {
-                    if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-                    onEditPassword(lead);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Editar senha
-                </button>
-              </div>
-            </>
-          )}
         </div>
       );
     }
