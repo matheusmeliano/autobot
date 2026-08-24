@@ -3,7 +3,7 @@ import { Providers } from "@/components/Providers";
 
 export const metadata = {
   title: "AutoBot",
-  description: "Cobrança automática via WhatsApp com PIX",
+  description: "Atendimento e mensagens automáticas",
   icons: {
     icon: [{ url: "/logo-autobot.png", type: "image/png" }],
     apple: [{ url: "/logo-autobot.png", type: "image/png" }],
