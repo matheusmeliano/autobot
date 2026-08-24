@@ -1298,7 +1298,7 @@ function LeadDetails({
             <div className="flex w-full flex-col gap-3 items-stretch sm:flex-row sm:justify-between sm:items-center">
               <div className="w-full sm:w-auto flex items-center justify-center sm:justify-start">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
-                  Pagamento da matrícula
+                  Pagamento da 1° mensalidade
                 </div>
               </div>
               {showPaymentActions && !paymentConfirmed && !paymentRejected ? (
