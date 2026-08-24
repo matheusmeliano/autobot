@@ -1336,6 +1336,7 @@ function LeadDetails({
           const hasRej = !!(paymentRejectedAt && paymentRejectedAt !== "null");
           const count = (hasConf ? 1 : 0) + (hasRej ? 1 : 0);
           if (count === 0) return null;
+          if (!showPaymentActions && !paymentConfirmed && !paymentRejected) return null;
           return (
             <div className={`mb-3 grid min-w-0 gap-3 ${count >= 2 ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
               {hasConf ? (
