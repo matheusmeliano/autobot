@@ -13,6 +13,7 @@ import {
   LogOut,
   XCircle,
 } from "lucide-react";
+import AlunoChangePasswordCard from "@/app/aluno/_components/AlunoChangePasswordCard";
 
 export const dynamic = "force-dynamic";
 
@@ -342,6 +343,8 @@ export default async function AlunoPortalPage(props: {
             ) : null}
           </div>
         </article>
+
+        <AlunoChangePasswordCard />
       </section>
 
       <footer className="mt-10 border-t border-slate-200/70 pt-5 text-xs font-semibold text-slate-500">
