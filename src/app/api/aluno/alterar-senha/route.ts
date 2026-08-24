@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       session.user.user_metadata &&
       typeof session.user.user_metadata === "object" &&
       "lead_id" in (session.user.user_metadata as object)
-        ? String((session.user.user_metadata as any).lead_id ?? ""
+        ? String((session.user.user_metadata as any).lead_id ?? "")
         : "";
 
     let leadId: string | null = null;
