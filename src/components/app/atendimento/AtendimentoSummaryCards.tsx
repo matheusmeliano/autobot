@@ -1290,7 +1290,10 @@ function LeadDetails({
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1">
         {showPaymentActions || paymentConfirmed || paymentRejected || paymentPendingConfirmation ? (
-          <div className="mb-3 w-full overflow-visible rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+          <div
+            className="mb-3 w-full overflow-visible rounded-2xl border border-[var(--app-border)] p-4"
+            style={{ backgroundColor: "#181b20" }}
+          >
             <div className="flex w-full flex-col gap-3 items-stretch sm:flex-row sm:justify-between sm:items-center">
               <div className="w-full sm:w-auto flex items-center justify-center sm:justify-start">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
