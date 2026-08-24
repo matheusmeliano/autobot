@@ -3436,7 +3436,10 @@ export async function POST(req: Request) {
           (anyAttendanceResolved || postAttendanceMatriculaPendenteByLead) &&
           (bookingAttendanceAttendedByCol ||
             bookingAttendanceAttendedByHistory ||
-            postAttendanceMatriculaPendenteByLead);
+            postAttendanceMatriculaPendenteByLead) &&
+          (postAttendanceHistoryConfirmedAttendedEvent ||
+            bookingAttendanceAttendedByCol ||
+            bookingAttendanceAttendedByHistory);
 
         const isLeadInMatriculaRecusadaPosAttendance =
           postAttendanceMatriculaRecusadaByLead ||
