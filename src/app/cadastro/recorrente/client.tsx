@@ -1940,7 +1940,7 @@ export default function CadastroRecorrenteBody() {
                           </div>
                         </div>
                         <div className="sm:text-right sm:shrink-0 self-start sm:self-center">
-                          <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">US$ 119,00</div>
+                          <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">US$ 100,00</div>
                           <div className="text-xs sm:text-sm text-slate-500 mt-1">Dólar americano</div>
                         </div>
                       </div>
@@ -2101,7 +2101,7 @@ export default function CadastroRecorrenteBody() {
                     <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Depósito internacional USD</h2>
                     <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-slate-50 px-5 py-2">
                       <div className="text-base sm:text-sm font-semibold text-slate-700">Valor:</div>
-                      <div className="text-2xl sm:text-3xl font-black text-slate-900">US$ 119,00</div>
+                      <div className="text-2xl sm:text-3xl font-black text-slate-900">US$ 100,00</div>
                     </div>
                   </div>
 
