@@ -1339,7 +1339,7 @@ function LeadDetails({
           return (
             <div className={`mb-3 grid min-w-0 gap-3 ${count >= 2 ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
               {hasConf ? (
-                <Field label="Confirmado em" value={formatAtendimentoDateTime(paymentConfirmedAt)} />
+                <Field label="Pagamento da 1° mensalidade" value={formatAtendimentoDateTime(paymentConfirmedAt)} />
               ) : null}
               {hasRej ? (
                 <Field label="Marcado em" value={formatAtendimentoDateTime(paymentRejectedAt)} />
