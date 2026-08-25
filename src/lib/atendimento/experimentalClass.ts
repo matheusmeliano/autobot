@@ -1,4 +1,4 @@
-import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "./constants";
+import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_PROFESSOR_TIME_ZONE } from "./constants";
 import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 export const EXPERIMENTAL_CLASS_SLOT_TIMES = [
@@ -34,6 +34,15 @@ export const EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST = [
   { name: "Lucas Brum", phone: "+55 65 9807-9407", short: "9807-9407" },
   { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
 ] as const;
+
+export function getExperimentalClassInternalStaffPhoneNumbers(): readonly string[] {
+  return [
+    ATENDIMENTO_DAILY_SUMMARY_PHONE,
+    EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+    EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+    ...EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.map((p) => String(p.phone)),
+  ];
+}
 
 export function resolveExperimentalClassAssignedProfessorPhone(input: {
   bookingAssignedPhone?: string | null;

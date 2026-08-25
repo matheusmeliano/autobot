@@ -31,6 +31,7 @@ import {
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
+  getExperimentalClassInternalStaffPhoneNumbers,
   RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_WEEKDAY_LABELS_PT_BR,
   resolveExperimentalClassAssignedProfessorPhone,
@@ -478,7 +479,7 @@ async function sendZapiText(params: {
   const normalizedPhone = normalizePhone(params.phone);
 
   const internalNotificationPhones = new Set(
-    [ATENDIMENTO_DAILY_SUMMARY_PHONE, EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE].map((value) =>
+    getExperimentalClassInternalStaffPhoneNumbers().map((value) =>
       normalizePhoneDigitsOnly(value),
     ),
   );
@@ -848,7 +849,7 @@ export async function sendAtendimentoWhatsAppText(params: {
 
   const normalizedDest = normalizePhoneDigitsOnly(params.phone);
   const internalNotificationPhones = new Set(
-    [ATENDIMENTO_DAILY_SUMMARY_PHONE, EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE].map((value) =>
+    getExperimentalClassInternalStaffPhoneNumbers().map((value) =>
       normalizePhoneDigitsOnly(value),
     ),
   );
