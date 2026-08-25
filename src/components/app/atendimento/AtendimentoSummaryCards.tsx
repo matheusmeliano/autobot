@@ -4703,6 +4703,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                     const hasRecurringPassword = Boolean(String((lead as any).recurring_registration_password ?? "").trim());
                     const classifiedAsAluno = isLeadInAlunosSection(lead);
                     if (!(hasRecurringPassword || classifiedAsAluno)) return false;
+                    const assignedRecurringProfessor = recurringClassAssignedProfessor(lead);
+                    if (!assignedRecurringProfessor) return false;
                     const booking = lead.experimental_class_booking ?? null;
                     const bookingId = String(booking?.id ?? "").trim();
                     const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
@@ -4819,6 +4821,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             String(booking?.attendance_status ?? "").trim() === "attended" ||
                             String(booking?.attendance_status ?? "").trim() === "no_show";
                           if (hasDisparo || hasAttendance) return false;
+                          const assignedProfessor = experimentalClassBookingAssignedProfessor(lead);
+                          if (!assignedProfessor) return false;
                           return (
                             bookingId &&
                             bookingStatus &&
@@ -4827,9 +4831,11 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           );
                         })();
 
+                        const assignedRecurringProfessor = recurringClassAssignedProfessor(lead);
                         const showRecLink =
                           recorrenteRealmenteIniciado &&
                           !showExpLink &&
+                          Boolean(assignedRecurringProfessor) &&
                           !String((lead as any).recurring_class_link ?? "").trim();
 
                         const recLinkSections = ["alunos", "agendamentos", "contratos"];
