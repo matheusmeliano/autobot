@@ -94,7 +94,22 @@ export async function GET(req: Request) {
   const cancelledLeadBookingIds = new Set<string>();
   const cancelledByHistoryLeadIds = new Set<string>();
   const cancelledAtByLeadId = new Map<string, string>();
-  const cancelledProfessorSnapshotByLeadId = new Map<string, { name: string; phone: string }>();
+  const cancelledProfessorSnapshotByLeadId = new Map<
+    string,
+    {
+      name: string;
+      phone: string;
+      leadDate: string;
+      leadTime: string;
+      professorDate: string;
+      professorTime: string;
+      leadStartAt: string;
+      professorStartAt: string;
+      leadTimezone: string;
+      professorTimezone: string;
+      lessonLink: string;
+    }
+  >();
   const latestClassEventByLeadId = new Map<string, string>();
 
   const parseStartAtMs = (value: unknown): number => {
@@ -314,8 +329,33 @@ export async function GET(req: Request) {
         if (!cancelledProfessorSnapshotByLeadId.has(leadId)) {
           const n = String(details?.professor_name_before ?? "").trim();
           const p = String(details?.professor_phone_before ?? "").trim();
-          if (n || p) {
-            cancelledProfessorSnapshotByLeadId.set(leadId, { name: n, phone: p });
+          const ld = String(details?.lead_date_before ?? "").trim();
+          const lt = String(details?.lead_time_before ?? "").trim();
+          const pd = String(details?.professor_date_before ?? "").trim();
+          const pt = String(details?.professor_time_before ?? "").trim();
+          const lsa = String(details?.lead_start_at_before ?? details?.lead_start_at ?? "").trim();
+          const psa = String(
+            details?.professor_start_at_before ?? details?.professor_start_at ?? "",
+          ).trim();
+          const ltz = String(details?.lead_timezone_before ?? details?.lead_timezone ?? "").trim();
+          const ptz = String(
+            details?.professor_timezone_before ?? details?.teacher_timezone ?? details?.professor_timezone ?? "",
+          ).trim();
+          const llink = String(details?.lesson_link_before ?? details?.lesson_link ?? "").trim();
+          if (n || p || ld || lt || pd || pt || lsa || psa || ltz || ptz || llink) {
+            cancelledProfessorSnapshotByLeadId.set(leadId, {
+              name: n,
+              phone: p,
+              leadDate: ld,
+              leadTime: lt,
+              professorDate: pd,
+              professorTime: pt,
+              leadStartAt: lsa,
+              professorStartAt: psa,
+              leadTimezone: ltz,
+              professorTimezone: ptz,
+              lessonLink: llink,
+            });
           }
         }
       }
@@ -764,25 +804,40 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const cancelledProfSnap = cancelledProfessorSnapshotByLeadId.get(leadId) ?? null;
       const snapProfName = String(cancelledProfSnap?.name ?? "").trim();
       const snapProfPhone = String(cancelledProfSnap?.phone ?? "").trim();
+      const snapLeadDate = String(cancelledProfSnap?.leadDate ?? "").trim();
+      const snapLeadTime = String(cancelledProfSnap?.leadTime ?? "").trim();
+      const snapProfessorDate = String(cancelledProfSnap?.professorDate ?? "").trim();
+      const snapProfessorTime = String(cancelledProfSnap?.professorTime ?? "").trim();
+      const snapLeadStartAt = String(cancelledProfSnap?.leadStartAt ?? "").trim();
+      const snapProfessorStartAt = String(cancelledProfSnap?.professorStartAt ?? "").trim();
+      const snapLeadTimezone = String(cancelledProfSnap?.leadTimezone ?? "").trim();
+      const snapProfessorTimezone = String(cancelledProfSnap?.professorTimezone ?? "").trim();
+      const snapLessonLink = String(cancelledProfSnap?.lessonLink ?? "").trim();
+
       const existingBooking =
         existingBookingRaw ??
         (isCancelledLead
           ? ({
               id: "",
               status: "cancelled",
-              lesson_link: null,
+              lesson_link: snapLessonLink || null,
               student_start_notification_sent_at: null,
               attendant_start_notification_sent_at: null,
               attendance_status: null,
               attendance_checked_at: null,
-              professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              professor_date: "",
-              professor_time: "",
-              professor_start_at: "",
-              lead_date: "",
-              lead_time: "",
-              lead_start_at: "",
+              professor_timezone:
+                snapProfessorTimezone ||
+                ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              lead_timezone:
+                snapLeadTimezone ||
+                String((row as any)?.timezone ?? "").trim() ||
+                ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              professor_date: snapProfessorDate || "",
+              professor_time: snapProfessorTime || "",
+              professor_start_at: snapProfessorStartAt || "",
+              lead_date: snapLeadDate || "",
+              lead_time: snapLeadTime || "",
+              lead_start_at: snapLeadStartAt || "",
               assigned_professor_name:
                 String((row as any)?.experimental_class_professor_name ?? "").trim() ||
                 snapProfName ||
@@ -817,38 +872,38 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const mergedRecurringProfName = rowRecurringProfName || "";
       const mergedRecurringProfPhone = rowRecurringProfPhone || "";
 
-      const mergedProfessorDate = isCancelledLead
-        ? ""
-        : String((row as any)?.experimental_class_professor_date ?? "").trim() ||
-          (cleanDraftTime?.professor_date ?? "") ||
-          (cleanDraftDate?.professor_date ?? "") ||
-          String((existingBooking as any)?.professor_date ?? "").trim();
-      const mergedLeadDate = isCancelledLead
-        ? ""
-        : String((row as any)?.experimental_class_lead_date ?? "").trim() ||
-          (cleanDraftTime?.lead_date ?? "") ||
-          (cleanDraftDate?.lead_date ?? "") ||
-          String((existingBooking as any)?.lead_date ?? "").trim();
-      const mergedProfessorTime = isCancelledLead
-        ? ""
-        : String((row as any)?.experimental_class_professor_time ?? "").trim() ||
-          (cleanDraftTime?.professor_time ?? "") ||
-          String((existingBooking as any)?.professor_time ?? "").trim();
-      const mergedLeadTime = isCancelledLead
-        ? ""
-        : String((row as any)?.experimental_class_lead_time ?? "").trim() ||
-          (cleanDraftTime?.lead_time ?? "") ||
-          String((existingBooking as any)?.lead_time ?? "").trim();
-      const mergedProfessorStartAt = isCancelledLead
-        ? ""
-        : String((row as any)?.experimental_class_professor_start_at ?? "").trim() ||
-          (cleanDraftTime?.professor_start_at ?? "") ||
-          String((existingBooking as any)?.professor_start_at ?? "").trim();
-      const mergedLeadStartAt = isCancelledLead
-        ? ""
-        : String((row as any)?.experimental_class_lead_start_at ?? "").trim() ||
-          (cleanDraftTime?.lead_start_at ?? "") ||
-          String((existingBooking as any)?.lead_start_at ?? "").trim();
+      const mergedProfessorDate =
+        String((row as any)?.experimental_class_professor_date ?? "").trim() ||
+        String((existingBooking as any)?.professor_date ?? "").trim() ||
+        (isCancelledLead ? snapProfessorDate : "") ||
+        (cleanDraftTime?.professor_date ?? "") ||
+        (cleanDraftDate?.professor_date ?? "");
+      const mergedLeadDate =
+        String((row as any)?.experimental_class_lead_date ?? "").trim() ||
+        String((existingBooking as any)?.lead_date ?? "").trim() ||
+        (isCancelledLead ? snapLeadDate : "") ||
+        (cleanDraftTime?.lead_date ?? "") ||
+        (cleanDraftDate?.lead_date ?? "");
+      const mergedProfessorTime =
+        String((row as any)?.experimental_class_professor_time ?? "").trim() ||
+        String((existingBooking as any)?.professor_time ?? "").trim() ||
+        (isCancelledLead ? snapProfessorTime : "") ||
+        (cleanDraftTime?.professor_time ?? "");
+      const mergedLeadTime =
+        String((row as any)?.experimental_class_lead_time ?? "").trim() ||
+        String((existingBooking as any)?.lead_time ?? "").trim() ||
+        (isCancelledLead ? snapLeadTime : "") ||
+        (cleanDraftTime?.lead_time ?? "");
+      const mergedProfessorStartAt =
+        String((row as any)?.experimental_class_professor_start_at ?? "").trim() ||
+        String((existingBooking as any)?.professor_start_at ?? "").trim() ||
+        (isCancelledLead ? snapProfessorStartAt : "") ||
+        (cleanDraftTime?.professor_start_at ?? "");
+      const mergedLeadStartAt =
+        String((row as any)?.experimental_class_lead_start_at ?? "").trim() ||
+        String((existingBooking as any)?.lead_start_at ?? "").trim() ||
+        (isCancelledLead ? snapLeadStartAt : "") ||
+        (cleanDraftTime?.lead_start_at ?? "");
       const mergedStatus = isCancelledLead
         ? ""
         : mergedRowExperimentalClassStatus ||

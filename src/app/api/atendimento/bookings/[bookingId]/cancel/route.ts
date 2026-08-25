@@ -269,6 +269,40 @@ export async function POST(
       String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim() ||
       String((lead as any)?.experimental_class_professor_phone ?? "").trim() ||
       null;
+    const snapLeadDate =
+      String((resolvedBooking as any)?.lead_date ?? payload?.leadDate ?? "").trim() ||
+      String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+      null;
+    const snapLeadTime =
+      String((resolvedBooking as any)?.lead_time ?? payload?.leadTime ?? "").trim() ||
+      String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+      null;
+    const snapProfessorDate =
+      String((resolvedBooking as any)?.professor_date ?? payload?.professorDate ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
+      null;
+    const snapProfessorTime =
+      String((resolvedBooking as any)?.professor_time ?? payload?.professorTime ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_time ?? "").trim() ||
+      null;
+    const snapLeadStartAt =
+      String((resolvedBooking as any)?.lead_start_at ?? "").trim() ||
+      String((lead as any)?.experimental_class_lead_start_at ?? "").trim() ||
+      null;
+    const snapProfessorStartAt =
+      String(
+        (resolvedBooking as any)?.professor_start_at ?? payload?.professorStartAt ?? "",
+      ).trim() || String((lead as any)?.experimental_class_professor_start_at ?? "").trim() || null;
+    const snapLeadTimezone =
+      String((resolvedBooking as any)?.lead_timezone ?? "").trim() ||
+      String((lead as any)?.timezone ?? "").trim() ||
+      null;
+    const snapProfessorTimezone =
+      String((resolvedBooking as any)?.professor_timezone ?? "").trim() || null;
+    const snapLessonLink =
+      String((resolvedBooking as any)?.lesson_link ?? "").trim() ||
+      String((lead as any)?.experimental_class_link ?? "").trim() ||
+      null;
     await appendHistoryEvent({
       leadId: resolvedLeadId,
       conversationId: null,
@@ -279,18 +313,15 @@ export async function POST(
         action: "deleted_and_unlinked",
         status_before: "scheduled",
         status_after: null,
-        lead_date_before: String(
-          (resolvedBooking as any)?.lead_date ?? payload?.leadDate ?? "",
-        ).trim() || null,
-        lead_time_before: String(
-          (resolvedBooking as any)?.lead_time ?? payload?.leadTime ?? "",
-        ).trim() || null,
-        professor_date_before: String(
-          (resolvedBooking as any)?.professor_date ?? payload?.professorDate ?? "",
-        ).trim() || null,
-        professor_time_before: String(
-          (resolvedBooking as any)?.professor_time ?? payload?.professorTime ?? "",
-        ).trim() || null,
+        lead_date_before: snapLeadDate,
+        lead_time_before: snapLeadTime,
+        professor_date_before: snapProfessorDate,
+        professor_time_before: snapProfessorTime,
+        lead_start_at_before: snapLeadStartAt,
+        professor_start_at_before: snapProfessorStartAt,
+        lead_timezone_before: snapLeadTimezone,
+        professor_timezone_before: snapProfessorTimezone,
+        lesson_link_before: snapLessonLink,
         professor_name_before: snapProfName,
         professor_phone_before: snapProfPhone,
       },
