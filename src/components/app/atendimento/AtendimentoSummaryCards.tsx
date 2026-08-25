@@ -4070,7 +4070,18 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; booking?: Record<string, unknown> | null; attendant_notification_sent?: boolean; attendant_notification_error?: string | null }
+        | {
+            ok?: boolean;
+            error?: string | null;
+            booking?: Record<string, unknown> | null;
+            all_mandatory_sent?: boolean;
+            student_notification_sent?: boolean;
+            student_notification_error?: string | null;
+            attendant_notification_sent?: boolean;
+            attendant_notification_error?: string | null;
+            registered_attendant_notification_sent?: boolean;
+            registered_attendant_notification_error?: string | null;
+          }
         | null;
 
       if (!response.ok || !payload?.ok || !payload.booking) {
@@ -4083,11 +4094,24 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         } else {
           modalToast.error(payload?.error ?? "Falha ao disparar a notificação.");
         }
-        return;
+        if (!payload?.booking) return;
       }
 
+      const studentNotificationSent = payload.student_notification_sent !== false;
       const attendantNotificationSent = payload.attendant_notification_sent !== false;
       const attendantNotificationError = String(payload.attendant_notification_error ?? "").trim() || null;
+      const studentNotificationError = String(payload.student_notification_error ?? "").trim() || null;
+
+      const rawSentStudentAt = String(
+        (payload.booking as any)?.student_start_notification_sent_at ??
+          lead.experimental_class_booking?.student_start_notification_sent_at ??
+          "",
+      ).trim();
+      const rawSentAttendantAt = String(
+        (payload.booking as any)?.attendant_start_notification_sent_at ??
+          lead.experimental_class_booking?.attendant_start_notification_sent_at ??
+          "",
+      ).trim();
 
       const updatedLead: AtendimentoLeadListItem = {
         ...lead,
@@ -4115,27 +4139,26 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
           source: ((payload.booking as any)?.source ?? booking?.source ?? "table") as "table" | "history",
           lesson_link:
             String((payload.booking as any)?.lesson_link ?? lead.experimental_class_booking?.lesson_link ?? "").trim() || null,
-          student_start_notification_sent_at:
-            String(
-              (payload.booking as any)?.student_start_notification_sent_at ??
-                lead.experimental_class_booking?.student_start_notification_sent_at ??
-                "",
-            ).trim() || new Date().toISOString(),
-          attendant_start_notification_sent_at:
-            String(
-              (payload.booking as any)?.attendant_start_notification_sent_at ??
-                lead.experimental_class_booking?.attendant_start_notification_sent_at ??
-                "",
-            ).trim() || new Date().toISOString(),
+          student_start_notification_sent_at: rawSentStudentAt || null,
+          attendant_start_notification_sent_at: rawSentAttendantAt || null,
         },
       };
 
       setLocalLeads((current) => current.map((item) => (item.id === lead.id ? updatedLead : item)));
-      if (attendantNotificationSent) {
+      if (studentNotificationSent && attendantNotificationSent) {
         modalToast.success("Notificações enviadas ao aluno e ao professor.");
-      } else {
+      } else if (studentNotificationSent && !attendantNotificationSent) {
         modalToast.warning(
           `Notificação enviada ao aluno. Não foi possível enviar ao professor: ${attendantNotificationError || "erro desconhecido"}`,
+        );
+      } else if (!studentNotificationSent && attendantNotificationSent) {
+        modalToast.warning(
+          `Notificação enviada ao professor. Não foi possível enviar ao aluno: ${studentNotificationError || "erro desconhecido"}`,
+        );
+      } else {
+        modalToast.error(
+          payload?.error ??
+            `Não foi possível enviar nenhuma das notificações obrigatórias.${studentNotificationError ? ` Aluno: ${studentNotificationError}` : ""}${attendantNotificationError ? ` Professor: ${attendantNotificationError}` : ""}`,
         );
       }
     } catch (error) {

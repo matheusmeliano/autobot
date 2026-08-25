@@ -35,6 +35,7 @@ import {
   RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_WEEKDAY_LABELS_PT_BR,
   resolveExperimentalClassAssignedProfessorPhone,
+  resolveRecurringClassAssignedProfessorPhone,
   type RecurringWeekdayKey,
 } from "@/lib/atendimento/experimentalClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
@@ -486,8 +487,29 @@ async function sendZapiText(params: {
   const destDigits = normalizePhoneDigitsOnly(normalizedPhone);
   const isInternalNotificationPhone = destDigits && internalNotificationPhones.has(destDigits);
 
+  let bypassAllowedPhoneDigitsSet: Set<string> | null = null;
+  try {
+    const admin = createSupabaseAdminClient();
+    const bypassRaw = await admin
+      .from("atendimento_leads")
+      .select("phone")
+      .not("phone", "is", null)
+      .limit(5000);
+    if (!bypassRaw.error && Array.isArray(bypassRaw.data)) {
+      bypassAllowedPhoneDigitsSet = new Set<string>();
+      for (const r of bypassRaw.data as any[]) {
+        const d = normalizePhoneDigitsOnly(String((r as any)?.phone ?? ""));
+        if (d) bypassAllowedPhoneDigitsSet.add(d);
+      }
+    }
+  } catch (_e) {
+    bypassAllowedPhoneDigitsSet = null;
+  }
+  const destIsRegisteredLead =
+    destDigits && Boolean(bypassAllowedPhoneDigitsSet) && bypassAllowedPhoneDigitsSet!.has(destDigits);
+
   const { self_instance_phone_digits_only: selfPhoneOpt } = params;
-  if (!isInternalNotificationPhone && destinationIsInstancePhone(normalizedPhone, null, selfPhoneOpt ?? null)) {
+  if (!isInternalNotificationPhone && !destIsRegisteredLead && destinationIsInstancePhone(normalizedPhone, null, selfPhoneOpt ?? null)) {
     return {
       ok: false,
       skipped: true,
@@ -496,7 +518,7 @@ async function sendZapiText(params: {
     } as any;
   }
 
-  if (!isInternalNotificationPhone) {
+  if (!isInternalNotificationPhone && !destIsRegisteredLead) {
     const runtimeBlocklist = await loadAllInstancePhoneBlocklist();
     if (destinationIsInstancePhone(normalizedPhone, runtimeBlocklist, selfPhoneOpt ?? null)) {
       return {
@@ -1487,11 +1509,15 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   );
 
   let studentSent = 0;
+  let studentFailed = 0;
   let attendantSent = 0;
+  let attendantFailed = 0;
   let registeredAttendantSent = 0;
+  let registeredAttendantFailed = 0;
   let missingLessonLink = 0;
   let missingProfessor = 0;
   let missingStudentPhone = 0;
+  let missingRequiredDestinations = 0;
 
   async function setBookingNotificationSentAt(params: {
     bookingId: string;
@@ -1579,6 +1605,10 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
     const registeredAttendantDue = attendantDue;
 
+    let thisBookingAttendantOk = cachedAttendantSent;
+    let thisBookingRegisteredAttendantOk = cachedRegisteredAttendantSent;
+    let thisBookingStudentOk = cachedStudentSent;
+
     if (attendantDue && !cachedAttendantSent) {
       const assignedCronProfessorPhone = resolvedProfessor.phone;
       try {
@@ -1607,7 +1637,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
         });
         sentAttendantBookingIds.add(bookingId);
         attendantSent += 1;
+        thisBookingAttendantOk = true;
       } catch (error) {
+        attendantFailed += 1;
         await appendHistoryEvent({
           leadId,
           conversationId,
@@ -1647,7 +1679,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
         });
         sentRegisteredAttendantBookingIds.add(bookingId);
         registeredAttendantSent += 1;
+        thisBookingRegisteredAttendantOk = true;
       } catch (error) {
+        registeredAttendantFailed += 1;
         await appendHistoryEvent({
           leadId,
           conversationId,
@@ -1668,51 +1702,59 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     if (studentDue && !cachedStudentSent) {
       if (!leadPhone) {
         missingStudentPhone += 1;
-        continue;
-      }
-
-      try {
-        await sendAtendimentoWhatsAppText({
-          phone: leadPhone,
-          message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
-        });
-
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_student_start_notification_sent",
-          title: "Link da aula experimental enviado ao aluno no inicio da aula",
-          details: {
-            booking_id: bookingId,
+      } else {
+        try {
+          await sendAtendimentoWhatsAppText({
             phone: leadPhone,
-            lesson_link: lessonLink,
-            start_at: leadStartAtRaw,
-          },
-          actorType: "system",
-        });
-        await setBookingNotificationSentAt({
-          bookingId,
-          column: "student_start_notification_sent_at",
-          nowIso,
-        });
-        sentStudentBookingIds.add(bookingId);
-        studentSent += 1;
-      } catch (error) {
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_student_start_notification_failed",
-          title: "Falha ao enviar o link da aula experimental ao aluno no inicio da aula",
-          details: {
-            booking_id: bookingId,
-            phone: leadPhone,
-            lesson_link: lessonLink,
-            start_at: leadStartAtRaw,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
-        });
+            message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+          });
+
+          await appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_student_start_notification_sent",
+            title: "Link da aula experimental enviado ao aluno no inicio da aula",
+            details: {
+              booking_id: bookingId,
+              phone: leadPhone,
+              lesson_link: lessonLink,
+              start_at: leadStartAtRaw,
+            },
+            actorType: "system",
+          });
+          await setBookingNotificationSentAt({
+            bookingId,
+            column: "student_start_notification_sent_at",
+            nowIso,
+          });
+          sentStudentBookingIds.add(bookingId);
+          studentSent += 1;
+          thisBookingStudentOk = true;
+        } catch (error) {
+          studentFailed += 1;
+          await appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_student_start_notification_failed",
+            title: "Falha ao enviar o link da aula experimental ao aluno no inicio da aula",
+            details: {
+              booking_id: bookingId,
+              phone: leadPhone,
+              lesson_link: lessonLink,
+              start_at: leadStartAtRaw,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            actorType: "system",
+          });
+        }
       }
+    }
+
+    if (
+      (studentDue && !thisBookingStudentOk) ||
+      (attendantDue && !thisBookingAttendantOk)
+    ) {
+      missingRequiredDestinations += 1;
     }
   }
 
@@ -1721,10 +1763,15 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     skipped: false as const,
     checkedBookings: bookingRows.length,
     studentSent,
+    studentFailed,
     attendantSent,
+    attendantFailed,
+    registeredAttendantSent,
+    registeredAttendantFailed,
     missingLessonLink,
     missingProfessor,
     missingStudentPhone,
+    missingRequiredDestinations,
   };
 }
 
@@ -1773,11 +1820,15 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
   }
 
   let studentSent = 0;
+  let studentFailed = 0;
   let attendantSent = 0;
+  let attendantFailed = 0;
   let registeredAttendantSent = 0;
+  let registeredAttendantFailed = 0;
   let missingLessonLink = 0;
   let missingStudentPhone = 0;
   let missingRecurringMeta = 0;
+  let missingRequiredDestinations = 0;
 
   const validWeekdayKeys = new Set<string>(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 
@@ -1853,6 +1904,11 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       continue;
     }
 
+    const resolvedRecurringProfessor = resolveRecurringClassAssignedProfessorPhone({
+      flatAssignedPhone: String(row?.recurring_class_professor_phone ?? "").trim(),
+      flatAssignedName: String(row?.recurring_class_professor_name ?? "").trim(),
+    });
+
     const professorStartAtMs = new Date(occurrence.professorStartAt).getTime();
     const leadStartAtMs = new Date(
       occurrence.leadStartAt || occurrence.professorStartAt,
@@ -1888,10 +1944,15 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)[weekdayRaw] ??
       weekdayRaw.toUpperCase();
 
+    let thisLeadAttendantOk = cachedAttendantSent;
+    let thisLeadRegisteredOk = cachedRegisteredAttendantSent;
+    let thisLeadStudentOk = cachedStudentSent;
+
     if (attendantDue && !cachedAttendantSent) {
+      const assignedRecurringProfessorPhone = resolvedRecurringProfessor?.phone || EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
       try {
         await sendAtendimentoWhatsAppText({
-          phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+          phone: assignedRecurringProfessorPhone,
           message: buildRecurringClassAttendantStartReminderWhatsAppMessage(
             leadFullName,
             weekdayLabel,
@@ -1914,24 +1975,29 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           eventType: "recurring_class_attendant_start_notification_sent",
           title: "Lembrete de inicio da aula recorrente enviado ao atendente",
           details: {
-            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            phone: assignedRecurringProfessorPhone,
             lesson_link: lessonLink,
             start_at: occurrence.professorStartAt,
             weekday: weekdayRaw,
             professor_time: professorTimeHHMM,
             source: "cron_recurring_class",
+            resolved_recurring_professor: resolvedRecurringProfessor
+              ? `${resolvedRecurringProfessor.name} (${resolvedRecurringProfessor.phone})`
+              : null,
           },
           actorType: "system",
         });
         attendantSent += 1;
+        thisLeadAttendantOk = true;
       } catch (error) {
+        attendantFailed += 1;
         await appendHistoryEvent({
           leadId,
           conversationId: null,
           eventType: "recurring_class_attendant_start_notification_failed",
           title: "Falha ao enviar lembrete de inicio da aula recorrente ao atendente",
           details: {
-            phone: EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+            phone: assignedRecurringProfessorPhone,
             lesson_link: lessonLink,
             start_at: occurrence.professorStartAt,
             error: error instanceof Error ? error.message : String(error),
@@ -1967,7 +2033,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           actorType: "system",
         });
         registeredAttendantSent += 1;
+        thisLeadRegisteredOk = true;
       } catch (error) {
+        registeredAttendantFailed += 1;
         await appendHistoryEvent({
           leadId,
           conversationId: null,
@@ -1987,53 +2055,62 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     if (studentDue && !cachedStudentSent) {
       if (!leadPhone) {
         missingStudentPhone += 1;
-        continue;
-      }
-      try {
-        await sendAtendimentoWhatsAppText({
-          phone: leadPhone,
-          message: buildRecurringClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
-        });
+      } else {
         try {
-          await admin
-            .from("atendimento_leads")
-            .update({
-              recurring_class_student_start_notification_sent_at: nowIso,
-              updated_at: nowIso,
-            } as any)
-            .eq("id", leadId);
-        } catch (_colErr) {}
-        await appendHistoryEvent({
-          leadId,
-          conversationId: null,
-          eventType: "recurring_class_student_start_notification_sent",
-          title: "Link da aula recorrente enviado ao aluno no inicio da aula",
-          details: {
+          await sendAtendimentoWhatsAppText({
             phone: leadPhone,
-            lesson_link: lessonLink,
-            start_at: occurrence.leadStartAt || occurrence.professorStartAt,
-            weekday: weekdayRaw,
-            professor_time: professorTimeHHMM,
-            source: "cron_recurring_class",
-          },
-          actorType: "system",
-        });
-        studentSent += 1;
-      } catch (error) {
-        await appendHistoryEvent({
-          leadId,
-          conversationId: null,
-          eventType: "recurring_class_student_start_notification_failed",
-          title: "Falha ao enviar link da aula recorrente ao aluno",
-          details: {
-            phone: leadPhone,
-            lesson_link: lessonLink,
-            start_at: occurrence.leadStartAt || occurrence.professorStartAt,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
-        });
+            message: buildRecurringClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+          });
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                recurring_class_student_start_notification_sent_at: nowIso,
+                updated_at: nowIso,
+              } as any)
+              .eq("id", leadId);
+          } catch (_colErr) {}
+          await appendHistoryEvent({
+            leadId,
+            conversationId: null,
+            eventType: "recurring_class_student_start_notification_sent",
+            title: "Link da aula recorrente enviado ao aluno no inicio da aula",
+            details: {
+              phone: leadPhone,
+              lesson_link: lessonLink,
+              start_at: occurrence.leadStartAt || occurrence.professorStartAt,
+              weekday: weekdayRaw,
+              professor_time: professorTimeHHMM,
+              source: "cron_recurring_class",
+            },
+            actorType: "system",
+          });
+          studentSent += 1;
+          thisLeadStudentOk = true;
+        } catch (error) {
+          studentFailed += 1;
+          await appendHistoryEvent({
+            leadId,
+            conversationId: null,
+            eventType: "recurring_class_student_start_notification_failed",
+            title: "Falha ao enviar link da aula recorrente ao aluno",
+            details: {
+              phone: leadPhone,
+              lesson_link: lessonLink,
+              start_at: occurrence.leadStartAt || occurrence.professorStartAt,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            actorType: "system",
+          });
+        }
       }
+    }
+
+    if (
+      (studentDue && !thisLeadStudentOk) ||
+      (attendantDue && !thisLeadAttendantOk)
+    ) {
+      missingRequiredDestinations += 1;
     }
   }
 
@@ -2043,10 +2120,15 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     skipped: false as const,
     checkedLeads: rows.length,
     studentSent,
+    studentFailed,
     attendantSent,
+    attendantFailed,
+    registeredAttendantSent,
+    registeredAttendantFailed,
     missingLessonLink,
     missingStudentPhone,
     missingRecurringMeta,
+    missingRequiredDestinations,
   };
 }
 

@@ -195,79 +195,15 @@ export async function POST(
   }
 
   const sentAtIso = new Date().toISOString();
+  const normalizedBookingPk = resolvedBooking && String((resolvedBooking as any)?.id ?? "").trim();
 
-  if (resolvedBooking && String((resolvedBooking as any)?.id ?? "").trim()) {
-    try {
-      const { error: updateError } = await admin
-        .from("atendimento_experimental_class_bookings")
-        .update({
-          student_start_notification_sent_at: sentAtIso,
-          attendant_start_notification_sent_at: sentAtIso,
-          updated_at: sentAtIso,
-        })
-        .eq("id", String((resolvedBooking as any).id));
-
-      if (updateError && isExperimentalClassBookingsNotificationColumnsUnavailable(updateError)) {
-        try {
-          await admin
-            .from("atendimento_experimental_class_bookings")
-            .update({ updated_at: sentAtIso })
-            .eq("id", String((resolvedBooking as any).id));
-        } catch (_e) {}
-      } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
-        return Response.json({ ok: false, error: updateError.message }, { status: 500 });
-      }
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !isExperimentalClassBookingsNotificationColumnsUnavailable(error)
-      ) {
-        throw error;
-      }
-      try {
-        await admin
-          .from("atendimento_experimental_class_bookings")
-          .update({ updated_at: sentAtIso })
-          .eq("id", String((resolvedBooking as any).id));
-      } catch (_e) {}
-    }
-  }
+  let studentNotificationOk = studentNotificationAlreadySent;
+  let attendantNotificationOk = attendantNotificationAlreadySent;
+  let registeredAttendantNotificationOk = false;
 
   let studentSendFailedError: string | null = null;
-  try {
-    await sendAtendimentoWhatsAppText({
-      phone: leadPhone,
-      message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
-    });
-  } catch (error) {
-    studentSendFailedError = error instanceof Error ? error.message : String(error);
-    await appendHistoryEvent({
-      leadId,
-      conversationId,
-      eventType: "experimental_class_student_start_notification_failed",
-      title: "Falha ao disparar manualmente o link da aula experimental ao aluno",
-      details: {
-        booking_id: normalizedBookingId,
-        phone: leadPhone,
-        lesson_link: lessonLink,
-        manually_triggered: true,
-        was_already_sent: studentNotificationAlreadySent,
-        error: studentSendFailedError,
-      },
-      actorType: "attendant",
-      actorEmail: auth.user.email,
-    });
-  }
-
-  if (studentSendFailedError) {
-    return Response.json(
-      {
-        ok: false,
-        error: studentSendFailedError,
-      },
-      { status: 500 },
-    );
-  }
+  let attendantSendFailedError: string | null = null;
+  let registeredAttendantSendFailedError: string | null = null;
 
   const assignedProfessorNotificationPhone =
     resolveExperimentalClassAssignedProfessorPhone({
@@ -277,77 +213,118 @@ export async function POST(
       flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
     })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
 
-  let attendantSendFailedError: string | null = null;
-  try {
-    await sendAtendimentoWhatsAppText({
-      phone: assignedProfessorNotificationPhone,
-      message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
-    });
-  } catch (error) {
-    attendantSendFailedError = error instanceof Error ? error.message : String(error);
-    await appendHistoryEvent({
-      leadId,
-      conversationId,
-      eventType: "experimental_class_attendant_start_notification_failed",
-      title: "Falha ao disparar manualmente o lembrete do inicio da aula experimental ao atendente",
-      details: {
-        booking_id: normalizedBookingId,
-        phone: assignedProfessorNotificationPhone,
-        lesson_link: lessonLink,
-        start_at: professorStartAtRaw || null,
-        manually_triggered: true,
-        was_already_sent: attendantNotificationAlreadySent,
-        error: attendantSendFailedError,
-      },
-      actorType: "attendant",
-      actorEmail: auth.user.email,
-    });
+  if (!studentNotificationAlreadySent) {
+    try {
+      await sendAtendimentoWhatsAppText({
+        phone: leadPhone,
+        message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+      });
+      studentNotificationOk = true;
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_student_start_notification_sent",
+        title: studentNotificationAlreadySent
+          ? "Link da aula experimental reenviado manualmente ao aluno"
+          : "Link da aula experimental disparado manualmente ao aluno",
+        details: {
+          booking_id: normalizedBookingId,
+          phone: leadPhone,
+          lesson_link: lessonLink,
+          manually_triggered: true,
+          was_already_sent: studentNotificationAlreadySent,
+        },
+        actorType: "attendant",
+        actorEmail: auth.user.email,
+      });
+    } catch (error) {
+      studentSendFailedError = error instanceof Error ? error.message : String(error);
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_student_start_notification_failed",
+        title: "Falha ao disparar manualmente o link da aula experimental ao aluno",
+        details: {
+          booking_id: normalizedBookingId,
+          phone: leadPhone,
+          lesson_link: lessonLink,
+          manually_triggered: true,
+          was_already_sent: studentNotificationAlreadySent,
+          error: studentSendFailedError,
+        },
+        actorType: "attendant",
+        actorEmail: auth.user.email,
+      });
+    }
   }
 
-  await appendHistoryEvent({
-    leadId,
-    conversationId,
-    eventType: "experimental_class_student_start_notification_sent",
-    title: studentNotificationAlreadySent
-      ? "Link da aula experimental reenviado manualmente ao aluno"
-      : "Link da aula experimental disparado manualmente ao aluno",
-    details: {
-      booking_id: normalizedBookingId,
-      phone: leadPhone,
-      lesson_link: lessonLink,
-      manually_triggered: true,
-      was_already_sent: studentNotificationAlreadySent,
-    },
-    actorType: "attendant",
-    actorEmail: auth.user.email,
-  });
-
-  if (!attendantSendFailedError) {
-    await appendHistoryEvent({
-      leadId,
-      conversationId,
-      eventType: "experimental_class_attendant_start_notification_sent",
-      title: attendantNotificationAlreadySent
-        ? "Lembrete de inicio da aula experimental reenviado manualmente ao atendente"
-        : "Lembrete de inicio da aula experimental disparado manualmente ao atendente",
-      details: {
-        booking_id: normalizedBookingId,
+  if (!attendantNotificationAlreadySent) {
+    try {
+      await sendAtendimentoWhatsAppText({
         phone: assignedProfessorNotificationPhone,
-        lesson_link: lessonLink,
-        start_at: professorStartAtRaw || null,
-        manually_triggered: true,
-        was_already_sent: attendantNotificationAlreadySent,
-      },
-      actorType: "attendant",
-      actorEmail: auth.user.email,
-    });
+        message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
+      });
+      attendantNotificationOk = true;
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_attendant_start_notification_sent",
+        title: attendantNotificationAlreadySent
+          ? "Lembrete de inicio da aula experimental reenviado manualmente ao atendente"
+          : "Lembrete de inicio da aula experimental disparado manualmente ao atendente",
+        details: {
+          booking_id: normalizedBookingId,
+          phone: assignedProfessorNotificationPhone,
+          lesson_link: lessonLink,
+          start_at: professorStartAtRaw || null,
+          manually_triggered: true,
+          was_already_sent: attendantNotificationAlreadySent,
+        },
+        actorType: "attendant",
+        actorEmail: auth.user.email,
+      });
+    } catch (error) {
+      attendantSendFailedError = error instanceof Error ? error.message : String(error);
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_attendant_start_notification_failed",
+        title: "Falha ao disparar manualmente o lembrete do inicio da aula experimental ao atendente",
+        details: {
+          booking_id: normalizedBookingId,
+          phone: assignedProfessorNotificationPhone,
+          lesson_link: lessonLink,
+          start_at: professorStartAtRaw || null,
+          manually_triggered: true,
+          was_already_sent: attendantNotificationAlreadySent,
+          error: attendantSendFailedError,
+        },
+        actorType: "attendant",
+        actorEmail: auth.user.email,
+      });
+    }
   }
 
-  let registeredAttendantSendFailedError: string | null = null;
   try {
     await sendAtendimentoWhatsAppText({
       phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
       message: buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
+    });
+    registeredAttendantNotificationOk = true;
+    await appendHistoryEvent({
+      leadId,
+      conversationId,
+      eventType: "experimental_class_registered_attendant_start_notification_sent",
+      title: "Lembrete de inicio da aula experimental disparado manualmente ao atendente cadastrado",
+      details: {
+        booking_id: normalizedBookingId,
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        lesson_link: lessonLink,
+        start_at: professorStartAtRaw || null,
+        manually_triggered: true,
+      },
+      actorType: "attendant",
+      actorEmail: auth.user.email,
     });
   } catch (error) {
     registeredAttendantSendFailedError = error instanceof Error ? error.message : String(error);
@@ -369,23 +346,44 @@ export async function POST(
     });
   }
 
-  if (!registeredAttendantSendFailedError) {
-    await appendHistoryEvent({
-      leadId,
-      conversationId,
-      eventType: "experimental_class_registered_attendant_start_notification_sent",
-      title: "Lembrete de inicio da aula experimental disparado manualmente ao atendente cadastrado",
-      details: {
-        booking_id: normalizedBookingId,
-        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-        lesson_link: lessonLink,
-        start_at: professorStartAtRaw || null,
-        manually_triggered: true,
-      },
-      actorType: "attendant",
-      actorEmail: auth.user.email,
-    });
+  if (normalizedBookingPk) {
+    try {
+      const patch: Record<string, string> = { updated_at: sentAtIso };
+      if (studentNotificationOk) patch.student_start_notification_sent_at = sentAtIso;
+      if (attendantNotificationOk) patch.attendant_start_notification_sent_at = sentAtIso;
+      const { error: updateError } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .update(patch as any)
+        .eq("id", normalizedBookingPk);
+
+      if (updateError && isExperimentalClassBookingsNotificationColumnsUnavailable(updateError)) {
+        try {
+          await admin
+            .from("atendimento_experimental_class_bookings")
+            .update({ updated_at: sentAtIso })
+            .eq("id", normalizedBookingPk);
+        } catch (_e) {}
+      } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
+        return Response.json({ ok: false, error: updateError.message }, { status: 500 });
+      }
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !isExperimentalClassBookingsNotificationColumnsUnavailable(error)
+      ) {
+        throw error;
+      }
+      try {
+        await admin
+          .from("atendimento_experimental_class_bookings")
+          .update({ updated_at: sentAtIso })
+          .eq("id", normalizedBookingPk);
+      } catch (_e) {}
+    }
   }
+
+  const finalStudentSentAt = studentNotificationOk ? sentAtIso : (String((resolvedBooking as any)?.student_start_notification_sent_at ?? "").trim() || null);
+  const finalAttendantSentAt = attendantNotificationOk ? sentAtIso : (String((resolvedBooking as any)?.attendant_start_notification_sent_at ?? "").trim() || null);
 
   const responseBooking = {
     ...(resolvedBooking ?? {}),
@@ -393,15 +391,30 @@ export async function POST(
     lead_id: leadId,
     conversation_id: conversationId,
     lesson_link: lessonLink,
-    student_start_notification_sent_at: sentAtIso,
-    attendant_start_notification_sent_at: sentAtIso,
+    student_start_notification_sent_at: finalStudentSentAt,
+    attendant_start_notification_sent_at: finalAttendantSentAt,
     status: bookingStatus,
   };
 
+  const allMandatoryOk = studentNotificationOk && attendantNotificationOk;
+
   return Response.json({
-    ok: true,
-    attendant_notification_sent: !attendantSendFailedError,
+    ok: allMandatoryOk,
+    all_mandatory_sent: allMandatoryOk,
+    student_notification_sent: studentNotificationOk,
+    student_notification_error: studentSendFailedError,
+    attendant_notification_sent: attendantNotificationOk,
     attendant_notification_error: attendantSendFailedError,
+    registered_attendant_notification_sent: registeredAttendantNotificationOk,
+    registered_attendant_notification_error: registeredAttendantSendFailedError,
     booking: responseBooking,
+    error: allMandatoryOk
+      ? null
+      : [
+          studentSendFailedError ? `aluno: ${studentSendFailedError}` : null,
+          attendantSendFailedError ? `atendente: ${attendantSendFailedError}` : null,
+        ].filter(Boolean).join(" | ") || "Algum destinatário obrigatório não recebeu.",
+  }, {
+    status: allMandatoryOk ? 200 : 502,
   });
 }

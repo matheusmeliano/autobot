@@ -72,6 +72,25 @@ export function resolveExperimentalClassAssignedProfessorPhone(input: {
   return null;
 }
 
+export function resolveRecurringClassAssignedProfessorPhone(input: {
+  flatAssignedPhone?: string | null;
+  flatAssignedName?: string | null;
+}): { name: string; phone: string } | null {
+  const name = String(input.flatAssignedName ?? "").trim();
+  const phone = String(input.flatAssignedPhone ?? "").trim();
+  if (name && phone) {
+    const match = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find(
+      (p) => String(p.phone) === phone && String(p.name) === name,
+    );
+    if (match) return { name: match.name, phone: match.phone };
+  }
+  if (phone) {
+    const match = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find((p) => String(p.phone) === phone);
+    if (match) return { name: match.name, phone: match.phone };
+  }
+  return null;
+}
+
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
 export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 export const RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
