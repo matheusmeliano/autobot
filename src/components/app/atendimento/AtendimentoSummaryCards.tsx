@@ -1324,8 +1324,8 @@ function LeadDetails({
             style={{ backgroundColor: "#181b20" }}
           >
             <div className="flex w-full flex-col gap-3 items-stretch sm:flex-row sm:justify-between sm:items-center">
-              <div className="w-full sm:w-auto flex items-center justify-center sm:justify-start">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
+              <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                   Pagamento da 1° mensalidade
                 </div>
               </div>
