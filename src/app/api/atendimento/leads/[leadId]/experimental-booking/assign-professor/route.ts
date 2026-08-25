@@ -152,7 +152,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
       const { data: existingBooking } = await admin
         .from("atendimento_experimental_class_bookings")
         .select(
-          "id, student_start_notification_sent_at, attendant_start_notification_sent_at",
+          "id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at",
         )
         .eq("id", bookingId)
         .maybeSingle();
@@ -162,15 +162,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
       const attendantSent =
         Boolean(existingBooking) &&
         Boolean(String((existingBooking as any)?.attendant_start_notification_sent_at ?? "").trim());
-      if (studentSent || attendantSent) {
+      const attendanceStatus = String((existingBooking as any)?.attendance_status ?? "").trim();
+      const hasAttendance = attendanceStatus === "attended" || attendanceStatus === "no_show";
+      const bookingIsCancelled = String((existingBooking as any)?.status ?? "").trim().toLowerCase() === "cancelled";
+      if (studentSent || attendantSent || hasAttendance || bookingIsCancelled) {
+        const reason = hasAttendance
+          ? "após comparecimento marcado."
+          : bookingIsCancelled
+            ? "após a aula experimental ser cancelada."
+            : "após o disparo ser realizado.";
         return NextResponse.json(
           {
             ok: false,
-            error:
-              "Professor não pode ser alterado após o disparo ser realizado.",
+            error: `Professor não pode ser alterado ${reason}`,
           },
-          { status: 409 },
-        );
+          { status: 409 },        );
       }
     }
 

@@ -1719,10 +1719,11 @@ function BookingDetails({
     String(booking?.attendant_start_notification_sent_at ?? "").trim(),
   );
   const professorLockedByDisparo = hasStudentNotification || hasAttendantNotification;
+  const bookingIsCancelled = String(booking?.status ?? "").trim().toLowerCase() === "cancelled";
   const hasAttendanceStatus =
     String(booking?.attendance_status ?? "").trim() === "attended" ||
     String(booking?.attendance_status ?? "").trim() === "no_show";
-  const experimentalLocked = professorLockedByDisparo || hasAttendanceStatus;
+  const experimentalLocked = professorLockedByDisparo || hasAttendanceStatus || bookingIsCancelled;
   const attendanceStatus = booking?.attendance_status ?? null;
   const hasValidExperimentalDateTime = Boolean(
     booking &&
@@ -1944,11 +1945,19 @@ function BookingDetails({
             type="button"
             onClick={() => {
               if (experimentalLocked) {
-                modalToast.warning(
-                  hasAttendanceStatus
-                    ? "Aula experimental não pode ser editada após comparecimento marcado."
-                    : "Aula experimental não pode ser editada após o disparo ser realizado.",
-                );
+                if (hasAttendanceStatus) {
+                  modalToast.warning(
+                    "Aula experimental não pode ser editada após comparecimento marcado.",
+                  );
+                } else if (bookingIsCancelled) {
+                  modalToast.warning(
+                    "Aula experimental não pode ser editada após o cancelamento.",
+                  );
+                } else {
+                  modalToast.warning(
+                    "Aula experimental não pode ser editada após o disparo ser realizado.",
+                  );
+                }
                 return;
               }
               void onEditExperimental(lead);
@@ -1958,7 +1967,9 @@ function BookingDetails({
               experimentalLocked
                 ? hasAttendanceStatus
                   ? "Aula experimental não pode ser editada após comparecimento marcado."
-                  : "Aula experimental não pode ser editada após o disparo ser realizado."
+                  : bookingIsCancelled
+                    ? "Aula experimental não pode ser editada após o cancelamento."
+                    : "Aula experimental não pode ser editada após o disparo ser realizado."
                 : "Editar data, horário e detalhes da aula experimental."
             }
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
@@ -2342,6 +2353,8 @@ function BookingDetails({
                         if (experimentalLocked) {
                           if (hasAttendanceStatus) {
                             modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                          } else if (bookingIsCancelled) {
+                            modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
                           } else {
                             modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
                           }
@@ -2356,9 +2369,12 @@ function BookingDetails({
                       className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
                       title={(() => {
                         if (experimentalLocked) {
-                          return hasAttendanceStatus
-                            ? "Professor não pode ser alterado após comparecimento marcado."
-                            : "Professor não pode ser alterado após o disparo ser realizado.";
+                          if (hasAttendanceStatus) {
+                            return "Professor não pode ser alterado após comparecimento marcado.";
+                          } else if (bookingIsCancelled) {
+                            return "Professor não pode ser alterado após a aula experimental ser cancelada.";
+                          }
+                          return "Professor não pode ser alterado após o disparo ser realizado.";
                         }
                         const assigned = experimentalClassBookingAssignedProfessor(lead);
                         return assigned
@@ -2397,6 +2413,8 @@ function BookingDetails({
                                 if (experimentalLocked) {
                                   if (hasAttendanceStatus) {
                                     modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                  } else if (bookingIsCancelled) {
+                                    modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
                                   } else {
                                     modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
                                   }
@@ -2417,7 +2435,9 @@ function BookingDetails({
                                 experimentalLocked
                                   ? hasAttendanceStatus
                                     ? "Professor não pode ser alterado após comparecimento marcado."
-                                    : "Professor não pode ser alterado após o disparo ser realizado."
+                                    : bookingIsCancelled
+                                      ? "Professor não pode ser alterado após a aula experimental ser cancelada."
+                                      : "Professor não pode ser alterado após o disparo ser realizado."
                                   : ""
                               }
                             >

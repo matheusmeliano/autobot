@@ -219,6 +219,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           return bt - at;
         })?.[0]?.id ?? null) as string | null;
 
+    if (activeId) {
+      const { data: activeBookingState, error: stateErr } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .select(
+          "id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at",
+        )
+        .eq("id", activeId)
+        .maybeSingle();
+      if (stateErr) throw stateErr;
+      if (activeBookingState) {
+        const statusRaw = String((activeBookingState as any).status ?? "").trim().toLowerCase();
+        const attendanceRaw = String((activeBookingState as any).attendance_status ?? "").trim();
+        const studentSent = Boolean(String((activeBookingState as any).student_start_notification_sent_at ?? "").trim());
+        const attendantSent = Boolean(String((activeBookingState as any).attendant_start_notification_sent_at ?? "").trim());
+        const isCancelled = statusRaw === "cancelled";
+        const hasAttendance = attendanceRaw === "attended" || attendanceRaw === "no_show";
+        const isLocked = isCancelled || hasAttendance || studentSent || attendantSent;
+        if (isLocked) {
+          const reason = isCancelled
+            ? "após a aula experimental ser cancelada."
+            : hasAttendance
+              ? "após comparecimento marcado."
+              : "após o disparo ser realizado.";
+          return Response.json(
+            { ok: false, error: `A aula experimental não pode ser editada ${reason}` },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
     try {
       await admin
         .from("atendimento_experimental_class_bookings")
