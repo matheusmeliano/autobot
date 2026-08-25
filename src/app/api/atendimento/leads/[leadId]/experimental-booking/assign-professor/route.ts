@@ -50,7 +50,7 @@ function stripUndefinedColumnFromPatch(
 }
 
 async function columnExists(
-  admin: ReturnType<typeof import("../../../../../../lib/supabase/admin").createSupabaseAdminClient>,
+  admin: ReturnType<typeof createSupabaseAdminClient>,
   tableName: string,
   columnName: string,
 ): Promise<boolean> {
@@ -79,7 +79,7 @@ async function columnExists(
 }
 
 async function stripSuspectMissingColumnsBeforePatch(
-  admin: ReturnType<typeof import("../../../../../../lib/supabase/admin").createSupabaseAdminClient>,
+  admin: ReturnType<typeof createSupabaseAdminClient>,
   tableName: string,
   patchObj: Record<string, unknown>,
   suspectAllowlist: ReadonlyArray<string>,
