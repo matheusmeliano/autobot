@@ -4641,6 +4641,35 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                     const assigned = experimentalClassBookingAssignedProfessor(lead);
                     return !assigned;
                   })();
+                  const showRecurringWarningIcon = (() => {
+                    const recurringSections = ["alunos", "agendamentos", "contratos"];
+                    if (!recurringSections.includes(activeSection)) return false;
+                    const hasRecurringPassword = Boolean(String((lead as any).recurring_registration_password ?? "").trim());
+                    const classifiedAsAluno = isLeadInAlunosSection(lead);
+                    if (!(hasRecurringPassword || classifiedAsAluno)) return false;
+                    const booking = lead.experimental_class_booking ?? null;
+                    const bookingId = String(booking?.id ?? "").trim();
+                    const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+                    const hasExpPending =
+                      bookingId &&
+                      bookingStatus &&
+                      bookingStatus !== "cancelled" &&
+                      !String((booking as any)?.lesson_link ?? "").trim();
+                    if (hasExpPending) return false;
+                    const hasRecLink = Boolean(String((lead as any).recurring_class_link ?? "").trim());
+                    if (hasRecLink) return false;
+                    return true;
+                  })();
+                  const warningIconTitle = (() => {
+                    if (showAgendamentoMissingProfessorIcon) {
+                      return "Selecione o professor responsável antes de disparar agora.";
+                    }
+                    if (showRecurringWarningIcon) {
+                      return "Adicione o link da aula recorrente.";
+                    }
+                    return "";
+                  })();
+                  const showWarningIcon = showAgendamentoMissingProfessorIcon || showRecurringWarningIcon;
                   return (
                     <button
                       key={lead.id}
@@ -4671,10 +4700,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           <CalendarDays className="h-3.5 w-3.5 shrink-0" />
                         </button>
                       ) : null}
-                      {showAgendamentoMissingProfessorIcon ? (
+                      {showWarningIcon ? (
                         <div
                           className="absolute right-3 top-3 inline-flex items-center"
-                          title="Selecione o professor responsável antes de disparar agora."
+                          title={warningIconTitle || undefined}
                         >
                           <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />
                         </div>
