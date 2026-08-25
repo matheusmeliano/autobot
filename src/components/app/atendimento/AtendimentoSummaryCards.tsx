@@ -605,6 +605,7 @@ function RecurringClassLinkCard({
 }) {
   if (activeSection !== "interessados" && activeSection !== "alunos") return null;
   const isDetails = context === "details";
+  const isList = context === "list";
   const nomeStr = String(lead.full_name ?? "").trim();
   const telStr = String(lead.phone ?? "").replace(/\D/g, "").trim();
   const partes = nomeStr.split(/\s+/).filter(Boolean);
@@ -614,6 +615,7 @@ function RecurringClassLinkCard({
   const isTelOk = telStr.length >= 10;
 
   if (!isNomeOk || !isTelOk) {
+    if (isList) return null;
     const missing: string[] = [];
     if (!isNomeOk) missing.push("nome");
     if (!isTelOk) missing.push("telefone");
@@ -918,6 +920,8 @@ function RecurringClassLinkCard({
   }
 
   const finalLink = urlEncoded;
+
+  if (isList) return null;
 
   return (
     <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 space-y-3">
