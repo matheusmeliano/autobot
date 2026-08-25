@@ -671,9 +671,29 @@ export function listExperimentalClassAvailability(params: {
     .filter((value) => Number.isFinite(value));
 
   const professorToday = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
-  const professorMonthEnd = endOfMonthLocalDate(professorToday);
   const dates: ExperimentalClassDateOption[] = [];
   const slotsByProfessorDate = new Map<string, ExperimentalClassTimeOption[]>();
+
+  function startOfProfessorWeek(d: Date): string {
+    const todayLocal = localDateInTimeZone(d, ATENDIMENTO_PROFESSOR_TIME_ZONE);
+    const todayNoonUtc = zonedDateTimeToUtcIso({
+      date: todayLocal,
+      time: "12:00",
+      timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+    });
+    const todayWeekday = weekdayInTimeZone(todayNoonUtc, ATENDIMENTO_PROFESSOR_TIME_ZONE).toLowerCase();
+    const order: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"> = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const todayIdx = order.indexOf(todayWeekday as any);
+    const monLocal = addDaysToLocalDate(todayLocal, -Math.max(0, todayIdx));
+    return monLocal;
+  }
+
+  const mondayThisWeek = startOfProfessorWeek(now);
+  const weeksToEmit = [
+    { startLocal: maxLocalDate(professorToday, mondayThisWeek), endLocal: addDaysToLocalDate(mondayThisWeek, 6) },
+    { startLocal: addDaysToLocalDate(mondayThisWeek, 7), endLocal: addDaysToLocalDate(mondayThisWeek, 13) },
+  ];
+
   const collectDates = (startDate: string, endDate: string) => {
     for (let currentDate = startDate; currentDate <= endDate; currentDate = addDaysToLocalDate(currentDate, 1)) {
       const middayIso = zonedDateTimeToUtcIso({
@@ -730,15 +750,8 @@ export function listExperimentalClassAvailability(params: {
     }
   };
 
-  const shouldUseNextMonth = professorToday > professorMonthEnd;
-  if (!shouldUseNextMonth) {
-    collectDates(professorToday, professorMonthEnd);
-  }
-
-  if (!dates.length) {
-    const nextMonthStart = startOfNextMonthLocalDate(professorToday);
-    const nextMonthEnd = endOfMonthLocalDate(nextMonthStart);
-    collectDates(nextMonthStart, nextMonthEnd);
+  for (const week of weeksToEmit) {
+    collectDates(week.startLocal, week.endLocal);
   }
 
   return {
