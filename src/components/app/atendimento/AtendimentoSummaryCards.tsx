@@ -4835,8 +4835,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             String(booking?.attendance_status ?? "").trim() === "attended" ||
                             String(booking?.attendance_status ?? "").trim() === "no_show";
                           if (hasDisparo || hasAttendance) return false;
-                          const assignedProfessor = experimentalClassBookingAssignedProfessor(lead);
-                          if (assignedProfessor) return false;
                           return (
                             bookingId &&
                             bookingStatus &&
@@ -4845,11 +4843,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           );
                         })();
 
-                        const assignedRecurringProfessor = recurringClassAssignedProfessor(lead);
                         const showRecLink =
                           recorrenteRealmenteIniciado &&
                           !showExpLink &&
-                          !Boolean(assignedRecurringProfessor) &&
                           !String((lead as any).recurring_class_link ?? "").trim();
 
                         const recLinkSections = ["alunos", "agendamentos", "contratos"];
