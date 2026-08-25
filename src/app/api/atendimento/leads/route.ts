@@ -87,6 +87,7 @@ export async function GET(req: Request) {
   const leadIds = leadRows.map((row) => String(row.id ?? "")).filter(Boolean);
   const conversationsByLeadId = new Map<string, any>();
   const bookingsByLeadId = new Map<string, any>();
+  const bookingsByLeadIdIncludingCancelled = new Map<string, any>();
   const bookingsById = new Map<string, any>();
   const latestBookingByLeadId = new Map<string, any>();
   const futureExperimentalBookingByLeadId = new Map<string, any>();
@@ -158,11 +159,6 @@ export async function GET(req: Request) {
       const leadId = String((booking as any)?.lead_id ?? "");
       const status = String((booking as any)?.status ?? "").trim().toLowerCase();
       if (!leadId) continue;
-      if (status === "cancelled") {
-        cancelledLeadBookingIds.add(leadId);
-        continue;
-      }
-      if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
       const candidate = {
         ...(booking as any),
         lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
@@ -173,6 +169,23 @@ export async function GET(req: Request) {
         professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         source: "table",
       };
+      const existingIncluding = bookingsByLeadIdIncludingCancelled.get(leadId);
+      if (!existingIncluding) {
+        bookingsByLeadIdIncludingCancelled.set(leadId, candidate);
+      } else {
+        const curStr = String(
+          (existingIncluding as any)?.updated_at || (existingIncluding as any)?.created_at || "",
+        );
+        const newStr = String((booking as any).updated_at || (booking as any).created_at || "");
+        if (newStr > curStr) {
+          bookingsByLeadIdIncludingCancelled.set(leadId, candidate);
+        }
+      }
+      if (status === "cancelled") {
+        cancelledLeadBookingIds.add(leadId);
+        continue;
+      }
+      if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
       if (bookingsByLeadId.has(leadId)) continue;
       bookingsByLeadId.set(leadId, candidate);
     }
@@ -731,11 +744,14 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         if (!preferredBookingId) return null;
         const b = bookingsById.get(preferredBookingId) ?? null;
         if (!b) return null;
-        const s = String(b.status ?? "").trim().toLowerCase();
-        if (s === "cancelled") return null;
         return b;
       })();
-      const existingBooking = preferredBooking ?? bookingsByLeadId.get(leadId) ?? null;
+      const existingBooking =
+        preferredBooking ??
+        bookingsByLeadId.get(leadId) ??
+        bookingsByLeadIdIncludingCancelled.get(leadId) ??
+        null;
+      const hasAnyRealBooking = Boolean(existingBooking);
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
       const cleanDraftDate = isCancelledLead ? null : draftDateByLeadId.get(leadId) ?? null;
       const cleanDraftTime = isCancelledLead ? null : draftTimeByLeadId.get(leadId) ?? null;
@@ -750,10 +766,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const bookingExpProfName = String((existingBooking as any)?.assigned_professor_name ?? "").trim();
       const bookingExpProfPhone = String((existingBooking as any)?.assigned_professor_phone ?? "").trim();
 
-      const mergedExperimentalProfName = isCancelledLead ? "" : rowExperimentalProfName || bookingExpProfName || "";
-      const mergedExperimentalProfPhone = isCancelledLead ? "" : rowExperimentalProfPhone || bookingExpProfPhone || "";
-      const mergedRecurringProfName = isCancelledLead ? "" : rowRecurringProfName || "";
-      const mergedRecurringProfPhone = isCancelledLead ? "" : rowRecurringProfPhone || "";
+      const mergedExperimentalProfName = rowExperimentalProfName || bookingExpProfName || "";
+      const mergedExperimentalProfPhone = rowExperimentalProfPhone || bookingExpProfPhone || "";
+      const mergedRecurringProfName = rowRecurringProfName || "";
+      const mergedRecurringProfPhone = rowRecurringProfPhone || "";
 
       const mergedProfessorDate = isCancelledLead
         ? ""
@@ -1047,10 +1063,20 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         experimental_class_booking: (() => {
           if (!bookingWithFallback) return null;
           const base = bookingWithFallback as any;
+          const resolvedStatus =
+            String((existingBooking as any)?.status ?? base?.status ?? "").trim().toLowerCase() ||
+            null;
           return {
             ...base,
-            assigned_professor_name: mergedExperimentalProfName || String(base?.assigned_professor_name ?? "").trim() || null,
-            assigned_professor_phone: mergedExperimentalProfPhone || String(base?.assigned_professor_phone ?? "").trim() || null,
+            status: resolvedStatus,
+            assigned_professor_name:
+              mergedExperimentalProfName ||
+              String(base?.assigned_professor_name ?? "").trim() ||
+              null,
+            assigned_professor_phone:
+              mergedExperimentalProfPhone ||
+              String(base?.assigned_professor_phone ?? "").trim() ||
+              null,
           };
         })(),
         latest_experimental_class_booking: latestPastExpBooking,
