@@ -1407,8 +1407,8 @@ function LeadDetails({
         ) : null}
 
         {showDraftSection ? (
-          <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/80">
+          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
               Agendamento aula experimental
             </div>
             <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
