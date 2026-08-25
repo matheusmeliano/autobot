@@ -94,6 +94,7 @@ export async function GET(req: Request) {
   const cancelledLeadBookingIds = new Set<string>();
   const cancelledByHistoryLeadIds = new Set<string>();
   const cancelledAtByLeadId = new Map<string, string>();
+  const cancelledProfessorSnapshotByLeadId = new Map<string, { name: string; phone: string }>();
   const latestClassEventByLeadId = new Map<string, string>();
 
   const parseStartAtMs = (value: unknown): number => {
@@ -309,6 +310,13 @@ export async function GET(req: Request) {
         cancelledByHistoryLeadIds.add(leadId);
         if (!cancelledAtByLeadId.has(leadId)) {
           cancelledAtByLeadId.set(leadId, String(eca ?? "").trim());
+        }
+        if (!cancelledProfessorSnapshotByLeadId.has(leadId)) {
+          const n = String(details?.professor_name_before ?? "").trim();
+          const p = String(details?.professor_phone_before ?? "").trim();
+          if (n || p) {
+            cancelledProfessorSnapshotByLeadId.set(leadId, { name: n, phone: p });
+          }
         }
       }
       if (eventType.startsWith("experimental_class_") && !latestClassEventByLeadId.has(leadId)) {
@@ -753,6 +761,9 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         null;
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
       const cancelledAt = cancelledAtByLeadId.get(leadId) ?? null;
+      const cancelledProfSnap = cancelledProfessorSnapshotByLeadId.get(leadId) ?? null;
+      const snapProfName = String(cancelledProfSnap?.name ?? "").trim();
+      const snapProfPhone = String(cancelledProfSnap?.phone ?? "").trim();
       const existingBooking =
         existingBookingRaw ??
         (isCancelledLead
@@ -773,9 +784,13 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
               lead_time: "",
               lead_start_at: "",
               assigned_professor_name:
-                String((row as any)?.experimental_class_professor_name ?? "").trim() || null,
+                String((row as any)?.experimental_class_professor_name ?? "").trim() ||
+                snapProfName ||
+                null,
               assigned_professor_phone:
-                String((row as any)?.experimental_class_professor_phone ?? "").trim() || null,
+                String((row as any)?.experimental_class_professor_phone ?? "").trim() ||
+                snapProfPhone ||
+                null,
               conversation_id: String((row as any)?.conversation_id ?? ""),
               created_at: cancelledAt || String(row.updated_at ?? row.created_at ?? ""),
               updated_at: cancelledAt || String(row.updated_at ?? row.created_at ?? ""),
@@ -797,8 +812,8 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const bookingExpProfName = String((existingBooking as any)?.assigned_professor_name ?? "").trim();
       const bookingExpProfPhone = String((existingBooking as any)?.assigned_professor_phone ?? "").trim();
 
-      const mergedExperimentalProfName = rowExperimentalProfName || bookingExpProfName || "";
-      const mergedExperimentalProfPhone = rowExperimentalProfPhone || bookingExpProfPhone || "";
+      const mergedExperimentalProfName = rowExperimentalProfName || bookingExpProfName || snapProfName || "";
+      const mergedExperimentalProfPhone = rowExperimentalProfPhone || bookingExpProfPhone || snapProfPhone || "";
       const mergedRecurringProfName = rowRecurringProfName || "";
       const mergedRecurringProfPhone = rowRecurringProfPhone || "";
 

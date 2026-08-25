@@ -259,6 +259,16 @@ export async function POST(
 
   // 4) appendHistoryEvent confirmando cancelamento/exclusao
   try {
+    const snapProfName =
+      String(resolvedAssignedProfessor?.name ?? "").trim() ||
+      String((resolvedBooking as any)?.assigned_professor_name ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_name ?? "").trim() ||
+      null;
+    const snapProfPhone =
+      String(resolvedAssignedProfessor?.phone ?? "").trim() ||
+      String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_phone ?? "").trim() ||
+      null;
     await appendHistoryEvent({
       leadId: resolvedLeadId,
       conversationId: null,
@@ -281,6 +291,8 @@ export async function POST(
         professor_time_before: String(
           (resolvedBooking as any)?.professor_time ?? payload?.professorTime ?? "",
         ).trim() || null,
+        professor_name_before: snapProfName,
+        professor_phone_before: snapProfPhone,
       },
       actorType: "attendant",
       actorEmail: String(auth.user?.email ?? "").trim() || null,
