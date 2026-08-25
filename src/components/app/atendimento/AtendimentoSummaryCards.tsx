@@ -4668,6 +4668,14 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   const showAgendamentoMissingProfessorIcon = (() => {
                     if (activeSection !== "agendamentos") return false;
                     if (leadHasAnyRecurringProgressSignal(lead) || leadHasMatriculaOrRecurringStageInitiated(lead)) return false;
+                    const booking = lead.experimental_class_booking ?? null;
+                    const hasDisparo =
+                      Boolean(String(booking?.student_start_notification_sent_at ?? "").trim()) ||
+                      Boolean(String(booking?.attendant_start_notification_sent_at ?? "").trim());
+                    const hasAttendance =
+                      String(booking?.attendance_status ?? "").trim() === "attended" ||
+                      String(booking?.attendance_status ?? "").trim() === "no_show";
+                    if (hasDisparo || hasAttendance) return false;
                     const assigned = experimentalClassBookingAssignedProfessor(lead);
                     return !assigned;
                   })();
@@ -4773,6 +4781,13 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           const booking = lead.experimental_class_booking ?? null;
                           const bookingId = String(booking?.id ?? "").trim();
                           const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
+                          const hasDisparo =
+                            Boolean(String(booking?.student_start_notification_sent_at ?? "").trim()) ||
+                            Boolean(String(booking?.attendant_start_notification_sent_at ?? "").trim());
+                          const hasAttendance =
+                            String(booking?.attendance_status ?? "").trim() === "attended" ||
+                            String(booking?.attendance_status ?? "").trim() === "no_show";
+                          if (hasDisparo || hasAttendance) return false;
                           return (
                             bookingId &&
                             bookingStatus &&
