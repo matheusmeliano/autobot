@@ -452,7 +452,7 @@ export function AppShell({
       <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-screen"}>
         <div
           className={[
-            "relative flex w-full app-scroll-container",
+            "relative flex w-full",
             drawerOnlyNav
               ? "min-h-0 flex-col gap-4 overflow-visible px-4 pb-6 pt-6 min-[1201px]:px-6 lg:h-full lg:min-h-0 lg:gap-6 lg:overflow-hidden lg:py-6"
               : "gap-6 px-4 py-6 min-[1201px]:px-6",

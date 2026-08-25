@@ -364,7 +364,7 @@ export function AtendimentoConversationPanel({
 
       <div
         ref={messagesViewportRef}
-        className={desktopExpanded ? "flex-1 space-y-3 overflow-y-auto app-scroll-container bg-[var(--app-bg)] px-5 py-4 pr-5" : "flex-1 space-y-3 overflow-y-auto app-scroll-container px-5 py-4 pr-5"}
+        className={desktopExpanded ? "flex-1 space-y-3 overflow-y-auto bg-[var(--app-bg)] px-4 py-4" : "flex-1 space-y-3 overflow-y-auto px-4 py-4"}
       >
         {messagesLoading ? (
           <div className="flex h-full min-h-56 items-center justify-center text-sm text-[var(--app-text-45)]">

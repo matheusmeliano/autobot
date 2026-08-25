@@ -206,7 +206,7 @@ export function AtendimentoLeadList({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto app-scroll-container px-4 py-4 pr-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {pagedLeads.length ? (
           <div className="space-y-4">
             {pagedLeads.map((lead) => {
