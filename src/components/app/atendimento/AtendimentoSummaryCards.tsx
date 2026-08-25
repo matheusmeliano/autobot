@@ -1713,6 +1713,7 @@ function BookingDetails({
   const hasAttendanceStatus =
     String(booking?.attendance_status ?? "").trim() === "attended" ||
     String(booking?.attendance_status ?? "").trim() === "no_show";
+  const experimentalLocked = professorLockedByDisparo || hasAttendanceStatus;
   const attendanceStatus = booking?.attendance_status ?? null;
   const hasValidExperimentalDateTime = Boolean(
     booking &&
@@ -1818,7 +1819,7 @@ function BookingDetails({
     : "Agendado";
   const canCancel = derivedStatus === "scheduled" && Boolean(bookingId) && !hasRecurringClass && !hideExperimentalInfoCompletely;
   const canEditLessonLink =
-    Boolean(bookingId) && bookingStatus !== "cancelled" && !bookingIsNoShow && !hideExperimentalInfoCompletely;
+    Boolean(bookingId) && bookingStatus !== "cancelled" && !bookingIsNoShow && !experimentalLocked && !hideExperimentalInfoCompletely;
   const canSendStudentNotification =
     (derivedStatus === "scheduled" || derivedStatus === "in_progress") &&
     Boolean(bookingId) &&
@@ -1933,14 +1934,24 @@ function BookingDetails({
           <button
             type="button"
             onClick={() => {
-              if (professorLockedByDisparo) {
-                modalToast.warning("Aula experimental não pode ser editada após o disparo ser realizado.");
+              if (experimentalLocked) {
+                modalToast.warning(
+                  hasAttendanceStatus
+                    ? "Aula experimental não pode ser editada após comparecimento marcado."
+                    : "Aula experimental não pode ser editada após o disparo ser realizado.",
+                );
                 return;
               }
               void onEditExperimental(lead);
             }}
-            disabled={professorLockedByDisparo}
-            title={professorLockedByDisparo ? "Aula experimental não pode ser editada após o disparo ser realizado." : "Editar data, horário e detalhes da aula experimental."}
+            disabled={experimentalLocked}
+            title={
+              experimentalLocked
+                ? hasAttendanceStatus
+                  ? "Aula experimental não pode ser editada após comparecimento marcado."
+                  : "Aula experimental não pode ser editada após o disparo ser realizado."
+                : "Editar data, horário e detalhes da aula experimental."
+            }
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
@@ -2319,8 +2330,12 @@ function BookingDetails({
                     <button
                       type="button"
                       onClick={() => {
-                        if (professorLockedByDisparo) {
-                          modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                        if (experimentalLocked) {
+                          if (hasAttendanceStatus) {
+                            modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                          } else {
+                            modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                          }
                           return;
                         }
                         setAssignProfessorDropdownOpen((v) => !v);
@@ -2328,11 +2343,14 @@ function BookingDetails({
                       onBlur={() => {
                         setTimeout(() => setAssignProfessorDropdownOpen(false), 180);
                       }}
-                      disabled={assigningProfessor || professorLockedByDisparo}
+                      disabled={assigningProfessor || experimentalLocked}
                       className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
                       title={(() => {
-                        if (professorLockedByDisparo)
-                          return "Professor não pode ser alterado após o disparo ser realizado.";
+                        if (experimentalLocked) {
+                          return hasAttendanceStatus
+                            ? "Professor não pode ser alterado após comparecimento marcado."
+                            : "Professor não pode ser alterado após o disparo ser realizado.";
+                        }
                         const assigned = experimentalClassBookingAssignedProfessor(lead);
                         return assigned
                           ? `Professor vinculado: ${assigned.name} (${assigned.short})`
@@ -2360,15 +2378,19 @@ function BookingDetails({
                         {EXPERIMENTAL_PROFESSOR_OPTIONS.map((opt) => {
                           const assigned = experimentalClassBookingAssignedProfessor(lead);
                           const isActive = assigned?.phone === opt.phone && assigned?.name === opt.name;
-                          const optionDisabled = assigningProfessor || professorLockedByDisparo;
+                          const optionDisabled = assigningProfessor || experimentalLocked;
                           return (
                             <button
                               key={opt.phone}
                               type="button"
                               disabled={optionDisabled}
                               onClick={() => {
-                                if (professorLockedByDisparo) {
-                                  modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                if (experimentalLocked) {
+                                  if (hasAttendanceStatus) {
+                                    modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                  } else {
+                                    modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                  }
                                   setAssignProfessorDropdownOpen(false);
                                   return;
                                 }
@@ -2383,8 +2405,10 @@ function BookingDetails({
                                 "disabled:cursor-not-allowed disabled:opacity-60",
                               ].join(" ")}
                               title={
-                                professorLockedByDisparo
-                                  ? "Professor não pode ser alterado após o disparo ser realizado."
+                                experimentalLocked
+                                  ? hasAttendanceStatus
+                                    ? "Professor não pode ser alterado após comparecimento marcado."
+                                    : "Professor não pode ser alterado após o disparo ser realizado."
                                   : ""
                               }
                             >
@@ -2463,7 +2487,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {canEditLessonLink && !hasAttendanceStatus && !hasRecurringSignalForHideExperimental ? (
+        {canEditLessonLink && !hasRecurringSignalForHideExperimental ? (
           <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
