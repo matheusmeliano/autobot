@@ -746,13 +746,44 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         if (!b) return null;
         return b;
       })();
-      const existingBooking =
+      const existingBookingRaw =
         preferredBooking ??
         bookingsByLeadId.get(leadId) ??
         bookingsByLeadIdIncludingCancelled.get(leadId) ??
         null;
-      const hasAnyRealBooking = Boolean(existingBooking);
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
+      const cancelledAt = cancelledAtByLeadId.get(leadId) ?? null;
+      const existingBooking =
+        existingBookingRaw ??
+        (isCancelledLead
+          ? ({
+              id: "",
+              status: "cancelled",
+              lesson_link: null,
+              student_start_notification_sent_at: null,
+              attendant_start_notification_sent_at: null,
+              attendance_status: null,
+              attendance_checked_at: null,
+              professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              professor_date: "",
+              professor_time: "",
+              professor_start_at: "",
+              lead_date: "",
+              lead_time: "",
+              lead_start_at: "",
+              assigned_professor_name:
+                String((row as any)?.experimental_class_professor_name ?? "").trim() || null,
+              assigned_professor_phone:
+                String((row as any)?.experimental_class_professor_phone ?? "").trim() || null,
+              conversation_id: String((row as any)?.conversation_id ?? ""),
+              created_at: cancelledAt || String(row.updated_at ?? row.created_at ?? ""),
+              updated_at: cancelledAt || String(row.updated_at ?? row.created_at ?? ""),
+              source: "cancelled_history",
+              cancelled_action: "deleted_and_unlinked",
+            } as any)
+          : null);
+      const hasAnyRealBooking = Boolean(existingBooking);
       const cleanDraftDate = isCancelledLead ? null : draftDateByLeadId.get(leadId) ?? null;
       const cleanDraftTime = isCancelledLead ? null : draftTimeByLeadId.get(leadId) ?? null;
       const mergedRowExperimentalClassStatus = isCancelledLead

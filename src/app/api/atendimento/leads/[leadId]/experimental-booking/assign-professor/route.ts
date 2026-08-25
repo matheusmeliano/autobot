@@ -148,6 +148,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     const bookingId = String((leadExists as any)?.experimental_class_booking_id ?? "").trim();
     const updatedAt = new Date().toISOString();
 
+    if (scope === "experimental" || scope === "both") {
+      const { data: lastCancelEvents } = await admin
+        .from("atendimento_history_events")
+        .select("id, event_type, created_at")
+        .eq("lead_id", safeLeadId)
+        .eq("event_type", "experimental_class_cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const lastCancelEvent =
+        Array.isArray(lastCancelEvents) && lastCancelEvents.length > 0 ? lastCancelEvents[0] : null;
+      if (lastCancelEvent) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Professor não pode ser alterado após a aula experimental ser cancelada.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     if (bookingId && (scope === "experimental" || scope === "both")) {
       const { data: existingBooking } = await admin
         .from("atendimento_experimental_class_bookings")

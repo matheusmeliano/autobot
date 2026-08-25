@@ -219,6 +219,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           return bt - at;
         })?.[0]?.id ?? null) as string | null;
 
+    if (!activeId) {
+      const { data: lastCancelEvents } = await admin
+        .from("atendimento_history_events")
+        .select("id, event_type, created_at")
+        .eq("lead_id", leadId)
+        .eq("event_type", "experimental_class_cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const lastCancelEvent =
+        Array.isArray(lastCancelEvents) && lastCancelEvents.length > 0 ? lastCancelEvents[0] : null;
+      if (lastCancelEvent) {
+        return Response.json(
+          {
+            ok: false,
+            error:
+              "A aula experimental não pode ser editada após a aula experimental ser cancelada.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     if (activeId) {
       const { data: activeBookingState, error: stateErr } = await admin
         .from("atendimento_experimental_class_bookings")
