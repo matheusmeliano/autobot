@@ -135,6 +135,18 @@ function experimentalClassBookingAssignedProfessor(lead: AtendimentoLeadListItem
   return null;
 }
 
+function recurringClassAssignedProfessor(lead: AtendimentoLeadListItem): {
+  name: string;
+  phone: string;
+  short: string;
+} | null {
+  const flatName = String((lead as any)?.recurring_class_professor_name ?? "").trim();
+  const flatPhone = String((lead as any)?.recurring_class_professor_phone ?? "").trim();
+  if (!flatName || !flatPhone) return null;
+  const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone && p.name === flatName);
+  return match ?? null;
+}
+
 
 function isLeadInAlunosSection(lead: AtendimentoLeadListItem): boolean {
   const st = String(lead.status ?? "").trim().toLowerCase();
@@ -1651,10 +1663,11 @@ function BookingDetails({
   onEditExperimental?: (lead: AtendimentoLeadListItem) => void;
   assigningProfessor: boolean;
   onAssignProfessor: (
-    lead: AtendimentoLeadListItem, professor: { name: string; phone: string }) => Promise<void>;
+    lead: AtendimentoLeadListItem, professor: { name: string; phone: string }, scope: "experimental" | "recurring" | "both") => Promise<void>;
 }) {
   const booking = lead.experimental_class_booking;
   const [assignProfessorDropdownOpen, setAssignProfessorDropdownOpen] = useState(false);
+  const [recurringAssignProfessorDropdownOpen, setRecurringAssignProfessorDropdownOpen] = useState(false);
   const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
   const hideExperimentalInfoCompletely = shouldHideExperimentalInfoCompletely(lead, activeSection);
   const initialSavedRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
@@ -1952,13 +1965,103 @@ function BookingDetails({
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 scrollbar-hide">
         {activeSection === "agendamentos" && leadHasMatriculaOrRecurringStageInitiated(lead) ? (
-          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/85">
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
                 Aula recorrente
               </div>
+              <div className="ml-auto flex w-full flex-wrap items-center gap-2 min-[600px]:w-auto min-[600px]:justify-end">
+                {(() => {
+                  const assigned = recurringClassAssignedProfessor(lead);
+                  if (assigned) return null;
+                  return (
+                    <div className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 min-[600px]:w-auto min-[600px]:px-3 min-[600px]:py-1 min-[600px]:text-[11px]">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      <span className="hidden sm:inline">Escolha o professor</span>
+                      <span className="sm:hidden">Escolha professor</span>
+                    </div>
+                  );
+                })()}
+                <div className="relative w-full min-[600px]:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecurringAssignProfessorDropdownOpen((v) => !v);
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setRecurringAssignProfessorDropdownOpen(false), 180);
+                    }}
+                    disabled={assigningProfessor}
+                    className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
+                    title={(() => {
+                      const assigned = recurringClassAssignedProfessor(lead);
+                      return assigned
+                        ? `Professor vinculado: ${assigned.name} (${assigned.short})`
+                        : "Selecionar professor responsável pela aula recorrente";
+                    })()}
+                  >
+                    {assigningProfessor ? (
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                    )}
+                    {(() => {
+                      const assigned = recurringClassAssignedProfessor(lead);
+                      return assigned
+                        ? `${assigned.name} (${assigned.short})`
+                        : "Selecionar professor";
+                    })()}
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                  </button>
+                  {recurringAssignProfessorDropdownOpen ? (
+                    <div
+                      className="absolute right-0 top-full z-[380] mt-2 flex w-[280px] flex-col gap-1.5 overflow-hidden rounded-2xl border border-[var(--app-border)] p-2 shadow-2xl"
+                      style={{ backgroundColor: "#18181b", opacity: 1, backdropFilter: "none" }}
+                    >
+                      {EXPERIMENTAL_PROFESSOR_OPTIONS.map((opt) => {
+                        const assigned = recurringClassAssignedProfessor(lead);
+                        const isActive = assigned?.phone === opt.phone && assigned?.name === opt.name;
+                        const optionDisabled = assigningProfessor;
+                        return (
+                          <button
+                            key={opt.phone}
+                            type="button"
+                            disabled={optionDisabled}
+                            onClick={() => {
+                              setRecurringAssignProfessorDropdownOpen(false);
+                              void onAssignProfessor(lead, { name: opt.name, phone: opt.phone }, "recurring");
+                            }}
+                            className={[
+                              "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
+                              isActive
+                                ? "bg-[var(--app-warning-bg)]"
+                                : "bg-[#23232a] hover:bg-[#2a2a32]",
+                              "disabled:cursor-not-allowed disabled:opacity-60",
+                            ].join(" ")}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                                {opt.name}
+                              </div>
+                              <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--app-text-55)]">
+                                {opt.phone}
+                              </div>
+                            </div>
+                            {isActive ? (
+                              <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-yellow-200">
+                                <Check className="h-3 w-3 shrink-0" />
+                                Atual
+                              </div>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
-            <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2">
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
               <Field
                 label="Dia da semana"
                 value={
@@ -1978,48 +2081,50 @@ function BookingDetails({
                 }
               />
             </div>
+          </div>
+        ) : null}
 
-            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  Link fixo das aulas
-                </div>
+        {activeSection === "agendamentos" && leadHasMatriculaOrRecurringStageInitiated(lead) ? (
+          <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                Link fixo das aulas
               </div>
+            </div>
 
-              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
-                <div className="min-w-0 flex-1">
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                    URL da aula
-                  </label>
-                  <input
-                    type="url"
-                    inputMode="url"
-                    placeholder="https://meet.google.com/..."
-                    value={recurringLinkDraft}
-                    onChange={(e) => setRecurringLinkDraft(e.target.value)}
-                    className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={savingRecurringLink}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void onSaveRecurringLink(lead, recurringLinkDraft)}
-                  disabled={savingRecurringLink || !recurringLinkChanged}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {savingRecurringLink ? (
-                    <>
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 shrink-0" />
-                      {savedRecurringLink ? "Atualizar" : "Salvar"}
-                    </>
-                  )}
-                </button>
+            <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+              <div className="min-w-0 flex-1">
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  URL da aula
+                </label>
+                <input
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://meet.google.com/..."
+                  value={recurringLinkDraft}
+                  onChange={(e) => setRecurringLinkDraft(e.target.value)}
+                  className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={savingRecurringLink}
+                />
               </div>
+              <button
+                type="button"
+                onClick={() => void onSaveRecurringLink(lead, recurringLinkDraft)}
+                disabled={savingRecurringLink || !recurringLinkChanged}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingRecurringLink ? (
+                  <>
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 shrink-0" />
+                    {savedRecurringLink ? "Atualizar" : "Salvar"}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         ) : null}
@@ -2254,7 +2359,7 @@ function BookingDetails({
                                   return;
                                 }
                                 setAssignProfessorDropdownOpen(false);
-                                void onAssignProfessor(lead, { name: opt.name, phone: opt.phone });
+                                void onAssignProfessor(lead, { name: opt.name, phone: opt.phone }, "experimental");
                               }}
                               className={[
                                 "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
@@ -4010,6 +4115,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   async function handleAssignProfessor(
     lead: AtendimentoLeadListItem,
     professor: { name: string; phone: string },
+    scope: "experimental" | "recurring" | "both" = "both",
   ) {
     const leadId = String(lead?.id ?? "").trim();
     if (!leadId) {
@@ -4030,7 +4136,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       const res = await fetch(`/api/atendimento/leads/${leadId}/experimental-booking/assign-professor`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ professor_name: match.name, professor_phone: match.phone }),
+        body: JSON.stringify({ professor_name: match.name, professor_phone: match.phone, scope }),
       });
       const payload = (await res.json().catch(() => null)) as
         | {
@@ -4049,8 +4155,9 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       const persistedBooking = lead.experimental_class_booking
         ? ({
             ...(lead.experimental_class_booking as Record<string, unknown>),
-            assigned_professor_name: assigned.name,
-            assigned_professor_phone: assigned.phone,
+            ...(scope === "experimental" || scope === "both"
+              ? { assigned_professor_name: assigned.name, assigned_professor_phone: assigned.phone }
+              : {}),
           } as unknown as AtendimentoLeadListItem["experimental_class_booking"])
         : null;
 
@@ -4059,15 +4166,23 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         ...(payload.lead ? (payload.lead as Partial<AtendimentoLeadListItem>) : null),
         experimental_class_booking: persistedBooking,
       } as AtendimentoLeadListItem;
-      (mergedFlat as any).experimental_class_professor_name = assigned.name;
-      (mergedFlat as any).experimental_class_professor_phone = assigned.phone;
+      if (scope === "experimental" || scope === "both") {
+        (mergedFlat as any).experimental_class_professor_name = assigned.name;
+        (mergedFlat as any).experimental_class_professor_phone = assigned.phone;
+      }
+      if (scope === "recurring" || scope === "both") {
+        (mergedFlat as any).recurring_class_professor_name = assigned.name;
+        (mergedFlat as any).recurring_class_professor_phone = assigned.phone;
+      }
 
       setLocalLeads((current) =>
         current.map((item) => (item.id === leadId ? mergedFlat : item)),
       );
 
       modalToast.success(
-        `Aula experimental vinculada ao professor ${assigned.name} (${assigned.phone}).`,
+        scope === "recurring"
+          ? `Aula recorrente vinculada ao professor ${assigned.name} (${assigned.phone}).`
+          : `Aula experimental vinculada ao professor ${assigned.name} (${assigned.phone}).`,
       );
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao vincular professor.");

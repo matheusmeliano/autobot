@@ -16,6 +16,8 @@ const STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_ALLOWLIST = [
   "experimental_class_professor_time",
   "experimental_class_lead_start_at",
   "experimental_class_professor_start_at",
+  "recurring_class_professor_name",
+  "recurring_class_professor_phone",
 ] as const;
 
 function extractUndefinedColumnName(raw: unknown): string | null {
@@ -65,9 +67,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     const body = (await req.json().catch(() => null)) as {
       professor_name?: string | null;
       professor_phone?: string | null;
+      scope?: "experimental" | "recurring" | "both" | null;
     } | null;
     const professorNameRaw = String(body?.professor_name ?? "").trim();
     const professorPhoneRaw = String(body?.professor_phone ?? "").trim();
+    const scope = (() => {
+      const raw = String(body?.scope ?? "").trim().toLowerCase();
+      if (raw === "experimental" || raw === "recurring") return raw as "experimental" | "recurring";
+      return "both";
+    })();
 
     const match = EXPERIMENTAL_PROFESSOR_ALLOWLIST.find(
       (p) => p.phone === professorPhoneRaw && p.name === professorNameRaw,
@@ -96,7 +104,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     const bookingId = String((leadExists as any)?.experimental_class_booking_id ?? "").trim();
     const updatedAt = new Date().toISOString();
 
-    if (bookingId) {
+    if (bookingId && (scope === "experimental" || scope === "both")) {
       const { data: existingBooking } = await admin
         .from("atendimento_experimental_class_bookings")
         .select(
@@ -122,7 +130,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
       }
     }
 
-    if (bookingId) {
+    if (bookingId && (scope === "experimental" || scope === "both")) {
       const bookingPatch = {
         assigned_professor_name: match.name,
         assigned_professor_phone: match.phone,
@@ -149,25 +157,40 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
       }
     }
 
-    const leadPatch = {
-      experimental_class_professor_name: match.name,
-      experimental_class_professor_phone: match.phone,
+    const leadPatch: Record<string, unknown> = {
       updated_at: updatedAt,
     };
+    if (scope === "experimental" || scope === "both") {
+      leadPatch.experimental_class_professor_name = match.name;
+      leadPatch.experimental_class_professor_phone = match.phone;
+    }
+    if (scope === "recurring" || scope === "both") {
+      leadPatch.recurring_class_professor_name = match.name;
+      leadPatch.recurring_class_professor_phone = match.phone;
+    }
     const suspectListForLeads = [
       ...STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_ALLOWLIST,
       "experimental_class_professor_name",
       "experimental_class_professor_phone",
+      "recurring_class_professor_name",
+      "recurring_class_professor_phone",
     ];
+    const selectCols = [
+      "id",
+      "experimental_class_booking_id",
+      "experimental_class_professor_name",
+      "experimental_class_professor_phone",
+      "recurring_class_professor_name",
+      "recurring_class_professor_phone",
+      "updated_at",
+    ].join(", ");
     const mergedAfterLead = await (async function attemptLead(currentPatch: Record<string, any>): Promise<any> {
       if (!Object.keys(currentPatch).length) return leadExists;
       const { data, error } = await admin
         .from("atendimento_leads")
         .update(currentPatch)
         .eq("id", safeLeadId)
-        .select(
-          "id, experimental_class_booking_id, experimental_class_professor_name, experimental_class_professor_phone, updated_at",
-        )
+        .select(selectCols)
         .maybeSingle();
       if (!error) return data ?? leadExists;
       const missing = extractUndefinedColumnName(error);
@@ -176,10 +199,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     })(leadPatch as Record<string, any>);
 
     const persistedName = String(
-      (mergedAfterLead as any)?.experimental_class_professor_name ?? match.name,
+      scope === "recurring"
+        ? (mergedAfterLead as any)?.recurring_class_professor_name ?? match.name
+        : (mergedAfterLead as any)?.experimental_class_professor_name ?? match.name,
     ).trim();
     const persistedPhone = String(
-      (mergedAfterLead as any)?.experimental_class_professor_phone ?? match.phone,
+      scope === "recurring"
+        ? (mergedAfterLead as any)?.recurring_class_professor_phone ?? match.phone
+        : (mergedAfterLead as any)?.experimental_class_professor_phone ?? match.phone,
     ).trim();
 
     return NextResponse.json({
