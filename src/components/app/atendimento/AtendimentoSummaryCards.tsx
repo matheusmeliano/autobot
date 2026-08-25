@@ -1319,17 +1319,17 @@ function LeadDetails({
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 scrollbar-hide">
         {showPaymentActions && !paymentConfirmed && !paymentRejected ? (
-          <div
-            className="mb-3 w-full overflow-visible rounded-2xl border border-[var(--app-border)] p-4"
-            style={{ backgroundColor: "#181b20" }}
-          >
-            <div className="flex w-full flex-col gap-3 items-stretch sm:flex-row sm:justify-between sm:items-center">
-              <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                  Pagamento da 1° mensalidade
+          <div className="mb-3 grid min-w-0 gap-3 md:grid-cols-1">
+            <div
+              className="w-full min-w-0 overflow-visible rounded-2xl border border-[var(--app-border)] px-4 py-3"
+              style={{ backgroundColor: "#181b20" }}
+            >
+              <div className="flex w-full flex-col gap-3 items-stretch sm:flex-row sm:justify-between sm:items-center">
+                <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                    Pagamento da 1° mensalidade
+                  </div>
                 </div>
-              </div>
-              {showPaymentActions && !paymentConfirmed && !paymentRejected ? (
                 <div className="w-full sm:w-auto flex flex-col sm:flex-row flex-nowrap items-stretch sm:items-center justify-stretch sm:justify-end gap-2">
                   <button
                     type="button"
@@ -1354,7 +1354,7 @@ function LeadDetails({
                     </span>
                   </button>
                 </div>
-              ) : null}
+              </div>
             </div>
           </div>
         ) : null}
