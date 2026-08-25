@@ -671,81 +671,95 @@ function RecurringClassLinkCard({
       : `https://www.autobot.business${alunoRel}`;
 
     const painelAlunoCard = (
-      <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
-            Painel do Aluno
+      <div
+        className="rounded-2xl border border-[var(--app-border)] overflow-hidden"
+        style={{ backgroundColor: "#181b20" }}
+      >
+        {onEditPassword && !isDetails && (
+          <>
+            <div className="px-4 py-3 flex items-center justify-between gap-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-55)]">
+                Senha do aluno
+              </div>
+              <button
+                type="button"
+                onClick={(ev) => {
+                  if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                  onEditPassword(lead);
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Pencil className="h-4 w-4 shrink-0" />
+                Editar
+              </button>
+            </div>
+            <div className="h-px w-full bg-[var(--app-border)]" />
+          </>
+        )}
+
+        <div className="px-4 py-3 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
+              Painel do Aluno
+            </div>
           </div>
-          {onEditPassword && !isDetails && (
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={(ev) => {
+              onClick={async (ev) => {
                 if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-                onEditPassword(lead);
+                try {
+                  window.open(alunoPortalLink, "_blank", "noopener,noreferrer");
+                } catch {}
               }}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={savingThisLead}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-sky-500 active:bg-sky-500 disabled:opacity-60"
             >
-              <Pencil className="h-4 w-4 shrink-0" />
-              Editar
+              {savingThisLead ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
+              )}
+              Abrir
             </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={async (ev) => {
-              if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-              try {
-                window.open(alunoPortalLink, "_blank", "noopener,noreferrer");
-              } catch {}
-            }}
-            disabled={savingThisLead}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-sky-500 active:bg-sky-500 disabled:opacity-60"
-          >
-            {savingThisLead ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <ExternalLink className="h-3.5 w-3.5" />
-            )}
-            Abrir
-          </button>
-          <button
-            type="button"
-            onClick={async (ev) => {
-              if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-              try {
-                if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
-                  await (navigator as any).clipboard.writeText(alunoPortalLink);
-                  modalToast.success("Link do Painel do Aluno copiado.");
-                } else {
-                  try {
-                    const ta = document.createElement("textarea");
-                    ta.value = alunoPortalLink;
-                    ta.style.position = "fixed";
-                    ta.style.opacity = "0";
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(ta);
+            <button
+              type="button"
+              onClick={async (ev) => {
+                if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                try {
+                  if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
+                    await (navigator as any).clipboard.writeText(alunoPortalLink);
                     modalToast.success("Link do Painel do Aluno copiado.");
-                  } catch {
-                    prompt("Copie o link do Painel do Aluno:", alunoPortalLink);
+                  } else {
+                    try {
+                      const ta = document.createElement("textarea");
+                      ta.value = alunoPortalLink;
+                      ta.style.position = "fixed";
+                      ta.style.opacity = "0";
+                      document.body.appendChild(ta);
+                      ta.select();
+                      document.execCommand("copy");
+                      document.body.removeChild(ta);
+                      modalToast.success("Link do Painel do Aluno copiado.");
+                    } catch {
+                      prompt("Copie o link do Painel do Aluno:", alunoPortalLink);
+                    }
                   }
+                } catch (e) {
+                  modalToast.error(e instanceof Error ? e.message : "Falha ao copiar o link.");
                 }
-              } catch (e) {
-                modalToast.error(e instanceof Error ? e.message : "Falha ao copiar o link.");
-              }
-            }}
-            disabled={savingThisLead}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
-          >
-            {savingThisLead ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-            Copiar
-          </button>
+              }}
+              disabled={savingThisLead}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+            >
+              {savingThisLead ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+              Copiar
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -920,81 +934,95 @@ function RecurringClassLinkCard({
   const finalLink = urlEncoded;
 
   return (
-    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/95">
-          Link de matrícula
+    <div
+      className="rounded-2xl border border-[var(--app-border)] overflow-hidden"
+      style={{ backgroundColor: "#181b20" }}
+    >
+      {onEditPassword && (
+        <>
+          <div className="px-4 py-3 flex items-center justify-between gap-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-55)]">
+              Senha do aluno
+            </div>
+            <button
+              type="button"
+              onClick={(ev) => {
+                if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+                onEditPassword(lead);
+              }}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Pencil className="h-4 w-4 shrink-0" />
+              Editar
+            </button>
+          </div>
+          <div className="h-px w-full bg-[var(--app-border)]" />
+        </>
+      )}
+
+      <div className="px-4 py-3 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/95">
+            Link de matrícula
+          </div>
         </div>
-        {onEditPassword && (
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={(ev) => {
+            onClick={async (ev) => {
               if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-              onEditPassword(lead);
+              try {
+                window.open(finalLink, "_blank", "noopener,noreferrer");
+              } catch {}
             }}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={savingThisLead}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-500 active:bg-emerald-500 disabled:opacity-60"
           >
-            <Pencil className="h-4 w-4 shrink-0" />
-            Editar
+            {savingThisLead ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ExternalLink className="h-3.5 w-3.5" />
+            )}
+            Abrir
           </button>
-        )}
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          type="button"
-          onClick={async (ev) => {
-            if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-            try {
-              window.open(finalLink, "_blank", "noopener,noreferrer");
-            } catch {}
-          }}
-          disabled={savingThisLead}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-semibold text-white shadow-sm hover:bg-emerald-500 active:bg-emerald-500 disabled:opacity-60"
-        >
-          {savingThisLead ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <ExternalLink className="h-3.5 w-3.5" />
-          )}
-          Abrir
-        </button>
-        <button
-          type="button"
-          onClick={async (ev) => {
-            if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
-            try {
-              if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
-                await (navigator as any).clipboard.writeText(finalLink);
-                modalToast.success("Link de matrícula copiado.");
-              } else {
-                try {
-                  const ta = document.createElement("textarea");
-                  ta.value = finalLink;
-                  ta.style.position = "fixed";
-                  ta.style.opacity = "0";
-                  document.body.appendChild(ta);
-                  ta.select();
-                  document.execCommand("copy");
-                  document.body.removeChild(ta);
+          <button
+            type="button"
+            onClick={async (ev) => {
+              if (typeof ev?.stopPropagation === "function") ev.stopPropagation();
+              try {
+                if (typeof navigator !== "undefined" && typeof (navigator as any).clipboard?.writeText === "function") {
+                  await (navigator as any).clipboard.writeText(finalLink);
                   modalToast.success("Link de matrícula copiado.");
-                } catch {
-                  prompt("Copie o link de matrícula:", finalLink);
+                } else {
+                  try {
+                    const ta = document.createElement("textarea");
+                    ta.value = finalLink;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    modalToast.success("Link de matrícula copiado.");
+                  } catch {
+                    prompt("Copie o link de matrícula:", finalLink);
+                  }
                 }
+              } catch (e) {
+                modalToast.error(e instanceof Error ? e.message : "Falha ao copiar o link.");
               }
-            } catch (e) {
-              modalToast.error(e instanceof Error ? e.message : "Falha ao copiar o link.");
-            }
-          }}
-          disabled={savingThisLead}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
-        >
-          {savingThisLead ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Copy className="h-3.5 w-3.5" />
-          )}
-          Copiar
-        </button>
+            }}
+            disabled={savingThisLead}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-2 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+          >
+            {savingThisLead ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            Copiar
+          </button>
+        </div>
       </div>
     </div>
   );
