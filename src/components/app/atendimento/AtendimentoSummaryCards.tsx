@@ -119,17 +119,17 @@ function experimentalClassBookingAssignedProfessor(lead: AtendimentoLeadListItem
   phone: string;
   short: string;
 } | null {
+  const flatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
+  const flatPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+  if (flatName && flatPhone) {
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone && p.name === flatName);
+    if (match) return match;
+  }
   const booking = lead.experimental_class_booking as any;
   const bookingName = String(booking?.assigned_professor_name ?? "").trim();
   const bookingPhone = String(booking?.assigned_professor_phone ?? "").trim();
   if (bookingName && bookingPhone) {
     const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === bookingPhone && p.name === bookingName);
-    if (match) return match;
-  }
-  const flatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
-  const flatPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
-  if (flatName && flatPhone) {
-    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone && p.name === flatName);
     if (match) return match;
   }
   return null;

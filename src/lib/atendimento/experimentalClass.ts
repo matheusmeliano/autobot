@@ -51,8 +51,8 @@ export function resolveExperimentalClassAssignedProfessorPhone(input: {
   flatAssignedName?: string | null;
 }): { name: string; phone: string } | null {
   const candidates: Array<{ name?: string | null; phone?: string | null }> = [
-    { name: input.bookingAssignedName, phone: input.bookingAssignedPhone },
     { name: input.flatAssignedName, phone: input.flatAssignedPhone },
+    { name: input.bookingAssignedName, phone: input.bookingAssignedPhone },
   ];
   for (const c of candidates) {
     const name = String(c.name ?? "").trim();
