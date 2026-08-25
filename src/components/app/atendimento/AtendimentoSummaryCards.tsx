@@ -2091,71 +2091,80 @@ function BookingDetails({
         ) : null}
 
         {showAttendanceCard ? (
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-            <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                Comparecimento
-              </div>
-              {hasAttendanceStatus ? (
-                <div
-                  className={[
-                    "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
-                    attendanceStatus === "attended"
-                      ? "bg-emerald-500/15 text-emerald-200"
-                      : "bg-amber-400/15 text-amber-200",
-                  ].join(" ")}
-                >
-                  {attendanceStatus === "attended" ? "Compareceu" : "Não compareceu"}
+          <div className="mb-3 grid min-w-0 gap-3 md:grid-cols-1">
+            <div
+              className="w-full min-w-0 overflow-visible rounded-2xl border border-[var(--app-border)] px-4 py-3"
+              style={{ backgroundColor: "#181b20" }}
+            >
+              <div className="flex w-full flex-col gap-3 items-stretch sm:flex-row sm:justify-between sm:items-center">
+                <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                    Comparecimento
+                  </div>
+                  {hasAttendanceStatus ? (
+                    <div
+                      className={[
+                        "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                        attendanceStatus === "attended"
+                          ? "bg-emerald-500/15 text-emerald-200"
+                          : "bg-amber-400/15 text-amber-200",
+                      ].join(" ")}
+                    >
+                      {attendanceStatus === "attended" ? "Compareceu" : "Não compareceu"}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-
-            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => void onMarkAttendance(lead, "attended")}
-                disabled={isMarkingAttendance || hasAttendanceStatus}
-                className={[
-                  "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
-                  attendanceStatus === "attended"
-                    ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-100"
-                    : "border-emerald-500/20 bg-emerald-500/8 text-emerald-100 hover:bg-emerald-500/12",
-                ].join(" ")}
-              >
-                {isMarkingAttendanceAttended ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4 shrink-0" />
-                )}
-                {isMarkingAttendanceAttended
-                  ? "Marcando..."
-                  : attendanceStatus === "attended"
-                  ? "Compareceu"
-                  : "Marcar como compareceu"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void onMarkAttendance(lead, "no_show")}
-                disabled={isMarkingAttendance || hasAttendanceStatus}
-                className={[
-                  "inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
-                  attendanceStatus === "no_show"
-                    ? "border-amber-400/30 bg-amber-400/15 text-amber-100"
-                    : "border-amber-400/20 bg-amber-400/8 text-amber-100 hover:bg-amber-400/12",
-                ].join(" ")}
-              >
-                {isMarkingAttendanceNoShow ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <X className="h-4 w-4 shrink-0" />
-                )}
-                {isMarkingAttendanceNoShow
-                  ? "Marcando..."
-                  : attendanceStatus === "no_show"
-                  ? "Não compareceu"
-                  : "Marcar como não compareceu"}
-              </button>
+                <div className="w-full sm:w-auto flex flex-col sm:flex-row flex-nowrap items-stretch sm:items-center justify-stretch sm:justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void onMarkAttendance(lead, "attended")}
+                    disabled={isMarkingAttendance || hasAttendanceStatus}
+                    className={[
+                      "inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border px-3 sm:px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                      attendanceStatus === "attended"
+                        ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-100"
+                        : "border-emerald-500/35 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20",
+                    ].join(" ")}
+                  >
+                    {isMarkingAttendanceAttended ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="shrink-0">
+                      {isMarkingAttendanceAttended
+                        ? "Marcando…"
+                        : attendanceStatus === "attended"
+                        ? "Compareceu"
+                        : "Marcar como compareceu"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onMarkAttendance(lead, "no_show")}
+                    disabled={isMarkingAttendance || hasAttendanceStatus}
+                    className={[
+                      "inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border px-3 sm:px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                      attendanceStatus === "no_show"
+                        ? "border-amber-400/30 bg-amber-400/15 text-amber-100"
+                        : "border-amber-400/30 bg-amber-400/15 text-amber-100 hover:bg-amber-400/20",
+                    ].join(" ")}
+                  >
+                    {isMarkingAttendanceNoShow ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="shrink-0">
+                      {isMarkingAttendanceNoShow
+                        ? "Marcando…"
+                        : attendanceStatus === "no_show"
+                        ? "Não compareceu"
+                        : "Marcar como não compareceu"}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}
