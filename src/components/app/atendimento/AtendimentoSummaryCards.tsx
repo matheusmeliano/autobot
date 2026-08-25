@@ -1719,7 +1719,6 @@ function BookingDetails({
     String(booking?.attendant_start_notification_sent_at ?? "").trim(),
   );
   const professorLockedByDisparo = hasStudentNotification || hasAttendantNotification;
-  const bookingIsCancelled = String(booking?.status ?? "").trim().toLowerCase() === "cancelled";
   const hasAttendanceStatus =
     String(booking?.attendance_status ?? "").trim() === "attended" ||
     String(booking?.attendance_status ?? "").trim() === "no_show";
