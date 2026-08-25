@@ -1926,7 +1926,15 @@ function BookingDetails({
         !hideExperimentalInfoCompletely ? (
           <button
             type="button"
-            onClick={() => void onEditExperimental(lead)}
+            onClick={() => {
+              if (professorLockedByDisparo) {
+                modalToast.warning("Aula experimental não pode ser editada após o disparo ser realizado.");
+                return;
+              }
+              void onEditExperimental(lead);
+            }}
+            disabled={professorLockedByDisparo}
+            title={professorLockedByDisparo ? "Aula experimental não pode ser editada após o disparo ser realizado." : "Editar data, horário e detalhes da aula experimental."}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
