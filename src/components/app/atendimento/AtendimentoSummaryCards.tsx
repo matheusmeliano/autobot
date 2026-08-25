@@ -1086,7 +1086,7 @@ function LeadDetails({
   const savedRecurringLink = initialRecurringLink;
   const recurringLinkChanged = recurringLinkDraft.trim() !== savedRecurringLink;
   const recurringLinkDraftEmpty = !recurringLinkDraft.trim() && !savedRecurringLink;
-  const recurringLinkSaveDisabled = savingThisLead || recurringLinkDraftEmpty;
+  const recurringLinkSaveDisabled = savingRecurringLink || recurringLinkDraftEmpty;
   const canOpenRecurringLink = /^https?:\/\//i.test(savedRecurringLink);
   const statusRaw = String(lead.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
