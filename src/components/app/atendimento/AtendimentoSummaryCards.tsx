@@ -1527,8 +1527,10 @@ function ContractDetails({
               </button>
             ) : null}
             {enrollmentNumberOk ? (
-              <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
-                <span className="truncate">N° da matrícula: {enrollmentNumberOk}</span>
+              <>
+                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
+                  <span className="truncate">N° da matrícula: {enrollmentNumberOk}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -1539,13 +1541,13 @@ function ContractDetails({
                       .then(() => modalToast.success("Número de matrícula copiado."))
                       .catch(() => modalToast.error("Não foi possível copiar a matrícula."));
                   }}
-                  className="inline-flex items-center justify-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2 py-1 text-[10px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   title="Copiar matrícula"
                 >
-                  <Copy className="h-3 w-3 shrink-0" />
+                  <Copy className="h-3.5 w-3.5 shrink-0" />
                   Copiar
                 </button>
-              </div>
+              </>
             ) : null}
           </div>
         </div>
@@ -1840,8 +1842,10 @@ function BookingDetails({
               Copiar
             </button>
             {enrollmentNumberOk ? (
-              <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-500/15 px-3 py-1.5 text-[11px] font-semibold text-sky-200">
-                <span className="truncate">N° da matrícula: {enrollmentNumberOk}</span>
+              <>
+                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
+                  <span className="truncate">N° da matrícula: {enrollmentNumberOk}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -1852,13 +1856,13 @@ function BookingDetails({
                       .then(() => modalToast.success("Número de matrícula copiado."))
                       .catch(() => modalToast.error("Não foi possível copiar a matrícula."));
                   }}
-                  className="inline-flex items-center justify-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2 py-1 text-[10px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   title="Copiar matrícula"
                 >
-                  <Copy className="h-3 w-3 shrink-0" />
+                  <Copy className="h-3.5 w-3.5 shrink-0" />
                   Copiar
                 </button>
-              </div>
+              </>
             ) : null}
           </div>
 
