@@ -1085,6 +1085,8 @@ function LeadDetails({
   }, [lead.id, (lead as any).recurring_class_link]);
   const savedRecurringLink = initialRecurringLink;
   const recurringLinkChanged = recurringLinkDraft.trim() !== savedRecurringLink;
+  const recurringLinkDraftEmpty = !recurringLinkDraft.trim() && !savedRecurringLink;
+  const recurringLinkSaveDisabled = savingThisLead || recurringLinkDraftEmpty;
   const canOpenRecurringLink = /^https?:\/\//i.test(savedRecurringLink);
   const statusRaw = String(lead.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
@@ -1677,6 +1679,8 @@ function BookingDetails({
     setRecurringLinkDraft(String((lead as any).recurring_class_link ?? "").trim());
   }, [lead.id, (lead as any).recurring_class_link]);
   const recurringLinkChanged = recurringLinkDraft.trim() !== savedRecurringLink;
+  const recurringLinkDraftEmpty = !recurringLinkDraft.trim() && !savedRecurringLink;
+  const recurringLinkSaveDisabled = savingRecurringLink || recurringLinkDraftEmpty;
   const canOpenSavedRecurringLink = /^https?:\/\//i.test(savedRecurringLink);
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const bookingId = String(booking?.id ?? "").trim();
@@ -1696,6 +1700,8 @@ function BookingDetails({
   const isMarkingAttendanceNoShow = isMarkingAttendance && markingAttendanceType === "no_show";
   const isSendingStudentNotification = sendingStudentNotificationBookingId === bookingId;
   const lessonLinkChanged = effectiveLessonLinkDraft.trim() !== effectiveSavedLessonLink;
+  const lessonLinkDraftEmpty = !effectiveLessonLinkDraft.trim() && !effectiveSavedLessonLink;
+  const lessonLinkSaveDisabled = isSavingLessonLink || lessonLinkDraftEmpty;
   const canOpenSavedLessonLink = /^https?:\/\//i.test(effectiveSavedLessonLink);
   const hasStudentNotification = Boolean(
     String(booking?.student_start_notification_sent_at ?? "").trim(),
@@ -2118,7 +2124,7 @@ function BookingDetails({
               <button
                 type="button"
                 onClick={() => void onSaveRecurringLink(lead, recurringLinkDraft)}
-                disabled={savingRecurringLink || !recurringLinkChanged}
+                disabled={recurringLinkSaveDisabled}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {savingRecurringLink ? (
@@ -2483,7 +2489,7 @@ function BookingDetails({
               <button
                 type="button"
                 onClick={() => void onSaveLessonLink(lead, effectiveLessonLinkDraft)}
-                disabled={isSavingLessonLink || !lessonLinkChanged}
+                disabled={lessonLinkSaveDisabled}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSavingLessonLink ? (
