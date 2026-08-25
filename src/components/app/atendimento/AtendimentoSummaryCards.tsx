@@ -1223,7 +1223,7 @@ function LeadDetails({
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
-      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
+      <div className="min-w-0 flex min-h-[168px] flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
           <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
@@ -1500,7 +1500,7 @@ function ContractDetails({
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
-      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
+      <div className="min-w-0 flex min-h-[168px] flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
           <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
@@ -1552,6 +1552,7 @@ function ContractDetails({
             ) : null}
           </div>
         </div>
+        <div className="min-w-0 flex flex-col items-stretch gap-2 min-[1176px]:ml-auto min-[1176px]:flex-row min-[1176px]:items-center min-[1176px]:justify-end" />
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-hide">
@@ -1817,7 +1818,7 @@ function BookingDetails({
 
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-4 lg:h-full lg:overflow-hidden flex flex-col">
-      <div className="min-w-0 flex flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
+      <div className="min-w-0 flex min-h-[168px] flex-col items-stretch gap-3 border-b border-[var(--app-border)] pb-4 min-[1176px]:flex-row min-[1176px]:items-start min-[1176px]:justify-between shrink-0">
         <div className="min-w-0 flex flex-1 flex-col gap-2">
           <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
