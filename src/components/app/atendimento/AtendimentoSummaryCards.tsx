@@ -125,11 +125,19 @@ function experimentalClassBookingAssignedProfessor(lead: AtendimentoLeadListItem
     const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone && p.name === flatName);
     if (match) return match;
   }
+  if (flatPhone) {
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone);
+    if (match) return match;
+  }
   const booking = lead.experimental_class_booking as any;
   const bookingName = String(booking?.assigned_professor_name ?? "").trim();
   const bookingPhone = String(booking?.assigned_professor_phone ?? "").trim();
   if (bookingName && bookingPhone) {
     const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === bookingPhone && p.name === bookingName);
+    if (match) return match;
+  }
+  if (bookingPhone) {
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === bookingPhone);
     if (match) return match;
   }
   return null;
@@ -142,9 +150,15 @@ function recurringClassAssignedProfessor(lead: AtendimentoLeadListItem): {
 } | null {
   const flatName = String((lead as any)?.recurring_class_professor_name ?? "").trim();
   const flatPhone = String((lead as any)?.recurring_class_professor_phone ?? "").trim();
-  if (!flatName || !flatPhone) return null;
-  const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone && p.name === flatName);
-  return match ?? null;
+  if (flatName && flatPhone) {
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone && p.name === flatName);
+    if (match) return match;
+  }
+  if (flatPhone) {
+    const match = EXPERIMENTAL_PROFESSOR_OPTIONS.find((p) => p.phone === flatPhone);
+    if (match) return match;
+  }
+  return null;
 }
 
 
@@ -4704,7 +4718,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                     const classifiedAsAluno = isLeadInAlunosSection(lead);
                     if (!(hasRecurringPassword || classifiedAsAluno)) return false;
                     const assignedRecurringProfessor = recurringClassAssignedProfessor(lead);
-                    if (!assignedRecurringProfessor) return false;
+                    if (assignedRecurringProfessor) return false;
                     const booking = lead.experimental_class_booking ?? null;
                     const bookingId = String(booking?.id ?? "").trim();
                     const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
@@ -4822,7 +4836,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             String(booking?.attendance_status ?? "").trim() === "no_show";
                           if (hasDisparo || hasAttendance) return false;
                           const assignedProfessor = experimentalClassBookingAssignedProfessor(lead);
-                          if (!assignedProfessor) return false;
+                          if (assignedProfessor) return false;
                           return (
                             bookingId &&
                             bookingStatus &&
@@ -4835,7 +4849,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                         const showRecLink =
                           recorrenteRealmenteIniciado &&
                           !showExpLink &&
-                          Boolean(assignedRecurringProfessor) &&
+                          !Boolean(assignedRecurringProfessor) &&
                           !String((lead as any).recurring_class_link ?? "").trim();
 
                         const recLinkSections = ["alunos", "agendamentos", "contratos"];
