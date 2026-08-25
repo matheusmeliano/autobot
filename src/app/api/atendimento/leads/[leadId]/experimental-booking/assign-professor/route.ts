@@ -49,6 +49,50 @@ function stripUndefinedColumnFromPatch(
   return next;
 }
 
+async function columnExists(
+  admin: ReturnType<typeof import("../../../../../../lib/supabase/admin").createSupabaseAdminClient>,
+  tableName: string,
+  columnName: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await admin
+      .from(tableName as any)
+      .select(columnName as any, { head: true, count: "exact" } as any)
+      .limit(1);
+    if (error) {
+      const msg = String(error.message ?? "").toLowerCase();
+      const code = String((error as any)?.code ?? "").trim();
+      if (
+        /column.*does not exist|does not exist.*column/i.test(msg) ||
+        code === "42703" ||
+        code === "42P01" ||
+        /relation.*does not exist/i.test(msg)
+      ) {
+        return false;
+      }
+    }
+    void data;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function stripSuspectMissingColumnsBeforePatch(
+  admin: ReturnType<typeof import("../../../../../../lib/supabase/admin").createSupabaseAdminClient>,
+  tableName: string,
+  patchObj: Record<string, unknown>,
+  suspectAllowlist: ReadonlyArray<string>,
+): Promise<Record<string, unknown>> {
+  const next = { ...patchObj };
+  for (const col of suspectAllowlist) {
+    if (next[col] === undefined) continue;
+    const exists = await columnExists(admin, tableName, col);
+    if (!exists) delete next[col];
+  }
+  return next;
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
   try {
     const auth = await requireAtendimentoUser();
@@ -142,6 +186,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
         "assigned_professor_phone",
       ];
       try {
+        const safePatch = await stripSuspectMissingColumnsBeforePatch(
+          admin,
+          "atendimento_experimental_class_bookings",
+          bookingPatch as Record<string, any>,
+          suspectListForBookings,
+        );
         await (async function attemptBooking(currentPatch: Record<string, any>): Promise<{ ok: boolean }> {
           if (!Object.keys(currentPatch).length) return { ok: true };
           const { error } = await admin
@@ -152,7 +202,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
           const missing = extractUndefinedColumnName(error);
           if (!missing) return { ok: true };
           return attemptBooking(stripUndefinedColumnFromPatch(currentPatch, missing, suspectListForBookings));
-        })(bookingPatch as Record<string, any>);
+        })(safePatch);
       } catch {
       }
     }
@@ -186,9 +236,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     ].join(", ");
     const mergedAfterLead = await (async function attemptLead(currentPatch: Record<string, any>): Promise<any> {
       if (!Object.keys(currentPatch).length) return leadExists;
+      const safePatch = await stripSuspectMissingColumnsBeforePatch(
+        admin,
+        "atendimento_leads",
+        currentPatch,
+        suspectListForLeads,
+      );
       const { data, error } = await admin
         .from("atendimento_leads")
-        .update(currentPatch)
+        .update(safePatch)
         .eq("id", safeLeadId)
         .select(selectCols)
         .maybeSingle();

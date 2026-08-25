@@ -743,6 +743,18 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         ? ""
         : String((row as any)?.experimental_class_status ?? "").trim();
 
+      const rowExperimentalProfName = String((row as any)?.experimental_class_professor_name ?? "").trim();
+      const rowExperimentalProfPhone = String((row as any)?.experimental_class_professor_phone ?? "").trim();
+      const rowRecurringProfName = String((row as any)?.recurring_class_professor_name ?? "").trim();
+      const rowRecurringProfPhone = String((row as any)?.recurring_class_professor_phone ?? "").trim();
+      const bookingExpProfName = String((existingBooking as any)?.assigned_professor_name ?? "").trim();
+      const bookingExpProfPhone = String((existingBooking as any)?.assigned_professor_phone ?? "").trim();
+
+      const mergedExperimentalProfName = isCancelledLead ? "" : rowExperimentalProfName || bookingExpProfName || "";
+      const mergedExperimentalProfPhone = isCancelledLead ? "" : rowExperimentalProfPhone || bookingExpProfPhone || "";
+      const mergedRecurringProfName = isCancelledLead ? "" : rowRecurringProfName || "";
+      const mergedRecurringProfPhone = isCancelledLead ? "" : rowRecurringProfPhone || "";
+
       const mergedProfessorDate = isCancelledLead
         ? ""
         : String((row as any)?.experimental_class_professor_date ?? "").trim() ||
@@ -1026,9 +1038,21 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         experimental_class_lead_time: mergedLeadTime || null,
         experimental_class_professor_start_at: mergedProfessorStartAt || null,
         experimental_class_lead_start_at: mergedLeadStartAt || null,
+        experimental_class_professor_name: mergedExperimentalProfName || null,
+        experimental_class_professor_phone: mergedExperimentalProfPhone || null,
+        recurring_class_professor_name: mergedRecurringProfName || null,
+        recurring_class_professor_phone: mergedRecurringProfPhone || null,
         experimental_class_status: mergedStatus || null,
         conversation: conversationsByLeadId.get(leadId) ?? null,
-        experimental_class_booking: bookingWithFallback,
+        experimental_class_booking: (() => {
+          if (!bookingWithFallback) return null;
+          const base = bookingWithFallback as any;
+          return {
+            ...base,
+            assigned_professor_name: mergedExperimentalProfName || String(base?.assigned_professor_name ?? "").trim() || null,
+            assigned_professor_phone: mergedExperimentalProfPhone || String(base?.assigned_professor_phone ?? "").trim() || null,
+          };
+        })(),
         latest_experimental_class_booking: latestPastExpBooking,
         future_experimental_class_booking: futureExpBooking,
         latest_past_class_meta: latestPastClassMeta,
