@@ -1288,9 +1288,9 @@ function LeadDetails({
             <button
               type="button"
               onClick={() => void onEditName(lead)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Pencil className="h-4 w-4 shrink-0" />
+              <Pencil className="h-3.5 w-3.5 shrink-0" />
               {hasName ? "Alterar nome" : "Adicionar nome"}
             </button>
           ) : null}
@@ -1298,9 +1298,9 @@ function LeadDetails({
             <button
               type="button"
               onClick={() => void onEditLocation(lead)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Pencil className="h-4 w-4 shrink-0" />
+              <Pencil className="h-3.5 w-3.5 shrink-0" />
               Editar
             </button>
           ) : null}
@@ -1309,9 +1309,9 @@ function LeadDetails({
               type="button"
               onClick={() => void onDelete()}
               disabled={deleting}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Trash2 className="h-4 w-4 shrink-0" />
+              <Trash2 className="h-3.5 w-3.5 shrink-0" />
               {deleting ? "Excluindo..." : isMatriculado ? "Excluir aluno" : "Excluir interessado"}
             </button>
           ) : null}
@@ -1899,9 +1899,9 @@ function BookingDetails({
                 }
                 return "Disparar notificações agora.";
               })()}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Zap className="h-4 w-4 shrink-0" />
+              <Zap className="h-3.5 w-3.5 shrink-0" />
               {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
             </button>
           );
@@ -1914,9 +1914,9 @@ function BookingDetails({
           <button
             type="button"
             onClick={() => void onEditExperimental(lead)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <CalendarDays className="h-4 w-4 shrink-0" />
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
             Editar
           </button>
         ) : null}
@@ -1938,9 +1938,9 @@ function BookingDetails({
                 onClick={() => void onCancelBooking(lead)}
                 disabled={cancelDisabled}
                 title={cancelTitle}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-red-200 transition hover:bg-red-500/15 min-[1176px]:ml-auto min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Trash2 className="h-4 w-4 shrink-0" />
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
                 {cancellingBookingId === bookingId
                   ? "Cancelando..."
                   : "Cancelar agendamento"}
