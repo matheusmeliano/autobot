@@ -37,13 +37,36 @@ async function resolveInitialLoginFromParams(
 ): Promise<string> {
   try {
     const leadIdFromQs = String(sp.lead ?? "").trim();
-    const isAlunoNext = String(sp.next ?? "").startsWith("/aluno");
+    const nextRaw = String(sp.next ?? "");
+    const isAlunoNext = /^%2Faluno|^\/aluno/.test(nextRaw); // pode vir codificado ou raw
     let leadId = leadIdFromQs;
     if (!leadId && isAlunoNext) {
-      const nextRaw = String(sp.next ?? "");
-      const leadMatch = nextRaw.match(/[?&]lead=([^&]+)/);
+      let decodedNext = nextRaw;
+      try {
+        if (/(%[0-9A-Fa-f]{2})/.test(nextRaw)) {
+          decodedNext = decodeURIComponent(nextRaw);
+        }
+      } catch {}
+      // 1) regex direto em path+search
+      const leadMatch = decodedNext.match(/[?&]lead=([^&]+)/);
       if (leadMatch && leadMatch[1]) {
-        leadId = decodeURIComponent(leadMatch[1]).trim();
+        const rawVal = decodeURIComponent(leadMatch[1]).trim();
+        if (rawVal) leadId = rawVal;
+      }
+      // 2) fallback new URL
+      if (!leadId) {
+        try {
+          const DUMMY = "https://dummy.local";
+          if (decodedNext.startsWith("/")) {
+            const fake = new URL(DUMMY + decodedNext);
+            const v = fake.searchParams.get("lead");
+            if (v) leadId = String(v).trim();
+          } else if (/^https?:\/\//i.test(decodedNext)) {
+            const u = new URL(decodedNext);
+            const v = u.searchParams.get("lead");
+            if (v) leadId = String(v).trim();
+          }
+        } catch {}
       }
     }
     if (leadId) {

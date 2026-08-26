@@ -90,7 +90,17 @@ export default async function AlunoPortalLayout({
       nextPath = `/aluno?${qs.toString()}`;
     }
     if (nextPath) {
-      redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+      const loginQs = new URLSearchParams();
+      loginQs.set("next", nextPath);
+      if (leadParamId) {
+        loginQs.set("lead", leadParamId);
+      }
+      redirect(`/login?${loginQs.toString()}`);
+    }
+    if (leadParamId) {
+      const loginQs = new URLSearchParams();
+      loginQs.set("lead", leadParamId);
+      redirect(`/login?${loginQs.toString()}`);
     }
     redirect("/login");
   }
