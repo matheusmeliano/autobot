@@ -557,11 +557,13 @@ function Field({
   value,
   copyable,
   copyValue,
+  titleOverride,
 }: {
   label: string;
   value: string | null | undefined;
   copyable?: boolean;
   copyValue?: string | null | undefined;
+  titleOverride?: string | null | undefined;
 }) {
   const displayValue = value || "-";
   const rawValue = typeof copyValue !== "undefined" ? copyValue : value;
@@ -572,6 +574,11 @@ function Field({
     await navigator.clipboard.writeText(String(rawValue).trim());
     modalToast.success(`${label} copiado.`);
   }
+
+  const titleAttr =
+    typeof titleOverride !== "undefined" && titleOverride !== null && titleOverride !== ""
+      ? String(titleOverride)
+      : displayValue;
 
   return (
     <div className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
@@ -590,7 +597,7 @@ function Field({
           </button>
         ) : null}
       </div>
-      <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]" title={displayValue}>
+      <div className="mt-2 truncate text-sm font-semibold text-[var(--app-text-85)]" title={titleAttr}>
         {displayValue}
       </div>
     </div>
@@ -1586,7 +1593,7 @@ function ContractDetails({
             </div>
             <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
               <Field label="Plano" value="Modelo individual" />
-              <Field label="Valor mensal" value="US$ 119,00" />
+              <Field label="Valor mensal" value="US$ 119,00" titleOverride="US$ 116,00" />
             </div>
           </div>
         ) : null}
