@@ -1580,8 +1580,8 @@ function ContractDetails({
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-hide">
         {hasRecurring ? (
-          <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
               Plano vinculado
             </div>
             <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
