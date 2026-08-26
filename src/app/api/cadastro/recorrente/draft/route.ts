@@ -114,17 +114,68 @@ export async function GET(req: NextRequest) {
         { status: 403 },
       );
     }
+
+    const curLeadStatus = String((data as any).status ?? "").trim().toLowerCase();
+    const curFunnelStage = String((data as any).funnel_stage ?? "").trim().toLowerCase();
+    const curContractStatus = String((data as any).contract_status ?? "").trim().toLowerCase();
+    const curPaymentStatus = String((data as any).payment_status ?? "").trim().toLowerCase();
+    const curRecurringClassStatus = String((data as any).recurring_class_status ?? "").trim().toLowerCase();
+    const existingEnrollmentNumber = String((data as any).enrollment_number ?? "").trim();
+    const existingContractSignedAtRaw = String((data as any).contract_signed_at ?? "").trim();
+    const existingContractPdfUrl = String((data as any).contract_pdf_url ?? "").trim();
+    const existingRecurringRegistrationPassword = String((data as any).recurring_registration_password ?? "").trim();
+    const existingSignupPasswordRawTemp = String((data as any).signup_password_raw_temp ?? "").trim();
+    const hasAnySavedPassword = Boolean(existingRecurringRegistrationPassword || existingSignupPasswordRawTemp);
+
     const stepRaw = (data as any)?.recurring_registration_step;
     const parsedStep =
       typeof stepRaw === "number" && stepRaw >= 0 && stepRaw <= 6
         ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6)
         : 0;
+
+    function matriculaEstaConcluidaRedirecionarAluno(): boolean {
+      const confirmouContrato =
+        curContractStatus === "assinado" ||
+        Boolean(existingContractSignedAtRaw && existingContractSignedAtRaw !== "null") ||
+        Boolean(existingContractPdfUrl);
+      const temMatriculaNumero = Boolean(existingEnrollmentNumber);
+      const statusOuFunnelMatriculado = new Set([
+        "matriculado",
+        "aluno",
+        "cadastro_recorrente_pendente_plataforma",
+        "contrato_assinado",
+        "contrato_aguardando_aceite",
+        "matricula_confirmada",
+      ]);
+      const entrouEtapaAluno =
+        statusOuFunnelMatriculado.has(curLeadStatus) ||
+        statusOuFunnelMatriculado.has(curFunnelStage) ||
+        curRecurringClassStatus === "confirmado" ||
+        curRecurringClassStatus === "cadastro_plataforma_pendente";
+      const pagamentoEstaOuFoiAvaliado =
+        curPaymentStatus === "confirmado" ||
+        curPaymentStatus === "pendente_confirmacao" ||
+        curPaymentStatus === "rejeitado" ||
+        curPaymentStatus === "nao_realizado" ||
+        Boolean((data as any).payment_confirmed_at) ||
+        Boolean((data as any).payment_rejected_at) ||
+        parsedStep >= 5;
+      if (!hasAnySavedPassword) return false;
+      if (temMatriculaNumero && confirmouContrato) return true;
+      if (parsedStep >= 6) return true;
+      if (entrouEtapaAluno && confirmouContrato && pagamentoEstaOuFoiAvaliado) return true;
+      if (entrouEtapaAluno && temMatriculaNumero) return true;
+      return false;
+    }
+
+    const redirectToAluno = matriculaEstaConcluidaRedirecionarAluno();
     const readStr = (key: string) => {
       const v = (data as any)?.[key];
       return typeof v === "string" && v.trim() ? v.trim() : null;
     }
     return NextResponse.json({
       ok: true,
+      redirect_to_aluno: redirectToAluno,
       lead: {
         id: (data as any).id,
         phone: String((data as any).phone ?? ""),

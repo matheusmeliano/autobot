@@ -540,6 +540,43 @@ export default function CadastroRecorrenteBody() {
           return;
         }
 
+        const mustRedirectToAluno = (json as any)?.redirect_to_aluno === true;
+        let leadIdForAluno = "";
+        let telefoneForAlunoDigits = "";
+        let nomeForAluno = "";
+        if (json?.lead && typeof (json.lead as any).id === "string") {
+          leadIdForAluno = String((json.lead as any).id).trim();
+        }
+        if (json?.lead && typeof (json.lead as any).phone === "string") {
+          telefoneForAlunoDigits = String((json.lead as any).phone ?? "").replace(/\D/g, "").trim();
+        }
+        if (json?.lead && typeof (json.lead as any).full_name === "string") {
+          nomeForAluno = String((json.lead as any).full_name ?? "").trim();
+        }
+        if (mustRedirectToAluno) {
+          try {
+            const nextQs = new URLSearchParams();
+            if (leadIdForAluno) nextQs.set("lead", leadIdForAluno);
+            if (telefoneForAlunoDigits) nextQs.set("telefone", telefoneForAlunoDigits);
+            if (nomeForAluno) nextQs.set("nome", nomeForAluno);
+            const nextPath = `/aluno${nextQs.toString() ? `?${nextQs.toString()}` : ""}`;
+            const loginQs = new URLSearchParams();
+            loginQs.set("next", nextPath);
+            if (leadIdForAluno) loginQs.set("lead", leadIdForAluno);
+            if (telefoneForAlunoDigits) loginQs.set("telefone", telefoneForAlunoDigits);
+            const target = `/login?${loginQs.toString()}`;
+            if (typeof window !== "undefined") {
+              try {
+                window.location.replace(target);
+              } catch {
+                window.location.href = target;
+              }
+            }
+            setInitialDataLoading(false);
+            return;
+          } catch {}
+        }
+
         let restoredLeadFullName = "";
         let restoredLeadPhone = "";
         let restoredLeadId = "";
