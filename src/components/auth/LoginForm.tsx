@@ -22,13 +22,14 @@ export function LoginForm({ initialLogin }: { initialLogin?: string }) {
   const [showPassword, setShowPassword] = useState(false);
   const didShowConfirmed = useRef(false);
   const didShowLinkNotice = useRef(false);
+  const initialLoginSafe = String(initialLogin ?? "").trim();
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { login: "", password: "" },
+    defaultValues: { login: initialLoginSafe, password: "" },
   });
   const next = String(searchParams?.get("next") ?? "");
   const safeNext = /^\/(?!\/)/.test(next) ? next : "";

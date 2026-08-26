@@ -58,15 +58,54 @@ async function resolveInitialLoginFromParams(
       if (emailRaw && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) return emailRaw;
       const phoneDigits = digitsOnly(phoneRaw);
       if (phoneDigits) {
+        const suffix10 = phoneDigits.slice(-10);
+        const suffix11 = phoneDigits.slice(-11);
+        const suffix12 = phoneDigits.slice(-12);
+        const suffix13 = phoneDigits.slice(-13);
+        const filterParts = [
+          `phone.eq.${phoneDigits}`,
+          `phone_digits.eq.${phoneDigits}`,
+        ];
+        if (suffix10) {
+          filterParts.push(`phone.ilike.%${suffix10}`);
+          filterParts.push(`phone_digits.ilike.%${suffix10}`);
+        }
+        if (suffix11 && suffix11 !== suffix10) {
+          filterParts.push(`phone.eq.${suffix11}`);
+          filterParts.push(`phone_digits.eq.${suffix11}`);
+        }
+        if (suffix12 && suffix12 !== suffix11) {
+          filterParts.push(`phone.eq.${suffix12}`);
+          filterParts.push(`phone_digits.eq.${suffix12}`);
+        }
+        if (suffix13 && suffix13 !== suffix12) {
+          filterParts.push(`phone.eq.${suffix13}`);
+          filterParts.push(`phone_digits.eq.${suffix13}`);
+        }
+        const orFilter = filterParts.join(",");
         const { data: profileMatch } = await supabase
           .from("profiles")
-          .select("email, phone")
-          .or(`phone.eq.${encodeURIComponent(phoneDigits)},phone.like.*${encodeURIComponent(phoneDigits.slice(-10))}`)
-          .limit(5);
+          .select("email, phone, phone_digits")
+          .or(orFilter)
+          .limit(20);
         if (Array.isArray(profileMatch) && profileMatch.length) {
           for (const p of profileMatch as any[]) {
             const em = String(p.email ?? "").trim();
             if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return em;
+          }
+          for (const p of profileMatch as any[]) {
+            const pd = digitsOnly(String(p.phone ?? "")) || digitsOnly(String(p.phone_digits ?? ""));
+            if (!pd) continue;
+            if (
+              pd === phoneDigits ||
+              (suffix10 && pd.endsWith(suffix10)) ||
+              (suffix11 && pd.endsWith(suffix11)) ||
+              (suffix12 && pd.endsWith(suffix12)) ||
+              (suffix13 && pd.endsWith(suffix13))
+            ) {
+              const em = String(p.email ?? "").trim();
+              if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return em;
+            }
           }
         }
         return formatPhoneMasked(phoneDigits) || phoneDigits;
