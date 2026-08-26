@@ -84,9 +84,27 @@ export default async function AlunoPortalLayout({
         } catch {}
       }
     }
+    let extraTelefoneForLoginQs = "";
     if (!nextPath && leadParamId) {
       const qs = new URLSearchParams();
       qs.set("lead", leadParamId);
+      try {
+        const supabaseTmp = createSupabaseServerClient;
+        const tmpAdmin = createSupabaseServerClient;
+        void supabaseTmp; void tmpAdmin;
+        const adm = await createSupabaseServerClient({ canSetCookies: false });
+        const { data: leadRow } = await adm
+          .from("atendimento_leads")
+          .select("phone")
+          .eq("id", String(leadParamId))
+          .limit(1)
+          .maybeSingle();
+        const digitsLead = String(((leadRow as any)?.phone) ?? "").replace(/\D/g, "").trim();
+        if (digitsLead) {
+          qs.set("telefone", digitsLead);
+          extraTelefoneForLoginQs = digitsLead;
+        }
+      } catch {}
       nextPath = `/aluno?${qs.toString()}`;
     }
     if (nextPath) {
@@ -95,11 +113,39 @@ export default async function AlunoPortalLayout({
       if (leadParamId) {
         loginQs.set("lead", leadParamId);
       }
+      if (extraTelefoneForLoginQs) {
+        loginQs.set("telefone", extraTelefoneForLoginQs);
+      } else {
+        try {
+          if (leadParamId) {
+            const adm2 = await createSupabaseServerClient({ canSetCookies: false });
+            const { data: leadRow } = await adm2
+              .from("atendimento_leads")
+              .select("phone")
+              .eq("id", String(leadParamId))
+              .limit(1)
+              .maybeSingle();
+            const digitsLead = String(((leadRow as any)?.phone) ?? "").replace(/\D/g, "").trim();
+            if (digitsLead) loginQs.set("telefone", digitsLead);
+          }
+        } catch {}
+      }
       redirect(`/login?${loginQs.toString()}`);
     }
     if (leadParamId) {
       const loginQs = new URLSearchParams();
       loginQs.set("lead", leadParamId);
+      try {
+        const adm3 = await createSupabaseServerClient({ canSetCookies: false });
+        const { data: leadRow } = await adm3
+          .from("atendimento_leads")
+          .select("phone")
+          .eq("id", String(leadParamId))
+          .limit(1)
+          .maybeSingle();
+        const digitsLead = String(((leadRow as any)?.phone) ?? "").replace(/\D/g, "").trim();
+        if (digitsLead) loginQs.set("telefone", digitsLead);
+      } catch {}
       redirect(`/login?${loginQs.toString()}`);
     }
     redirect("/login");

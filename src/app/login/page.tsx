@@ -33,10 +33,14 @@ function formatPhoneMasked(raw: string | null | undefined): string {
 
 async function resolveInitialLoginFromParams(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  sp: { confirmed?: string; next?: string; lead?: string },
+  sp: { confirmed?: string; next?: string; lead?: string; telefone?: string },
 ): Promise<string> {
   try {
     const leadIdFromQs = String(sp.lead ?? "").trim();
+    const telefoneFromQs = String(sp.telefone ?? "").replace(/\D/g, "").trim();
+    if (telefoneFromQs && telefoneFromQs.length >= 10) {
+      return formatPhoneMasked(telefoneFromQs) || telefoneFromQs;
+    }
     const nextRaw = String(sp.next ?? "");
     const isAlunoNext = /^%2Faluno|^\/aluno/.test(nextRaw); // pode vir codificado ou raw
     let leadId = leadIdFromQs;
@@ -141,7 +145,7 @@ async function resolveInitialLoginFromParams(
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ confirmed?: string; next?: string; lead?: string }>;
+  searchParams?: Promise<{ confirmed?: string; next?: string; lead?: string; telefone?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   let user: unknown = null;

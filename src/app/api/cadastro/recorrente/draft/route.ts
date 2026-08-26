@@ -145,6 +145,7 @@ export async function GET(req: NextRequest) {
         "cadastro_recorrente_pendente_plataforma",
         "contrato_assinado",
         "contrato_aguardando_aceite",
+        "contrato_coletando_dados",
         "matricula_confirmada",
       ]);
       const entrouEtapaAluno =
@@ -161,6 +162,7 @@ export async function GET(req: NextRequest) {
         Boolean((data as any).payment_rejected_at) ||
         parsedStep >= 5;
       if (!hasAnySavedPassword) return false;
+      if (parsedStep >= 1 && hasAnySavedPassword) return true;
       if (temMatriculaNumero && confirmouContrato) return true;
       if (parsedStep >= 6) return true;
       if (entrouEtapaAluno && confirmouContrato && pagamentoEstaOuFoiAvaliado) return true;
