@@ -36,12 +36,15 @@ async function resolveEmailFromLogin(supabase: Awaited<ReturnType<typeof createS
 
   const loginDigitsNoCountry = loginDigits.replace(/^55/, "");
   const phoneTail10 = (loginDigitsNoCountry || loginDigits).slice(-10);
+  const phoneTail11 = (loginDigitsNoCountry || loginDigits).slice(-11);
+  const phoneTail12 = (loginDigitsNoCountry || loginDigits).slice(-12);
+  const phoneTail13 = (loginDigitsNoCountry || loginDigits).slice(-13);
   const syntheticStudentEmail = phoneTail10 ? `tel.${phoneTail10}@aluno.autobot.business` : "";
 
   if (syntheticStudentEmail) {
     const { data: profileSyn } = await supabase
       .from("profiles")
-      .select("email, phone")
+      .select("email, phone, phone_digits")
       .eq("email", syntheticStudentEmail)
       .limit(1)
       .maybeSingle();
@@ -50,27 +53,52 @@ async function resolveEmailFromLogin(supabase: Awaited<ReturnType<typeof createS
   }
 
   const profilePhoneFilters: string[] = [];
-  profilePhoneFilters.push(`phone.eq.${encodeURIComponent(loginDigits)}`);
+  profilePhoneFilters.push(`phone.eq.${loginDigits}`);
+  profilePhoneFilters.push(`phone_digits.eq.${loginDigits}`);
   if (loginDigitsNoCountry && loginDigitsNoCountry !== loginDigits) {
-    profilePhoneFilters.push(`phone.eq.${encodeURIComponent(loginDigitsNoCountry)}`);
+    profilePhoneFilters.push(`phone.eq.${loginDigitsNoCountry}`);
+    profilePhoneFilters.push(`phone_digits.eq.${loginDigitsNoCountry}`);
   }
   if (phoneTail10) {
-    profilePhoneFilters.push(`phone.like.*${encodeURIComponent(phoneTail10)}`);
+    profilePhoneFilters.push(`phone.ilike.%${phoneTail10}`);
+    profilePhoneFilters.push(`phone_digits.ilike.%${phoneTail10}`);
+  }
+  if (phoneTail11 && phoneTail11 !== phoneTail10) {
+    profilePhoneFilters.push(`phone.eq.${phoneTail11}`);
+    profilePhoneFilters.push(`phone_digits.eq.${phoneTail11}`);
+  }
+  if (phoneTail12 && phoneTail12 !== phoneTail11) {
+    profilePhoneFilters.push(`phone.eq.${phoneTail12}`);
+    profilePhoneFilters.push(`phone_digits.eq.${phoneTail12}`);
+  }
+  if (phoneTail13 && phoneTail13 !== phoneTail12) {
+    profilePhoneFilters.push(`phone.eq.${phoneTail13}`);
+    profilePhoneFilters.push(`phone_digits.eq.${phoneTail13}`);
   }
 
   const { data: profileRows } = await supabase
     .from("profiles")
-    .select("phone, email, user_id")
+    .select("phone, phone_digits, email, user_id")
     .or(profilePhoneFilters.join(","))
-    .limit(20);
+    .limit(50);
 
   if (Array.isArray(profileRows)) {
     for (const row of profileRows) {
-      const rowDigits = onlyDigits(String((row as any).phone ?? ""));
+      const rowDigits =
+        onlyDigits(String((row as any).phone ?? "")) ||
+        onlyDigits(String((row as any).phone_digits ?? ""));
       if (!rowDigits) continue;
-      const a = rowDigits.length > loginDigits.length ? rowDigits : loginDigits;
-      const b = rowDigits.length > loginDigits.length ? loginDigits : rowDigits;
-      if (a === b || a.endsWith(b)) {
+      const matchExactOrSuffix =
+        rowDigits === loginDigits ||
+        rowDigits.endsWith(phoneTail10) ||
+        rowDigits.endsWith(phoneTail11) ||
+        rowDigits.endsWith(phoneTail12) ||
+        rowDigits.endsWith(phoneTail13) ||
+        loginDigits.endsWith(rowDigits.slice(-10)) ||
+        loginDigits.endsWith(rowDigits.slice(-11)) ||
+        loginDigits.endsWith(rowDigits.slice(-12)) ||
+        loginDigits.endsWith(rowDigits.slice(-13));
+      if (matchExactOrSuffix) {
         const email = String((row as any).email ?? "").trim();
         if (EMAIL_REGEX.test(email)) return email;
       }
@@ -78,50 +106,66 @@ async function resolveEmailFromLogin(supabase: Awaited<ReturnType<typeof createS
   }
 
   const leadFilters: string[] = [];
-  leadFilters.push(`phone.eq.${encodeURIComponent(loginDigits)}`);
+  leadFilters.push(`phone.eq.${loginDigits}`);
   if (loginDigitsNoCountry && loginDigitsNoCountry !== loginDigits) {
-    leadFilters.push(`phone.eq.${encodeURIComponent(loginDigitsNoCountry)}`);
+    leadFilters.push(`phone.eq.${loginDigitsNoCountry}`);
   }
   if (phoneTail10) {
-    leadFilters.push(`phone.like.*${encodeURIComponent(phoneTail10)}`);
+    leadFilters.push(`phone.ilike.%${phoneTail10}`);
+  }
+  if (phoneTail11 && phoneTail11 !== phoneTail10) {
+    leadFilters.push(`phone.eq.${phoneTail11}`);
+  }
+  if (phoneTail12 && phoneTail12 !== phoneTail11) {
+    leadFilters.push(`phone.eq.${phoneTail12}`);
+  }
+  if (phoneTail13 && phoneTail13 !== phoneTail12) {
+    leadFilters.push(`phone.eq.${phoneTail13}`);
   }
 
   const { data: leadRows } = await supabase
     .from("atendimento_leads")
     .select("phone, student_email, recurring_registration_password, id")
     .or(leadFilters.join(","))
-    .limit(20);
+    .limit(50);
 
   if (Array.isArray(leadRows)) {
     for (const row of leadRows) {
       const rowDigits = onlyDigits(String((row as any).phone ?? ""));
       if (!rowDigits) continue;
-      const a = rowDigits.length > loginDigits.length ? rowDigits : loginDigits;
-      const b = rowDigits.length > loginDigits.length ? loginDigits : rowDigits;
-      if (a === b || a.endsWith(b)) {
-        const leadEmail = String((row as any).student_email ?? "").trim();
-        if (EMAIL_REGEX.test(leadEmail)) {
-          const { data: profileByEmail } = await supabase
-            .from("profiles")
-            .select("email")
-            .eq("email", leadEmail)
-            .limit(1)
-            .maybeSingle();
-          const profileEmail = String((profileByEmail as any)?.email ?? "").trim();
-          if (EMAIL_REGEX.test(profileEmail)) return profileEmail;
-        }
-        const rowTail10 = (rowDigits.replace(/^55/, "") || rowDigits).slice(-10);
-        const synth = rowTail10 ? `tel.${rowTail10}@aluno.autobot.business` : "";
-        if (synth) {
-          const { data: syn } = await supabase
-            .from("profiles")
-            .select("email")
-            .eq("email", synth)
-            .limit(1)
-            .maybeSingle();
-          const s = String((syn as any)?.email ?? "").trim();
-          if (EMAIL_REGEX.test(s)) return s;
-        }
+      const matchExactOrSuffix =
+        rowDigits === loginDigits ||
+        rowDigits.endsWith(phoneTail10) ||
+        rowDigits.endsWith(phoneTail11) ||
+        rowDigits.endsWith(phoneTail12) ||
+        rowDigits.endsWith(phoneTail13) ||
+        loginDigits.endsWith(rowDigits.slice(-10)) ||
+        loginDigits.endsWith(rowDigits.slice(-11)) ||
+        loginDigits.endsWith(rowDigits.slice(-12)) ||
+        loginDigits.endsWith(rowDigits.slice(-13));
+      if (!matchExactOrSuffix) continue;
+      const leadEmail = String((row as any).student_email ?? "").trim();
+      if (EMAIL_REGEX.test(leadEmail)) {
+        const { data: profileByEmail } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("email", leadEmail)
+          .limit(1)
+          .maybeSingle();
+        const profileEmail = String((profileByEmail as any)?.email ?? "").trim();
+        if (EMAIL_REGEX.test(profileEmail)) return profileEmail;
+      }
+      const rowTail10 = (rowDigits.replace(/^55/, "") || rowDigits).slice(-10);
+      const synth = rowTail10 ? `tel.${rowTail10}@aluno.autobot.business` : "";
+      if (synth) {
+        const { data: syn } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("email", synth)
+          .limit(1)
+          .maybeSingle();
+        const s = String((syn as any)?.email ?? "").trim();
+        if (EMAIL_REGEX.test(s)) return s;
       }
     }
   }
@@ -154,30 +198,54 @@ export async function loginAction(formData: FormData) {
     const isPhone = !EMAIL_REGEX.test(String(parsed.data.login ?? "").trim());
     const loginDigits = isPhone ? onlyDigits(parsed.data.login) : "";
     const phoneTail10 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-10);
+    const phoneTail11 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-11);
+    const phoneTail12 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-12);
+    const phoneTail13 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-13);
     let recovered = false;
     if (isPhone && loginDigits.length >= 10 && phoneTail10) {
       const filters: string[] = [];
-      filters.push(`phone.eq.${encodeURIComponent(loginDigits)}`);
+      filters.push(`phone.eq.${loginDigits}`);
       const no55 = loginDigits.replace(/^55/, "");
       if (no55 && no55 !== loginDigits) {
-        filters.push(`phone.eq.${encodeURIComponent(no55)}`);
+        filters.push(`phone.eq.${no55}`);
       }
-      filters.push(`phone.like.*${encodeURIComponent(phoneTail10)}`);
+      filters.push(`phone.ilike.%${phoneTail10}`);
+      if (phoneTail11 && phoneTail11 !== phoneTail10) {
+        filters.push(`phone.eq.${phoneTail11}`);
+      }
+      if (phoneTail12 && phoneTail12 !== phoneTail11) {
+        filters.push(`phone.eq.${phoneTail12}`);
+      }
+      if (phoneTail13 && phoneTail13 !== phoneTail12) {
+        filters.push(`phone.eq.${phoneTail13}`);
+      }
       const supabaseSrvr = await createSupabaseServerClient({ canSetCookies: false });
       const { data: hits } = await supabaseSrvr
         .from("atendimento_leads")
-        .select("id, phone, recurring_registration_password, student_email, full_name")
+        .select("id, phone, recurring_registration_password, student_email, full_name, signup_password_raw_temp, password")
         .or(filters.join(","))
-        .limit(20);
+        .limit(50);
       if (Array.isArray(hits) && hits.length) {
         for (const row of hits as any[]) {
           const rowDigits = onlyDigits(String(row.phone ?? ""));
           if (!rowDigits) continue;
-          const bigger = rowDigits.length > loginDigits.length ? rowDigits : loginDigits;
-          const smaller = rowDigits.length > loginDigits.length ? loginDigits : rowDigits;
-          const matches = bigger === smaller || bigger.endsWith(smaller);
+          const matches =
+            rowDigits === loginDigits ||
+            rowDigits.endsWith(phoneTail10) ||
+            rowDigits.endsWith(phoneTail11) ||
+            rowDigits.endsWith(phoneTail12) ||
+            rowDigits.endsWith(phoneTail13) ||
+            loginDigits.endsWith(rowDigits.slice(-10)) ||
+            loginDigits.endsWith(rowDigits.slice(-11)) ||
+            loginDigits.endsWith(rowDigits.slice(-12)) ||
+            loginDigits.endsWith(rowDigits.slice(-13));
           if (!matches) continue;
-          const savedPwd = String(row.recurring_registration_password ?? "").trim();
+          const savedPwd = String(
+            row.recurring_registration_password ??
+              row.signup_password_raw_temp ??
+              row.password ??
+              "",
+          ).trim();
           const typedPwd = String(parsed.data.password ?? "").trim();
           if (!savedPwd || !typedPwd || savedPwd.length < 4) continue;
           if (savedPwd !== typedPwd) continue;
