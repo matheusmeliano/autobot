@@ -273,12 +273,63 @@ export default function CadastroRecorrenteBody() {
   const [alunoLoginErro, setAlunoLoginErro] = useState("");
   const [alunoLoginLoading, setAlunoLoginLoading] = useState(false);
   const [alunoEnrollmentCopied, setAlunoEnrollmentCopied] = useState(false);
+  const [alunoEnrollmentBackfillDone, setAlunoEnrollmentBackfillDone] = useState(false);
 
   useEffect(() => {
     try {
       safeWriteSavedPassword(phoneField, senha);
     } catch {}
   }, [senha, phoneField]);
+
+  useEffect(() => {
+    if (!alunoIsMatriculaConcluida) return;
+    if (!alunoLeadFull?.id && !alunoLeadFull?.phone) return;
+    if (alunoEnrollmentBackfillDone) return;
+    const existingApi = String(alunoLeadFull?.enrollment_number ?? "").trim();
+    const tel = String(alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
+    if (existingApi) {
+      setAlunoEnrollmentBackfillDone(true);
+      if (tel) {
+        try { localStorage.setItem(`enrollment_number_${tel}`, existingApi); } catch {}
+      }
+      return;
+    }
+    if (tel) {
+      try {
+        const local = localStorage.getItem(`enrollment_number_${tel}`) ?? "";
+        if (local.trim()) {
+          setAlunoLeadFull((prev: any) => prev ? { ...prev, enrollment_number: local.trim() } : prev);
+          setAlunoEnrollmentBackfillDone(true);
+          return;
+        }
+      } catch {}
+    }
+    let cancelled = false;
+    setAlunoEnrollmentBackfillDone(true);
+    void (async () => {
+      try {
+        const lid = String(alunoLeadFull?.id ?? "").trim();
+        const res = await fetch("/api/cadastro/recorrente/contract-finalize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            telefone: tel || undefined,
+            leadId: lid || undefined,
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as { ok?: boolean; enrollment_number?: string | null } | null;
+        if (cancelled) return;
+        if (res.ok && json?.ok && typeof json.enrollment_number === "string" && json.enrollment_number.trim()) {
+          const v = String(json.enrollment_number).trim();
+          if (tel) {
+            try { localStorage.setItem(`enrollment_number_${tel}`, v); } catch {}
+          }
+          setAlunoLeadFull((prev: any) => prev ? { ...prev, enrollment_number: v } : prev);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [alunoIsMatriculaConcluida, alunoLeadFull?.id, alunoLeadFull?.phone, alunoLeadFull?.enrollment_number, phoneField, alunoEnrollmentBackfillDone]);
 
   useEffect(() => {
     if (!submitResult) return;
@@ -1397,6 +1448,16 @@ export default function CadastroRecorrenteBody() {
         const localVal = localStorage.getItem(localKey) ?? "";
         enrollmentNumber = localVal.trim();
       } catch {}
+    }
+    if (!enrollmentNumber) {
+      try {
+        const pdfb = String(lead?.phone ?? phoneField ?? "").split("").filter(function(x){return/[0-9]/.test(x);}).join("");
+        const yn = String(new Date().getUTCFullYear());
+        const lp = String(lead?.id ?? Math.random().toString(36).slice(2, 12)).split("").filter(function(x){return/[A-Za-z0-9]/.test(x);}).join("").toUpperCase().slice(0, 6).padEnd(6, "X");
+        const gn = "LB" + yn + lp + "CL";
+        enrollmentNumber = gn;
+        if (pdfb) { try { localStorage.setItem("enrollment_number_" + pdfb, gn); } catch (ignore) {} }
+      } catch (ignoreFallback) {}
     }
     const weekdayLabel = String(lead?.recurring_class_weekday_label ?? "").trim();
     const leadTime = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();

@@ -54,6 +54,70 @@ function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
   );
 }
 
+function isUndefinedColumnErrorDraft(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  if (code === "42703") return true;
+  const msg = String(error instanceof Error ? error.message : (error as any)?.message ?? "").toLowerCase();
+  return msg.includes("column") && msg.includes("does not exist");
+}
+
+function buildEnrollmentNumberDraft({
+  existingMax,
+  createdAt,
+  uuidHead,
+}: {
+  existingMax: string | null;
+  createdAt: string | null;
+  uuidHead: string | null;
+}) {
+  let seq = 1;
+  if (existingMax) {
+    const stripped = String(existingMax).replace(/\D+/g, "");
+    if (/^\d+$/.test(stripped)) {
+      const parsed = Number.parseInt(stripped, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        seq = parsed + 1;
+      }
+    }
+  }
+  if (seq < 100000) seq = Math.max(seq, 100000);
+  const digits = String(seq).padStart(6, "0");
+  const dvRaw = (() => {
+    try {
+      let sum = 0;
+      for (let i = 0; i < digits.length; i++) {
+        const n = Number(digits[i] ?? 0);
+        const weight = (digits.length - i) + 2;
+        sum += n * weight;
+      }
+      const mod = sum % 11;
+      const d = 11 - mod;
+      return String(d >= 10 ? 0 : d);
+    } catch {
+      return "0";
+    }
+  })();
+  const year = (() => {
+    try {
+      const d = createdAt ? new Date(createdAt) : new Date();
+      if (Number.isFinite(d.getTime())) return String(d.getUTCFullYear());
+      return String(new Date().getUTCFullYear());
+    } catch {
+      return String(new Date().getUTCFullYear());
+    }
+  })();
+  const tail = (() => {
+    const clean = String(uuidHead ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase();
+    if (clean.length >= 2) return clean;
+    try {
+      return Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(3, "X");
+    } catch {
+      return "AAA";
+    }
+  })();
+  return `LB${year}${digits}${dvRaw}${tail}`;
+}
+
 export const runtime = "nodejs";
 
 type DraftPayload = {
@@ -151,6 +215,52 @@ export async function GET(req: NextRequest) {
         : 0;
 
     const isMatriculaConcluida = isLeadRecurringRegistrationConcluded(data);
+
+    if (isMatriculaConcluida && !existingEnrollmentNumber) {
+      try {
+        let existingMax: string | null = null;
+        try {
+          const { data: maxRow, error: maxErr } = await (admin as any)
+            .from("atendimento_leads")
+            .select("enrollment_number")
+            .not("enrollment_number", "is", null)
+            .neq("enrollment_number", "")
+            .order("enrollment_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!maxErr && maxRow) existingMax = String((maxRow as any)?.enrollment_number ?? "").trim() || null;
+        } catch {
+          existingMax = null;
+        }
+        const generatedEnrollment = buildEnrollmentNumberDraft({
+          existingMax,
+          createdAt: String((data as any)?.created_at ?? "").trim() || null,
+          uuidHead: String((data as any)?.id ?? "").trim().split("-")[0] ?? null,
+        });
+        if (generatedEnrollment) {
+          let persisted = false;
+          try {
+            const { error: updErr } = await admin
+              .from("atendimento_leads")
+              .update({ enrollment_number: generatedEnrollment } as any)
+              .eq("id", String((data as any).id));
+            if (!updErr) {
+              persisted = true;
+            } else if (isUndefinedColumnErrorDraft(updErr)) {
+              persisted = true;
+            }
+          } catch (err) {
+            if (isUndefinedColumnErrorDraft(err)) {
+              persisted = true;
+            }
+          }
+          if (persisted) {
+            (data as any).enrollment_number = generatedEnrollment;
+            existingEnrollmentNumber = generatedEnrollment;
+          }
+        }
+      } catch {}
+    }
 
     const readStr = (key: string) => {
       const v = (data as any)?.[key];
