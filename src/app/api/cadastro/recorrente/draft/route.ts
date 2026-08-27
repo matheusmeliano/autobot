@@ -201,7 +201,7 @@ export async function GET(req: NextRequest) {
     const curContractStatus = String((data as any).contract_status ?? "").trim().toLowerCase();
     const curPaymentStatus = String((data as any).payment_status ?? "").trim().toLowerCase();
     const curRecurringClassStatus = String((data as any).recurring_class_status ?? "").trim().toLowerCase();
-    const existingEnrollmentNumber = String((data as any).enrollment_number ?? "").trim();
+    let existingEnrollmentNumber = String((data as any).enrollment_number ?? "").trim();
     const existingContractSignedAtRaw = String((data as any).contract_signed_at ?? "").trim();
     const existingContractPdfUrl = String((data as any).contract_pdf_url ?? "").trim();
     const existingRecurringRegistrationPassword = String((data as any).recurring_registration_password ?? "").trim();
