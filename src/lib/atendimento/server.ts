@@ -3582,7 +3582,161 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
   lead: any;
   dashboardLink?: string | null;
 }) {
-  return { ok: false, created: false, userId: null, email: null };
+  const { admin, leadId, lead } = params;
+  if (!lead?.id) return { ok: false, created: false, userId: null, email: null };
+  const rawPhone = String(lead.phone ?? (lead as any)?.telefone ?? "").trim();
+  const phoneDigits = rawPhone.replace(/\D/g, "");
+  const studentEmailFromLead =
+    typeof (lead as any)?.student_email === "string" &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String((lead as any).student_email).trim())
+      ? String((lead as any).student_email).trim()
+      : typeof (lead as any)?.email === "string" &&
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String((lead as any).email).trim())
+        ? String((lead as any).email).trim()
+        : null;
+  const studentPassword = extractStudentPasswordFromLead(lead);
+  if (!studentPassword) return { ok: false, created: false, userId: null, email: studentEmailFromLead };
+
+  let email = studentEmailFromLead || buildSyntheticStudentEmail(phoneDigits);
+  if (!email) return { ok: false, created: false, userId: null, email: null };
+  const fullName =
+    typeof lead.full_name === "string" && lead.full_name.trim()
+      ? lead.full_name.trim()
+      : "Aluno(a) Lucas Brum Online Music USA";
+
+  let userId: string | null = null;
+  let created = false;
+  try {
+    const { data: existing } = await admin.auth.admin.listUsers({
+      perPage: 5,
+    });
+    let match: any = null;
+    if (Array.isArray((existing as any)?.users)) {
+      for (const u of (existing as any).users) {
+        const uEmail = String(u.email ?? "").toLowerCase();
+        const uPhone = String(u.phone ?? u.phone_number ?? "").trim();
+        if (uEmail && uEmail === email.toLowerCase()) {
+          match = u;
+          break;
+        }
+        if (phoneDigits && (await isStudentLoginPhoneMatch(admin, uPhone, phoneDigits))) {
+          match = u;
+          break;
+        }
+      }
+    }
+    if (match && typeof match === "object" && "id" in match) {
+      userId = String((match as any).id);
+      try {
+        await admin.auth.admin.updateUserById(userId, {
+          password: studentPassword,
+          app_metadata: {
+            ...(match && typeof match === "object" && "app_metadata" in match && (match as any).app_metadata && typeof (match as any).app_metadata === "object"
+              ? (match as any).app_metadata
+              : {}),
+            access_scope: "aluno",
+          },
+        });
+      } catch {}
+    } else {
+      const { data } = await admin.auth.admin.createUser({
+        email,
+        password: studentPassword,
+        email_confirm: true,
+        phone: phoneDigits ? `+${phoneDigits}` : undefined,
+        phone_confirm: true,
+        user_metadata: {
+          lead_id: leadId,
+          student_phone_digits: phoneDigits || null,
+          full_name: fullName,
+          origin: "aluno_matricula_recorrente",
+        },
+        app_metadata: {
+          access_scope: "aluno",
+        },
+      });
+      userId = (data as any)?.user?.id ? String((data as any).user.id) : null;
+      created = !!userId;
+    }
+  } catch (e) {
+    try {
+      await appendHistoryEvent({
+        leadId,
+        eventType: "student_auth_user_creation_failed",
+        title: "Falha ao criar usuário Painel do Aluno",
+        details: {
+          error: e instanceof Error ? e.message : String(e),
+          email,
+        },
+        actorType: "system",
+      });
+    } catch {}
+    return { ok: false, created: false, userId: null, email };
+  }
+
+  if (userId) {
+    try {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("user_id, access_scope, email, phone")
+        .eq("user_id", String(userId))
+        .maybeSingle();
+      if ((profile as any)?.user_id) {
+        await admin
+          .from("profiles")
+          .update({
+            access_scope: "aluno",
+            email: email,
+            phone: phoneDigits ? phoneDigits : (profile as any).phone,
+            full_name: fullName,
+          })
+          .eq("user_id", String(userId));
+      } else {
+        try {
+          await admin.from("profiles").insert({
+            user_id: userId,
+            access_scope: "aluno",
+            email,
+            phone: phoneDigits ? phoneDigits : null,
+            full_name: fullName,
+          });
+        } catch (insErr) {
+          const code = String((insErr as any)?.code ?? "").trim();
+          const msg = String((insErr as any)?.message ?? "").toLowerCase();
+          const ignore = code === "42703" || msg.includes("column") && msg.includes("does not exist");
+          if (!ignore) {
+            try {
+              await appendHistoryEvent({
+                leadId,
+                eventType: "student_auth_profile_insert_failed",
+                title: "Falha ao gravar perfil do Painel do Aluno (colunas incompatíveis, ignorar)",
+                details: {
+                  error: insErr instanceof Error ? insErr.message : String(insErr),
+                  user_id: userId,
+                },
+                actorType: "system",
+              });
+            } catch {}
+          }
+        }
+      }
+      try {
+        await appendHistoryEvent({
+          leadId,
+          eventType: "student_auth_user_created",
+          title: "Usuário Painel do Aluno criado",
+          details: {
+            user_id: userId,
+            email,
+            phone_digits: phoneDigits || null,
+            created,
+          },
+          actorType: "system",
+        });
+      } catch {}
+    } catch {}
+  }
+  return { ok: !!userId, created, userId, email };
 }
 
 const SUSPECT_MISSING_COLUMNS_BL = [
@@ -3694,6 +3848,9 @@ export async function confirmLeadRecurringPayment(params: {
   } catch {}
 
   if (alreadyConfirmed) {
+    try {
+      await ensureStudentAuthUserCreatedForLead({ admin, leadId, lead });
+    } catch {}
     return {
       ok: true,
       confirmed_at: payConfirmedAtRaw || now,
@@ -3728,6 +3885,14 @@ export async function confirmLeadRecurringPayment(params: {
   if (!patchRes.ok && !applied) {
     return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };
   }
+
+  try {
+    await ensureStudentAuthUserCreatedForLead({
+      admin,
+      leadId,
+      lead,
+    });
+  } catch {}
 
   try {
     const fullName = String((lead as any).full_name ?? "").trim();

@@ -37,6 +37,23 @@ function toNomeESobrenome(raw: string | null | undefined): string {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
+export function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
+  const obj = (lead ?? {}) as Record<string, unknown>;
+  const payStatusRaw = String(obj?.payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String(obj?.payment_confirmed_at ?? "").trim();
+  const leadStatusRaw = String(obj?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(obj?.funnel_stage ?? "").trim().toLowerCase();
+  return (
+    payStatusRaw === "confirmado" ||
+    payStatusRaw === "matriculado" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    leadStatusRaw === "matriculado" ||
+    leadStatusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada"
+  );
+}
+
 export const runtime = "nodejs";
 
 type DraftPayload = {
@@ -133,6 +150,8 @@ export async function GET(req: NextRequest) {
         ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6)
         : 0;
 
+    const isMatriculaConcluida = isLeadRecurringRegistrationConcluded(data);
+
     const readStr = (key: string) => {
       const v = (data as any)?.[key];
       return typeof v === "string" && v.trim() ? v.trim() : null;
@@ -149,6 +168,20 @@ export async function GET(req: NextRequest) {
         city: readStr("city"),
         country: readStr("country"),
         timezone: readStr("timezone"),
+        enrollment_number: readStr("enrollment_number"),
+        student_email: readStr("student_email"),
+        email: readStr("email"),
+        recurring_class_weekday: readStr("recurring_class_weekday"),
+        recurring_class_weekday_label: readStr("recurring_class_weekday_label"),
+        recurring_class_professor_time: readStr("recurring_class_professor_time"),
+        recurring_class_lead_time: readStr("recurring_class_lead_time"),
+        recurring_class_professor_name: readStr("recurring_class_professor_name"),
+        plan_name: readStr("plan_name"),
+        plan_monthly_value: readStr("plan_monthly_value"),
+        payment_status: readStr("payment_status"),
+        payment_confirmed_at: readStr("payment_confirmed_at"),
+        status: readStr("status"),
+        funnel_stage: readStr("funnel_stage"),
       },
       progress: {
         step: parsedStep,
@@ -158,6 +191,7 @@ export async function GET(req: NextRequest) {
         recurring_class_professor_time: readStr("recurring_class_professor_time"),
         recurring_class_lead_time: readStr("recurring_class_lead_time"),
       },
+      is_matricula_concluida: isMatriculaConcluida,
     });
   } catch (e) {
     return NextResponse.json(

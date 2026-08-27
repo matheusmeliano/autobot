@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { appendHistoryEvent, findLeadByPhone } from "@/lib/atendimento/server";
+import { appendHistoryEvent, findLeadByPhone, ensureStudentAuthUserCreatedForLead } from "@/lib/atendimento/server";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
@@ -260,6 +260,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const createUserResult = { ok: false, created: false, userId: null as string | null, email: null as string | null };
+    try {
+      const createRes = await ensureStudentAuthUserCreatedForLead({
+        admin,
+        leadId: String(lead.id),
+        lead,
+      });
+      if (createRes?.ok) {
+        createUserResult.ok = true;
+        createUserResult.created = Boolean((createRes as any)?.created);
+        createUserResult.userId = (createRes as any)?.userId ? String((createRes as any).userId) : null;
+        createUserResult.email = (createRes as any)?.email ? String((createRes as any).email) : null;
+      }
+    } catch {}
+
     try {
       const { data: convRow } = await admin
         .from("atendimento_conversations")
@@ -285,6 +300,9 @@ export async function POST(req: NextRequest) {
             applied_patch: appliedPatch,
             full_patch_error: fullPatchError,
             source: "cadastro_recorrente_plataforma",
+            auth_user_created: createUserResult.ok
+              ? { ok: true, created: createUserResult.created, email: createUserResult.email }
+              : { ok: false },
           },
           actorType: "lead",
         }).catch(() => {});

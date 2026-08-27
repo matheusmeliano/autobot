@@ -6,6 +6,7 @@ import { inferCountry } from "../../../lib/atendimento/experimentalClass";
 import { resolveStudentTimezone } from "../../../lib/timezone";
 import { AppModal } from "@/components/app/AppModal";
 import { Info, X, Eye, EyeOff } from "lucide-react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
@@ -263,6 +264,15 @@ export default function CadastroRecorrenteBody() {
   const [resumeError, setResumeError] = useState<string>("");
   const [showPlanoInfo, setShowPlanoInfo] = useState<boolean>(false);
 
+  const [alunoIsMatriculaConcluida, setAlunoIsMatriculaConcluida] = useState(false);
+  const [alunoLeadFull, setAlunoLeadFull] = useState<any | null>(null);
+  const [alunoAuthLoading, setAlunoAuthLoading] = useState(false);
+  const [alunoAuthUser, setAlunoAuthUser] = useState<any | null>(null);
+  const [alunoLoginSenha, setAlunoLoginSenha] = useState("");
+  const [alunoLoginMostrarSenha, setAlunoLoginMostrarSenha] = useState(false);
+  const [alunoLoginErro, setAlunoLoginErro] = useState("");
+  const [alunoLoginLoading, setAlunoLoginLoading] = useState(false);
+
   useEffect(() => {
     try {
       safeWriteSavedPassword(phoneField, senha);
@@ -503,6 +513,7 @@ export default function CadastroRecorrenteBody() {
               ok?: boolean;
               blocked?: boolean;
               error?: string | null;
+              is_matricula_concluida?: boolean;
               lead?: {
                 id?: string | null;
                 full_name?: string | null;
@@ -514,7 +525,22 @@ export default function CadastroRecorrenteBody() {
                 contract_signed_at?: string | null;
                 state?: string | null;
                 city?: string | null;
+                country?: string | null;
                 timezone?: string | null;
+                enrollment_number?: string | null;
+                student_email?: string | null;
+                email?: string | null;
+                recurring_class_weekday?: string | null;
+                recurring_class_weekday_label?: string | null;
+                recurring_class_professor_time?: string | null;
+                recurring_class_lead_time?: string | null;
+                recurring_class_professor_name?: string | null;
+                plan_name?: string | null;
+                plan_monthly_value?: string | null;
+                payment_status?: string | null;
+                payment_confirmed_at?: string | null;
+                status?: string | null;
+                funnel_stage?: string | null;
               } | null;
               progress?: {
                 step?: number | null;
@@ -597,6 +623,16 @@ export default function CadastroRecorrenteBody() {
           }
           if (restoredEnrollmentNumber) {
             setEnrollmentNumber(restoredEnrollmentNumber);
+          }
+
+          const concluded = Boolean((json as any)?.is_matricula_concluida);
+          setAlunoIsMatriculaConcluida(concluded);
+          setAlunoLeadFull(json?.lead ?? null);
+          if (concluded) {
+            setInitialDataLoading(false);
+            setInitialDataError("");
+            setShowResumeScreen(false);
+            return;
           }
 
           const hasLoc = Boolean(restoredState || restoredCity);
@@ -1220,6 +1256,96 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
+  function alunoFormatPhoneMasked(raw: unknown): string {
+    const digits = String(raw ?? "").replace(/\D/g, "").trim();
+    if (digits.length <= 10) {
+      if (digits.length <= 6) return digits;
+      const ddd = digits.slice(0, 2);
+      const local = digits.slice(2);
+      if (local.length <= 4) return `(${ddd}) ${local}`;
+      return `(${ddd}) ${local.slice(0, local.length - 4)}-${local.slice(-4)}`;
+    }
+    const ddd = digits.slice(0, 2);
+    const first = digits.slice(2, 3);
+    const p1 = digits.slice(3, 7);
+    const p2 = digits.slice(7);
+    return `(${ddd}) ${first} ${p1}-${p2}`;
+  }
+
+  function alunoBuildEmailFromLead(lead: any): string {
+    const studentEmail = String(lead?.student_email ?? "").trim();
+    const email = String(lead?.email ?? "").trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentEmail)) return studentEmail;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return email;
+    const phone = String(lead?.phone ?? "").replace(/\D/g, "").trim();
+    const tail = phone.slice(-10) || phone;
+    return tail ? `tel.${tail}@aluno.autobot.business` : "";
+  }
+
+  useEffect(() => {
+    if (!alunoIsMatriculaConcluida) return;
+    let cancelled = false;
+    void (async () => {
+      setAlunoAuthLoading(true);
+      setAlunoAuthUser(null);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { data: sess } = await supabase.auth.getSession();
+        const user = sess?.session?.user ?? null;
+        if (!cancelled) {
+          setAlunoAuthUser(user ? { id: user.id, email: user.email ?? null, phone: user.phone ?? null } : null);
+        }
+      } catch {}
+      if (!cancelled) setAlunoAuthLoading(false);
+    })();
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+        const u = session?.user ?? null;
+        setAlunoAuthUser(u ? { id: u.id, email: u.email ?? null, phone: u.phone ?? null } : null);
+      });
+      return () => {
+        cancelled = true;
+        try { sub?.subscription?.unsubscribe?.(); } catch {}
+      };
+    } catch {
+      return () => { cancelled = true; };
+    }
+  }, [alunoIsMatriculaConcluida]);
+
+  async function handleAlunoLoginAttempt() {
+    setAlunoLoginErro("");
+    const password = alunoLoginSenha.trim();
+    if (password.length < 4) {
+      setAlunoLoginErro("Informe a senha cadastrada durante a matrícula (mínimo 4 caracteres).");
+      return;
+    }
+    const email = alunoBuildEmailFromLead(alunoLeadFull);
+    if (!email) {
+      setAlunoLoginErro("Não foi possível identificar suas credenciais. Contate o atendimento.");
+      return;
+    }
+    setAlunoLoginLoading(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        const m = String(error.message ?? "").toLowerCase();
+        if (m.includes("invalid") || m.includes("password") || m.includes("email")) {
+          setAlunoLoginErro("Senha incorreta. Verifique e tente novamente.");
+        } else {
+          setAlunoLoginErro(String(error.message ?? "Falha ao entrar. Tente novamente."));
+        }
+      } else {
+        setAlunoLoginSenha("");
+      }
+    } catch (e) {
+      setAlunoLoginErro(toErrorMessage(e, "Falha ao entrar. Tente novamente."));
+    } finally {
+      setAlunoLoginLoading(false);
+    }
+  }
+
   if (accessBlocked) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-red-50 via-white to-rose-50 py-10 px-4 sm:px-6 flex items-center justify-center">
@@ -1250,6 +1376,208 @@ export default function CadastroRecorrenteBody() {
             <div className="mt-8 pt-7 border-t border-slate-100 text-xs text-slate-500 leading-relaxed">
               © {new Date().getFullYear()} Lucas Brum Online Music USA. Todos os direitos reservados.
             </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (alunoIsMatriculaConcluida && !initialDataLoading) {
+    const lead = alunoLeadFull ?? {};
+    const fullName = String(lead?.full_name ?? "").trim() || "Aluno(a)";
+    const phoneRaw = String(lead?.phone ?? "").trim();
+    const phoneDisplay = alunoFormatPhoneMasked(phoneRaw || phoneField);
+    const studentEmail = alunoBuildEmailFromLead(lead);
+    const enrollmentNumber = String(lead?.enrollment_number ?? "").trim();
+    const weekdayLabel = String(lead?.recurring_class_weekday_label ?? "").trim();
+    const leadTime = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
+    const professorName = String(lead?.recurring_class_professor_name ?? "").trim() || "Lucas Brum";
+    const planName = String(lead?.plan_name ?? "").trim() || "Plano Individual";
+    const planMonthly = String(lead?.plan_monthly_value ?? "").trim();
+    const statusLabel = "Matrícula concluída";
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 py-10 px-4 sm:px-6 flex items-center justify-center">
+        <div className="mx-auto max-w-2xl w-full">
+          <div className="bg-white rounded-3xl shadow-xl shadow-indigo-100/50 border border-slate-100 p-6 sm:p-10">
+            <div className="text-center mb-8">
+              <div className="mx-auto w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                Painel do Aluno
+              </h1>
+              <p className="mt-4 text-slate-600 text-base leading-relaxed">
+                {fullName}, sua matrícula foi concluída com sucesso. Acompanhe seus dados e dias de aula abaixo.
+              </p>
+            </div>
+
+            {alunoAuthLoading ? (
+              <div className="text-center py-10 text-slate-500 text-sm">Verificando sessão…</div>
+            ) : alunoAuthUser ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-emerald-500 text-white inline-flex items-center justify-center font-bold">
+                      ✓
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+                        Status
+                      </div>
+                      <div className="text-base font-semibold text-emerald-900 mt-1 truncate">
+                        {statusLabel}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+                        Nome completo
+                      </div>
+                      <div className="text-slate-900 font-semibold truncate">{fullName}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+                        WhatsApp
+                      </div>
+                      <div className="text-slate-900 font-semibold">{phoneDisplay}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+                        E-mail (acesso)
+                      </div>
+                      <div className="text-slate-900 font-semibold break-all">
+                        {studentEmail || "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+                        Matrícula
+                      </div>
+                      <div className="text-slate-900 font-semibold">
+                        {enrollmentNumber || "—"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-indigo-200/70 bg-indigo-500/10 p-5">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-800/80 mb-4">
+                    Aulas recorrentes
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700/75 mb-1">
+                        Dia e horário
+                      </div>
+                      <div className="text-indigo-950 font-semibold text-base leading-snug">
+                        {(weekdayLabel && leadTime) ? `${weekdayLabel} · ${leadTime}` : weekdayLabel || leadTime || "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700/75 mb-1">
+                        Professor
+                      </div>
+                      <div className="text-indigo-950 font-semibold text-base leading-snug">
+                        {professorName}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700/75 mb-1">
+                        Plano
+                      </div>
+                      <div className="text-indigo-950 font-semibold text-base leading-snug">{planName}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700/75 mb-1">
+                        Valor mensal
+                      </div>
+                      <div className="text-indigo-950 font-semibold text-base leading-snug">
+                        {planMonthly || "—"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-xs text-slate-500 text-center leading-relaxed">
+                  © {new Date().getFullYear()} Lucas Brum Online Music USA. Todos os direitos reservados.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    E-mail / WhatsApp
+                  </label>
+                  <input
+                    type="text"
+                    value={phoneDisplay}
+                    readOnly
+                    className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-600 outline-none cursor-not-allowed text-base"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    Senha
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={alunoLoginMostrarSenha ? "text" : "password"}
+                      autoFocus
+                      value={alunoLoginSenha}
+                      onChange={(e) => {
+                        setAlunoLoginSenha(e.target.value);
+                        setAlunoLoginErro("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleAlunoLoginAttempt();
+                        }
+                      }}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
+                      placeholder="Digite sua senha"
+                      minLength={4}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAlunoLoginMostrarSenha((v) => !v)}
+                      tabIndex={-1}
+                      aria-label={alunoLoginMostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 transition"
+                    >
+                      {alunoLoginMostrarSenha ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {alunoLoginErro ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 leading-relaxed">
+                    {alunoLoginErro}
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-1 gap-3 pt-2 w-full">
+                  <button
+                    onClick={() => void handleAlunoLoginAttempt()}
+                    disabled={alunoLoginLoading || alunoLoginSenha.trim().length < 4}
+                    className="w-full sm:w-auto sm:ml-auto rounded-2xl px-7 py-3.5 bg-indigo-600 text-white font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition justify-center flex items-center text-base"
+                  >
+                    {alunoLoginLoading ? "Entrando…" : "Entrar"}
+                  </button>
+                </div>
+                <div className="pt-4 text-xs text-slate-500 text-center leading-relaxed">
+                  © {new Date().getFullYear()} Lucas Brum Online Music USA. Todos os direitos reservados.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
