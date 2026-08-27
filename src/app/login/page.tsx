@@ -79,3 +79,22 @@ export default async function LoginPage({
 
   return (
     <>
+      <style>{`
+        html,
+        body {
+          -webkit-text-size-adjust: 100%;
+          text-size-adjust: 100%;
+        }
+
+        @supports (-webkit-touch-callout: none) {
+          input,
+          textarea,
+          select {
+            font-size: 16px !important;
+          }
+        }
+      `}</style>
+      <LoginForm initialLogin={initialLogin} />
+    </>
+  );
+}
