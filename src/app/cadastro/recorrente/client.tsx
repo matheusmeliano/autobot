@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { inferCountry } from "../../../lib/atendimento/experimentalClass";
 import { resolveStudentTimezone } from "../../../lib/timezone";
 import { AppModal } from "@/components/app/AppModal";
-import { Info, X, Eye, EyeOff } from "lucide-react";
+import { Info, X, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
@@ -272,6 +272,7 @@ export default function CadastroRecorrenteBody() {
   const [alunoLoginMostrarSenha, setAlunoLoginMostrarSenha] = useState(false);
   const [alunoLoginErro, setAlunoLoginErro] = useState("");
   const [alunoLoginLoading, setAlunoLoginLoading] = useState(false);
+  const [alunoEnrollmentCopied, setAlunoEnrollmentCopied] = useState(false);
 
   useEffect(() => {
     try {
@@ -1387,14 +1388,42 @@ export default function CadastroRecorrenteBody() {
     const fullName = String(lead?.full_name ?? "").trim() || "Aluno(a)";
     const phoneRaw = String(lead?.phone ?? "").trim();
     const phoneDisplay = alunoFormatPhoneMasked(phoneRaw || phoneField);
-    const studentEmail = alunoBuildEmailFromLead(lead);
-    const enrollmentNumber = String(lead?.enrollment_number ?? "").trim();
+    const apiEnrollment = String(lead?.enrollment_number ?? "").trim();
+    let enrollmentNumber = apiEnrollment;
+    if (!enrollmentNumber) {
+      try {
+        const safePhoneDigits = (phoneRaw || phoneField).replace(/\D/g, "").trim();
+        const localKey = `enrollment_number_${safePhoneDigits}`;
+        const localVal = localStorage.getItem(localKey) ?? "";
+        enrollmentNumber = localVal.trim();
+      } catch {}
+    }
     const weekdayLabel = String(lead?.recurring_class_weekday_label ?? "").trim();
     const leadTime = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
     const professorName = String(lead?.recurring_class_professor_name ?? "").trim() || "Lucas Brum";
     const planName = String(lead?.plan_name ?? "").trim() || "Plano Individual";
     const planMonthly = String(lead?.plan_monthly_value ?? "").trim();
     const statusLabel = "Matrícula concluída";
+
+    async function handleCopyEnrollment() {
+      if (!enrollmentNumber) return;
+      try {
+        try {
+          await navigator.clipboard.writeText(enrollmentNumber);
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = enrollmentNumber;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        setAlunoEnrollmentCopied(true);
+        window.setTimeout(() => setAlunoEnrollmentCopied(false), 2000);
+      } catch {}
+    }
     return (
       <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 py-10 px-4 sm:px-6 flex items-center justify-center">
         <div className="mx-auto max-w-2xl w-full">
@@ -1451,8 +1480,24 @@ export default function CadastroRecorrenteBody() {
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
                         N° da matrícula
                       </div>
-                      <div className="text-slate-900 font-semibold">
-                        {enrollmentNumber || "—"}
+                      <div className="flex items-center gap-2 min-w-0 w-full">
+                        <div className="text-slate-900 font-semibold truncate min-w-0 flex-1">
+                          {enrollmentNumber || "—"}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyEnrollment()}
+                          disabled={!enrollmentNumber}
+                          title={alunoEnrollmentCopied ? "Copiado!" : "Copiar número da matrícula"}
+                          aria-label={alunoEnrollmentCopied ? "Copiado!" : "Copiar número da matrícula"}
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        >
+                          {alunoEnrollmentCopied ? (
+                            <Check className="h-5 w-5 text-emerald-600" />
+                          ) : (
+                            <Copy className="h-5 w-5" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>

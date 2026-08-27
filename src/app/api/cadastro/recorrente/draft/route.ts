@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
       } else if (/column.*does not exist|PGRST204|42703/i.test(String(selFull.error?.message ?? ""))) {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
         try {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
