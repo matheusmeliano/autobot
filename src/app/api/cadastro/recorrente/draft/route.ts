@@ -37,7 +37,7 @@ function toNomeESobrenome(raw: string | null | undefined): string {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
-export function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
+function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
   const obj = (lead ?? {}) as Record<string, unknown>;
   const payStatusRaw = String(obj?.payment_status ?? "").trim().toLowerCase();
   const payConfirmedAtRaw = String(obj?.payment_confirmed_at ?? "").trim();
