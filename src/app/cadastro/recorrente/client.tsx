@@ -1447,15 +1447,7 @@ export default function CadastroRecorrenteBody() {
                       </div>
                       <div className="text-slate-900 font-semibold">{phoneDisplay}</div>
                     </div>
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
-                        E-mail (acesso)
-                      </div>
-                      <div className="text-slate-900 font-semibold break-all">
-                        {studentEmail || "—"}
-                      </div>
-                    </div>
-                    <div>
+                    <div className="sm:col-span-2">
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
                         Matrícula
                       </div>
