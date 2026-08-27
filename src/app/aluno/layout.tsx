@@ -182,7 +182,7 @@ export default async function AlunoPortalLayout({
           }
         }
       `}</style>
-      <div className="min-h-[100dvh] w-full bg-gradient-to-b from-indigo-50/60 via-white to-white">
+      <div className="min-h-[100dvh] w-full bg-gradient-to-br from-indigo-50 via-white to-sky-50">
         {children}
       </div>
     </>

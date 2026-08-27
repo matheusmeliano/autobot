@@ -184,17 +184,83 @@ export async function loginAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
+  const admin = createSupabaseAdminClient();
 
-  const resolvedEmail = await resolveEmailFromLogin(supabase, parsed.data.login);
+  const loginInputRaw = String(parsed.data.login ?? "").trim();
+  const isPhoneInput = !EMAIL_REGEX.test(loginInputRaw);
+  const loginInputDigits = isPhoneInput ? onlyDigits(loginInputRaw) : "";
+  const pwd = String(parsed.data.password ?? "").trim();
+
+  let resolvedEmail = await resolveEmailFromLogin(supabase, loginInputRaw);
+  let resolvedViaLeadRecover = false;
+  if (!resolvedEmail && isPhoneInput && loginInputDigits.length >= 10 && pwd.length >= 4) {
+    try {
+      const no55 = loginInputDigits.replace(/^55/, "");
+      const suf10 = (no55 || loginInputDigits).slice(-10);
+      const suf11 = (no55 || loginInputDigits).slice(-11);
+      const suf12 = (no55 || loginInputDigits).slice(-12);
+      const suf13 = (no55 || loginInputDigits).slice(-13);
+      const filters: string[] = [];
+      filters.push(`phone.eq.${loginInputDigits}`);
+      if (no55 && no55 !== loginInputDigits) {
+        filters.push(`phone.eq.${no55}`);
+      }
+      if (suf10) filters.push(`phone.ilike.%${suf10}`);
+      if (suf11 && suf11 !== suf10) filters.push(`phone.eq.${suf11}`);
+      if (suf12 && suf12 !== suf11) filters.push(`phone.eq.${suf12}`);
+      if (suf13 && suf13 !== suf12) filters.push(`phone.eq.${suf13}`);
+      const { data: leadHits } = await supabase
+        .from("atendimento_leads")
+        .select("*")
+        .or(filters.join(","))
+        .limit(50);
+      if (Array.isArray(leadHits) && leadHits.length) {
+        for (const leadRow of leadHits as any[]) {
+          const rowDigits = onlyDigits(String(leadRow.phone ?? ""));
+          if (!rowDigits) continue;
+          const matches =
+            rowDigits === loginInputDigits ||
+            (suf10 && rowDigits.endsWith(suf10)) ||
+            (suf11 && rowDigits.endsWith(suf11)) ||
+            (suf12 && rowDigits.endsWith(suf12)) ||
+            (suf13 && rowDigits.endsWith(suf13)) ||
+            loginInputDigits.endsWith(rowDigits.slice(-10)) ||
+            loginInputDigits.endsWith(rowDigits.slice(-11)) ||
+            loginInputDigits.endsWith(rowDigits.slice(-12)) ||
+            loginInputDigits.endsWith(rowDigits.slice(-13));
+          if (!matches) continue;
+          const savedPwd = String(
+            leadRow.recurring_registration_password ??
+              leadRow.signup_password_raw_temp ??
+              leadRow.password ??
+              "",
+          ).trim();
+          if (!savedPwd || savedPwd.length < 4) continue;
+          if (savedPwd !== pwd) continue;
+          const created = await ensureStudentAuthUserCreatedForLead({
+            admin,
+            leadId: String(leadRow.id),
+            lead: leadRow,
+          });
+          if (created.ok && created.email) {
+            resolvedEmail = created.email;
+            resolvedViaLeadRecover = true;
+            break;
+          }
+        }
+      }
+    } catch {}
+  }
+
   if (!resolvedEmail) {
     return { ok: false, error: "Credenciais inválidas." };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
+  let { error } = await supabase.auth.signInWithPassword({
     email: resolvedEmail,
     password: parsed.data.password,
   });
-  if (error) {
+  if (error && !resolvedViaLeadRecover) {
     const isPhone = !EMAIL_REGEX.test(String(parsed.data.login ?? "").trim());
     const loginDigits = isPhone ? onlyDigits(parsed.data.login) : "";
     const phoneTail10 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-10);

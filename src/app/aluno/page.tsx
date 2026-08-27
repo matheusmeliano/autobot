@@ -176,180 +176,191 @@ export default async function AlunoPortalPage(props: {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-      <header className="flex w-full flex-col items-start gap-4 border-b border-slate-200/70 pb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-600/30">
-            <GraduationCap className="h-6 w-6 shrink-0" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Lucas Brum Online Music USA
+    <main className="min-h-[100dvh] w-full py-10 px-4 sm:px-6">
+      <div className="mx-auto max-w-2xl text-center">
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
+          Lucas Brum Online Music USA
+        </h1>
+        <p className="mt-3 text-base sm:text-lg text-slate-500">
+          Acesse seu painel e acompanhe sua matrícula, horários e aulas.
+        </p>
+      </div>
+
+      <section className="mx-auto mt-10 w-full max-w-3xl bg-white rounded-3xl shadow-xl shadow-indigo-100/50 border border-slate-100 p-6 sm:p-10">
+        <header className="flex w-full flex-col items-start gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-600/30">
+              <GraduationCap className="h-6 w-6 shrink-0" aria-hidden="true" />
             </div>
-            <h1 className="mt-1 truncate text-xl font-bold text-slate-900 sm:text-2xl">
-              Olá, {firstName}!
-            </h1>
-          </div>
-        </div>
-        <form action={handleSignOutAction} className="w-full sm:w-auto">
-          <button
-            type="submit"
-            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:bg-slate-100 sm:w-auto"
-          >
-            <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Sair</span>
-          </button>
-        </form>
-      </header>
-
-      <section className="mt-8 grid min-w-0 gap-4 md:grid-cols-2">
-        <article className="w-full rounded-2xl border border-indigo-200/70 bg-white p-5 shadow-sm shadow-indigo-50/50">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-500">
-            <Hash className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Número da matrícula</span>
-          </div>
-          <div className="mt-4 truncate text-lg font-bold text-slate-900">
-            {enrollmentNumber || "—"}
-          </div>
-        </article>
-
-        <article className="w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-50">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            <AtSign className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Dados cadastrais</span>
-          </div>
-          <div className="mt-4 truncate text-sm font-semibold text-slate-900">
-            {safeFullName}
-          </div>
-        </article>
-
-        <article className="w-full rounded-2xl border border-emerald-200/70 bg-white p-5 shadow-sm shadow-emerald-50/50">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-            <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Dia da aula</span>
-          </div>
-          <div className="mt-4 truncate text-lg font-bold text-slate-900">
-            {classWeekday}
-          </div>
-        </article>
-
-        <article className="w-full rounded-2xl border border-emerald-200/70 bg-white p-5 shadow-sm shadow-emerald-50/50">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-            <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Horário fixo</span>
-          </div>
-          <div className="mt-4 truncate text-lg font-bold text-slate-900">
-            {classTime}
-          </div>
-        </article>
-      </section>
-
-      <section className="mt-6 grid min-w-0 gap-4">
-        <article className="w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-50">
-          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Link fixo das aulas</span>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Painel do Aluno
               </div>
-              <div
-                className="mt-3 max-w-xl truncate text-sm font-semibold text-slate-700"
-                title={recurringClassLink || ""}
-              >
-                {recurringClassLink || "Link da aula ainda não disponível."}
-              </div>
+              <h2 className="mt-1 truncate text-xl font-bold text-slate-900 sm:text-2xl">
+                Olá, {firstName}!
+              </h2>
             </div>
-            {recurringClassLink ? (
-              <a
-                href={recurringClassLink}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 active:bg-indigo-800 sm:w-auto"
-              >
-                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Abrir aula</span>
-              </a>
-            ) : null}
           </div>
-        </article>
-      </section>
+          <form action={handleSignOutAction} className="w-full sm:w-auto">
+            <button
+              type="submit"
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:bg-slate-100 sm:w-auto shadow-sm shadow-slate-100"
+            >
+              <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Sair</span>
+            </button>
+          </form>
+        </header>
 
-      <section className="mt-6 grid min-w-0 gap-4 md:grid-cols-2">
-        <article
-          className={
-            paymentOk
-              ? "w-full rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm shadow-emerald-50"
-              : "w-full rounded-2xl border border-red-200 bg-red-50/60 p-5 shadow-sm shadow-red-50"
-          }
-        >
-          <div
+        <section className="mt-8 grid min-w-0 gap-4 md:grid-cols-2">
+          <article className="w-full rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm shadow-indigo-50/50">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-500">
+              <Hash className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Número da matrícula</span>
+            </div>
+            <div className="mt-4 truncate text-lg font-bold text-slate-900">
+              {enrollmentNumber || "—"}
+            </div>
+          </article>
+
+          <article className="w-full rounded-2xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-50">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <AtSign className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Dados cadastrais</span>
+            </div>
+            <div className="mt-4 truncate text-sm font-semibold text-slate-900">
+              {safeFullName}
+            </div>
+          </article>
+
+          <article className="w-full rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm shadow-emerald-50/50">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
+              <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Dia da aula</span>
+            </div>
+            <div className="mt-4 truncate text-lg font-bold text-slate-900">
+              {classWeekday}
+            </div>
+          </article>
+
+          <article className="w-full rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm shadow-emerald-50/50">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
+              <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Horário fixo</span>
+            </div>
+            <div className="mt-4 truncate text-lg font-bold text-slate-900">
+              {classTime}
+            </div>
+          </article>
+        </section>
+
+        <section className="mt-6 grid min-w-0 gap-4">
+          <article className="w-full rounded-2xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-50">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>Link fixo das aulas</span>
+                </div>
+                <div
+                  className="mt-3 max-w-xl truncate text-sm font-semibold text-slate-700"
+                  title={recurringClassLink || ""}
+                >
+                  {recurringClassLink || "Link da aula ainda não disponível."}
+                </div>
+              </div>
+              {recurringClassLink ? (
+                <a
+                  href={recurringClassLink}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 active:bg-indigo-800 sm:w-auto shadow-lg shadow-indigo-200/50"
+                >
+                  <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>Abrir aula</span>
+                </a>
+              ) : null}
+            </div>
+          </article>
+        </section>
+
+        <section className="mt-6 grid min-w-0 gap-4 md:grid-cols-2">
+          <article
             className={
               paymentOk
-                ? "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700"
-                : "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600"
+                ? "w-full rounded-2xl border border-emerald-100 bg-emerald-50/70 p-5 shadow-sm shadow-emerald-100/60"
+                : "w-full rounded-2xl border border-red-100 bg-red-50/70 p-5 shadow-sm shadow-red-100/60"
             }
           >
-            {paymentOk ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <XCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            )}
-            <span>Status do pagamento</span>
-          </div>
-          <div className="mt-4 flex flex-col gap-1">
             <div
               className={
                 paymentOk
-                  ? "text-lg font-bold text-emerald-800"
-                  : "text-lg font-bold text-red-700"
+                  ? "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700"
+                  : "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600"
               }
             >
-              {paymentOk ? "Pagamento confirmado" : "Pagamento pendente"}
+              {paymentOk ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <XCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              <span>Status do pagamento</span>
             </div>
-            {paymentOk && paymentConfirmedAt ? (
-              <div className="text-xs font-semibold text-emerald-700/90">
-                Confirmado em {paymentConfirmedAt}
+            <div className="mt-4 flex flex-col gap-1">
+              <div
+                className={
+                  paymentOk
+                    ? "text-lg font-bold text-emerald-800"
+                    : "text-lg font-bold text-red-700"
+                }
+              >
+                {paymentOk ? "Pagamento confirmado" : "Pagamento pendente"}
               </div>
-            ) : null}
-          </div>
-        </article>
-
-        <article className="w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-50">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Contrato</span>
-          </div>
-          <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900">
-                {contractPdfUrl ? "Contrato assinado disponível" : "Contrato ainda não disponível"}
-              </div>
-              {contractSignedAt ? (
-                <div className="mt-1 text-xs font-semibold text-slate-500">
-                  Assinado em {contractSignedAt}
+              {paymentOk && paymentConfirmedAt ? (
+                <div className="text-xs font-semibold text-emerald-700/90">
+                  Confirmado em {paymentConfirmedAt}
                 </div>
               ) : null}
             </div>
-            {contractPdfUrl ? (
-              <a
-                href={contractPdfUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 active:bg-slate-100 sm:w-auto"
-              >
-                <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Baixar PDF</span>
-              </a>
-            ) : null}
-          </div>
-        </article>
+          </article>
 
-        <AlunoChangePasswordCard />
+          <article className="w-full rounded-2xl border border-slate-100 bg-white p-5 shadow-sm shadow-slate-50">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Contrato</span>
+            </div>
+            <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900">
+                  {contractPdfUrl ? "Contrato assinado disponível" : "Contrato ainda não disponível"}
+                </div>
+                {contractSignedAt ? (
+                  <div className="mt-1 text-xs font-semibold text-slate-500">
+                    Assinado em {contractSignedAt}
+                  </div>
+                ) : null}
+              </div>
+              {contractPdfUrl ? (
+                <a
+                  href={contractPdfUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 active:bg-slate-100 sm:w-auto shadow-sm shadow-slate-100"
+                >
+                  <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>Baixar PDF</span>
+                </a>
+              ) : null}
+            </div>
+          </article>
+
+          <AlunoChangePasswordCard />
+        </section>
+
+        <footer className="mt-10 border-t border-slate-100 pt-6 text-center text-xs font-semibold text-slate-500">
+          © {new Date().getFullYear()} Lucas Brum Online Music USA. Painel do Aluno.
+        </footer>
       </section>
-
-      <footer className="mt-10 border-t border-slate-200/70 pt-5 text-xs font-semibold text-slate-500">
-        © {new Date().getFullYear()} Lucas Brum Online Music USA. Painel do Aluno.
-      </footer>
     </main>
   );
 }
