@@ -1309,19 +1309,26 @@ export default function CadastroRecorrenteBody() {
   }
 
   function alunoFormatPhoneMasked(raw: unknown): string {
-    const digits = String(raw ?? "").replace(/\D/g, "").trim();
-    if (digits.length <= 10) {
-      if (digits.length <= 6) return digits;
-      const ddd = digits.slice(0, 2);
-      const local = digits.slice(2);
-      if (local.length <= 4) return `(${ddd}) ${local}`;
-      return `(${ddd}) ${local.slice(0, local.length - 4)}-${local.slice(-4)}`;
+    const d = String(raw ?? "").replace(/\D/g, "").trim();
+    if (!d) return "";
+    if (d.startsWith("55")) {
+      const rest = d.slice(2);
+      if (rest.length === 10) {
+        return `+55 ${rest.slice(0, 2)} ${rest.slice(2, 6)}-${rest.slice(6)}`;
+      }
+      if (rest.length === 11) {
+        return `+55 ${rest.slice(0, 2)} ${rest.slice(2, 3)} ${rest.slice(3, 7)}-${rest.slice(7)}`;
+      }
+      if (rest.length <= 2) return `+55 ${rest}`;
+      return `+55 ${rest.slice(0, 2)} ${rest.slice(2)}`;
     }
-    const ddd = digits.slice(0, 2);
-    const first = digits.slice(2, 3);
-    const p1 = digits.slice(3, 7);
-    const p2 = digits.slice(7);
-    return `(${ddd}) ${first} ${p1}-${p2}`;
+    if (d.length === 10) {
+      return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    }
+    if (d.length === 11) {
+      return `(${d.slice(0,2)}) ${d.slice(2,3)} ${d.slice(3,7)}-${d.slice(7)}`;
+    }
+    return d;
   }
 
   function alunoBuildEmailFromLead(lead: any): string {
