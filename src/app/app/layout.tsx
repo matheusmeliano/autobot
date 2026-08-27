@@ -1,7 +1,6 @@
 import { AppShell } from "@/components/app/AppShell";
 import {
   getDefaultAuthenticatedPath,
-  isAlunoOnlyAccessScope,
   isAtendimentoOnlyAccessScope,
 } from "@/lib/auth/access";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
@@ -56,10 +55,7 @@ export default async function AppLayout({
     .eq("user_id", session.user.id)
     .maybeSingle();
 
-  if (
-    isAtendimentoOnlyAccessScope((profile as any)?.access_scope) ||
-    isAlunoOnlyAccessScope((profile as any)?.access_scope)
-  ) {
+  if (isAtendimentoOnlyAccessScope((profile as any)?.access_scope)) {
     redirect(getDefaultAuthenticatedPath((profile as any)?.access_scope));
   }
 
