@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { inferCountry } from "../../../lib/atendimento/experimentalClass";
 import { resolveStudentTimezone } from "../../../lib/timezone";
 import { AppModal } from "@/components/app/AppModal";
-import { Info, X } from "lucide-react";
+import { Info, X, Eye, EyeOff } from "lucide-react";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
@@ -211,6 +211,7 @@ export default function CadastroRecorrenteBody() {
   const [nome, setNome] = useState<string>(toNomeESobrenome(initialNameParam));
   const [phoneField, setPhoneField] = useState<string>(initialPhoneParam);
   const [senha, setSenha] = useState<string>(() => safeReadSavedPassword(initialPhoneParam));
+  const [mostrarSenhaCriar, setMostrarSenhaCriar] = useState(false);
   const [hasPasswordInitial, setHasPasswordInitial] = useState<boolean>(false);
   const [stateField, setStateField] = useState<string>("");
   const [cityField, setCityField] = useState<string>("");
@@ -257,6 +258,7 @@ export default function CadastroRecorrenteBody() {
   const [pixCopied, setPixCopied] = useState<boolean>(false);
   const [showResumeScreen, setShowResumeScreen] = useState<boolean>(false);
   const [resumePassword, setResumePassword] = useState<string>("");
+  const [mostrarSenhaResume, setMostrarSenhaResume] = useState(false);
   const [resumeLoading, setResumeLoading] = useState<boolean>(false);
   const [resumeError, setResumeError] = useState<string>("");
   const [showPlanoInfo, setShowPlanoInfo] = useState<boolean>(false);
@@ -1298,24 +1300,39 @@ export default function CadastroRecorrenteBody() {
                 <label className="block text-sm font-semibold text-slate-800 mb-2">
                   Sua senha
                 </label>
-                <input
-                  type="password"
-                  autoFocus
-                  value={resumePassword}
-                  onChange={(e) => {
-                    setResumePassword(e.target.value);
-                    setResumeError("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void handleResumeAttempt();
-                    }
-                  }}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
-                  placeholder="Digite sua senha"
-                  minLength={4}
-                />
+                <div className="relative">
+                  <input
+                    type={mostrarSenhaResume ? "text" : "password"}
+                    autoFocus
+                    value={resumePassword}
+                    onChange={(e) => {
+                      setResumePassword(e.target.value);
+                      setResumeError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleResumeAttempt();
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition text-base"
+                    placeholder="Digite sua senha"
+                    minLength={4}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarSenhaResume((v) => !v)}
+                    tabIndex={-1}
+                    aria-label={mostrarSenhaResume ? "Ocultar senha" : "Mostrar senha"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 transition"
+                  >
+                    {mostrarSenhaResume ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </div>
               {resumeError ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 leading-relaxed">
@@ -1530,14 +1547,29 @@ export default function CadastroRecorrenteBody() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-800 mb-2">Crie uma senha</label>
-                    <input
-                      type="password"
-                      value={senha}
-                      onChange={(e) => setSenha(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
-                      placeholder="Mínimo 4 caracteres"
-                      minLength={4}
-                    />
+                    <div className="relative">
+                      <input
+                        type={mostrarSenhaCriar ? "text" : "password"}
+                        value={senha}
+                        onChange={(e) => setSenha(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        placeholder="Mínimo 4 caracteres"
+                        minLength={4}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setMostrarSenhaCriar((v) => !v)}
+                        tabIndex={-1}
+                        aria-label={mostrarSenhaCriar ? "Ocultar senha" : "Mostrar senha"}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 transition"
+                      >
+                        {mostrarSenhaCriar ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3 pt-2 w-full">
