@@ -274,6 +274,7 @@ export default function CadastroRecorrenteBody() {
   const [alunoLoginLoading, setAlunoLoginLoading] = useState(false);
   const [alunoEnrollmentCopied, setAlunoEnrollmentCopied] = useState(false);
   const [alunoEnrollmentBackfillDone, setAlunoEnrollmentBackfillDone] = useState(false);
+  const [alunoStatusDismissed, setAlunoStatusDismissed] = useState<null | boolean>(null);
 
   useEffect(() => {
     try {
@@ -330,6 +331,25 @@ export default function CadastroRecorrenteBody() {
     })();
     return () => { cancelled = true; };
   }, [alunoIsMatriculaConcluida, alunoLeadFull?.id, alunoLeadFull?.phone, alunoLeadFull?.enrollment_number, phoneField, alunoEnrollmentBackfillDone]);
+
+  useEffect(() => {
+    if (!alunoIsMatriculaConcluida) return;
+    const v = String(alunoLeadFull?.recurring_matricula_concluida_dismissed_at ?? "").trim();
+    setAlunoStatusDismissed(Boolean(v));
+  }, [alunoIsMatriculaConcluida, alunoLeadFull?.recurring_matricula_concluida_dismissed_at]);
+
+  async function handleDismissStatusBanner() {
+    setAlunoStatusDismissed(true);
+    try {
+      const tel = String(alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
+      const lid = String(alunoLeadFull?.id ?? "").trim();
+      await fetch("/api/cadastro/recorrente/dismiss-matricula-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefone: tel || undefined, lead_id: lid || undefined }),
+      });
+    } catch {}
+  }
 
   useEffect(() => {
     if (!submitResult) return;
@@ -1506,7 +1526,7 @@ export default function CadastroRecorrenteBody() {
                 Painel do Aluno
               </h1>
               <p className="mt-4 text-slate-600 text-base leading-relaxed">
-                {fullName}, sua matrícula foi concluída com sucesso. Acompanhe seus dados e dias de aula abaixo.
+                <strong className="font-bold text-slate-900">{fullName}</strong>, sua matrícula foi concluída com sucesso. Acompanhe seus dados e dias de aula abaixo.
               </p>
             </div>
 
@@ -1514,21 +1534,32 @@ export default function CadastroRecorrenteBody() {
               <div className="text-center py-10 text-slate-500 text-sm">Verificando sessão…</div>
             ) : alunoAuthUser ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-emerald-500 text-white inline-flex items-center justify-center font-bold">
-                      ✓
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
-                        Status
+                {alunoStatusDismissed !== true ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 relative">
+                    <button
+                      type="button"
+                      onClick={() => void handleDismissStatusBanner()}
+                      title="Fechar mensagem"
+                      aria-label="Fechar mensagem de status"
+                      className="absolute top-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700/70 hover:text-emerald-900 hover:bg-emerald-100/70 transition"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                    <div className="flex items-center gap-3 pr-10">
+                      <div className="h-9 w-9 rounded-full bg-emerald-500 text-white inline-flex items-center justify-center font-bold">
+                        ✓
                       </div>
-                      <div className="text-base font-semibold text-emerald-900 mt-1 truncate">
-                        {statusLabel}
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+                          Status
+                        </div>
+                        <div className="text-base font-semibold text-emerald-900 mt-1 truncate">
+                          {statusLabel}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

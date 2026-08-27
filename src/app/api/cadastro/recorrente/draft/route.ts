@@ -292,6 +292,7 @@ export async function GET(req: NextRequest) {
         payment_confirmed_at: readStr("payment_confirmed_at"),
         status: readStr("status"),
         funnel_stage: readStr("funnel_stage"),
+        recurring_matricula_concluida_dismissed_at: readStr("recurring_matricula_concluida_dismissed_at"),
       },
       progress: {
         step: parsedStep,
