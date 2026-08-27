@@ -133,51 +133,12 @@ export async function GET(req: NextRequest) {
         ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6)
         : 0;
 
-    function matriculaEstaConcluidaRedirecionarAluno(): boolean {
-      const confirmouContrato =
-        curContractStatus === "assinado" ||
-        Boolean(existingContractSignedAtRaw && existingContractSignedAtRaw !== "null") ||
-        Boolean(existingContractPdfUrl);
-      const temMatriculaNumero = Boolean(existingEnrollmentNumber);
-      const statusOuFunnelMatriculado = new Set([
-        "matriculado",
-        "aluno",
-        "cadastro_recorrente_pendente_plataforma",
-        "contrato_assinado",
-        "contrato_aguardando_aceite",
-        "contrato_coletando_dados",
-        "matricula_confirmada",
-      ]);
-      const entrouEtapaAluno =
-        statusOuFunnelMatriculado.has(curLeadStatus) ||
-        statusOuFunnelMatriculado.has(curFunnelStage) ||
-        curRecurringClassStatus === "confirmado" ||
-        curRecurringClassStatus === "cadastro_plataforma_pendente";
-      const pagamentoEstaOuFoiAvaliado =
-        curPaymentStatus === "confirmado" ||
-        curPaymentStatus === "pendente_confirmacao" ||
-        curPaymentStatus === "rejeitado" ||
-        curPaymentStatus === "nao_realizado" ||
-        Boolean((data as any).payment_confirmed_at) ||
-        Boolean((data as any).payment_rejected_at) ||
-        parsedStep >= 5;
-      if (!hasAnySavedPassword) return false;
-      if (parsedStep >= 1 && hasAnySavedPassword) return true;
-      if (temMatriculaNumero && confirmouContrato) return true;
-      if (parsedStep >= 6) return true;
-      if (entrouEtapaAluno && confirmouContrato && pagamentoEstaOuFoiAvaliado) return true;
-      if (entrouEtapaAluno && temMatriculaNumero) return true;
-      return false;
-    }
-
-    const redirectToAluno = matriculaEstaConcluidaRedirecionarAluno();
     const readStr = (key: string) => {
       const v = (data as any)?.[key];
       return typeof v === "string" && v.trim() ? v.trim() : null;
-    }
+    };
     return NextResponse.json({
       ok: true,
-      redirect_to_aluno: redirectToAluno,
       lead: {
         id: (data as any).id,
         phone: String((data as any).phone ?? ""),

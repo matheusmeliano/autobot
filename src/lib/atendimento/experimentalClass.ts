@@ -606,7 +606,7 @@ export function buildRecurringPaymentConfirmedStudentWelcomeMessage(
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
   const safeDashboard =
-    String(dashboardLink ?? "").trim() || "https://www.autobot.business/aluno";
+    String(dashboardLink ?? "").trim();
   return `Parabéns, ${safeFirst}! 🎉
 
 Seu pagamento foi confirmado e sua matrícula está oficialmente concluída na Lucas Brum Online Music USA.

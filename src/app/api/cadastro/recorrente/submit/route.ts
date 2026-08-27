@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import {
-  appendHistoryEvent,
-  ensureStudentAuthUserCreatedForLead,
-  findLeadByPhone,
-} from "@/lib/atendimento/server";
+import { appendHistoryEvent, findLeadByPhone } from "@/lib/atendimento/server";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
@@ -264,35 +260,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let createUserResult: { ok: boolean; created: boolean; email: string | null; userId: string | null } | null = null;
-    try {
-      const refreshedLeadRes = await admin
-        .from("atendimento_leads")
-        .select("*")
-        .eq("id", String(lead.id))
-        .limit(1)
-        .maybeSingle();
-      const refreshed = (refreshedLeadRes?.data ?? lead) as any;
-      createUserResult = await ensureStudentAuthUserCreatedForLead({
-        admin,
-        leadId: String(lead.id),
-        lead: refreshed,
-      });
-    } catch (e) {
-      try {
-        await appendHistoryEvent({
-          leadId: String(lead.id),
-          eventType: "student_auth_user_creation_failed",
-          title: "Falha ao criar usuário Painel do Aluno após matrícula",
-          details: {
-            error: e instanceof Error ? e.message : String(e ?? ""),
-            source: "cadastro_recorrente_submit",
-          },
-          actorType: "system",
-        });
-      } catch {}
-    }
-
     try {
       const { data: convRow } = await admin
         .from("atendimento_conversations")
@@ -318,9 +285,6 @@ export async function POST(req: NextRequest) {
             applied_patch: appliedPatch,
             full_patch_error: fullPatchError,
             source: "cadastro_recorrente_plataforma",
-            auth_user_created: createUserResult?.created || false,
-            auth_user_ok: createUserResult?.ok || false,
-            auth_user_email: createUserResult?.email || null,
           },
           actorType: "lead",
         }).catch(() => {});
@@ -332,13 +296,6 @@ export async function POST(req: NextRequest) {
       leadId: String(lead.id),
       appliedPatch,
       fullPatchError,
-      authUser: createUserResult
-        ? {
-            created: createUserResult.created,
-            ok: createUserResult.ok,
-            email: createUserResult.email,
-          }
-        : null,
       scheduled: {
         weekday,
         weekdayLabel: safeWeekdayLabel,

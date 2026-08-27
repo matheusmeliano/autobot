@@ -2,10 +2,8 @@
 
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { getSafeAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
-import { ensureStudentAuthUserCreatedForLead } from "@/lib/atendimento/server";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -184,161 +182,21 @@ export async function loginAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient({ canSetCookies: true });
-  const admin = createSupabaseAdminClient();
 
   const loginInputRaw = String(parsed.data.login ?? "").trim();
-  const isPhoneInput = !EMAIL_REGEX.test(loginInputRaw);
-  const loginInputDigits = isPhoneInput ? onlyDigits(loginInputRaw) : "";
   const pwd = String(parsed.data.password ?? "").trim();
 
-  let resolvedEmail = await resolveEmailFromLogin(supabase, loginInputRaw);
-  let resolvedViaLeadRecover = false;
-  if (!resolvedEmail && isPhoneInput && loginInputDigits.length >= 10 && pwd.length >= 4) {
-    try {
-      const no55 = loginInputDigits.replace(/^55/, "");
-      const suf10 = (no55 || loginInputDigits).slice(-10);
-      const suf11 = (no55 || loginInputDigits).slice(-11);
-      const suf12 = (no55 || loginInputDigits).slice(-12);
-      const suf13 = (no55 || loginInputDigits).slice(-13);
-      const filters: string[] = [];
-      filters.push(`phone.eq.${loginInputDigits}`);
-      if (no55 && no55 !== loginInputDigits) {
-        filters.push(`phone.eq.${no55}`);
-      }
-      if (suf10) filters.push(`phone.ilike.%${suf10}`);
-      if (suf11 && suf11 !== suf10) filters.push(`phone.eq.${suf11}`);
-      if (suf12 && suf12 !== suf11) filters.push(`phone.eq.${suf12}`);
-      if (suf13 && suf13 !== suf12) filters.push(`phone.eq.${suf13}`);
-      const { data: leadHits } = await supabase
-        .from("atendimento_leads")
-        .select("*")
-        .or(filters.join(","))
-        .limit(50);
-      if (Array.isArray(leadHits) && leadHits.length) {
-        for (const leadRow of leadHits as any[]) {
-          const rowDigits = onlyDigits(String(leadRow.phone ?? ""));
-          if (!rowDigits) continue;
-          const matches =
-            rowDigits === loginInputDigits ||
-            (suf10 && rowDigits.endsWith(suf10)) ||
-            (suf11 && rowDigits.endsWith(suf11)) ||
-            (suf12 && rowDigits.endsWith(suf12)) ||
-            (suf13 && rowDigits.endsWith(suf13)) ||
-            loginInputDigits.endsWith(rowDigits.slice(-10)) ||
-            loginInputDigits.endsWith(rowDigits.slice(-11)) ||
-            loginInputDigits.endsWith(rowDigits.slice(-12)) ||
-            loginInputDigits.endsWith(rowDigits.slice(-13));
-          if (!matches) continue;
-          const savedPwd = String(
-            leadRow.recurring_registration_password ??
-              leadRow.signup_password_raw_temp ??
-              leadRow.password ??
-              "",
-          ).trim();
-          if (!savedPwd || savedPwd.length < 4) continue;
-          if (savedPwd !== pwd) continue;
-          const created = await ensureStudentAuthUserCreatedForLead({
-            admin,
-            leadId: String(leadRow.id),
-            lead: leadRow,
-          });
-          if (created.ok && created.email) {
-            resolvedEmail = created.email;
-            resolvedViaLeadRecover = true;
-            break;
-          }
-        }
-      }
-    } catch {}
-  }
-
+  const resolvedEmail = await resolveEmailFromLogin(supabase, loginInputRaw);
   if (!resolvedEmail) {
     return { ok: false, error: "Credenciais inválidas." };
   }
 
   let { error } = await supabase.auth.signInWithPassword({
     email: resolvedEmail,
-    password: parsed.data.password,
+    password: pwd,
   });
-  if (error && !resolvedViaLeadRecover) {
-    const isPhone = !EMAIL_REGEX.test(String(parsed.data.login ?? "").trim());
-    const loginDigits = isPhone ? onlyDigits(parsed.data.login) : "";
-    const phoneTail10 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-10);
-    const phoneTail11 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-11);
-    const phoneTail12 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-12);
-    const phoneTail13 = (loginDigits.replace(/^55/, "") || loginDigits).slice(-13);
-    let recovered = false;
-    if (isPhone && loginDigits.length >= 10 && phoneTail10) {
-      const filters: string[] = [];
-      filters.push(`phone.eq.${loginDigits}`);
-      const no55 = loginDigits.replace(/^55/, "");
-      if (no55 && no55 !== loginDigits) {
-        filters.push(`phone.eq.${no55}`);
-      }
-      filters.push(`phone.ilike.%${phoneTail10}`);
-      if (phoneTail11 && phoneTail11 !== phoneTail10) {
-        filters.push(`phone.eq.${phoneTail11}`);
-      }
-      if (phoneTail12 && phoneTail12 !== phoneTail11) {
-        filters.push(`phone.eq.${phoneTail12}`);
-      }
-      if (phoneTail13 && phoneTail13 !== phoneTail12) {
-        filters.push(`phone.eq.${phoneTail13}`);
-      }
-      const supabaseSrvr = await createSupabaseServerClient({ canSetCookies: false });
-      const { data: hits } = await supabaseSrvr
-        .from("atendimento_leads")
-        .select("id, phone, recurring_registration_password, student_email, full_name, signup_password_raw_temp, password")
-        .or(filters.join(","))
-        .limit(50);
-      if (Array.isArray(hits) && hits.length) {
-        for (const row of hits as any[]) {
-          const rowDigits = onlyDigits(String(row.phone ?? ""));
-          if (!rowDigits) continue;
-          const matches =
-            rowDigits === loginDigits ||
-            rowDigits.endsWith(phoneTail10) ||
-            rowDigits.endsWith(phoneTail11) ||
-            rowDigits.endsWith(phoneTail12) ||
-            rowDigits.endsWith(phoneTail13) ||
-            loginDigits.endsWith(rowDigits.slice(-10)) ||
-            loginDigits.endsWith(rowDigits.slice(-11)) ||
-            loginDigits.endsWith(rowDigits.slice(-12)) ||
-            loginDigits.endsWith(rowDigits.slice(-13));
-          if (!matches) continue;
-          const savedPwd = String(
-            row.recurring_registration_password ??
-              row.signup_password_raw_temp ??
-              row.password ??
-              "",
-          ).trim();
-          const typedPwd = String(parsed.data.password ?? "").trim();
-          if (!savedPwd || !typedPwd || savedPwd.length < 4) continue;
-          if (savedPwd !== typedPwd) continue;
-          try {
-            const admin = createSupabaseAdminClient();
-            const res = await ensureStudentAuthUserCreatedForLead({
-              admin,
-              leadId: String(row.id),
-              lead: row,
-            });
-            if (res.ok && res.email) {
-              const r2 = await supabase.auth.signInWithPassword({
-                email: res.email,
-                password: parsed.data.password,
-              });
-              if (!r2.error) {
-                recovered = true;
-                break;
-              }
-            }
-          } catch {}
-        }
-      }
-    }
-    if (!recovered) {
-      return { ok: false, error: supabaseErrorToPt(error.message) };
-    }
+  if (error) {
+    return { ok: false, error: supabaseErrorToPt(error.message) };
   }
 
   const {

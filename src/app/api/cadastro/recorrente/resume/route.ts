@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import {
-  ensureStudentAuthUserCreatedForLead,
-  findLeadByPhone,
-} from "@/lib/atendimento/server";
+import { findLeadByPhone } from "@/lib/atendimento/server";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -101,46 +98,9 @@ export async function POST(req: NextRequest) {
         : 0;
     const safeStep = parsedStep > 0 ? parsedStep : 1;
 
-    let matriculaJaConcluidaRedirecionarAluno = false;
-    try {
-      if (
-        (String((lead as any).recurring_registration_password ?? "").trim() ||
-          String((lead as any).signup_password_raw_temp ?? "").trim()) &&
-        safeStep >= 1
-      ) {
-        matriculaJaConcluidaRedirecionarAluno = true;
-      }
-      if (String((lead as any).enrollment_number ?? "").trim()) {
-        matriculaJaConcluidaRedirecionarAluno = true;
-      }
-      if (String((lead as any).contract_signed_at ?? "").trim()) {
-        matriculaJaConcluidaRedirecionarAluno = true;
-      }
-    } catch {}
-
-    let authCreated: { ok: boolean; created: boolean; email: string | null; userId: string | null } | null =
-      null;
-    if (matriculaJaConcluidaRedirecionarAluno) {
-      try {
-        authCreated = await ensureStudentAuthUserCreatedForLead({
-          admin,
-          leadId: String((lead as any).id),
-          lead,
-        });
-      } catch {}
-    }
-
     return NextResponse.json({
       ok: true,
       resume: true,
-      redirect_to_aluno: matriculaJaConcluidaRedirecionarAluno,
-      authUser: authCreated
-        ? {
-            created: authCreated.created,
-            ok: authCreated.ok,
-            email: authCreated.email,
-          }
-        : null,
       lead: {
         id: (lead as any).id,
         phone: String((lead as any).phone ?? ""),
