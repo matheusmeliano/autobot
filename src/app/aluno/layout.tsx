@@ -38,13 +38,17 @@ export default async function AlunoPortalLayout({
   children: ReactNode;
 }) {
   const hdrs = await headers();
+  const invokePath = hdrs.get("x-invoke-path");
+  const invokeQuery = hdrs.get("x-invoke-query") ?? hdrs.get("x-query") ?? hdrs.get("x-query-string");
+  const invokeWithQuery = invokePath && invokeQuery ? `${invokePath}?${invokeQuery}` : invokePath;
   const pathCandidates = [
-    hdrs.get("x-invoke-path"),
-    hdrs.get("x-matched-path"),
+    invokeWithQuery,
     hdrs.get("next-url"),
     hdrs.get("x-next-url"),
     hdrs.get("x-original-uri"),
     hdrs.get("x-forwarded-uri"),
+    hdrs.get("x-matched-path"),
+    invokePath,
   ];
   let leadParamId: string | null = null;
   for (const raw of pathCandidates) {
@@ -64,6 +68,13 @@ export default async function AlunoPortalLayout({
         }
       } catch {}
     }
+  }
+  if (!leadParamId && invokeQuery) {
+    try {
+      const usp = new URLSearchParams(invokeQuery);
+      const v = usp.get("lead");
+      if (typeof v === "string" && v.trim()) leadParamId = v.trim();
+    } catch {}
   }
   const supabase = await createSupabaseServerClient();
   const {
