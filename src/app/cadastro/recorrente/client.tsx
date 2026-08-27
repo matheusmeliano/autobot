@@ -1447,9 +1447,9 @@ export default function CadastroRecorrenteBody() {
                       </div>
                       <div className="text-slate-900 font-semibold">{phoneDisplay}</div>
                     </div>
-                    <div className="sm:col-span-2">
+                    <div className="col-span-2">
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
-                        Matrícula
+                        N° da matrícula
                       </div>
                       <div className="text-slate-900 font-semibold">
                         {enrollmentNumber || "—"}
