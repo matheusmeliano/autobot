@@ -34,6 +34,10 @@ function isAdminPath(pathname: string) {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
+function isAlunoPath(pathname: string) {
+  return pathname === "/aluno" || pathname.startsWith("/aluno/");
+}
+
 function isAuthPath(pathname: string) {
   return pathname === "/login" || pathname === "/signup";
 }
@@ -59,11 +63,16 @@ function copyCookies(
   return response;
 }
 
-function buildLoginRedirect(request: NextRequest, next: string) {
+function buildLoginRedirect(request: NextRequest, next: string, extras?: Record<string, string | undefined>) {
   const redirectUrl = request.nextUrl.clone();
   redirectUrl.pathname = "/login";
   redirectUrl.search = "";
   redirectUrl.searchParams.set("next", next);
+  if (extras) {
+    for (const [k, v] of Object.entries(extras)) {
+      if (typeof v === "string" && v.trim()) redirectUrl.searchParams.set(k, v.trim());
+    }
+  }
   return redirectUrl;
 }
 
@@ -213,9 +222,43 @@ export async function middleware(request: NextRequest) {
     return copyCookies(NextResponse.redirect(redirectUrl), cookiesToReplay);
   }
 
+  if (isAlunoPath(pathname)) {
+    if (!user) {
+      const leadFromQs = String(request.nextUrl.searchParams.get("lead") ?? "").trim();
+      let telefoneLeadDigits = String(request.nextUrl.searchParams.get("telefone") ?? "").replace(/\D/g, "").trim();
+      if (leadFromQs && !telefoneLeadDigits) {
+        try {
+          const { data: leadRow } = await supabase
+            .from("atendimento_leads")
+            .select("phone")
+            .eq("id", leadFromQs)
+            .limit(1)
+            .maybeSingle();
+          const p = String((leadRow as any)?.phone ?? "").replace(/\D/g, "").trim();
+          if (p) telefoneLeadDigits = p;
+        } catch {}
+      }
+      const nextSafe = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+      const redirectLogin = buildLoginRedirect(request, nextSafe, {
+        lead: leadFromQs,
+        telefone: telefoneLeadDigits,
+      });
+      return copyCookies(NextResponse.redirect(redirectLogin), cookiesToReplay);
+    }
+    const isAluno =
+      accessScope === "aluno";
+    if (!isAluno) {
+      const redirectUrl = request.nextUrl.clone();
+      const destination = splitDestination(getDefaultAuthenticatedPath(accessScope));
+      redirectUrl.pathname = destination.pathname;
+      redirectUrl.search = destination.search;
+      return copyCookies(NextResponse.redirect(redirectUrl), cookiesToReplay);
+    }
+  }
+
   return response;
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/admin/:path*", "/atendimento", "/atendimento/:path*", "/login", "/signup"],
+  matcher: ["/app/:path*", "/admin/:path*", "/atendimento", "/atendimento/:path*", "/login", "/signup", "/aluno", "/aluno/:path*"],
 };
