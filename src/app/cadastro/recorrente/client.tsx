@@ -1490,7 +1490,21 @@ export default function CadastroRecorrenteBody() {
     const leadTime = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
     const professorName = String(lead?.recurring_class_professor_name ?? "").trim() || "Lucas Brum";
     const planName = String(lead?.plan_name ?? "").trim() || "Plano Individual";
-    const planMonthly = String(lead?.plan_monthly_value ?? "").trim();
+    const planMonthlyRaw = String(lead?.plan_monthly_value ?? "").trim();
+    let planMonthlyDisplay = "";
+    if (planMonthlyRaw) {
+      const digits = planMonthlyRaw.replace(/\D+/g, "");
+      if (/^\d+$/.test(digits)) {
+        const n = Number.parseInt(digits, 10);
+        if (Number.isFinite(n) && n > 0) {
+          planMonthlyDisplay = `US$${n.toLocaleString("en-US")}`;
+        }
+      }
+      if (!planMonthlyDisplay) {
+        planMonthlyDisplay = planMonthlyRaw.startsWith("US$") || planMonthlyRaw.startsWith("$") ? planMonthlyRaw : `US$${planMonthlyRaw}`;
+      }
+    }
+    if (!planMonthlyDisplay) planMonthlyDisplay = "US$116";
     const statusLabel = "Matrícula concluída";
 
     async function handleCopyEnrollment() {
@@ -1649,7 +1663,7 @@ export default function CadastroRecorrenteBody() {
                         Valor mensal
                       </div>
                       <div className="text-indigo-950 font-semibold text-base leading-snug">
-                        {planMonthly || "—"}
+                        {planMonthlyDisplay}
                       </div>
                     </div>
                   </div>
