@@ -1544,7 +1544,7 @@ export default function CadastroRecorrenteBody() {
                       </div>
                       <div className="text-slate-900 font-semibold">{phoneDisplay}</div>
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
                         N° da matrícula
                       </div>
@@ -1566,6 +1566,21 @@ export default function CadastroRecorrenteBody() {
                             <Copy className="h-5 w-5" />
                           )}
                         </button>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1.5">
+                        Localidade
+                      </div>
+                      <div className="text-slate-900 font-semibold truncate">
+                        {(() => {
+                          const c = String(lead?.city ?? "").trim();
+                          const s = String(lead?.state ?? "").trim();
+                          if (c && s) return `${c}/${s}`;
+                          if (c) return c;
+                          if (s) return s;
+                          return "—";
+                        })()}
                       </div>
                     </div>
                   </div>
