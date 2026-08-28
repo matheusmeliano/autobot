@@ -1806,8 +1806,8 @@ export default function CadastroRecorrenteBody() {
                 </div>
 
                 {alunoSchedOpen ? (
-                  <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
-                    <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 pointer-events-none">
+                    <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 pointer-events-auto">
                       <div className="flex items-start justify-between gap-3 px-5 sm:px-6 py-4 border-b border-slate-200">
                         <div className="min-w-0 pr-3">
                           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 mb-1">
