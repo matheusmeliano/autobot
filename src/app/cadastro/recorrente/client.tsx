@@ -3308,10 +3308,10 @@ export default function CadastroRecorrenteBody() {
                 )}
               </div>
 
-              <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 border border-emerald-100 p-8 max-w-2xl mx-auto space-y-5">
+              <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 border border-emerald-100 p-5 sm:p-8 max-w-2xl mx-auto space-y-5">
                 <div className="text-left">
-                  <div className="text-2xl font-bold text-slate-900">📄 Confirmação de Matrícula</div>
-                  <p className="mt-1 text-slate-600">
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">📄 Confirmação de Matrícula</div>
+                  <p className="mt-1 text-slate-600 text-sm sm:text-base leading-relaxed">
                     Clique abaixo para baixar sua confirmação completa em PDF.
                   </p>
                 </div>
@@ -3320,15 +3320,15 @@ export default function CadastroRecorrenteBody() {
                     href={contractPdfUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 sm:px-8 py-3.5 sm:py-4 bg-emerald-600 text-white font-bold text-sm sm:text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition w-full min-w-0"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 sm:px-8 py-3.5 sm:py-4 bg-emerald-600 text-white font-bold text-sm sm:text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition w-full min-w-0 text-center break-words"
                   >
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Baixar confirmação em PDF
+                    <span className="min-w-0 truncate sm:whitespace-normal">Baixar confirmação em PDF</span>
                   </a>
                 ) : (
-                  <div className="rounded-2xl bg-white border border-slate-200 p-5 text-slate-600">
+                  <div className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-5 text-slate-600 text-sm sm:text-base leading-relaxed">
                     Link do PDF sendo preparado… Se não aparecer, recarregue a página.
                   </div>
                 )}
