@@ -1806,9 +1806,9 @@ export default function CadastroRecorrenteBody() {
                 </div>
 
                 {alunoSchedOpen ? (
-                  <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-6 pointer-events-none">
-                    <div className="w-full h-full sm:h-auto sm:max-w-2xl bg-white sm:rounded-3xl rounded-none shadow-2xl overflow-hidden border-0 sm:border sm:border-slate-200 pointer-events-auto">
-                      <div className="flex items-start justify-between gap-3 px-5 sm:px-6 py-4 border-b border-slate-200">
+                  <div className="fixed inset-0 z-50 flex flex-col sm:flex sm:items-center sm:justify-center p-0 sm:p-6 pointer-events-none">
+                    <div className="w-full flex-1 h-full sm:flex-initial sm:h-auto sm:max-w-2xl bg-white sm:rounded-3xl rounded-none shadow-2xl overflow-hidden border-0 sm:border sm:border-slate-200 pointer-events-auto flex flex-col">
+                      <div className="flex-none flex items-start justify-between gap-3 px-5 sm:px-6 py-4 border-b border-slate-200">
                         <div className="min-w-0 pr-3">
                           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 mb-1">
                             Aulas recorrentes
@@ -1835,7 +1835,7 @@ export default function CadastroRecorrenteBody() {
                         </button>
                       </div>
 
-                      <div className="px-5 sm:px-6 py-5 max-h-[68vh] overflow-y-auto">
+                      <div className="flex-1 min-h-0 px-5 sm:px-6 py-5 overflow-y-auto">
                         {alunoSchedLoading && (
                           <div className="py-14 text-center text-slate-500 text-sm">
                             Carregando dias e horários disponíveis…
@@ -1981,7 +1981,7 @@ export default function CadastroRecorrenteBody() {
                         ) : null}
                       </div>
 
-                      <div className="px-5 sm:px-6 py-4 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex-none px-5 sm:px-6 py-4 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {alunoSchedStep === 0 ? (
                           <>
                             <button
