@@ -412,6 +412,30 @@ export default function CadastroRecorrenteBody() {
     setAlunoSchedSaveError("");
   }
 
+  useEffect(() => {
+    try {
+      const tel = String(phoneField ?? initialPhoneParam ?? "").replace(/\D/g, "").trim();
+      if (tel && tel.length >= 10) {
+        const v = localStorage.getItem(`painel_aluno_ativado_${tel}`) ?? "";
+        if (v && (v === "1" || v === "true" || v === "sim" || v === "on")) {
+          setAlunoForcePainel(true);
+          setInitialDataLoading(false);
+          setInitialDataError("");
+        }
+      }
+    } catch {}
+  }, [phoneField, initialPhoneParam]);
+
+  function writePainelAtivadoFlagIfNeeded(phoneDigitsOverride?: string) {
+    try {
+      const tel = String(phoneDigitsOverride ?? phoneField ?? alunoLeadFull?.phone ?? initialPhoneParam ?? "").replace(/\D/g, "").trim();
+      if (!tel || tel.length < 10) return;
+      const k = `painel_aluno_ativado_${tel}`;
+      const existing = localStorage.getItem(k) ?? "";
+      if (!existing) localStorage.setItem(k, "1");
+    } catch {}
+  }
+
   const alunoSchedSelectedDay: RecurringWeekdayOption | null =
     alunoSchedAvail && alunoSchedDayId
       ? (alunoSchedAvail.dates.find((d) => d.id === alunoSchedDayId) ?? null)
@@ -811,6 +835,7 @@ export default function CadastroRecorrenteBody() {
 
           const concluded = Boolean((json as any)?.is_matricula_concluida);
           setAlunoIsMatriculaConcluida(concluded);
+          if (concluded) writePainelAtivadoFlagIfNeeded();
           setAlunoLeadFull(json?.lead ?? null);
           if (concluded) {
             setInitialDataLoading(false);
@@ -3285,6 +3310,7 @@ export default function CadastroRecorrenteBody() {
                 <button
                   type="button"
                   onClick={async () => {
+                    writePainelAtivadoFlagIfNeeded();
                     try {
                       const tel = String(phoneField ?? alunoLeadFull?.phone ?? initialPhoneParam ?? "").replace(/\D/g, "").trim();
                       if (tel && tel.length >= 10) {
@@ -3299,6 +3325,7 @@ export default function CadastroRecorrenteBody() {
                             setAlunoLeadFull(json.lead);
                             const concluded = Boolean(json.is_matricula_concluida);
                             setAlunoIsMatriculaConcluida(concluded);
+                            if (concluded) writePainelAtivadoFlagIfNeeded();
                             const pdfUrl = typeof json.lead.contract_pdf_url === "string" ? String(json.lead.contract_pdf_url).trim() : "";
                             const signedAt = typeof json.lead.contract_signed_at === "string" ? String(json.lead.contract_signed_at).trim() : "";
                             const enr = typeof json.lead.enrollment_number === "string" ? String(json.lead.enrollment_number).trim() : "";
