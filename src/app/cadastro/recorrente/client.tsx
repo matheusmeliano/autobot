@@ -1490,6 +1490,19 @@ export default function CadastroRecorrenteBody() {
     const leadTime = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
     const professorName = String(lead?.recurring_class_professor_name ?? "").trim() || "Lucas Brum";
     const planName = String(lead?.plan_name ?? "").trim() || "Plano Individual";
+    const alunoContractPdfUrl = String(lead?.contract_pdf_url ?? "").trim();
+    const alunoContractSignedAtRaw = String(lead?.contract_signed_at ?? "").trim();
+    let alunoContractSignedDate: string | null = null;
+    if (alunoContractSignedAtRaw) {
+      try {
+        const d = new Date(alunoContractSignedAtRaw);
+        if (Number.isFinite(d.getTime())) {
+          alunoContractSignedDate = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+            " · " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        }
+      } catch {}
+    }
+    const alunoContractSigned = Boolean(alunoContractPdfUrl && alunoContractSignedDate);
     const planMonthlyRaw = String(lead?.plan_monthly_value ?? "").trim();
     let planMonthlyDisplay = "";
     if (planMonthlyRaw) {
@@ -1666,6 +1679,44 @@ export default function CadastroRecorrenteBody() {
                         {planMonthlyDisplay}
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1">
+                        Contrato
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${alunoContractSigned ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${alunoContractSigned ? "bg-emerald-500" : "bg-amber-500"}`} />
+                          {alunoContractSigned ? "Assinado" : "Em processamento"}
+                        </span>
+                        {alunoContractSignedDate ? (
+                          <span className="text-sm text-slate-600">
+                            Assinado em {alunoContractSignedDate}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    {alunoContractSigned && alunoContractPdfUrl ? (
+                      <a
+                        href={alunoContractPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 hover:bg-slate-100 hover:text-slate-900 transition"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2v-7m-5-7v7m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                        Baixar contrato
+                      </a>
+                    ) : (
+                      <div className="text-xs text-slate-500 leading-relaxed max-w-xs text-right">
+                        O contrato será disponibilizado assim que a assinatura for confirmada.
+                      </div>
+                    )}
                   </div>
                 </div>
 
