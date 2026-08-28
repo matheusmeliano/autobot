@@ -1579,11 +1579,13 @@ function BookingDetails({
   markingAttendanceBookingId,
   markingAttendanceType,
   sendingStudentNotificationBookingId,
+  sendingRecurringNotificationLeadId,
   savingRecurringLink,
   onCancelBooking,
   onSaveLessonLink,
   onMarkAttendance,
   onSendStudentNotification,
+  onSendRecurringNotification,
   onSaveRecurringLink,
   onEditExperimental,
   assigningProfessor,
@@ -1596,11 +1598,13 @@ function BookingDetails({
   markingAttendanceBookingId: string | null;
   markingAttendanceType: "attended" | "no_show" | null;
   sendingStudentNotificationBookingId: string | null;
+  sendingRecurringNotificationLeadId: string | null;
   savingRecurringLink: boolean;
   onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveLessonLink: (lead: AtendimentoLeadListItem, lessonLink: string) => Promise<void>;
   onMarkAttendance: (lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") => Promise<void>;
   onSendStudentNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
+  onSendRecurringNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
   onEditExperimental?: (lead: AtendimentoLeadListItem) => void;
   assigningProfessor: boolean;
@@ -1639,6 +1643,7 @@ function BookingDetails({
   const isMarkingAttendanceAttended = isMarkingAttendance && markingAttendanceType === "attended";
   const isMarkingAttendanceNoShow = isMarkingAttendance && markingAttendanceType === "no_show";
   const isSendingStudentNotification = sendingStudentNotificationBookingId === bookingId;
+  const isSendingRecurringNotification = sendingRecurringNotificationLeadId === lead.id;
   const lessonLinkChanged = effectiveLessonLinkDraft.trim() !== effectiveSavedLessonLink;
   const lessonLinkDraftEmpty = !effectiveLessonLinkDraft.trim() && !effectiveSavedLessonLink;
   const lessonLinkSaveDisabled = isSavingLessonLink || lessonLinkDraftEmpty;
@@ -1863,6 +1868,41 @@ function BookingDetails({
             >
               <Zap className="h-3.5 w-3.5 shrink-0" />
               {isSendingStudentNotification ? "Disparando..." : "Disparar agora"}
+            </button>
+          );
+        })()}
+
+        {(() => {
+          const canShow =
+            activeSection === "agendamentos" &&
+            leadHasMatriculaOrRecurringStageInitiated(lead) &&
+            (hasRecurringClass || Boolean(savedRecurringLink));
+          if (!canShow) return null;
+          const hasLinkOk = Boolean(savedRecurringLink);
+          const assignedOk = recurringClassAssignedProfessor(lead);
+          const hasPhoneOk = Boolean(String(lead?.phone ?? "").trim());
+          const canSend = hasLinkOk && assignedOk && hasPhoneOk;
+          return (
+            <button
+              type="button"
+              onClick={() => void onSendRecurringNotification(lead)}
+              disabled={!canSend || isSendingRecurringNotification}
+              title={(() => {
+                if (!hasLinkOk && !assignedOk) {
+                  return "Adicione o link da aula recorrente e selecione o professor antes de disparar.";
+                }
+                if (!hasLinkOk) {
+                  return "Adicione o link fixo da aula recorrente antes de disparar.";
+                }
+                if (!assignedOk) {
+                  return "Selecione o professor responsável pela aula recorrente antes de disparar agora.";
+                }
+                return "Disparar notificações agora (aluno, professor e atendente).";
+              })()}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] min-[1176px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Zap className="h-3.5 w-3.5 shrink-0" />
+              {isSendingRecurringNotification ? "Disparando..." : "Disparar agora"}
             </button>
           );
         })()}
@@ -3459,6 +3499,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
   const [markingAttendanceType, setMarkingAttendanceType] = useState<"attended" | "no_show" | null>(null);
   const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] = useState<string | null>(null);
+  const [sendingRecurringNotificationLeadId, setSendingRecurringNotificationLeadId] = useState<string | null>(null);
   const [savingRecurringLinkLeadId, setSavingRecurringLinkLeadId] = useState<string | null>(null);
   const [assigningProfessorLeadId, setAssigningProfessorLeadId] = useState<string | null>(null);
   const [loadingPaymentLeadId, setLoadingPaymentLeadId] = useState<string | null>(null);
@@ -4129,6 +4170,72 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       modalToast.error(error instanceof Error ? error.message : "Falha ao disparar a notificação.");
     } finally {
       setSendingStudentNotificationBookingId(null);
+    }
+  }
+
+  async function handleSendRecurringNotification(lead: AtendimentoLeadListItem) {
+    const leadId = String(lead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Aluno indisponível para disparar a notificação.");
+      return;
+    }
+    const linkOk = Boolean(String((lead as any)?.recurring_class_link ?? "").trim());
+    const assignedOk = recurringClassAssignedProfessor(lead);
+    if (!linkOk && !assignedOk) {
+      modalToast.error("Adicione o link da aula recorrente e selecione o professor antes de disparar.");
+      return;
+    }
+    if (!linkOk) {
+      modalToast.error("Adicione o link fixo da aula recorrente antes de disparar a notificação.");
+      return;
+    }
+    if (!assignedOk) {
+      modalToast.error("Selecione o professor responsável pela aula recorrente antes de disparar agora.");
+      return;
+    }
+    const leadPhoneOk = Boolean(String(lead?.phone ?? "").trim());
+    if (!leadPhoneOk) {
+      modalToast.error("Telefone do aluno não encontrado.");
+      return;
+    }
+    try {
+      setSendingRecurringNotificationLeadId(leadId);
+      const r = await fetch(`/api/atendimento/leads/${encodeURIComponent(leadId)}/send-recurring-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const payload = (await r.json().catch(() => null)) as
+        | { ok?: boolean; error?: string | null; student_notification_sent?: boolean; attendant_notification_sent?: boolean; registered_attendant_notification_sent?: boolean; student_notification_error?: string | null; attendant_notification_error?: string | null; registered_attendant_notification_error?: string | null }
+        | null;
+      const sOk = payload?.student_notification_sent !== false;
+      const aOk = payload?.attendant_notification_sent !== false;
+      const rOk = payload?.registered_attendant_notification_sent !== false;
+      if (r.ok && payload?.ok) {
+        if (sOk && aOk && rOk) {
+          modalToast.success("Notificações enviadas ao aluno, professor e atendente.");
+        } else {
+          const fails: string[] = [];
+          if (!sOk) fails.push("aluno");
+          if (!aOk) fails.push("professor");
+          if (!rOk) fails.push("atendente cadastrado");
+          modalToast.warning(`Enviado com falhas. Não recebido: ${fails.join(", ")}.`);
+        }
+      } else {
+        if (payload?.error === "missing_lesson_link") {
+          modalToast.error("Cadastre o link fixo da aula recorrente antes de disparar.");
+        } else if (payload?.error === "missing_recurring_professor") {
+          modalToast.error("Selecione o professor responsável pela aula recorrente.");
+        } else if (payload?.error === "missing_lead_phone") {
+          modalToast.error("Telefone do aluno não encontrado.");
+        } else {
+          modalToast.error(payload?.error ?? "Falha ao disparar as notificações da aula recorrente.");
+        }
+      }
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao disparar a notificação.");
+    } finally {
+      setSendingRecurringNotificationLeadId(null);
     }
   }
 
@@ -4961,11 +5068,13 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   markingAttendanceBookingId={markingAttendanceBookingId}
                   markingAttendanceType={markingAttendanceType}
                   sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
+                  sendingRecurringNotificationLeadId={sendingRecurringNotificationLeadId}
                   savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                   onCancelBooking={handleCancelBooking}
                   onSaveLessonLink={handleSaveLessonLink}
                   onMarkAttendance={handleMarkAttendance}
                   onSendStudentNotification={handleSendStudentNotification}
+                  onSendRecurringNotification={handleSendRecurringNotification}
                   onSaveRecurringLink={handleSaveRecurringLink}
                   onEditExperimental={(l) => openEditExperimental(l)}
                   assigningProfessor={assigningProfessorLeadId === selectedLead.id}
@@ -5053,11 +5162,13 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       markingAttendanceBookingId={markingAttendanceBookingId}
                       markingAttendanceType={markingAttendanceType}
                       sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
+                      sendingRecurringNotificationLeadId={sendingRecurringNotificationLeadId}
                       savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
                       onCancelBooking={handleCancelBooking}
                       onSaveLessonLink={handleSaveLessonLink}
                       onMarkAttendance={handleMarkAttendance}
                       onSendStudentNotification={handleSendStudentNotification}
+                      onSendRecurringNotification={handleSendRecurringNotification}
                       onSaveRecurringLink={handleSaveRecurringLink}
                       assigningProfessor={assigningProfessorLeadId === selectedLead.id}
                       onAssignProfessor={handleAssignProfessor}
