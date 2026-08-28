@@ -123,7 +123,7 @@ export const runtime = "nodejs";
 type DraftPayload = {
   telefone: string;
   nome?: string | null;
-  weekday?: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | null;
+  weekday?: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun" | null;
   weekdayLabel?: string | null;
   professorTime?: string | null;
   leadTime?: string | null;
@@ -133,6 +133,8 @@ type DraftPayload = {
   city?: string | null;
   country?: string | null;
   timezone?: string | null;
+  leadId?: string | null;
+  lead_id?: string | null;
 };
 
 export async function GET(req: NextRequest) {
@@ -318,11 +320,12 @@ export async function PATCH(req: NextRequest) {
     if (!rawBody || typeof rawBody !== "object") {
       return NextResponse.json({ ok: false, error: "Corpo inválido." }, { status: 400 });
     }
-    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password, state, city, country, timezone } =
+    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password, state, city, country, timezone, leadId, lead_id } =
       rawBody as DraftPayload;
 
     const safePhoneDigits = String(telefone ?? "").replace(/\D/g, "").trim();
-    if (safePhoneDigits.length < 10) {
+    const safeLeadId = String(leadId ?? lead_id ?? "").trim();
+    if (!safeLeadId && safePhoneDigits.length < 10) {
       return NextResponse.json({ ok: false, error: "Telefone inválido." }, { status: 400 });
     }
 
@@ -370,8 +373,22 @@ export async function PATCH(req: NextRequest) {
     }
 
     const admin = createSupabaseAdminClient();
-    let lead = await findLeadByPhone({ phone: safePhoneDigits });
-    if (!lead?.id) {
+    let lead: any = null;
+    if (safeLeadId) {
+      try {
+        const { data: leadById } = await admin
+          .from("atendimento_leads")
+          .select("*")
+          .eq("id", safeLeadId)
+          .limit(1)
+          .maybeSingle();
+        lead = leadById ?? null;
+      } catch {}
+    }
+    if (!lead?.id && safePhoneDigits) {
+      lead = await findLeadByPhone({ phone: safePhoneDigits });
+    }
+    if (!lead?.id && safePhoneDigits) {
       try {
         function phoneCandidates(base: string): string[] {
           const out = new Set<string>();

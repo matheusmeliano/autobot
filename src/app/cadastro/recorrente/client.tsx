@@ -438,7 +438,7 @@ export default function CadastroRecorrenteBody() {
       const lid = String(alunoLeadFull?.id ?? "").trim();
       if (lid) (payload as any).leadId = lid;
       const res = await fetch("/api/cadastro/recorrente/draft", {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
