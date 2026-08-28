@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, Copy, Do
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
+import { isLeadRecurringRegistrationConcluded } from "@/lib/atendimento/server";
 import {
   deriveExperimentalClassBookingDisplayStatus,
   experimentalClassBookingDisplayStatusLabel,
@@ -1881,13 +1882,17 @@ function BookingDetails({
           const hasLinkOk = Boolean(savedRecurringLink);
           const assignedOk = recurringClassAssignedProfessor(lead);
           const hasPhoneOk = Boolean(String(lead?.phone ?? "").trim());
-          const canSend = hasLinkOk && assignedOk && hasPhoneOk;
+          const isMatriculaConcluida = isLeadRecurringRegistrationConcluded(lead);
+          const canSend = isMatriculaConcluida && hasLinkOk && assignedOk && hasPhoneOk;
           return (
             <button
               type="button"
               onClick={() => void onSendRecurringNotification(lead)}
               disabled={!canSend || isSendingRecurringNotification}
               title={(() => {
+                if (!isMatriculaConcluida) {
+                  return "O botão Disparar agora só fica disponível quando a matrícula do aluno estiver concluída.";
+                }
                 if (!hasLinkOk && !assignedOk) {
                   return "Adicione o link da aula recorrente e selecione o professor antes de disparar.";
                 }

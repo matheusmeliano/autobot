@@ -3576,6 +3576,23 @@ async function isStudentLoginPhoneMatch(admin: ReturnType<typeof createSupabaseA
   return cmp.includes(refDig) || refDig.includes(cmp);
 }
 
+export function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
+  const obj = (lead ?? {}) as Record<string, unknown>;
+  const payStatusRaw = String(obj?.payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String(obj?.payment_confirmed_at ?? "").trim();
+  const leadStatusRaw = String(obj?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(obj?.funnel_stage ?? "").trim().toLowerCase();
+  return (
+    payStatusRaw === "confirmado" ||
+    payStatusRaw === "matriculado" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    leadStatusRaw === "matriculado" ||
+    leadStatusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada"
+  );
+}
+
 export async function ensureStudentAuthUserCreatedForLead(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;

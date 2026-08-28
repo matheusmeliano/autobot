@@ -4,6 +4,7 @@ import {
   findLeadByPhone,
   triggerRecurringPaymentIntentIfNeeded,
   sendAtendimentoWhatsAppText,
+  isLeadRecurringRegistrationConcluded,
 } from "@/lib/atendimento/server";
 import { ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER } from "@/lib/atendimento/constants";
 import {
@@ -45,23 +46,6 @@ function toNomeESobrenome(raw: string | null | undefined): string {
   const parts = clean.split(/\s+/).filter((s) => s && s.trim());
   if (parts.length <= 2) return clean;
   return `${parts[0]} ${parts[parts.length - 1]}`;
-}
-
-function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
-  const obj = (lead ?? {}) as Record<string, unknown>;
-  const payStatusRaw = String(obj?.payment_status ?? "").trim().toLowerCase();
-  const payConfirmedAtRaw = String(obj?.payment_confirmed_at ?? "").trim();
-  const leadStatusRaw = String(obj?.status ?? "").trim().toLowerCase();
-  const funnelRaw = String(obj?.funnel_stage ?? "").trim().toLowerCase();
-  return (
-    payStatusRaw === "confirmado" ||
-    payStatusRaw === "matriculado" ||
-    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
-    leadStatusRaw === "matriculado" ||
-    leadStatusRaw === "matricula_confirmada" ||
-    funnelRaw === "matriculado" ||
-    funnelRaw === "matricula_confirmada"
-  );
 }
 
 function isUndefinedColumnErrorDraft(error: unknown): boolean {
