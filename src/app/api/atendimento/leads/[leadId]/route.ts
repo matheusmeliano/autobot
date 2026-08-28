@@ -1,5 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled, maybeSendExperimentalClassConfirmationToStudent } from "@/lib/atendimento/server";
+import { requireAtendimentoUser, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled } from "@/lib/atendimento/server";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { z } from "zod";
 
@@ -762,11 +762,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       leadId,
       leadName: String((updated as any)?.full_name ?? "").trim() || null,
       conversationId: null,
-    });
-    void maybeSendExperimentalClassConfirmationToStudent({
-      leadId,
-      conversationId: null,
-      leadName: String((updated as any)?.full_name ?? "").trim() || null,
     });
   }
 

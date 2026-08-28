@@ -1602,7 +1602,8 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
     const cachedRegisteredAttendantSent = sentRegisteredAttendantBookingIds.has(bookingId);
 
-    const studentDue = leadStartAtMs <= nowMs;
+    const studentDue =
+      leadStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
     const attendantDue =
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
     const registeredAttendantDue = attendantDue;
@@ -2757,120 +2758,6 @@ export async function maybeNotifyRegisteredAttendantAboutExperimentalClassSchedu
       },
       actorType: "system",
     });
-    return { ok: true, sent: true };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-const EXPERIMENTAL_STUDENT_CONFIRMATION_NOTICE_EVENT_TYPE =
-  "experimental_class_whatsapp_confirmation_sent";
-
-export async function maybeSendExperimentalClassConfirmationToStudent(params: {
-  leadId: string;
-  conversationId?: string | null;
-  leadName?: string | null;
-}) {
-  try {
-    const admin = createSupabaseAdminClient();
-    const { count: already } = await admin
-      .from("atendimento_history_events")
-      .select("id", { count: "exact", head: true })
-      .eq("lead_id", params.leadId)
-      .eq("event_type", EXPERIMENTAL_STUDENT_CONFIRMATION_NOTICE_EVENT_TYPE);
-    if (already && already > 0) return { ok: true, deduped: true };
-
-    const { data: leadRow } = await admin
-      .from("atendimento_leads")
-      .select(
-        "id, full_name, phone, funnel_stage, experimental_class_status, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_booking_id",
-      )
-      .eq("id", params.leadId)
-      .limit(1)
-      .maybeSingle();
-
-    const studentPhone = String((leadRow as any)?.phone ?? "").trim();
-    if (!studentPhone) {
-      return { ok: true, skipped: true, reason: "lead sem telefone" };
-    }
-    const fs = String((leadRow as any)?.funnel_stage ?? "").trim().toLowerCase();
-    const es = String((leadRow as any)?.experimental_class_status ?? "").trim().toLowerCase();
-    const hasLd = Boolean(String((leadRow as any)?.experimental_class_lead_date ?? "").trim());
-    const hasLt = Boolean(String((leadRow as any)?.experimental_class_lead_time ?? "").trim());
-    const hasPd = Boolean(String((leadRow as any)?.experimental_class_professor_date ?? "").trim());
-    const hasPt = Boolean(String((leadRow as any)?.experimental_class_professor_time ?? "").trim());
-    const hasBooking = Boolean(String((leadRow as any)?.experimental_class_booking_id ?? "").trim());
-    const isFunnelAgendada =
-      fs === "aula_experimental_agendada" ||
-      fs === "aula_experimental_realizada" ||
-      fs === "aula_experimental_cancelada";
-    const isStatusScheduledLike =
-      es === "scheduled" ||
-      es === "booked" ||
-      es === "time_selected" ||
-      es === "completed" ||
-      es === "cancelled";
-    const hasBothDates = (hasLd && hasLt) || (hasPd && hasPt);
-    const isActuallyScheduled = Boolean(isFunnelAgendada || isStatusScheduledLike || (hasBothDates && hasBooking));
-    if (!isActuallyScheduled) {
-      return { ok: true, skipped: true, reason: "ainda falta dia e horario" };
-    }
-
-    const firstName =
-      String(params.leadName ?? (leadRow as any)?.full_name ?? "").trim().split(/\s+/)[0] ||
-      "Aluno";
-
-    let errMsg: string | null = null;
-    try {
-      for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
-        await sendAtendimentoWhatsAppText({
-          phone: studentPhone,
-          message: m,
-        });
-      }
-    } catch (e) {
-      errMsg = e instanceof Error ? e.message : String(e ?? "erro_desconhecido");
-    }
-
-    const safeCid = params.conversationId ?? null;
-    if (errMsg) {
-      try {
-        await appendHistoryEvent({
-          leadId: params.leadId,
-          conversationId: safeCid,
-          eventType: "experimental_class_whatsapp_confirmation_failed",
-          title: "Falha ao enviar a confirmação da aula experimental no WhatsApp",
-          details: {
-            phone: studentPhone,
-            error: errMsg,
-            funnel_stage: fs || null,
-            experimental_class_status: es || null,
-          },
-          actorType: "system",
-        });
-      } catch {}
-      return { ok: false, error: errMsg };
-    }
-
-    try {
-      await appendHistoryEvent({
-        leadId: params.leadId,
-        conversationId: safeCid,
-        eventType: EXPERIMENTAL_STUDENT_CONFIRMATION_NOTICE_EVENT_TYPE,
-        title: "Confirmação de aula experimental enviada ao aluno via WhatsApp",
-        details: {
-          phone: studentPhone,
-          funnel_stage: fs || null,
-          experimental_class_status: es || null,
-          has_lead_date: hasLd,
-          has_lead_time: hasLt,
-          has_professor_date: hasPd,
-          has_professor_time: hasPt,
-          has_booking_id: hasBooking,
-        },
-        actorType: "system",
-      });
-    } catch {}
     return { ok: true, sent: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
