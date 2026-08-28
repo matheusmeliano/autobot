@@ -92,6 +92,7 @@ export function resolveRecurringClassAssignedProfessorPhone(input: {
 }
 
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK = "https://www.autobot.business/app/atendimento";
+export const EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK = "https://www.autobot.business/cadastro/recorrente";
 export const EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 export const RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES = 5;
 
@@ -606,7 +607,7 @@ export function buildRecurringPaymentConfirmedStudentWelcomeMessage(
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
   const safeDashboard =
-    String(dashboardLink ?? "").trim();
+    String(dashboardLink ?? "").trim() || EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK;
   return `Parabéns, ${safeFirst}! 🎉
 
 Seu pagamento foi confirmado e sua matrícula está oficialmente concluída na Lucas Brum Online Music USA.

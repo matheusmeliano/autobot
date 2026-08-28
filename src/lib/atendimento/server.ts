@@ -31,6 +31,7 @@ import {
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
+  EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK,
   getExperimentalClassInternalStaffPhoneNumbers,
   RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_WEEKDAY_LABELS_PT_BR,
@@ -3988,12 +3989,19 @@ export async function confirmLeadRecurringPayment(params: {
   try {
     const fullName = String((lead as any).full_name ?? "").trim();
     const firstName = fullName.split(/\s+/)[0] || fullName || null;
-    const studentMsg = buildRecurringPaymentConfirmedStudentWelcomeMessage(
-      firstName,
-      "",
-    );
     const studentPhone = String((lead as any).phone ?? (lead as any)?.telefone ?? "").trim();
-    if (studentPhone && studentPhone.replace(/\D/g, "").length >= 10) {
+    const phoneDigits = studentPhone.replace(/\D/g, "").trim();
+    let dashboardLink = EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK;
+    if (phoneDigits.length >= 10) {
+      try {
+        const sp = new URLSearchParams();
+        sp.set("telefone", phoneDigits);
+        if (typeof leadId === "string" && leadId) sp.set("id", leadId);
+        dashboardLink = `${EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK.replace(/\/$/, "")}?${sp.toString()}`;
+      } catch {}
+    }
+    const studentMsg = buildRecurringPaymentConfirmedStudentWelcomeMessage(firstName, dashboardLink);
+    if (studentPhone && phoneDigits.length >= 10) {
       try {
         await sendAtendimentoWhatsAppText({
           phone: studentPhone,
@@ -4008,6 +4016,7 @@ export async function confirmLeadRecurringPayment(params: {
             details: {
               enrollment_number: (lead as any).enrollment_number || null,
               student_phone: studentPhone,
+              dashboard_link: dashboardLink,
             },
             actorType: "system",
           });
@@ -4021,13 +4030,28 @@ export async function confirmLeadRecurringPayment(params: {
             details: {
               error: e instanceof Error ? e.message : String(e),
               student_phone: studentPhone,
+              dashboard_link: dashboardLink,
             },
             actorType: "system",
           });
         } catch {}
       }
     }
-  } catch {}
+  } catch (outerE) {
+    try {
+      const studentPhone = String((lead as any).phone ?? (lead as any)?.telefone ?? "").trim();
+      await appendHistoryEvent({
+        leadId,
+        eventType: "recurring_payment_confirmed_welcome_whatsapp_failed",
+        title: "Falha ao enviar notificação de boas-vindas",
+        details: {
+          error: outerE instanceof Error ? outerE.message : String(outerE),
+          student_phone: studentPhone || null,
+        },
+        actorType: "system",
+      });
+    } catch {}
+  }
 
   return { ok: true, confirmed_at: now };
 }
