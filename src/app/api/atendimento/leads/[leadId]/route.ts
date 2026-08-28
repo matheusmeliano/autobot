@@ -16,6 +16,13 @@ function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   );
 }
 
+function isRelationMissingError(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "").toLowerCase();
+  if (code === "42P01") return true;
+  return /relation .* does not exist/.test(message) || /could not find the table .* in the schema cache/.test(message);
+}
+
 function isUndefinedColumnError(error: unknown): boolean {
   const code = String((error as any)?.code ?? "").trim();
   if (code === "42703") return true;
@@ -790,26 +797,13 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
   }
 
   const authUserId = String((lead as { auth_user_id?: string | null }).auth_user_id ?? "").trim();
-  const [{ data: conversations, error: conversationsError }, profileResult] = await Promise.all([
-    admin
-      .from("atendimento_conversations")
-      .select("id")
-      .eq("lead_id", leadId),
-    authUserId
-      ? admin
-          .from("profiles")
-          .select("access_scope")
-          .eq("user_id", authUserId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-  ]);
+  const { data: conversations, error: conversationsError } = await admin
+    .from("atendimento_conversations")
+    .select("id")
+    .eq("lead_id", leadId);
 
   if (conversationsError) {
     return Response.json({ ok: false, error: conversationsError.message }, { status: 500 });
-  }
-
-  if (profileResult.error) {
-    return Response.json({ ok: false, error: profileResult.error.message }, { status: 500 });
   }
 
   const conversationIds = (conversations ?? [])
@@ -823,10 +817,24 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
           .delete()
           .in("conversation_id", conversationIds)
       : Promise.resolve({ error: null });
-  const [messagesResult, eventsResult, capturedFieldsResult] = await Promise.all([
+
+  const deleteOptionalTables = async () => {
+    try {
+      const up = await admin.from("atendimento_file_uploads").delete().eq("lead_id", leadId);
+      if (up.error && !isRelationMissingError(up.error)) {
+        return up.error;
+      }
+    } catch (e) {
+      if (!isRelationMissingError(e)) return e;
+    }
+    return null;
+  };
+
+  const [messagesResult, eventsResult, capturedFieldsResult, optionalDeleteErr] = await Promise.all([
     deleteMessagesPromise,
     admin.from("atendimento_history_events").delete().eq("lead_id", leadId),
     admin.from("atendimento_captured_fields").delete().eq("lead_id", leadId),
+    deleteOptionalTables(),
   ]);
 
   if (messagesResult.error) {
@@ -841,6 +849,10 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
   const { error: capturedFieldsError } = capturedFieldsResult;
   if (capturedFieldsError) {
     return Response.json({ ok: false, error: capturedFieldsError.message }, { status: 500 });
+  }
+
+  if (optionalDeleteErr && typeof optionalDeleteErr === "object" && (optionalDeleteErr as any)?.message) {
+    return Response.json({ ok: false, error: (optionalDeleteErr as any).message }, { status: 500 });
   }
 
   {
@@ -866,13 +878,31 @@ export async function DELETE(_: Request, context: { params: Promise<{ leadId: st
     return Response.json({ ok: false, error: leadDeleteError.message }, { status: 500 });
   }
 
-  if (
-    authUserId &&
-    isAtendimentoOnlyAccessScope(normalizeAccessScope((profileResult.data as any)?.access_scope))
-  ) {
-    const { error: deleteAuthUserError } = await admin.auth.admin.deleteUser(authUserId);
-    if (deleteAuthUserError) {
-      return Response.json({ ok: false, error: deleteAuthUserError.message }, { status: 500 });
+  if (authUserId) {
+    try {
+      const profileDelete = await admin.from("profiles").delete().eq("user_id", authUserId);
+      if (profileDelete.error && !isRelationMissingError(profileDelete.error)) {
+        return Response.json({ ok: false, error: profileDelete.error.message }, { status: 500 });
+      }
+    } catch (e) {
+      if (!isRelationMissingError(e)) {
+        return Response.json({
+          ok: false,
+          error: e instanceof Error ? e.message : String(e ?? "erro ao limpar perfil"),
+        }, { status: 500 });
+      }
+    }
+
+    try {
+      const { error: deleteAuthUserError } = await admin.auth.admin.deleteUser(authUserId);
+      if (deleteAuthUserError) {
+        return Response.json({ ok: false, error: deleteAuthUserError.message }, { status: 500 });
+      }
+    } catch (e) {
+      return Response.json({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e ?? "erro ao remover credenciais do aluno"),
+      }, { status: 500 });
     }
   }
 
