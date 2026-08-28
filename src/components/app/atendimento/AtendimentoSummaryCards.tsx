@@ -6,7 +6,23 @@ import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, Copy, Do
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
-import { isLeadRecurringRegistrationConcluded } from "@/lib/atendimento/server";
+
+function isLeadRecurringRegistrationConcludedClient(lead: unknown): boolean {
+  const obj = (lead ?? {}) as Record<string, unknown>;
+  const payStatusRaw = String(obj?.payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String(obj?.payment_confirmed_at ?? "").trim();
+  const leadStatusRaw = String(obj?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(obj?.funnel_stage ?? "").trim().toLowerCase();
+  return (
+    payStatusRaw === "confirmado" ||
+    payStatusRaw === "matriculado" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    leadStatusRaw === "matriculado" ||
+    leadStatusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada"
+  );
+}
 import {
   deriveExperimentalClassBookingDisplayStatus,
   experimentalClassBookingDisplayStatusLabel,
@@ -1882,7 +1898,7 @@ function BookingDetails({
           const hasLinkOk = Boolean(savedRecurringLink);
           const assignedOk = recurringClassAssignedProfessor(lead);
           const hasPhoneOk = Boolean(String(lead?.phone ?? "").trim());
-          const isMatriculaConcluida = isLeadRecurringRegistrationConcluded(lead);
+          const isMatriculaConcluida = isLeadRecurringRegistrationConcludedClient(lead);
           const canSend = isMatriculaConcluida && hasLinkOk && assignedOk && hasPhoneOk;
           return (
             <button
