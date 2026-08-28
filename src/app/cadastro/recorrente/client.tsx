@@ -284,6 +284,7 @@ export default function CadastroRecorrenteBody() {
   const [alunoSchedTimeOpt, setAlunoSchedTimeOpt] = useState<RecurringWeekdayTimeOption | null>(null);
   const [alunoSchedSaving, setAlunoSchedSaving] = useState(false);
   const [alunoSchedSaveError, setAlunoSchedSaveError] = useState("");
+  const [alunoForcePainel, setAlunoForcePainel] = useState(false);
 
   useEffect(() => {
     try {
@@ -1572,7 +1573,7 @@ export default function CadastroRecorrenteBody() {
     );
   }
 
-  if (alunoIsMatriculaConcluida && !initialDataLoading) {
+  if ((alunoIsMatriculaConcluida || alunoForcePainel) && !initialDataLoading) {
     const lead = alunoLeadFull ?? {};
     const fullName = String(lead?.full_name ?? "").trim() || "Aluno(a)";
     const phoneRaw = String(lead?.phone ?? "").trim();
@@ -3280,30 +3281,51 @@ export default function CadastroRecorrenteBody() {
                 )}
               </div>
 
-              <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 border border-emerald-100 p-5 sm:p-8 max-w-2xl mx-auto space-y-5">
-                <div className="text-left">
-                  <div className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">📄 Confirmação de Matrícula</div>
-                  <p className="mt-1 text-slate-600 text-sm sm:text-base leading-relaxed">
-                    Clique abaixo para baixar sua confirmação completa em PDF.
-                  </p>
-                </div>
-                {contractPdfUrl ? (
-                  <a
-                    href={contractPdfUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 sm:px-8 py-3.5 sm:py-4 bg-emerald-600 text-white font-bold text-sm sm:text-lg shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition w-full min-w-0 text-center break-words"
-                  >
-                    <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="min-w-0 truncate sm:whitespace-normal">Baixar confirmação em PDF</span>
-                  </a>
-                ) : (
-                  <div className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-5 text-slate-600 text-sm sm:text-base leading-relaxed">
-                    Link do PDF sendo preparado… Se não aparecer, recarregue a página.
-                  </div>
-                )}
+              <div className="pt-4 max-w-2xl mx-auto">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const tel = String(phoneField ?? alunoLeadFull?.phone ?? initialPhoneParam ?? "").replace(/\D/g, "").trim();
+                      if (tel && tel.length >= 10) {
+                        try {
+                          const sp = new URLSearchParams();
+                          sp.set("telefone", tel);
+                          if (initialLeadIdParam) sp.set("id", initialLeadIdParam);
+                          const qs = sp.toString();
+                          const r = await fetch(`/api/cadastro/recorrente/draft${qs ? `?${qs}` : ""}`, { method: "GET" });
+                          const json = (await r.json().catch(() => null)) as any;
+                          if (r.ok && json?.ok && json?.lead) {
+                            setAlunoLeadFull(json.lead);
+                            const concluded = Boolean(json.is_matricula_concluida);
+                            setAlunoIsMatriculaConcluida(concluded);
+                            const pdfUrl = typeof json.lead.contract_pdf_url === "string" ? String(json.lead.contract_pdf_url).trim() : "";
+                            const signedAt = typeof json.lead.contract_signed_at === "string" ? String(json.lead.contract_signed_at).trim() : "";
+                            const enr = typeof json.lead.enrollment_number === "string" ? String(json.lead.enrollment_number).trim() : "";
+                            if (pdfUrl) setContractPdfUrl(pdfUrl);
+                            if (signedAt) setContractSignedAt(signedAt);
+                            if (enr) setEnrollmentNumber(enr);
+                            const dismissAt = typeof json.lead.recurring_matricula_concluida_dismissed_at === "string" ? String(json.lead.recurring_matricula_concluida_dismissed_at).trim() : "";
+                            setAlunoStatusDismissed(dismissAt ? true : null);
+                          }
+                        } catch {}
+                      }
+                      setShowResumeScreen(false);
+                      setInitialDataLoading(false);
+                      setInitialDataError("");
+                      setAlunoForcePainel(true);
+                      if (typeof window !== "undefined") {
+                        try { window.scrollTo({ top: 0, left: 0, behavior: "smooth" }); } catch { window.scrollTo(0, 0); }
+                      }
+                    } catch {}
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 sm:px-10 py-3.5 sm:py-4 bg-indigo-600 text-white font-bold text-sm sm:text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition w-full max-w-2xl min-w-0 text-center"
+                >
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Acessar Painel do Aluno
+                </button>
               </div>
 
               <div className="pt-2 max-w-2xl mx-auto text-center text-sm text-slate-500">
