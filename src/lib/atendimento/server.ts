@@ -1252,9 +1252,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   // Step 1: Tabela real de bookings
   {
     const bookingsSelectWithLessonLink =
-      "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
+      "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
     const bookingsSelectWithoutLessonLink =
-      "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at";
+      "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
 
     let data: any[] | null = null;
     try {
@@ -1303,7 +1303,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   try {
     const leadsQ = await admin
       .from("atendimento_leads")
-      .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, cpf, city, state, country, timezone, origin")
+      .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_professor_name, experimental_class_professor_phone, cpf, city, state, country, timezone, origin")
       .gte("experimental_class_professor_start_at", candidateWindowStartIso)
       .lte("experimental_class_professor_start_at", candidateWindowEndIso);
     if (!leadsQ.error && Array.isArray(leadsQ.data)) {
@@ -1323,7 +1323,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     try {
       const r = await admin
         .from("atendimento_leads")
-        .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_status, cpf, city, state, country, timezone, origin")
+        .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_status, experimental_class_professor_name, experimental_class_professor_phone, cpf, city, state, country, timezone, origin")
         .in("id", allLeadIds);
       if (!r.error) fullLeads = (r.data as any[]) ?? [];
     } catch (_e) {
@@ -1591,7 +1591,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     });
     if (!resolvedProfessor) {
       missingProfessor += 1;
-      continue;
+      console.error(
+        `[cron-exp-bookings] booking ${bookingId} / lead ${leadId}: professor não atribuído - pulando apenas notificação do professor, enviando aluno e atend cadastrado`,
+      );
     }
 
     const cachedStudentSent =
@@ -1613,50 +1615,56 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     let thisBookingStudentOk = cachedStudentSent;
 
     if (attendantDue && !cachedAttendantSent) {
-      const assignedCronProfessorPhone = resolvedProfessor.phone;
-      try {
-        await sendAtendimentoWhatsAppText({
-          phone: assignedCronProfessorPhone,
-          message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
-        });
+      const assignedCronProfessorPhone = resolvedProfessor?.phone;
+      if (assignedCronProfessorPhone) {
+        try {
+          await sendAtendimentoWhatsAppText({
+            phone: assignedCronProfessorPhone,
+            message: buildExperimentalClassAttendantStartReminderWhatsAppMessage(leadFullName, lessonLink),
+          });
 
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_attendant_start_notification_sent",
-          title: "Lembrete de inicio da aula experimental enviado ao atendente",
-          details: {
-            booking_id: bookingId,
-            phone: assignedCronProfessorPhone,
-            lesson_link: lessonLink,
-            start_at: professorStartAtRaw,
-          },
-          actorType: "system",
-        });
-        await setBookingNotificationSentAt({
-          bookingId,
-          column: "attendant_start_notification_sent_at",
-          nowIso,
-        });
-        sentAttendantBookingIds.add(bookingId);
-        attendantSent += 1;
-        thisBookingAttendantOk = true;
-      } catch (error) {
-        attendantFailed += 1;
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_attendant_start_notification_failed",
-          title: "Falha ao enviar lembrete de inicio da aula experimental ao atendente",
-          details: {
-            booking_id: bookingId,
-            phone: assignedCronProfessorPhone,
-            lesson_link: lessonLink,
-            start_at: professorStartAtRaw,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
-        });
+          await appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_attendant_start_notification_sent",
+            title: "Lembrete de inicio da aula experimental enviado ao atendente",
+            details: {
+              booking_id: bookingId,
+              phone: assignedCronProfessorPhone,
+              lesson_link: lessonLink,
+              start_at: professorStartAtRaw,
+            },
+            actorType: "system",
+          });
+          await setBookingNotificationSentAt({
+            bookingId,
+            column: "attendant_start_notification_sent_at",
+            nowIso,
+          });
+          sentAttendantBookingIds.add(bookingId);
+          attendantSent += 1;
+          thisBookingAttendantOk = true;
+        } catch (error) {
+          attendantFailed += 1;
+          console.error(
+            `[cron-exp-bookings] falha ao enviar notificação professor ${assignedCronProfessorPhone}:`,
+            error,
+          );
+          await appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_attendant_start_notification_failed",
+            title: "Falha ao enviar lembrete de inicio da aula experimental ao atendente",
+            details: {
+              booking_id: bookingId,
+              phone: assignedCronProfessorPhone,
+              lesson_link: lessonLink,
+              start_at: professorStartAtRaw,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            actorType: "system",
+          });
+        }
       }
     }
 
@@ -1685,6 +1693,10 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
         thisBookingRegisteredAttendantOk = true;
       } catch (error) {
         registeredAttendantFailed += 1;
+        console.error(
+          `[cron-exp-bookings] falha ao enviar notificação atendente cadastrado ${EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE}:`,
+          error,
+        );
         await appendHistoryEvent({
           leadId,
           conversationId,
@@ -1735,6 +1747,10 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
           thisBookingStudentOk = true;
         } catch (error) {
           studentFailed += 1;
+          console.error(
+            `[cron-exp-bookings] falha ao enviar notificação ALUNO ${leadPhone} (lead ${leadId}):`,
+            error,
+          );
           await appendHistoryEvent({
             leadId,
             conversationId,
