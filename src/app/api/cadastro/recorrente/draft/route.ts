@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { findLeadByPhone, triggerRecurringPaymentIntentIfNeeded } from "@/lib/atendimento/server";
+import {
+  findLeadByPhone,
+  triggerRecurringPaymentIntentIfNeeded,
+  sendAtendimentoWhatsAppText,
+} from "@/lib/atendimento/server";
 import { ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER } from "@/lib/atendimento/constants";
-import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
+import {
+  RECURRING_WEEKDAY_LABELS_PT_BR,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  resolveRecurringClassAssignedProfessorPhone,
+  buildRecurringClassScheduleChangedAttendantNotification,
+  buildRecurringClassScheduleChangedProfessorNotification,
+} from "@/lib/atendimento/experimentalClass";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -584,6 +594,94 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ ok: false, error: msg }, { status: 500 });
       }
     }
+
+    try {
+      const concluded = isLeadRecurringRegistrationConcluded(lead);
+      if (concluded) {
+        const oldWeekday = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+        const oldTime =
+          String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "")
+            .trim();
+        const newWeekday = String(patch.recurring_class_weekday_label ?? oldWeekday ?? "").trim();
+        const newTime = String(
+          patch.recurring_class_lead_time ??
+            patch.recurring_class_professor_time ??
+            oldTime ??
+            "",
+        ).trim();
+        const changedWd =
+          Boolean(patch.recurring_class_weekday || patch.recurring_class_weekday_label) &&
+          newWeekday &&
+          oldWeekday !== newWeekday;
+        const changedTm =
+          Boolean(patch.recurring_class_professor_time || patch.recurring_class_lead_time) &&
+          newTime &&
+          oldTime !== newTime;
+        if (changedWd || changedTm) {
+          const studentFull = String((lead as any)?.full_name ?? "").trim() || "Aluno(a)";
+          const attendantMsg = buildRecurringClassScheduleChangedAttendantNotification(
+            studentFull,
+            oldWeekday || null,
+            oldTime || null,
+            newWeekday || null,
+            newTime || null,
+          );
+          await sendAtendimentoWhatsAppText({
+            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+            message: attendantMsg,
+            baseUrl: undefined as any,
+          }).catch(() => {});
+
+          const assigned = resolveRecurringClassAssignedProfessorPhone({
+            flatAssignedName: String((lead as any)?.recurring_class_professor_name ?? null),
+            flatAssignedPhone: String((lead as any)?.recurring_class_professor_phone ?? null),
+          });
+          if (assigned?.phone) {
+            const profMsg = buildRecurringClassScheduleChangedProfessorNotification(
+              studentFull,
+              oldWeekday || null,
+              oldTime || null,
+              newWeekday || null,
+              newTime || null,
+            );
+            await sendAtendimentoWhatsAppText({
+              phone: assigned.phone,
+              message: profMsg,
+              baseUrl: undefined as any,
+            }).catch(() => {});
+          }
+          try {
+            const { data: convRow } = await admin
+              .from("atendimento_conversations")
+              .select("id")
+              .eq("lead_id", String(lead.id))
+              .eq("channel", "whatsapp")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if ((convRow as any)?.id) {
+              const { appendHistoryEvent } = await import("@/lib/atendimento/server");
+              await appendHistoryEvent({
+                leadId: String(lead.id),
+                conversationId: String((convRow as any).id),
+                eventType: "recurring_class_schedule_changed_notification_sent",
+                title: "Notificação de alteração de dia/horário recorrente enviada",
+                details: {
+                  from_weekday: oldWeekday || null,
+                  from_time: oldTime || null,
+                  to_weekday: newWeekday || null,
+                  to_time: newTime || null,
+                  attendant_notified_phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+                  professor_notified_phone: assigned?.phone ?? null,
+                  professor_notified_name: assigned?.name ?? null,
+                },
+                actorType: "system",
+              }).catch(() => {});
+            }
+          } catch {}
+        }
+      }
+    } catch {}
 
     try {
       if (safeStepRaw !== null && safeStepRaw >= 5) {

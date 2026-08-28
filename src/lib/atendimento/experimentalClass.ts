@@ -619,6 +619,52 @@ ${safeDashboard}
 Para entrar, utilize o WhatsApp/e-mail e a senha cadastrados durante a matrícula.`;
 }
 
+export function buildRecurringClassScheduleChangedAttendantNotification(
+  studentName: string | null | undefined,
+  fromWeekdayLabel: string | null | undefined,
+  fromTimeLabel: string | null | undefined,
+  toWeekdayLabel: string | null | undefined,
+  toTimeLabel: string | null | undefined,
+) {
+  const safeName = String(studentName ?? "").trim() || "Aluno(a)";
+  const fromWd = String(fromWeekdayLabel ?? "").trim() || "—";
+  const fromTm = String(fromTimeLabel ?? "").trim() || "—";
+  const toWd = String(toWeekdayLabel ?? "").trim() || "—";
+  const toTm = String(toTimeLabel ?? "").trim() || "—";
+  return `🔔 Alteração de aula recorrente
+
+O aluno ${safeName} alterou o dia e horário de suas aulas recorrentes:
+
+De: ${fromWd} · ${fromTm}
+Para: ${toWd} · ${toTm}
+
+Acesse o painel para conferir:
+${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
+}
+
+export function buildRecurringClassScheduleChangedProfessorNotification(
+  studentName: string | null | undefined,
+  fromWeekdayLabel: string | null | undefined,
+  fromTimeLabel: string | null | undefined,
+  toWeekdayLabel: string | null | undefined,
+  toTimeLabel: string | null | undefined,
+) {
+  const safeName = String(studentName ?? "").trim() || "Aluno(a)";
+  const fromWd = String(fromWeekdayLabel ?? "").trim() || "—";
+  const fromTm = String(fromTimeLabel ?? "").trim() || "—";
+  const toWd = String(toWeekdayLabel ?? "").trim() || "—";
+  const toTm = String(toTimeLabel ?? "").trim() || "—";
+  return `🔔 Atualização de horário
+
+O aluno ${safeName} alterou o dia e horário de suas aulas recorrentes:
+
+De: ${fromWd} · ${fromTm}
+Para: ${toWd} · ${toTm}
+
+Acesse o painel para conferir:
+${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
+}
+
 export function buildExperimentalClassPostAttendanceWhatsAppMessages(name?: string | null) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "";
