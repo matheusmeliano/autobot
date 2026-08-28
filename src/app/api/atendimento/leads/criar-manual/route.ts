@@ -48,6 +48,34 @@ export async function POST(req: Request) {
     );
   }
 
+  try {
+    const { data: existingAuthUsers } = await admin.auth.admin.listUsers({ perPage: 50 });
+    if (existingAuthUsers && Array.isArray((existingAuthUsers as any)?.users)) {
+      for (const u of (existingAuthUsers as any).users) {
+        const uEmail = String(u.email ?? "").toLowerCase();
+        const uPhone = String(u.phone ?? u.phone_number ?? "").trim().replace(/\D/g, "");
+        const syntheticEmail = `tel.${normalizedPhone.slice(-10)}@aluno.autobot.business`.toLowerCase();
+        const matches =
+          (uPhone && uPhone === normalizedPhone) ||
+          (uEmail && (uEmail === syntheticEmail || uEmail.endsWith("@aluno.autobot.business") && normalizedPhone.includes(uEmail.replace(/^tel\./, "").replace(/@aluno\.autobot\.business$/, ""))));
+        if (!matches) continue;
+        let hasBoundLead = false;
+        try {
+          const { data } = await admin
+            .from("atendimento_leads")
+            .select("id")
+            .eq("auth_user_id", String(u.id ?? "").trim())
+            .maybeSingle();
+          if (data && (data as any).id) hasBoundLead = true;
+        } catch {}
+        if (!hasBoundLead) {
+          try { await admin.from("profiles").delete().eq("user_id", String(u.id ?? "").trim()); } catch {}
+          try { await admin.auth.admin.deleteUser(String(u.id ?? "").trim()); } catch {}
+        }
+      }
+    }
+  } catch {}
+
   const publicLink = await ensureAtendimentoPublicLink();
 
   const { data: createdLead, error: leadError } = await admin

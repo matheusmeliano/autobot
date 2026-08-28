@@ -412,19 +412,28 @@ export default function CadastroRecorrenteBody() {
     setAlunoSchedSaveError("");
   }
 
+  const [alunoStoredPainelAtivadoHint, setAlunoStoredPainelAtivadoHint] = useState(false);
+
   useEffect(() => {
     try {
       const tel = String(phoneField ?? initialPhoneParam ?? "").replace(/\D/g, "").trim();
       if (tel && tel.length >= 10) {
         const v = localStorage.getItem(`painel_aluno_ativado_${tel}`) ?? "";
         if (v && (v === "1" || v === "true" || v === "sim" || v === "on")) {
-          setAlunoForcePainel(true);
-          setInitialDataLoading(false);
-          setInitialDataError("");
+          setAlunoStoredPainelAtivadoHint(true);
         }
       }
     } catch {}
   }, [phoneField, initialPhoneParam]);
+
+  function clearPainelAtivadoFlagForPhone(phoneDigitsOverride?: string) {
+    try {
+      const tel = String(phoneDigitsOverride ?? phoneField ?? alunoLeadFull?.phone ?? initialPhoneParam ?? "").replace(/\D/g, "").trim();
+      if (!tel || tel.length < 10) return;
+      const k = `painel_aluno_ativado_${tel}`;
+      try { localStorage.removeItem(k); } catch {}
+    } catch {}
+  }
 
   function writePainelAtivadoFlagIfNeeded(phoneDigitsOverride?: string) {
     try {
@@ -761,6 +770,19 @@ export default function CadastroRecorrenteBody() {
             }
           | null;
         if (json?.blocked === true) {
+          try {
+            const tel = initialPhoneParam.replace(/\D/g, "").trim();
+            if (tel && tel.length >= 10) {
+              const k = `painel_aluno_ativado_${tel}`;
+              try { localStorage.removeItem(k); } catch {}
+            }
+            try {
+              const sb = createSupabaseBrowserClient();
+              await sb.auth.signOut();
+            } catch {}
+          } catch {}
+          setAlunoForcePainel(false);
+          setAlunoIsMatriculaConcluida(false);
           setAccessBlocked(true);
           setAccessBlockedMessage(
             String(json?.error ?? "").trim() ||
@@ -835,13 +857,25 @@ export default function CadastroRecorrenteBody() {
 
           const concluded = Boolean((json as any)?.is_matricula_concluida);
           setAlunoIsMatriculaConcluida(concluded);
-          if (concluded) writePainelAtivadoFlagIfNeeded();
-          setAlunoLeadFull(json?.lead ?? null);
+          let shouldActivatePainelForStoredHint = false;
           if (concluded) {
+            writePainelAtivadoFlagIfNeeded();
+          } else if (alunoStoredPainelAtivadoHint) {
+            const hasPassword = Boolean((json as any)?.progress?.has_password);
+            if (hasPassword) {
+              shouldActivatePainelForStoredHint = true;
+              setAlunoForcePainel(true);
+              writePainelAtivadoFlagIfNeeded();
+            } else {
+              clearPainelAtivadoFlagForPhone();
+            }
+          }
+          setAlunoLeadFull(json?.lead ?? null);
+          if (concluded || shouldActivatePainelForStoredHint) {
             setInitialDataLoading(false);
             setInitialDataError("");
             setShowResumeScreen(false);
-            return;
+            if (concluded) return;
           }
 
           const hasLoc = Boolean(restoredState || restoredCity);

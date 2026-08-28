@@ -3608,22 +3608,90 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
   let created = false;
   try {
     const { data: existing } = await admin.auth.admin.listUsers({
-      perPage: 5,
+      perPage: 50,
     });
     let match: any = null;
+    let mustDeleteBeforeRecreate = false;
     if (Array.isArray((existing as any)?.users)) {
       for (const u of (existing as any).users) {
         const uEmail = String(u.email ?? "").toLowerCase();
         const uPhone = String(u.phone ?? u.phone_number ?? "").trim();
+        let isMatch = false;
         if (uEmail && uEmail === email.toLowerCase()) {
-          match = u;
-          break;
+          isMatch = true;
+        } else if (phoneDigits && (await isStudentLoginPhoneMatch(admin, uPhone, phoneDigits))) {
+          isMatch = true;
         }
-        if (phoneDigits && (await isStudentLoginPhoneMatch(admin, uPhone, phoneDigits))) {
+        if (!isMatch) continue;
+        const leadIdFromMeta =
+          typeof u === "object" &&
+          u !== null &&
+          typeof (u as any).user_metadata === "object" &&
+          (u as any).user_metadata !== null &&
+          typeof (u as any).user_metadata.lead_id === "string"
+            ? String((u as any).user_metadata.lead_id).trim()
+            : "";
+        let boundLeadExists = false;
+        if (leadIdFromMeta) {
+          try {
+            const { data, error } = await admin
+              .from("atendimento_leads")
+              .select("id, auth_user_id")
+              .eq("id", leadIdFromMeta)
+              .maybeSingle();
+            if (!error && data && (data as any).id) {
+              const boundAuthUserId = String((data as any).auth_user_id ?? "").trim();
+              if (boundAuthUserId === String(u.id ?? "").trim()) {
+                boundLeadExists = true;
+              }
+            }
+          } catch {}
+        }
+        if (!boundLeadExists && leadIdFromMeta) {
+          try {
+            const { data, error } = await admin
+              .from("atendimento_leads")
+              .select("id")
+              .eq("auth_user_id", String(u.id ?? "").trim())
+              .maybeSingle();
+            if (!error && data && (data as any).id) boundLeadExists = true;
+          } catch {}
+        }
+        if (!boundLeadExists) {
+          try {
+            const { data, error } = await admin
+              .from("atendimento_leads")
+              .select("id")
+              .eq("auth_user_id", String(u.id ?? "").trim())
+              .maybeSingle();
+            if (!error && data && (data as any).id) boundLeadExists = true;
+          } catch {}
+        }
+        if (!boundLeadExists) {
+          try {
+            await admin.from("profiles").delete().eq("user_id", String(u.id ?? "").trim());
+          } catch {}
+          try {
+            await admin.auth.admin.deleteUser(String(u.id ?? "").trim());
+          } catch {}
+          continue;
+        }
+        if (leadIdFromMeta === leadId || !leadIdFromMeta) {
           match = u;
           break;
+        } else {
+          mustDeleteBeforeRecreate = true;
+          try {
+            await admin.from("profiles").delete().eq("user_id", String(u.id ?? "").trim());
+          } catch {}
+          try {
+            await admin.auth.admin.deleteUser(String(u.id ?? "").trim());
+          } catch {}
         }
       }
+    }
+    if (mustDeleteBeforeRecreate) {
+      match = null;
     }
     if (match && typeof match === "object" && "id" in match) {
       userId = String((match as any).id);
@@ -3635,6 +3703,12 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
               ? (match as any).app_metadata
               : {}),
             access_scope: "aluno",
+          },
+          user_metadata: {
+            lead_id: leadId,
+            student_phone_digits: phoneDigits || null,
+            full_name: fullName,
+            origin: "aluno_matricula_recorrente",
           },
         });
       } catch {}
