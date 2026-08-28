@@ -1474,7 +1474,7 @@ export default function CadastroRecorrenteBody() {
   }
 
   useEffect(() => {
-    if (!alunoIsMatriculaConcluida) return;
+    if (!alunoIsMatriculaConcluida && !alunoForcePainel) return;
     let cancelled = false;
     void (async () => {
       setAlunoAuthLoading(true);
@@ -1502,7 +1502,7 @@ export default function CadastroRecorrenteBody() {
     } catch {
       return () => { cancelled = true; };
     }
-  }, [alunoIsMatriculaConcluida]);
+  }, [alunoIsMatriculaConcluida, alunoForcePainel]);
 
   async function handleAlunoLoginAttempt() {
     setAlunoLoginErro("");
