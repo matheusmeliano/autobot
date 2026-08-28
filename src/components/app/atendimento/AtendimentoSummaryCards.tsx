@@ -4828,31 +4828,35 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      {showJumpToAgendamento ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setActiveSectionSelectedLead(lead.id, "agendamentos");
-                            setActiveSection("agendamentos");
-                            setMobileDetailsOpen(true);
-                          }}
-                          className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-2 py-1.5 text-[11px] font-semibold text-[var(--app-text-65)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-                          title="Ver em agendamento"
-                        >
-                          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                        </button>
-                      ) : null}
-                      {showWarningIcon ? (
-                        <div
-                          className="absolute right-3 top-3 inline-flex items-center"
-                          title={warningIconTitle || undefined}
-                        >
-                          <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />
+                      {(showJumpToAgendamento || showWarningIcon) ? (
+                        <div className="absolute right-3 top-3 inline-flex items-center gap-1.5">
+                          {showWarningIcon ? (
+                            <div
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/5"
+                              title={warningIconTitle || undefined}
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+                            </div>
+                          ) : null}
+                          {showJumpToAgendamento ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setActiveSectionSelectedLead(lead.id, "agendamentos");
+                                setActiveSection("agendamentos");
+                                setMobileDetailsOpen(true);
+                              }}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-2 text-[11px] font-semibold text-[var(--app-text-65)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+                              title="Ver em agendamento"
+                            >
+                              <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                       <div
-                        className="pr-10 truncate text-sm font-semibold text-[var(--app-text-85)]"
+                        className="pr-20 truncate text-sm font-semibold text-[var(--app-text-85)]"
                         title={lead.phone || lead.full_name || "Interessado sem telefone"}
                       >
                         {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
