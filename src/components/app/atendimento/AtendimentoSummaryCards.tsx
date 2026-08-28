@@ -1890,15 +1890,16 @@ function BookingDetails({
         })()}
 
         {(() => {
+          const isMatriculaConcluida = isLeadRecurringRegistrationConcludedClient(lead);
           const canShow =
             activeSection === "agendamentos" &&
+            isMatriculaConcluida &&
             leadHasMatriculaOrRecurringStageInitiated(lead) &&
             (hasRecurringClass || Boolean(savedRecurringLink));
           if (!canShow) return null;
           const hasLinkOk = Boolean(savedRecurringLink);
           const assignedOk = recurringClassAssignedProfessor(lead);
           const hasPhoneOk = Boolean(String(lead?.phone ?? "").trim());
-          const isMatriculaConcluida = isLeadRecurringRegistrationConcludedClient(lead);
           const canSend = isMatriculaConcluida && hasLinkOk && assignedOk && hasPhoneOk;
           return (
             <button
@@ -1906,9 +1907,6 @@ function BookingDetails({
               onClick={() => void onSendRecurringNotification(lead)}
               disabled={!canSend || isSendingRecurringNotification}
               title={(() => {
-                if (!isMatriculaConcluida) {
-                  return "O botão Disparar agora só fica disponível quando a matrícula do aluno estiver concluída.";
-                }
                 if (!hasLinkOk && !assignedOk) {
                   return "Adicione o link da aula recorrente e selecione o professor antes de disparar.";
                 }
