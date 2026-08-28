@@ -111,11 +111,5 @@ export async function POST(req: Request) {
     .select("*")
     .maybeSingle();
 
-  void maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime({
-    leadId: String(createdLead.id),
-    leadName: null,
-    conversationId: null,
-  });
-
   return Response.json({ ok: true, lead: createdLead });
 }

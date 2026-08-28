@@ -2595,12 +2595,6 @@ export async function ensureInitialBotConversationFlow(params: {
       details: { funnel_stage: "aula_experimental_convidada" },
       actorType: "bot",
     });
-
-    void maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime({
-      leadId: params.leadId,
-      leadName: String((params as any)?.leadName ?? (params as any)?.fullName ?? "").trim() || null,
-      conversationId: params.conversationId,
-    });
   }
 
   await syncConversationPreview({
@@ -2679,6 +2673,87 @@ export async function maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPend
       title:
         "Atendente cadastrado avisado sobre novo interessado em aula experimental (Falta dia e horário)",
       details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE },
+      actorType: "system",
+    });
+    return { ok: true, sent: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+const REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_SCHEDULED_NOTICE_EVENT_TYPE =
+  "registered_attendant_experimental_lead_scheduled_notice_sent";
+
+export async function maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled(params: {
+  leadId: string;
+  leadName: string | null | undefined;
+  conversationId?: string | null;
+}) {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { count: already } = await admin
+      .from("atendimento_history_events")
+      .select("id", { count: "exact", head: true })
+      .eq("lead_id", params.leadId)
+      .eq("event_type", REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_SCHEDULED_NOTICE_EVENT_TYPE);
+    if (already && already > 0) return { ok: true, deduped: true };
+
+    const { data: leadRow } = await admin
+      .from("atendimento_leads")
+      .select(
+        "id, full_name, funnel_stage, experimental_class_status, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_booking_id",
+      )
+      .eq("id", params.leadId)
+      .limit(1)
+      .maybeSingle();
+    const fs = String((leadRow as any)?.funnel_stage ?? "").trim().toLowerCase();
+    const es = String((leadRow as any)?.experimental_class_status ?? "").trim().toLowerCase();
+    const hasLd = Boolean(String((leadRow as any)?.experimental_class_lead_date ?? "").trim());
+    const hasLt = Boolean(String((leadRow as any)?.experimental_class_lead_time ?? "").trim());
+    const hasPd = Boolean(String((leadRow as any)?.experimental_class_professor_date ?? "").trim());
+    const hasPt = Boolean(String((leadRow as any)?.experimental_class_professor_time ?? "").trim());
+    const hasBooking = Boolean(String((leadRow as any)?.experimental_class_booking_id ?? "").trim());
+    const isFunnelAgendada =
+      fs === "aula_experimental_agendada" ||
+      fs === "aula_experimental_realizada" ||
+      fs === "aula_experimental_cancelada";
+    const isStatusScheduledLike =
+      es === "scheduled" ||
+      es === "booked" ||
+      es === "time_selected" ||
+      es === "date_selected_link_sent" ||
+      es === "completed" ||
+      es === "cancelled";
+    const hasBothDates = (hasLd && hasLt) || (hasPd && hasPt);
+    const isActuallyScheduled = Boolean(isFunnelAgendada || isStatusScheduledLike || (hasBothDates && hasBooking));
+    if (!isActuallyScheduled) {
+      return { ok: true, skipped: true, reason: "lead ainda falta dia e horario" };
+    }
+
+    const firstName =
+      String(params.leadName ?? (leadRow as any)?.full_name ?? "").trim().split(/\s+/)[0] ||
+      "o interessado";
+    const message = buildExperimentalClassRegisteredAttendantWhatsAppMessage(firstName);
+    await sendAtendimentoWhatsAppText({
+      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+      message,
+    });
+    await appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId ?? null,
+      eventType: REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_SCHEDULED_NOTICE_EVENT_TYPE,
+      title:
+        "Atendente cadastrado avisado sobre aula experimental AGENDADA (saiu de Falta dia e horário)",
+      details: {
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        funnel_stage: fs || null,
+        experimental_class_status: es || null,
+        has_lead_date: hasLd,
+        has_lead_time: hasLt,
+        has_professor_date: hasPd,
+        has_professor_time: hasPt,
+        has_booking_id: hasBooking,
+      },
       actorType: "system",
     });
     return { ok: true, sent: true };

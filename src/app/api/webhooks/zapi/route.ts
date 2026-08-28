@@ -57,7 +57,7 @@ import {
   ensureWhatsAppLeadAndConversation,
   findLeadByPhone,
   hasAnyBotMessage,
-  maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime,
+  maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
   sendAtendimentoWhatsAppText,
   sendAtendimentoWhatsAppTextBatch,
   syncConversationPreview,
@@ -5203,12 +5203,6 @@ export async function POST(req: Request) {
             actorType: "system",
           });
 
-          void maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime({
-            leadId,
-            leadName: String((lead as any)?.full_name ?? "").trim() || null,
-            conversationId,
-          });
-
           const introMsgs = buildExperimentalClassDatePromptMessages(
             String((lead as any)?.full_name ?? "").trim() || null,
           );
@@ -5366,6 +5360,12 @@ export async function POST(req: Request) {
                       .eq("id", leadId);
                   } catch (_e) {}
                 }
+
+                void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+                  leadId,
+                  leadName: String((lead as any)?.full_name ?? "").trim() || null,
+                  conversationId,
+                });
 
                 const firstName = String((lead as any)?.full_name ?? "").trim().split(" ")[0] || "Aluno";
                 const alreadyBookingCancelled =
@@ -5853,6 +5853,12 @@ export async function POST(req: Request) {
                 actorType: "system",
               });
             } catch (_e) {}
+
+            void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+              leadId,
+              leadName: String((lead as any)?.full_name ?? "").trim() || null,
+              conversationId,
+            });
 
             if (!needsPostBookingCpf) {
               try {

@@ -51,7 +51,7 @@ import {
   findLeadByPhone,
   formalizeAndPersistContract,
   getAuthenticatedAtendimentoConversationAccess,
-  maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime,
+  maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
   triggerRecurringPaymentIntentIfNeeded,
@@ -2460,6 +2460,12 @@ export async function POST(req: Request) {
           lead_time: selectedTimeOption.leadTime,
         },
         actorType: "system",
+      });
+
+      void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+        leadId,
+        leadName: String((lead as any)?.full_name ?? "").trim() || null,
+        conversationId,
       });
 
       const firstName = firstNameFromLead(lead as { full_name?: string | null }) || "Aluno";
