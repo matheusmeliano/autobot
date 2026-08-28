@@ -21,6 +21,7 @@ import {
   buildExperimentalClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
+  buildExperimentalClassStudentWhatsAppMessages,
   buildRecurringClassAttendantStartReminderWhatsAppMessage,
   buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildRecurringClassPostEnrollmentRegisteredAttendantNotification,
