@@ -3273,34 +3273,6 @@ export default function CadastroRecorrenteBody() {
                 <p className="mt-4 text-base text-slate-500">
                   Aulas todas as <strong>{submitResult.weekdayLabel}</strong> às <strong>{submitResult.leadTime}</strong>.
                 </p>
-                {enrollmentNumber && (
-                  <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-sky-500/35 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-700">
-                    <span>N° da matrícula:</span>
-                    <span className="font-black tracking-tight">{enrollmentNumber}</span>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          if (navigator?.clipboard?.writeText) {
-                            await navigator.clipboard.writeText(enrollmentNumber);
-                          } else {
-                            const ta = document.createElement("textarea");
-                            ta.value = enrollmentNumber;
-                            ta.style.position = "fixed";
-                            ta.style.opacity = "0";
-                            document.body.appendChild(ta);
-                            ta.select();
-                            try { document.execCommand("copy"); } catch {}
-                            document.body.removeChild(ta);
-                          }
-                        } catch {}
-                      }}
-                      className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold border border-sky-500/40 bg-white hover:bg-sky-50 text-sky-700 transition"
-                    >
-                      Copiar
-                    </button>
-                  </div>
-                )}
                 {contractSignedAt && (
                   <p className="mt-2 text-sm text-slate-500">
                     Formalizado em: {new Date(contractSignedAt).toLocaleString("pt-BR")}
