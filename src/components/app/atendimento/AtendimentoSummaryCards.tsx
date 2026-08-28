@@ -4646,7 +4646,8 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                 {pagedItems.map((lead) => {
                   const active = lead.id === selectedLead?.id;
                   const showJumpToAgendamento =
-                    activeSection === "interessados" && leadHasAnyExperimentalVinculo(lead);
+                    (activeSection === "interessados" && leadHasAnyExperimentalVinculo(lead)) ||
+                    (activeSection === "alunos" && (leadHasAnyExperimentalVinculo(lead) || leadHasAnyRecurringProgressSignal(lead)));
                   const showAgendamentoMissingProfessorIcon = (() => {
                     if (activeSection !== "agendamentos") return false;
                     if (leadHasAnyRecurringProgressSignal(lead) || leadHasMatriculaOrRecurringStageInitiated(lead)) return false;
