@@ -1114,7 +1114,10 @@ export async function POST(req: Request) {
   const isNoLenient = lenientDecision.result === "no";
 
   const inPostAttendanceWindow =
-    lastBotAsksSimNao &&
+    (lastBotAsksSimNao ||
+      postAttendanceHistoryConfirmedAttendedEvent ||
+      flatAttendanceAttended ||
+      bookingAttendanceAttended) &&
     !postAttendanceHistoryMatriculaConfirmadaEvent &&
     !postAttendanceHistoryMatriculaRecusadaEvent &&
     ((currentFunnelStage === "matricula_pendente" ||
@@ -1189,6 +1192,7 @@ export async function POST(req: Request) {
             admin,
             conversationId: String(conversation.id),
             insertIntoConversation: true,
+            allowNoInbound: true,
           });
         } catch (_e) {}
       }
@@ -1246,6 +1250,7 @@ export async function POST(req: Request) {
             admin,
             conversationId: String(conversation.id),
             insertIntoConversation: true,
+            allowNoInbound: true,
           });
         } catch (_e) {}
       }

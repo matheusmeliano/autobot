@@ -217,10 +217,27 @@ export async function POST(
   }
 
   const leadId = String((resolvedBooking as any)?.lead_id ?? payload?.leadId ?? "").trim();
-  const conversationId = String((resolvedBooking as any)?.conversation_id ?? payload?.conversationId ?? "").trim() || null;
+  let conversationId =
+    String((resolvedBooking as any)?.conversation_id ?? payload?.conversationId ?? "").trim() ||
+    null;
 
   if (!leadId) {
     return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+  if (!conversationId) {
+    try {
+      const { data: convFallback } = await admin
+        .from("atendimento_conversations")
+        .select("id")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const fallbackId = String((convFallback as any)?.id ?? "").trim();
+      if (fallbackId) conversationId = fallbackId;
+    } catch (_e) {
+      void _e;
+    }
   }
 
   const { data: lead, error: leadError } = await admin

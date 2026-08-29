@@ -1021,14 +1021,15 @@ export async function sendAtendimentoWhatsAppTextBatch(params: {
   admin?: any;
   conversationId?: string | null;
   insertIntoConversation?: boolean;
+  allowNoInbound?: boolean;
 }) {
-  const { phone, messages, baseUrl, admin, conversationId, insertIntoConversation = Boolean(admin && conversationId) } = params;
+  const { phone, messages, baseUrl, admin, conversationId, insertIntoConversation = Boolean(admin && conversationId), allowNoInbound } = params;
   const safeMessages = (messages ?? []).filter((msg) => typeof msg === "string" && msg.trim().length > 0);
   if (!safeMessages.length) return { results: [], insertedRows: [] };
 
   const sends = safeMessages.map(async (message) => {
     try {
-      const r = await sendAtendimentoWhatsAppText({ phone, message, baseUrl });
+      const r = await sendAtendimentoWhatsAppText({ phone, message, baseUrl, allowNoInbound });
       return { ok: true, message, result: r };
     } catch (e) {
       return { ok: false, message, error: String((e as any)?.message ?? "") };
