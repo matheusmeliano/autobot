@@ -270,6 +270,7 @@ export async function POST(
       await sendAtendimentoWhatsAppText({
         phone: leadPhone,
         message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+        allowNoInbound: true,
       });
       studentNotificationOk = true;
       await appendHistoryEvent({

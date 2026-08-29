@@ -865,6 +865,7 @@ export async function sendAtendimentoWhatsAppText(params: {
   phone: string;
   message: string;
   baseUrl?: string | null;
+  allowNoInbound?: boolean;
 }) {
   const config = await getAtendimentoWhatsAppConfig();
   if (!config) {
@@ -931,19 +932,21 @@ export async function sendAtendimentoWhatsAppText(params: {
 
       resolvedConversationIdForDedupe = conversationId;
 
-      const { count: inboundCount } = await admin
-        .from("atendimento_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", conversationId)
-        .eq("sender_role", "lead");
+      if (!Boolean(params.allowNoInbound)) {
+        const { count: inboundCount } = await admin
+          .from("atendimento_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("conversation_id", conversationId)
+          .eq("sender_role", "lead");
 
-      if (Number(inboundCount ?? 0) <= 0) {
-        return {
-          ok: false,
-          skipped: true,
-          reason: "no_prior_inbound_message_from_lead",
-          phone: normalizedDest,
-        };
+        if (Number(inboundCount ?? 0) <= 0) {
+          return {
+            ok: false,
+            skipped: true,
+            reason: "no_prior_inbound_message_from_lead",
+            phone: normalizedDest,
+          };
+        }
       }
 
       const messageText = String(params.message ?? "").trim();
@@ -2841,7 +2844,7 @@ export async function maybeSendExperimentalClassConfirmationToStudent(params: {
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
       try {
-        await sendAtendimentoWhatsAppText({ phone: leadPhone, message: msg });
+        await sendAtendimentoWhatsAppText({ phone: leadPhone, message: msg, allowNoInbound: true });
       } catch (e) {
         await appendHistoryEvent({
           leadId: params.leadId,

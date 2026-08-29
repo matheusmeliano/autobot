@@ -581,6 +581,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           await sendAtendimentoWhatsAppText({
             phone: studentPhone,
             message: m,
+            allowNoInbound: true,
           });
         }
       } catch (error) {

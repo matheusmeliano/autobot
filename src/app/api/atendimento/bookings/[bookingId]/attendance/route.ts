@@ -458,7 +458,7 @@ export async function POST(
       for (let i = 0; i < messages.length; i += 1) {
         const message = messages[i];
         try {
-          await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
+          await sendAtendimentoWhatsAppText({ phone: leadPhone, message, allowNoInbound: true });
           sentMessages.push(message);
           if (conversationId) {
             try {
@@ -589,7 +589,7 @@ export async function POST(
       for (let i = 0; i < messages.length; i += 1) {
         const message = messages[i];
         try {
-          await sendAtendimentoWhatsAppText({ phone: leadPhone, message });
+          await sendAtendimentoWhatsAppText({ phone: leadPhone, message, allowNoInbound: true });
           sentMessages.push(message);
           if (conversationId) {
             try {
