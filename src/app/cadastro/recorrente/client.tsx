@@ -3331,9 +3331,15 @@ export default function CadastroRecorrenteBody() {
               </div>
               <div>
                 <h2 className="text-3xl font-extrabold text-slate-900">Estamos verificando o seu pagamento! 🤝</h2>
-                <p className="mt-5 text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto">
-                  Você receberá uma notificação pelo WhatsApp em até 24 horas, assim que o pagamento for confirmado. Até a confirmação, seus dados de matrícula permanecerão registrados como pré-aprovados.
-                </p>
+                <div className="mt-5 text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto space-y-4 text-left">
+                  <p>Você receberá uma notificação pelo WhatsApp em até 24 horas, assim que o pagamento for confirmado.</p>
+                  <p>Até lá, sua matrícula permanecerá como pré-aprovada. Na confirmação, enviaremos o link de acesso ao seu painel, onde você poderá:</p>
+                  <ul className="list-disc pl-6 space-y-1">
+                    <li>Consultar o número da matrícula;</li>
+                    <li>Editar o dia e horário das aulas;</li>
+                    <li>Acessar o contrato simplificado confirmado durante a matrícula.</li>
+                  </ul>
+                </div>
                 <p className="mt-4 text-base text-slate-500">
                   Aulas todas as <strong>{submitResult.weekdayLabel}</strong> às <strong>{submitResult.leadTime}</strong>.
                 </p>
