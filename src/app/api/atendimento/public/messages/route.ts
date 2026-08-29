@@ -1160,12 +1160,12 @@ export async function POST(req: Request) {
       outbound: null,
       blocked: false,
       ignored: true,
-      reason: "post_attendance_first_answer_lock_sim_previne_nao",
-      flow: "post_attendance_primeira_resposta_sim_locked",
+      reason: "public_messages_sim_definitivo_ignora_nao_posterior",
+      flow: "public_messages_post_attendance_sim_prioridade_ignora_nao",
       conversation: { id: String(conversation.id), bot_enabled: false },
     });
   }
-  if (postAttendanceHistoryMatriculaRecusadaEvent) {
+  if (postAttendanceHistoryMatriculaRecusadaEvent && !isYesLenient) {
     try {
       void admin
         .from("atendimento_leads")
@@ -1177,26 +1177,14 @@ export async function POST(req: Request) {
         })
         .eq("id", String(lead.id));
     } catch (_e) {}
-    try {
-      void admin
-        .from("atendimento_conversations")
-        .update({ bot_enabled: false, updated_at: nowIso })
-        .eq("id", String(conversation.id));
-    } catch (_e) {}
-    try {
-      void admin
-        .from("atendimento_leads")
-        .update({ bot_enabled: false, updated_at: nowIso })
-        .eq("id", String(lead.id));
-    } catch (_e) {}
     return Response.json({
       ok: true,
       inbound,
       outbound: null,
       blocked: false,
       ignored: true,
-      reason: "post_attendance_first_answer_lock_nao_previne_sim",
-      flow: "post_attendance_primeira_resposta_nao_locked",
+      reason: "public_messages_ja_foi_nao_espera_sim",
+      flow: "public_messages_post_attendance_nao_mantido_ate_que_venha_sim",
       conversation: { id: String(conversation.id), bot_enabled: false },
     });
   }

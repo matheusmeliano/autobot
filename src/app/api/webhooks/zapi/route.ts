@@ -2991,12 +2991,12 @@ export async function POST(req: Request) {
           return Response.json({
             ok: true,
             ignored: true,
-            reason: "nuclear_first_answer_lock_sim_previne_nao",
-            flow: "nuclear_post_attendance_primeira_resposta_sim_locked",
+            reason: "nuclear_sim_definitivo_ignora_nao_posterior",
+            flow: "nuclear_post_attendance_sim_prioridade_ignora_nao",
           });
         }
 
-        if (postAttendanceHistoryMatriculaRecusadaEvent) {
+        if (postAttendanceHistoryMatriculaRecusadaEvent && !isYesNuclear) {
           try {
             await admin.from("atendimento_messages").insert({
               conversation_id: conversationId,
@@ -3024,23 +3024,11 @@ export async function POST(req: Request) {
               })
               .eq("id", leadId);
           } catch (_e) {}
-          try {
-            void admin
-              .from("atendimento_conversations")
-              .update({ bot_enabled: false, updated_at: nowIso })
-              .eq("id", conversationId);
-          } catch (_e) {}
-          try {
-            void admin
-              .from("atendimento_leads")
-              .update({ bot_enabled: false, updated_at: nowIso })
-              .eq("id", leadId);
-          } catch (_e) {}
           return Response.json({
             ok: true,
             ignored: true,
-            reason: "nuclear_first_answer_lock_nao_previne_sim",
-            flow: "nuclear_post_attendance_primeira_resposta_nao_locked",
+            reason: "nuclear_resposta_ja_foi_nao_e_nova_nao_e_ambiguous",
+            flow: "nuclear_post_attendance_nao_mantido_ate_que_venha_sim",
           });
         }
 
