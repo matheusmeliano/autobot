@@ -173,11 +173,36 @@ export function suggestClosestName(
 }
 
 export function leadMatchesSearchQuery(
-  lead: { full_name?: string | null; phone?: string | null },
+  lead: { full_name?: string | null; phone?: string | null; enrollment_number?: string | null; contract_status?: string | null; recurring_class_weekday?: string | null; recurring_class_weekday_label?: string | null; recurring_class_professor_time?: string | null; recurring_class_lead_time?: string | null; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; email?: string | null; student_email?: string | null },
   rawQuery: string,
 ): boolean {
   const q = String(rawQuery ?? "").trim();
   if (!q) return true;
+  const qNorm = q.toLowerCase();
+
+  const enrollmentNumberRaw = String(lead?.enrollment_number ?? "").trim();
+  if (enrollmentNumberRaw) {
+    const e = enrollmentNumberRaw.toLowerCase();
+    if (e.includes(qNorm) || qNorm.includes(e)) return true;
+  }
+
+  const haystacks: string[] = [
+    String(lead?.contract_status ?? ""),
+    String(lead?.recurring_class_weekday ?? ""),
+    String(lead?.recurring_class_weekday_label ?? ""),
+    String(lead?.recurring_class_professor_time ?? ""),
+    String(lead?.recurring_class_lead_time ?? ""),
+    String(lead?.experimental_class_lead_date ?? ""),
+    String(lead?.experimental_class_lead_time ?? ""),
+    String(lead?.email ?? ""),
+    String(lead?.student_email ?? ""),
+  ];
+  for (const raw of haystacks) {
+    const s = String(raw ?? "").toLowerCase();
+    if (!s) continue;
+    if (s.includes(qNorm) || qNorm.includes(s)) return true;
+  }
+
   const phoneQ = normalizePhoneDigits(q);
   const nameQ = normalizeNameForSearch(q);
 
