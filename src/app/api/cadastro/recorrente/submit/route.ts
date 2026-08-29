@@ -119,6 +119,41 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
     if (!lead?.id) {
+      try {
+        function phoneCandidatesSubmitProbe(base: string): string[] {
+          const out = new Set<string>();
+          out.add(base);
+          if (base.startsWith("55") && base.length >= 12) out.add(base.slice(2));
+          else if (base.length >= 10 && !base.startsWith("55")) out.add(`55${base}`);
+          if (base.length === 10 && !base.startsWith("55")) {
+            const ddd = base.slice(0, 2); const rest = base.slice(2);
+            out.add(`${ddd}9${rest}`); out.add(`55${ddd}9${rest}`);
+          } else if (base.length === 11 && !base.startsWith("55") && base[2] === "9") {
+            const ddd = base.slice(0, 2); const rest = base.slice(3);
+            out.add(`${ddd}${rest}`); out.add(`55${ddd}${rest}`);
+          } else if (base.length === 13 && base.startsWith("55") && base[4] === "9") {
+            const ddd = base.slice(2, 4); const rest = base.slice(5);
+            out.add(`55${ddd}${rest}`); out.add(`${ddd}${rest}`);
+          } else if (base.length === 12 && base.startsWith("55")) {
+            const ddd = base.slice(2, 4); const rest = base.slice(4);
+            out.add(`55${ddd}9${rest}`); out.add(`${ddd}9${rest}`);
+          }
+          return Array.from(out);
+        }
+        const candsProbe = phoneCandidatesSubmitProbe(safePhoneDigits);
+        const probeMin = await admin
+          .from("atendimento_leads")
+          .select("id, phone, full_name, funnel_stage, status, recurring_registration_step, recurring_registration_password, signup_password_raw_temp, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, contract_pdf_url, contract_signed_at, contract_status, enrollment_number, state, city, country, timezone, cpf, legal_responsible_name, legal_responsible_cpf, student_email, email")
+          .in("phone", candsProbe)
+          .order("created_at", { ascending: false })
+          .limit(5)
+          .maybeSingle();
+        if (!probeMin.error && probeMin.data && String((probeMin.data as any).id ?? "").trim()) {
+          lead = probeMin.data as any;
+        }
+      } catch {}
+    }
+    if (!lead?.id) {
       return NextResponse.json(
         {
           ok: false,

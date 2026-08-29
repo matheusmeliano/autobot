@@ -3138,15 +3138,35 @@ export async function findLeadByPhone(params: { phone: string; userId?: string |
 
   const candidates = phoneCandidates(normalizedSearch);
 
-  const { data: byDirect } = await admin
-    .from("atendimento_leads")
-    .select("*")
-    .in("phone", candidates)
-    .order("created_at", { ascending: false })
-    .limit(10)
-    .maybeSingle();
+  let byDirect: any = null;
+  try {
+    const selStar = await admin
+      .from("atendimento_leads")
+      .select("*")
+      .in("phone", candidates)
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .maybeSingle();
+    if (!selStar.error && selStar.data && (selStar.data as any).id) {
+      byDirect = selStar.data as any;
+    }
+  } catch {}
+  if (!byDirect) {
+    try {
+      const selMin = await admin
+        .from("atendimento_leads")
+        .select("id, phone, full_name, funnel_stage, status, recurring_registration_step, recurring_registration_password, signup_password_raw_temp, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, contract_pdf_url, contract_signed_at, contract_status, enrollment_number, state, city, country, timezone, cpf, legal_responsible_name, legal_responsible_cpf, student_email, email")
+        .in("phone", candidates)
+        .order("created_at", { ascending: false })
+        .limit(10)
+        .maybeSingle();
+      if (!selMin.error && selMin.data && (selMin.data as any).id) {
+        byDirect = selMin.data as any;
+      }
+    } catch {}
+  }
 
-  if (byDirect && typeof (byDirect as any).id !== "undefined" && (byDirect as any).id) {
+  if (byDirect && byDirect.id) {
     return byDirect as any;
   }
 
@@ -3157,6 +3177,18 @@ export async function findLeadByPhone(params: { phone: string; userId?: string |
     .limit(300);
 
   const rowsAll = (byAll ?? []) as any[];
+  if (!rowsAll?.length) {
+    try {
+      const selMinAll = await admin
+        .from("atendimento_leads")
+        .select("id, phone, full_name, funnel_stage, status, recurring_registration_step, recurring_registration_password, signup_password_raw_temp, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, contract_pdf_url, contract_signed_at, contract_status, enrollment_number, state, city, country, timezone, cpf, legal_responsible_name, legal_responsible_cpf, student_email, email")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (selMinAll && !selMinAll.error && Array.isArray(selMinAll.data)) {
+        rowsAll.push(...(selMinAll.data as any[]));
+      }
+    } catch {}
+  }
   for (const row of rowsAll) {
     const storedNorm = normalizePhoneDigitsOnly(row?.phone);
     if (!storedNorm) continue;

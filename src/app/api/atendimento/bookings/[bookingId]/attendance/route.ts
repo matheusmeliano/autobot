@@ -647,7 +647,7 @@ export async function POST(
         leadId,
         conversationId,
         eventType: "experimental_class_attendance_no_show_message_failed",
-        title: "Falha ao enviar as mensagens de repescagem apos aluno nao comparecer a aula experimental",
+        title: "Falha ao enviar as mensagens apos aluno nao comparecer a aula experimental",
         details: {
           booking_id: normalizedBookingId,
           phone: leadPhone,
@@ -679,7 +679,7 @@ export async function POST(
       leadId,
       conversationId,
       eventType: "experimental_class_attendance_no_show_message_sent",
-      title: "Mensagens de repescagem enviadas ao aluno apos nao comparecimento na aula experimental",
+      title: "Mensagens enviadas ao aluno apos nao comparecimento na aula experimental",
       details: {
         booking_id: normalizedBookingId,
         phone: leadPhone,
@@ -703,7 +703,7 @@ export async function POST(
       leadId,
       conversationId,
       eventType: "experimental_class_attendance_follow_up_required",
-      title: "Aluno marcado para repescagem manual da aula experimental",
+      title: "Aluno marcado como nao compareceu a aula experimental",
       details: {
         booking_id: normalizedBookingId,
         lesson_link: String((resolvedBooking as any)?.lesson_link ?? "").trim() || null,

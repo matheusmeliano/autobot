@@ -770,25 +770,29 @@ export default function CadastroRecorrenteBody() {
             }
           | null;
         if (json?.blocked === true) {
-          try {
-            const tel = initialPhoneParam.replace(/\D/g, "").trim();
-            if (tel && tel.length >= 10) {
-              const k = `painel_aluno_ativado_${tel}`;
-              try { localStorage.removeItem(k); } catch {}
-            }
+          const hasLeadId = Boolean(String((json as any)?.lead?.id ?? "").trim());
+          const hasProgressStep = typeof (json as any)?.progress?.step === "number";
+          if (!hasLeadId && !hasProgressStep) {
             try {
-              const sb = createSupabaseBrowserClient();
-              await sb.auth.signOut();
+              const tel = initialPhoneParam.replace(/\D/g, "").trim();
+              if (tel && tel.length >= 10) {
+                const k = `painel_aluno_ativado_${tel}`;
+                try { localStorage.removeItem(k); } catch {}
+              }
+              try {
+                const sb = createSupabaseBrowserClient();
+                await sb.auth.signOut();
+              } catch {}
             } catch {}
-          } catch {}
-          setAlunoForcePainel(false);
-          setAlunoIsMatriculaConcluida(false);
-          setAccessBlocked(true);
-          setAccessBlockedMessage(
-            String(json?.error ?? "").trim() ||
-              "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
-          );
-          return;
+            setAlunoForcePainel(false);
+            setAlunoIsMatriculaConcluida(false);
+            setAccessBlocked(true);
+            setAccessBlockedMessage(
+              String(json?.error ?? "").trim() ||
+                "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
+            );
+            return;
+          }
         }
         if (!res.ok || !json?.ok) {
           setInitialDataError(

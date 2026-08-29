@@ -181,6 +181,20 @@ export async function GET(req: NextRequest) {
       }
     }
     if (!data) {
+      try {
+        const probeMin = await admin
+          .from("atendimento_leads")
+          .select("id, phone, full_name")
+          .eq("phone", normalizedPhone)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!probeMin.error && probeMin.data && String((probeMin.data as any).id ?? "").trim()) {
+          data = probeMin.data as any;
+        }
+      } catch {}
+    }
+    if (!data) {
       return NextResponse.json(
         {
           ok: false,
