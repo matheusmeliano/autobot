@@ -3334,7 +3334,7 @@ export default function CadastroRecorrenteBody() {
                 <div className="mt-5 text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto space-y-4 text-center">
                   <p>Você receberá uma notificação pelo WhatsApp em até 24 horas, assim que o pagamento for confirmado.</p>
                   <p>Até lá, sua matrícula permanecerá como pré-aprovada. Na confirmação, enviaremos o link de acesso ao seu painel, onde você poderá:</p>
-                  <ul className="list-disc list-inside space-y-1 text-left mx-auto inline-block">
+                  <ul className="list-disc space-y-1 text-left mx-auto table pl-0">
                     <li>Consultar o número da matrícula;</li>
                     <li>Editar o dia e horário das aulas;</li>
                     <li>Acessar o contrato simplificado confirmado durante a matrícula.</li>
