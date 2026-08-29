@@ -3193,15 +3193,27 @@ export async function POST(req: Request) {
               allowNoInbound: true,
             });
             try {
-              void admin
-                .from("atendimento_leads")
-                .update({
-                  funnel_stage: "pre_cadastro_concluido",
-                  status: "matricula_pendente",
-                  bot_enabled: false,
-                  updated_at: nowIso,
-                })
-                .eq("id", leadId);
+              const patchNowSim = {
+                funnel_stage: "pre_cadastro_concluido",
+                status: "matricula_pendente",
+                bot_enabled: false,
+                updated_at: nowIso,
+              };
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update(patchNowSim)
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    experimental_class_attendance_status: "attended",
+                    experimental_class_status: "completed",
+                  } as any)
+                  .eq("id", leadId);
+              } catch (_e) {}
             } catch (_e) {}
             try {
               void appendHistoryEvent({

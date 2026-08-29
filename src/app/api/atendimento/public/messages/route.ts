@@ -1281,6 +1281,29 @@ export async function POST(req: Request) {
         `${baseUrl.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullNameForLink)}&telefone=${encodeURIComponent(leadPhoneRaw || String((lead as any).phone ?? ""))}`;
       const yesMsg =
         `Maravilha, ${safeFirstName}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLink}`;
+      try {
+        const patchNow = {
+          funnel_stage: "pre_cadastro_concluido",
+          status: "matricula_pendente",
+          bot_enabled: false,
+          updated_at: nowIso,
+        };
+        try {
+          await admin
+            .from("atendimento_leads")
+            .update(patchNow)
+            .eq("id", String(lead.id));
+        } catch (_e) {}
+        try {
+          void admin
+            .from("atendimento_leads")
+            .update({
+              experimental_class_attendance_status: "attended",
+              experimental_class_status: "completed",
+            } as any)
+            .eq("id", String(lead.id));
+        } catch (_e) {}
+      } catch (_e) {}
       if (leadPhoneRaw) {
         try {
           await sendAtendimentoWhatsAppTextBatch({
