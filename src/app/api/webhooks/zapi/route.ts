@@ -2991,8 +2991,56 @@ export async function POST(req: Request) {
           return Response.json({
             ok: true,
             ignored: true,
-            reason: "global_nuclear_post_attendance_matricula_confirmada_ignored_quiet",
-            flow: "nuclear_post_attendance_matricula_confirmada_ignored",
+            reason: "nuclear_first_answer_lock_sim_previne_nao",
+            flow: "nuclear_post_attendance_primeira_resposta_sim_locked",
+          });
+        }
+
+        if (postAttendanceHistoryMatriculaRecusadaEvent) {
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: mediaInfo.hasPaymentMedia
+                ? mediaInfo.mediaUrl
+                  ? "document"
+                  : "text"
+                : "text",
+              media_url: mediaInfo.mediaUrl || null,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", leadId);
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "nuclear_first_answer_lock_nao_previne_sim",
+            flow: "nuclear_post_attendance_primeira_resposta_nao_locked",
           });
         }
 
