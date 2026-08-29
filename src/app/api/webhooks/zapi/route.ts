@@ -3124,7 +3124,114 @@ export async function POST(req: Request) {
               .eq("id", leadId);
           } catch (_e) {}
 
+          const isRepescagemOrRecusadaZapiEarly =
+            leadEstaEmMatriculaRecusadaPosAttendance ||
+            leadEstaEmRepescagemNoShow ||
+            funnelStageRaw === "repescagem" ||
+            leadStatusRaw === "repescagem" ||
+            funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada" ||
+            postAttendanceHistoryMatriculaRecusadaEvent ||
+            postAttendanceHistoryConfirmedNoShowEvent ||
+            flatLeadAttendanceNoShowByCol ||
+            bookingAttendanceNoShowByCol;
+          const hasAnyAttendanceSignalZapiEarly =
+            postAttendanceHistoryConfirmedAttendedEvent ||
+            postAttendanceHistoryConfirmedNoShowEvent ||
+            postAttendanceHistoryMatriculaRecusadaEvent ||
+            bookingAttendanceAttendedByCol ||
+            bookingAttendanceNoShowByCol ||
+            flatLeadAttendanceAttendedByCol ||
+            flatLeadAttendanceNoShowByCol ||
+            flatLeadCompletedStatus ||
+            Boolean(currentBookingId);
+          if (
+            isYesNuclear &&
+            !postAttendanceHistoryMatriculaConfirmadaEvent &&
+            !leadEstaEmMatriculaConfirmadaPosAttendance &&
+            (isRepescagemOrRecusadaZapiEarly || hasAnyAttendanceSignalZapiEarly)
+          ) {
+            const safeFirstNameZapi =
+              (String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] ?? "").trim() || "Aluno(a)";
+            const safeFullNameForLinkZapi =
+              String((lead as any)?.full_name ?? "").trim() || safeFirstNameZapi || "Aluno(a)";
+            const baseUrlZapi =
+              resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) ||
+              "https://www.autobot.business";
+            const cadastroLinkZapi =
+              `${baseUrlZapi.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullNameForLinkZapi)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
+            const yesMsgZapi =
+              `Maravilha, ${safeFirstNameZapi}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkZapi}`;
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "pre_cadastro_concluido",
+                  status: "matricula_pendente",
+                  bot_enabled: false,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  experimental_class_attendance_status: "attended",
+                  experimental_class_status: "completed",
+                } as any)
+                .eq("id", leadId);
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: [yesMsgZapi],
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+                allowNoInbound: true,
+              });
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_pendente_resposta_sim_nuclear",
+                title: "Matricula pendente pos-attendance (zapi FORCE EARLY): lead respondeu SIM",
+                details: {
+                  inbound_text: inboundContentRaw || null,
+                  reply_messages: [yesMsgZapi],
+                  cadastro_link: cadastroLinkZapi,
+                  source: "zapi_post_attendance_force_early",
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              ignored: false,
+              handled: true,
+              flow: "zapi_post_attendance_sim_force_early_remove_repescagem",
+            });
+          }
+
           if (leadEstaEmMatriculaConfirmadaPosAttendance) {
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "pre_cadastro_concluido",
+                  status: "matricula_pendente",
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
             return Response.json({
               ok: true,
               ignored: true,
@@ -3134,6 +3241,16 @@ export async function POST(req: Request) {
           }
 
           if (postAttendanceHistoryMatriculaConfirmadaEvent) {
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "pre_cadastro_concluido",
+                  status: "matricula_pendente",
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
             return Response.json({
               ok: true,
               ignored: true,
