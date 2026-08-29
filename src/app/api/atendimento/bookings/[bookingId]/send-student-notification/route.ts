@@ -121,17 +121,25 @@ export async function POST(
   }
 
   if (!resolvedBooking) {
-    const fallbackLeadId =
-      payload?.leadId && String(payload.leadId).trim()
+    const trimmedPayloadLeadId =
+      payload?.leadId !== undefined && payload?.leadId !== null && String(payload.leadId).trim() !== ""
         ? String(payload.leadId).trim()
-        : normalizedBookingId.startsWith("draft-")
-          ? normalizedBookingId.slice("draft-".length)
-          : "";
+        : "";
+    let fallbackLeadId = trimmedPayloadLeadId;
+    if (!fallbackLeadId) {
+      if (normalizedBookingId === "fallback") {
+        fallbackLeadId = "";
+      } else if (normalizedBookingId.startsWith("draft-")) {
+        fallbackLeadId = normalizedBookingId.slice("draft-".length);
+      } else {
+        fallbackLeadId = "";
+      }
+    }
     if (fallbackLeadId) {
       const { data: fallbackLead, error: flErr } = await admin
         .from("atendimento_leads")
         .select(
-          "id, full_name, phone, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at",
+          "id, full_name, phone, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_student_notification_sent_at, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at",
         )
         .eq("id", fallbackLeadId)
         .maybeSingle();

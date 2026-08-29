@@ -1,5 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled } from "@/lib/atendimento/server";
+import { requireAtendimentoUser, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled, maybeSendExperimentalClassConfirmationToStudent } from "@/lib/atendimento/server";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { z } from "zod";
 
@@ -759,6 +759,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     Object.prototype.hasOwnProperty.call(updateData, "funnel_stage");
   if (touchedScheduleFields) {
     void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+      leadId,
+      leadName: String((updated as any)?.full_name ?? "").trim() || null,
+      conversationId: null,
+    });
+    void maybeSendExperimentalClassConfirmationToStudent({
       leadId,
       leadName: String((updated as any)?.full_name ?? "").trim() || null,
       conversationId: null,
