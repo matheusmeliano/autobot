@@ -123,6 +123,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     timezone: z.string().trim().max(120).nullable().optional(),
     funnel_stage: z.string().trim().max(120).nullable().optional(),
     experimental_class_status: z.string().trim().max(120).nullable().optional(),
+    experimental_class_lead_date: z.string().trim().max(40).nullable().optional(),
+    experimental_class_lead_time: z.string().trim().max(20).nullable().optional(),
+    experimental_class_professor_date: z.string().trim().max(40).nullable().optional(),
+    experimental_class_professor_time: z.string().trim().max(20).nullable().optional(),
+    experimental_class_lead_start_at: z.string().trim().max(80).nullable().optional(),
+    experimental_class_professor_start_at: z.string().trim().max(80).nullable().optional(),
+    experimental_class_link: z.string().trim().max(500).nullable().optional(),
+    experimental_class_professor_name: z.string().trim().max(160).nullable().optional(),
+    experimental_class_professor_phone: z.string().trim().max(40).nullable().optional(),
+    experimental_class_booking_id: z.string().trim().max(120).nullable().optional(),
   });
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -684,6 +694,41 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     safeExpStatus = String(expStatusRaw).trim() || null;
   }
 
+  function toSafeStringTrimOrNull<T>(value: T | undefined | null): undefined | null | string {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const s = String(value).trim();
+    return s.length === 0 ? null : s;
+  }
+
+  const safeExpLeadDate = toSafeStringTrimOrNull(parsed.data.experimental_class_lead_date);
+  const safeExpLeadTime = toSafeStringTrimOrNull(parsed.data.experimental_class_lead_time);
+  const safeExpProfessorDate = toSafeStringTrimOrNull(parsed.data.experimental_class_professor_date);
+  const safeExpProfessorTime = toSafeStringTrimOrNull(parsed.data.experimental_class_professor_time);
+  const safeExpLeadStartAt = toSafeStringTrimOrNull(parsed.data.experimental_class_lead_start_at);
+  const safeExpProfessorStartAt = toSafeStringTrimOrNull(parsed.data.experimental_class_professor_start_at);
+
+  let safeExpLink: undefined | null | string = undefined;
+  const expLinkRaw = parsed.data.experimental_class_link;
+  if (expLinkRaw === undefined) {
+    safeExpLink = undefined;
+  } else if (expLinkRaw === null) {
+    safeExpLink = null;
+  } else {
+    const trimmed = String(expLinkRaw).trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      safeExpLink = trimmed;
+    } else if (trimmed.length === 0) {
+      safeExpLink = null;
+    } else {
+      safeExpLink = null;
+    }
+  }
+
+  const safeExpProfessorName = toSafeStringTrimOrNull(parsed.data.experimental_class_professor_name);
+  const safeExpProfessorPhone = toSafeStringTrimOrNull(parsed.data.experimental_class_professor_phone);
+  const safeExpBookingId = toSafeStringTrimOrNull(parsed.data.experimental_class_booking_id);
+
   const admin = createSupabaseAdminClient();
   const updateData: Record<string, unknown> = {};
   if (safeFullName !== undefined) updateData.full_name = safeFullName;
@@ -694,12 +739,22 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   if (safeTimezone !== undefined) updateData.timezone = safeTimezone;
   if (safeFunnelStage !== undefined) updateData.funnel_stage = safeFunnelStage;
   if (safeExpStatus !== undefined) updateData.experimental_class_status = safeExpStatus;
+  if (safeExpLeadDate !== undefined) updateData.experimental_class_lead_date = safeExpLeadDate;
+  if (safeExpLeadTime !== undefined) updateData.experimental_class_lead_time = safeExpLeadTime;
+  if (safeExpProfessorDate !== undefined) updateData.experimental_class_professor_date = safeExpProfessorDate;
+  if (safeExpProfessorTime !== undefined) updateData.experimental_class_professor_time = safeExpProfessorTime;
+  if (safeExpLeadStartAt !== undefined) updateData.experimental_class_lead_start_at = safeExpLeadStartAt;
+  if (safeExpProfessorStartAt !== undefined) updateData.experimental_class_professor_start_at = safeExpProfessorStartAt;
+  if (safeExpLink !== undefined) updateData.experimental_class_link = safeExpLink;
+  if (safeExpProfessorName !== undefined) updateData.experimental_class_professor_name = safeExpProfessorName;
+  if (safeExpProfessorPhone !== undefined) updateData.experimental_class_professor_phone = safeExpProfessorPhone;
+  if (safeExpBookingId !== undefined) updateData.experimental_class_booking_id = safeExpBookingId;
 
   if (Object.keys(updateData).length === 0) {
     return Response.json({ ok: true, lead: null });
   }
 
-  const selectFull = "id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, updated_at";
+  const selectFull = "id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_link, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_booking_id, updated_at";
   const selectSafe = "id, full_name, recurring_class_link, city, state, country, timezone, updated_at";
 
   let updated: any = null;
@@ -756,7 +811,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
 
   const touchedScheduleFields =
     Object.prototype.hasOwnProperty.call(updateData, "experimental_class_status") ||
-    Object.prototype.hasOwnProperty.call(updateData, "funnel_stage");
+    Object.prototype.hasOwnProperty.call(updateData, "funnel_stage") ||
+    Object.prototype.hasOwnProperty.call(updateData, "experimental_class_lead_date") ||
+    Object.prototype.hasOwnProperty.call(updateData, "experimental_class_lead_time") ||
+    Object.prototype.hasOwnProperty.call(updateData, "experimental_class_professor_date") ||
+    Object.prototype.hasOwnProperty.call(updateData, "experimental_class_professor_time") ||
+    Object.prototype.hasOwnProperty.call(updateData, "experimental_class_booking_id");
   if (touchedScheduleFields) {
     void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
       leadId,

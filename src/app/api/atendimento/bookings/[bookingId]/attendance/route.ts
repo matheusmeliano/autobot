@@ -171,6 +171,51 @@ export async function POST(
 
     resolvedBooking = (bookingWithLessonLinkResult.data as Record<string, unknown> | null) ?? null;
   }
+
+  if (!resolvedBooking) {
+    const trimmedPayloadLeadId = String(payload?.leadId ?? "").trim();
+    let fallbackLeadId = "";
+    if (trimmedPayloadLeadId) {
+      fallbackLeadId = trimmedPayloadLeadId;
+    } else if (normalizedBookingId === "fallback") {
+      fallbackLeadId = "";
+    } else if (normalizedBookingId.startsWith("draft-")) {
+      fallbackLeadId = normalizedBookingId.slice("draft-".length);
+    }
+    if (fallbackLeadId) {
+      const { data: fallbackLead, error: flErr } = await admin
+        .from("atendimento_leads")
+        .select(
+          "id, full_name, phone, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_attendance_status, experimental_class_attendance_checked_at, experimental_class_professor_name, experimental_class_professor_phone",
+        )
+        .eq("id", fallbackLeadId)
+        .maybeSingle();
+      if (!flErr && fallbackLead) {
+        resolvedBooking = {
+          id: normalizedBookingId || `draft-${fallbackLeadId}`,
+          lead_id: String((fallbackLead as any).id),
+          conversation_id: null,
+          status:
+            String((fallbackLead as any).experimental_class_status ?? "").trim() ||
+            String((fallbackLead as any).funnel_stage ?? "").trim() ||
+            "scheduled",
+          lesson_link: String((fallbackLead as any).experimental_class_link ?? "").trim(),
+          professor_date: String((fallbackLead as any).experimental_class_professor_date ?? "").trim(),
+          professor_time: String((fallbackLead as any).experimental_class_professor_time ?? "").trim(),
+          professor_start_at: String((fallbackLead as any).experimental_class_professor_start_at ?? "").trim(),
+          lead_date: String((fallbackLead as any).experimental_class_lead_date ?? "").trim(),
+          lead_time: String((fallbackLead as any).experimental_class_lead_time ?? "").trim(),
+          lead_start_at:
+            String((fallbackLead as any).experimental_class_lead_start_at ?? "").trim() ||
+            String((fallbackLead as any).experimental_class_professor_start_at ?? "").trim(),
+          attendance_status: String((fallbackLead as any).experimental_class_attendance_status ?? "").trim(),
+          attendance_checked_at: String((fallbackLead as any).experimental_class_attendance_checked_at ?? "").trim(),
+          source: "draft_fallback",
+        } as unknown as Record<string, unknown>;
+      }
+    }
+  }
+
   const leadId = String((resolvedBooking as any)?.lead_id ?? payload?.leadId ?? "").trim();
   const conversationId = String((resolvedBooking as any)?.conversation_id ?? payload?.conversationId ?? "").trim() || null;
 
@@ -213,27 +258,70 @@ export async function POST(
     String((existingPostAttendanceHistory as any)?.id ?? "").trim() !== "";
 
   if (resolvedBooking && String((resolvedBooking as any)?.id ?? "").trim()) {
-    const attendanceUpdatePayload: Record<string, unknown> = {
-      attendance_status: attendance,
-      attendance_checked_at: checkedAtIso,
-      updated_at: checkedAtIso,
-    };
-    if (attendance === "attended") {
-      attendanceUpdatePayload.status = "completed";
-    }
-    if (attendance === "no_show") {
-      attendanceUpdatePayload.lesson_link = null;
-      attendanceUpdatePayload.student_start_notification_sent_at = null;
-      attendanceUpdatePayload.attendant_start_notification_sent_at = null;
-    }
+    const isDraftFallback =
+      String((resolvedBooking as any)?.source ?? "").trim() === "draft_fallback";
+    if (!isDraftFallback) {
+      const attendanceUpdatePayload: Record<string, unknown> = {
+        attendance_status: attendance,
+        attendance_checked_at: checkedAtIso,
+        updated_at: checkedAtIso,
+      };
+      if (attendance === "attended") {
+        attendanceUpdatePayload.status = "completed";
+      }
+      if (attendance === "no_show") {
+        attendanceUpdatePayload.lesson_link = null;
+        attendanceUpdatePayload.student_start_notification_sent_at = null;
+        attendanceUpdatePayload.attendant_start_notification_sent_at = null;
+      }
 
-    try {
-      const { error: updateError } = await admin
-        .from("atendimento_experimental_class_bookings")
-        .update(attendanceUpdatePayload)
-        .eq("id", String((resolvedBooking as any).id));
+      try {
+        const { error: updateError } = await admin
+          .from("atendimento_experimental_class_bookings")
+          .update(attendanceUpdatePayload)
+          .eq("id", String((resolvedBooking as any).id));
 
-      if (updateError && isExperimentalClassBookingsAttendanceColumnsUnavailable(updateError)) {
+        if (updateError && isExperimentalClassBookingsAttendanceColumnsUnavailable(updateError)) {
+          const fallbackPayload: Record<string, unknown> = { updated_at: checkedAtIso };
+          if (attendance === "attended") fallbackPayload.status = "completed";
+          try {
+            await admin
+              .from("atendimento_experimental_class_bookings")
+              .update(fallbackPayload)
+              .eq("id", String((resolvedBooking as any).id));
+          } catch (_e) {}
+        } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
+          const msg = String((updateError as any)?.message ?? "");
+          const code = String((updateError as any)?.code ?? "");
+          const isLessonLinkOrNotificationMissingColError =
+            attendance === "no_show" &&
+            (code === "42703" ||
+              code === "PGRST204" ||
+              code === "PGRST205" ||
+              /lesson_link|notification_sent_at|student_start|attendant_start/i.test(msg));
+          if (isLessonLinkOrNotificationMissingColError) {
+            try {
+              const safeFallbackPayload: Record<string, unknown> = {
+                attendance_status: attendance,
+                attendance_checked_at: checkedAtIso,
+                updated_at: checkedAtIso,
+              };
+              await admin
+                .from("atendimento_experimental_class_bookings")
+                .update(safeFallbackPayload)
+                .eq("id", String((resolvedBooking as any).id));
+            } catch (_e2) {}
+          } else {
+            return Response.json({ ok: false, error: updateError.message }, { status: 500 });
+          }
+        }
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !isExperimentalClassBookingsAttendanceColumnsUnavailable(error)
+        ) {
+          throw error;
+        }
         const fallbackPayload: Record<string, unknown> = { updated_at: checkedAtIso };
         if (attendance === "attended") fallbackPayload.status = "completed";
         try {
@@ -242,46 +330,36 @@ export async function POST(
             .update(fallbackPayload)
             .eq("id", String((resolvedBooking as any).id));
         } catch (_e) {}
-      } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
-        const msg = String((updateError as any)?.message ?? "");
-        const code = String((updateError as any)?.code ?? "");
-        const isLessonLinkOrNotificationMissingColError =
-          attendance === "no_show" &&
-          (code === "42703" ||
-            code === "PGRST204" ||
-            code === "PGRST205" ||
-            /lesson_link|notification_sent_at|student_start|attendant_start/i.test(msg));
-        if (isLessonLinkOrNotificationMissingColError) {
-          try {
-            const safeFallbackPayload: Record<string, unknown> = {
-              attendance_status: attendance,
-              attendance_checked_at: checkedAtIso,
-              updated_at: checkedAtIso,
-            };
-            await admin
-              .from("atendimento_experimental_class_bookings")
-              .update(safeFallbackPayload)
-              .eq("id", String((resolvedBooking as any).id));
-          } catch (_e2) {}
-        } else {
-          return Response.json({ ok: false, error: updateError.message }, { status: 500 });
-        }
       }
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !isExperimentalClassBookingsAttendanceColumnsUnavailable(error)
-      ) {
-        throw error;
-      }
-      const fallbackPayload: Record<string, unknown> = { updated_at: checkedAtIso };
-      if (attendance === "attended") fallbackPayload.status = "completed";
+    } else {
       try {
-        await admin
-          .from("atendimento_experimental_class_bookings")
-          .update(fallbackPayload)
-          .eq("id", String((resolvedBooking as any).id));
-      } catch (_e) {}
+        const patchLead: Record<string, any> = { updated_at: checkedAtIso };
+        patchLead.experimental_class_attendance_status = attendance;
+        patchLead.experimental_class_attendance_checked_at = checkedAtIso;
+        if (attendance === "attended") {
+          patchLead.experimental_class_status = "completed";
+        }
+        if (attendance === "no_show") {
+          patchLead.experimental_class_link = null;
+          patchLead.experimental_class_student_notification_sent_at = null;
+          patchLead.experimental_class_attendant_notification_sent_at = null;
+        }
+        const { error: patchLeadErr } = await admin
+          .from("atendimento_leads")
+          .update(patchLead)
+          .eq("id", leadId);
+        if (patchLeadErr) {
+          console.error(
+            `[attendance] draft fallback: falhou ao marcar attendance no lead ${leadId}`,
+            patchLeadErr,
+          );
+        }
+      } catch (e) {
+        console.error(
+          `[attendance] draft fallback: erro ao marcar attendance no lead ${leadId}`,
+          e,
+        );
+      }
     }
   }
 
