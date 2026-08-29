@@ -3105,6 +3105,7 @@ export async function POST(req: Request) {
               admin,
               conversationId,
               insertIntoConversation: true,
+              allowNoInbound: true,
             });
             try {
               void appendHistoryEvent({
@@ -3153,7 +3154,19 @@ export async function POST(req: Request) {
               admin,
               conversationId,
               insertIntoConversation: true,
+              allowNoInbound: true,
             });
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "pre_cadastro_concluido",
+                  status: "matricula_pendente",
+                  bot_enabled: false,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
             try {
               void appendHistoryEvent({
                 leadId,
@@ -3173,7 +3186,7 @@ export async function POST(req: Request) {
             try {
               await admin
                 .from("atendimento_conversations")
-                .update({ updated_at: nowIso })
+                .update({ bot_enabled: false, updated_at: nowIso })
                 .eq("id", conversationId);
             } catch (_e) {}
             try {

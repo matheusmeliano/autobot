@@ -866,6 +866,8 @@ export async function sendAtendimentoWhatsAppText(params: {
   message: string;
   baseUrl?: string | null;
   allowNoInbound?: boolean;
+  admin?: any;
+  conversationId?: string | null;
 }) {
   const config = await getAtendimentoWhatsAppConfig();
   if (!config) {
@@ -903,84 +905,90 @@ export async function sendAtendimentoWhatsAppText(params: {
   let resolvedConversationIdForDedupe: string | null = null;
 
   if (normalizedDest && !internalNotificationPhones.has(normalizedDest)) {
-    const admin = createSupabaseAdminClient();
-    const { data: leadRow } = await admin
-      .from("atendimento_leads")
-      .select("id")
-      .ilike("phone", `%${normalizedDest}%`)
-      .limit(1)
-      .maybeSingle();
+    const admin = params.admin || createSupabaseAdminClient();
+    const passedConversationId = String(params.conversationId ?? "").trim();
 
-    if (leadRow?.id) {
-      const { data: conv } = await admin
-        .from("atendimento_conversations")
+    if (passedConversationId) {
+      resolvedConversationIdForDedupe = passedConversationId;
+    } else {
+      const { data: leadRow } = await admin
+        .from("atendimento_leads")
         .select("id")
-        .eq("lead_id", String((leadRow as any).id))
-        .order("created_at", { ascending: false })
+        .ilike("phone", `%${normalizedDest}%`)
         .limit(1)
         .maybeSingle();
-      const conversationId = String((conv as any)?.id ?? "").trim();
 
-      if (!conversationId) {
-        return {
-          ok: false,
-          skipped: true,
-          reason: "no_conversation_found_for_lead",
-          phone: normalizedDest,
-        };
-      }
+      if (leadRow?.id) {
+        const { data: conv } = await admin
+          .from("atendimento_conversations")
+          .select("id")
+          .eq("lead_id", String((leadRow as any).id))
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const conversationId = String((conv as any)?.id ?? "").trim();
 
-      resolvedConversationIdForDedupe = conversationId;
-
-      if (!Boolean(params.allowNoInbound)) {
-        const { count: inboundCount } = await admin
-          .from("atendimento_messages")
-          .select("id", { count: "exact", head: true })
-          .eq("conversation_id", conversationId)
-          .eq("sender_role", "lead");
-
-        if (Number(inboundCount ?? 0) <= 0) {
+        if (!conversationId) {
           return {
             ok: false,
             skipped: true,
-            reason: "no_prior_inbound_message_from_lead",
+            reason: "no_conversation_found_for_lead",
             phone: normalizedDest,
           };
         }
-      }
 
-      const messageText = String(params.message ?? "").trim();
-      if (messageText) {
-        const dedupeWindowStartUtc = new Date(Date.now() - 60 * 60_000).toISOString();
-        const dedupeGraceEndUtc = new Date(Date.now() - 15_000).toISOString();
-        try {
-          const { count: duplicates } = await admin
-            .from("atendimento_messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conversationId)
-            .eq("sender_role", "bot")
-            .eq("content_text", messageText)
-            .gte("sent_at", dedupeWindowStartUtc)
-            .lte("sent_at", dedupeGraceEndUtc)
-            .limit(1);
-          if (Number(duplicates ?? 0) > 0) {
-            return {
-              ok: false,
-              skipped: true,
-              reason: "duplicate_bot_message_within_60min_window",
-              phone: normalizedDest,
-              conversationId,
-            };
-          }
-        } catch (_e) {}
+        resolvedConversationIdForDedupe = conversationId;
+      } else {
+        return {
+          ok: false,
+          skipped: true,
+          reason: "unknown_lead_no_prior_inbound",
+          phone: normalizedDest,
+        };
       }
-    } else {
-      return {
-        ok: false,
-        skipped: true,
-        reason: "unknown_lead_no_prior_inbound",
-        phone: normalizedDest,
-      };
+    }
+
+    if (resolvedConversationIdForDedupe && !Boolean(params.allowNoInbound)) {
+      const { count: inboundCount } = await admin
+        .from("atendimento_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", resolvedConversationIdForDedupe)
+        .eq("sender_role", "lead");
+
+      if (Number(inboundCount ?? 0) <= 0) {
+        return {
+          ok: false,
+          skipped: true,
+          reason: "no_prior_inbound_message_from_lead",
+          phone: normalizedDest,
+        };
+      }
+    }
+
+    const messageText = String(params.message ?? "").trim();
+    if (messageText && resolvedConversationIdForDedupe) {
+      const dedupeWindowStartUtc = new Date(Date.now() - 60 * 60_000).toISOString();
+      const dedupeGraceEndUtc = new Date(Date.now() - 15_000).toISOString();
+      try {
+        const { count: duplicates } = await admin
+          .from("atendimento_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("conversation_id", resolvedConversationIdForDedupe)
+          .eq("sender_role", "bot")
+          .eq("content_text", messageText)
+          .gte("sent_at", dedupeWindowStartUtc)
+          .lte("sent_at", dedupeGraceEndUtc)
+          .limit(1);
+        if (Number(duplicates ?? 0) > 0) {
+          return {
+            ok: false,
+            skipped: true,
+            reason: "duplicate_bot_message_within_60min_window",
+            phone: normalizedDest,
+            conversationId: resolvedConversationIdForDedupe,
+          };
+        }
+      } catch (_e) {}
     }
   }
 
@@ -1029,7 +1037,7 @@ export async function sendAtendimentoWhatsAppTextBatch(params: {
 
   const sends = safeMessages.map(async (message) => {
     try {
-      const r = await sendAtendimentoWhatsAppText({ phone, message, baseUrl, allowNoInbound });
+      const r = await sendAtendimentoWhatsAppText({ phone, message, baseUrl, allowNoInbound, admin, conversationId });
       return { ok: true, message, result: r };
     } catch (e) {
       return { ok: false, message, error: String((e as any)?.message ?? "") };
