@@ -54,6 +54,8 @@ import {
   maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
   maybeSendExperimentalClassConfirmationToStudent,
   sendAtendimentoWhatsAppText,
+  sendAtendimentoWhatsAppTextBatch,
+  detectLenientYesNo,
   syncConversationPreview,
   triggerRecurringPaymentIntentIfNeeded,
 } from "@/lib/atendimento/server";
@@ -1058,6 +1060,250 @@ export async function POST(req: Request) {
 
   const currentFunnelStage = String((lead as any).funnel_stage ?? "").trim();
   const currentStatus = String((lead as any).status ?? "").trim();
+
+  const lastBotMsgText = String(lastBotMessage?.content_text ?? "").trim();
+  const lastBotAsksSimNao =
+    lastBotMsgText.includes("Responda com sim ou não.") ||
+    lastBotMsgText.includes("Vamos confirmar sua matrícula e iniciar suas aulas?");
+
+  const flatAttendanceAttended =
+    String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "attended";
+  const flatAttendanceNoShow =
+    String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "no_show";
+  const flatExpCompleted =
+    String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase() === "completed";
+  const bookingAttendanceAttended =
+    String((lead as any)?.experimental_class_booking?.attendance_status ?? "").trim().toLowerCase() === "attended";
+  const bookingAttendanceNoShow =
+    String((lead as any)?.experimental_class_booking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
+  const hasBookingReal = Boolean(String((lead as any)?.experimental_class_booking?.id ?? "").trim());
+  const isRepescagemStage =
+    currentFunnelStage === "repescagem" || currentStatus === "repescagem";
+
+  const { data: recentHistoryEvents } = await admin
+    .from("atendimento_history_events")
+    .select("event_type, id")
+    .eq("lead_id", String(lead.id))
+    .in("event_type", [
+      "experimental_class_attendance_confirmation_message_sent",
+      "experimental_class_attendance_no_show_message_sent",
+      "matricula_pendente_resposta_sim_nuclear",
+      "matricula_pendente_resposta_nao_nuclear",
+      "experimental_class_attendance_confirmed",
+    ])
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const historyEventTypeSet = new Set(
+    (recentHistoryEvents ?? []).map((e) => String((e as any).event_type ?? "").trim()),
+  );
+  const postAttendanceHistoryConfirmedAttendedEvent =
+    historyEventTypeSet.has("experimental_class_attendance_confirmed") ||
+    historyEventTypeSet.has("experimental_class_attendance_confirmation_message_sent");
+  const postAttendanceHistoryConfirmedNoShowEvent = historyEventTypeSet.has(
+    "experimental_class_attendance_no_show_message_sent",
+  );
+  const postAttendanceHistoryMatriculaConfirmadaEvent = historyEventTypeSet.has(
+    "matricula_pendente_resposta_sim_nuclear",
+  );
+  const postAttendanceHistoryMatriculaRecusadaEvent = historyEventTypeSet.has(
+    "matricula_pendente_resposta_nao_nuclear",
+  );
+
+  const lenientDecision = detectLenientYesNo(contentText);
+  const isYesLenient = lenientDecision.result === "yes";
+  const isNoLenient = lenientDecision.result === "no";
+
+  const inPostAttendanceWindow =
+    lastBotAsksSimNao &&
+    !postAttendanceHistoryMatriculaConfirmadaEvent &&
+    !postAttendanceHistoryMatriculaRecusadaEvent &&
+    ((currentFunnelStage === "matricula_pendente" ||
+      currentStatus === "matricula_pendente" ||
+      currentFunnelStage === "matricula_pendente_recusada" ||
+      currentStatus === "matricula_pendente_recusada") &&
+      (postAttendanceHistoryConfirmedAttendedEvent ||
+        flatAttendanceAttended ||
+        flatExpCompleted ||
+        bookingAttendanceAttended ||
+        hasBookingReal));
+
+  if (postAttendanceHistoryMatriculaConfirmadaEvent) {
+    try {
+      void admin
+        .from("atendimento_leads")
+        .update({
+          unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+          is_new_for_attendant: true,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", String(lead.id));
+    } catch (_e) {}
+    try {
+      void admin
+        .from("atendimento_conversations")
+        .update({ bot_enabled: false, updated_at: nowIso })
+        .eq("id", String(conversation.id));
+    } catch (_e) {}
+  }
+
+  if (inPostAttendanceWindow && (isYesLenient || isNoLenient)) {
+    try {
+      void admin
+        .from("atendimento_leads")
+        .update({
+          unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+          is_new_for_attendant: true,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", String(lead.id));
+    } catch (_e) {}
+
+    const safeFirstName =
+      (String((lead as any).full_name ?? "").trim().split(/\s+/)[0] ?? "").trim() || "Aluno(a)";
+    const safeFullNameForLink =
+      String((lead as any).full_name ?? "").trim() || safeFirstName || "Aluno(a)";
+    const leadPhoneRaw = String((lead as any).phone ?? "").trim();
+
+    if (isNoLenient) {
+      try {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            funnel_stage: "matricula_pendente_recusada",
+            status: "matricula_pendente_recusada",
+            updated_at: nowIso,
+          })
+          .eq("id", String(lead.id));
+      } catch (_e) {}
+      const noMsg1 = safeFirstName
+        ? `Tudo bem, ${safeFirstName}. Entendemos que talvez ainda não seja o momento.`
+        : "Tudo bem, entendemos que talvez ainda não seja o momento.";
+      const replies = [[noMsg1, "Em breve nossa equipe entrará em contato."].filter(Boolean).join("\n\n")];
+      if (leadPhoneRaw) {
+        try {
+          await sendAtendimentoWhatsAppTextBatch({
+            phone: leadPhoneRaw,
+            messages: replies,
+            admin,
+            conversationId: String(conversation.id),
+            insertIntoConversation: true,
+          });
+        } catch (_e) {}
+      }
+      try {
+        void appendHistoryEvent({
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+          eventType: "matricula_pendente_resposta_nao_nuclear",
+          title: "Matricula pendente pos-attendance (evolution): lead respondeu NAO",
+          details: {
+            inbound_text: contentText || null,
+            reply_messages: replies,
+            source: "public_messages_evolution_post_attendance",
+          },
+          actorType: "bot",
+        });
+      } catch (_e) {}
+      try {
+        void admin
+          .from("atendimento_conversations")
+          .update({ bot_enabled: false, updated_at: nowIso })
+          .eq("id", String(conversation.id));
+      } catch (_e) {}
+      try {
+        void admin
+          .from("atendimento_leads")
+          .update({ bot_enabled: false, updated_at: nowIso })
+          .eq("id", String(lead.id));
+      } catch (_e) {}
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: null,
+        blocked: false,
+        handled: true,
+        flow: "post_attendance_matricula_pendente_resposta_nao",
+        conversation: { id: String(conversation.id), bot_enabled: false },
+      });
+    }
+
+    if (isYesLenient) {
+      const baseUrl =
+        resolveBaseUrlFromHeaders(
+          new Headers({ host: String(req.headers.get("host") ?? "") }),
+        ) || "https://www.autobot.business";
+      const cadastroLink =
+        `${baseUrl.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullNameForLink)}&telefone=${encodeURIComponent(leadPhoneRaw || String((lead as any).phone ?? ""))}`;
+      const yesMsg =
+        `Maravilha, ${safeFirstName}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLink}`;
+      if (leadPhoneRaw) {
+        try {
+          await sendAtendimentoWhatsAppTextBatch({
+            phone: leadPhoneRaw,
+            messages: [yesMsg],
+            admin,
+            conversationId: String(conversation.id),
+            insertIntoConversation: true,
+          });
+        } catch (_e) {}
+      }
+      try {
+        void appendHistoryEvent({
+          leadId: String(lead.id),
+          conversationId: String(conversation.id),
+          eventType: "matricula_pendente_resposta_sim_nuclear",
+          title: "Matricula pendente pos-attendance (evolution): lead respondeu SIM",
+          details: {
+            inbound_text: contentText || null,
+            reply_messages: [yesMsg],
+            cadastro_link: cadastroLink,
+            source: "public_messages_evolution_post_attendance",
+          },
+          actorType: "bot",
+        });
+      } catch (_e) {}
+      try {
+        void admin
+          .from("atendimento_conversations")
+          .update({ bot_enabled: false, updated_at: nowIso })
+          .eq("id", String(conversation.id));
+      } catch (_e) {}
+      try {
+        void admin
+          .from("atendimento_leads")
+          .update({
+            funnel_stage: "pre_cadastro_concluido",
+            status: "matricula_pendente",
+            bot_enabled: false,
+            updated_at: nowIso,
+          })
+          .eq("id", String(lead.id));
+      } catch (_e) {}
+      return Response.json({
+        ok: true,
+        inbound,
+        outbound: null,
+        blocked: false,
+        handled: true,
+        flow: "post_attendance_matricula_pendente_resposta_sim",
+        conversation: { id: String(conversation.id), bot_enabled: false },
+      });
+    }
+  }
+
+  if (postAttendanceHistoryConfirmedNoShowEvent && isRepescagemStage && flatAttendanceNoShow) {
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: null,
+      blocked: false,
+      ignored: true,
+      reason: "post_attendance_repescagem_no_show_ignored",
+    });
+  }
+
   const isContractRelatedStage =
     currentFunnelStage === "contrato_coletando_dados" ||
     currentFunnelStage === "contrato_aguardando_aceite" ||

@@ -2880,11 +2880,19 @@ export async function POST(req: Request) {
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         const bookingAttendanceNoShowByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
+        const flatLeadAttendanceAttendedByCol =
+          String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "attended";
+        const flatLeadAttendanceNoShowByCol =
+          String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "no_show";
+        const flatLeadCompletedStatus =
+          String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase() === "completed";
         const leadEstaEmMatriculaPendentePosAttendance =
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
           (postAttendanceHistoryConfirmedAttendedEvent ||
             Boolean(currentBookingId) ||
-            bookingAttendanceAttendedByCol) &&
+            bookingAttendanceAttendedByCol ||
+            flatLeadAttendanceAttendedByCol ||
+            flatLeadCompletedStatus) &&
           !postAttendanceHistoryMatriculaRecusadaEvent &&
           !postAttendanceHistoryMatriculaConfirmadaEvent;
         const leadEstaEmMatriculaRecusadaPosAttendance =
@@ -2893,33 +2901,40 @@ export async function POST(req: Request) {
             leadStatusRaw === "matricula_pendente_recusada") &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
               Boolean(currentBookingId) ||
-              bookingAttendanceAttendedByCol));
+              bookingAttendanceAttendedByCol ||
+              flatLeadAttendanceAttendedByCol));
         const leadEstaEmMatriculaConfirmadaPosAttendance =
           postAttendanceHistoryMatriculaConfirmadaEvent ||
           ((funnelStageRaw === "matricula_confirmada" || leadStatusRaw === "matricula_confirmada") &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
               Boolean(currentBookingId) ||
-              bookingAttendanceAttendedByCol));
+              bookingAttendanceAttendedByCol ||
+              flatLeadAttendanceAttendedByCol));
         const leadEstaEmRepescagemNoShow =
           (isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent) ||
           (isLeadRepescagemStatus && bookingAttendanceNoShowByCol) ||
+          (isLeadRepescagemStatus && flatLeadAttendanceNoShowByCol) ||
           (postAttendanceHistoryConfirmedNoShowEvent && (funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem"));
         const leadDirectlyInPosAttendanceStepNuclear =
           (funnelStageRaw === "matricula_pendente" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
               bookingAttendanceAttendedByCol ||
+              flatLeadAttendanceAttendedByCol ||
               Boolean(currentBookingId))) ||
           (funnelStageRaw === "matricula_pendente_recusada" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
               bookingAttendanceAttendedByCol ||
+              flatLeadAttendanceAttendedByCol ||
               Boolean(currentBookingId))) ||
           (leadStatusRaw === "matricula_pendente" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
               bookingAttendanceAttendedByCol ||
+              flatLeadAttendanceAttendedByCol ||
               Boolean(currentBookingId))) ||
           (leadStatusRaw === "matricula_pendente_recusada" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
               bookingAttendanceAttendedByCol ||
+              flatLeadAttendanceAttendedByCol ||
               Boolean(currentBookingId)));
         const entrouNoFluxoPosAttendancePorForcaBruta =
           ultimaMsgBotPedeSimNao &&
@@ -2992,6 +3007,8 @@ export async function POST(req: Request) {
           (ultimaMsgBotPedeSimNao &&
             (leadEstaEmMatriculaPendentePosAttendance ||
               postAttendanceHistoryConfirmedAttendedEvent ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadCompletedStatus ||
               (Boolean(currentBookingId) &&
                 (bookingAttendanceAttendedByCol ||
                   String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed"))))

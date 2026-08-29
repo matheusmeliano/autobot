@@ -573,32 +573,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       // ignore
     }
 
-    const bookingIdForHistory = bookingOut?.id ? String(bookingOut.id) : `draft-${leadId}`;
-    const studentPhone = String((leadExists as any)?.phone ?? "").trim();
-    if (studentPhone) {
-      try {
-        for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
-          await sendAtendimentoWhatsAppText({
-            phone: studentPhone,
-            message: m,
-            allowNoInbound: true,
-          });
-        }
-      } catch (error) {
-        await appendHistoryEvent({
-          leadId,
-          eventType: "experimental_class_whatsapp_confirmation_failed",
-          title: "Falha ao enviar a confirmação da aula experimental no WhatsApp",
-          details: {
-            booking_id: bookingIdForHistory,
-            phone: studentPhone,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
-        });
-      }
-    }
-
     const assignedBookingResolved =
       resolveExperimentalClassAssignedProfessorPhone({
         bookingAssignedPhone: String((bookingOut as any)?.assigned_professor_phone ?? "").trim(),

@@ -338,11 +338,15 @@ export async function POST(
         patchLead.experimental_class_attendance_checked_at = checkedAtIso;
         if (attendance === "attended") {
           patchLead.experimental_class_status = "completed";
+          patchLead.funnel_stage = "matricula_pendente";
+          patchLead.status = "matricula_pendente";
         }
         if (attendance === "no_show") {
           patchLead.experimental_class_link = null;
           patchLead.experimental_class_student_notification_sent_at = null;
           patchLead.experimental_class_attendant_notification_sent_at = null;
+          patchLead.funnel_stage = "repescagem";
+          patchLead.status = "repescagem";
         }
         const { error: patchLeadErr } = await admin
           .from("atendimento_leads")
