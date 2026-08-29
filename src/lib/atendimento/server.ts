@@ -1604,8 +1604,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
     const cachedRegisteredAttendantSent = sentRegisteredAttendantBookingIds.has(bookingId);
 
-    const studentDue =
-      leadStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
+    const studentDue = leadStartAtMs <= nowMs;
     const attendantDue =
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
     const registeredAttendantDue = attendantDue;

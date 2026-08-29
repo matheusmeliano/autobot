@@ -120,6 +120,47 @@ export async function POST(
     resolvedBooking = (bookingWithLessonLinkResult.data as Record<string, unknown> | null) ?? null;
   }
 
+  if (!resolvedBooking) {
+    const fallbackLeadId =
+      payload?.leadId && String(payload.leadId).trim()
+        ? String(payload.leadId).trim()
+        : normalizedBookingId.startsWith("draft-")
+          ? normalizedBookingId.slice("draft-".length)
+          : "";
+    if (fallbackLeadId) {
+      const { data: fallbackLead, error: flErr } = await admin
+        .from("atendimento_leads")
+        .select(
+          "id, full_name, phone, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at",
+        )
+        .eq("id", fallbackLeadId)
+        .maybeSingle();
+      if (!flErr && fallbackLead) {
+        resolvedBooking = {
+          id: normalizedBookingId || `draft-${fallbackLeadId}`,
+          lead_id: String((fallbackLead as any).id),
+          conversation_id: null,
+          status:
+            String((fallbackLead as any).experimental_class_status ?? "").trim() ||
+            String((fallbackLead as any).funnel_stage ?? "").trim() ||
+            "scheduled",
+          lesson_link: String((fallbackLead as any).experimental_class_link ?? "").trim(),
+          professor_start_at: String((fallbackLead as any).experimental_class_professor_start_at ?? "").trim(),
+          lead_start_at:
+            String((fallbackLead as any).experimental_class_lead_start_at ?? "").trim() ||
+            String((fallbackLead as any).experimental_class_professor_start_at ?? "").trim(),
+          student_start_notification_sent_at:
+            String((fallbackLead as any).experimental_class_student_notification_sent_at ?? "").trim(),
+          attendant_start_notification_sent_at:
+            String((fallbackLead as any).experimental_class_attendant_notification_sent_at ?? "").trim(),
+          assigned_professor_name: String((fallbackLead as any).experimental_class_professor_name ?? "").trim(),
+          assigned_professor_phone: String((fallbackLead as any).experimental_class_professor_phone ?? "").trim(),
+          source: "draft_fallback",
+        } as unknown as Record<string, unknown>;
+      }
+    }
+  }
+
   const leadId = String((resolvedBooking as any)?.lead_id ?? payload?.leadId ?? "").trim();
   const conversationId = String((resolvedBooking as any)?.conversation_id ?? payload?.conversationId ?? "").trim() || null;
   const bookingStatus = String((resolvedBooking as any)?.status ?? "scheduled").trim().toLowerCase();
@@ -347,38 +388,67 @@ export async function POST(
   }
 
   if (normalizedBookingPk) {
-    try {
-      const patch: Record<string, string> = { updated_at: sentAtIso };
-      if (studentNotificationOk) patch.student_start_notification_sent_at = sentAtIso;
-      if (attendantNotificationOk) patch.attendant_start_notification_sent_at = sentAtIso;
-      const { error: updateError } = await admin
-        .from("atendimento_experimental_class_bookings")
-        .update(patch as any)
-        .eq("id", normalizedBookingPk);
+    const isDraftFallback =
+      String((resolvedBooking as any)?.source ?? "").trim() === "draft_fallback";
+    if (!isDraftFallback) {
+      try {
+        const patch: Record<string, string> = { updated_at: sentAtIso };
+        if (studentNotificationOk) patch.student_start_notification_sent_at = sentAtIso;
+        if (attendantNotificationOk) patch.attendant_start_notification_sent_at = sentAtIso;
+        const { error: updateError } = await admin
+          .from("atendimento_experimental_class_bookings")
+          .update(patch as any)
+          .eq("id", normalizedBookingPk);
 
-      if (updateError && isExperimentalClassBookingsNotificationColumnsUnavailable(updateError)) {
+        if (updateError && isExperimentalClassBookingsNotificationColumnsUnavailable(updateError)) {
+          try {
+            await admin
+              .from("atendimento_experimental_class_bookings")
+              .update({ updated_at: sentAtIso })
+              .eq("id", normalizedBookingPk);
+          } catch (_e) {}
+        } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
+          return Response.json({ ok: false, error: updateError.message }, { status: 500 });
+        }
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !isExperimentalClassBookingsNotificationColumnsUnavailable(error)
+        ) {
+          throw error;
+        }
         try {
           await admin
             .from("atendimento_experimental_class_bookings")
             .update({ updated_at: sentAtIso })
             .eq("id", normalizedBookingPk);
         } catch (_e) {}
-      } else if (updateError && !isExperimentalClassBookingsTableUnavailable(updateError)) {
-        return Response.json({ ok: false, error: updateError.message }, { status: 500 });
       }
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !isExperimentalClassBookingsNotificationColumnsUnavailable(error)
-      ) {
-        throw error;
-      }
+    } else {
       try {
-        await admin
-          .from("atendimento_experimental_class_bookings")
-          .update({ updated_at: sentAtIso })
-          .eq("id", normalizedBookingPk);
-      } catch (_e) {}
+        const patchLead: Record<string, any> = { updated_at: sentAtIso };
+        if (studentNotificationOk) {
+          patchLead.experimental_class_student_start_notification_sent_at = sentAtIso;
+        }
+        if (attendantNotificationOk) {
+          patchLead.experimental_class_attendant_start_notification_sent_at = sentAtIso;
+        }
+        const { error: patchLeadErr } = await admin
+          .from("atendimento_leads")
+          .update(patchLead)
+          .eq("id", leadId);
+        if (patchLeadErr) {
+          console.error(
+            `[send-student-notification] draft fallback: falhou ao marcar sent_at no lead ${leadId}`,
+            patchLeadErr,
+          );
+        }
+      } catch (e) {
+        console.error(
+          `[send-student-notification] draft fallback: erro ao marcar sent_at no lead ${leadId}`,
+          e,
+        );
+      }
     }
   }
 
