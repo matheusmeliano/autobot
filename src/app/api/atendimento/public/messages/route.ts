@@ -52,6 +52,7 @@ import {
   formalizeAndPersistContract,
   getAuthenticatedAtendimentoConversationAccess,
   maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
+  maybeSendExperimentalClassConfirmationToStudent,
   sendAtendimentoWhatsAppText,
   syncConversationPreview,
   triggerRecurringPaymentIntentIfNeeded,
@@ -2463,6 +2464,11 @@ export async function POST(req: Request) {
       });
 
       void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+        leadId,
+        leadName: String((lead as any)?.full_name ?? "").trim() || null,
+        conversationId,
+      });
+      void maybeSendExperimentalClassConfirmationToStudent({
         leadId,
         leadName: String((lead as any)?.full_name ?? "").trim() || null,
         conversationId,

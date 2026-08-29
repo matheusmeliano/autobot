@@ -201,6 +201,9 @@ export async function POST(
 
   let lessonLink = String((resolvedBooking as any)?.lesson_link ?? "").trim();
   if (!lessonLink) {
+    lessonLink = String((lead as any)?.experimental_class_link ?? "").trim();
+  }
+  if (!lessonLink) {
     const { data: historyEvents, error: historyError } = await admin
       .from("atendimento_history_events")
       .select("details, created_at")

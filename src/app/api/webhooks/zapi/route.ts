@@ -58,6 +58,7 @@ import {
   findLeadByPhone,
   hasAnyBotMessage,
   maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
+  maybeSendExperimentalClassConfirmationToStudent,
   sendAtendimentoWhatsAppText,
   sendAtendimentoWhatsAppTextBatch,
   syncConversationPreview,
@@ -5366,6 +5367,11 @@ export async function POST(req: Request) {
                   leadName: String((lead as any)?.full_name ?? "").trim() || null,
                   conversationId,
                 });
+                void maybeSendExperimentalClassConfirmationToStudent({
+                  leadId,
+                  leadName: String((lead as any)?.full_name ?? "").trim() || null,
+                  conversationId,
+                });
 
                 const firstName = String((lead as any)?.full_name ?? "").trim().split(" ")[0] || "Aluno";
                 const alreadyBookingCancelled =
@@ -5855,6 +5861,11 @@ export async function POST(req: Request) {
             } catch (_e) {}
 
             void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+              leadId,
+              leadName: String((lead as any)?.full_name ?? "").trim() || null,
+              conversationId,
+            });
+            void maybeSendExperimentalClassConfirmationToStudent({
               leadId,
               leadName: String((lead as any)?.full_name ?? "").trim() || null,
               conversationId,

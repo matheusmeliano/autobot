@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser, appendHistoryEvent, sendAtendimentoWhatsAppText, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled } from "@/lib/atendimento/server";
+import { requireAtendimentoUser, appendHistoryEvent, sendAtendimentoWhatsAppText, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled, maybeSendExperimentalClassConfirmationToStudent } from "@/lib/atendimento/server";
 import {
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   buildExperimentalClassRegisteredAttendantWhatsAppMessage,
@@ -545,6 +545,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     }
 
     void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+      leadId,
+      leadName: String((leadExists as any)?.full_name ?? "").trim() || null,
+      conversationId: null,
+    });
+    void maybeSendExperimentalClassConfirmationToStudent({
       leadId,
       leadName: String((leadExists as any)?.full_name ?? "").trim() || null,
       conversationId: null,
