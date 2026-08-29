@@ -2887,22 +2887,32 @@ export async function POST(req: Request) {
         const flatLeadCompletedStatus =
           String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase() === "completed";
         const leadEstaEmMatriculaPendentePosAttendance =
-          (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
+          (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente" ||
+            funnelStageRaw === "matricula_pendente_recusada" || leadStatusRaw === "matricula_pendente_recusada" ||
+            funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem") &&
           (postAttendanceHistoryConfirmedAttendedEvent ||
+            postAttendanceHistoryConfirmedNoShowEvent ||
+            postAttendanceHistoryMatriculaRecusadaEvent ||
             Boolean(currentBookingId) ||
             bookingAttendanceAttendedByCol ||
+            bookingAttendanceNoShowByCol ||
             flatLeadAttendanceAttendedByCol ||
+            flatLeadAttendanceNoShowByCol ||
             flatLeadCompletedStatus) &&
-          !postAttendanceHistoryMatriculaRecusadaEvent &&
           !postAttendanceHistoryMatriculaConfirmadaEvent;
         const leadEstaEmMatriculaRecusadaPosAttendance =
           postAttendanceHistoryMatriculaRecusadaEvent ||
           ((funnelStageRaw === "matricula_pendente_recusada" ||
-            leadStatusRaw === "matricula_pendente_recusada") &&
+            leadStatusRaw === "matricula_pendente_recusada" ||
+            funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem") &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
               Boolean(currentBookingId) ||
               bookingAttendanceAttendedByCol ||
-              flatLeadAttendanceAttendedByCol));
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol));
         const leadEstaEmMatriculaConfirmadaPosAttendance =
           postAttendanceHistoryMatriculaConfirmadaEvent ||
           ((funnelStageRaw === "matricula_confirmada" || leadStatusRaw === "matricula_confirmada") &&
@@ -2918,33 +2928,68 @@ export async function POST(req: Request) {
         const leadDirectlyInPosAttendanceStepNuclear =
           (funnelStageRaw === "matricula_pendente" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
               bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
               flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
               Boolean(currentBookingId))) ||
           (funnelStageRaw === "matricula_pendente_recusada" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
               bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
               flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId))) ||
+          (funnelStageRaw === "repescagem" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
               Boolean(currentBookingId))) ||
           (leadStatusRaw === "matricula_pendente" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
               bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
               flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
               Boolean(currentBookingId))) ||
           (leadStatusRaw === "matricula_pendente_recusada" &&
             (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
               bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
               flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId))) ||
+          (leadStatusRaw === "repescagem" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
               Boolean(currentBookingId)));
         const entrouNoFluxoPosAttendancePorForcaBruta =
           ultimaMsgBotPedeSimNao &&
           (isYesNuclear || isNoNuclear) &&
-          !postAttendanceHistoryMatriculaRecusadaEvent &&
           !postAttendanceHistoryMatriculaConfirmadaEvent &&
           (funnelStageRaw === "matricula_pendente" ||
             leadStatusRaw === "matricula_pendente" ||
             funnelStageRaw === "matricula_pendente_recusada" ||
-            leadStatusRaw === "matricula_pendente_recusada");
+            leadStatusRaw === "matricula_pendente_recusada" ||
+            funnelStageRaw === "repescagem" ||
+            leadStatusRaw === "repescagem");
 
         if (
           postAttendanceHistoryMatriculaConfirmadaEvent
@@ -3097,7 +3142,7 @@ export async function POST(req: Request) {
             });
           }
 
-          if (leadEstaEmRepescagemNoShow) {
+          if (leadEstaEmRepescagemNoShow && !isYesNuclear) {
             return Response.json({
               ok: true,
               ignored: true,
@@ -3386,7 +3431,7 @@ export async function POST(req: Request) {
           });
         }
 
-        if (leadEstaEmRepescagemNoShow) {
+        if (leadEstaEmRepescagemNoShow && !isYesNuclear) {
           return Response.json({
             ok: true,
             ignored: true,

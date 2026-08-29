@@ -1116,18 +1116,26 @@ export async function POST(req: Request) {
   const inPostAttendanceWindow =
     (lastBotAsksSimNao ||
       postAttendanceHistoryConfirmedAttendedEvent ||
+      postAttendanceHistoryConfirmedNoShowEvent ||
+      postAttendanceHistoryMatriculaRecusadaEvent ||
       flatAttendanceAttended ||
-      bookingAttendanceAttended) &&
+      flatAttendanceNoShow ||
+      bookingAttendanceAttended ||
+      bookingAttendanceNoShow) &&
     !postAttendanceHistoryMatriculaConfirmadaEvent &&
-    !postAttendanceHistoryMatriculaRecusadaEvent &&
     ((currentFunnelStage === "matricula_pendente" ||
       currentStatus === "matricula_pendente" ||
       currentFunnelStage === "matricula_pendente_recusada" ||
-      currentStatus === "matricula_pendente_recusada") &&
+      currentStatus === "matricula_pendente_recusada" ||
+      isRepescagemStage) &&
       (postAttendanceHistoryConfirmedAttendedEvent ||
+        postAttendanceHistoryConfirmedNoShowEvent ||
+        postAttendanceHistoryMatriculaRecusadaEvent ||
         flatAttendanceAttended ||
-        flatExpCompleted ||
+        flatAttendanceNoShow ||
         bookingAttendanceAttended ||
+        bookingAttendanceNoShow ||
+        flatExpCompleted ||
         hasBookingReal));
 
   if (postAttendanceHistoryMatriculaConfirmadaEvent) {
@@ -1360,7 +1368,98 @@ export async function POST(req: Request) {
     }
   }
 
-  if (postAttendanceHistoryConfirmedNoShowEvent && isRepescagemStage && flatAttendanceNoShow) {
+  const isRepescagemOrRecusadaStage =
+    isRepescagemStage ||
+    currentFunnelStage === "matricula_pendente_recusada" ||
+    currentStatus === "matricula_pendente_recusada";
+  const hasAnyPostAttendanceSignal =
+    postAttendanceHistoryConfirmedAttendedEvent ||
+    postAttendanceHistoryConfirmedNoShowEvent ||
+    postAttendanceHistoryMatriculaRecusadaEvent ||
+    flatAttendanceAttended ||
+    flatAttendanceNoShow ||
+    bookingAttendanceAttended ||
+    bookingAttendanceNoShow;
+
+  if (isYesLenient && isRepescagemOrRecusadaStage && hasAnyPostAttendanceSignal && !postAttendanceHistoryMatriculaConfirmadaEvent) {
+    const safeFirstNameForce =
+      (String((lead as any).full_name ?? "").trim().split(/\s+/)[0] ?? "").trim() || "Aluno(a)";
+    const safeFullNameForLinkForce =
+      String((lead as any).full_name ?? "").trim() || safeFirstNameForce || "Aluno(a)";
+    const leadPhoneRawForce = String((lead as any).phone ?? "").trim();
+    const baseUrlForce =
+      resolveBaseUrlFromHeaders(
+        new Headers({ host: String(req.headers.get("host") ?? "") }),
+      ) || "https://www.autobot.business";
+    const cadastroLinkForce =
+      `${baseUrlForce.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullNameForLinkForce)}&telefone=${encodeURIComponent(leadPhoneRawForce || String((lead as any).phone ?? ""))}`;
+    const yesMsgForce =
+      `Maravilha, ${safeFirstNameForce}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkForce}`;
+    try {
+      await admin
+        .from("atendimento_leads")
+        .update({
+          funnel_stage: "pre_cadastro_concluido",
+          status: "matricula_pendente",
+          bot_enabled: false,
+          updated_at: nowIso,
+        })
+        .eq("id", String(lead.id));
+    } catch (_e) {}
+    try {
+      void admin
+        .from("atendimento_leads")
+        .update({
+          experimental_class_attendance_status: "attended",
+          experimental_class_status: "completed",
+        } as any)
+        .eq("id", String(lead.id));
+    } catch (_e) {}
+    if (leadPhoneRawForce) {
+      try {
+        await sendAtendimentoWhatsAppTextBatch({
+          phone: leadPhoneRawForce,
+          messages: [yesMsgForce],
+          admin,
+          conversationId: String(conversation.id),
+          insertIntoConversation: true,
+          allowNoInbound: true,
+        });
+      } catch (_e) {}
+    }
+    try {
+      void appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String(conversation.id),
+        eventType: "matricula_pendente_resposta_sim_nuclear",
+        title: "Matricula pendente pos-attendance (evolution FORCE fallback): lead respondeu SIM",
+        details: {
+          inbound_text: contentText || null,
+          reply_messages: [yesMsgForce],
+          cadastro_link: cadastroLinkForce,
+          source: "public_messages_evolution_post_attendance_force_fallback",
+        },
+        actorType: "bot",
+      });
+    } catch (_e) {}
+    try {
+      void admin
+        .from("atendimento_conversations")
+        .update({ bot_enabled: false, updated_at: nowIso })
+        .eq("id", String(conversation.id));
+    } catch (_e) {}
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: null,
+      blocked: false,
+      handled: true,
+      flow: "post_attendance_matricula_pendente_resposta_sim_force_fallback",
+      conversation: { id: String(conversation.id), bot_enabled: false },
+    });
+  }
+
+  if (postAttendanceHistoryConfirmedNoShowEvent && isRepescagemStage && flatAttendanceNoShow && !isYesLenient) {
     return Response.json({
       ok: true,
       inbound,

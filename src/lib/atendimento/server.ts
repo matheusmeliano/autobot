@@ -2850,30 +2850,27 @@ export async function maybeSendExperimentalClassConfirmationToStudent(params: {
       String(params.leadName ?? (leadRow as any)?.full_name ?? "").trim() || "Aluno(a)";
     const messages = buildExperimentalClassStudentWhatsAppMessages(fullName);
 
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
-      try {
-        await sendAtendimentoWhatsAppText({ phone: leadPhone, message: msg, allowNoInbound: true });
-      } catch (e) {
-        await appendHistoryEvent({
-          leadId: params.leadId,
-          conversationId: params.conversationId ?? null,
-          eventType: "experimental_class_student_confirmation_whatsapp_failed",
-          title: "Falha ao enviar confirmacao de aula experimental ao aluno",
-          details: {
-            phone: leadPhone,
-            message_index: i,
-            error: e instanceof Error ? e.message : String(e),
-            funnel_stage: fs || null,
-            experimental_class_status: es || null,
-          },
-          actorType: "system",
-        });
-        return {
-          ok: false,
-          error: `mensagem ${i + 1} falhou: ${e instanceof Error ? e.message : String(e)}`,
-        };
-      }
+    const combinedMessage = messages.filter(Boolean).join("\n\n");
+    try {
+      await sendAtendimentoWhatsAppText({ phone: leadPhone, message: combinedMessage, allowNoInbound: true });
+    } catch (e) {
+      await appendHistoryEvent({
+        leadId: params.leadId,
+        conversationId: params.conversationId ?? null,
+        eventType: "experimental_class_student_confirmation_whatsapp_failed",
+        title: "Falha ao enviar confirmacao de aula experimental ao aluno",
+        details: {
+          phone: leadPhone,
+          error: e instanceof Error ? e.message : String(e),
+          funnel_stage: fs || null,
+          experimental_class_status: es || null,
+        },
+        actorType: "system",
+      });
+      return {
+        ok: false,
+        error: `mensagem confirmacao falhou: ${e instanceof Error ? e.message : String(e)}`,
+      };
     }
 
     await appendHistoryEvent({

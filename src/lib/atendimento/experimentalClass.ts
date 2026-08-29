@@ -450,8 +450,12 @@ export function buildExperimentalClassStudentWhatsAppMessages(name: string) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno(a)";
   return [
-    `Show, ${safeFirst}! Vai ser um prazer conhecer você na aula. 😊`,
-    `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`,
+    [
+      `Show, ${safeFirst}! Vai ser um prazer conhecer você na aula. 😊`,
+      `Agora é só aguardar. No dia agendado, vamos enviar o link da sua aula por aqui.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
   ];
 }
 
