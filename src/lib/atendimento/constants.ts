@@ -162,7 +162,7 @@ export const STAGE_LABELS: Record<string, string> = {
   pagamento_nao_realizado: "Pagamento Não Realizado",
   matricula_confirmada: "Matrícula Confirmada",
   matriculado: "Matrícula Concluída",
-  repescagem: "Repescagem",
+  repescagem: "",
   encerrado: "Encerrado",
 };
 
@@ -181,6 +181,6 @@ export const STATUS_LABELS: Record<string, string> = {
   matricula_confirmada: "Matrícula Confirmada",
   matriculado: "Matrícula Concluída",
   aluno: "Aluno",
-  repescagem: "Repescagem",
+  repescagem: "",
   encerrado: "Encerrado",
 };

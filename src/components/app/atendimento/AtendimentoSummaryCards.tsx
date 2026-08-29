@@ -95,16 +95,8 @@ function leadHasAnyExperimentalVinculo(lead: AtendimentoLeadListItem) {
   return leadHasExperimentalClassPanelStatus(lead);
 }
 
-function isLeadRepescagem(lead: AtendimentoLeadListItem | null | undefined) {
-  if (!lead) return false;
-  const stage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
-  const st = String((lead as any)?.status ?? "").trim().toLowerCase();
-  return (
-    stage === "repescagem" ||
-    st === "repescagem" ||
-    stage === "matricula_pendente_recusada" ||
-    st === "matricula_pendente_recusada"
-  );
+function isLeadRepescagem(_lead: AtendimentoLeadListItem | null | undefined) {
+  return false;
 }
 
 function isLeadMatriculaRecusadaPosAttendance(
@@ -555,18 +547,8 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
   return "";
 }
 
-function RepescagemBadge({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={[
-        "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-100",
-        className,
-      ].join(" ")}
-    >
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-      Repescagem
-    </div>
-  );
+function RepescagemBadge(_props?: { className?: string }) {
+  return null;
 }
 
 function Field({
@@ -2744,7 +2726,6 @@ export function AtendimentoSummaryCards({
         "contrato_assinado",
         "cadastro_recorrente_pendente_plataforma",
         "aluno_recorrente_cadastrado",
-        "repescagem",
       ];
       const advancedStatus = ["matriculado", "aluno", "contrato_coletando_dados", "contrato_assinado", "matricula_confirmada"];
 
@@ -4632,7 +4613,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       modalToast.success(
         attendance === "attended"
           ? "Comparecimento confirmado e mensagem enviada ao aluno."
-          : "Aluno marcado para repescagem manual.",
+          : "Aluno marcado como não compareceu.",
       );
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao registrar o comparecimento da aula.");

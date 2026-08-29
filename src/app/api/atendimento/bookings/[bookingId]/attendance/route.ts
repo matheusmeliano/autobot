@@ -362,8 +362,8 @@ export async function POST(
           patchLead.experimental_class_link = null;
           patchLead.experimental_class_student_notification_sent_at = null;
           patchLead.experimental_class_attendant_notification_sent_at = null;
-          patchLead.funnel_stage = "repescagem";
-          patchLead.status = "repescagem";
+          patchLead.funnel_stage = "matricula_pendente_recusada";
+          patchLead.status = "matricula_pendente_recusada";
         }
         const { error: patchLeadErr } = await admin
           .from("atendimento_leads")
@@ -405,8 +405,8 @@ export async function POST(
       nextLeadStatus = targetStatus;
     }
   } else if (attendance === "no_show") {
-    nextLeadFunnelStage = "repescagem";
-    nextLeadStatus = "repescagem";
+    nextLeadFunnelStage = "matricula_pendente_recusada";
+    nextLeadStatus = "matricula_pendente_recusada";
   }
 
   if (nextLeadFunnelStage !== currentLeadFunnelStage || nextLeadStatus !== currentLeadStatus) {
