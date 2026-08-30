@@ -103,22 +103,22 @@ export function LoginForm({ initialLogin }: { initialLogin?: string }) {
     >
       <form onSubmit={onSubmit} className="space-y-3">
         <div>
-          <label className="text-xs font-semibold text-white/60">E-mail ou WhatsApp</label>
+          <label className="text-xs font-semibold text-white/60">E-mail</label>
           <input
             type="text"
             autoComplete="username"
             className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 text-sm text-white outline-none ring-0 placeholder:text-white/30 focus:border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] autofill:bg-[#0b1220] autofill:text-white autofill:shadow-[inset_0_0_0px_1000px_#0b1220] autofill:[-webkit-text-fill-color:#ffffff]"
-            placeholder="voce@email.com ou (11) 9XXXX-XXXX"
+            placeholder="voce@email.com"
             style={{ backgroundColor: "#0b1220" }}
             {...register("login", {
-              required: "Informe seu e-mail ou WhatsApp.",
+              required: "Informe seu e-mail.",
               validate: (value) => {
                 const v = String(value ?? "").trim();
-                if (!v) return "Informe seu e-mail ou WhatsApp.";
+                if (!v) return "Informe seu e-mail.";
                 if (EMAIL_REGEX.test(v)) return true;
                 const digits = v.replace(/\D/g, "");
                 if (digits.length >= 10) return true;
-                return "Informe um e-mail válido ou um WhatsApp com DDD.";
+                return "Informe um e-mail válido.";
               },
             })}
           />
