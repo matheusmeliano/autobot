@@ -3,11 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 
 export const metadata = {
-  title: "Instagram | AutoBot",
-  description: "Página do Instagram do AutoBot.",
+  title: "LinkedIn | AutoBot",
+  description: "Página do LinkedIn do AutoBot.",
 };
 
-export default function InstagramPage() {
+export default function LinkedInPage() {
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
       <header className="sticky top-0 z-30">
@@ -30,11 +30,11 @@ export default function InstagramPage() {
       <main className="mx-auto w-full max-w-2xl px-6 py-10">
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
           <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            Instagram
+            LinkedIn
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-white/60">
             Em breve, esta página vai apontar para o perfil oficial do AutoBot no
-            Instagram. Enquanto isso, você pode falar com a gente por e-mail.
+            LinkedIn. Enquanto isso, você pode falar com a gente por e-mail.
           </p>
 
           <div className="mt-8 grid gap-3">
