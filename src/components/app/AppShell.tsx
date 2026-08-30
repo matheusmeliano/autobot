@@ -588,12 +588,12 @@ export function AppShell({
 
               <div className="mt-4 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--app-border)] bg-white p-1">
+                  <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--app-border)] bg-black p-0">
                     <img
                       src="/logo%20-%20online-music-usa.png"
                       alt="Lucas Brum Online Music USA"
                       loading="lazy"
-                      className="h-full w-full object-contain"
+                      className="h-full w-full object-cover"
                     />
                   </div>
                   <div className="min-w-0">
