@@ -24,10 +24,12 @@ import {
 import {
   formatCurrencyDigitsForEmail,
   parseCurrencyToNumberForEmail,
+} from "@/lib/currency";
+import {
   useCurrencySymbolValue,
   useFormatCurrency,
   useCurrentUserEmail,
-} from "@/lib/currency";
+} from "@/lib/useCurrency";
 
 export type DebtorRow = {
   id: string;

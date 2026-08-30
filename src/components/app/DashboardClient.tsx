@@ -6,7 +6,7 @@ import { CalendarDays, MessageSquareText, Users, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { deriveAgendarVisualStatus, getAgendarDisplayReferenceMoment } from "@/lib/agendarStatus";
 import { type BrazilTimeZone } from "@/lib/timezone";
-import { useFormatCurrency } from "@/lib/currency";
+import { useFormatCurrency } from "@/lib/useCurrency";
 
 type StatPack = {
   clients: number;
