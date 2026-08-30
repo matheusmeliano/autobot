@@ -3,6 +3,7 @@ import { normalizePlan, planLabel } from "@/lib/plans";
 import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
 import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
 import { redirect } from "next/navigation";
+import { formatCurrencyForEmail, getCurrencySymbol, isUSDCurrencyEmail } from "@/lib/currency";
 
 function dateBR(v: string | null) {
   if (!v) return "-";
@@ -99,7 +100,7 @@ export default async function AssinaturaPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">Básico</div>
               <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
-                R$ 149/mês
+                {`${getCurrencySymbol(user?.email)} 149${isUSDCurrencyEmail(user?.email) ? "/month" : "/mês"}`}
               </div>
             </div>
           </div>
@@ -141,7 +142,7 @@ export default async function AssinaturaPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">Pro</div>
               <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
-                R$ 199/mês
+                {`${getCurrencySymbol(user?.email)} 199${isUSDCurrencyEmail(user?.email) ? "/month" : "/mês"}`}
               </div>
             </div>
             <div className="shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--app-accent-text)] ring-1 ring-[var(--app-accent-ring)]">
@@ -186,7 +187,7 @@ export default async function AssinaturaPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">Vitalício</div>
               <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
-                R$ 2.490/único
+                {`${getCurrencySymbol(user?.email)} 2.490${isUSDCurrencyEmail(user?.email) ? "/one-time" : "/único"}`}
               </div>
             </div>
           </div>

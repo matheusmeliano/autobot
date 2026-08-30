@@ -21,6 +21,13 @@ import {
   DEFAULT_RETRY_WEEKDAYS,
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
+import {
+  formatCurrencyDigitsForEmail,
+  parseCurrencyToNumberForEmail,
+  useCurrencySymbolValue,
+  useFormatCurrency,
+  useCurrentUserEmail,
+} from "@/lib/currency";
 
 export type DebtorRow = {
   id: string;
@@ -101,9 +108,9 @@ const weekdayOptions = [
   { value: 7, label: "Dom" },
 ];
 
-function money(v: number | null) {
+function money(v: number | null, fmt: (val: any) => string) {
   if (typeof v !== "number") return "-";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return fmt(v);
 }
 
 function dueDayLabel(v: string | null) {
@@ -376,6 +383,9 @@ function normalizePixKeyForSave(raw: string) {
 }
 
 export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: PlanKey }) {
+  const fmt = useFormatCurrency();
+  const currencySym = useCurrencySymbolValue();
+  const usrEmail = useCurrentUserEmail();
   const { theme } = useAppTheme();
   const pageSize = 5;
   const currentDate = useMemo(() => new Date(), []);
@@ -590,7 +600,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         return {
           index,
           id: c.charge_id,
-          amount: c.amount ? parseBRLToNumber(c.amount) : null,
+          amount: c.amount ? parseCurrencyToNumberForEmail(c.amount, usrEmail) : null,
           dueDay,
           recurrenceMonth: recurrence.month,
           recurrenceYear: recurrence.year,
@@ -771,7 +781,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                             Valor
                           </div>
                           <div className="mt-1 text-sm font-semibold text-[var(--app-text-85)]">
-                            {money(chargesTotal(r, currentRecurrence))}
+                            {money(chargesTotal(r, currentRecurrence), fmt)}
                           </div>
                         </div>
                         <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
@@ -845,7 +855,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     <div className="col-span-2 truncate text-center text-[var(--app-text-70)]">
                       {r.telefone ?? "-"}
                     </div>
-                    <div className="col-span-2 text-center">{money(chargesTotal(r, currentRecurrence))}</div>
+                    <div className="col-span-2 text-center">{money(chargesTotal(r, currentRecurrence), fmt)}</div>
                     <div className="col-span-2 text-center text-[var(--app-text-70)]">
                       {chargesDueDaysLabel(r)}
                     </div>
@@ -1004,7 +1014,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                                 render={({ field }) => (
                                   <div className="relative mt-2">
                                     <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-white/55">
-                                      R$
+                                      {currencySym}
                                     </div>
                                     <input
                                       inputMode="numeric"
@@ -1012,7 +1022,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                                       placeholder="0,00"
                                       value={field.value ?? ""}
                                       onChange={(e) => {
-                                        const next = formatBRLFromDigits(e.currentTarget.value);
+                                        const next = formatCurrencyDigitsForEmail(e.currentTarget.value, usrEmail);
                                         field.onChange(next);
                                       }}
                                       onBlur={field.onBlur}

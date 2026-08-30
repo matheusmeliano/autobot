@@ -6,6 +6,7 @@ import { CalendarDays, MessageSquareText, Users, Wallet } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { deriveAgendarVisualStatus, getAgendarDisplayReferenceMoment } from "@/lib/agendarStatus";
 import { type BrazilTimeZone } from "@/lib/timezone";
+import { useFormatCurrency } from "@/lib/currency";
 
 type StatPack = {
   clients: number;
@@ -236,8 +237,8 @@ function dateTimeBR(v: string, timeZone: BrazilTimeZone) {
   }).format(d);
 }
 
-function brl(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+function brl(value: number, fmt: (v: any) => string) {
+  return fmt(value);
 }
 
 function statusBadgeClassName(status: string) {
@@ -312,6 +313,7 @@ export function DashboardClient({
   hasCurrentMonthSchedules: boolean;
   timeZone: BrazilTimeZone | null;
 }) {
+  const fmt = useFormatCurrency();
   const pageSize = 3;
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
   const [activityPage, setActivityPage] = useState(1);
@@ -375,19 +377,19 @@ export function DashboardClient({
       <div className="mt-0 grid gap-4 min-[1201px]:mt-6 min-[1201px]:grid-cols-3">
         <Card
           title="Total a receber (mês)"
-          value={brl(visibleStats.receivableMonthTotal)}
+          value={brl(visibleStats.receivableMonthTotal, fmt)}
           subtitle=""
           icon={<Wallet className="h-5 w-5" />}
         />
         <Card
           title="Já recebidos (mês)"
-          value={brl(visibleStats.receivableMonthPaid)}
+          value={brl(visibleStats.receivableMonthPaid, fmt)}
           subtitle=""
           icon={<Wallet className="h-5 w-5" />}
         />
         <Card
           title="Falta receber (mês)"
-          value={brl(visibleStats.receivableMonthRemaining)}
+          value={brl(visibleStats.receivableMonthRemaining, fmt)}
           subtitle=""
           icon={<Wallet className="h-5 w-5" />}
         />
