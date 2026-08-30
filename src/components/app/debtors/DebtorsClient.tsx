@@ -1114,7 +1114,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                         Acumular mensalidades em aberto
                       </div>
                       <div className="mt-1 text-[11px] text-white/45">
-                        Quando ativado, mensalidades vencidas somam automaticamente aos meses seguintes ate o pagamento ou encerramento da cobranca.
+                        Quando ativado, mensalidades vencidas somam automaticamente aos meses seguintes até o pagamento ou encerramento da cobrança.
                       </div>
                     </div>
                   </label>

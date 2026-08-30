@@ -30,7 +30,7 @@ export function PixCopyClient({ pixKey, debtorName, amount }: PixCopyClientProps
           </div>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight">Copiar PIX</h1>
           <p className="mt-2 text-sm text-white/70">
-            Toque no botao abaixo para copiar a chave PIX e concluir o pagamento.
+            Toque no botão abaixo para copiar a chave PIX e concluir o pagamento.
           </p>
         </div>
 

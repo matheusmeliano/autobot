@@ -321,7 +321,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                   rows={7}
                   className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
                   placeholder={
-                    "Ola {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPara copiar a chave PIX, acesse: {pix_link}\n\nObrigado!"
+                    "Olá {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPara copiar a chave PIX, acesse: {pix_link}\n\nObrigado!"
                   }
                   {...register("conteudo", {
                     validate: (value) =>
