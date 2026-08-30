@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Key, Pencil, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Key, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { isProtectedAdminOrUserEmail } from "@/lib/auth/admin";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import {
+  createUserAdminAction,
   deleteUserAdminAction,
   resetPasswordAdminAction,
   updateUserAdminAction,
@@ -34,6 +35,12 @@ type EditValues = {
 
 type PasswordValues = {
   id: string;
+  password: string;
+};
+
+type CreateValues = {
+  nome: string;
+  email: string;
   password: string;
 };
 
@@ -80,9 +87,11 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const [openEdit, setOpenEdit] = useState(false);
   const [openPassword, setOpenPassword] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
+  const [openCreate, setOpenCreate] = useState(false);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [deleting, setDeleting] = useState<AdminUserRow | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
 
   const isSelfAdmin = (email: string) => isProtectedAdminOrUserEmail(email);
@@ -144,6 +153,9 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
   const passForm = useForm<PasswordValues>({
     defaultValues: { id: "", password: "" },
   });
+  const createForm = useForm<CreateValues>({
+    defaultValues: { nome: "", email: "", password: "" },
+  });
   const { ref: vencimentoFieldRef, ...vencimentoFieldProps } = editForm.register("vencimento");
 
   const refresh = () => {
@@ -182,6 +194,12 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     setDeleting(null);
   };
 
+  const closeCreate = () => {
+    setOpenCreate(false);
+    setShowNewPassword(false);
+    createForm.reset({ nome: "", email: "", password: "" });
+  };
+
   const openVencimentoPicker = () => {
     vencimentoInputRef.current?.showPicker?.();
   };
@@ -210,6 +228,31 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     setDeleting(row);
     setOpenDelete(true);
   };
+
+  const saveCreate = createForm.handleSubmit(async (values) => {
+    const res = await createUserAdminAction({
+      nome: values.nome,
+      email: values.email,
+      password: values.password,
+    });
+    if (!res.ok) {
+      modalToast.error(res.error ?? "Falha ao criar.");
+      return;
+    }
+    modalToast.success("Usuário criado.");
+    closeCreate();
+    refresh();
+  }, (errors) => {
+    if (errors.password?.message) {
+      modalToast.error(String(errors.password.message));
+      return;
+    }
+    if (errors.email?.message) {
+      modalToast.error(String(errors.email.message));
+      return;
+    }
+    modalToast.warning("Confira os campos.");
+  });
 
   const saveEdit = editForm.handleSubmit(async (values) => {
     const res = await updateUserAdminAction({
@@ -281,9 +324,17 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nome ou email..."
+            placeholder="Buscar por nome ou e-mail..."
             className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 min-[1201px]:w-[360px]"
           />
+          <button
+            type="button"
+            onClick={() => setOpenCreate(true)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 min-[1201px]:w-auto"
+          >
+            <UserPlus className="h-4 w-4" />
+            Criar usuário
+          </button>
         </div>
       </div>
 
@@ -404,6 +455,93 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           </div>
         ) : null}
       </div>
+
+
+      <AppModal open={openCreate} onClose={closeCreate} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-white/90">Criar usuário</div>
+            <div className="mt-1 text-xs text-white/55">Plano teste (7 dias) com acesso ao painel.</div>
+          </div>
+          <button
+            onClick={closeCreate}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={saveCreate} className="mt-5 space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-white/60">Nome</label>
+            <input
+              type="text"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              placeholder="Nome do usuário"
+              {...createForm.register("nome", { required: true, minLength: 2 })}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-white/60">E-mail</label>
+            <input
+              type="email"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              placeholder="voce@email.com"
+              {...createForm.register("email", {
+                required: "Informe o e-mail.",
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Informe um e-mail válido.",
+                },
+              })}
+            />
+            {createForm.formState.errors.email?.message ? (
+              <div className="mt-2 text-xs font-semibold text-rose-200">
+                {String(createForm.formState.errors.email.message)}
+              </div>
+            ) : null}
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-white/60">Senha</label>
+            <div className="relative mt-2">
+              <input
+                type={showNewPassword ? "text" : "password"}
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                placeholder="Mínimo 8 caracteres"
+                {...createForm.register("password", {
+                  required: true,
+                  minLength: { value: 8, message: "A senha deve ter no mínimo 8 caracteres." },
+                })}
+              />
+              <button
+                type="button"
+                aria-label={showNewPassword ? "Ocultar senha" : "Mostrar senha"}
+                onClick={() => setShowNewPassword((v) => !v)}
+                className="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+              >
+                {showNewPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            {createForm.formState.errors.password?.message ? (
+              <div className="mt-2 text-xs font-semibold text-rose-200">
+                {String(createForm.formState.errors.password.message)}
+              </div>
+            ) : null}
+          </div>
+
+          <button
+            type="submit"
+            disabled={createForm.formState.isSubmitting}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {createForm.formState.isSubmitting ? "Criando..." : "Criar usuário"}
+          </button>
+        </form>
+      </AppModal>
 
       <AppModal open={openEdit} onClose={closeEdit} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">

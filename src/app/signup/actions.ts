@@ -18,7 +18,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const schema = z.object({
   email: z.string().trim().regex(EMAIL_REGEX),
   password: z.string().min(8),
-  name: z.string().min(2).optional(),
+  name: z.string().min(2),
 });
 
 export async function signupAction(formData: FormData) {
