@@ -127,7 +127,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
             Templates
           </h1>
           <div className="mt-2 text-sm text-[var(--app-text-60)]">
-            Use variÃ¡veis: {"{nome}"} {"{valor}"} {"{vencimento}"} {"{pix}"} {"{pix_link}"}
+            Use variáveis: {"{nome}"} {"{valor}"} {"{vencimento}"} {"{pix}"} {"{pix_link}"}
           </div>
         </div>
 
@@ -285,7 +285,7 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
               {editing ? "Editar template" : "Novo template"}
             </div>
             <div className="mt-1 text-xs text-[var(--app-text-55)]">
-              Monte sua mensagem com variaveis, PIX e link para copiar o PIX.
+              Monte sua mensagem com variáveis, PIX e link para copiar o PIX.
             </div>
           </div>
           <button
