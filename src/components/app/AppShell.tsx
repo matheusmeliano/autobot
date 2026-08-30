@@ -590,7 +590,7 @@ export function AppShell({
                 <div className="flex items-center gap-3">
                   <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black p-0">
                     <img
-                      src="/logo%20-%20online-music-usa-2.png"
+                      src="/logo%20-%20online-music-usa-3.png"
                       alt="Lucas Brum Online Music USA"
                       loading="lazy"
                       className="h-[120%] w-[120%] shrink-0 object-cover scale-110"
