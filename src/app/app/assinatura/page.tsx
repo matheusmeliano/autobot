@@ -143,7 +143,7 @@ export default async function AssinaturaPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">Pro</div>
               <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
-                R$ 99/mês
+                R$ 199/mês
               </div>
             </div>
             <div className="shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--app-accent-text)] ring-1 ring-[var(--app-accent-ring)]">

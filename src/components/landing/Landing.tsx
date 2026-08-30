@@ -620,7 +620,7 @@ export function Landing() {
                 },
                 {
                   name: "Pro",
-                  price: "R$ 99/mês",
+                  price: "R$ 199/mês",
                   highlight: true,
                   items: [
                     "Tudo do Básico",
