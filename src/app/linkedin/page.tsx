@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 
 export const metadata = {
@@ -38,15 +38,6 @@ export default function LinkedInPage() {
           </p>
 
           <div className="mt-8 grid gap-3">
-            <a
-              href="https://www.linkedin.com"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-white/90"
-            >
-              Abrir LinkedIn <ArrowUpRight className="h-4 w-4" />
-            </a>
-
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/70">
               Contato:{" "}
               <span className="font-semibold text-white/85">

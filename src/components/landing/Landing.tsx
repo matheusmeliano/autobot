@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  ArrowUpRight,
   BadgeCheck,
   CalendarDays,
   BarChart3,
@@ -814,8 +815,13 @@ export function Landing() {
                     <div className="text-xs font-semibold tracking-[0.2em] text-white/40">
                       SOCIAL
                     </div>
-                    <a className="block hover:text-white" href="#">
-                      Instagram
+                    <a
+                      href="https://www.instagram.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-white/90"
+                    >
+                      Abrir Instagram <ArrowUpRight className="h-4 w-4" />
                     </a>
                     <Link className="block hover:text-white" href="/linkedin">
                       LinkedIn
