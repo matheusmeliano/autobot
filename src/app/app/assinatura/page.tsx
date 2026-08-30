@@ -99,7 +99,7 @@ export default async function AssinaturaPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold">Básico</div>
               <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,2.25rem)] font-semibold tracking-tight leading-none">
-                R$ 49/mês
+                R$ 149/mês
               </div>
             </div>
           </div>

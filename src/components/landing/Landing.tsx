@@ -609,7 +609,7 @@ export function Landing() {
               {[
                 {
                   name: "Básico",
-                  price: "R$ 49/mês",
+                  price: "R$ 149/mês",
                   highlight: false,
                   items: [
                     "Conexão via Z-API",
