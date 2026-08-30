@@ -59,10 +59,10 @@ export default async function AppLayout({
     redirect(getDefaultAuthenticatedPath((profile as any)?.access_scope));
   }
 
-  const savedTheme = normalizeStoredTheme(profile?.theme);
-  const initialTheme = savedTheme ?? "dark";
+  const savedTheme = null;
+  const initialTheme = "dark";
   const themeStorageKey = getThemeStorageKey(session.user.id);
-  const initialBackground = initialTheme === "light" ? "#f8fafc" : "#070A10";
+  const initialBackground = "#070A10";
 
   return (
     <>
@@ -76,16 +76,11 @@ export default async function AppLayout({
       <Script id="autobot-app-theme-init" strategy="beforeInteractive">
         {`
           (function() {
-            var fallbackTheme = ${JSON.stringify(initialTheme)};
+            var fallbackTheme = "dark";
             try {
               var storageKey = ${JSON.stringify(themeStorageKey)};
-              var theme = ${JSON.stringify(savedTheme)};
-              if (theme !== "light" && theme !== "dark") {
-                var storedTheme = localStorage.getItem(storageKey);
-                theme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : fallbackTheme;
-              } else {
-                localStorage.setItem(storageKey, theme);
-              }
+              var theme = "dark";
+              localStorage.setItem(storageKey, theme);
               var el = document.documentElement;
               el.classList.add("app-theme");
               el.setAttribute("data-app-theme-scope", "app");

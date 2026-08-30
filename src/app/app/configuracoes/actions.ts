@@ -114,6 +114,8 @@ export async function updateThemeAction(input: unknown) {
   const parsed = themeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Tema inválido." };
 
+  const themeForced = "dark" as const;
+
   const supabase = await createSupabaseServerClient();
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
@@ -122,7 +124,7 @@ export async function updateThemeAction(input: unknown) {
   const { error } = await supabase.from("profiles").upsert(
     {
       user_id: userId,
-      theme: parsed.data.theme,
+      theme: themeForced,
     },
     { onConflict: "user_id" },
   );

@@ -1,7 +1,8 @@
 export type StoredAppTheme = "light" | "dark";
 
 export function normalizeStoredTheme(value: unknown): StoredAppTheme | null {
-  return value === "light" || value === "dark" ? value : null;
+  const raw = typeof value === "string" ? value.trim() : null;
+  return raw === "dark" ? "dark" : null;
 }
 
 export function getThemeStorageKey(userId: string) {

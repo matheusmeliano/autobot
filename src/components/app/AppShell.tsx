@@ -139,7 +139,8 @@ export function AppShell({
   }, [theme]);
 
   const saveTheme = useCallback(
-    async (next: AppTheme) => {
+    async (_next: AppTheme) => {
+      const next: AppTheme = "dark";
       const previousTheme = theme;
       setTheme(next);
 
@@ -285,13 +286,7 @@ export function AppShell({
     router.replace("/app/assinatura?blocked=1");
   }, [authChecked, isAuthed, pathname, restricted, router]);
 
-  const showThemeGate =
-    authChecked &&
-    isAuthed &&
-    themeLoaded &&
-    !themePreference &&
-    !restricted &&
-    (pathname ?? "") === "/app/dashboard";
+  const showThemeGate = false;
 
   useEffect(() => {
     if (!showThemeGate) return;
