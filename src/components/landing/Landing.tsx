@@ -602,7 +602,7 @@ export function Landing() {
             <SectionTitle
               eyebrow="PLANOS"
               title="Um plano para cada fase."
-              description="Comece com o teste gratuito de 7 dias e evolua para o plano ideal conforme aumentar o volume de cobranças e a sua operação."
+              description="Comece com o teste gratuito de 3 meses e evolua para o plano ideal conforme aumentar o volume de cobranças e a sua operação."
             />
 
             <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
@@ -713,7 +713,7 @@ export function Landing() {
                 },
                 {
                   q: "Tem teste grátis?",
-                  a: "Ao se cadastrar, seu teste grátis de 7 dias começa automaticamente.",
+                  a: "Ao se cadastrar, seu teste grátis de 3 meses começa automaticamente.",
                 },
               ].map((item) => (
                 <GlassCard key={item.q} className="p-5">

@@ -139,7 +139,7 @@ export async function signupAction(formData: FormData) {
 
   const userId = data.user?.id ?? null;
   if (userId && admin) {
-    const vencimento = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const vencimento = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);
 

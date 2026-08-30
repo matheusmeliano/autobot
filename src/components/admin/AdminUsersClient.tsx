@@ -461,7 +461,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-white/90">Criar usuário</div>
-            <div className="mt-1 text-xs text-white/55">Plano teste (7 dias) com acesso ao painel.</div>
+            <div className="mt-1 text-xs text-white/55">Plano teste (3 meses) com acesso ao painel.</div>
           </div>
           <button
             onClick={closeCreate}

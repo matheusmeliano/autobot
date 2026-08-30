@@ -248,8 +248,8 @@ export async function createUserAdminAction(input: unknown) {
     return { ok: false as const, error: supabaseErrorToPt(profileError.message) };
   }
 
-  // Assinatura teste 7 dias
-  const vencimento = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  // Assinatura teste 3 meses
+  const vencimento = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
   const { error: subError } = await supabase.from("subscriptions").insert({
