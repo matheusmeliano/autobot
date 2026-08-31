@@ -12,10 +12,10 @@ export default function PrivacidadePage() {
     <div className="min-h-screen bg-[#070A10] text-white">
       <header className="sticky top-0 z-30">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <Logo />
             <div className="text-sm font-semibold tracking-tight">AutoBot</div>
-          </div>
+          </Link>
 
           <Link
             href="/"
