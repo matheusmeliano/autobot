@@ -24,6 +24,7 @@ import {
 import {
   formatCurrencyDigitsForEmail,
   parseCurrencyToNumberForEmail,
+  numericToDigitsString,
 } from "@/lib/currency";
 import {
   useCurrencySymbolValue,
