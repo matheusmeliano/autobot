@@ -150,7 +150,7 @@ export default async function AssinaturaPage() {
               </div>
             ) : (
               <a
-                href={waLink("Tenho interesse no plano Básico – R$ 149/mês.")}
+                href={waLink("Tenho interesse no plano Básico do AutoBot – R$ 149/mês.")}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
@@ -201,7 +201,7 @@ export default async function AssinaturaPage() {
               </div>
             ) : (
               <a
-                href={waLink("Tenho interesse no plano Pro – R$ 199/mês.")}
+                href={waLink("Tenho interesse no plano Pro do AutoBot – R$ 199/mês.")}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
@@ -241,7 +241,7 @@ export default async function AssinaturaPage() {
               </div>
             ) : (
               <a
-                href={waLink("Tenho interesse no plano Vitalício – R$ 2.490 pagamento único.")}
+                href={waLink("Tenho interesse no plano Vitalício do AutoBot – R$ 2.490 pagamento único.")}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
