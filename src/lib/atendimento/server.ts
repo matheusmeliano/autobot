@@ -3246,6 +3246,12 @@ export async function ensureWhatsAppLeadAndConversation(params: {
   initialStateNormalized?: string | null;
   initialTimezone?: string | null;
   initialCountry?: string | null;
+  __skipOfficialBotRecipientValidationForTrustedFlow?: boolean;
+  __inboundEventVerified?: {
+    recipientMatchesOfficialBot: boolean;
+    eventIsInboundExternalMessage: boolean;
+    senderIsValidContact: boolean;
+  } | null;
 }) {
   const admin = createSupabaseAdminClient();
 
@@ -3260,6 +3266,32 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       `Telefone informado nao corresponde a um usuario WhatsApp valido: ${normalizedPhone ? "len=" + normalizedPhone.length : "empty"}`,
     );
   }
+
+  // --- GATE INTERNO: validacoes obrigatorias antes de CRIAR interessado (novo lead) ---
+  // Quando a chamada vem via origin "zapi_from_header", EXIGIMOS a tripla validacao
+  // (destinatario = bot oficial, evento = mensagem recebida, remetente valido).
+  // Qualquer falha aqui BLOQUEIA a criacao de novo lead (mas ainda permite atualizar lead ja existente
+  //  por fluxos validos como o de validacao de telefone).
+  let existingLeadCheck: { id: string } | null = null;
+  try {
+    const { data: existingRow } = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });
+    existingLeadCheck = existingRow ? { id: String((existingRow as any).id) } : null;
+  } catch (_existingErr) {
+    existingLeadCheck = null;
+  }
+
+  const isCreatingNewLead = !existingLeadCheck?.id;
+  if (isCreatingNewLead && params.creationOrigin === "zapi_from_header") {
+    const verified = params.__inboundEventVerified ?? null;
+    const recipientOk = Boolean(verified?.recipientMatchesOfficialBot);
+    const inboundEventOk = Boolean(verified?.eventIsInboundExternalMessage);
+    const senderOk = Boolean(verified?.senderIsValidContact);
+    const mustBlock = !recipientOk || !inboundEventOk || !senderOk;
+    if (mustBlock) {
+      return null;
+    }
+  }
+  // --- FIM DO GATE INTERNO ---
 
   {
     const { data: instRow } = await admin

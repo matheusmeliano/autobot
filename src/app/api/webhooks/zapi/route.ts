@@ -2696,6 +2696,67 @@ export async function POST(req: Request) {
   }
 
   if (normalizedFrom) {
+    // --- GATE OBRIGATORIO ANTES DE CRIAR INTERESSADO ---
+    // Regra: interessado so eh criado quando:
+    //   (1) destinatario (toPhone) === numero oficial do bot conectado a Z-API
+    //   (2) evento = mensagem RECEBIDA de contato EXTERNO (rawFromMe false)
+    //   (3) remetente (fromPhone) eh valido e existe
+    // Qualquer uma dessas falhando -> NAO cria interessado.
+    const toDigitsGate = String(toPhone ?? "").replace(/\D/g, "");
+    const fromDigitsGate = String(fromPhone ?? "").replace(/\D/g, "");
+    const botDigitsGate = connectedInstancePhoneDigits;
+
+    const recipientMatchesOfficialBot =
+      botDigitsGate.length >= 10 &&
+      toDigitsGate.length >= 10 &&
+      equivalentBrazilianPhoneSuffix(botDigitsGate, toDigitsGate);
+
+    const eventIsInboundExternalMessage =
+      !rawFromMe &&
+      !isOutboundOnlyEvent &&
+      (normalizedEventType === "ReceivedCallback" ||
+        normalizedEventType === "MESSAGE_RECEIVED" ||
+        normalizedEventType === "message_received" ||
+        normalizedEventType === "inbound_message" ||
+        normalizedEventType === "inbound" ||
+        normalizedEventType === "received_message" ||
+        normalizedEventType === "new_message" ||
+        normalizedEventType === "incoming_message" ||
+        normalizedEventType === "incoming" ||
+        normalizedEventType === "message" ||
+        normalizedEventType === "chat_message" ||
+        normalizedEventType === "text" ||
+        normalizedEventType === "received");
+
+    const senderIsValidContact =
+      fromDigitsGate.length >= 10 &&
+      isValidWhatsAppUserPhone(fromDigitsGate) &&
+      !equivalentBrazilianPhoneSuffix(fromDigitsGate, botDigitsGate) &&
+      !equivalentBrazilianPhoneSuffix(fromDigitsGate, toDigitsGate);
+
+    const gatePassed =
+      recipientMatchesOfficialBot && eventIsInboundExternalMessage && senderIsValidContact;
+
+    if (!gatePassed && !pendingPhoneValidationRef.id) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "gate_mandatorio_lead_creation_blocked_failed_validation",
+        gate_checks: {
+          recipient_matches_official_bot: recipientMatchesOfficialBot,
+          event_is_inbound_external_message: eventIsInboundExternalMessage,
+          sender_is_valid_contact: senderIsValidContact,
+        },
+        debug: {
+          bot_number_digits: botDigitsGate.slice(0, 6) || "-",
+          to_digits: toDigitsGate.slice(0, 6) || "-",
+          from_digits: fromDigitsGate.slice(0, 6) || "-",
+          eventType: normalizedEventType || "unknown",
+        },
+      });
+    }
+    // --- FIM DO GATE OBRIGATORIO ---
+
     try {
       const leadContext = await ensureWhatsAppLeadAndConversation({
         phone: normalizedPhoneOnly,
@@ -2705,6 +2766,11 @@ export async function POST(req: Request) {
         initialState: null,
         initialTimezone: null,
         initialCountry: null,
+        __inboundEventVerified: {
+          recipientMatchesOfficialBot,
+          eventIsInboundExternalMessage,
+          senderIsValidContact,
+        },
       });
       if (!leadContext?.lead?.id || !leadContext?.conversation?.id) {
         return Response.json({
