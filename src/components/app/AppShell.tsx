@@ -15,6 +15,7 @@ import { modalToast } from "@/lib/modalToast";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 import { getDefaultAuthenticatedPath, isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
+import { isUSDCurrencyEmail } from "@/lib/currency";
 
 function paymentToastMessage(pending: any) {
   const name = String(pending?.debtor?.nome ?? "").trim();
@@ -588,14 +589,20 @@ export function AppShell({
 
               <div className="mt-4 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black p-0">
-                    <img
-                      src="/logo%20-%20online-music-usa-3.png"
-                      alt="Lucas Brum Online Music USA"
-                      loading="lazy"
-                      className="h-[120%] w-[120%] shrink-0 object-cover scale-110"
-                    />
-                  </div>
+                  {isUSDCurrencyEmail(email) ? (
+                    <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-black p-0">
+                      <img
+                        src="/logo%20-%20online-music-usa-3.png"
+                        alt="Lucas Brum Online Music USA"
+                        loading="lazy"
+                        className="h-[120%] w-[120%] shrink-0 object-cover scale-110"
+                      />
+                    </div>
+                  ) : (
+                    <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] font-bold tracking-tight text-[var(--app-text-85)]">
+                      LB
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
                       {displayName}
