@@ -2701,7 +2701,10 @@ export async function POST(req: Request) {
     //   (1) destinatario (toPhone) === numero oficial do bot conectado a Z-API
     //   (2) evento = mensagem RECEBIDA de contato EXTERNO (rawFromMe false)
     //   (3) remetente (fromPhone) eh valido e existe
-    // Qualquer uma dessas falhando -> NAO cria interessado.
+    // IMPORTANTE: o bloqueio SO vale quando o lead NAO EXISTE ainda (criacao de NOVO interessado).
+    // Se o lead JA EXISTE (respondendo a fluxos existentes como SIM/NAO de matricula, etc),
+    // o NAO PASSAR nessas 3 validacoes NAO bloqueia a execucao - o fluxo continua normalmente
+    // para tratar a resposta do lead no contexto existente.
     const toDigitsGate = String(toPhone ?? "").replace(/\D/g, "");
     const fromDigitsGate = String(fromPhone ?? "").replace(/\D/g, "");
     const botDigitsGate = connectedInstancePhoneDigits;
@@ -2738,22 +2741,33 @@ export async function POST(req: Request) {
       recipientMatchesOfficialBot && eventIsInboundExternalMessage && senderIsValidContact;
 
     if (!gatePassed && !pendingPhoneValidationRef.id) {
-      return Response.json({
-        ok: true,
-        ignored: true,
-        reason: "gate_mandatorio_lead_creation_blocked_failed_validation",
-        gate_checks: {
-          recipient_matches_official_bot: recipientMatchesOfficialBot,
-          event_is_inbound_external_message: eventIsInboundExternalMessage,
-          sender_is_valid_contact: senderIsValidContact,
-        },
-        debug: {
-          bot_number_digits: botDigitsGate.slice(0, 6) || "-",
-          to_digits: toDigitsGate.slice(0, 6) || "-",
-          from_digits: fromDigitsGate.slice(0, 6) || "-",
-          eventType: normalizedEventType || "unknown",
-        },
-      });
+      let isNewLeadCandidate = false;
+      try {
+        const existingResult = await findLeadByPhone({ phone: normalizedPhoneOnly, userId });
+        if (!existingResult?.data) {
+          isNewLeadCandidate = true;
+        }
+      } catch (_checkErr) {
+        isNewLeadCandidate = true;
+      }
+      if (isNewLeadCandidate) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "gate_mandatorio_lead_creation_blocked_failed_validation",
+          gate_checks: {
+            recipient_matches_official_bot: recipientMatchesOfficialBot,
+            event_is_inbound_external_message: eventIsInboundExternalMessage,
+            sender_is_valid_contact: senderIsValidContact,
+          },
+          debug: {
+            bot_number_digits: botDigitsGate.slice(0, 6) || "-",
+            to_digits: toDigitsGate.slice(0, 6) || "-",
+            from_digits: fromDigitsGate.slice(0, 6) || "-",
+            eventType: normalizedEventType || "unknown",
+          },
+        });
+      }
     }
     // --- FIM DO GATE OBRIGATORIO ---
 
@@ -2922,6 +2936,7 @@ export async function POST(req: Request) {
         }
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
         const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
+        const MSG_CONFIRMAR_MATRICULA_PERGUNTA = "Vamos confirmar sua matrícula e iniciar suas aulas?";
         const NAO_RECUSA_MSG_1_PREFIX = leadFirstName
           ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
           : "Tudo bem, entendemos que talvez ainda não seja o momento.";
@@ -2939,9 +2954,14 @@ export async function POST(req: Request) {
         const isNoNuclear = lenientYesNoNuclear.result === "no";
         const isAmbiguousNuclear = lenientYesNoNuclear.result === "ambiguous";
 
-        const recentBotHasMsgSimNao = recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA));
+        const recentBotHasMsgSimNao =
+          recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA)) ||
+          recentBotTextsNuclear.some((text) => text.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA));
         const ultimaMsgBotPedeSimNao =
-          (lastBotTextNuclear && lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA)) || recentBotHasMsgSimNao;
+          (lastBotTextNuclear &&
+            (lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA) ||
+              lastBotTextNuclear.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA))) ||
+          recentBotHasMsgSimNao;
         const bookingAttendanceAttendedByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         const bookingAttendanceNoShowByCol =
