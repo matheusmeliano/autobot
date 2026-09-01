@@ -600,7 +600,7 @@ export function AppShell({
                     </div>
                   ) : (
                     <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] font-bold tracking-tight text-[var(--app-text-85)]">
-                      LB
+ {displayName.trim().charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
