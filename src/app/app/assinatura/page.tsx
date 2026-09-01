@@ -224,8 +224,8 @@ export default async function AssinaturaPage() {
       </div>
 
       {!_isUsaAtt && !_hasPaidActivePlan ? (
-        <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-          <div className="text-base font-semibold text-emerald-50">
+        <div className="mt-6 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4 text-sm text-[var(--app-warning-text)]">
+          <div className="text-base font-semibold text-[var(--app-warning-text)]">
             Importante sobre a conexão com o WhatsApp
           </div>
           <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
