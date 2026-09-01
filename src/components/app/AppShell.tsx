@@ -83,6 +83,8 @@ export function AppShell({
   const [paymentResolving, setPaymentResolving] = useState<"confirm" | "reject" | null>(null);
   const lastPaymentSuspicionRealtimeIdRef = useRef<string>("");
 
+  const showThemeGate = false;
+
   useEffect(() => {
     let active = true;
     supabase.auth.getUser().then(({ data }) => {
@@ -189,7 +191,6 @@ export function AppShell({
       setProfileName(String(profile?.nome ?? "").trim());
       const rawTheme = (profile as { theme?: unknown } | null)?.theme;
       const savedTheme = normalizeStoredTheme(rawTheme);
-      setThemePreference(savedTheme);
       let storedTheme: AppTheme | null = null;
       if (userId) {
         try {
@@ -197,6 +198,7 @@ export function AppShell({
         } catch {}
       }
       const resolvedTheme = savedTheme ?? storedTheme ?? initialTheme;
+      setThemePreference(savedTheme ?? resolvedTheme);
       setTheme(resolvedTheme);
       if (userId) {
         try {
@@ -248,6 +250,7 @@ export function AppShell({
     if (!themeLoaded) return;
     if (themePreference) return;
     if (restricted) return;
+    if (!showThemeGate) return;
 
     const currentPath = pathname ?? "";
     if (
@@ -257,7 +260,7 @@ export function AppShell({
     ) {
       router.replace("/app/dashboard");
     }
-  }, [authChecked, isAuthed, pathname, restricted, router, themeLoaded, themePreference]);
+  }, [authChecked, isAuthed, pathname, restricted, router, themeLoaded, themePreference, showThemeGate]);
 
   useEffect(() => {
     if (!authChecked) return;
@@ -288,8 +291,6 @@ export function AppShell({
 
     router.replace("/app/assinatura?blocked=1");
   }, [authChecked, isAuthed, pathname, restricted, router]);
-
-  const showThemeGate = false;
 
   useEffect(() => {
     if (!showThemeGate) return;
