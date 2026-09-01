@@ -1,9 +1,13 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isUSDCurrencyEmail } from "@/lib/currency";
 import { normalizePlan, planLabel } from "@/lib/plans";
-import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
-import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
 import { redirect } from "next/navigation";
+
+const WHATSAPP_NUMBER = "5565996933336";
+
+function waLink(message: string) {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
 
 function dateBR(v: string | null) {
   if (!v) return "-";
@@ -137,17 +141,23 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <MercadoPagoRecurringButton
-              plan="basico"
-              amount={149}
-              userEmail={user?.email ?? null}
-              disabled={plan === "basico" || plan === "vitalicio"}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
-            >
-              {plan === "basico"
-                ? "Plano atual"
-                : "Assinar"}
-            </MercadoPagoRecurringButton>
+            {(plan === "basico" || plan === "vitalicio") ? (
+              <div
+                className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 text-sm font-semibold text-[var(--app-text-60)] opacity-100"
+                aria-disabled="true"
+              >
+                {plan === "basico" ? "Plano atual" : "Assinar"}
+              </div>
+            ) : (
+              <a
+                href={waLink("Tenho interesse no plano Básico – R$ 149/mês.")}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+              >
+                Assinar
+              </a>
+            )}
           </div>
         </div>
 
@@ -182,17 +192,23 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <MercadoPagoRecurringButton
-              plan="pro"
-              amount={199}
-              userEmail={user?.email ?? null}
-              disabled={plan === "pro" || plan === "vitalicio"}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
-            >
-              {plan === "pro"
-                ? "Plano atual"
-                : "Assinar"}
-            </MercadoPagoRecurringButton>
+            {(plan === "pro" || plan === "vitalicio") ? (
+              <div
+                className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 text-sm font-semibold text-[var(--app-text-60)] opacity-100"
+                aria-disabled="true"
+              >
+                {plan === "pro" ? "Plano atual" : "Assinar"}
+              </div>
+            ) : (
+              <a
+                href={waLink("Tenho interesse no plano Pro – R$ 199/mês.")}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+              >
+                Assinar
+              </a>
+            )}
           </div>
         </div>
 
@@ -216,13 +232,23 @@ export default async function AssinaturaPage() {
             </li>
           </ul>
           <div className="mt-6">
-            <MercadoPagoCheckoutButton
-              plan="vitalicio"
-              disabled={plan === "vitalicio"}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
-            >
-              {plan === "vitalicio" ? "Plano atual" : "Comprar vitalício"}
-            </MercadoPagoCheckoutButton>
+            {plan === "vitalicio" ? (
+              <div
+                className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 text-sm font-semibold text-[var(--app-text-60)] opacity-100"
+                aria-disabled="true"
+              >
+                Plano atual
+              </div>
+            ) : (
+              <a
+                href={waLink("Tenho interesse no plano Vitalício – R$ 2.490 pagamento único.")}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+              >
+                Comprar vitalício
+              </a>
+            )}
           </div>
         </div>
       </div>
