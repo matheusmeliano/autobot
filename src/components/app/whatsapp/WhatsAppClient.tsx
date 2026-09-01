@@ -21,7 +21,13 @@ type FormValues = {
   client_token: string;
 };
 
-export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
+export function WhatsAppClient({
+  initial,
+  showZApiNotice,
+}: {
+  initial: InstanceRow | null;
+  showZApiNotice?: boolean;
+}) {
   const {
     register,
     handleSubmit,
@@ -69,6 +75,19 @@ export function WhatsAppClient({ initial }: { initial: InstanceRow | null }) {
           Configure sua instância por usuário.
         </div>
       </div>
+
+      {showZApiNotice ? (
+        <div className="mt-6 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4 text-sm text-[var(--app-warning-text)]">
+          <div className="text-base font-semibold text-[var(--app-warning-text)]">
+            Sobre a conexão com o WhatsApp
+          </div>
+          <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
+            <p>
+              Você também precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="text-sm font-semibold">Configuração</div>

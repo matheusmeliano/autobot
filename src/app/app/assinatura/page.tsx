@@ -223,19 +223,6 @@ export default async function AssinaturaPage() {
         </div>
       </div>
 
-      {!_isUsaAtt && !_hasPaidActivePlan ? (
-        <div className="mt-6 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4 text-sm text-[var(--app-warning-text)]">
-          <div className="text-base font-semibold text-[var(--app-warning-text)]">
-            Sobre a conexão com o WhatsApp
-          </div>
-          <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
-            <p>
-              Você também precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       {plan !== "vitalicio" ? (
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
           Está com problemas com a assinatura mensal?{" "}

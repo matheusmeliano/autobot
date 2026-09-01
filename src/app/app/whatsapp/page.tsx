@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { WhatsAppClient } from "@/components/app/whatsapp/WhatsAppClient";
 import { refreshOneWhatsAppInstanceStatusLive } from "@/lib/atendimento/server";
+import { isUSDCurrencyEmail } from "@/lib/currency";
+import { normalizePlan } from "@/lib/plans";
 
 const BASE_COLS = ["instance_id", "token", "status"] as const;
 const OPTIONAL_COLS = ["client_token", "phone"] as const;
@@ -109,8 +111,46 @@ export default async function WhatsAppPage() {
     );
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [{ data: profile }, { data: subscription }] = await Promise.all([
+    user?.id
+      ? supabase.from("profiles").select("plano").eq("user_id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    user?.id
+      ? supabase
+          .from("subscriptions")
+          .select("plano, status, vencimento, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const _rawPlan: string | null =
+    (profile?.plano as string | null) ??
+    (subscription?.plano as string | null) ??
+    null;
+  const plan = normalizePlan(_rawPlan ?? "teste");
+  const _isUsaAtt = isUSDCurrencyEmail(user?.email ?? null);
+  const rawSubStatus = String(subscription?.status ?? "").toLowerCase();
+  const subStatus =
+    rawSubStatus === "pausado" || rawSubStatus === "past_due" ? "cancelado" : rawSubStatus;
+  const vencimento = subscription?.vencimento ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  const isExpired =
+    typeof vencimento === "string" &&
+    vencimento.length >= 10 &&
+    vencimento.slice(0, 10) < today;
+  const isBlocked = subStatus === "cancelado" || (plan !== "vitalicio" && isExpired);
+  const _hasPaidActivePlan =
+    !isBlocked && (plan === "basico" || plan === "pro" || plan === "vitalicio");
+  const showZApiNotice = !_isUsaAtt && !_hasPaidActivePlan;
+
   const liveStatus = await safeRefreshInstanceStatusLive(supabase, data);
-  const status = liveStatus ?? (data?.status ?? null);
+  const instanceStatus = liveStatus ?? (data?.status ?? null);
 
   return (
     <WhatsAppClient
@@ -118,13 +158,14 @@ export default async function WhatsAppPage() {
         data
           ? {
               instance_id: data.instance_id ?? null,
-              status,
+              status: instanceStatus,
               hasToken: Boolean(data.token),
               hasClientToken: Boolean(data.client_token),
               phone: String(data.phone ?? "").trim() || null,
             }
           : null
       }
+      showZApiNotice={showZApiNotice}
     />
   );
 }
