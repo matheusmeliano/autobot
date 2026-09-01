@@ -641,12 +641,7 @@ export function Landing() {
               ].map((plan) => (
                 <GlassCard
                   key={plan.name}
-                  className={[
-                    "flex h-full flex-col p-6",
-                    plan.highlight
-                      ? "ring-1 ring-indigo-400/30"
-                      : "",
-                  ].join(" ")}
+                  className="flex h-full flex-col p-6"
                 >
                   <div className="flex items-start justify-between">
                     <div className="min-w-0">
