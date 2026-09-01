@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+﻿import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isUSDCurrencyEmail } from "@/lib/currency";
 import { normalizePlan, planLabel } from "@/lib/plans";
 import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
@@ -64,6 +64,10 @@ export default async function AssinaturaPage() {
     vencimento.length >= 10 &&
     vencimento.slice(0, 10) < today;
   const isBlocked = status === "cancelado" || (plan !== "vitalicio" && isExpired);
+  const _hasPaidActivePlan =
+    !isBlocked &&
+    (plan === "basico" || plan === "pro" || plan === "vitalicio");
+
 
   return (
     <div>
@@ -219,7 +223,7 @@ export default async function AssinaturaPage() {
         </div>
       </div>
 
-      {!_isUsaAtt && !_hasAssignedPlan ? (
+      {!_isUsaAtt && !_hasPaidActivePlan ? (
         <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
           <div className="text-base font-semibold text-emerald-50">
             Importante sobre a conexão com o WhatsApp
