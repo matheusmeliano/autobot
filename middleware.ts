@@ -154,8 +154,10 @@ export async function middleware(request: NextRequest) {
       pathname === "/app/assinatura" || pathname.startsWith("/app/assinatura/");
     const allowConfiguracoes =
       pathname === "/app/configuracoes" || pathname.startsWith("/app/configuracoes/");
+    const allowWhatsapp =
+      pathname === "/app/whatsapp" || pathname.startsWith("/app/whatsapp/");
 
-    if (!allowAssinatura && !allowConfiguracoes) {
+    if (!allowAssinatura && !allowConfiguracoes && !allowWhatsapp) {
       const { data: sub } = await supabase
         .from("subscriptions")
         .select("id, plano, status, vencimento, created_at")

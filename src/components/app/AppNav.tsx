@@ -73,7 +73,9 @@ function getVisibleNavGroups({
       items: group.items.filter(
         (item) =>
           item.href !== "/app/atendimento" &&
-          (item.href === "/app/assinatura" || item.href === "/app/configuracoes"),
+          (item.href === "/app/assinatura" ||
+            item.href === "/app/configuracoes" ||
+            item.href === "/app/whatsapp"),
       ),
     })).filter((group) => group.items.length > 0);
   }

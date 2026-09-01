@@ -279,7 +279,9 @@ export function AppShell({
       currentPath === "/app/assinatura" ||
       currentPath.startsWith("/app/assinatura/") ||
       currentPath === "/app/configuracoes" ||
-      currentPath.startsWith("/app/configuracoes/")
+      currentPath.startsWith("/app/configuracoes/") ||
+      currentPath === "/app/whatsapp" ||
+      currentPath.startsWith("/app/whatsapp/")
     ) {
       return;
     }
@@ -438,7 +440,9 @@ export function AppShell({
     currentPath !== "/app/assinatura" &&
     !currentPath.startsWith("/app/assinatura/") &&
     currentPath !== "/app/configuracoes" &&
-    !currentPath.startsWith("/app/configuracoes/");
+    !currentPath.startsWith("/app/configuracoes/") &&
+    currentPath !== "/app/whatsapp" &&
+    !currentPath.startsWith("/app/whatsapp/");
   if (shouldHoldRender) return null;
 
   const themeProviderValue = { theme, themePreference, themeLoaded, saveTheme };
