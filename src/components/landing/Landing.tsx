@@ -692,7 +692,7 @@ export function Landing() {
               </div>
               <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
                 <p>
-                  Você também precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
+                  Você precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
                 </p>
               </div>
             </div>
