@@ -77,13 +77,12 @@ export function WhatsAppClient({
       </div>
 
       {showZApiNotice ? (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-6">
-          <div className="text-sm font-semibold text-white/85">
+        <div className="mt-6 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4 text-sm text-[var(--app-warning-text)]">
+          <div className="text-base font-semibold text-[var(--app-warning-text)]">
             Sobre a conexão com o WhatsApp
           </div>
-          <div className="mt-4 flex items-start gap-3 text-sm text-white/70">
-            <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50"></div>
-            <p className="leading-relaxed">
+          <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
+            <p>
               Você precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
             </p>
           </div>
