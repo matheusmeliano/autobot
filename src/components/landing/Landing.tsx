@@ -692,13 +692,7 @@ export function Landing() {
               </div>
               <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
                 <p>
-                  Você também irá precisar da Z-API para conectar o seu WhatsApp ao AutoBot e utilizar os recursos de envio automático de mensagens.
-                </p>
-                <p>
-                  A Z-API é um serviço externo e deve ser contratada e paga separadamente, pois não está inclusa no plano do AutoBot.
-                </p>
-                <p>
-                  Após a contratação, você poderá integrar a plataforma da Z-API ao AutoBot para conectar seu WhatsApp e utilizar as automações disponíveis no sistema.
+                  Você também precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
                 </p>
               </div>
             </div>
