@@ -1289,22 +1289,11 @@ function LeadDetails({
                     type="button"
                     onClick={() => onConfirmPayment?.(lead)}
                     disabled={confirmBtnDisabled}
-                    className="inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-3 sm:px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-[44px] shrink-0 w-full sm:w-auto items-center justify-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-3 sm:px-4 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
                     <span className="shrink-0">
                       {loadingPayment && loadingPaymentAction === "confirm" ? "Confirmando…" : "Pagamento realizado"}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onRejectPayment?.(lead)}
-                    disabled={rejectBtnDisabled}
-                    className="inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 sm:px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <XCircle className="h-4 w-4 shrink-0" />
-                    <span className="shrink-0">
-                      {loadingPayment && loadingPaymentAction === "reject" ? "Atualizando…" : "Pagamento não realizado"}
                     </span>
                   </button>
                 </div>
@@ -2241,7 +2230,7 @@ function BookingDetails({
                     onClick={() => void onMarkAttendance(lead, "attended")}
                     disabled={isMarkingAttendance || hasAttendanceStatus}
                     className={[
-                      "inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border px-3 sm:px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                      "inline-flex min-h-[44px] shrink-0 w-full sm:w-auto items-center justify-center gap-2 rounded-full border px-3 sm:px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
                       attendanceStatus === "attended"
                         ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-100"
                         : "border-emerald-500/35 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20",
@@ -2258,30 +2247,6 @@ function BookingDetails({
                         : attendanceStatus === "attended"
                         ? "Compareceu"
                         : "Marcar como compareceu"}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void onMarkAttendance(lead, "no_show")}
-                    disabled={isMarkingAttendance || hasAttendanceStatus}
-                    className={[
-                      "inline-flex min-h-[44px] shrink-0 w-full sm:min-w-[calc(50%-0.25rem)] sm:w-auto items-center justify-center gap-2 rounded-full border px-3 sm:px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-                      attendanceStatus === "no_show"
-                        ? "border-amber-400/30 bg-amber-400/15 text-amber-100"
-                        : "border-amber-400/30 bg-amber-400/15 text-amber-100 hover:bg-amber-400/20",
-                    ].join(" ")}
-                  >
-                    {isMarkingAttendanceNoShow ? (
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                    ) : (
-                      <XCircle className="h-4 w-4 shrink-0" />
-                    )}
-                    <span className="shrink-0">
-                      {isMarkingAttendanceNoShow
-                        ? "Marcando…"
-                        : attendanceStatus === "no_show"
-                        ? "Não compareceu"
-                        : "Marcar como não compareceu"}
                     </span>
                   </button>
                 </div>
