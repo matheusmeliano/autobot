@@ -81,7 +81,7 @@ export default async function AssinaturaPage() {
       {isBlocked ? (
         <div className="mt-6 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4 text-sm text-[var(--app-warning-text)]">
           <div className="text-base font-semibold text-[var(--app-warning-text)]">
-            Seu teste gratuito terminou.
+            Seu teste gratuito terminou
           </div>
           <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
             <p>
