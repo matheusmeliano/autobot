@@ -690,12 +690,9 @@ export function Landing() {
               <div className="text-sm font-semibold text-white/85">
                 Sobre a conexão com o WhatsApp
               </div>
-              <div className="mt-4 flex items-start gap-3 text-sm text-white/70">
-                <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50"></div>
-                <p className="leading-relaxed">
-                  Você precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
-                </p>
-              </div>
+              <p className="mt-4 text-sm leading-relaxed text-white/70">
+                Você precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
+              </p>
             </div>
           </Container>
         </section>
