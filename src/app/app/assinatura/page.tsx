@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isUSDCurrencyEmail } from "@/lib/currency";
 import { normalizePlan, planLabel } from "@/lib/plans";
 import { MercadoPagoRecurringButton } from "@/components/app/MercadoPagoRecurringButton";
 import { MercadoPagoCheckoutButton } from "@/components/app/MercadoPagoCheckoutButton";
@@ -47,7 +48,13 @@ export default async function AssinaturaPage() {
     );
   }
 
-  const plan = normalizePlan(profile?.plano ?? subscription?.plano ?? "teste");
+  const _rawPlan: string | null =
+    (profile?.plano as string | null) ??
+    (subscription?.plano as string | null) ??
+    null;
+  const plan = normalizePlan(_rawPlan ?? "teste");
+  const _hasAssignedPlan = _rawPlan !== null && String(_rawPlan).trim() !== "";
+  const _isUsaAtt = isUSDCurrencyEmail(user?.email ?? null);
   const rawStatus = String(subscription?.status ?? "").toLowerCase();
   const status = rawStatus === "pausado" || rawStatus === "past_due" ? "cancelado" : rawStatus;
   const vencimento = subscription?.vencimento ?? null;
@@ -211,6 +218,25 @@ export default async function AssinaturaPage() {
           </div>
         </div>
       </div>
+
+      {!_isUsaAtt && !_hasAssignedPlan ? (
+        <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+          <div className="text-base font-semibold text-emerald-50">
+            Importante sobre a conexão com o WhatsApp
+          </div>
+          <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
+            <p>
+              Você também irá precisar da Z-API para conectar o seu WhatsApp ao AutoBot e utilizar os recursos de envio e recebimento automático de mensagens.
+            </p>
+            <p>
+              A Z-API é um serviço externo e deve ser contratada e paga separadamente, pois não está inclusa no plano do AutoBot.
+            </p>
+            <p>
+              Após a contratação, você poderá integrar a plataforma da Z-API ao AutoBot para conectar seu WhatsApp e utilizar as automações disponíveis no sistema.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {plan !== "vitalicio" ? (
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
