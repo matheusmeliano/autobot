@@ -688,7 +688,7 @@ export function Landing() {
             </div>
             <div className="mt-12 rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4 text-sm text-[var(--app-warning-text)]">
               <div className="text-base font-semibold text-[var(--app-warning-text)]">
-                Importante sobre a conexão com o WhatsApp
+                Sobre a conexão com o WhatsApp
               </div>
               <div className="mt-3 space-y-3 opacity-95 leading-relaxed">
                 <p>
