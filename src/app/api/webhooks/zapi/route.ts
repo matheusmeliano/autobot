@@ -2998,15 +2998,6 @@ export async function POST(req: Request) {
         const isYesNuclear = lenientYesNoNuclear.result === "yes";
         const isNoNuclear = lenientYesNoNuclear.result === "no";
         const isAmbiguousNuclear = lenientYesNoNuclear.result === "ambiguous";
-
-        const recentBotHasMsgSimNao =
-          recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA)) ||
-          recentBotTextsNuclear.some((text) => text.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA));
-        const ultimaMsgBotPedeSimNao =
-          (lastBotTextNuclear &&
-            (lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA) ||
-              lastBotTextNuclear.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA))) ||
-          recentBotHasMsgSimNao;
         const bookingAttendanceAttendedByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         const bookingAttendanceNoShowByCol =
