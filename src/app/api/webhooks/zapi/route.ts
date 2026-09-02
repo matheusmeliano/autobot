@@ -5675,16 +5675,6 @@ export async function POST(req: Request) {
                 const needsPostBookingCpf = !Boolean(String((lead as any)?.cpf ?? "").trim());
 
                 if (needsPostBookingCpf) {
-                  const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-                  const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
-                  await sendAtendimentoWhatsAppTextBatch({
-                    phone: normalizedPhoneOnly,
-                    messages: combinedBatch,
-                    admin,
-                    conversationId,
-                    insertIntoConversation: true,
-                  });
-
                   void appendHistoryEvent({
                     leadId,
                     conversationId,
@@ -5707,15 +5697,6 @@ export async function POST(req: Request) {
                   } catch (_e) {}
                   void __cpfInsert.catch(() => {});
                 } else {
-                  const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-                  const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
-                  await sendAtendimentoWhatsAppTextBatch({
-                    phone: normalizedPhoneOnly,
-                    messages: combinedBatch,
-                    admin,
-                    conversationId,
-                    insertIntoConversation: true,
-                  });
                   const zapiFallbackBookingRef = (already as any) ?? null;
                   const zapiFallbackResolved =
                     resolveExperimentalClassAssignedProfessorPhone({
@@ -6190,16 +6171,6 @@ export async function POST(req: Request) {
             }
 
             if (needsPostBookingCpf) {
-              const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-              const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
-              await sendAtendimentoWhatsAppTextBatch({
-                phone: normalizedPhoneOnly,
-                messages: combinedBatch,
-                admin,
-                conversationId,
-                insertIntoConversation: true,
-              });
-
               void appendHistoryEvent({
                 leadId,
                 conversationId,
@@ -6222,15 +6193,6 @@ export async function POST(req: Request) {
               } catch (_e) {}
               void __cpfInsert.catch(() => {});
             } else {
-              const studentMsgs = buildExperimentalClassStudentWhatsAppMessages(firstName);
-              const combinedBatch = [studentMsgs.filter(Boolean).join("\n\n")];
-              await sendAtendimentoWhatsAppTextBatch({
-                phone: normalizedPhoneOnly,
-                messages: combinedBatch,
-                admin,
-                conversationId,
-                insertIntoConversation: true,
-              });
               const zapiBookedBookingRef = (booking as any) ?? null;
               const zapiBookedResolved =
                 resolveExperimentalClassAssignedProfessorPhone({
