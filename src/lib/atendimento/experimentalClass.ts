@@ -670,18 +670,24 @@ Acesse o painel para conferir:
 ${EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_LINK}`;
 }
 
-export function buildExperimentalClassPostAttendanceWhatsAppMessages(name?: string | null) {
+export function buildExperimentalClassPostAttendanceWhatsAppMessages(
+  name?: string | null,
+  params?: { phone?: string | null; baseUrl?: string | null },
+) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "";
+  const safeFullForLink = safeFull || safeFirst || "Aluno(a)";
+  const safePhone = String(params?.phone ?? "").trim().replace(/\D+/g, "");
+  const safeBase = String(params?.baseUrl ?? "").trim() || "https://www.autobot.business";
+  const link =
+    `${safeBase.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullForLink)}&telefone=${encodeURIComponent(safePhone || "")}`;
   const line1 = safeFirst
-    ? `${safeFirst}, ficamos felizes pela sua participação na aula experimental!`
-    : "Ficamos felizes pela sua participação na aula experimental!";
+    ? `Maravilha, ${safeFirst}! 🎉 Agora é hora do próximo passo. Acesse o link abaixo e conclua sua matrícula na plataforma.`
+    : `Maravilha! 🎉 Agora é hora do próximo passo. Acesse o link abaixo e conclua sua matrícula na plataforma.`;
   return [
     [
       line1,
-      "Agora é hora do próximo passo.",
-      "Vamos confirmar sua matrícula e iniciar suas aulas?",
-      "Responda com sim ou não.",
+      `Link: ${link}`,
     ].join("\n\n"),
   ];
 }

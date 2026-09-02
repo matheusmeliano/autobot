@@ -12,6 +12,7 @@ import {
   ATENDIMENTO_STAGE_ORDER,
   ATENDIMENTO_STATUS_ORDER,
 } from "@/lib/atendimento/constants";
+import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 
 async function insertAttendanceBotTextMessage(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
@@ -255,6 +256,10 @@ export async function POST(
   const currentLeadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase() || null;
   const currentLeadStatus = String((lead as any)?.status ?? "").trim().toLowerCase() || null;
 
+  const postAttendanceBaseUrl =
+    resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) ||
+    "https://www.autobot.business";
+
   const checkedAtIso = new Date().toISOString();
   const finalBookingStatus = attendance === "attended" ? "completed" : String((resolvedBooking as any)?.status ?? "scheduled").trim().toLowerCase();
 
@@ -470,7 +475,10 @@ export async function POST(
 
     let totalMessagesToSend = 0;
     let messagesAlreadySent = 0;
-    const messages = buildExperimentalClassPostAttendanceWhatsAppMessages(leadName);
+    const messages = buildExperimentalClassPostAttendanceWhatsAppMessages(leadName, {
+      phone: leadPhone,
+      baseUrl: postAttendanceBaseUrl,
+    });
     totalMessagesToSend = messages.length;
     const sentMessages: string[] = [];
     let lastError: unknown = null;

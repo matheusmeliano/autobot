@@ -166,17 +166,18 @@ test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso 
   );
 });
 
-test("buildExperimentalClassPostAttendanceWhatsAppMessages envia 1 mensagem UNICA (4 blocos juntos com \\n\\n) apos comparecimento, com primeiro nome", () => {
-  const messages = buildExperimentalClassPostAttendanceWhatsAppMessages("Pedro Henrique");
+test("buildExperimentalClassPostAttendanceWhatsAppMessages envia 1 mensagem UNICA apos comparecimento, com primeiro nome e link de matricula preenchido", () => {
+  const messages = buildExperimentalClassPostAttendanceWhatsAppMessages("Pedro Henrique", {
+    phone: "5511999998888",
+    baseUrl: "https://www.autobot.business",
+  });
   assert.equal(Array.isArray(messages), true);
   assert.equal(messages.length, 1);
   assert.equal(
     messages[0],
     [
-      "Pedro, ficamos felizes pela sua participação na aula experimental!",
-      "Agora é hora do próximo passo.",
-      "Vamos confirmar sua matrícula e iniciar suas aulas?",
-      "Responda com sim ou não.",
+      "Maravilha, Pedro! 🎉 Agora é hora do próximo passo. Acesse o link abaixo e conclua sua matrícula na plataforma.",
+      "Link: https://www.autobot.business/cadastro/recorrente?nome=Pedro%20Henrique&telefone=5511999998888",
     ].join("\n\n"),
   );
 });
