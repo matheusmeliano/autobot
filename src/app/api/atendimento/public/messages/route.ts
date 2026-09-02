@@ -523,7 +523,7 @@ async function getScheduledExperimentalClassBooking(params: {
     .from("atendimento_experimental_class_bookings")
     .select("*")
     .eq("lead_id", params.leadId)
-    .in("status", ["scheduled", "completed"])
+    .eq("status", "scheduled")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1062,33 +1062,9 @@ export async function POST(req: Request) {
   const currentStatus = String((lead as any).status ?? "").trim();
 
   const lastBotMsgText = String(lastBotMessage?.content_text ?? "").trim();
-
-  function normalizeSimNaoDetection(value: string | null | undefined): string {
-    const raw = String(value ?? "").trim();
-    if (!raw) return "";
-    return raw
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\s+/g, " ")
-      .toLowerCase();
-  }
-
-  function botTextHasPostAttendancePromptFragments(textRaw: string): boolean {
-    const t = normalizeSimNaoDetection(textRaw);
-    if (!t) return false;
-    let hits = 0;
-    if (t.includes(normalizeSimNaoDetection("Responda com sim ou não."))) hits += 1;
-    if (t.includes(normalizeSimNaoDetection("Vamos confirmar sua matrícula e iniciar suas aulas?"))) hits += 1;
-    if (t.includes(normalizeSimNaoDetection("ficamos felizes pela sua participação na aula experimental"))) hits += 1;
-    if (t.includes(normalizeSimNaoDetection("hora do próximo passo.").replace(/o/i, "o"))) hits += 1;
-    if (normalizeSimNaoDetection("hora do próximo passo").split(" ").every((w) => t.includes(w))) hits += 1;
-    return hits >= 2;
-  }
-
   const lastBotAsksSimNao =
     lastBotMsgText.includes("Responda com sim ou não.") ||
-    lastBotMsgText.includes("Vamos confirmar sua matrícula e iniciar suas aulas?") ||
-    botTextHasPostAttendancePromptFragments(lastBotMsgText);
+    lastBotMsgText.includes("Vamos confirmar sua matrícula e iniciar suas aulas?");
 
   const flatAttendanceAttended =
     String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "attended";
@@ -1147,7 +1123,7 @@ export async function POST(req: Request) {
       bookingAttendanceAttended ||
       bookingAttendanceNoShow) &&
     !postAttendanceHistoryMatriculaConfirmadaEvent &&
-    (((currentFunnelStage === "matricula_pendente" ||
+    ((currentFunnelStage === "matricula_pendente" ||
       currentStatus === "matricula_pendente" ||
       currentFunnelStage === "matricula_pendente_recusada" ||
       currentStatus === "matricula_pendente_recusada" ||
@@ -1160,8 +1136,7 @@ export async function POST(req: Request) {
         bookingAttendanceAttended ||
         bookingAttendanceNoShow ||
         flatExpCompleted ||
-        hasBookingReal)) ||
-      (lastBotAsksSimNao && (isYesLenient || isNoLenient)));
+        hasBookingReal));
 
   const isRepescagemOrRecusadaStageEarly =
     isRepescagemStage ||

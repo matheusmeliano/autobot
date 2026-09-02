@@ -1326,7 +1326,7 @@ async function getScheduledExperimentalClassBookingWhatsApp(params: {
       "professor_start_at, id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_checked_at",
     )
     .eq("lead_id", params.leadId)
-    .in("status", ["scheduled", "completed"])
+    .eq("status", "scheduled")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -2696,141 +2696,27 @@ export async function POST(req: Request) {
   }
 
   if (normalizedFrom) {
-    // --- GATE OBRIGATORIO ANTES DE CRIAR INTERESSADO ---
-    // Regra: interessado SO EH CRIADO quando as 3 condicoes passarem.
-    // IMPORTANTE: este gate NUNCA retorna/aborta o webhook. O unico objetivo dele eh:
-    //   -> BLOQUEAR a chamada ensureWhatsAppLeadAndConversation SE o lead NAO EXISTE ainda e o gate falhou.
-    // Todo o resto do fluxo (triagem inicial, dores, SIM/NAO de matricula, etc) SEMPRE continua rodando normalmente.
-    // Quando o lead JA EXISTE, a flag __inboundEventVerified é passada e o gate INTERIOR (server.ts#L3269) decide.
-    const toDigitsGate = String(toPhone ?? "").replace(/\D/g, "");
-    const fromDigitsGate = String(fromPhone ?? "").replace(/\D/g, "");
-    const botDigitsGate = connectedInstancePhoneDigits;
-
-    const recipientMatchesOfficialBot =
-      botDigitsGate.length >= 10 &&
-      toDigitsGate.length >= 10 &&
-      equivalentBrazilianPhoneSuffix(botDigitsGate, toDigitsGate);
-
-    const eventIsInboundExternalMessage =
-      !rawFromMe &&
-      !isOutboundOnlyEvent &&
-      (normalizedEventType === "ReceivedCallback" ||
-        normalizedEventType === "MESSAGE_RECEIVED" ||
-        normalizedEventType === "message_received" ||
-        normalizedEventType === "inbound_message" ||
-        normalizedEventType === "inbound" ||
-        normalizedEventType === "received_message" ||
-        normalizedEventType === "new_message" ||
-        normalizedEventType === "incoming_message" ||
-        normalizedEventType === "incoming" ||
-        normalizedEventType === "message" ||
-        normalizedEventType === "chat_message" ||
-        normalizedEventType === "text" ||
-        normalizedEventType === "received");
-
-    const senderIsValidContact =
-      fromDigitsGate.length >= 10 &&
-      isValidWhatsAppUserPhone(fromDigitsGate) &&
-      !equivalentBrazilianPhoneSuffix(fromDigitsGate, botDigitsGate) &&
-      !equivalentBrazilianPhoneSuffix(fromDigitsGate, toDigitsGate);
-
-    const gatePassed =
-      recipientMatchesOfficialBot && eventIsInboundExternalMessage && senderIsValidContact;
-
-    // Decide se PODE chamar ensureWhatsAppLeadAndConversation (funcao que CRIA lead novo).
-    // Regra: CHAMA se (1) gate passou  OU  (2) lead JA EXISTE (encontrado por findLeadByPhone)  OU  (3) validacao pendente.
-    // Se nenhuma dessas condicoes -> NAO CHAMA a funcao, mas CONTINUA rodando o resto do webhook.
-    let mustSkipEnsureWhatsAppLeadAndConversation = false;
-    let gateSkipReason: string | null = null;
-    let gateExistingLeadFound = false;
-    if (!gatePassed && !pendingPhoneValidationRef.id) {
-      try {
-        const existingResult = await findLeadByPhone({ phone: normalizedPhoneOnly, userId });
-        if (existingResult?.data) {
-          gateExistingLeadFound = true;
-        }
-      } catch (_e) { void _e; }
-      if (!gateExistingLeadFound) {
-        mustSkipEnsureWhatsAppLeadAndConversation = true;
-        gateSkipReason = "gate_mandatorio_skip_ensureWhatsAppLeadAndConversation_nao_passou_e_nao_existe_lead";
-      }
-    }
-    // --- FIM DO GATE OBRIGATORIO ---
-
-    let leadContext: any = null;
-    if (!mustSkipEnsureWhatsAppLeadAndConversation) {
-      try {
-        leadContext = await ensureWhatsAppLeadAndConversation({
-          phone: normalizedPhoneOnly,
-          userId,
-          creationOrigin: "zapi_from_header",
-          firstNameFromMessage: null,
-          initialState: null,
-          initialTimezone: null,
-          initialCountry: null,
-          __inboundEventVerified: {
-            recipientMatchesOfficialBot,
-            eventIsInboundExternalMessage,
-            senderIsValidContact,
-          },
-        });
-      } catch (_createErr) {
-        leadContext = null;
-      }
-    }
-
-    if (mustSkipEnsureWhatsAppLeadAndConversation && !leadContext) {
-      // gate bloqueou a criacao de novo lead. mas o fluxo DO WEBHOOK continua normalmente abaixo.
-      // para as linhas 2800+ precisamos de placeholders seguros.
-      // se temos leadId vazio / conversationId vazio, mas o fluxo abaixo usa ambos,
-      // vamos carregar manualmente o lead ja existente se existir (para triagem inicial etc).
-      try {
-        const existing = await findLeadByPhone({ phone: normalizedPhoneOnly, userId });
-        if (existing?.data) {
-          const existingLead = (existing as any).data as any;
-          const existingLeadId = String(existingLead?.id ?? "").trim();
-          let existingConversationId: string | null = null;
-          if (existingLeadId) {
-            try {
-              const { data: convRow } = await createSupabaseAdminClient()
-                .from("atendimento_conversations")
-                .select("id")
-                .eq("lead_id", existingLeadId)
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-              existingConversationId = String((convRow as any)?.id ?? "").trim() || null;
-            } catch (_e) { void _e; }
-          }
-          if (existingLeadId && existingConversationId) {
-            leadContext = { lead: existingLead, conversation: { id: existingConversationId } } as any;
-          } else if (existingLeadId) {
-            // cria a conversation automaticamente se nao existir
-            try {
-              const { data: c } = await createSupabaseAdminClient()
-                .from("atendimento_conversations")
-                .insert({ lead_id: existingLeadId, channel: "whatsapp", status: "open", bot_enabled: true })
-                .select("id")
-                .maybeSingle();
-              const cid = String((c as any)?.id ?? "").trim();
-              if (cid) leadContext = { lead: existingLead, conversation: { id: cid } } as any;
-            } catch (_e) { void _e; }
-          }
-        }
-      } catch (_e) { void _e; }
-    }
-
-    if (!leadContext?.lead?.id || !leadContext?.conversation?.id) {
-      return Response.json({
-        ok: true,
-        ignored: true,
-        reason: leadContext === null && mustSkipEnsureWhatsAppLeadAndConversation
-          ? (gateSkipReason ?? "ensure_whatsapp_lead_and_conversation_skipped_by_mandatory_gate")
-          : "lead_or_conversation_missing",
-      });
-    }
-    const nowIso = new Date().toISOString();
     try {
+      const leadContext = await ensureWhatsAppLeadAndConversation({
+        phone: normalizedPhoneOnly,
+        userId,
+        creationOrigin: "zapi_from_header",
+        firstNameFromMessage: null,
+        initialState: null,
+        initialTimezone: null,
+        initialCountry: null,
+      });
+      if (!leadContext?.lead?.id || !leadContext?.conversation?.id) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason:
+            leadContext === null
+              ? "phone_hidden_blocklist_notification_number"
+              : "lead_or_conversation_missing",
+        });
+      }
+      const nowIso = new Date().toISOString();
         const leadId = String(leadContext.lead.id);
         const conversationId = String(leadContext.conversation.id);
         const lead = leadContext.lead as any;
@@ -2921,8 +2807,6 @@ export async function POST(req: Request) {
               "experimental_class_attendance_follow_up_required",
               "experimental_class_attendance_attended",
               "experimental_class_attendance_no_show",
-              "experimental_class_attendance_confirmation_message_sent",
-              "experimental_class_attendance_no_show_message_sent",
               "matricula_pendente_resposta_nao_nuclear",
               "whatsapp_matricula_recusada_fixed_reply",
               "matricula_pendente_resposta_sim_nuclear",
@@ -2936,14 +2820,12 @@ export async function POST(req: Request) {
           postAttendanceHistoryConfirmedAttendedEvent = histAttEvents.some(
             (e) =>
               e.event_type === "experimental_class_attendance_confirmed" ||
-              e.event_type === "experimental_class_attendance_attended" ||
-              e.event_type === "experimental_class_attendance_confirmation_message_sent",
+              e.event_type === "experimental_class_attendance_attended",
           );
           postAttendanceHistoryConfirmedNoShowEvent = histAttEvents.some(
             (e) =>
               e.event_type === "experimental_class_attendance_follow_up_required" ||
-              e.event_type === "experimental_class_attendance_no_show" ||
-              e.event_type === "experimental_class_attendance_no_show_message_sent",
+              e.event_type === "experimental_class_attendance_no_show",
           );
           postAttendanceHistoryMatriculaRecusadaEvent = histAttEvents.some(
             (e) =>
@@ -2974,48 +2856,6 @@ export async function POST(req: Request) {
         }
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
         const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
-        const MSG_CONFIRMAR_MATRICULA_PERGUNTA = "Vamos confirmar sua matrícula e iniciar suas aulas?";
-        const MSG_PARTICIPACAO_AULA_EXPERIMENTAL = "ficamos felizes pela sua participação na aula experimental";
-        const MSG_PROXIMO_PASSO = "Agora é hora do próximo passo.";
-        const MSG_PROXIMO_PASSO_NORMALIZADO = "hora do proximo passo";
-
-        function normalizeForSimNaoDetection(value: string | null | undefined): string {
-          const raw = String(value ?? "").trim();
-          if (!raw) return "";
-          return raw
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/\s+/g, " ")
-            .toLowerCase();
-        }
-
-        const ultimoBotTextoNormalizado = normalizeForSimNaoDetection(lastBotTextNuclear);
-        const recentesBotTextosNormalizados = recentBotTextsNuclear
-          .map((t) => normalizeForSimNaoDetection(t))
-          .filter((t) => t.length >= 10);
-
-        function hasFragmentsOfPostAttendancePrompt(text: string): boolean {
-          if (!text) return false;
-          const t = normalizeForSimNaoDetection(text);
-          if (!t) return false;
-          let hits = 0;
-          if (t.includes(normalizeForSimNaoDetection(MSG_SIM_NAO_INVALIDA))) hits += 1;
-          if (t.includes(normalizeForSimNaoDetection(MSG_CONFIRMAR_MATRICULA_PERGUNTA))) hits += 1;
-          if (t.includes(normalizeForSimNaoDetection(MSG_PARTICIPACAO_AULA_EXPERIMENTAL))) hits += 1;
-          if (t.includes(MSG_PROXIMO_PASSO_NORMALIZADO)) hits += 1;
-          return hits >= 2;
-        }
-
-        const recentBotHasMsgSimNao =
-          recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA)) ||
-          recentBotTextsNuclear.some((text) => text.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA)) ||
-          recentesBotTextosNormalizados.some((t) => hasFragmentsOfPostAttendancePrompt(t));
-        const ultimaMsgBotPedeSimNao =
-          (lastBotTextNuclear &&
-            (lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA) ||
-              lastBotTextNuclear.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA))) ||
-          recentBotHasMsgSimNao ||
-          (ultimoBotTextoNormalizado && hasFragmentsOfPostAttendancePrompt(ultimoBotTextoNormalizado));
         const NAO_RECUSA_MSG_1_PREFIX = leadFirstName
           ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
           : "Tudo bem, entendemos que talvez ainda não seja o momento.";
@@ -3032,6 +2872,10 @@ export async function POST(req: Request) {
         const isYesNuclear = lenientYesNoNuclear.result === "yes";
         const isNoNuclear = lenientYesNoNuclear.result === "no";
         const isAmbiguousNuclear = lenientYesNoNuclear.result === "ambiguous";
+
+        const recentBotHasMsgSimNao = recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA));
+        const ultimaMsgBotPedeSimNao =
+          (lastBotTextNuclear && lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA)) || recentBotHasMsgSimNao;
         const bookingAttendanceAttendedByCol =
           String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
         const bookingAttendanceNoShowByCol =
@@ -3042,83 +2886,6 @@ export async function POST(req: Request) {
           String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "no_show";
         const flatLeadCompletedStatus =
           String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase() === "completed";
-        let postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent = false;
-        try {
-          const { data: histConfirmMsgAll } = await admin
-            .from("atendimento_history_events")
-            .select("event_type, created_at, details, title")
-            .eq("lead_id", leadId)
-            .eq("conversation_id", conversationId)
-            .in("event_type", [
-              "experimental_class_attendance_confirmation_message_sent",
-              "experimental_class_attendance_no_show_message_sent",
-              "matricula_pendente_resposta_sim_nuclear",
-              "matricula_pendente_resposta_sim",
-            ])
-            .order("created_at", { ascending: false })
-            .limit(12);
-          const histConfirmMsgArr = Array.isArray((histConfirmMsgAll as any)?.data ?? [])
-            ? ((histConfirmMsgAll as any).data as Array<{
-                event_type: string;
-                created_at?: string | null;
-                details?: any;
-                title?: string | null;
-              }>)
-            : [];
-          if (histConfirmMsgArr.length > 0) {
-            let encontrouRespostaSimMaisRecente = false;
-            let encontrouMensagemEnvioComparecimento = false;
-            for (const ev of histConfirmMsgArr) {
-              const tipo = String(ev?.event_type ?? "").trim();
-              if (!encontrouRespostaSimMaisRecente) {
-                if (
-                  tipo === "matricula_pendente_resposta_sim_nuclear" ||
-                  tipo === "matricula_pendente_resposta_sim"
-                ) {
-                  encontrouRespostaSimMaisRecente = true;
-                  break;
-                }
-                if (
-                  tipo === "experimental_class_attendance_confirmation_message_sent" ||
-                  tipo === "experimental_class_attendance_no_show_message_sent"
-                ) {
-                  encontrouMensagemEnvioComparecimento = true;
-                  break;
-                }
-              }
-            }
-            postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent =
-              encontrouMensagemEnvioComparecimento && !encontrouRespostaSimMaisRecente;
-          }
-        } catch (_e) {}
-        if (postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent) {
-          if (!postAttendanceHistoryConfirmedAttendedEvent && !postAttendanceHistoryConfirmedNoShowEvent) {
-            try {
-              const histTipoCheck = await admin
-                .from("atendimento_history_events")
-                .select("event_type, details")
-                .eq("lead_id", leadId)
-                .eq("conversation_id", conversationId)
-                .eq("event_type", "experimental_class_attendance_confirmation_message_sent")
-                .limit(1);
-              const arr = Array.isArray((histTipoCheck as any)?.data ?? [])
-                ? ((histTipoCheck as any).data as any[])
-                : [];
-              if (arr.length > 0) {
-                const ev = arr[0] as any;
-                const stFunnel = String(ev?.details?.lead_funnel_stage ?? "").trim().toLowerCase();
-                const stStatus = String(ev?.details?.lead_status ?? "").trim().toLowerCase();
-                if (stFunnel === "matricula_pendente" || stStatus === "matricula_pendente") {
-                  postAttendanceHistoryConfirmedAttendedEvent = true;
-                } else if (stFunnel === "repescagem" || stStatus === "repescagem") {
-                  postAttendanceHistoryConfirmedNoShowEvent = true;
-                } else {
-                  postAttendanceHistoryConfirmedAttendedEvent = true;
-                }
-              }
-            } catch (_e) {}
-          }
-        }
         const leadEstaEmMatriculaPendentePosAttendance =
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente" ||
             funnelStageRaw === "matricula_pendente_recusada" || leadStatusRaw === "matricula_pendente_recusada" ||
@@ -3214,19 +2981,15 @@ export async function POST(req: Request) {
               flatLeadAttendanceNoShowByCol ||
               Boolean(currentBookingId)));
         const entrouNoFluxoPosAttendancePorForcaBruta =
-          (ultimaMsgBotPedeSimNao &&
-            (isYesNuclear || isNoNuclear) &&
-            !postAttendanceHistoryMatriculaConfirmadaEvent &&
-            (funnelStageRaw === "matricula_pendente" ||
-              leadStatusRaw === "matricula_pendente" ||
-              funnelStageRaw === "matricula_pendente_recusada" ||
-              leadStatusRaw === "matricula_pendente_recusada" ||
-              funnelStageRaw === "repescagem" ||
-              leadStatusRaw === "repescagem")) ||
-          (ultimaMsgBotPedeSimNao &&
-            (isYesNuclear || isNoNuclear) &&
-            !postAttendanceHistoryMatriculaConfirmadaEvent &&
-            postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent);
+          ultimaMsgBotPedeSimNao &&
+          (isYesNuclear || isNoNuclear) &&
+          !postAttendanceHistoryMatriculaConfirmadaEvent &&
+          (funnelStageRaw === "matricula_pendente" ||
+            leadStatusRaw === "matricula_pendente" ||
+            funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada" ||
+            funnelStageRaw === "repescagem" ||
+            leadStatusRaw === "repescagem");
 
         if (
           postAttendanceHistoryMatriculaConfirmadaEvent
@@ -3329,8 +3092,7 @@ export async function POST(req: Request) {
               flatLeadCompletedStatus ||
               (Boolean(currentBookingId) &&
                 (bookingAttendanceAttendedByCol ||
-                  String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed")))) ||
-          (ultimaMsgBotPedeSimNao && (isYesNuclear || isNoNuclear) && !postAttendanceHistoryMatriculaConfirmadaEvent)
+                  String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed"))))
         ) {
           const inboundMediaType = mediaInfo.hasPaymentMedia
             ? mediaInfo.mediaUrl
