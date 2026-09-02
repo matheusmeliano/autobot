@@ -2697,14 +2697,11 @@ export async function POST(req: Request) {
 
   if (normalizedFrom) {
     // --- GATE OBRIGATORIO ANTES DE CRIAR INTERESSADO ---
-    // Regra: interessado so eh criado quando:
-    //   (1) destinatario (toPhone) === numero oficial do bot conectado a Z-API
-    //   (2) evento = mensagem RECEBIDA de contato EXTERNO (rawFromMe false)
-    //   (3) remetente (fromPhone) eh valido e existe
-    // IMPORTANTE: o bloqueio SO vale quando o lead NAO EXISTE ainda (criacao de NOVO interessado).
-    // Se o lead JA EXISTE (respondendo a fluxos existentes como SIM/NAO de matricula, etc),
-    // o NAO PASSAR nessas 3 validacoes NAO bloqueia a execucao - o fluxo continua normalmente
-    // para tratar a resposta do lead no contexto existente.
+    // Regra: interessado SO EH CRIADO quando as 3 condicoes passarem.
+    // IMPORTANTE: este gate NUNCA retorna/aborta o webhook. O unico objetivo dele eh:
+    //   -> BLOQUEAR a chamada ensureWhatsAppLeadAndConversation SE o lead NAO EXISTE ainda e o gate falhou.
+    // Todo o resto do fluxo (triagem inicial, dores, SIM/NAO de matricula, etc) SEMPRE continua rodando normalmente.
+    // Quando o lead JA EXISTE, a flag __inboundEventVerified é passada e o gate INTERIOR (server.ts#L3269) decide.
     const toDigitsGate = String(toPhone ?? "").replace(/\D/g, "");
     const fromDigitsGate = String(fromPhone ?? "").replace(/\D/g, "");
     const botDigitsGate = connectedInstancePhoneDigits;
@@ -2740,63 +2737,100 @@ export async function POST(req: Request) {
     const gatePassed =
       recipientMatchesOfficialBot && eventIsInboundExternalMessage && senderIsValidContact;
 
+    // Decide se PODE chamar ensureWhatsAppLeadAndConversation (funcao que CRIA lead novo).
+    // Regra: CHAMA se (1) gate passou  OU  (2) lead JA EXISTE (encontrado por findLeadByPhone)  OU  (3) validacao pendente.
+    // Se nenhuma dessas condicoes -> NAO CHAMA a funcao, mas CONTINUA rodando o resto do webhook.
+    let mustSkipEnsureWhatsAppLeadAndConversation = false;
+    let gateSkipReason: string | null = null;
+    let gateExistingLeadFound = false;
     if (!gatePassed && !pendingPhoneValidationRef.id) {
-      let isNewLeadCandidate = false;
       try {
         const existingResult = await findLeadByPhone({ phone: normalizedPhoneOnly, userId });
-        if (!existingResult?.data) {
-          isNewLeadCandidate = true;
+        if (existingResult?.data) {
+          gateExistingLeadFound = true;
         }
-      } catch (_checkErr) {
-        isNewLeadCandidate = true;
-      }
-      if (isNewLeadCandidate) {
-        return Response.json({
-          ok: true,
-          ignored: true,
-          reason: "gate_mandatorio_lead_creation_blocked_failed_validation",
-          gate_checks: {
-            recipient_matches_official_bot: recipientMatchesOfficialBot,
-            event_is_inbound_external_message: eventIsInboundExternalMessage,
-            sender_is_valid_contact: senderIsValidContact,
-          },
-          debug: {
-            bot_number_digits: botDigitsGate.slice(0, 6) || "-",
-            to_digits: toDigitsGate.slice(0, 6) || "-",
-            from_digits: fromDigitsGate.slice(0, 6) || "-",
-            eventType: normalizedEventType || "unknown",
-          },
-        });
+      } catch (_e) { void _e; }
+      if (!gateExistingLeadFound) {
+        mustSkipEnsureWhatsAppLeadAndConversation = true;
+        gateSkipReason = "gate_mandatorio_skip_ensureWhatsAppLeadAndConversation_nao_passou_e_nao_existe_lead";
       }
     }
     // --- FIM DO GATE OBRIGATORIO ---
 
-    try {
-      const leadContext = await ensureWhatsAppLeadAndConversation({
-        phone: normalizedPhoneOnly,
-        userId,
-        creationOrigin: "zapi_from_header",
-        firstNameFromMessage: null,
-        initialState: null,
-        initialTimezone: null,
-        initialCountry: null,
-        __inboundEventVerified: {
-          recipientMatchesOfficialBot,
-          eventIsInboundExternalMessage,
-          senderIsValidContact,
-        },
-      });
-      if (!leadContext?.lead?.id || !leadContext?.conversation?.id) {
-        return Response.json({
-          ok: true,
-          ignored: true,
-          reason:
-            leadContext === null
-              ? "phone_hidden_blocklist_notification_number"
-              : "lead_or_conversation_missing",
+    let leadContext: any = null;
+    if (!mustSkipEnsureWhatsAppLeadAndConversation) {
+      try {
+        leadContext = await ensureWhatsAppLeadAndConversation({
+          phone: normalizedPhoneOnly,
+          userId,
+          creationOrigin: "zapi_from_header",
+          firstNameFromMessage: null,
+          initialState: null,
+          initialTimezone: null,
+          initialCountry: null,
+          __inboundEventVerified: {
+            recipientMatchesOfficialBot,
+            eventIsInboundExternalMessage,
+            senderIsValidContact,
+          },
         });
+      } catch (_createErr) {
+        leadContext = null;
       }
-      const nowIso = new Date().toISOString();
+    }
+
+    if (mustSkipEnsureWhatsAppLeadAndConversation && !leadContext) {
+      // gate bloqueou a criacao de novo lead. mas o fluxo DO WEBHOOK continua normalmente abaixo.
+      // para as linhas 2800+ precisamos de placeholders seguros.
+      // se temos leadId vazio / conversationId vazio, mas o fluxo abaixo usa ambos,
+      // vamos carregar manualmente o lead ja existente se existir (para triagem inicial etc).
+      try {
+        const existing = await findLeadByPhone({ phone: normalizedPhoneOnly, userId });
+        if (existing?.data) {
+          const existingLead = (existing as any).data as any;
+          const existingLeadId = String(existingLead?.id ?? "").trim();
+          let existingConversationId: string | null = null;
+          if (existingLeadId) {
+            try {
+              const { data: convRow } = await createSupabaseAdminClient()
+                .from("atendimento_conversations")
+                .select("id")
+                .eq("lead_id", existingLeadId)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              existingConversationId = String((convRow as any)?.id ?? "").trim() || null;
+            } catch (_e) { void _e; }
+          }
+          if (existingLeadId && existingConversationId) {
+            leadContext = { lead: existingLead, conversation: { id: existingConversationId } } as any;
+          } else if (existingLeadId) {
+            // cria a conversation automaticamente se nao existir
+            try {
+              const { data: c } = await createSupabaseAdminClient()
+                .from("atendimento_conversations")
+                .insert({ lead_id: existingLeadId, channel: "whatsapp", status: "open", bot_enabled: true })
+                .select("id")
+                .maybeSingle();
+              const cid = String((c as any)?.id ?? "").trim();
+              if (cid) leadContext = { lead: existingLead, conversation: { id: cid } } as any;
+            } catch (_e) { void _e; }
+          }
+        }
+      } catch (_e) { void _e; }
+    }
+
+    if (!leadContext?.lead?.id || !leadContext?.conversation?.id) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: leadContext === null && mustSkipEnsureWhatsAppLeadAndConversation
+          ? (gateSkipReason ?? "ensure_whatsapp_lead_and_conversation_skipped_by_mandatory_gate")
+          : "lead_or_conversation_missing",
+      });
+    }
+    const nowIso = new Date().toISOString();
+    try {
         const leadId = String(leadContext.lead.id);
         const conversationId = String(leadContext.conversation.id);
         const lead = leadContext.lead as any;
