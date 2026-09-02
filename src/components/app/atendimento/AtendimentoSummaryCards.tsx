@@ -2067,24 +2067,66 @@ function BookingDetails({
               </div>
             </div>
             <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-              <Field
-                label="Dia da semana"
-                value={
-                  String(lead.recurring_class_weekday_label ?? "").trim() ||
-                  String(lead.recurring_class_weekday ?? "").trim() ||
-                  null
-                }
-              />
-              <Field
-                label="Horário fixo"
-                value={
-                  atendimentoTimeLabel(
-                    String(lead.recurring_class_lead_time ?? "").trim() ||
-                      String(lead.recurring_class_professor_time ?? "").trim() ||
-                      null,
-                  )
-                }
-              />
+              {(() => {
+                const weekdayKeyVal = ["mon","tue","wed","thu","fri","sat","sun"].includes(
+                  String(lead.recurring_class_weekday ?? "").trim().toLowerCase()
+                )
+                  ? String(lead.recurring_class_weekday ?? "").trim().toLowerCase()
+                  : null;
+                const ptBrFull: Record<string, string> = {
+                  mon: "Segundas-feiras",
+                  tue: "Terças-feiras",
+                  wed: "Quartas-feiras",
+                  thu: "Quintas-feiras",
+                  fri: "Sextas-feiras",
+                  sat: "Sábados",
+                  sun: "Domingos",
+                };
+                const savedFullWeekday = weekdayKeyVal
+                  ? ptBrFull[weekdayKeyVal] ?? null
+                  : null;
+                const friendlyFixedText = (() => {
+                  if (savedFullWeekday) {
+                    const t = atendimentoTimeLabel(
+                      String(lead.recurring_class_lead_time ?? "").trim() ||
+                        String(lead.recurring_class_professor_time ?? "").trim() ||
+                        null,
+                    );
+                    if (t && t !== "-") return `Todas as ${savedFullWeekday} às ${t}`;
+                    return `Todas as ${savedFullWeekday}`;
+                  }
+                  const rawLabel =
+                    String(lead.recurring_class_weekday_label ?? "").trim() ||
+                    String(lead.recurring_class_weekday ?? "").trim() ||
+                    null;
+                  if (rawLabel) return `Todas ${rawLabel}`;
+                  return null;
+                })();
+                const nextDateShort = nextRecurring?.professorDate
+                  ? formatAtendimentoDate(nextRecurring.professorDate)
+                  : null;
+                return (
+                  <>
+                    <Field
+                      label="Dia da semana"
+                      value={friendlyFixedText}
+                      titleOverride={
+                        friendlyFixedText && nextDateShort
+                          ? `${friendlyFixedText} — Próxima aula: ${nextDateShort}`
+                          : undefined
+                      }
+                    />
+                    <Field
+                      label="Próxima aula"
+                      value={
+                        nextRecurring
+                          ? `${formatAtendimentoDate(nextRecurring.professorDate)} às ${atendimentoTimeLabel(nextRecurring.professorTime ?? null)}`
+                          : null
+                      }
+                    />
+                  </>
+                );
+              })()}
             </div>
           </div>
         ) : null}
