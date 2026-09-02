@@ -968,7 +968,7 @@ export async function sendAtendimentoWhatsAppText(params: {
     const messageText = String(params.message ?? "").trim();
     if (messageText && resolvedConversationIdForDedupe) {
       const dedupeWindowStartUtc = new Date(Date.now() - 60 * 60_000).toISOString();
-      const dedupeGraceEndUtc = new Date(Date.now() - 15_000).toISOString();
+      const dedupeWindowEndUtc = new Date(Date.now() + 60_000).toISOString();
       try {
         const { count: duplicates } = await admin
           .from("atendimento_messages")
@@ -977,7 +977,7 @@ export async function sendAtendimentoWhatsAppText(params: {
           .eq("sender_role", "bot")
           .eq("content_text", messageText)
           .gte("sent_at", dedupeWindowStartUtc)
-          .lte("sent_at", dedupeGraceEndUtc)
+          .lte("sent_at", dedupeWindowEndUtc)
           .limit(1);
         if (Number(duplicates ?? 0) > 0) {
           return {

@@ -1447,17 +1447,6 @@ export async function POST(req: Request) {
           .update({ bot_enabled: false, updated_at: nowIso })
           .eq("id", String(conversation.id));
       } catch (_e) {}
-      try {
-        void admin
-          .from("atendimento_leads")
-          .update({
-            funnel_stage: "pre_cadastro_concluido",
-            status: "matricula_pendente",
-            bot_enabled: false,
-            updated_at: nowIso,
-          })
-          .eq("id", String(lead.id));
-      } catch (_e) {}
       return Response.json({
         ok: true,
         inbound,
@@ -2997,29 +2986,6 @@ export async function POST(req: Request) {
           conversationId,
           contentText: botMessages[index],
           sentAt: new Date(Date.now() + index).toISOString(),
-        });
-      }
-
-      try {
-        const phone = String((lead as any)?.phone ?? "").trim();
-        if (phone) {
-          for (const m of buildExperimentalClassStudentWhatsAppMessages(firstName)) {
-            await sendAtendimentoWhatsAppText({
-              phone,
-              message: m,
-            });
-          }
-        }
-      } catch (error) {
-        await appendHistoryEvent({
-          leadId,
-          conversationId,
-          eventType: "experimental_class_whatsapp_confirmation_failed",
-          title: "Falha ao enviar a confirmação da aula experimental no WhatsApp",
-          details: {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
         });
       }
 
