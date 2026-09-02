@@ -1044,8 +1044,15 @@ export async function sendAtendimentoWhatsAppTextBatch(params: {
     }
   });
 
-  const insertPromise = (() => {
-    if (!insertIntoConversation || !admin || !conversationId) return Promise.resolve([] as any[]);
+  const results = await Promise.allSettled(sends).then((out) =>
+    out.map((o) => {
+      if (o.status !== "fulfilled") return { ok: false, message: "", error: String(o.reason ?? "settled_rejected") };
+      return o.value;
+    }),
+  );
+
+  const insertedRows = await (async () => {
+    if (!insertIntoConversation || !admin || !conversationId) return [] as any[];
     return Promise.allSettled(
       safeMessages.map((contentText) =>
         admin
@@ -1065,20 +1072,13 @@ export async function sendAtendimentoWhatsAppTextBatch(params: {
     ).then((outs) =>
       outs
         .map((o, idx) => {
-          if (o.status !== "fulfilled") return null;
-          const v: any = o.value;
-          return { index: idx, row: (v?.data ?? null) as Record<string, unknown> | null, error: v?.error ?? null };
-        })
+        if (o.status !== "fulfilled") return null;
+        const v: any = o.value;
+        return { index: idx, row: (v?.data ?? null) as Record<string, unknown> | null, error: v?.error ?? null };
+      })
         .filter(Boolean) as Array<{ index: number; row: Record<string, unknown> | null; error: any }>,
     );
   })();
-
-  const [results, insertedRows] = await Promise.all([Promise.allSettled(sends).then((out) =>
-    out.map((o) => {
-      if (o.status !== "fulfilled") return { ok: false, message: "", error: String(o.reason ?? "settled_rejected") };
-      return o.value;
-    }),
-  ), insertPromise]);
 
   return {
     results,
