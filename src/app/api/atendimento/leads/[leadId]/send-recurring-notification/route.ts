@@ -31,11 +31,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
   const wl = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
   const weekdayLabel = wl || (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string,string>)[wr] || "horario fixo";
   const profPhone = rp?.phone || EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
+  let resolvedConversationId: string | null = null;
+  try {
+    const { data: convs } = await admin
+      .from("atendimento_conversations")
+      .select("id")
+      .eq("lead_id", lid)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (convs?.[0]?.id) resolvedConversationId = String(convs[0].id).trim();
+  } catch {}
   let sok = false, aok = false, rok = false;
   let serr: string|null = null, aerr: string|null = null, rerr: string|null = null;
 
   try {
-    await sendAtendimentoWhatsAppText({ phone: leadPhone, message: buildRecurringClassStudentLessonReadyWhatsAppMessage(fn(leadName), lessonLink) });
+    await sendAtendimentoWhatsAppText({ phone: leadPhone, message: buildRecurringClassStudentLessonReadyWhatsAppMessage(fn(leadName), lessonLink), admin, conversationId: resolvedConversationId, allowNoInbound: true });
     sok = true;
     await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_sent_manual", title: "Link aula recorrente disparado manualmente ao aluno", details: { phone: leadPhone, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, source: "manual_trigger_button", sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
   } catch (e) { serr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_failed_manual", title: "Falha disparo manual aula recorrente ao aluno", details: { phone: leadPhone, lesson_link: lessonLink, manually_triggered: true, error: serr }, actorType: "attendant", actorEmail: auth.user.email }); }
