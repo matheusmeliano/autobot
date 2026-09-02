@@ -913,7 +913,7 @@ export async function sendAtendimentoWhatsAppText(params: {
     } else {
       const { data: leadRow } = await admin
         .from("atendimento_leads")
-        .select("id")
+        .select("id, full_name, status")
         .ilike("phone", `%${normalizedDest}%`)
         .limit(1)
         .maybeSingle();
@@ -926,7 +926,25 @@ export async function sendAtendimentoWhatsAppText(params: {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        const conversationId = String((conv as any)?.id ?? "").trim();
+        let conversationId = String((conv as any)?.id ?? "").trim();
+
+        if (!conversationId) {
+          try {
+            const { data: createdConv } = await admin
+              .from("atendimento_conversations")
+              .insert({
+                lead_id: String((leadRow as any).id),
+                channel: "whatsapp",
+                status: "open",
+                bot_enabled: true,
+              })
+              .select("id")
+              .maybeSingle();
+            conversationId = String((createdConv as any)?.id ?? "").trim();
+          } catch (_e) {
+            void _e;
+          }
+        }
 
         if (!conversationId) {
           return {
