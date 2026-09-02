@@ -4243,12 +4243,26 @@ export async function confirmLeadRecurringPayment(params: {
       } catch {}
     }
     const studentMsg = buildRecurringPaymentConfirmedStudentWelcomeMessage(firstName, dashboardLink);
+    let resolvedConversationId: string | null = null;
+    try {
+      const { data: convs } = await admin
+        .from("atendimento_conversations")
+        .select("id")
+        .eq("lead_id", String(leadId))
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const found = convs?.[0] ?? null;
+      if (found?.id) resolvedConversationId = String(found.id).trim();
+    } catch {}
     if (studentPhone && phoneDigits.length >= 10) {
       try {
         await sendAtendimentoWhatsAppText({
           phone: studentPhone,
           message: studentMsg,
           baseUrl: undefined as any,
+          admin,
+          conversationId: resolvedConversationId,
+          allowNoInbound: true,
         });
         try {
           await appendHistoryEvent({
