@@ -1978,12 +1978,8 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       `recurring_class_registered_attendant_start_notification_sent|${thisProfessorOccurrenceKey}`,
     );
 
-    const cachedStudentSent =
-      studentOccurrenceAlreadySent ||
-      Boolean(String(row?.recurring_class_student_start_notification_sent_at ?? "").trim());
-    const cachedAttendantSent =
-      attendantOccurrenceAlreadySent ||
-      Boolean(String(row?.recurring_class_attendant_start_notification_sent_at ?? "").trim());
+    const cachedStudentSent = studentOccurrenceAlreadySent;
+    const cachedAttendantSent = attendantOccurrenceAlreadySent;
     const cachedRegisteredAttendantSent = registeredAttendantOccurrenceAlreadySent;
 
     const studentDue = leadStartAtMs <= nowMs;
