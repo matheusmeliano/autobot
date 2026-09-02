@@ -1733,6 +1733,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
           await sendAtendimentoWhatsAppText({
             phone: leadPhone,
             message: buildExperimentalClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+            admin,
+            conversationId,
+            allowNoInbound: true,
           });
 
           await appendHistoryEvent({
@@ -1864,6 +1867,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
 
   const recurringLeadIds = (rows as any[]).map((r: any) => String(r?.id ?? "")).filter(Boolean);
   const sentOccurrencesByLeadId = new Map<string, Set<string>>();
+  const conversationIdByLeadId = new Map<string, string | null>();
   if (recurringLeadIds.length > 0) {
     try {
       const { data: hist } = await admin
@@ -1887,6 +1891,22 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           const set = sentOccurrencesByLeadId.get(lid) ?? new Set<string>();
           set.add(key);
           sentOccurrencesByLeadId.set(lid, set);
+        }
+      }
+    } catch (_e) {}
+    try {
+      const { data: convRows } = await admin
+        .from("atendimento_conversations")
+        .select("id, lead_id, created_at")
+        .in("lead_id", recurringLeadIds)
+        .order("created_at", { ascending: false });
+      if (Array.isArray(convRows)) {
+        for (const row of convRows as any[]) {
+          const lid = String(row?.lead_id ?? "").trim();
+          if (!lid) continue;
+          if (conversationIdByLeadId.has(lid)) continue;
+          const cid = String(row?.id ?? "").trim();
+          conversationIdByLeadId.set(lid, cid || null);
         }
       }
     } catch (_e) {}
@@ -2090,6 +2110,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           await sendAtendimentoWhatsAppText({
             phone: leadPhone,
             message: buildRecurringClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+            admin,
+            conversationId: conversationIdByLeadId.get(leadId) ?? null,
+            allowNoInbound: true,
           });
           try {
             await admin
