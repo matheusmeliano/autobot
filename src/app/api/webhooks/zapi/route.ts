@@ -2887,6 +2887,8 @@ export async function POST(req: Request) {
               "experimental_class_attendance_follow_up_required",
               "experimental_class_attendance_attended",
               "experimental_class_attendance_no_show",
+              "experimental_class_attendance_confirmation_message_sent",
+              "experimental_class_attendance_no_show_message_sent",
               "matricula_pendente_resposta_nao_nuclear",
               "whatsapp_matricula_recusada_fixed_reply",
               "matricula_pendente_resposta_sim_nuclear",
@@ -2900,12 +2902,14 @@ export async function POST(req: Request) {
           postAttendanceHistoryConfirmedAttendedEvent = histAttEvents.some(
             (e) =>
               e.event_type === "experimental_class_attendance_confirmed" ||
-              e.event_type === "experimental_class_attendance_attended",
+              e.event_type === "experimental_class_attendance_attended" ||
+              e.event_type === "experimental_class_attendance_confirmation_message_sent",
           );
           postAttendanceHistoryConfirmedNoShowEvent = histAttEvents.some(
             (e) =>
               e.event_type === "experimental_class_attendance_follow_up_required" ||
-              e.event_type === "experimental_class_attendance_no_show",
+              e.event_type === "experimental_class_attendance_no_show" ||
+              e.event_type === "experimental_class_attendance_no_show_message_sent",
           );
           postAttendanceHistoryMatriculaRecusadaEvent = histAttEvents.some(
             (e) =>
@@ -2937,6 +2941,47 @@ export async function POST(req: Request) {
         const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
         const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
         const MSG_CONFIRMAR_MATRICULA_PERGUNTA = "Vamos confirmar sua matrícula e iniciar suas aulas?";
+        const MSG_PARTICIPACAO_AULA_EXPERIMENTAL = "ficamos felizes pela sua participação na aula experimental";
+        const MSG_PROXIMO_PASSO = "Agora é hora do próximo passo.";
+        const MSG_PROXIMO_PASSO_NORMALIZADO = "hora do proximo passo";
+
+        function normalizeForSimNaoDetection(value: string | null | undefined): string {
+          const raw = String(value ?? "").trim();
+          if (!raw) return "";
+          return raw
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, " ")
+            .toLowerCase();
+        }
+
+        const ultimoBotTextoNormalizado = normalizeForSimNaoDetection(lastBotTextNuclear);
+        const recentesBotTextosNormalizados = recentBotTextsNuclear
+          .map((t) => normalizeForSimNaoDetection(t))
+          .filter((t) => t.length >= 10);
+
+        function hasFragmentsOfPostAttendancePrompt(text: string): boolean {
+          if (!text) return false;
+          const t = normalizeForSimNaoDetection(text);
+          if (!t) return false;
+          let hits = 0;
+          if (t.includes(normalizeForSimNaoDetection(MSG_SIM_NAO_INVALIDA))) hits += 1;
+          if (t.includes(normalizeForSimNaoDetection(MSG_CONFIRMAR_MATRICULA_PERGUNTA))) hits += 1;
+          if (t.includes(normalizeForSimNaoDetection(MSG_PARTICIPACAO_AULA_EXPERIMENTAL))) hits += 1;
+          if (t.includes(MSG_PROXIMO_PASSO_NORMALIZADO)) hits += 1;
+          return hits >= 2;
+        }
+
+        const recentBotHasMsgSimNao =
+          recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA)) ||
+          recentBotTextsNuclear.some((text) => text.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA)) ||
+          recentesBotTextosNormalizados.some((t) => hasFragmentsOfPostAttendancePrompt(t));
+        const ultimaMsgBotPedeSimNao =
+          (lastBotTextNuclear &&
+            (lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA) ||
+              lastBotTextNuclear.includes(MSG_CONFIRMAR_MATRICULA_PERGUNTA))) ||
+          recentBotHasMsgSimNao ||
+          (ultimoBotTextoNormalizado && hasFragmentsOfPostAttendancePrompt(ultimoBotTextoNormalizado));
         const NAO_RECUSA_MSG_1_PREFIX = leadFirstName
           ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
           : "Tudo bem, entendemos que talvez ainda não seja o momento.";
@@ -2972,6 +3017,83 @@ export async function POST(req: Request) {
           String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "no_show";
         const flatLeadCompletedStatus =
           String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase() === "completed";
+        let postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent = false;
+        try {
+          const { data: histConfirmMsgAll } = await admin
+            .from("atendimento_history_events")
+            .select("event_type, created_at, details, title")
+            .eq("lead_id", leadId)
+            .eq("conversation_id", conversationId)
+            .in("event_type", [
+              "experimental_class_attendance_confirmation_message_sent",
+              "experimental_class_attendance_no_show_message_sent",
+              "matricula_pendente_resposta_sim_nuclear",
+              "matricula_pendente_resposta_sim",
+            ])
+            .order("created_at", { ascending: false })
+            .limit(12);
+          const histConfirmMsgArr = Array.isArray((histConfirmMsgAll as any)?.data ?? [])
+            ? ((histConfirmMsgAll as any).data as Array<{
+                event_type: string;
+                created_at?: string | null;
+                details?: any;
+                title?: string | null;
+              }>)
+            : [];
+          if (histConfirmMsgArr.length > 0) {
+            let encontrouRespostaSimMaisRecente = false;
+            let encontrouMensagemEnvioComparecimento = false;
+            for (const ev of histConfirmMsgArr) {
+              const tipo = String(ev?.event_type ?? "").trim();
+              if (!encontrouRespostaSimMaisRecente) {
+                if (
+                  tipo === "matricula_pendente_resposta_sim_nuclear" ||
+                  tipo === "matricula_pendente_resposta_sim"
+                ) {
+                  encontrouRespostaSimMaisRecente = true;
+                  break;
+                }
+                if (
+                  tipo === "experimental_class_attendance_confirmation_message_sent" ||
+                  tipo === "experimental_class_attendance_no_show_message_sent"
+                ) {
+                  encontrouMensagemEnvioComparecimento = true;
+                  break;
+                }
+              }
+            }
+            postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent =
+              encontrouMensagemEnvioComparecimento && !encontrouRespostaSimMaisRecente;
+          }
+        } catch (_e) {}
+        if (postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent) {
+          if (!postAttendanceHistoryConfirmedAttendedEvent && !postAttendanceHistoryConfirmedNoShowEvent) {
+            try {
+              const histTipoCheck = await admin
+                .from("atendimento_history_events")
+                .select("event_type, details")
+                .eq("lead_id", leadId)
+                .eq("conversation_id", conversationId)
+                .eq("event_type", "experimental_class_attendance_confirmation_message_sent")
+                .limit(1);
+              const arr = Array.isArray((histTipoCheck as any)?.data ?? [])
+                ? ((histTipoCheck as any).data as any[])
+                : [];
+              if (arr.length > 0) {
+                const ev = arr[0] as any;
+                const stFunnel = String(ev?.details?.lead_funnel_stage ?? "").trim().toLowerCase();
+                const stStatus = String(ev?.details?.lead_status ?? "").trim().toLowerCase();
+                if (stFunnel === "matricula_pendente" || stStatus === "matricula_pendente") {
+                  postAttendanceHistoryConfirmedAttendedEvent = true;
+                } else if (stFunnel === "repescagem" || stStatus === "repescagem") {
+                  postAttendanceHistoryConfirmedNoShowEvent = true;
+                } else {
+                  postAttendanceHistoryConfirmedAttendedEvent = true;
+                }
+              }
+            } catch (_e) {}
+          }
+        }
         const leadEstaEmMatriculaPendentePosAttendance =
           (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente" ||
             funnelStageRaw === "matricula_pendente_recusada" || leadStatusRaw === "matricula_pendente_recusada" ||
