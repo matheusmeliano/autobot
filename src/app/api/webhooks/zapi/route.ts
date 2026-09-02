@@ -1326,7 +1326,7 @@ async function getScheduledExperimentalClassBookingWhatsApp(params: {
       "professor_start_at, id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_checked_at",
     )
     .eq("lead_id", params.leadId)
-    .eq("status", "scheduled")
+    .in("status", ["scheduled", "completed"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -3180,15 +3180,19 @@ export async function POST(req: Request) {
               flatLeadAttendanceNoShowByCol ||
               Boolean(currentBookingId)));
         const entrouNoFluxoPosAttendancePorForcaBruta =
-          ultimaMsgBotPedeSimNao &&
-          (isYesNuclear || isNoNuclear) &&
-          !postAttendanceHistoryMatriculaConfirmadaEvent &&
-          (funnelStageRaw === "matricula_pendente" ||
-            leadStatusRaw === "matricula_pendente" ||
-            funnelStageRaw === "matricula_pendente_recusada" ||
-            leadStatusRaw === "matricula_pendente_recusada" ||
-            funnelStageRaw === "repescagem" ||
-            leadStatusRaw === "repescagem");
+          (ultimaMsgBotPedeSimNao &&
+            (isYesNuclear || isNoNuclear) &&
+            !postAttendanceHistoryMatriculaConfirmadaEvent &&
+            (funnelStageRaw === "matricula_pendente" ||
+              leadStatusRaw === "matricula_pendente" ||
+              funnelStageRaw === "matricula_pendente_recusada" ||
+              leadStatusRaw === "matricula_pendente_recusada" ||
+              funnelStageRaw === "repescagem" ||
+              leadStatusRaw === "repescagem")) ||
+          (ultimaMsgBotPedeSimNao &&
+            (isYesNuclear || isNoNuclear) &&
+            !postAttendanceHistoryMatriculaConfirmadaEvent &&
+            postAttendanceHistoryConfirmationMessageSentAfterNoPreviousConfirmacaoEvent);
 
         if (
           postAttendanceHistoryMatriculaConfirmadaEvent
@@ -3291,7 +3295,8 @@ export async function POST(req: Request) {
               flatLeadCompletedStatus ||
               (Boolean(currentBookingId) &&
                 (bookingAttendanceAttendedByCol ||
-                  String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed"))))
+                  String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed")))) ||
+          (ultimaMsgBotPedeSimNao && (isYesNuclear || isNoNuclear) && !postAttendanceHistoryMatriculaConfirmadaEvent)
         ) {
           const inboundMediaType = mediaInfo.hasPaymentMedia
             ? mediaInfo.mediaUrl
