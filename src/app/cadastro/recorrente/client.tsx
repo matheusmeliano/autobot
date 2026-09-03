@@ -3267,7 +3267,7 @@ export default function CadastroRecorrenteBody() {
                       <div className="text-sm font-bold uppercase tracking-wider text-emerald-800 mb-3">QR Code</div>
                       <div className="w-full aspect-square max-w-[280px] rounded-2xl bg-white border-2 border-emerald-100 p-3 flex items-center justify-center mx-auto overflow-hidden">
                         <img
-                          src="/qr-code-2.jpeg"
+                          src="/qr-code-3.jpeg"
                           alt="QR Code PIX"
                           className="w-full h-full object-contain"
                         />
