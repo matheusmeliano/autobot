@@ -2979,7 +2979,7 @@ export default function CadastroRecorrenteBody() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="text-base sm:text-lg font-bold text-slate-900 leading-snug">3. PIX</div>
-                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">QR Code ou copia e cola · Cotação fixa Ago/2026</div>
+                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">QR Code ou Pix Copia e Cola com cotação fixa.</div>
                           </div>
                         </div>
                         <div className="sm:text-right sm:shrink-0 self-start sm:self-center">
