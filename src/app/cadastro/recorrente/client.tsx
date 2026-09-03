@@ -2932,7 +2932,7 @@ export default function CadastroRecorrenteBody() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="text-base sm:text-lg font-bold text-slate-900 leading-snug">1. Link de pagamento</div>
-                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">Pagamento online por cartão</div>
+                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">Pagamento online por cartão.</div>
                           </div>
                         </div>
                         <div className="sm:shrink-0 self-start sm:self-center">
@@ -2956,7 +2956,7 @@ export default function CadastroRecorrenteBody() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="text-base sm:text-lg font-bold text-slate-900 leading-snug">2. Depósito bancário</div>
-                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">Wise US Inc · Conta Checking (USD)</div>
+                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">Wise US Inc · Conta Checking (USD).</div>
                           </div>
                         </div>
                         <div className="sm:text-right sm:shrink-0 self-start sm:self-center">
