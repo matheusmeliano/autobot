@@ -3002,7 +3002,7 @@ export default function CadastroRecorrenteBody() {
                           Condição especial · 3 primeiros meses
                         </div>
                         <div className="text-sm sm:text-base text-emerald-900 leading-relaxed">
-                          Para você que participou da aula experimental, oferecemos uma condição especial: nos 3 primeiros meses, a mensalidade será de <strong className="font-extrabold">US$ 99</strong>. A partir do 4º mês, será aplicado o valor regular de <strong className="font-extrabold">US$ 166</strong> por mês.
+                          Para você que participou da aula experimental, oferecemos uma condição especial: nos 3 primeiros meses, a mensalidade será de <strong className="font-extrabold">US$ 99</strong>. A partir do 4º mês, será aplicado o valor regular de <strong className="font-extrabold">US$ 116</strong> por mês.
                         </div>
                       </div>
                     </div>
