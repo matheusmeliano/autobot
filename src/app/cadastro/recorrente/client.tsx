@@ -3265,7 +3265,7 @@ export default function CadastroRecorrenteBody() {
                         />
                       </div>
                       <div className="text-xs sm:text-sm text-slate-500 mt-3 leading-relaxed">
-                        Abra o app do seu banco e escaneie o QR Code ao lado.
+                        Escaneie o QR Code.
                       </div>
                     </div>
 
