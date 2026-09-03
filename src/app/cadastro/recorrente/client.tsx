@@ -3229,14 +3229,6 @@ export default function CadastroRecorrenteBody() {
                   <div>
                     <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Pagamento por PIX</h2>
                     <div className="mt-6 mx-auto w-full max-w-2xl rounded-3xl border-2 border-emerald-200 bg-emerald-50 px-4 sm:px-7 py-4 sm:py-6 text-center">
-                      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-300/60 px-3 sm:px-4 py-1.5 mb-3 sm:mb-5">
-                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-800">
-                          Cotação fixa · Ago/2026
-                        </span>
-                      </div>
                       <div className="flex flex-col sm:flex-row sm:items-stretch sm:justify-stretch gap-3 sm:gap-5">
                         <div className="flex-1 rounded-2xl bg-white/70 border border-emerald-200/60 px-5 sm:px-7 py-3 sm:py-5 flex flex-col items-center sm:items-start sm:text-left justify-center gap-1 sm:gap-1.5 min-w-0">
                           <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-700/90">
