@@ -3080,7 +3080,7 @@ export default function CadastroRecorrenteBody() {
                   </div>
 
                   <a
-                    href="https://buy.stripe.com/8x23cw4LQ1Due7E6MMcwg03"
+                    href="https://buy.stripe.com/7sY8wQ4LQ3LC4x43AAcwg05"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 sm:px-8 py-4 bg-sky-600 text-white font-bold text-base sm:text-xl shadow-lg shadow-sky-200 hover:bg-sky-700 transition w-full max-w-2xl mx-auto min-w-0"
