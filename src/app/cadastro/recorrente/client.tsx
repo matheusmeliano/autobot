@@ -2990,6 +2990,24 @@ export default function CadastroRecorrenteBody() {
                     </button>
                   </div>
 
+                  <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 sm:p-6 text-left max-w-2xl mx-auto shadow-sm">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="w-11 h-11 shrink-0 rounded-2xl bg-emerald-500/15 text-emerald-700 flex items-center justify-center">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-800">
+                          Condição especial · 3 primeiros meses
+                        </div>
+                        <div className="text-sm sm:text-base text-emerald-900 leading-relaxed">
+                          Para você que participou da aula experimental, oferecemos uma condição especial: nos 3 primeiros meses, a mensalidade será de <strong className="font-extrabold">US$ 99</strong>. A partir do 4º mês, será aplicado o valor regular de <strong className="font-extrabold">US$ 166</strong> por mês.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 sm:p-6 text-left max-w-2xl mx-auto shadow-sm">
                     <div className="flex items-start gap-3 sm:gap-4">
                       <div className="w-11 h-11 shrink-0 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
