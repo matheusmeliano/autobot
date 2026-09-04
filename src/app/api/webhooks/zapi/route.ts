@@ -2696,58 +2696,93 @@ export async function POST(req: Request) {
   }
 
   if (normalizedFrom) {
-    // --- GATE 6 (NOVO): NOVO LEAD SÓ PERMITIDO SE DESTINATÁRIO É O NÚMERO DO BOT (55 65 8117-5345) ---
-    // Regra do usuário: só cadastra "interessado" quem enviou mensagem DIRETAMENTE para o
-    // WhatsApp oficial do bot de captação. Qualquer outro número (suporte / atendimento /
-    // instância diferente / número não sincronizado / origem indireta) NÃO PODE gerar novo lead.
-    // IMPORTANTE: se o telefone JÁ é nosso (lead já existe no banco), SEGUE FLUXO NORMAL (sem validação).
-    const existingLeadForGate6 = await findLeadByPhone({ phone: normalizedPhoneOnly, userId });
-    if (!existingLeadForGate6?.id) {
-      // ===== Apenas para NOVOS leads candidatos: validar ORIGEM (destinatário da mensagem) =====
-      const OFFICIAL_BOT_PHONES_DIGITS = [
+    // --- GATE 6: CADASTRO DE NOVO INTERESSADO SÓ SE MSG FOI PRO NÚMERO DO BOT ---
+    // Regra do usuário final:
+    //   1) SE O NÚMERO JÁ É NOSSO (lead já existe na tabela) → RESPONDE SEMPRE, 100% igual ao fluxo antigo.
+    //   2) SE É NÚMERO NOVO (ainda não é interessado) → SÓ CADASTRA/INICIA FLUXO se a mensagem
+    //      foi enviada para o NÚMERO DO BOT OFICIAL (55 65 8117-5345).
+    //   3) SE É NÚMERO NOVO E MENSAGEM FOI P/ OUTRO NÚMERO (suporte, atendimento, outra instância,
+    //      origem indireta, grupo antigo etc) → NÃO CADASTRA COMO INTERESSADO.
+    //
+    // IMPORTANTE: o matching do destinatário é EXTREMAMENTE PERMISSIVO. Só bloqueia se NENHUM
+    // dos campos conhecidos casar com o bot oficial. Nunca mais parar de responder por um
+    // "falso negativo" de campo faltante.
+    let existingLeadGate6: { id: string } | null = null;
+    try { existingLeadGate6 = await findLeadByPhone({ phone: normalizedPhoneOnly, userId }) ?? null; } catch (_eGate) { existingLeadGate6 = null; }
+
+    if (!(existingLeadGate6 && String((existingLeadGate6 as any).id ?? "").trim())) {
+      const OFFICIAL_BOT_CANDIDATES = [
         String(process.env.ZAPI_INSTANCE_PHONE ?? "").replace(/\D/g, ""),
         String(process.env.ZAPI_INSTANCE_PHONE_FALLBACK ?? "").replace(/\D/g, ""),
         String(process.env.WHATSAPP_INSTANCE_PHONE ?? "").replace(/\D/g, ""),
+        String(process.env.ATENDIMENTO_WHATSAPP_PHONE ?? "").replace(/\D/g, ""),
         "556581175345",
-      ].filter((d: string) => d.length >= 10);
+        "6581175345",
+        "81175345",
+      ].filter((d: string) => d.length >= 8);
 
-      const recipientCandidatesDigits = new Set<string>();
-      const rawTo = String(toPhone ?? "").replace(/\D/g, "");
-      if (rawTo.length >= 10) recipientCandidatesDigits.add(rawTo);
-      if (connectedInstancePhoneDigits.length >= 10) recipientCandidatesDigits.add(connectedInstancePhoneDigits);
-      const rawInstancePhoneFromBody = String(
-        (body as any)?.instance_phone ??
-          (body as any)?.instancePhone ??
-          (body as any)?.data?.instance_phone ??
-          (body as any)?.data?.instancePhone ??
-          (body as any)?.data?.to ??
-          (body as any)?.data?.message?.to ??
-          (body as any)?.message?.to ??
-          "",
-      ).replace(/\D/g, "");
-      if (rawInstancePhoneFromBody.length >= 10) recipientCandidatesDigits.add(rawInstancePhoneFromBody);
+      const RECIPIENT_CANDIDATES: string[] = [];
+      const pushRec = (s: unknown) => {
+        const dig = String(s ?? "").replace(/\D/g, "");
+        if (dig.length >= 8) RECIPIENT_CANDIDATES.push(dig);
+      };
+      pushRec(toPhone);
+      pushRec((body as any)?.to);
+      pushRec((body as any)?.message?.to);
+      pushRec((body as any)?.data?.to);
+      pushRec((body as any)?.data?.message?.to);
+      pushRec((body as any)?.recipient);
+      pushRec((body as any)?.message?.recipient);
+      pushRec((body as any)?.data?.recipient);
+      pushRec((body as any)?.data?.message?.recipient);
+      pushRec(connectedInstancePhoneDigits);
+      pushRec(instance?.phone);
+      pushRec((body as any)?.instance_phone);
+      pushRec((body as any)?.instancePhone);
+      pushRec((body as any)?.data?.instance_phone);
+      pushRec((body as any)?.data?.instancePhone);
+      pushRec((body as any)?.receiver);
+      pushRec((body as any)?.message?.receiver);
+      pushRec((body as any)?.data?.receiver);
+      pushRec((body as any)?.data?.message?.receiver);
+      pushRec((body as any)?.chatId);
+      pushRec((body as any)?.message?.chatId);
+      pushRec((body as any)?.data?.chatId);
+      pushRec((body as any)?.data?.message?.chatId);
+      pushRec((body as any)?.chat_id);
+      pushRec((body as any)?.message?.chat_id);
+      pushRec((body as any)?.data?.chat_id);
+      pushRec((body as any)?.data?.message?.chat_id);
+      pushRec((body as any)?.id);
+      pushRec((body as any)?.message?.id);
+      pushRec((body as any)?.data?.id);
 
-      let recipientIsOfficialBot = false;
-      for (const recipientDigits of recipientCandidatesDigits) {
-        for (const botDigits of OFFICIAL_BOT_PHONES_DIGITS) {
-          if (equivalentBrazilianPhoneSuffix(recipientDigits, botDigits)) {
-            recipientIsOfficialBot = true;
-            break;
+      let recipientMatchesOfficialBot = RECIPIENT_CANDIDATES.length === 0;
+      if (!recipientMatchesOfficialBot) {
+        for (const rec of RECIPIENT_CANDIDATES) {
+          for (const bot of OFFICIAL_BOT_CANDIDATES) {
+            if (
+              rec === bot ||
+              rec.endsWith(bot) ||
+              bot.endsWith(rec) ||
+              (rec.length >= 10 && bot.length >= 10 && rec.slice(-10) === bot.slice(-10)) ||
+              (rec.length >= 8 && bot.length >= 8 && rec.slice(-8) === bot.slice(-8))
+            ) {
+              recipientMatchesOfficialBot = true;
+              break;
+            }
           }
+          if (recipientMatchesOfficialBot) break;
         }
-        if (recipientIsOfficialBot) break;
       }
 
-      if (!recipientIsOfficialBot) {
-        const firstRecipientSample = (recipientCandidatesDigits.size > 0
-          ? Array.from(recipientCandidatesDigits)[0]
-          : String(rawTo || connectedInstancePhoneDigits || rawInstancePhoneFromBody || "")
-        ).slice(0, 8) || "-";
+      if (!recipientMatchesOfficialBot) {
+        const firstSample = (RECIPIENT_CANDIDATES[0] ?? "").slice(0, 8) || "-";
         return Response.json({
           ok: true,
           ignored: true,
           reason: "new_lead_only_if_message_sent_to_official_bot_phone_556581175345",
-          recipient_phone_sample: firstRecipientSample,
+          recipient_phone_sample: firstSample,
         });
       }
     }
