@@ -2696,6 +2696,62 @@ export async function POST(req: Request) {
   }
 
   if (normalizedFrom) {
+    // --- GATE 6 (NOVO): NOVO LEAD SÓ PERMITIDO SE DESTINATÁRIO É O NÚMERO DO BOT (55 65 8117-5345) ---
+    // Regra do usuário: só cadastra "interessado" quem enviou mensagem DIRETAMENTE para o
+    // WhatsApp oficial do bot de captação. Qualquer outro número (suporte / atendimento /
+    // instância diferente / número não sincronizado / origem indireta) NÃO PODE gerar novo lead.
+    // IMPORTANTE: se o telefone JÁ é nosso (lead já existe no banco), SEGUE FLUXO NORMAL (sem validação).
+    const existingLeadForGate6 = await findLeadByPhone({ phone: normalizedPhoneOnly, userId });
+    if (!existingLeadForGate6?.id) {
+      // ===== Apenas para NOVOS leads candidatos: validar ORIGEM (destinatário da mensagem) =====
+      const OFFICIAL_BOT_PHONES_DIGITS = [
+        String(process.env.ZAPI_INSTANCE_PHONE ?? "").replace(/\D/g, ""),
+        String(process.env.ZAPI_INSTANCE_PHONE_FALLBACK ?? "").replace(/\D/g, ""),
+        String(process.env.WHATSAPP_INSTANCE_PHONE ?? "").replace(/\D/g, ""),
+        "556581175345",
+      ].filter((d: string) => d.length >= 10);
+
+      const recipientCandidatesDigits = new Set<string>();
+      const rawTo = String(toPhone ?? "").replace(/\D/g, "");
+      if (rawTo.length >= 10) recipientCandidatesDigits.add(rawTo);
+      if (connectedInstancePhoneDigits.length >= 10) recipientCandidatesDigits.add(connectedInstancePhoneDigits);
+      const rawInstancePhoneFromBody = String(
+        (body as any)?.instance_phone ??
+          (body as any)?.instancePhone ??
+          (body as any)?.data?.instance_phone ??
+          (body as any)?.data?.instancePhone ??
+          (body as any)?.data?.to ??
+          (body as any)?.data?.message?.to ??
+          (body as any)?.message?.to ??
+          "",
+      ).replace(/\D/g, "");
+      if (rawInstancePhoneFromBody.length >= 10) recipientCandidatesDigits.add(rawInstancePhoneFromBody);
+
+      let recipientIsOfficialBot = false;
+      for (const recipientDigits of recipientCandidatesDigits) {
+        for (const botDigits of OFFICIAL_BOT_PHONES_DIGITS) {
+          if (equivalentBrazilianPhoneSuffix(recipientDigits, botDigits)) {
+            recipientIsOfficialBot = true;
+            break;
+          }
+        }
+        if (recipientIsOfficialBot) break;
+      }
+
+      if (!recipientIsOfficialBot) {
+        const firstRecipientSample = (recipientCandidatesDigits.size > 0
+          ? Array.from(recipientCandidatesDigits)[0]
+          : String(rawTo || connectedInstancePhoneDigits || rawInstancePhoneFromBody || "")
+        ).slice(0, 8) || "-";
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "new_lead_only_if_message_sent_to_official_bot_phone_556581175345",
+          recipient_phone_sample: firstRecipientSample,
+        });
+      }
+    }
+    // --- FIM GATE 6 ---
     try {
       const leadContext = await ensureWhatsAppLeadAndConversation({
         phone: normalizedPhoneOnly,
