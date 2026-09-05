@@ -2,6 +2,8 @@ import { AdminUsersClient, type AdminUserRow } from "@/components/admin/AdminUse
 import { listAllAuthUsers } from "@/lib/adminUsers";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizePlan } from "@/lib/plans";
+import { ATENDIMENTO_EMAIL } from "@/lib/atendimento/constants";
+import { isGlobalAdminEmail, isProtectedAdminOrUserEmail } from "@/lib/auth/admin";
 
 export default async function AdminUsuariosPage() {
   const supabase = tryCreateSupabaseAdminClient();
@@ -85,6 +87,24 @@ export default async function AdminUsuariosPage() {
     });
   }
 
+  const blockedPhones = new Set<string>();
+  const blockedEmails = new Set<string>();
+  const blockedNamesLower = new Set<string>();
+  try {
+    const atendBlock = await supabase
+      .from("atendimento_leads")
+      .select("phone, email, full_name")
+      .eq("assigned_user_email", ATENDIMENTO_EMAIL);
+    (atendBlock.data ?? []).forEach((row: any) => {
+      const ph = String(row.phone ?? "").trim();
+      if (ph) blockedPhones.add(ph);
+      const em = String(row.email ?? "").trim().toLowerCase();
+      if (em) blockedEmails.add(em);
+      const nm = String(row.full_name ?? "").trim().toLowerCase();
+      if (nm && nm.length >= 3) blockedNamesLower.add(nm);
+    });
+  } catch (_atb) {}
+
   let whatsappByUserId = new Map<string, {
     instance_id: string | null;
     display_name: string | null;
@@ -135,8 +155,28 @@ export default async function AdminUsuariosPage() {
     whatsappByUserId = new Map();
   }
 
+  const atendEmail = ATENDIMENTO_EMAIL.toLowerCase();
   const initial: AdminUserRow[] = users
-    .filter((u) => String((profileById.get(u.id) as any)?.access_scope ?? "app") !== "atendimento")
+    .filter((u) => {
+      const p = profileById.get(u.id) as any | undefined;
+      const accessScope = String(p?.access_scope ?? "app");
+      const userEmailRaw = String(u.email ?? "").trim().toLowerCase();
+      const profileEmailRaw = String(p?.email ?? "").trim().toLowerCase();
+      const wa = whatsappByUserId.get(u.id);
+      const waPhone = String(wa?.phone ?? "").trim();
+      const nomeRaw = String(p?.nome ?? (u.user_metadata as any)?.name ?? "").trim().toLowerCase();
+
+      if (accessScope === "atendimento") return false;
+      if (userEmailRaw === atendEmail || profileEmailRaw === atendEmail) return false;
+      if (isProtectedAdminOrUserEmail(userEmailRaw) && !isGlobalAdminEmail(userEmailRaw)) return false;
+      if (isProtectedAdminOrUserEmail(profileEmailRaw) && !isGlobalAdminEmail(profileEmailRaw)) return false;
+      if (userEmailRaw && blockedEmails.has(userEmailRaw)) return false;
+      if (profileEmailRaw && blockedEmails.has(profileEmailRaw)) return false;
+      if (waPhone && blockedPhones.has(waPhone)) return false;
+      if (nomeRaw && blockedNamesLower.has(nomeRaw)) return false;
+
+      return true;
+    })
     .map((u) => {
     const p = profileById.get(u.id);
     const s = subById.get(u.id);
