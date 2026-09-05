@@ -25,7 +25,6 @@ import {
   POST_BOOKING_CPF_STAGE_ENABLED,
   POST_BOOKING_CPF_SUCCESS_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
-  isAllowedPhoneInbound,
   isDedicatedExclusiveBotPhone,
   isOwnerPersonalPrivatePhone,
   isZapiInternalBlocklistedPhone,
@@ -1829,10 +1828,8 @@ export async function POST(req: Request) {
 
   const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
   const toPhoneDigits = String(toPhone ?? "").replace(/\D/g, "");
-  const fromPhoneDigitsEarly = String(fromPhone ?? "").replace(/\D/g, "");
-  const trustedInbound = isAllowedPhoneInbound(fromPhoneDigitsEarly);
 
-  if ((!trustedInbound) && connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
+  if (connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
     const toMatchInstance =
       toPhoneDigits.endsWith(connectedInstancePhoneDigits) ||
       connectedInstancePhoneDigits.endsWith(toPhoneDigits) ||
@@ -1852,7 +1849,7 @@ export async function POST(req: Request) {
     const resolvedConnectedDigitsOk = connectedInstancePhoneDigits.length >= 10;
     const resolvedToDigitsOk = toPhoneDigits.length >= 10;
     const looksLikeRealInbound = Boolean(messageText || mediaUrl) && !isOnlyStatusEvent && !rawFromMe;
-    if (!trustedInbound && !resolvedConnectedDigitsOk && !resolvedToDigitsOk && looksLikeRealInbound && !pendingPhoneValidationRef.id) {
+    if (!resolvedConnectedDigitsOk && !resolvedToDigitsOk && looksLikeRealInbound && !pendingPhoneValidationRef.id) {
       return Response.json({
         ok: true,
         ignored: true,
@@ -1890,23 +1887,23 @@ export async function POST(req: Request) {
   const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
   const toPhoneDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
 
-  if (!rawFromMe && !trustedInbound && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
+  if (!rawFromMe && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
     rawFromMe = true;
   }
 
   {
-    const fromIsOur = !trustedInbound && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
-    const toIsOur = !trustedInbound && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+    const fromIsOur = equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
+    const toIsOur = equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
     if (fromIsOur || toIsOur) {
       if (!rawFromMe && fromIsOur) rawFromMe = true;
     }
   }
 
   const isToOrFromOurNumber =
-    (!trustedInbound && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits)) ||
-    (!trustedInbound && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits));
+    equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
+    equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
 
-  if (rawFromMe || (!trustedInbound && equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad))) {
+  if (rawFromMe || equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad)) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -1946,7 +1943,6 @@ export async function POST(req: Request) {
 
   const isMessageFromConnectedNumber =
     Boolean(rawFromMe) &&
-    !trustedInbound &&
     normalizedEventType !== "DeliveryCallback" &&
     normalizedEventType !== "MessageStatusCallback" &&
     normalizedEventType !== "DisconnectedCallback";
@@ -1959,7 +1955,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (isOutboundOnlyEvent && !trustedInbound) {
+  if (isOutboundOnlyEvent) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -1967,7 +1963,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (Boolean(rawFromMe) && !trustedInbound) {
+  if (Boolean(rawFromMe)) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -2457,15 +2453,6 @@ export async function POST(req: Request) {
   });
 
   const normalizedFrom = normalizePhone(fromPhone);
-
-  if (normalizedFrom && !isAllowedPhoneInbound(normalizedFrom)) {
-    return Response.json({
-      ok: true,
-      ignored: true,
-      reason: "blocked_brasil_phone_disallowed_country_ddi_55",
-    });
-  }
-
   const validatedFrom = normalizeAndValidateFromPhone(fromPhone);
   const normalizedPhoneOnly = validatedFrom.digitsOnly;
   const isRealInboundMessage =
@@ -2490,8 +2477,7 @@ export async function POST(req: Request) {
   {
     const ourDigits = connectedInstancePhoneDigits;
     const candidateDigits = validatedFrom.digitsOnly || String(fromPhone ?? "").replace(/\D/g, "");
-    const skipLoopbackGuards = trustedInbound || isAllowedPhoneInbound(candidateDigits);
-    if (!skipLoopbackGuards && equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)) {
+    if (equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)) {
       return Response.json({
         ok: true,
         ignored: true,
@@ -2499,7 +2485,7 @@ export async function POST(req: Request) {
         phone: String(candidateDigits ?? "").slice(0, 8) || "-",
       });
     }
-    if (!skipLoopbackGuards && equivalentBrazilianPhoneSuffix(candidateDigits, String(toPhone ?? "").replace(/\D/g, ""))) {
+    if (equivalentBrazilianPhoneSuffix(candidateDigits, String(toPhone ?? "").replace(/\D/g, ""))) {
       return Response.json({
         ok: true,
         ignored: true,
@@ -2507,7 +2493,7 @@ export async function POST(req: Request) {
         phone: String(candidateDigits ?? "").slice(0, 8) || "-",
       });
     }
-    if (!skipLoopbackGuards && isZapiInternalBlocklistedPhone(candidateDigits)) {
+    if (isZapiInternalBlocklistedPhone(candidateDigits)) {
       return Response.json({
         ok: true,
         ignored: true,
@@ -2546,15 +2532,13 @@ export async function POST(req: Request) {
         ),
       );
       if (String(participantRaw ?? "").trim() || isGroupChat) {
-        if (!trustedInbound) {
-          return Response.json({
-            ok: true,
-            ignored: true,
-            reason: "group_or_participant_message_blocked_only_direct_1to1_allowed",
-            has_participant: Boolean(String(participantRaw ?? "").trim()),
-            is_group_chat: isGroupChat,
-          });
-        }
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "group_or_participant_message_blocked_only_direct_1to1_allowed",
+          has_participant: Boolean(String(participantRaw ?? "").trim()),
+          is_group_chat: isGroupChat,
+        });
       }
     }
 
@@ -2588,7 +2572,7 @@ export async function POST(req: Request) {
           } catch (_me) {}
         }
       }
-      if (thirdPartyMentions.length > 0 && !trustedInbound) {
+      if (thirdPartyMentions.length > 0) {
         return Response.json({
           ok: true,
           ignored: true,
@@ -2637,7 +2621,7 @@ export async function POST(req: Request) {
           } catch (_cme) {}
         }
       }
-      if (thirdPartyContacts.length > 0 && !trustedInbound) {
+      if (thirdPartyContacts.length > 0) {
         return Response.json({
           ok: true,
           ignored: true,
@@ -2664,7 +2648,6 @@ export async function POST(req: Request) {
         const senderDigits = String(explicitSenderPhone ?? "").replace(/\D/g, "");
         const fromDigits = String(fromPhone ?? "").replace(/\D/g, "");
         if (
-          !trustedInbound &&
           senderDigits.length >= 10 &&
           fromDigits.length >= 10 &&
           !equivalentBrazilianPhoneSuffix(senderDigits, fromDigits)
@@ -2686,11 +2669,11 @@ export async function POST(req: Request) {
     {
       const toDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
       if (
-        !trustedInbound &&
         toDigitsBroad.length >= 10 &&
         equivalentBrazilianPhoneSuffix(candidateDigits, toDigitsBroad) &&
         !equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)
       ) {
+        // Caso extremamente raro: from === to (mas caiu fora do loopback). Bloqueia.
         return Response.json({
           ok: true,
           ignored: true,
@@ -2703,7 +2686,7 @@ export async function POST(req: Request) {
     // --- FIM: BLOQUEIOS CRITERIOSOS ---
   }
 
-  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id && !trustedInbound) {
+  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id) {
     return Response.json({
       ok: true,
       ignored: true,

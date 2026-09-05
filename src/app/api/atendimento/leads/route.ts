@@ -1,4 +1,4 @@
-import { ATENDIMENTO_PROFESSOR_TIME_ZONE, isAllowedPhoneInbound, isZapiInternalBlocklistedPhone } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE, isZapiInternalBlocklistedPhone } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
@@ -83,7 +83,6 @@ export async function GET(req: Request) {
   const hiddenBlocklist = await loadHiddenWhatsAppPhoneBlocklist({ supabaseAdmin: admin });
 
   const leadRows = (leads ?? [])
-    .filter((row: any) => isAllowedPhoneInbound(String(row?.phone ?? "")))
     .filter((row: any) => !phoneIsInHiddenBrazilianBlocklist(String(row?.phone ?? ""), hiddenBlocklist)) as any[];
   const leadIds = leadRows.map((row) => String(row.id ?? "")).filter(Boolean);
   const conversationsByLeadId = new Map<string, any>();

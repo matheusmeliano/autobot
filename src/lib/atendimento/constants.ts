@@ -3,63 +3,11 @@ export const ATENDIMENTO_PUBLIC_LINK_SLUG = "lucas-brum-online-music-usa";
 
 export const ATENDIMENTO_DAILY_SUMMARY_PHONE = "+55 65 9985-1142";
 
-export const BRASIL_DDI = "55";
-export const US_DDI = "1";
-export const ALLOWED_BRASIL_PHONES_DIGITS: readonly string[] = [
-  "5565996933336",
-  "556581175345",
-];
-
-function brasilSuffixKey(digitsOnly: string): string {
-  const d = String(digitsOnly ?? "").replace(/\D/g, "");
-  if (!d) return "";
-  if (d.startsWith("55") && d.length >= 12) {
-    const afterDdi = d.slice(2);
-    if (afterDdi.length === 11) return afterDdi.slice(-10);
-    if (afterDdi.length === 10) return afterDdi;
-    return afterDdi.slice(-10);
-  }
-  if (d.length >= 10) return d.slice(-10);
-  return d;
-}
-
-function phoneMatchesAllowedBrasil(digitsOnly: string): boolean {
-  const d = String(digitsOnly ?? "").replace(/\D/g, "");
-  if (!d) return false;
-  const key = brasilSuffixKey(d);
-  if (!key) return false;
-  for (const allowed of ALLOWED_BRASIL_PHONES_DIGITS) {
-    if (allowed === d) return true;
-    if (brasilSuffixKey(allowed) === key) return true;
-  }
-  return false;
-}
-
 export const ZAPI_INTERNAL_PHONE_BLOCKLIST_SUFFIX_10: readonly string[] = [];
 
 export const OWNER_PERSONAL_PRIVATE_PHONE_SUFFIXES_10: readonly string[] = [];
 
 export const BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10: readonly string[] = [];
-
-export function normalizePhoneToDigits(raw: unknown): string {
-  return String(raw ?? "").replace(/\D+/g, "");
-}
-
-export function isAllowedPhoneInbound(rawPhone: unknown): boolean {
-  const digits = normalizePhoneToDigits(rawPhone);
-  if (!digits) return true;
-  if (digits.startsWith(US_DDI)) return true;
-  if (phoneMatchesAllowedBrasil(digits)) return true;
-  return !digits.startsWith(BRASIL_DDI);
-}
-
-export function isBlockedBrasilPhone(rawPhone: unknown): boolean {
-  const digits = normalizePhoneToDigits(rawPhone);
-  if (!digits) return false;
-  if (digits.startsWith(US_DDI)) return false;
-  if (phoneMatchesAllowedBrasil(digits)) return false;
-  return digits.startsWith(BRASIL_DDI);
-}
 
 function matchBrazilianPhoneSuffix(digitsRaw: string | null | undefined, suffixesList: readonly string[]): boolean {
   return false;

@@ -30,7 +30,6 @@ import {
   LOCATION_STATE_BLOCKED_FINAL_MESSAGE,
   LOCATION_STATE_INVALID_MESSAGE,
   NUMERIC_ONLY_FIELDS,
-  isAllowedPhoneInbound,
 } from "@/lib/atendimento/constants";
 import {
   buildExperimentalClassBookingChatMessages,
@@ -789,9 +788,6 @@ async function getConversationAccess(params: {
   }
   const conversationIdRaw = String(params.conversationId ?? "").trim();
   const phoneRaw = String(params.telefone ?? "").replace(/\D/g, "").trim();
-  if (phoneRaw && !isAllowedPhoneInbound(phoneRaw)) {
-    return { ok: false as const, status: 403, error: "blocked_brasil_phone_disallowed_country_ddi_55" } as const;
-  }
   if (conversationIdRaw && phoneRaw && phoneRaw.length >= 10) {
     const admin = createSupabaseAdminClient();
     const { data: conversation } = await admin

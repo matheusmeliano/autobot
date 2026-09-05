@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isAllowedPhoneInbound, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
 import {
   ATENDIMENTO_FILES_BUCKET,
   ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES,
@@ -3280,10 +3280,6 @@ export async function ensureWhatsAppLeadAndConversation(params: {
     );
   }
 
-  if (!isAllowedPhoneInbound(normalizedPhone)) {
-    return null;
-  }
-
   {
     const { data: instRow } = await admin
       .from("whatsapp_instances")
@@ -3321,7 +3317,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
         const ourKey = ourPhoneDigits.slice(-10);
         const rowKey = normalizedPhone.slice(-10);
         if (ourKey === rowKey || normalizedPhone.endsWith(ourKey) || ourPhoneDigits.endsWith(rowKey)) {
-          if (!isAllowedPhoneInbound(normalizedPhone)) return null;
+          return null;
         }
       }
     }
@@ -3335,7 +3331,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       return new Set<string>();
     }
   })();
-  if (hiddenBlocklist.size > 0 && !isAllowedPhoneInbound(normalizedPhone)) {
+  if (hiddenBlocklist.size > 0) {
     const { areBrazilianPhonesEquivalent } = await import("@/lib/painelHiddenPhones");
     let isBlocked = false;
     for (const blocked of hiddenBlocklist) {
@@ -3353,7 +3349,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
 
   let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });
 
-  if (!lead?.id && !isAllowedPhoneInbound(normalizedPhone)) {
+  if (!lead?.id) {
     let anyEquivalentPhoneHasCancelledBooking = false;
     try {
       const norm10 = normalizedPhone.slice(-10);

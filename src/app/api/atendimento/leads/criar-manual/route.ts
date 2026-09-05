@@ -1,7 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser, appendHistoryEvent, findLeadByPhone, ensureAtendimentoPublicLink, maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPendingDayTime } from "@/lib/atendimento/server";
 import { makeConversationSessionSlug } from "@/lib/atendimento/utils";
-import { ATENDIMENTO_EMAIL, isAllowedPhoneInbound } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_EMAIL } from "@/lib/atendimento/constants";
 
 function normalizePhoneDigitsOnly(value: string | null | undefined): string {
   return String(value ?? "").replace(/\D/g, "");
@@ -30,13 +30,6 @@ export async function POST(req: Request) {
   if (!isValidWhatsAppUserPhone(normalizedPhone)) {
     return Response.json(
       { ok: false, error: "Telefone inválido. Informe um número com DDD (ex: 556599851142)." },
-      { status: 400 },
-    );
-  }
-
-  if (!isAllowedPhoneInbound(normalizedPhone)) {
-    return Response.json(
-      { ok: false, error: "Não é possível cadastrar números do Brasil. Apenas EUA (+1) são permitidos." },
       { status: 400 },
     );
   }
