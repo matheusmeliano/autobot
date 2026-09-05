@@ -166,10 +166,14 @@ export default async function AdminUsuariosPage() {
       const waPhone = String(wa?.phone ?? "").trim();
       const nomeRaw = String(p?.nome ?? (u.user_metadata as any)?.name ?? "").trim().toLowerCase();
 
+      const isAtendimentoSelf =
+        userEmailRaw === atendEmail || profileEmailRaw === atendEmail;
+      const isGlobalAdminSelf =
+        isGlobalAdminEmail(userEmailRaw) || isGlobalAdminEmail(profileEmailRaw);
+
+      if (isAtendimentoSelf || isGlobalAdminSelf) return true;
+
       if (accessScope === "atendimento") return false;
-      if (userEmailRaw === atendEmail || profileEmailRaw === atendEmail) return false;
-      if (isProtectedAdminOrUserEmail(userEmailRaw) && !isGlobalAdminEmail(userEmailRaw)) return false;
-      if (isProtectedAdminOrUserEmail(profileEmailRaw) && !isGlobalAdminEmail(profileEmailRaw)) return false;
       if (userEmailRaw && blockedEmails.has(userEmailRaw)) return false;
       if (profileEmailRaw && blockedEmails.has(profileEmailRaw)) return false;
       if (waPhone && blockedPhones.has(waPhone)) return false;
