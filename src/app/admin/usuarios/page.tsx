@@ -2,7 +2,7 @@ import { AdminUsersClient, type AdminUserRow } from "@/components/admin/AdminUse
 import { listAllAuthUsers } from "@/lib/adminUsers";
 import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizePlan } from "@/lib/plans";
-import { ATENDIMENTO_EMAIL } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_EMAIL, isAllowedPhoneInbound } from "@/lib/atendimento/constants";
 import { isGlobalAdminEmail, isProtectedAdminOrUserEmail } from "@/lib/auth/admin";
 
 export default async function AdminUsuariosPage() {
@@ -177,6 +177,7 @@ export default async function AdminUsuariosPage() {
       if (userEmailRaw && blockedEmails.has(userEmailRaw)) return false;
       if (profileEmailRaw && blockedEmails.has(profileEmailRaw)) return false;
       if (waPhone && blockedPhones.has(waPhone)) return false;
+      if (waPhone && !isAllowedPhoneInbound(waPhone)) return false;
       if (nomeRaw && blockedNamesLower.has(nomeRaw)) return false;
 
       return true;

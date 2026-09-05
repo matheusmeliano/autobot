@@ -25,6 +25,7 @@ import {
   POST_BOOKING_CPF_STAGE_ENABLED,
   POST_BOOKING_CPF_SUCCESS_MESSAGE,
   WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
+  isAllowedPhoneInbound,
   isDedicatedExclusiveBotPhone,
   isOwnerPersonalPrivatePhone,
   isZapiInternalBlocklistedPhone,
@@ -2453,6 +2454,15 @@ export async function POST(req: Request) {
   });
 
   const normalizedFrom = normalizePhone(fromPhone);
+
+  if (normalizedFrom && !isAllowedPhoneInbound(normalizedFrom)) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "blocked_brasil_phone_disallowed_country_ddi_55",
+    });
+  }
+
   const validatedFrom = normalizeAndValidateFromPhone(fromPhone);
   const normalizedPhoneOnly = validatedFrom.digitsOnly;
   const isRealInboundMessage =
