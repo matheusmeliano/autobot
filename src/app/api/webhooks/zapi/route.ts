@@ -1829,8 +1829,10 @@ export async function POST(req: Request) {
 
   const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
   const toPhoneDigits = String(toPhone ?? "").replace(/\D/g, "");
+  const fromPhoneDigitsEarly = String(fromPhone ?? "").replace(/\D/g, "");
+  const trustedInbound = isAllowedPhoneInbound(fromPhoneDigitsEarly);
 
-  if (connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
+  if ((!trustedInbound) && connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
     const toMatchInstance =
       toPhoneDigits.endsWith(connectedInstancePhoneDigits) ||
       connectedInstancePhoneDigits.endsWith(toPhoneDigits) ||
@@ -1850,7 +1852,7 @@ export async function POST(req: Request) {
     const resolvedConnectedDigitsOk = connectedInstancePhoneDigits.length >= 10;
     const resolvedToDigitsOk = toPhoneDigits.length >= 10;
     const looksLikeRealInbound = Boolean(messageText || mediaUrl) && !isOnlyStatusEvent && !rawFromMe;
-    if (!resolvedConnectedDigitsOk && !resolvedToDigitsOk && looksLikeRealInbound && !pendingPhoneValidationRef.id) {
+    if (!trustedInbound && !resolvedConnectedDigitsOk && !resolvedToDigitsOk && looksLikeRealInbound && !pendingPhoneValidationRef.id) {
       return Response.json({
         ok: true,
         ignored: true,
@@ -1887,7 +1889,6 @@ export async function POST(req: Request) {
 
   const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
   const toPhoneDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
-  const trustedInbound = isAllowedPhoneInbound(fromPhoneDigits);
 
   if (!rawFromMe && !trustedInbound && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
     rawFromMe = true;
