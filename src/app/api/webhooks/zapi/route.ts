@@ -1888,23 +1888,23 @@ export async function POST(req: Request) {
   const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
   const toPhoneDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
 
-  if (!rawFromMe && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
+  if (!rawFromMe && !isAllowedPhoneInbound(fromPhoneDigits) && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
     rawFromMe = true;
   }
 
   {
-    const fromIsOur = equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
-    const toIsOur = equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+    const fromIsOur = !isAllowedPhoneInbound(fromPhoneDigits) && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
+    const toIsOur = !isAllowedPhoneInbound(toPhoneDigitsBroad) && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
     if (fromIsOur || toIsOur) {
       if (!rawFromMe && fromIsOur) rawFromMe = true;
     }
   }
 
   const isToOrFromOurNumber =
-    equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
-    equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+    (!isAllowedPhoneInbound(fromPhoneDigits) && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits)) ||
+    (!isAllowedPhoneInbound(toPhoneDigitsBroad) && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits));
 
-  if (rawFromMe || equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad)) {
+  if (rawFromMe || (!isAllowedPhoneInbound(fromPhoneDigits) && !isAllowedPhoneInbound(toPhoneDigitsBroad) && equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad))) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -1944,6 +1944,7 @@ export async function POST(req: Request) {
 
   const isMessageFromConnectedNumber =
     Boolean(rawFromMe) &&
+    !isAllowedPhoneInbound(fromPhoneDigits) &&
     normalizedEventType !== "DeliveryCallback" &&
     normalizedEventType !== "MessageStatusCallback" &&
     normalizedEventType !== "DisconnectedCallback";
@@ -1956,7 +1957,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (isOutboundOnlyEvent) {
+  if (isOutboundOnlyEvent && !isAllowedPhoneInbound(fromPhoneDigits)) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -1964,7 +1965,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (Boolean(rawFromMe)) {
+  if (Boolean(rawFromMe) && !isAllowedPhoneInbound(fromPhoneDigits)) {
     return Response.json({
       ok: true,
       ignored: true,
