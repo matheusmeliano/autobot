@@ -1887,24 +1887,25 @@ export async function POST(req: Request) {
 
   const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
   const toPhoneDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
+  const trustedInbound = isAllowedPhoneInbound(fromPhoneDigits);
 
-  if (!rawFromMe && !isAllowedPhoneInbound(fromPhoneDigits) && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
+  if (!rawFromMe && !trustedInbound && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
     rawFromMe = true;
   }
 
   {
-    const fromIsOur = !isAllowedPhoneInbound(fromPhoneDigits) && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
-    const toIsOur = !isAllowedPhoneInbound(toPhoneDigitsBroad) && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+    const fromIsOur = !trustedInbound && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
+    const toIsOur = !trustedInbound && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
     if (fromIsOur || toIsOur) {
       if (!rawFromMe && fromIsOur) rawFromMe = true;
     }
   }
 
   const isToOrFromOurNumber =
-    (!isAllowedPhoneInbound(fromPhoneDigits) && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits)) ||
-    (!isAllowedPhoneInbound(toPhoneDigitsBroad) && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits));
+    (!trustedInbound && equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits)) ||
+    (!trustedInbound && equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits));
 
-  if (rawFromMe || (!isAllowedPhoneInbound(fromPhoneDigits) && !isAllowedPhoneInbound(toPhoneDigitsBroad) && equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad))) {
+  if (rawFromMe || (!trustedInbound && equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad))) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -1944,7 +1945,7 @@ export async function POST(req: Request) {
 
   const isMessageFromConnectedNumber =
     Boolean(rawFromMe) &&
-    !isAllowedPhoneInbound(fromPhoneDigits) &&
+    !trustedInbound &&
     normalizedEventType !== "DeliveryCallback" &&
     normalizedEventType !== "MessageStatusCallback" &&
     normalizedEventType !== "DisconnectedCallback";
@@ -1957,7 +1958,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (isOutboundOnlyEvent && !isAllowedPhoneInbound(fromPhoneDigits)) {
+  if (isOutboundOnlyEvent && !trustedInbound) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -1965,7 +1966,7 @@ export async function POST(req: Request) {
     });
   }
 
-  if (Boolean(rawFromMe) && !isAllowedPhoneInbound(fromPhoneDigits)) {
+  if (Boolean(rawFromMe) && !trustedInbound) {
     return Response.json({
       ok: true,
       ignored: true,
@@ -2488,7 +2489,7 @@ export async function POST(req: Request) {
   {
     const ourDigits = connectedInstancePhoneDigits;
     const candidateDigits = validatedFrom.digitsOnly || String(fromPhone ?? "").replace(/\D/g, "");
-    const skipLoopbackGuards = isAllowedPhoneInbound(candidateDigits);
+    const skipLoopbackGuards = trustedInbound || isAllowedPhoneInbound(candidateDigits);
     if (!skipLoopbackGuards && equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)) {
       return Response.json({
         ok: true,
@@ -2544,13 +2545,15 @@ export async function POST(req: Request) {
         ),
       );
       if (String(participantRaw ?? "").trim() || isGroupChat) {
-        return Response.json({
-          ok: true,
-          ignored: true,
-          reason: "group_or_participant_message_blocked_only_direct_1to1_allowed",
-          has_participant: Boolean(String(participantRaw ?? "").trim()),
-          is_group_chat: isGroupChat,
-        });
+        if (!trustedInbound) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "group_or_participant_message_blocked_only_direct_1to1_allowed",
+            has_participant: Boolean(String(participantRaw ?? "").trim()),
+            is_group_chat: isGroupChat,
+          });
+        }
       }
     }
 
@@ -2584,7 +2587,7 @@ export async function POST(req: Request) {
           } catch (_me) {}
         }
       }
-      if (thirdPartyMentions.length > 0) {
+      if (thirdPartyMentions.length > 0 && !trustedInbound) {
         return Response.json({
           ok: true,
           ignored: true,
@@ -2633,7 +2636,7 @@ export async function POST(req: Request) {
           } catch (_cme) {}
         }
       }
-      if (thirdPartyContacts.length > 0) {
+      if (thirdPartyContacts.length > 0 && !trustedInbound) {
         return Response.json({
           ok: true,
           ignored: true,
@@ -2660,6 +2663,7 @@ export async function POST(req: Request) {
         const senderDigits = String(explicitSenderPhone ?? "").replace(/\D/g, "");
         const fromDigits = String(fromPhone ?? "").replace(/\D/g, "");
         if (
+          !trustedInbound &&
           senderDigits.length >= 10 &&
           fromDigits.length >= 10 &&
           !equivalentBrazilianPhoneSuffix(senderDigits, fromDigits)
@@ -2681,11 +2685,11 @@ export async function POST(req: Request) {
     {
       const toDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
       if (
+        !trustedInbound &&
         toDigitsBroad.length >= 10 &&
         equivalentBrazilianPhoneSuffix(candidateDigits, toDigitsBroad) &&
         !equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)
       ) {
-        // Caso extremamente raro: from === to (mas caiu fora do loopback). Bloqueia.
         return Response.json({
           ok: true,
           ignored: true,
@@ -2698,7 +2702,7 @@ export async function POST(req: Request) {
     // --- FIM: BLOQUEIOS CRITERIOSOS ---
   }
 
-  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id) {
+  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id && !trustedInbound) {
     return Response.json({
       ok: true,
       ignored: true,
