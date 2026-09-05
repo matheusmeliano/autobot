@@ -38,9 +38,9 @@ export default function InstagramPage() {
           </p>
 
           <div className="mt-8 grid gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/70">
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/70 break-words">
               Contato:{" "}
-              <span className="font-semibold text-white/85">
+              <span className="block font-semibold text-white/85 break-all">
                 heybrotherscolaboradores@gmail.com
               </span>
             </div>
