@@ -1320,16 +1320,18 @@ function LeadDetails({
           );
         })()}
 
-        <div className="mb-4">
-          <RecurringClassLinkCard
-            lead={lead}
-            activeSection={activeSection}
-            savingThisLead={savingRecurringLink}
-            onSaveRecurringLink={onSaveRecurringLink}
-            onEditPassword={onEditPassword}
-            context="details"
-          />
-        </div>
+        {(activeSection === "interessados" || activeSection === "alunos") ? (
+          <div className="mb-4">
+            <RecurringClassLinkCard
+              lead={lead}
+              activeSection={activeSection}
+              savingThisLead={savingRecurringLink}
+              onSaveRecurringLink={onSaveRecurringLink}
+              onEditPassword={onEditPassword}
+              context="details"
+            />
+          </div>
+        ) : null}
         {!isLeadRepescagem(lead) && !bookingWasNoShow ? (
           <div className="grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Cidade" value={formatAtendimentoLocationName(lead.city)} />
@@ -4998,15 +5000,17 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           <RepescagemBadge />
                         </div>
                       ) : null}
-                      <div className="mt-3">
-                        <RecurringClassLinkCard
-                          lead={lead}
-                          activeSection={activeSection}
-                          savingThisLead={savingRecurringLinkLeadId === lead.id}
-                          onSaveRecurringLink={handleSaveRecurringLink}
-                          context="list"
-                        />
-                      </div>
+                      {(activeSection === "interessados" || activeSection === "alunos") ? (
+                        <div className="mt-3">
+                          <RecurringClassLinkCard
+                            lead={lead}
+                            activeSection={activeSection}
+                            savingThisLead={savingRecurringLinkLeadId === lead.id}
+                            onSaveRecurringLink={handleSaveRecurringLink}
+                            context="list"
+                          />
+                        </div>
+                      ) : null}
                     </button>
                   );
                 })}
