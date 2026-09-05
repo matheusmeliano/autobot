@@ -10,16 +10,16 @@ export const metadata = {
 export default function LinkedInPage() {
   return (
     <div className="min-h-screen bg-[#070A10] text-white">
-      <header className="sticky top-0 z-30">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#070A10]">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+          <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2">
             <Logo />
-            <div className="text-sm font-semibold tracking-tight">AutoBot</div>
+            <div className="truncate text-sm font-semibold tracking-tight">AutoBot</div>
           </Link>
 
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-white/10"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar
