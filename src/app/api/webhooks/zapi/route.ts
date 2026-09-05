@@ -2487,7 +2487,8 @@ export async function POST(req: Request) {
   {
     const ourDigits = connectedInstancePhoneDigits;
     const candidateDigits = validatedFrom.digitsOnly || String(fromPhone ?? "").replace(/\D/g, "");
-    if (equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)) {
+    const skipLoopbackGuards = isAllowedPhoneInbound(candidateDigits);
+    if (!skipLoopbackGuards && equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)) {
       return Response.json({
         ok: true,
         ignored: true,
@@ -2495,7 +2496,7 @@ export async function POST(req: Request) {
         phone: String(candidateDigits ?? "").slice(0, 8) || "-",
       });
     }
-    if (equivalentBrazilianPhoneSuffix(candidateDigits, String(toPhone ?? "").replace(/\D/g, ""))) {
+    if (!skipLoopbackGuards && equivalentBrazilianPhoneSuffix(candidateDigits, String(toPhone ?? "").replace(/\D/g, ""))) {
       return Response.json({
         ok: true,
         ignored: true,
@@ -2503,7 +2504,7 @@ export async function POST(req: Request) {
         phone: String(candidateDigits ?? "").slice(0, 8) || "-",
       });
     }
-    if (isZapiInternalBlocklistedPhone(candidateDigits)) {
+    if (!skipLoopbackGuards && isZapiInternalBlocklistedPhone(candidateDigits)) {
       return Response.json({
         ok: true,
         ignored: true,

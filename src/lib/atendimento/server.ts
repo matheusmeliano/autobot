@@ -3321,7 +3321,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
         const ourKey = ourPhoneDigits.slice(-10);
         const rowKey = normalizedPhone.slice(-10);
         if (ourKey === rowKey || normalizedPhone.endsWith(ourKey) || ourPhoneDigits.endsWith(rowKey)) {
-          return null;
+          if (!isAllowedPhoneInbound(normalizedPhone)) return null;
         }
       }
     }
@@ -3335,7 +3335,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
       return new Set<string>();
     }
   })();
-  if (hiddenBlocklist.size > 0) {
+  if (hiddenBlocklist.size > 0 && !isAllowedPhoneInbound(normalizedPhone)) {
     const { areBrazilianPhonesEquivalent } = await import("@/lib/painelHiddenPhones");
     let isBlocked = false;
     for (const blocked of hiddenBlocklist) {
@@ -3353,7 +3353,7 @@ export async function ensureWhatsAppLeadAndConversation(params: {
 
   let lead = await findLeadByPhone({ phone: normalizedPhone, userId: params.userId });
 
-  if (!lead?.id) {
+  if (!lead?.id && !isAllowedPhoneInbound(normalizedPhone)) {
     let anyEquivalentPhoneHasCancelledBooking = false;
     try {
       const norm10 = normalizedPhone.slice(-10);
