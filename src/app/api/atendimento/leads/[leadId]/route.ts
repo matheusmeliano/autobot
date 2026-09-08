@@ -133,6 +133,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     experimental_class_professor_name: z.string().trim().max(160).nullable().optional(),
     experimental_class_professor_phone: z.string().trim().max(40).nullable().optional(),
     experimental_class_booking_id: z.string().trim().max(120).nullable().optional(),
+    internal_notes: z.string().max(5000).nullable().optional(),
   });
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -729,6 +730,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   const safeExpProfessorPhone = toSafeStringTrimOrNull(parsed.data.experimental_class_professor_phone);
   const safeExpBookingId = toSafeStringTrimOrNull(parsed.data.experimental_class_booking_id);
 
+  const internalNotesRaw = parsed.data.internal_notes;
+  let safeInternalNotes: undefined | null | string = undefined;
+  if (internalNotesRaw === undefined) {
+    safeInternalNotes = undefined;
+  } else if (internalNotesRaw === null) {
+    safeInternalNotes = null;
+  } else {
+    safeInternalNotes = String(internalNotesRaw).substring(0, 5000);
+  }
+
   const admin = createSupabaseAdminClient();
   const updateData: Record<string, unknown> = {};
   if (safeFullName !== undefined) updateData.full_name = safeFullName;
@@ -749,12 +760,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   if (safeExpProfessorName !== undefined) updateData.experimental_class_professor_name = safeExpProfessorName;
   if (safeExpProfessorPhone !== undefined) updateData.experimental_class_professor_phone = safeExpProfessorPhone;
   if (safeExpBookingId !== undefined) updateData.experimental_class_booking_id = safeExpBookingId;
+  if (safeInternalNotes !== undefined) updateData.internal_notes = safeInternalNotes;
 
   if (Object.keys(updateData).length === 0) {
     return Response.json({ ok: true, lead: null });
   }
 
-  const selectFull = "id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_link, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_booking_id, updated_at";
+  const selectFull = "id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_link, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_booking_id, internal_notes, updated_at";
   const selectSafe = "id, full_name, recurring_class_link, city, state, country, timezone, updated_at";
 
   let updated: any = null;
@@ -843,6 +855,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       funnel_stage: String((updated as any).funnel_stage ?? safeFunnelStage ?? "").trim() || null,
       experimental_class_status: String((updated as any).experimental_class_status ?? safeExpStatus ?? "").trim() || null,
       enrollment_number: String((updated as any).enrollment_number ?? "").trim() || null,
+      internal_notes: String((updated as any).internal_notes ?? safeInternalNotes ?? "").trim() || null,
       updated_at: String((updated as any).updated_at ?? new Date().toISOString()),
     },
   });

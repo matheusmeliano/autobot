@@ -45,6 +45,7 @@ export type AtendimentoLead = {
   contract_pdf_url?: string | null;
   contract_html_snapshot?: string | null;
   enrollment_number?: string | null;
+  internal_notes?: string | null;
 };
 
 export type AtendimentoConversation = {

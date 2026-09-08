@@ -1571,12 +1571,14 @@ function BookingDetails({
   sendingStudentNotificationBookingId,
   sendingRecurringNotificationLeadId,
   savingRecurringLink,
+  savingInternalNotes,
   onCancelBooking,
   onSaveLessonLink,
   onMarkAttendance,
   onSendStudentNotification,
   onSendRecurringNotification,
   onSaveRecurringLink,
+  onSaveInternalNotes,
   onEditExperimental,
   assigningProfessor,
   onAssignProfessor,
@@ -1590,12 +1592,14 @@ function BookingDetails({
   sendingStudentNotificationBookingId: string | null;
   sendingRecurringNotificationLeadId: string | null;
   savingRecurringLink: boolean;
+  savingInternalNotes: boolean;
   onCancelBooking: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveLessonLink: (lead: AtendimentoLeadListItem, lessonLink: string) => Promise<void>;
   onMarkAttendance: (lead: AtendimentoLeadListItem, attendance: "attended" | "no_show") => Promise<void>;
   onSendStudentNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSendRecurringNotification: (lead: AtendimentoLeadListItem) => Promise<void>;
   onSaveRecurringLink: (lead: AtendimentoLeadListItem, recurringLink: string) => Promise<void>;
+  onSaveInternalNotes: (lead: AtendimentoLeadListItem, notes: string) => Promise<void>;
   onEditExperimental?: (lead: AtendimentoLeadListItem) => void;
   assigningProfessor: boolean;
   onAssignProfessor: (
@@ -1616,6 +1620,16 @@ function BookingDetails({
   const recurringLinkDraftEmpty = !recurringLinkDraft.trim() && !savedRecurringLink;
   const recurringLinkSaveDisabled = savingRecurringLink || recurringLinkDraftEmpty;
   const canOpenSavedRecurringLink = /^https?:\/\//i.test(savedRecurringLink);
+
+  const initialSavedInternalNotes = String((lead as any)?.internal_notes ?? "").trim();
+  const [internalNotesDraft, setInternalNotesDraft] = useState(initialSavedInternalNotes);
+  const savedInternalNotes = initialSavedInternalNotes;
+  useEffect(() => {
+    setInternalNotesDraft(String((lead as any)?.internal_notes ?? "").trim());
+  }, [lead.id, (lead as any)?.internal_notes]);
+  const internalNotesChanged = internalNotesDraft.trim() !== savedInternalNotes;
+  const internalNotesDraftEmpty = !internalNotesDraft.trim() && !savedInternalNotes;
+  const internalNotesSaveDisabled = savingInternalNotes || !internalNotesChanged;
   const professorTimeZone = String(booking?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const bookingId = String(booking?.id ?? "").trim();
   const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
@@ -2177,6 +2191,58 @@ function BookingDetails({
             </div>
           </div>
         ) : null}
+
+        {(() => {
+          const isMatriculaConcluida = isLeadRecurringRegistrationConcludedClient(lead);
+          const canShow =
+            activeSection === "agendamentos" &&
+            isMatriculaConcluida &&
+            leadHasMatriculaOrRecurringStageInitiated(lead) &&
+            (hasRecurringClass || Boolean(savedRecurringLink));
+          if (!canShow) return null;
+          return (
+            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                  Anotações Internas
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                    Observações
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="Anotações de acompanhamento interno..."
+                    value={internalNotesDraft}
+                    onChange={(e) => setInternalNotesDraft(e.target.value)}
+                    className="w-full min-w-0 resize-y rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={savingInternalNotes}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onSaveInternalNotes(lead, internalNotesDraft)}
+                  disabled={internalNotesSaveDisabled}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingInternalNotes ? (
+                    <>
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 shrink-0" />
+                      {savedInternalNotes ? "Atualizar" : "Salvar"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {activeSection !== "agendamentos" && hasRecurringClass && pastRecurringPaged.length ? (
           <div className="mt-6 space-y-3">
@@ -3510,6 +3576,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] = useState<string | null>(null);
   const [sendingRecurringNotificationLeadId, setSendingRecurringNotificationLeadId] = useState<string | null>(null);
   const [savingRecurringLinkLeadId, setSavingRecurringLinkLeadId] = useState<string | null>(null);
+  const [savingInternalNotesLeadId, setSavingInternalNotesLeadId] = useState<string | null>(null);
   const [assigningProfessorLeadId, setAssigningProfessorLeadId] = useState<string | null>(null);
   const [loadingPaymentLeadId, setLoadingPaymentLeadId] = useState<string | null>(null);
   const [loadingPaymentAction, setLoadingPaymentAction] = useState<"confirm" | "reject" | null>(null);
@@ -4465,6 +4532,47 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     }
   }
 
+  async function handleSaveInternalNotes(lead: AtendimentoLeadListItem, notes: string) {
+    const leadId = String(lead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para salvar as anotações internas.");
+      return;
+    }
+    const trimmed = notes.trim();
+
+    try {
+      setSavingInternalNotesLeadId(leadId);
+      const response = await fetch(`/api/atendimento/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ internal_notes: trimmed || null }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; lead?: { id?: string; internal_notes?: string | null; updated_at?: string } | null }
+        | null;
+
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao salvar as anotações internas.");
+        return;
+      }
+
+      const newNotes = String(payload?.lead?.internal_notes ?? trimmed).trim() || null;
+      const newUpdatedAt = String(payload?.lead?.updated_at ?? lead.updated_at ?? new Date().toISOString());
+      setLocalLeads((current) =>
+        current.map((item) =>
+          item.id === leadId
+            ? ({ ...item, internal_notes: newNotes, updated_at: newUpdatedAt } as AtendimentoLeadListItem & { internal_notes: string | null })
+            : item,
+        ),
+      );
+      modalToast.success(newNotes ? "Anotações internas salvas." : "Anotações internas removidas.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao salvar as anotações internas.");
+    } finally {
+      setSavingInternalNotesLeadId(null);
+    }
+  }
+
   async function handlePaymentAction(
     lead: AtendimentoLeadListItem,
     action: "confirm" | "reject",
@@ -5085,12 +5193,14 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
                   sendingRecurringNotificationLeadId={sendingRecurringNotificationLeadId}
                   savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
+                  savingInternalNotes={savingInternalNotesLeadId === selectedLead.id}
                   onCancelBooking={handleCancelBooking}
                   onSaveLessonLink={handleSaveLessonLink}
                   onMarkAttendance={handleMarkAttendance}
                   onSendStudentNotification={handleSendStudentNotification}
                   onSendRecurringNotification={handleSendRecurringNotification}
                   onSaveRecurringLink={handleSaveRecurringLink}
+                  onSaveInternalNotes={handleSaveInternalNotes}
                   onEditExperimental={(l) => openEditExperimental(l)}
                   assigningProfessor={assigningProfessorLeadId === selectedLead.id}
                   onAssignProfessor={handleAssignProfessor}
@@ -5179,12 +5289,14 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       sendingStudentNotificationBookingId={sendingStudentNotificationBookingId}
                       sendingRecurringNotificationLeadId={sendingRecurringNotificationLeadId}
                       savingRecurringLink={savingRecurringLinkLeadId === selectedLead.id}
+                      savingInternalNotes={savingInternalNotesLeadId === selectedLead.id}
                       onCancelBooking={handleCancelBooking}
                       onSaveLessonLink={handleSaveLessonLink}
                       onMarkAttendance={handleMarkAttendance}
                       onSendStudentNotification={handleSendStudentNotification}
                       onSendRecurringNotification={handleSendRecurringNotification}
                       onSaveRecurringLink={handleSaveRecurringLink}
+                      onSaveInternalNotes={handleSaveInternalNotes}
                       assigningProfessor={assigningProfessorLeadId === selectedLead.id}
                       onAssignProfessor={handleAssignProfessor}
                     />
