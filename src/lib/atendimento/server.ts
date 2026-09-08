@@ -1616,22 +1616,36 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
     const cachedRegisteredAttendantSent = sentRegisteredAttendantBookingIds.has(bookingId);
 
-    const NOTIFICATION_STALE_AFTER_START_MS = 3 * 60 * 60 * 1000;
+    const STALE_WINDOW_MS = 3 * 60 * 60 * 1000;
+    const CRON_GRACE_MS = 10 * 60 * 1000;
     const attendantFireMs =
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
+    const attendantWindowEndMs = attendantFireMs + CRON_GRACE_MS;
     const studentFireMs = leadStartAtMs;
+    const studentWindowEndMs = studentFireMs + CRON_GRACE_MS;
+    const attendantMissed =
+      !cachedAttendantSent &&
+      nowMs > attendantWindowEndMs &&
+      nowMs <= professorStartAtMs + STALE_WINDOW_MS;
+    const studentMissed =
+      !cachedStudentSent &&
+      nowMs > studentWindowEndMs &&
+      nowMs <= leadStartAtMs + STALE_WINDOW_MS;
     const attendantDue =
       !cachedAttendantSent &&
-      nowMs >= attendantFireMs &&
-      nowMs <= professorStartAtMs + NOTIFICATION_STALE_AFTER_START_MS;
+      ((nowMs >= attendantFireMs && nowMs <= attendantWindowEndMs) || attendantMissed);
     const registeredAttendantDue =
       !cachedRegisteredAttendantSent &&
-      nowMs >= attendantFireMs &&
-      nowMs <= professorStartAtMs + NOTIFICATION_STALE_AFTER_START_MS;
+      ((nowMs >= attendantFireMs && nowMs <= attendantWindowEndMs) ||
+        (!cachedRegisteredAttendantSent &&
+          nowMs > attendantWindowEndMs &&
+          nowMs <= professorStartAtMs + STALE_WINDOW_MS));
     const studentDue =
       !cachedStudentSent &&
       nowMs >= studentFireMs &&
-      nowMs <= leadStartAtMs + NOTIFICATION_STALE_AFTER_START_MS;
+      ((nowMs <= studentWindowEndMs) || studentMissed) &&
+      nowMs <= leadStartAtMs + STALE_WINDOW_MS &&
+      nowMs >= studentFireMs;
 
     let thisBookingAttendantOk = cachedAttendantSent;
     let thisBookingRegisteredAttendantOk = cachedRegisteredAttendantSent;
@@ -1994,18 +2008,35 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const cachedAttendantSent = attendantOccurrenceAlreadySent;
     const cachedRegisteredAttendantSent = registeredAttendantOccurrenceAlreadySent;
 
-    const RECURRING_NOTIFICATION_STALE_AFTER_START_MS = 3 * 60 * 60 * 1000;
+    const RECURRING_STALE_WINDOW_MS = 3 * 60 * 60 * 1000;
+    const RECURRING_CRON_GRACE_MS = 10 * 60 * 1000;
     const attendantFireMs =
       professorStartAtMs - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
+    const attendantWindowEndMs = attendantFireMs + RECURRING_CRON_GRACE_MS;
     const studentFireMs = leadStartAtMs;
+    const studentWindowEndMs = studentFireMs + RECURRING_CRON_GRACE_MS;
+    const attendantMissed =
+      !cachedAttendantSent &&
+      nowMs > attendantWindowEndMs &&
+      nowMs <= professorStartAtMs + RECURRING_STALE_WINDOW_MS;
+    const studentMissed =
+      !cachedStudentSent &&
+      nowMs > studentWindowEndMs &&
+      nowMs <= leadStartAtMs + RECURRING_STALE_WINDOW_MS;
     const attendantDue =
       !cachedAttendantSent &&
-      nowMs >= attendantFireMs &&
-      nowMs <= professorStartAtMs + RECURRING_NOTIFICATION_STALE_AFTER_START_MS;
+      ((nowMs >= attendantFireMs && nowMs <= attendantWindowEndMs) || attendantMissed);
+    const registeredAttendantDue =
+      !cachedRegisteredAttendantSent &&
+      ((nowMs >= attendantFireMs && nowMs <= attendantWindowEndMs) ||
+        (!cachedRegisteredAttendantSent &&
+          nowMs > attendantWindowEndMs &&
+          nowMs <= professorStartAtMs + RECURRING_STALE_WINDOW_MS));
     const studentDue =
       !cachedStudentSent &&
       nowMs >= studentFireMs &&
-      nowMs <= leadStartAtMs + RECURRING_NOTIFICATION_STALE_AFTER_START_MS;
+      ((nowMs <= studentWindowEndMs) || studentMissed) &&
+      nowMs <= leadStartAtMs + RECURRING_STALE_WINDOW_MS;
 
     const weekdayLabel =
       (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)[weekdayRaw] ??

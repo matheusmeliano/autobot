@@ -777,6 +777,12 @@ async function presentExperimentalClassTimeOptions(params: {
   };
 }
 
+function isAllowedPhoneInbound(digitsOnly: string) {
+  if (!digitsOnly) return false;
+  if (/^55\d{10,11}$/.test(digitsOnly)) return false;
+  return digitsOnly.length >= 10 && digitsOnly.length <= 15;
+}
+
 async function getConversationAccess(params: {
   publicSlug?: string | null;
   conversationId?: string | null;
@@ -788,6 +794,9 @@ async function getConversationAccess(params: {
   }
   const conversationIdRaw = String(params.conversationId ?? "").trim();
   const phoneRaw = String(params.telefone ?? "").replace(/\D/g, "").trim();
+  if (phoneRaw && !isAllowedPhoneInbound(phoneRaw)) {
+    return { ok: false as const, status: 403, error: "blocked_brasil_phone_disallowed_country_ddi_55" } as const;
+  }
   if (conversationIdRaw && phoneRaw && phoneRaw.length >= 10) {
     const admin = createSupabaseAdminClient();
     const { data: conversation } = await admin
