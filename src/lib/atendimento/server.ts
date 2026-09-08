@@ -1616,10 +1616,27 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
     const cachedRegisteredAttendantSent = sentRegisteredAttendantBookingIds.has(bookingId);
 
-    const studentDue = leadStartAtMs <= nowMs;
+    const CRON_NOTIFICATION_GRACE_MS = 2 * 60 * 1000;
+    const attendantWindowStartMs =
+      professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
+    const attendantWindowEndMs = attendantWindowStartMs + CRON_NOTIFICATION_GRACE_MS;
+    const studentWindowStartMs = leadStartAtMs;
+    const studentWindowEndMs = leadStartAtMs + CRON_NOTIFICATION_GRACE_MS;
+    const missedLookbackStartMs =
+      new Date(candidateWindowStartIso).getTime();
+    const attendantMissedWindow =
+      attendantWindowStartMs < nowMs - CRON_NOTIFICATION_GRACE_MS &&
+      attendantWindowStartMs >= missedLookbackStartMs;
+    const studentMissedWindow =
+      studentWindowStartMs < nowMs - CRON_NOTIFICATION_GRACE_MS &&
+      studentWindowStartMs >= missedLookbackStartMs;
     const attendantDue =
-      professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
+      (nowMs >= attendantWindowStartMs && nowMs <= attendantWindowEndMs) ||
+      attendantMissedWindow;
     const registeredAttendantDue = attendantDue;
+    const studentDue =
+      (nowMs >= studentWindowStartMs && nowMs <= studentWindowEndMs) ||
+      studentMissedWindow;
 
     let thisBookingAttendantOk = cachedAttendantSent;
     let thisBookingRegisteredAttendantOk = cachedRegisteredAttendantSent;
@@ -1982,9 +1999,26 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const cachedAttendantSent = attendantOccurrenceAlreadySent;
     const cachedRegisteredAttendantSent = registeredAttendantOccurrenceAlreadySent;
 
-    const studentDue = leadStartAtMs <= nowMs;
+    const RECURRING_CRON_NOTIFICATION_GRACE_MS = 2 * 60 * 1000;
+    const recurringMissedLookbackStartMs = nowMs - 3 * 24 * 60 * 60 * 1000;
+    const attendantWindowStartMs =
+      professorStartAtMs - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
+    const attendantWindowEndMs = attendantWindowStartMs + RECURRING_CRON_NOTIFICATION_GRACE_MS;
+    const studentWindowStartMs = leadStartAtMs;
+    const studentWindowEndMs = leadStartAtMs + RECURRING_CRON_NOTIFICATION_GRACE_MS;
+    const attendantMissedWindow =
+      attendantWindowStartMs < nowMs - RECURRING_CRON_NOTIFICATION_GRACE_MS &&
+      attendantWindowStartMs >= recurringMissedLookbackStartMs;
+    const studentMissedWindow =
+      studentWindowStartMs < nowMs - RECURRING_CRON_NOTIFICATION_GRACE_MS &&
+      studentWindowStartMs >= recurringMissedLookbackStartMs;
+
+    const studentDue =
+      (nowMs >= studentWindowStartMs && nowMs <= studentWindowEndMs) ||
+      studentMissedWindow;
     const attendantDue =
-      professorStartAtMs - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000 <= nowMs;
+      (nowMs >= attendantWindowStartMs && nowMs <= attendantWindowEndMs) ||
+      attendantMissedWindow;
 
     const weekdayLabel =
       (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)[weekdayRaw] ??
