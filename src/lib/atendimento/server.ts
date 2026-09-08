@@ -1616,7 +1616,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
     const cachedRegisteredAttendantSent = sentRegisteredAttendantBookingIds.has(bookingId);
 
-    const CRON_GRACE_MS = 10 * 60 * 1000;
+    const CRON_GRACE_MS = 2 * 60 * 1000;
     const attendantFireMs =
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
     const attendantWindowEndMs = attendantFireMs + CRON_GRACE_MS;
@@ -1996,7 +1996,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const cachedAttendantSent = attendantOccurrenceAlreadySent;
     const cachedRegisteredAttendantSent = registeredAttendantOccurrenceAlreadySent;
 
-    const RECURRING_CRON_GRACE_MS = 10 * 60 * 1000;
+    const RECURRING_CRON_GRACE_MS = 2 * 60 * 1000;
     const attendantFireMs =
       professorStartAtMs - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
     const attendantWindowEndMs = attendantFireMs + RECURRING_CRON_GRACE_MS;
