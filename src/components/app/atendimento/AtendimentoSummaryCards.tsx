@@ -2209,9 +2209,6 @@ function BookingDetails({
               </div>
               <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
                 <div className="min-w-0 flex-1">
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                    Observações
-                  </label>
                   <textarea
                     rows={4}
                     placeholder="Anotações de acompanhamento interno..."
