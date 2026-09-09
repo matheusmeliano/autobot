@@ -29,6 +29,7 @@ import {
   buildRecurringPaymentConfirmedStudentWelcomeMessage,
   buildRecurringPaymentPendingConfirmationAttendantNotification,
   calculateNextRecurringOccurrence,
+  calculateCurrentOrNextRecurringOccurrence,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
@@ -1839,6 +1840,8 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     "phone",
     "status",
     "funnel_stage",
+    "payment_status",
+    "payment_confirmed_at",
     "timezone",
     "recurring_class_weekday",
     "recurring_class_professor_time",
@@ -1846,6 +1849,8 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     "recurring_class_professor_timezone",
     "recurring_class_lead_timezone",
     "recurring_class_link",
+    "recurring_class_professor_name",
+    "recurring_class_professor_phone",
     "recurring_class_professor_date",
     "recurring_class_professor_start_at",
     "recurring_class_lead_date",
@@ -1859,11 +1864,14 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const { data, error } = await admin
       .from("atendimento_leads")
       .select(allRecurringColumns.join(", "))
-      .in("status", ["aluno", "matriculado", "cadastro_recorrente_pendente_plataforma"])
       .not("recurring_class_weekday", "is", null);
     if (!error && Array.isArray(data)) rows = data as any[];
   } catch (_e) {
     rows = [];
+  }
+
+  if (rows.length > 0) {
+    rows = rows.filter((row) => isLeadRecurringRegistrationConcluded(row));
   }
 
   let studentSent = 0;
@@ -1945,7 +1953,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       continue;
     }
 
-    const occurrence = calculateNextRecurringOccurrence({
+    const occurrence = calculateCurrentOrNextRecurringOccurrence({
       weekday: weekdayRaw as RecurringWeekdayKey,
       professorTimeHHMM,
       professorTimeZone: professorTz,
