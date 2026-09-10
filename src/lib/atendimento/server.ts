@@ -1260,6 +1260,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   const sentStudentBookingIds = new Set<string>();
   const sentAttendantBookingIds = new Set<string>();
   const sentRegisteredAttendantBookingIds = new Set<string>();
+  const sentCompositeKeys = new Set<string>();
   const latestLessonLinkByLeadId = new Map<string, string | null>();
 
   // Step 1: Tabela real de bookings
@@ -1391,14 +1392,26 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
 
       if (eventType === "experimental_class_student_start_notification_sent") {
         if (bookingIdFromDetails) sentStudentBookingIds.add(bookingIdFromDetails);
+        const eventStartAt = String(details?.start_at ?? details?.professor_start_at ?? "").trim();
+        const eventLeadId = leadId;
+        if (eventStartAt && eventLeadId)
+          sentCompositeKeys.add(`${eventLeadId}|${eventStartAt}|student`);
         continue;
       }
       if (eventType === "experimental_class_attendant_start_notification_sent") {
         if (bookingIdFromDetails) sentAttendantBookingIds.add(bookingIdFromDetails);
+        const eventStartAt = String(details?.start_at ?? details?.professor_start_at ?? "").trim();
+        const eventLeadId = leadId;
+        if (eventStartAt && eventLeadId)
+          sentCompositeKeys.add(`${eventLeadId}|${eventStartAt}|attendant`);
         continue;
       }
       if (eventType === "experimental_class_registered_attendant_start_notification_sent") {
         if (bookingIdFromDetails) sentRegisteredAttendantBookingIds.add(bookingIdFromDetails);
+        const eventStartAt = String(details?.start_at ?? details?.professor_start_at ?? "").trim();
+        const eventLeadId = leadId;
+        if (eventStartAt && eventLeadId)
+          sentCompositeKeys.add(`${eventLeadId}|${eventStartAt}|registeredAttendant`);
         continue;
       }
 
@@ -1611,11 +1624,23 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
 
     const cachedStudentSent =
       sentStudentBookingIds.has(bookingId) ||
-      Boolean(String((booking as any)?.student_start_notification_sent_at ?? "").trim());
+      Boolean(String((booking as any)?.student_start_notification_sent_at ?? "").trim()) ||
+      sentCompositeKeys.has(`${leadId}|${professorStartAtRaw}|student`);
     const cachedAttendantSent =
       sentAttendantBookingIds.has(bookingId) ||
-      Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim());
-    const cachedRegisteredAttendantSent = sentRegisteredAttendantBookingIds.has(bookingId);
+      Boolean(String((booking as any)?.attendant_start_notification_sent_at ?? "").trim()) ||
+      sentCompositeKeys.has(`${leadId}|${professorStartAtRaw}|attendant`);
+    const cachedRegisteredAttendantSent =
+      sentRegisteredAttendantBookingIds.has(bookingId) ||
+      sentCompositeKeys.has(`${leadId}|${professorStartAtRaw}|registeredAttendant`);
+
+    if (
+      Number.isFinite(professorStartAtMs) &&
+      Number.isFinite(leadStartAtMs) &&
+      Math.abs(professorStartAtMs - leadStartAtMs) > 12 * 60 * 60 * 1000
+    ) {
+      leadStartAtMs = professorStartAtMs;
+    }
 
     const CRON_GRACE_MS = 2 * 60 * 1000;
     const attendantFireMs =
@@ -1668,6 +1693,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
             nowIso,
           });
           sentAttendantBookingIds.add(bookingId);
+          sentCompositeKeys.add(`${leadId}|${professorStartAtRaw}|attendant`);
           attendantSent += 1;
           thisBookingAttendantOk = true;
         } catch (error) {
@@ -1715,6 +1741,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
           actorType: "system",
         });
         sentRegisteredAttendantBookingIds.add(bookingId);
+        sentCompositeKeys.add(`${leadId}|${professorStartAtRaw}|registeredAttendant`);
         registeredAttendantSent += 1;
         thisBookingRegisteredAttendantOk = true;
       } catch (error) {
@@ -1772,6 +1799,8 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
             nowIso,
           });
           sentStudentBookingIds.add(bookingId);
+          sentCompositeKeys.add(`${leadId}|${professorStartAtRaw}|student`);
+          sentCompositeKeys.add(`${leadId}|${leadStartAtRaw}|student`);
           studentSent += 1;
           thisBookingStudentOk = true;
         } catch (error) {
@@ -1988,6 +2017,14 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
 
     if (!Number.isFinite(professorStartAtMs) || !Number.isFinite(leadStartAtMs)) continue;
 
+    if (Math.abs(professorStartAtMs - leadStartAtMs) > 12 * 60 * 60 * 1000) {
+      occurrence.leadStartAt = occurrence.professorStartAt;
+    }
+
+    const professorStartAtMsFinal = new Date(occurrence.professorStartAt).getTime();
+    const leadStartAtMsFinal = new Date(occurrence.leadStartAt || occurrence.professorStartAt).getTime();
+    if (!Number.isFinite(professorStartAtMsFinal) || !Number.isFinite(leadStartAtMsFinal)) continue;
+
     const existingSentSet = sentOccurrencesByLeadId.get(leadId) ?? new Set<string>();
     const thisProfessorOccurrenceKey = occurrence.professorStartAt;
     const studentOccurrenceAlreadySent = existingSentSet.has(
@@ -2006,9 +2043,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
 
     const RECURRING_CRON_GRACE_MS = 2 * 60 * 1000;
     const attendantFireMs =
-      professorStartAtMs - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
+      professorStartAtMsFinal - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
     const attendantWindowEndMs = attendantFireMs + RECURRING_CRON_GRACE_MS;
-    const studentFireMs = leadStartAtMs;
+    const studentFireMs = leadStartAtMsFinal;
     const studentWindowEndMs = studentFireMs + RECURRING_CRON_GRACE_MS;
     const attendantDue =
       !cachedAttendantSent &&
