@@ -2124,6 +2124,7 @@ export async function POST(req: Request) {
 
   const isExperimentalBotFlow =
     isAwaitingPhoneConfirmation ||
+    expectedField === "full_name" ||
     expectedField === "phone" ||
     expectedField === "state" ||
     expectedField === "city" ||

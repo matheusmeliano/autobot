@@ -2463,6 +2463,26 @@ export async function POST(req: Request) {
     normalizedEventType === "inbound" ||
     (normalizedFrom !== "receivedcallback" && (Boolean(messageText?.trim()) || Boolean(mediaUrl?.trim())));
 
+  let experimentalClassBotDisabled = false;
+  try {
+    const { data: settingsData, error: settingsError } = await admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "experimental_class_bot_disabled")
+      .maybeSingle();
+    if (!settingsError || String((settingsError as any)?.code ?? "") === "42P01") {
+      const raw = (settingsData as any)?.value;
+      experimentalClassBotDisabled =
+        raw === true ||
+        raw === "true" ||
+        raw === 1 ||
+        raw === "1" ||
+        String(raw ?? "").trim().toLowerCase() === "true";
+    }
+  } catch {
+    experimentalClassBotDisabled = false;
+  }
+
   if (normalizedFrom && !validatedFrom.valid) {
     return Response.json({
       ok: true,
@@ -5006,6 +5026,57 @@ export async function POST(req: Request) {
         }
         if (expectedField === "city" && !hasStateValidated) {
           expectedField = "state";
+        }
+
+        if (experimentalClassBotDisabled && !handledByPosAttendanceFlow && !isBookingWaitingAttendance) {
+          const wantsPreStage =
+            isFirstBotInteraction ||
+            expectedField === "full_name" ||
+            expectedField === "phone" ||
+            expectedField === "state" ||
+            expectedField === "city" ||
+            (!expectedField && !hasReachedPostCityStage && String((lead as any)?.phone ?? "").trim());
+          if (wantsPreStage) {
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  bot_enabled: false,
+                  unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                  is_new_for_attendant: true,
+                  last_interaction_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "bot_experimental_class_disabled",
+                title: "Bot de agendamento experimental desativado: atendimento humano assumido",
+                details: {
+                  is_first_interaction: Boolean(isFirstBotInteraction),
+                  expected_field: expectedField || null,
+                  phone: normalizedPhoneOnly,
+                  source: "whatsapp_zapi",
+                },
+                actorType: "system",
+              });
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_experimental_class_bot_disabled",
+              bot_enabled: false,
+            });
+          }
         }
 
         if (isFirstBotInteraction) {
