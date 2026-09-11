@@ -3375,8 +3375,18 @@ export function AtendimentoSummaryCards({
       Math.max(1, Math.floor(idx / PANEL_PAGE_SIZE) + 1),
       Math.max(1, Math.ceil(targetItems.length / PANEL_PAGE_SIZE)),
     );
+    jumpToButtonPendingTargetRef.current = {
+      section: effectiveTarget,
+      leadId: realTargetId,
+      page: targetPage,
+      startedAt: Date.now(),
+      pageSettled: false,
+      sectionSettled: false,
+    };
     jumpToButtonPendingSectionRef.current = effectiveTarget;
     jumpToButtonPendingPageRef.current = targetPage;
+    setActiveSection(effectiveTarget);
+    setQuery("");
     setPage(targetPage);
     setActiveSectionSelectedLead(realTargetId, effectiveTarget);
   }
@@ -3618,6 +3628,14 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
   }
   const jumpToButtonPendingSectionRef = useRef<SummarySectionId | null>(null);
   const jumpToButtonPendingPageRef = useRef<number | null>(null);
+  const jumpToButtonPendingTargetRef = useRef<{
+    section: SummarySectionId;
+    leadId: string;
+    page: number;
+    startedAt: number;
+    sectionSettled: boolean;
+    pageSettled: boolean;
+  } | null>(null);
   const selectedLeadId: string | null = selectedLeadIdBySection[activeSection] ?? null;
   const queryParamsInitializedRef = useRef(false);
   const lastActiveSectionRef = useRef<SummarySectionId | null>(null);
@@ -3643,6 +3661,19 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       }
     } catch (_e) {}
   }, []);
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
+  const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
+  const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
+  const [markingAttendanceType, setMarkingAttendanceType] = useState<"attended" | "no_show" | null>(null);
+  const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] = useState<string | null>(null);
+  const [sendingRecurringNotificationLeadId, setSendingRecurringNotificationLeadId] = useState<string | null>(null);
+  const [savingRecurringLinkLeadId, setSavingRecurringLinkLeadId] = useState<string | null>(null);
+  const [savingInternalNotesLeadId, setSavingInternalNotesLeadId] = useState<string | null>(null);
+  const [assigningProfessorLeadId, setAssigningProfessorLeadId] = useState<string | null>(null);
+  const [loadingPaymentLeadId, setLoadingPaymentLeadId] = useState<string | null>(null);
+  const [loadingPaymentAction, setLoadingPaymentAction] = useState<"confirm" | "reject" | null>(null);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   useEffect(() => {
     if (!queryParamsInitializedRef.current || typeof window === "undefined") return;
     try {
@@ -3660,19 +3691,6 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       window.history.replaceState({}, "", url.toString());
     } catch (_e) {}
   }, [activeSection, selectedLeadId]);
-  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
-  const [savingLessonLinkBookingId, setSavingLessonLinkBookingId] = useState<string | null>(null);
-  const [markingAttendanceBookingId, setMarkingAttendanceBookingId] = useState<string | null>(null);
-  const [markingAttendanceType, setMarkingAttendanceType] = useState<"attended" | "no_show" | null>(null);
-  const [sendingStudentNotificationBookingId, setSendingStudentNotificationBookingId] = useState<string | null>(null);
-  const [sendingRecurringNotificationLeadId, setSendingRecurringNotificationLeadId] = useState<string | null>(null);
-  const [savingRecurringLinkLeadId, setSavingRecurringLinkLeadId] = useState<string | null>(null);
-  const [savingInternalNotesLeadId, setSavingInternalNotesLeadId] = useState<string | null>(null);
-  const [assigningProfessorLeadId, setAssigningProfessorLeadId] = useState<string | null>(null);
-  const [loadingPaymentLeadId, setLoadingPaymentLeadId] = useState<string | null>(null);
-  const [loadingPaymentAction, setLoadingPaymentAction] = useState<"confirm" | "reject" | null>(null);
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
   const [addLeadPhoneInput, setAddLeadPhoneInput] = useState("");
@@ -3776,6 +3794,18 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     }
     jumpToButtonPendingSectionRef.current = null;
     jumpToButtonPendingPageRef.current = null;
+    const jumpTarget = jumpToButtonPendingTargetRef.current;
+    if (jumpTarget) {
+      const timeoutMs = 6000;
+      if (!jumpTarget.sectionSettled || !jumpTarget.pageSettled) {
+        const started = jumpTarget.startedAt;
+        const expired = Date.now() - started > timeoutMs;
+        if (!expired) return;
+      }
+      if (jumpTarget.sectionSettled && jumpTarget.pageSettled) {
+        jumpToButtonPendingTargetRef.current = null;
+      }
+    }
     setMobileDetailsOpen(true);
     const targetId = selectedLeadIdBySection[activeSection] ?? null;
     if (!targetId) return;
@@ -4037,6 +4067,12 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
   useEffect(() => {
     if (lastActiveSectionRef.current === activeSection) return;
+    const jump = jumpToButtonPendingTargetRef.current;
+    if (jump && jump.section === activeSection) {
+      jump.sectionSettled = true;
+      lastActiveSectionRef.current = activeSection;
+      return;
+    }
     lastActiveSectionRef.current = activeSection;
     setQuery("");
     setPage(1);
@@ -4065,11 +4101,18 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
 
   useEffect(() => {
     setPage((current) => {
+      const jump = jumpToButtonPendingTargetRef.current;
+      if (jump && jump.section === activeSection && !jump.pageSettled) {
+        jump.pageSettled = true;
+        const safeTotalPages = Math.max(1, Math.ceil(filteredItems.length / PANEL_PAGE_SIZE));
+        const boundedPage = Math.min(Math.max(1, jump.page), safeTotalPages);
+        return boundedPage;
+      }
       if (current < 1) return 1;
       if (current > totalPages) return totalPages;
       return current;
     });
-  }, [totalPages]);
+  }, [totalPages, activeSection, filteredItems.length, PANEL_PAGE_SIZE]);
 
   useEffect(() => {
     setSelectedLeadIdBySection((current) => {
