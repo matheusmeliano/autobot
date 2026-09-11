@@ -585,7 +585,7 @@ export function AppShell({
                     "inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all",
                     experimentalBotDisabled
                       ? "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] hover:bg-[var(--app-solid-surface-2)] disabled:opacity-60"
-                      : "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600 hover:border-emerald-600 disabled:opacity-60",
+                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-60",
                   ].join(" ")}
                   aria-label="Alternar bot de agendamento experimental"
                   aria-pressed={!experimentalBotDisabled}
