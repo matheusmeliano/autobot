@@ -3365,8 +3365,20 @@ export function AtendimentoSummaryCards({
   function navigateBetweenSections(lead: AtendimentoLeadListItem, targetSection: SummarySectionId) {
     const jumpTarget = resolveJumpTargetForLead(lead, sectionsRef.current);
     const effectiveTarget = targetSection === jumpTarget || targetSection === activeSection ? targetSection : jumpTarget;
+    const targetItems = sectionsRef.current.find((s) => s.id === effectiveTarget)?.items ?? [];
+    const realTargetId =
+      targetItems.some((l) => l.id === lead.id)
+        ? lead.id
+        : (targetItems[0]?.id ?? lead.id);
+    const idx = Math.max(0, targetItems.findIndex((l) => l.id === realTargetId));
+    const targetPage = Math.min(
+      Math.max(1, Math.floor(idx / PANEL_PAGE_SIZE) + 1),
+      Math.max(1, Math.ceil(targetItems.length / PANEL_PAGE_SIZE)),
+    );
     jumpToButtonPendingSectionRef.current = effectiveTarget;
-    setActiveSectionSelectedLead(lead.id, effectiveTarget);
+    jumpToButtonPendingPageRef.current = targetPage;
+    setPage(targetPage);
+    setActiveSectionSelectedLead(realTargetId, effectiveTarget);
   }
 
 function sortLeadsBySectionEnteredDesc<T extends { created_at?: unknown; updated_at?: unknown }>(
@@ -3605,17 +3617,28 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     setSelectedLeadIdBySection((current) => ({ ...current, [section]: id }));
   }
   const jumpToButtonPendingSectionRef = useRef<SummarySectionId | null>(null);
+  const jumpToButtonPendingPageRef = useRef<number | null>(null);
   useEffect(() => {
     const pending = jumpToButtonPendingSectionRef.current;
     if (!pending) return;
     if (activeSection !== pending) return;
+    const pendingPage = jumpToButtonPendingPageRef.current;
+    const safeTotalPages = Math.max(1, Math.ceil(filteredItems.length / PANEL_PAGE_SIZE));
+    if (pendingPage !== null && Number.isFinite(pendingPage)) {
+      const boundedPage = Math.min(Math.max(1, pendingPage), safeTotalPages);
+      if (page !== boundedPage) {
+        setPage(boundedPage);
+        jumpToButtonPendingPageRef.current = boundedPage;
+        return;
+      }
+    }
     jumpToButtonPendingSectionRef.current = null;
+    jumpToButtonPendingPageRef.current = null;
     setMobileDetailsOpen(true);
-    const currentSectionItems = sectionsRef.current.find((s) => s.id === activeSection)?.items ?? [];
     const targetId = selectedLeadIdBySection[activeSection] ?? null;
     if (!targetId) return;
     requestAnimationFrame(() => {
-      if (currentSectionItems.some((lead) => lead.id === targetId)) {
+      if (filteredItems.some((lead) => lead.id === targetId)) {
         const el = selectedCardRefById.current.get(targetId) ?? null;
         if (el && typeof el.scrollIntoView === "function") {
           try {
@@ -3628,7 +3651,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
         }
       }
     });
-  }, [activeSection, selectedLeadIdBySection]);
+  }, [activeSection, selectedLeadIdBySection, filteredItems, page]);
   const selectedLeadId: string | null = selectedLeadIdBySection[activeSection] ?? null;
   const queryParamsInitializedRef = useRef(false);
   const lastActiveSectionRef = useRef<SummarySectionId | null>(null);
