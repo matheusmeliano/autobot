@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Plus, Save, Search, Trash2, X, XCircle, Zap } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, Copy, Download, ExternalLink, FileText, Loader2, Pencil, Plus, Save, Search, Trash2, UserRound, Users, X, XCircle, Zap } from "lucide-react";
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -4869,6 +4869,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                   const showJumpToAgendamento =
                     (activeSection === "interessados" && leadHasAnyExperimentalVinculo(lead)) ||
                     (activeSection === "alunos" && (leadHasAnyExperimentalVinculo(lead) || leadHasAnyRecurringProgressSignal(lead)));
+                  const showJumpToInteressadoOuAluno = (() => {
+                    if (activeSection !== "agendamentos") return false;
+                    return true;
+                  })();
                   const showAgendamentoMissingProfessorIcon = (() => {
                     if (activeSection !== "agendamentos") return false;
                     if (leadHasAnyRecurringProgressSignal(lead) || leadHasMatriculaOrRecurringStageInitiated(lead)) return false;
@@ -4942,7 +4946,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                           : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      {(showJumpToAgendamento || showWarningIcon) ? (
+                      {(showJumpToAgendamento || showJumpToInteressadoOuAluno || showWarningIcon) ? (
                         <div className="absolute right-3 top-3 inline-flex items-center gap-1.5">
                           {showWarningIcon ? (
                             <div
@@ -4951,6 +4955,26 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                             >
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />
                             </div>
+                          ) : null}
+                          {showJumpToInteressadoOuAluno ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const target = isLeadInAlunosSection(lead) ? "alunos" : "interessados";
+                                setActiveSectionSelectedLead(lead.id, target);
+                                setActiveSection(target);
+                                setMobileDetailsOpen(true);
+                              }}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-2 text-[11px] font-semibold text-[var(--app-text-65)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+                              title={isLeadInAlunosSection(lead) ? "Ver em alunos" : "Ver em interessados"}
+                            >
+                              {isLeadInAlunosSection(lead) ? (
+                                <Users className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <UserRound className="h-3.5 w-3.5 shrink-0" />
+                              )}
+                            </button>
                           ) : null}
                           {showJumpToAgendamento ? (
                             <button
