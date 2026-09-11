@@ -1590,7 +1590,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     const professorStartAtRaw = String((booking as any)?.professor_start_at ?? "").trim();
     const leadStartAtRaw = String((booking as any)?.lead_start_at ?? professorStartAtRaw).trim();
     const professorStartAtMs = new Date(professorStartAtRaw).getTime();
-    const leadStartAtMs = new Date(leadStartAtRaw).getTime();
+    let leadStartAtMs = new Date(leadStartAtRaw).getTime();
 
     if (
       !bookingId ||
