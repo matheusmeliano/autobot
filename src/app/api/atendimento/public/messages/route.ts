@@ -936,6 +936,26 @@ export async function POST(req: Request) {
     });
   }
 
+  let experimentalClassBotDisabled = false;
+  try {
+    const { data: settingsData, error: settingsError } = await admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "experimental_class_bot_disabled")
+      .maybeSingle();
+    if (!settingsError || String((settingsError as any)?.code ?? "") === "42P01") {
+      const raw = (settingsData as any)?.value;
+      experimentalClassBotDisabled =
+        raw === true ||
+        raw === "true" ||
+        raw === 1 ||
+        raw === "1" ||
+        String(raw ?? "").trim().toLowerCase() === "true";
+    }
+  } catch {
+    experimentalClassBotDisabled = false;
+  }
+
   const { data: inbound, error: inboundError } = await admin
     .from("atendimento_messages")
     .insert({
@@ -2100,6 +2120,79 @@ export async function POST(req: Request) {
         });
       }
     }
+  }
+
+  const isExperimentalBotFlow =
+    isAwaitingPhoneConfirmation ||
+    expectedField === "phone" ||
+    expectedField === "state" ||
+    expectedField === "city" ||
+    (!expectedField && String((lead as any)?.phone ?? "").trim());
+
+  if (experimentalClassBotDisabled && isExperimentalBotFlow) {
+    await admin
+      .from("atendimento_leads")
+      .update({
+        unread_count: Number(lead.unread_count ?? 0) + 1,
+        is_new_for_attendant: true,
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", String(lead.id));
+
+    await admin
+      .from("atendimento_conversations")
+      .update({
+        bot_enabled: false,
+        updated_at: nowIso,
+      })
+      .eq("id", String(conversation.id));
+
+    await syncConversationPreview({
+      conversationId: String(conversation.id),
+      contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+      createdAt: nowIso,
+    });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "message_received",
+      title: "Mensagem recebida do lead",
+      details: {
+        content_text: contentText || null,
+        media_type: mediaType,
+        media_url: mediaUrl,
+        mime_type: mimeType,
+        file_name: fileName,
+        file_size_bytes: fileSizeBytes,
+      },
+      actorType: "lead",
+    });
+
+    await appendHistoryEvent({
+      leadId: String(lead.id),
+      conversationId: String(conversation.id),
+      eventType: "bot_experimental_class_disabled",
+      title: "Atendimento humano assumido (bot experimental desativado)",
+      details: {
+        reason: "experimental_class_bot_disabled",
+        expected_field: expectedField || null,
+        awaiting_phone_confirmation: isAwaitingPhoneConfirmation,
+      },
+      actorType: "system",
+    });
+
+    return Response.json({
+      ok: true,
+      inbound,
+      outbound: null,
+      blocked: false,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: false,
+      },
+    });
   }
 
   if (isAwaitingPhoneConfirmation) {

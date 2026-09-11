@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Bot, Loader2, Menu, X } from "lucide-react";
 import { AppNav } from "@/components/app/AppNav";
 import { logoutAction } from "@/app/app/actions";
 import { Logo } from "@/components/ui/Logo";
@@ -82,6 +82,10 @@ export function AppShell({
   const [pendingPayment, setPendingPayment] = useState<any | null>(null);
   const [paymentResolving, setPaymentResolving] = useState<"confirm" | "reject" | null>(null);
   const lastPaymentSuspicionRealtimeIdRef = useRef<string>("");
+  const [experimentalBotDisabled, setExperimentalBotDisabled] = useState(false);
+  const [experimentalBotLoading, setExperimentalBotLoading] = useState(true);
+  const [experimentalBotSaving, setExperimentalBotSaving] = useState(false);
+  const [showExperimentalBotPopover, setShowExperimentalBotPopover] = useState(false);
 
   const showThemeGate = false;
 
@@ -403,6 +407,56 @@ export function AppShell({
     };
   }, [authChecked, fetchPendingPayment, isAuthed, supabase, userId]);
 
+  const loadExperimentalBotSetting = useCallback(async () => {
+    if (!authChecked || !isAuthed) return;
+    if (!drawerOnlyNav) {
+      setExperimentalBotLoading(false);
+      return;
+    }
+    try {
+      setExperimentalBotLoading(true);
+      const res = await fetch("/api/atendimento/settings/experimental-class-bot", {
+        method: "GET",
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.ok) {
+        setExperimentalBotDisabled(Boolean(json.experimental_class_bot_disabled));
+      }
+    } catch {
+    } finally {
+      setExperimentalBotLoading(false);
+    }
+  }, [authChecked, isAuthed, drawerOnlyNav]);
+
+  useEffect(() => {
+    loadExperimentalBotSetting();
+  }, [loadExperimentalBotSetting]);
+
+  const toggleExperimentalBot = useCallback(async () => {
+    if (experimentalBotSaving) return;
+    const prev = experimentalBotDisabled;
+    const newValue = !prev;
+    try {
+      setExperimentalBotSaving(true);
+      setExperimentalBotDisabled(newValue);
+      const res = await fetch("/api/atendimento/settings/experimental-class-bot", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ experimental_class_bot_disabled: newValue }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error ?? "Erro ao salvar.");
+      }
+      modalToast.success("Configuração salva.");
+    } catch (e: any) {
+      setExperimentalBotDisabled(prev);
+      modalToast.error(String(e?.message ?? "Erro ao salvar configuração."));
+    } finally {
+      setExperimentalBotSaving(false);
+    }
+  }, [experimentalBotDisabled, experimentalBotSaving]);
+
   const resolvePendingPayment = useCallback(
     async (decision: "confirm" | "reject") => {
       if (!pendingPayment?.id) return;
@@ -431,11 +485,11 @@ export function AppShell({
     [paymentResolving, pendingPayment, router],
   );
 
-  if (authChecked && !isAuthed) return null;
-
   const currentPath = pathname ?? "";
   const drawerOnlyNav =
     currentPath === "/app/atendimento" || currentPath.startsWith("/app/atendimento/");
+
+  if (authChecked && !isAuthed) return null;
   const shouldHoldRender =
     restricted &&
     currentPath !== "/app/assinatura" &&
@@ -512,17 +566,109 @@ export function AppShell({
               drawerOnlyNav ? "" : "min-[1201px]:hidden",
             ].join(" ")}
           >
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] transition-all hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-fg)]"
-              aria-label="Abrir menu"
-              aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-app-drawer"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            </div>
+            {drawerOnlyNav ? (
+              <>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowExperimentalBotPopover((v) => !v)}
+                    className={[
+                      "inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all",
+                      experimentalBotDisabled
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
+                    ].join(" ")}
+                    aria-label="Alternar bot de agendamento experimental"
+                    aria-expanded={showExperimentalBotPopover}
+                    aria-controls="experimental-bot-popover"
+                  >
+                    <Bot className="h-5 w-5" />
+                  </button>
+                  {showExperimentalBotPopover ? (
+                    <div
+                      id="experimental-bot-popover"
+                      role="dialog"
+                      className="absolute right-0 bottom-full mb-2 z-[300] w-[280px] rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 shadow-xl"
+                    >
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                        Bot de Agendamento Experimental
+                      </div>
+                      <p className="mb-3 text-xs text-[var(--app-text-65)]">
+                        Quando desativado, os interessados em aula experimental serão atendidos
+                        manualmente por um atendente humano. Nenhum outro fluxo é afetado.
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-[var(--app-text-85)]">
+                          {experimentalBotDisabled ? "Desativado" : "Ativado"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={toggleExperimentalBot}
+                          disabled={experimentalBotSaving || experimentalBotLoading}
+                          className={[
+                            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-60",
+                            experimentalBotDisabled
+                              ? "bg-[var(--app-bg-disabled)]"
+                              : "bg-emerald-500",
+                          ].join(" ")}
+                          role="switch"
+                          aria-checked={!experimentalBotDisabled}
+                        >
+                          <span
+                            className={[
+                              "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform",
+                              experimentalBotDisabled ? "translate-x-0" : "translate-x-5",
+                            ].join(" ")}
+                          >
+                            {experimentalBotSaving ? (
+                              <Loader2 className="absolute inset-0 m-auto h-3.5 w-3.5 animate-spin text-[var(--app-text-65)]" />
+                            ) : null}
+                          </span>
+                        </button>
+                      </div>
+                      {experimentalBotLoading ? (
+                        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[var(--app-text-45)]">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Carregando configuração…
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExperimentalBotPopover(false);
+                    setMobileMenuOpen(true);
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] transition-all hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-fg)]"
+                  aria-label="Abrir menu"
+                  aria-expanded={mobileMenuOpen}
+                  aria-controls="mobile-app-drawer"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] transition-all hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-fg)]"
+                aria-label="Abrir menu"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-app-drawer"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+          {showExperimentalBotPopover ? (
+            <div
+              className="fixed inset-0 z-[299]"
+              onClick={() => setShowExperimentalBotPopover(false)}
+              aria-hidden="true"
+            />
+          ) : null}
           {drawerOnlyNav ? (
             children
           ) : (
