@@ -159,12 +159,24 @@ function resolveOperationalLocalDate(params: {
   const charges = Array.isArray(params.debtor?.debtor_charges) ? params.debtor.debtor_charges : [];
   const scheduleChargeId = String(params.schedule.charge_id ?? "").trim();
   const recurrenceDay = Number(params.schedule.recurrence_day ?? 0);
-  const referenceLocalDate = extractLocalDateFromIso(
-    params.schedule.charge_due_at ?? params.schedule.data_envio ?? null,
+  const scheduleChargeDueLocalDate = extractLocalDateFromIso(
+    params.schedule.charge_due_at ?? null,
     params.timeZone,
   );
+  const scheduleDataEnvioLocalDate = extractLocalDateFromIso(
+    params.schedule.data_envio ?? null,
+    params.timeZone,
+  );
+  const referenceLocalDate =
+    scheduleChargeDueLocalDate ||
+    scheduleDataEnvioLocalDate ||
+    extractLocalDateFromIso(params.schedule.charge_due_at ?? params.schedule.data_envio ?? null, params.timeZone);
   const referenceMonthKey = referenceLocalDate ? referenceLocalDate.slice(0, 7) : "";
   const referenceDay = referenceLocalDate ? Number(referenceLocalDate.slice(-2)) : 0;
+
+  if (scheduleChargeDueLocalDate) {
+    return scheduleChargeDueLocalDate;
+  }
 
   const scoredCharges = charges
     .map((charge) => {

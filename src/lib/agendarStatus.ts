@@ -115,6 +115,9 @@ export function getAgendarDisplayReferenceMoment(
   const operationalMoment = String(row.operational_due_at ?? "").trim();
   const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
   const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+  if (dueMoment) {
+    return dueMoment;
+  }
   const operationalYearMonth = operationalMoment ? agendarYearMonthKey(operationalMoment, timeZone) : "";
   const projectedCurrentMonthMoment = buildAgendarOperationalMonthMoment(
     {
@@ -144,6 +147,9 @@ function getAgendarStatusReferenceMoment(
   const operationalMoment = String(row.operational_due_at ?? "").trim();
   const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
   const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+  if (dueMoment) {
+    return dueMoment;
+  }
   const operationalYearMonth = operationalMoment ? agendarYearMonthKey(operationalMoment, timeZone) : "";
   const dueYearMonth = dueMoment ? agendarYearMonthKey(dueMoment, timeZone) : "";
   const executedYearMonth = lastExecutedMoment ? agendarYearMonthKey(lastExecutedMoment, timeZone) : "";

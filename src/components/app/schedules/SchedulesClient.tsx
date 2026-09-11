@@ -1318,12 +1318,63 @@ export function SchedulesClient({
   const markAsPaid = async (row: ScheduleRow) => {
     const visualStatus = displayStatus(row);
     const effectiveTimeZone = (String(row.schedule_timezone ?? "").trim() || timeZone) as BrazilTimeZone;
-    const referenceMoment = displayReferenceMoment(row) || new Date().toISOString();
+    const primaryChargeMoment = String(row.charge_due_at ?? "").trim();
+    const referenceMoment =
+      primaryChargeMoment || displayReferenceMoment(row) || new Date().toISOString();
     const referenceMonthLabel = referenceMoment ? monthYearBR(referenceMoment, effectiveTimeZone) : null;
     const referenceMonthCompactLabel = referenceMoment
       ? monthYearCompactBR(referenceMoment, effectiveTimeZone)
       : null;
-    const nextRecurringMoment = getNextRecurringMoment(row, effectiveTimeZone);
+    const nextRecurringMomentBase = String(row.charge_due_at ?? row.data_envio ?? "").trim();
+    const nextRecurringMoment = (() => {
+      if (!nextRecurringMomentBase) return getNextRecurringMoment(row, effectiveTimeZone);
+      const recurrence = String(row.recurrence ?? "none").trim().toLowerCase();
+      try {
+        const d = new Date(nextRecurringMomentBase);
+        if (Number.isNaN(d.getTime())) return getNextRecurringMoment(row, effectiveTimeZone);
+        const tz = effectiveTimeZone;
+        const parts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: tz,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).formatToParts(d);
+        const map: Record<string, string> = {};
+        for (const part of parts) if (part.type !== "literal") map[part.type] = part.value;
+        const y = Number(map.year || 0);
+        const m = Number(map.month || 0);
+        const day = Number(map.day || 0);
+        if (!y || !m) return getNextRecurringMoment(row, effectiveTimeZone);
+        if (recurrence === "monthly") {
+          let nextM = m + 1;
+          let nextY = y;
+          if (nextM > 12) { nextM = 1; nextY += 1; }
+          const safeMax = new Date(Date.UTC(nextY, nextM, 0)).getUTCDate();
+          const safeDay = Math.max(1, Math.min(day || Number(row.recurrence_day || 1), safeMax));
+          const nextTime = (String(row.recurrence_time ?? "").trim() || "00:00")
+            .padStart(5, "0").slice(0, 5);
+          return zonedDateTimeToUtcIso({
+            date: `${String(nextY).padStart(4, "0")}-${String(nextM).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`,
+            time: nextTime,
+            timeZone: tz as any,
+          });
+        }
+        if (recurrence === "yearly") {
+          const safeMax = new Date(Date.UTC(y + 1, m, 0)).getUTCDate();
+          const safeDay = Math.max(1, Math.min(day || Number(row.recurrence_day || 1), safeMax));
+          const nextTime = (String(row.recurrence_time ?? "").trim() || "00:00")
+            .padStart(5, "0").slice(0, 5);
+          return zonedDateTimeToUtcIso({
+            date: `${String(y + 1).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`,
+            time: nextTime,
+            timeZone: tz as any,
+          });
+        }
+        return getNextRecurringMoment(row, effectiveTimeZone);
+      } catch {
+        return getNextRecurringMoment(row, effectiveTimeZone);
+      }
+    })();
     const nextReferenceLabel = nextRecurringMoment ? monthYearBR(nextRecurringMoment, effectiveTimeZone) : null;
     if (visualStatus.isPaid) {
       modalToast.info(

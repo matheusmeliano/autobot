@@ -169,6 +169,30 @@ export function nextRecurringIsoAfterSettlement(params: {
             timeZone: params.timeZone,
           });
         }
+        if (targetKey < currentKey) {
+          const recurrence = String(params.recurrence ?? "none").trim().toLowerCase();
+          if (recurrence === "monthly") {
+            return nextMonthlyIsoAfterSettlement({
+              accumulateOpenMonthlyCharges: params.accumulateOpenMonthlyCharges,
+              chargeDueAt: params.chargeDueAt,
+              dataEnvio: params.dataEnvio,
+              nowUtcIso: params.nowUtcIso,
+              timeZone: params.timeZone,
+              day: params.day,
+              time: params.time,
+            });
+          }
+          if (recurrence === "yearly") {
+            const maxDay = lastDayOfMonth(parts.year + 1, parts.month);
+            const safeDay = Math.max(1, Math.min(Number(params.day) || 1, maxDay));
+            const date = `${String(parts.year + 1).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+            return zonedDateTimeToUtcIso({
+              date,
+              time: params.time,
+              timeZone: params.timeZone,
+            });
+          }
+        }
       }
     }
   }
