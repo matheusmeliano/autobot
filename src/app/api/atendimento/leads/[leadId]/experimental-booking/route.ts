@@ -72,19 +72,66 @@ function safeIsoDate(date: string, time: string, timezone: string): string | nul
   const d = String(date ?? "").trim().slice(0, 10);
   const t = String(time ?? "").trim();
   if (!d || !/^\d{1,2}:\d{2}(:\d{2})?$/.test(t)) return null;
-  const isoLike = `${d}T${t.includes(":") && t.split(":").length === 2 ? `${t}:00` : t}`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  const tz = String(timezone ?? "UTC").trim() || "UTC";
   try {
-    const dt = new Date(isoLike);
-    if (Number.isNaN(dt.getTime())) return null;
-    return dt.toISOString();
-  } catch {
-    try {
-      const utc = new Date(`${isoLike}Z`);
-      if (Number.isNaN(utc.getTime())) return null;
-      return utc.toISOString();
-    } catch {
-      return null;
+    const ymd = d.split("-");
+    const hhmmss = t.split(":");
+    const hh = Number(hhmmss[0] ?? 0);
+    const mm = Number(hhmmss[1] ?? 0);
+    const ss = Number(hhmmss[2] ?? 0);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm) || !Number.isFinite(ss)) return null;
+    const utcGuess = new Date(Date.UTC(
+      Number(ymd[0] ?? 0),
+      Number(ymd[1] ?? 1) - 1,
+      Number(ymd[2] ?? 1),
+      hh, mm, ss, 0,
+    ));
+    if (!Number.isFinite(utcGuess.getTime())) return null;
+    if (tz === "UTC" || tz === "Etc/UTC") {
+      return utcGuess.toISOString();
     }
+    const haveIntl =
+      typeof (globalThis as any).Intl !== "undefined" &&
+      typeof (globalThis as any).Intl.DateTimeFormat === "function";
+    if (!haveIntl) {
+      return utcGuess.toISOString();
+    }
+    const fmt = new (globalThis as any).Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    const parts = fmt.formatToParts(utcGuess);
+    const map: Record<string, string> = {};
+    for (const p of parts as any[]) {
+      const tp = String(p?.type ?? "");
+      const vl = String(p?.value ?? "");
+      if (tp && vl) map[tp] = vl;
+    }
+    const y = map.year;
+    const mo = map.month;
+    const da = map.day;
+    const hr = map.hour === "24" ? "00" : map.hour;
+    const mi = map.minute;
+    const se = map.second || "00";
+    if (!y || !mo || !da || !hr || !mi) return null;
+    const local = new Date(Date.UTC(
+      Number(y), Number(mo) - 1, Number(da), Number(hr), Number(mi), Number(se ?? "00"), 0,
+    ));
+    if (!Number.isFinite(local.getTime())) return null;
+    const offMs = local.getTime() - utcGuess.getTime();
+    const targetMs = utcGuess.getTime() - offMs;
+    const finalDate = new Date(targetMs);
+    if (!Number.isFinite(finalDate.getTime())) return null;
+    return finalDate.toISOString();
+  } catch {
+    return null;
   }
 }
 

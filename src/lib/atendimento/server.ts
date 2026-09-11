@@ -1639,6 +1639,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       Number.isFinite(leadStartAtMs) &&
       Math.abs(professorStartAtMs - leadStartAtMs) > 12 * 60 * 60 * 1000
     ) {
+      console.warn(
+        `[cron-exp-bookings] coerção start_at booking=${bookingId} lead=${leadId}: professor=${professorStartAtRaw} lead=${leadStartAtRaw} (|diff|=${Math.round(Math.abs(professorStartAtMs - leadStartAtMs) / 60000)}min). Forçando lead = professor.`,
+      );
       leadStartAtMs = professorStartAtMs;
     }
 
@@ -1660,6 +1663,16 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       !cachedStudentSent &&
       nowMs >= studentFireMs &&
       nowMs <= studentWindowEndMs;
+    if (process.env.NODE_ENV !== "production" || attendantDue || registeredAttendantDue || studentDue) {
+      const profDate = new Date(professorStartAtMs);
+      const studDate = new Date(studentFireMs);
+      const fireProf = new Date(attendantFireMs);
+      const fireWinEnd = new Date(attendantWindowEndMs);
+      const studentWinEnd = new Date(studentWindowEndMs);
+      console.log(
+        `[cron-exp-bookings] booking=${bookingId} lead=${leadId} now=${new Date(nowMs).toISOString()} profStart=${profDate.toISOString()} leadFire(student)=${studDate.toISOString()} profFire(H-5)=${fireProf.toISOString()} profWin=[${fireProf.toISOString()}~${fireWinEnd.toISOString()}] studentWin=[${studDate.toISOString()}~${studentWinEnd.toISOString()}] attendantDue=${String(attendantDue)} regAttDue=${String(registeredAttendantDue)} studentDue=${String(studentDue)} cachedSent(att/reg/stud)=${String(cachedAttendantSent)}/${String(cachedRegisteredAttendantSent)}/${String(cachedStudentSent)} source=${String((booking as any).source ?? "unknown")}`,
+      );
+    }
 
     let thisBookingAttendantOk = cachedAttendantSent;
     let thisBookingRegisteredAttendantOk = cachedRegisteredAttendantSent;
