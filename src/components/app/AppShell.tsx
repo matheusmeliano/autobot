@@ -407,6 +407,10 @@ export function AppShell({
     };
   }, [authChecked, fetchPendingPayment, isAuthed, supabase, userId]);
 
+  const currentPath = pathname ?? "";
+  const drawerOnlyNav =
+    currentPath === "/app/atendimento" || currentPath.startsWith("/app/atendimento/");
+
   const loadExperimentalBotSetting = useCallback(async () => {
     if (!authChecked || !isAuthed) return;
     if (!drawerOnlyNav) {
@@ -484,10 +488,6 @@ export function AppShell({
     },
     [paymentResolving, pendingPayment, router],
   );
-
-  const currentPath = pathname ?? "";
-  const drawerOnlyNav =
-    currentPath === "/app/atendimento" || currentPath.startsWith("/app/atendimento/");
 
   if (authChecked && !isAuthed) return null;
   const shouldHoldRender =
