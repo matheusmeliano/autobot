@@ -5032,9 +5032,11 @@ export async function POST(req: Request) {
           const wantsPreStage =
             isFirstBotInteraction ||
             expectedField === "full_name" ||
-            expectedField === "phone" ||
             expectedField === "state" ||
             expectedField === "city" ||
+            nextMissingField === "full_name" ||
+            nextMissingField === "state" ||
+            nextMissingField === "city" ||
             (!expectedField && !hasReachedPostCityStage && String((lead as any)?.phone ?? "").trim());
           if (wantsPreStage) {
             try {
