@@ -560,22 +560,22 @@ export function AppShell({
               : "min-h-[calc(100vh-3rem)] pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
-          <div
-            className={[
-              "fixed right-4 top-4 z-[250] flex flex-col items-end gap-2",
-            ].join(" ")}
-          >
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] transition-all hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-fg)]"
-              aria-label="Abrir menu"
-              aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-app-drawer"
+          {drawerOnlyNav ? (
+            <div
+              className={[
+                "fixed right-4 top-4 z-[250] flex flex-col items-end gap-2",
+              ].join(" ")}
             >
-              <Menu className="h-5 w-5" />
-            </button>
-            {drawerOnlyNav ? (
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] transition-all hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-fg)]"
+                aria-label="Abrir menu"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-app-drawer"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
               <div className="relative">
                 <button
                   type="button"
@@ -597,8 +597,8 @@ export function AppShell({
                   )}
                 </button>
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
           {drawerOnlyNav ? (
             children
           ) : (
