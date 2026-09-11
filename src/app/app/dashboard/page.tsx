@@ -52,6 +52,11 @@ function activitySortTime(activity: {
   const chargeDueAt = String(activity.chargeDueAt ?? "").trim();
   const dataEnvio = String(activity.dataEnvio ?? "").trim();
   const lastExecutedScheduledFor = String(activity.lastExecutedScheduledFor ?? "").trim();
+  const chargeMonthKey = chargeDueAt ? scheduleLocalMonthKey(chargeDueAt, timeZone) : null;
+  if (chargeMonthKey === currentMonthKey) {
+    const time = new Date(chargeDueAt).getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
   const operationalMonthKey = operationalDueAt ? scheduleLocalMonthKey(operationalDueAt, timeZone) : null;
   if (operationalMonthKey === currentMonthKey) {
     const time = new Date(operationalDueAt).getTime();
@@ -81,6 +86,8 @@ function activityCurrentMonthPriority(activity: {
   const chargeDueAt = String(activity.chargeDueAt ?? "").trim();
   const dataEnvio = String(activity.dataEnvio ?? "").trim();
   const lastExecutedScheduledFor = String(activity.lastExecutedScheduledFor ?? "").trim();
+  const chargeMonthKey = chargeDueAt ? scheduleLocalMonthKey(chargeDueAt, timeZone) : null;
+  if (chargeMonthKey === currentMonthKey) return 0;
   const operationalMonthKey = operationalDueAt ? scheduleLocalMonthKey(operationalDueAt, timeZone) : null;
   if (operationalMonthKey === currentMonthKey) return 0;
   const dueMoment = chargeDueAt || dataEnvio;
