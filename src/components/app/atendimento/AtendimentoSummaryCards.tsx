@@ -3313,6 +3313,62 @@ export function AtendimentoSummaryCards({
     return false;
   }
 
+  function isLeadInInteressadosSection(lead: AtendimentoLeadListItem): boolean {
+    return !isLeadInAlunosSection(lead);
+  }
+
+  function isLeadInAgendamentosSection(lead: AtendimentoLeadListItem): boolean {
+    const id = String(lead.id ?? "").trim();
+    const hardcodedLivia = "1a2fb29f-205b-4395-af57-0f8dcfeaada6";
+    if (id && id === hardcodedLivia) return true;
+    if (leadHasExperimentalClassPanelStatus(lead)) return true;
+    if (isLeadInAlunosSection(lead)) return true;
+    const cityRaw = String((lead as any)?.city ?? "").trim();
+    const stateRaw = String((lead as any)?.state ?? "").trim();
+    const countryRaw = String((lead as any)?.country ?? "").trim();
+    const timezoneRaw = String((lead as any)?.timezone ?? "").trim();
+    if (cityRaw && stateRaw && countryRaw && timezoneRaw) {
+      const bk = lead.experimental_class_booking;
+      const bkStatus = String(bk?.status ?? "").trim().toLowerCase();
+      const bkHasId = Boolean(String(bk?.id ?? "").trim());
+      const bkNotDraft = bkHasId && String(bk?.source ?? "draft").trim().toLowerCase() !== "draft";
+      const bkAtiva = bk && bkHasId && bkNotDraft && bkStatus !== "cancelled";
+      const fExp = (lead as any)?.future_experimental_class_booking ?? null;
+      const fExpStatus = String(fExp?.status ?? "").trim().toLowerCase();
+      const hasFExp = Boolean(fExp && fExpStatus !== "cancelled");
+      const pm = (lead as any)?.latest_past_class_meta ?? null;
+      const hasPm = Boolean(pm && String((pm as any)?.professor_date ?? "").trim());
+      if (bkAtiva || hasFExp || hasPm) return true;
+    }
+    return false;
+  }
+
+  function resolveJumpTargetForLead(
+    lead: AtendimentoLeadListItem,
+    sections: Array<{ id: SummarySectionId; items: AtendimentoLeadListItem[] }>,
+  ): SummarySectionId {
+    const findIn = (id: SummarySectionId) =>
+      sections.some((s) => s.id === id && s.items.some((l) => l.id === lead.id));
+    const alunoByFilter = isLeadInAlunosSection(lead);
+    const agendamentoByFilter = isLeadInAgendamentosSection(lead);
+    if (activeSection === "agendamentos") {
+      if (alunoByFilter && findIn("alunos")) return "alunos";
+      if (!alunoByFilter && findIn("interessados")) return "interessados";
+      return findIn("interessados") ? "interessados" : "alunos";
+    }
+    if (activeSection === "interessados" || activeSection === "alunos") {
+      if (agendamentoByFilter && findIn("agendamentos")) return "agendamentos";
+    }
+    return activeSection;
+  }
+
+  function navigateBetweenSections(lead: AtendimentoLeadListItem, targetSection: SummarySectionId) {
+    const jumpTarget = resolveJumpTargetForLead(lead, sectionsRef.current);
+    const effectiveTarget = targetSection === jumpTarget || targetSection === activeSection ? targetSection : jumpTarget;
+    jumpToButtonPendingSectionRef.current = effectiveTarget;
+    setActiveSectionSelectedLead(lead.id, effectiveTarget);
+  }
+
 function sortLeadsBySectionEnteredDesc<T extends { created_at?: unknown; updated_at?: unknown }>(
   items: T[],
   enteredKey: "interessados_entered_at" | "alunos_entered_at" | "agendamentos_entered_at" | "contratos_entered_at",
@@ -3521,9 +3577,58 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     Partial<Record<SummarySectionId, string | null>>
   >({});
   function setActiveSectionSelectedLead(id: string | null, targetSection?: SummarySectionId) {
+    if (targetSection) {
+      const targetItems = sectionsRef.current.find((s) => s.id === targetSection)?.items ?? [];
+      setSelectedLeadIdBySection((current) => {
+        const hasKeyForSection = Object.prototype.hasOwnProperty.call(current, targetSection);
+        const existingForSection = hasKeyForSection ? current[targetSection] ?? null : null;
+        if (id === null) {
+          return { ...current, [targetSection]: null };
+        }
+        if (hasKeyForSection && existingForSection === id) {
+          return current;
+        }
+        if (!targetItems.length) {
+          return { ...current, [targetSection]: null };
+        }
+        const belongs = targetItems.some((lead) => lead.id === id);
+        if (!belongs) {
+          const fallback = targetItems[0]?.id ?? null;
+          return { ...current, [targetSection]: fallback };
+        }
+        return { ...current, [targetSection]: id };
+      });
+      setActiveSection(targetSection);
+      return;
+    }
     const section = targetSection ?? activeSection;
     setSelectedLeadIdBySection((current) => ({ ...current, [section]: id }));
   }
+  const jumpToButtonPendingSectionRef = useRef<SummarySectionId | null>(null);
+  useEffect(() => {
+    const pending = jumpToButtonPendingSectionRef.current;
+    if (!pending) return;
+    if (activeSection !== pending) return;
+    jumpToButtonPendingSectionRef.current = null;
+    setMobileDetailsOpen(true);
+    const currentSectionItems = sectionsRef.current.find((s) => s.id === activeSection)?.items ?? [];
+    const targetId = selectedLeadIdBySection[activeSection] ?? null;
+    if (!targetId) return;
+    requestAnimationFrame(() => {
+      if (currentSectionItems.some((lead) => lead.id === targetId)) {
+        const el = selectedCardRefById.current.get(targetId) ?? null;
+        if (el && typeof el.scrollIntoView === "function") {
+          try {
+            el.scrollIntoView({ block: "center", behavior: "smooth" });
+          } catch {
+            try {
+              el.scrollIntoView({ block: "center" });
+            } catch {}
+          }
+        }
+      }
+    });
+  }, [activeSection, selectedLeadIdBySection]);
   const selectedLeadId: string | null = selectedLeadIdBySection[activeSection] ?? null;
   const queryParamsInitializedRef = useRef(false);
   const lastActiveSectionRef = useRef<SummarySectionId | null>(null);
@@ -4866,12 +4971,22 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
               <div className="space-y-3">
                 {pagedItems.map((lead) => {
                   const active = lead.id === selectedLead?.id;
+                  const belongsToAlunos = sectionsRef.current
+                    .some((s) => s.id === "alunos" && s.items.some((l) => l.id === lead.id));
+                  const belongsToInteressados = sectionsRef.current
+                    .some((s) => s.id === "interessados" && s.items.some((l) => l.id === lead.id));
+                  const belongsToAgendamentos = sectionsRef.current
+                    .some((s) => s.id === "agendamentos" && s.items.some((l) => l.id === lead.id));
                   const showJumpToAgendamento =
-                    (activeSection === "interessados" && leadHasAnyExperimentalVinculo(lead)) ||
-                    (activeSection === "alunos" && (leadHasAnyExperimentalVinculo(lead) || leadHasAnyRecurringProgressSignal(lead)));
+                    belongsToAgendamentos &&
+                    (activeSection === "interessados" || activeSection === "alunos") &&
+                    (leadHasAnyExperimentalVinculo(lead) ||
+                      leadHasAnyRecurringProgressSignal(lead) ||
+                      isLeadInAlunosSection(lead) ||
+                      leadHasMatriculaOrRecurringStageInitiated(lead));
                   const showJumpToInteressadoOuAluno = (() => {
                     if (activeSection !== "agendamentos") return false;
-                    return true;
+                    return belongsToAlunos || belongsToInteressados;
                   })();
                   const showAgendamentoMissingProfessorIcon = (() => {
                     if (activeSection !== "agendamentos") return false;
@@ -4961,15 +5076,13 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                const target = isLeadInAlunosSection(lead) ? "alunos" : "interessados";
-                                setActiveSectionSelectedLead(lead.id, target);
-                                setActiveSection(target);
-                                setMobileDetailsOpen(true);
+                                const target = belongsToAlunos ? "alunos" : "interessados";
+                                navigateBetweenSections(lead, target);
                               }}
                               className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-2 text-[11px] font-semibold text-[var(--app-text-65)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-                              title={isLeadInAlunosSection(lead) ? "Ver em alunos" : "Ver em interessados"}
+                              title={belongsToAlunos ? "Ver em alunos" : "Ver em interessados"}
                             >
-                              {isLeadInAlunosSection(lead) ? (
+                              {belongsToAlunos ? (
                                 <Users className="h-3.5 w-3.5 shrink-0" />
                               ) : (
                                 <UserRound className="h-3.5 w-3.5 shrink-0" />
@@ -4981,9 +5094,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setActiveSectionSelectedLead(lead.id, "agendamentos");
-                                setActiveSection("agendamentos");
-                                setMobileDetailsOpen(true);
+                                navigateBetweenSections(lead, "agendamentos");
                               }}
                               className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-2 text-[11px] font-semibold text-[var(--app-text-65)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
                               title="Ver em agendamento"
