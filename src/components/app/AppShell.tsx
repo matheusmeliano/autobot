@@ -598,7 +598,24 @@ export function AppShell({
                 </button>
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div
+              className={[
+                "fixed right-4 top-4 z-[250] flex min-[1201px]:hidden",
+              ].join(" ")}
+            >
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] transition-all hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-fg)]"
+                aria-label="Abrir menu"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-app-drawer"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </div>
+          )}
           {drawerOnlyNav ? (
             children
           ) : (
