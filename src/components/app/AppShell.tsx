@@ -452,7 +452,7 @@ export function AppShell({
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error ?? "Erro ao salvar.");
       }
-      modalToast.success("Configuração salva.");
+      modalToast.success(newValue ? "Bot desabilitado." : "Bot habilitado.");
     } catch (e: any) {
       setExperimentalBotDisabled(prev);
       modalToast.error(String(e?.message ?? "Erro ao salvar configuração."));
