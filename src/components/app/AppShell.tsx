@@ -562,8 +562,7 @@ export function AppShell({
         >
           <div
             className={[
-              "fixed right-4 top-4 z-[250] flex items-center justify-end gap-2",
-              drawerOnlyNav ? "" : "min-[1201px]:hidden",
+              "fixed right-4 top-4 z-[250] flex flex-col items-end gap-2",
             ].join(" ")}
           >
             <button
