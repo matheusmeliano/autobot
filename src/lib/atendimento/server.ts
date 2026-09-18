@@ -3057,7 +3057,7 @@ export async function getAtendimentoActivePresenceCount(conversationId: string) 
 export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: string) {
   const auth = await requireAuthenticatedAtendimentoParticipant();
   if (!auth.ok || !auth.user?.id) {
-    return { ok: false as const, status: 401, error: "unauthorized" };
+    return { ok: false as const, status: 401, error: "Sessão expirada. Faça login novamente." };
   }
 
   const admin = createSupabaseAdminClient();
@@ -3068,7 +3068,7 @@ export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: 
     .maybeSingle();
 
   if (!conversation?.id) {
-    return { ok: false as const, status: 404, error: "not_found" };
+    return { ok: false as const, status: 404, error: "Conversa não encontrada." };
   }
 
   const { data: lead } = await admin
@@ -3082,7 +3082,7 @@ export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: 
   }
 
   if (String((lead as any).auth_user_id ?? "") !== auth.user.id) {
-    return { ok: false as const, status: 403, error: "forbidden" };
+    return { ok: false as const, status: 403, error: "Você não tem permissão para acessar essa conversa." };
   }
 
   return { ok: true as const, auth, admin, conversation, lead };
@@ -3091,7 +3091,7 @@ export async function getAuthenticatedAtendimentoConversationAccess(publicSlug: 
 export async function getAtendimentoConversationAccessForAttendant(conversationId: string) {
   const auth = await requireAtendimentoUser();
   if (!auth.ok || !auth.user?.email) {
-    return { ok: false as const, status: 403, error: "forbidden" };
+    return { ok: false as const, status: 403, error: "Acesso negado. Faça login novamente." };
   }
 
   const admin = createSupabaseAdminClient();
@@ -3102,7 +3102,7 @@ export async function getAtendimentoConversationAccessForAttendant(conversationI
     .maybeSingle();
 
   if (!conversation?.id) {
-    return { ok: false as const, status: 404, error: "not_found" };
+    return { ok: false as const, status: 404, error: "Conversa não encontrada." };
   }
 
   return { ok: true as const, auth, admin, conversation };
@@ -3164,7 +3164,7 @@ export async function uploadAtendimentoFileToStorage(params: {
   const mimeType = String(params.file.type ?? "").trim().toLowerCase();
   const mediaType = getAtendimentoMediaTypeFromMimeType(mimeType);
   if (!mediaType) {
-    throw new Error("unsupported_file_type");
+    throw new Error("Tipo de arquivo não permitido.");
   }
 
   const admin = createSupabaseAdminClient();
@@ -3190,7 +3190,11 @@ export async function uploadAtendimentoFileToStorage(params: {
   }
 
   if (error) {
-    throw new Error(error.message || "upload_failed");
+    const msg = String(error.message ?? "").trim();
+    if (msg.toLowerCase().includes("file too large") || msg.toLowerCase().includes("exceeds")) {
+      throw new Error("Arquivo muito grande. Tamanho máximo permitido: 5 MB.");
+    }
+    throw new Error(msg || "Não foi possível salvar o arquivo. Tente novamente.");
   }
 
   const { data } = admin.storage.from(ATENDIMENTO_FILES_BUCKET).getPublicUrl(storagePath);

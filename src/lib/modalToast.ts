@@ -1,5 +1,7 @@
 "use client";
 
+import { translateErrorMessage } from "@/lib/errorMessages";
+
 export type ModalToastVariant = "success" | "error" | "warning" | "info" | "confirm";
 
 export type ModalToastOptions = {
@@ -30,7 +32,11 @@ function emit(detail: ModalToastInternal) {
 export const modalToast = {
   open(options: ModalToastOptions) {
     const id = options.id ?? randomId();
-    emit({ ...options, id });
+    const translatedMessage =
+      options.variant === "success"
+        ? options.message
+        : translateErrorMessage(options.message ?? "");
+    emit({ ...options, id, message: translatedMessage });
     return id;
   },
   success(message: string, title = "Sucesso") {
@@ -62,7 +68,7 @@ export const modalToast = {
         id,
         variant: "confirm",
         title: opts?.title ?? "Confirmar",
-        message,
+        message: translateErrorMessage(message),
         confirmText: opts?.confirmText ?? "Confirmar",
         cancelText: opts?.cancelText ?? "Cancelar",
       });

@@ -25,7 +25,7 @@ export async function uploadAtendimentoFileWithProgress(params: {
     getAtendimentoMediaTypeFromMimeType(params.file.type) ??
     (isAtendimentoDocumentExtensionAllowed(params.file.name) ? "file" : null);
   if (!mediaType) {
-    throw new Error("unsupported_file_type");
+    throw new Error("Tipo de arquivo não permitido.");
   }
 
   const {
@@ -35,7 +35,7 @@ export async function uploadAtendimentoFileWithProgress(params: {
   const accessToken = String(session?.access_token ?? "").trim();
   const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   if (!accessToken || !supabaseUrl) {
-    throw new Error("upload_auth_missing");
+    throw new Error("Não foi possível autenticar o envio. Atualize a página e tente novamente.");
   }
 
   const storagePath = buildAtendimentoStoragePath({
@@ -61,11 +61,26 @@ export async function uploadAtendimentoFileWithProgress(params: {
       const progress = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
       params.onProgress(progress);
     };
-    xhr.onerror = () => reject(new Error("upload_failed"));
+    xhr.onerror = () =>
+      reject(new Error("Não foi possível enviar o arquivo. Verifique sua conexão e tente novamente."));
     xhr.onload = () => {
-      const response = xhr.response ?? JSON.parse(xhr.responseText || "null");
+      let response: any = null;
+      try {
+        response = xhr.response ?? JSON.parse(xhr.responseText || "null");
+      } catch {
+        response = null;
+      }
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error(String(response?.message ?? response?.error ?? "upload_failed")));
+        const msg = String(response?.message ?? response?.error ?? "").trim();
+        if (msg) {
+          reject(new Error(msg));
+        } else if (xhr.status === 413) {
+          reject(new Error("Arquivo muito grande. Tamanho máximo permitido: 5 MB."));
+        } else if (xhr.status === 401 || xhr.status === 403) {
+          reject(new Error("Sua sessão expirou. Atualize a página e tente novamente."));
+        } else {
+          reject(new Error("Não foi possível enviar o arquivo. Tente novamente."));
+        }
         return;
       }
       params.onProgress?.(100);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { translateErrorMessage } from "@/lib/errorMessages";
 
 export default function GlobalError({
   error,
@@ -19,28 +20,66 @@ export default function GlobalError({
   }, [error]);
 
   const rawMsg = String(error?.message ?? "").trim();
-  const low = rawMsg.toLowerCase();
+  const translated = translateErrorMessage(error ?? rawMsg || null);
+  const low = translated.toLowerCase();
 
   let title = "Erro no aplicativo";
   let body =
     "Ocorreu um erro inesperado. Atualize a página e tente novamente.";
 
   if (
-    low.includes("image") ||
     low.includes("imagem") ||
-    low.includes("arquivo")
+    low.includes("arquivo") ||
+    low.includes("tipo de arquivo") ||
+    low.includes("formato") ||
+    low.includes("processar a imagem") ||
+    low.includes("processar o arquivo")
   ) {
     title = "Erro ao processar imagem ou arquivo";
     body =
-      "Formato ou tamanho incompatível. Use JPG, JPEG, PNG, WEBP ou GIF com no máximo 5 MB e tente novamente.";
+      translated.includes("5 MB") || translated.includes("limite")
+        ? translated
+        : "Formato ou tamanho incompatível. Use JPG, JPEG, PNG, WEBP ou GIF com no máximo 5 MB e tente novamente.";
   } else if (
-    low.includes("upload") ||
-    low.includes("enviar") ||
-    low.includes("envio")
+    low.includes("envio") ||
+    low.includes("concluir o envio") ||
+    low.includes("enviar o arquivo")
   ) {
     title = "Erro no envio";
-    body =
-      "Não foi possível enviar o arquivo agora. Verifique sua conexão e tente novamente.";
+    body = translated;
+  } else if (
+    low.includes("arquivo muito grande") ||
+    low.includes("limite") ||
+    low.includes("tamanho máximo")
+  ) {
+    title = "Arquivo muito grande";
+    body = translated;
+  } else if (
+    low.includes("sessão expirou") ||
+    low.includes("faça login novamente") ||
+    low.includes("acesso negado") ||
+    low.includes("permissão")
+  ) {
+    title = "Problema de acesso";
+    body = translated;
+  } else if (
+    low.includes("rede") ||
+    low.includes("internet") ||
+    low.includes("conexão") ||
+    low.includes("conectar ao servidor")
+  ) {
+    title = "Erro de conexão";
+    body = translated;
+  } else if (
+    low.includes("servidor") ||
+    low.includes("indisponível") ||
+    low.includes("interno")
+  ) {
+    title = "Erro no servidor";
+    body = translated;
+  } else if (translated !== rawMsg) {
+    title = "Ops! Tivemos um problema";
+    body = translated;
   }
 
   return (
