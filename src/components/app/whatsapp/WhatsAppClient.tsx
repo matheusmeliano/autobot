@@ -165,7 +165,7 @@ export function WhatsAppClient({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-btn-primary-bg)] shadow-none"
+            className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-6 py-2.5 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-solid-surface)] shadow-none"
           >
             {isSubmitting ? "Salvando..." : "Salvar"}
           </button>
