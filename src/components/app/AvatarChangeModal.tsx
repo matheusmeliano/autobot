@@ -45,45 +45,119 @@ export function AvatarChangeModal({
   const hasUserAvatar = Boolean(String(currentAvatarUrl ?? "").trim());
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    if (inputRef.current) inputRef.current.value = "";
+    let file: File | null = null;
+    try {
+      file = e.target.files?.[0] ?? null;
+    } catch {
+      modalToast.error("Não foi possível ler o arquivo selecionado.");
+    }
+    try {
+      if (inputRef.current) inputRef.current.value = "";
+    } catch {}
     if (!file) return;
 
-    if (!String(file.type ?? "").startsWith("image/")) {
+    let typeOk = false;
+    try {
+      typeOk = String(file.type ?? "").startsWith("image/");
+    } catch {
+      typeOk = false;
+    }
+    if (!typeOk) {
       modalToast.error("Tipo de arquivo não permitido. Escolha uma imagem.");
       return;
     }
-    if (file.size > MAX_BYTES) {
+    let sizeOk = false;
+    try {
+      sizeOk = file.size <= MAX_BYTES;
+    } catch {
+      sizeOk = false;
+    }
+    if (!sizeOk) {
       modalToast.error("Arquivo muito grande. Tamanho máximo permitido: 5 MB.");
       return;
     }
 
-    const fd = new FormData();
-    fd.append("avatar", file);
+    let fd: FormData | null = null;
+    try {
+      fd = new FormData();
+      fd.append("avatar", file);
+    } catch {
+      modalToast.error("Erro ao preparar arquivo para envio.");
+      return;
+    }
+
     startUpload(async () => {
-      const res = await uploadProfileAvatarAction(fd);
-      if (!res.ok) {
-        modalToast.error(res.error ?? "Falha ao enviar imagem.");
+      let res: Awaited<ReturnType<typeof uploadProfileAvatarAction>> | null = null;
+      try {
+        res = await uploadProfileAvatarAction(fd!);
+      } catch (error) {
+        modalToast.error(
+          error instanceof Error
+            ? error.message
+            : "Falha ao enviar imagem.",
+        );
         return;
       }
-      onAvatarChanged(res.newUrl);
-      const id = modalToast.success("Foto de perfil atualizada!");
-      await modalToast.wait(id);
-      onClose();
+      if (!res || !res.ok) {
+        modalToast.error(res?.error ?? "Falha ao enviar imagem.");
+        return;
+      }
+      try {
+        onAvatarChanged(res.newUrl);
+      } catch (error) {
+        modalToast.error(
+          error instanceof Error
+            ? error.message
+            : "Falha ao atualizar a visualização.",
+        );
+        return;
+      }
+      try {
+        const id = modalToast.success("Foto de perfil atualizada!");
+        await modalToast.wait(id);
+        onClose();
+      } catch {
+        try {
+          onClose();
+        } catch {}
+      }
     });
   };
 
   const handleRemove = () => {
     startDelete(async () => {
-      const res = await deleteProfileAvatarAction();
-      if (!res.ok) {
-        modalToast.error(res.error ?? "Falha ao remover foto.");
+      let res: Awaited<ReturnType<typeof deleteProfileAvatarAction>> | null = null;
+      try {
+        res = await deleteProfileAvatarAction();
+      } catch (error) {
+        modalToast.error(
+          error instanceof Error ? error.message : "Falha ao remover foto.",
+        );
         return;
       }
-      onAvatarChanged(null);
-      const id = modalToast.success("Foto de perfil removida.");
-      await modalToast.wait(id);
-      onClose();
+      if (!res || !res.ok) {
+        modalToast.error(res?.error ?? "Falha ao remover foto.");
+        return;
+      }
+      try {
+        onAvatarChanged(null);
+      } catch (error) {
+        modalToast.error(
+          error instanceof Error
+            ? error.message
+            : "Falha ao atualizar a visualização.",
+        );
+        return;
+      }
+      try {
+        const id = modalToast.success("Foto de perfil removida.");
+        await modalToast.wait(id);
+        onClose();
+      } catch {
+        try {
+          onClose();
+        } catch {}
+      }
     });
   };
 

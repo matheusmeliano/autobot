@@ -19,6 +19,7 @@ import { uploadAtendimentoFileWithProgress } from "@/lib/atendimento/upload-clie
 import type { AtendimentoConversation, AtendimentoMessage } from "@/lib/atendimento/types";
 import { formatAtendimentoDateTime } from "@/lib/atendimento/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { modalToast } from "@/lib/modalToast";
 
 function statusLabel(status: string) {
   if (status === "lida") return "Lida";
@@ -225,29 +226,52 @@ export function AtendimentoConversationPanel({
 
   async function uploadSelectedFiles(fileList: FileList | File[]) {
     if (!conversation?.id || disabled) return;
-    const { files, errors } = validateAtendimentoFiles(fileList);
+
+    let validation;
+    try {
+      validation = validateAtendimentoFiles(fileList);
+    } catch (error) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : "Erro ao validar arquivos selecionados.";
+      modalToast.error(msg);
+      return;
+    }
+    const { files, errors } = validation;
+
     if (errors.length) {
-      alert(errors.join("\n"));
+      modalToast.error(errors.join("\n"));
       return;
     }
 
     for (const file of files) {
-      const mediaType =
-        getAtendimentoMediaTypeFromMimeType(file.type) ?? (isAtendimentoDocumentExtensionAllowed(file.name) ? "file" : null);
+      let mediaType;
+      try {
+        mediaType =
+          getAtendimentoMediaTypeFromMimeType(file.type) ??
+          (isAtendimentoDocumentExtensionAllowed(file.name) ? "file" : null);
+      } catch {
+        mediaType = null;
+      }
       if (!mediaType) continue;
 
       const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      setUploadItems((currentItems) => [
-        ...currentItems,
-        {
-          id: uploadId,
-          fileName: file.name,
-          fileSizeBytes: file.size,
-          progress: 0,
-          status: "queued",
-          error: null,
-        },
-      ]);
+      try {
+        setUploadItems((currentItems) => [
+          ...currentItems,
+          {
+            id: uploadId,
+            fileName: file.name,
+            fileSizeBytes: file.size,
+            progress: 0,
+            status: "queued",
+            error: null,
+          },
+        ]);
+      } catch {
+        continue;
+      }
 
       try {
         updateUploadItem(uploadId, { status: "uploading", progress: 0, error: null });
@@ -270,16 +294,24 @@ export function AtendimentoConversationPanel({
         updateUploadItem(uploadId, { status: "done", progress: 100 });
         window.setTimeout(() => removeUploadItem(uploadId), 1400);
       } catch (error) {
-        updateUploadItem(uploadId, {
-          status: "error",
-          error: error instanceof Error ? error.message : "Falha no upload.",
-        });
+        try {
+          updateUploadItem(uploadId, {
+            status: "error",
+            error: error instanceof Error ? error.message : "Falha no upload.",
+          });
+        } catch {
+          const fallbackMsg =
+            error instanceof Error ? error.message : "Falha no upload.";
+          modalToast.error(fallbackMsg);
+        }
       }
     }
 
-    if (documentInputRef.current) documentInputRef.current.value = "";
-    if (imageInputRef.current) imageInputRef.current.value = "";
-    if (videoInputRef.current) videoInputRef.current.value = "";
+    try {
+      if (documentInputRef.current) documentInputRef.current.value = "";
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      if (videoInputRef.current) videoInputRef.current.value = "";
+    } catch {}
   }
 
   function handleFilePicker() {
