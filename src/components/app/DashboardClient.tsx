@@ -427,7 +427,7 @@ export function DashboardClient({
                 Dados reais dos agendamentos cadastrados.
               </div>
             </div>
-            <div className="inline-flex w-full items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1 sm:w-auto">
+            <div className="inline-flex w-full min-w-0 shrink items-center gap-1 overflow-hidden rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1 sm:w-auto">
               {[
                 { key: "days", label: "Dias" },
                 { key: "weeks", label: "Semanas" },
@@ -438,7 +438,7 @@ export function DashboardClient({
                   key={option.key}
                   type="button"
                   className={[
-                    "flex-1 rounded-full px-4 py-1.5 text-[0.8rem] font-medium transition-colors sm:flex-none",
+                    "flex min-w-0 flex-1 items-center justify-center truncate rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors sm:flex-none sm:px-4",
                     chartFilter === option.key
                       ? "bg-[var(--app-active)] text-[#9a3412] font-semibold"
                       : "text-[var(--app-text-55)] hover:text-[var(--app-text-85)]",
