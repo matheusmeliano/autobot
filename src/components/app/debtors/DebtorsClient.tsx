@@ -738,7 +738,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
         </div>
       ) : (
         <>
-          <div className="grid gap-3 p-3 min-[1201px]:hidden">
+          <div className="grid w-full gap-3 py-3 min-[1201px]:hidden">
             {pagedRows.map((r) => (
               <div key={r.id}>
                 <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
