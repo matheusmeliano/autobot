@@ -361,10 +361,7 @@ export function AppShell({
       const shapeClass =
         variant === "sidebar" ? "rounded-full" : "rounded-2xl";
       const hasAvatar = Boolean(avatarUrl);
-      const fallbackLetter =
-        variant === "sidebar"
-          ? avatarLabel || "U"
-          : displayName.trim().charAt(0).toUpperCase() || "U";
+      const fallbackLabel = avatarLabel || "U";
 
       return (
         <button
@@ -376,9 +373,7 @@ export function AppShell({
             shapeClass,
             hasAvatar
               ? "bg-black p-0"
-              : variant === "sidebar"
-              ? "border border-[color:var(--app-active)] bg-[color:var(--app-active)]"
-              : "border border-[var(--app-border)] bg-[var(--app-solid-surface-2)]",
+              : "border border-[color:var(--app-active)] bg-[color:var(--app-active)]",
           ].join(" ")}
         >
           {hasAvatar ? (
@@ -389,13 +384,8 @@ export function AppShell({
               className="h-[120%] w-[120%] shrink-0 object-cover scale-110"
             />
           ) : (
-            <span
-              className={[
-                "font-bold tracking-tight",
-                variant === "sidebar" ? "text-[#9a3412]" : "text-[var(--app-text-85)]",
-              ].join(" ")}
-            >
-              {fallbackLetter}
+            <span className="font-bold tracking-tight text-[#9a3412]">
+              {fallbackLabel}
             </span>
           )}
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-150 group-hover:bg-black/45">
@@ -404,7 +394,7 @@ export function AppShell({
         </button>
       );
     },
-    [avatarUrl, avatarLabel, displayName],
+    [avatarUrl, avatarLabel],
   );
 
   const fetchPendingPayment = useCallback(async () => {
