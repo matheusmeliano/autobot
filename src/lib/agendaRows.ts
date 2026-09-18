@@ -8,6 +8,7 @@ type TemplateChoice = {
 type DebtorRow = {
   id: string;
   nome?: string | null;
+  telefone?: string | null;
   vencimento?: string | null;
   debtor_charges?:
     | Array<{
