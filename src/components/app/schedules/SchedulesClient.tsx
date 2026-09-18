@@ -84,6 +84,7 @@ export type ScheduleRow = {
   last_executed_scheduled_for?: string | null;
   created_at: string;
   debtor_nome: string;
+  debtor_telefone: string | null;
   template_nome: string | null;
   template_pending_nome: string | null;
   template_overdue_nome: string | null;
@@ -1633,10 +1634,10 @@ export function SchedulesClient({
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03]">
+      <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
         <div className="min-[1201px]:hidden">
           {filtered.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-white/55">
+            <div className="px-4 py-10 text-center text-sm text-[var(--app-text-60)]">
               Nenhum agendamento encontrado.
             </div>
           ) : (
@@ -1648,79 +1649,92 @@ export function SchedulesClient({
                   return (
                 <div
                   key={r.id}
-                  className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4"
+                  className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]">
-                        {r.debtor_nome}
-                      </div>
-                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Agendamento
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
-                        {visualStatus.label}
-                      </span>
-                      {visualStatus.subtitle ? (
-                        <div className="mt-1 text-[10px] font-medium text-[var(--app-text-60)]">
-                          {visualStatus.subtitle}
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]">
+                          {r.debtor_nome}
                         </div>
-                      ) : null}
+                        <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                          Agendamento
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${visualStatus.className}`}>
+                          {visualStatus.label}
+                        </span>
+                        {visualStatus.subtitle ? (
+                          <div className="mt-1 text-[10px] font-medium text-[var(--app-text-60)]">
+                            {visualStatus.subtitle}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Template pendente
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                          Telefone
+                        </div>
+                        <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]">
+                          {r.debtor_telefone ?? "-"}
+                        </div>
                       </div>
-                      <div
-                        className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]"
-                        title={r.template_pending_nome ?? "-"}
-                      >
-                        {r.template_pending_nome ?? "-"}
-                      </div>
-                    </div>
-                    <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Template atrasado
-                      </div>
-                      <div
-                        className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]"
-                        title={r.template_overdue_nome ?? "-"}
-                      >
-                        {r.template_overdue_nome ?? "-"}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Vencimento
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                            Template agendado
+                          </div>
+                          <div
+                            className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]"
+                            title={r.template_pending_nome ?? "-"}
+                          >
+                            {r.template_pending_nome ?? "-"}
+                          </div>
+                        </div>
+                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                            Template atrasado
+                          </div>
+                          <div
+                            className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]"
+                            title={r.template_overdue_nome ?? "-"}
+                          >
+                            {r.template_overdue_nome ?? "-"}
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-1 text-[15px] font-semibold text-[var(--app-text-85)]">
-                        {moments.primaryDate}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Hora
-                      </div>
-                      <div className="mt-1 text-[15px] font-semibold text-[var(--app-text-85)]">
-                        {moments.primaryTime}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-card-2)] p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                      Agendado para
-                    </div>
-                    <div className="mt-1 text-[15px] font-semibold text-[var(--app-text-85)]">
-                      {moments.scheduledDate}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                            Vencimento
+                          </div>
+                          <div className="mt-1 text-[15px] font-semibold text-[var(--app-text-85)]">
+                            {moments.primaryDate}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                            Hora
+                          </div>
+                          <div className="mt-1 text-[15px] font-semibold text-[var(--app-text-85)]">
+                            {moments.primaryTime}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                          Agendado para
+                        </div>
+                        <div className="mt-1 text-[15px] font-semibold text-[var(--app-text-85)]">
+                          {moments.scheduledDate}
+                        </div>
+                      </div>
                     </div>
                   </div>
 

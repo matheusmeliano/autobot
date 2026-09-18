@@ -226,10 +226,10 @@ export function AtendimentoLeadList({
                     }
                   }}
                   className={[
-                    "w-full rounded-2xl border px-4 py-3 text-left transition-all",
+                    "w-full rounded-2xl border border-[var(--app-border)] px-4 py-3 text-left",
                     active
-                      ? "border-[var(--app-border)] bg-[var(--app-card)] lg:border-yellow-500/30 lg:bg-yellow-500/10"
-                      : "border-[var(--app-border)] bg-[var(--app-card)] hover:bg-[var(--app-hover)]",
+                      ? "bg-[var(--app-solid-surface)] lg:border-yellow-500/30 lg:bg-yellow-500/10"
+                      : "bg-[var(--app-solid-surface)]",
                   ].join(" ")}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -241,13 +241,13 @@ export function AtendimentoLeadList({
                           </span>
                         ) : null}
                         <div
-                          className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--app-text-85)]"
+                          className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]"
                           title={lead.full_name || "Novo Lead"}
                         >
                           {lead.full_name || "Novo Lead"}
                         </div>
                       </div>
-                      <div className="mt-1 text-xs text-[var(--app-text-55)]">
+                      <div className="mt-1 text-[13px] font-semibold text-[var(--app-text-55)]">
                         {formatAtendimentoDateTime(lead.last_interaction_at || lead.created_at)}
                       </div>
                     </div>
@@ -256,37 +256,53 @@ export function AtendimentoLeadList({
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-col items-stretch gap-2">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onOpenConversation(String(lead.id));
-                      }}
-                      className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] lg:hidden"
-                    >
-                      Abrir conversa
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void openFilesModal(lead);
-                      }}
-                      className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                    >
-                      Arquivos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setDeleteLead(lead);
-                      }}
-                      className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                    >
-                      Excluir aluno
-                    </button>
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                        Telefone
+                      </div>
+                      <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]">
+                        {lead.phone || "-"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                        Ações
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenConversation(String(lead.id));
+                          }}
+                          className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-white px-3 py-2 text-[13px] font-semibold text-[var(--app-text-85)] lg:hidden"
+                        >
+                          Abrir conversa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void openFilesModal(lead);
+                          }}
+                          className="inline-flex items-center justify-center rounded-xl border border-[var(--app-border)] bg-white px-3 py-2 text-[13px] font-semibold text-[var(--app-text-85)] lg:col-span-2"
+                        >
+                          Arquivos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteLead(lead);
+                          }}
+                          className="inline-flex items-center justify-center rounded-xl border border-red-400/60 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-600 lg:col-span-2"
+                        >
+                          Excluir aluno
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

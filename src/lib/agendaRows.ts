@@ -72,6 +72,7 @@ type AgendaRow = {
   last_executed_scheduled_for: string | null;
   created_at: string;
   debtor_nome: string;
+  debtor_telefone: string | null;
   template_nome: string | null;
   template_pending_nome: string | null;
   template_overdue_nome: string | null;
@@ -306,6 +307,7 @@ export function buildAgendaRows(params: {
       last_executed_scheduled_for: params.latestExecutedRunBySchedule.get(scheduleId) ?? null,
       created_at: String(schedule.created_at ?? schedule.data_envio ?? ""),
       debtor_nome: String(debtor?.nome ?? "-"),
+      debtor_telefone: String(debtor?.telefone ?? "") || null,
       template_nome: pendingTemplateName,
       template_pending_nome: pendingTemplateName,
       template_overdue_nome: overdueTemplateName,
