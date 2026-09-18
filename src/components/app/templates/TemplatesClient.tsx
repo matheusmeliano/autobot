@@ -172,12 +172,14 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
                         </div>
                       </div>
                     </div>
-                    <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Conteúdo
-                      </div>
-                      <div className="mt-1 whitespace-pre-line text-[15px] text-[var(--app-text-85)] line-clamp-4">
-                        {r.conteudo}
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                          Conteúdo
+                        </div>
+                        <div className="mt-1 whitespace-pre-line text-[15px] text-[var(--app-text-85)] line-clamp-4">
+                          {r.conteudo}
+                        </div>
                       </div>
                     </div>
                     <div className="mt-4 border-t border-[var(--app-border)] pt-4">
