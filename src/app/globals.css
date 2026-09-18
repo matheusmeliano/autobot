@@ -195,7 +195,9 @@ body {
 .app-theme[data-theme="light"] input[type="text"],
 .app-theme[data-theme="light"] input[type="time"],
 .app-theme[data-theme="light"] input:not([type]),
-.app-theme[data-theme="light"] textarea {
+.app-theme[data-theme="light"] textarea,
+.app-theme[data-theme="light"] select,
+.app-theme[data-theme="light"] select[multiple] {
   color-scheme: light !important;
   appearance: none !important;
   -webkit-appearance: none !important;
@@ -213,6 +215,28 @@ body {
   mix-blend-mode: normal !important;
   background-clip: padding-box !important;
   isolation: isolate !important;
+  accent-color: #ea580c !important;
+}
+
+.app-theme[data-theme="light"] select,
+.app-theme[data-theme="light"] select[multiple] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.9rem center !important;
+  background-size: 1.1rem 1.1rem !important;
+  padding-right: 2.6rem !important;
+}
+
+.app-theme[data-theme="light"] select option,
+.app-theme[data-theme="light"] select optgroup {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: rgba(24, 24, 27, 0.92) !important;
+  -webkit-text-fill-color: rgba(24, 24, 27, 0.92) !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
 }
 
 .app-theme[data-theme="light"] input[type="number"]::-webkit-inner-spin-button,
@@ -275,6 +299,8 @@ body {
 .app-theme[data-theme="light"] input[type="time"]:focus,
 .app-theme[data-theme="light"] input:not([type]):focus,
 .app-theme[data-theme="light"] textarea:focus,
+.app-theme[data-theme="light"] select:focus,
+.app-theme[data-theme="light"] select[multiple]:focus,
 .app-theme[data-theme="light"] input[type="date"]:focus-visible,
 .app-theme[data-theme="light"] input[type="email"]:focus-visible,
 .app-theme[data-theme="light"] input[type="number"]:focus-visible,
@@ -283,7 +309,9 @@ body {
 .app-theme[data-theme="light"] input[type="text"]:focus-visible,
 .app-theme[data-theme="light"] input[type="time"]:focus-visible,
 .app-theme[data-theme="light"] input:not([type]):focus-visible,
-.app-theme[data-theme="light"] textarea:focus-visible {
+.app-theme[data-theme="light"] textarea:focus-visible,
+.app-theme[data-theme="light"] select:focus-visible,
+.app-theme[data-theme="light"] select[multiple]:focus-visible {
   outline: none !important;
   background-color: #ffffff !important;
   background-image: none !important;
@@ -291,6 +319,16 @@ body {
   border-color: rgba(234, 88, 12, 0.32) !important;
   box-shadow: none !important;
   -webkit-box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"] select:focus,
+.app-theme[data-theme="light"] select[multiple]:focus,
+.app-theme[data-theme="light"] select:focus-visible,
+.app-theme[data-theme="light"] select[multiple]:focus-visible {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.9rem center !important;
+  background-size: 1.1rem 1.1rem !important;
 }
 
 .app-theme[data-theme="light"]
@@ -303,7 +341,9 @@ body {
     input[type="date"],
     input[type="time"],
     input:not([type]),
-    textarea
+    textarea,
+    select,
+    select[multiple]
   )::placeholder {
   color: rgba(24, 24, 27, 0.35) !important;
   opacity: 1 !important;
@@ -319,7 +359,9 @@ body {
     input[type="date"],
     input[type="time"],
     input:not([type]),
-    textarea
+    textarea,
+    select,
+    select[multiple]
   ):-webkit-autofill,
 .app-theme[data-theme="light"]
   :is(
@@ -331,7 +373,9 @@ body {
     input[type="date"],
     input[type="time"],
     input:not([type]),
-    textarea
+    textarea,
+    select,
+    select[multiple]
   ):-webkit-autofill:hover,
 .app-theme[data-theme="light"]
   :is(
@@ -343,7 +387,9 @@ body {
     input[type="date"],
     input[type="time"],
     input:not([type]),
-    textarea
+    textarea,
+    select,
+    select[multiple]
   ):-webkit-autofill:focus,
 .app-theme[data-theme="light"]
   :is(
@@ -355,7 +401,9 @@ body {
     input[type="date"],
     input[type="time"],
     input:not([type]),
-    textarea
+    textarea,
+    select,
+    select[multiple]
   ):-webkit-autofill:active,
 .app-theme[data-theme="light"]
   :is(
@@ -367,7 +415,9 @@ body {
     input[type="date"],
     input[type="time"],
     input:not([type]),
-    textarea
+    textarea,
+    select,
+    select[multiple]
   ):-internal-autofill-selected {
   -webkit-text-fill-color: rgba(24, 24, 27, 0.92) !important;
   -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
