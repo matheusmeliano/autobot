@@ -33,10 +33,14 @@ export function AvatarChangeModal({
   const [isDeleting, startDelete] = useTransition();
   const busy = isUploading || isDeleting;
 
-  const initialLetter = String(displayName ?? email ?? "U")
+  const initials = String(displayName ?? email ?? "U")
     .trim()
-    .charAt(0)
-    .toUpperCase();
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("")
+    .slice(0, 2);
 
   const hasUserAvatar = Boolean(String(currentAvatarUrl ?? "").trim());
 
@@ -114,8 +118,8 @@ export function AvatarChangeModal({
           </div>
         ) : (
           <div className="relative inline-flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[color:var(--app-active)] bg-[color:var(--app-active)]">
-            <span className="text-3xl font-bold tracking-tight !text-white">
-              {initialLetter || "U"}
+            <span className="text-3xl font-bold tracking-tight text-[#9a3412]">
+              {initials || "U"}
             </span>
           </div>
         )}
