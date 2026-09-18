@@ -85,6 +85,7 @@ export function AppShell({
   const [experimentalBotDisabled, setExperimentalBotDisabled] = useState(false);
   const [experimentalBotLoading, setExperimentalBotLoading] = useState(true);
   const [experimentalBotSaving, setExperimentalBotSaving] = useState(false);
+  const [bootOverlayVisible, setBootOverlayVisible] = useState(true);
   const [showExperimentalBotPopover, setShowExperimentalBotPopover] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -561,8 +562,32 @@ export function AppShell({
   const resolvedTheme: AppTheme = isAppThemeScope ? "light" : theme;
   const themeProviderValue = { theme: resolvedTheme, themePreference, themeLoaded, saveTheme };
 
+  useEffect(() => {
+    const ready =
+      themeLoaded &&
+      authChecked &&
+      typeof pathname !== "undefined" &&
+      pathname !== null;
+    if (!ready) return;
+    const t = window.setTimeout(() => setBootOverlayVisible(false), 120);
+    return () => window.clearTimeout(t);
+  }, [themeLoaded, authChecked, pathname]);
+
   return (
     <AppThemeProvider value={themeProviderValue}>
+      <div
+        aria-hidden={!bootOverlayVisible}
+        className={[
+          "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#efeeed] transition-opacity duration-200",
+          bootOverlayVisible ? "opacity-100" : "pointer-events-none opacity-0",
+        ].join(" ")}
+      >
+        <Loader2 className="h-10 w-10 animate-spin text-[#ea580c]" />
+        <div className="mt-4 text-[15px] font-semibold tracking-tight text-[#9a3412]">
+          Carregando AutoBot...
+        </div>
+      </div>
+
       <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-screen"}>
         <div
           className={[
