@@ -148,141 +148,165 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
-        {filtered.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-[var(--app-text-60)]">
-            Nenhum template encontrado.
+      {filtered.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-10 text-center text-sm text-[var(--app-text-60)] shadow-none">
+          Nenhum template encontrado.
+        </div>
+      ) : (
+        <>
+          <div className="grid w-full gap-4 py-3 min-[1201px]:hidden">
+            {pagedRows.map((r) => (
+              <div
+                key={r.id}
+                className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]" title={r.nome}>
+                        {r.nome}
+                      </div>
+                      <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">
+                        Template
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                        Conteúdo
+                      </div>
+                      <div className="mt-1 whitespace-pre-line text-[15px] text-[var(--app-text-85)] line-clamp-4">
+                        {r.conteudo}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 border-t border-[var(--app-border)] pt-4">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                      Ações
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => openEdit(r)}
+                        className="inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                        title="Editar"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => remove(r)}
+                        disabled={isPending}
+                        className="inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {filtered.length > pageSize ? (
+              <div className="grid grid-cols-3 items-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 shadow-none">
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Página anterior"
+                >
+                  {"<"}
+                </button>
+                <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
+                  {safePage} / {totalPages}
+                </div>
+                <button
+                  type="button"
+                  className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  aria-label="Próxima página"
+                >
+                  {">"}
+                </button>
+              </div>
+            ) : null}
           </div>
-        ) : (
-          <>
-            <div className="grid w-full gap-4 py-3 min-[1201px]:hidden">
+
+          <div className="hidden min-[1201px]:block mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+            <div className="grid grid-cols-12 gap-3 border-b border-[var(--app-border)] px-4 py-3 text-xs font-semibold text-[var(--app-text-55)]">
+              <div className="col-span-3 text-center">Nome</div>
+              <div className="col-span-7 text-center">Conteúdo</div>
+              <div className="col-span-2 text-right">Ações</div>
+            </div>
+
+            <div className="divide-y divide-[var(--app-border)]">
               {pagedRows.map((r) => (
                 <div
                   key={r.id}
-                  className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none"
+                  className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-[15px] text-[var(--app-text-85)]"
                 >
-                  <div className="min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]" title={r.nome}>
-                          {r.nome}
-                        </div>
-                        <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">
-                          Template
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                          Conteúdo
-                        </div>
-                        <div className="mt-1 whitespace-pre-line text-[15px] text-[var(--app-text-85)] line-clamp-4">
-                          {r.conteudo}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 border-t border-[var(--app-border)] pt-4">
-                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                        Ações
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => openEdit(r)}
-                          className="inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => remove(r)}
-                          disabled={isPending}
-                          className="inline-flex min-h-[40px] w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-xs font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60"
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
+                  <div
+                    className="col-span-3 truncate text-center text-[17px] font-semibold tracking-tight"
+                    title={r.nome}
+                  >
+                    {r.nome}
+                  </div>
+                  <div className="col-span-7 min-w-0 text-center text-[var(--app-text-70)] line-clamp-2">
+                    {r.conteudo}
+                  </div>
+                  <div className="col-span-2 flex justify-end gap-2">
+                    <button
+                      onClick={() => openEdit(r)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
+                      title="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => remove(r)}
+                      disabled={isPending}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-60"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="hidden min-[1201px]:block">
-              <div className="grid grid-cols-12 gap-3 border-b border-[var(--app-border)] px-4 py-3 text-xs font-semibold text-[var(--app-text-55)]">
-                <div className="col-span-3 text-center">Nome</div>
-                <div className="col-span-7 text-center">Conteúdo</div>
-                <div className="col-span-2 text-right">Ações</div>
+            {filtered.length > pageSize ? (
+              <div className="grid grid-cols-3 items-center border-t border-[var(--app-border)] px-4 py-3">
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Página anterior"
+                >
+                  {"<"}
+                </button>
+                <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
+                  {safePage} / {totalPages}
+                </div>
+                <button
+                  type="button"
+                  className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  aria-label="Próxima página"
+                >
+                  {">"}
+                </button>
               </div>
-
-              <div className="divide-y divide-[var(--app-border)]">
-                {pagedRows.map((r) => (
-                  <div
-                    key={r.id}
-                    className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-[15px] text-[var(--app-text-85)]"
-                  >
-                    <div
-                      className="col-span-3 truncate text-center text-[17px] font-semibold tracking-tight"
-                      title={r.nome}
-                    >
-                      {r.nome}
-                    </div>
-                    <div className="col-span-7 min-w-0 text-center text-[var(--app-text-70)] line-clamp-2">
-                      {r.conteudo}
-                    </div>
-                    <div className="col-span-2 flex justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(r)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
-                        title="Editar"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => remove(r)}
-                        disabled={isPending}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-60"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {filtered.length > pageSize ? (
-          <div className="grid grid-cols-3 items-center border-t border-[var(--app-border)] px-4 py-3">
-            <button
-              type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-              aria-label="Página anterior"
-            >
-              {"<"}
-            </button>
-            <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
-              {safePage} / {totalPages}
-            </div>
-            <button
-              type="button"
-              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safePage >= totalPages}
-              aria-label="Próxima página"
-            >
-              {">"}
-            </button>
+            ) : null}
           </div>
-        ) : null}
-      </div>
+        </>
+      )}
 
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
