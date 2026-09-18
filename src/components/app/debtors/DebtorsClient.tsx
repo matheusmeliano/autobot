@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-import { FileText, KeyRound, Loader2, Pencil, Plus, Settings2, Trash2, User, Wallet, X } from "lucide-react";
+import { FileText, KeyRound, Loader2, Pencil, Plus, Settings2, Trash2, UserRound, Wallet, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
@@ -945,7 +945,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
           <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
-                <User className="h-4 w-4" />
+                <UserRound className="h-4 w-4" />
               </div>
               <div>
                 <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">

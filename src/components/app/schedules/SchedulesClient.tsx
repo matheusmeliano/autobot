@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
-import { Calendar, Check, Clock, FileText, MessageSquare, Pencil, Plus, RefreshCcw, Repeat, RotateCcw, Send, Trash2, User2, X } from "lucide-react";
+import { Calendar, Check, Clock, FileText, MessageSquare, Pencil, Plus, RefreshCcw, Repeat, RotateCcw, Send, Trash2, UserRound, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
@@ -1880,7 +1880,7 @@ export function SchedulesClient({
           <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
-                <User2 className="h-4 w-4" />
+                <UserRound className="h-4 w-4" />
               </div>
               <div>
                 <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Cliente</div>
