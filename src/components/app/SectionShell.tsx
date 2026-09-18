@@ -18,7 +18,7 @@ export function SectionShell({
       <div className="text-xs font-semibold tracking-[0.2em] text-[var(--app-text-45)]">
         {eyebrow}
       </div>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">
+      <h1 className="mt-0 text-xl font-bold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-2xl min-[1201px]:text-[1.6rem] leading-[1.15] text-[var(--app-text-85)]">
         {title}
       </h1>
       <div className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--app-text-60)]">

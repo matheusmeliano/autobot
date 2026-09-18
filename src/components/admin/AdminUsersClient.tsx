@@ -312,7 +312,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
     <div>
       <div className="flex flex-col gap-4 min-[1201px]:flex-row min-[1201px]:items-end min-[1201px]:justify-between">
         <div className="min-w-0">
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight min-[1201px]:text-3xl">
+          <h1 className="mt-0 text-xl font-bold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-2xl min-[1201px]:text-[1.6rem] leading-[1.15] text-[var(--app-text-85)]">
             Usuários
           </h1>
           <div className="mt-2 truncate text-sm text-white/60">

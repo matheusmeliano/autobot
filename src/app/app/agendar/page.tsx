@@ -34,7 +34,7 @@ export default async function AgendarPage() {
   if (schedulesRes.error || scheduleRunsRes.error || debtorsRes.error || templatesRes.error) {
     return (
       <div>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Agendamentos</h1>
+        <h1 className="mt-0 text-xl font-bold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-2xl min-[1201px]:text-[1.6rem] leading-[1.15] text-[var(--app-text-85)]">Agendamentos</h1>
         <div className="mt-2 text-sm text-white/60">
           Não foi possível carregar seus dados. Verifique se as tabelas existem e se você está
           logado.

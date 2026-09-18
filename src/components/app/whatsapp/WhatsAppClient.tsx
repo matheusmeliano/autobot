@@ -68,7 +68,7 @@ export function WhatsAppClient({
   return (
     <div>
       <div>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--app-text-85)] md:text-3xl">
+        <h1 className="mt-0 text-xl font-bold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-2xl min-[1201px]:text-[1.6rem] leading-[1.15] text-[var(--app-text-85)]">
           Integração Z-API
         </h1>
         <div className="mt-2 text-sm text-[var(--app-text-60)]">
