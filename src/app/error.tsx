@@ -18,7 +18,7 @@ export default function GlobalError({
   }, [error]);
 
   const rawMsg = String(error?.message ?? "").trim();
-  const translated = translateErrorMessage(error ?? rawMsg || null);
+  const translated = translateErrorMessage(error ?? (rawMsg || null));
   const low = translated.toLowerCase();
 
   let title = "Algo deu errado";
