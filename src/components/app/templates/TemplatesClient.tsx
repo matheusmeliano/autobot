@@ -148,14 +148,14 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)]">
+      <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
         {filtered.length === 0 ? (
           <div className="px-4 py-10 text-center text-sm text-[var(--app-text-60)]">
             Nenhum template encontrado.
           </div>
         ) : (
           <>
-            <div className="grid w-full gap-3 py-3 min-[1201px]:hidden">
+            <div className="grid w-full gap-4 py-3 min-[1201px]:hidden">
               {pagedRows.map((r) => (
                 <div
                   key={r.id}
