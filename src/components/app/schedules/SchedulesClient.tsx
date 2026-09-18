@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { createPortal } from "react-dom";
-import { Calendar, Check, Clock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { Calendar, Check, Clock, FileText, MessageSquare, Pencil, Plus, RefreshCcw, Repeat, RotateCcw, Send, Trash2, User2, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
@@ -1844,382 +1844,426 @@ export function SchedulesClient({
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-white/90">
+            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">
               {editing ? "Editar agendamento" : "Novo agendamento"}
             </div>
-            <div className="mt-1 text-xs text-white/55">
+            <div className="mt-1 text-sm text-[var(--app-text-55)]">
               Escolha cliente, template e data/hora.
             </div>
           </div>
           <button
             onClick={close}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-4 grid gap-3">
-              <input type="hidden" {...register("status")} />
-              <input type="hidden" {...register("charge_id")} />
+        <form onSubmit={onSubmit} className="mt-6 grid gap-5">
+          <input type="hidden" {...register("status")} />
+          <input type="hidden" {...register("charge_id")} />
+
+          <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
+                <User2 className="h-4 w-4" />
+              </div>
               <div>
-                <div className="text-xs font-semibold text-white/60">
-                  Cliente
-                </div>
+                <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Cliente</div>
+                <div className="mt-0.5 text-xs text-[var(--app-text-50)]">Selecione quem receberá a cobrança</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">Cliente</div>
+              <select
+                className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&>option]:bg-white [&>option]:text-[var(--app-text-85)]"
+                {...register("debtor_id", { required: true })}
+              >
+                <option value="">Selecione...</option>
+                {selectableDebtors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </section>
+
+          <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
+                <MessageSquare className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Mensagens</div>
+                <div className="mt-0.5 text-xs text-[var(--app-text-50)]">Templates usados no agendamento e atraso</div>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">Template Agendado</div>
                 <select
-                  className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                  {...register("debtor_id", { required: true })}
+                  className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&>option]:bg-white [&>option]:text-[var(--app-text-85)]"
+                  {...register("template_pending_id")}
                 >
                   <option value="">Selecione...</option>
-                  {selectableDebtors.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.nome}
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
                     </option>
                   ))}
                 </select>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="text-xs font-semibold text-white/60">Template Agendado</div>
-                  <select
-                    className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                    {...register("template_pending_id")}
-                  >
-                    <option value="">Selecione...</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-white/60">Template Atrasado</div>
-                  <select
-                    className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                    {...register("template_overdue_id")}
-                  >
-                    <option value="">Selecione...</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
               <div>
-                <div className="text-xs font-semibold text-white/60">
-                  Recorrência
-                </div>
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">Template Atrasado</div>
                 <select
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                  {...register("recurrence")}
+                  className="mt-2 w-full truncate overflow-hidden text-ellipsis whitespace-nowrap rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&>option]:bg-white [&>option]:text-[var(--app-text-85)]"
+                  {...register("template_overdue_id")}
                 >
-                  <option value="none">Uma vez</option>
-                  <option value="monthly">Mensal</option>
-                  <option value="yearly">Anual</option>
+                  <option value="">Selecione...</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
+                    </option>
+                  ))}
                 </select>
               </div>
+            </div>
+          </section>
 
-              <div className="grid gap-3">
-                <div>
-                  <div className="text-xs font-semibold text-white/60">
-                    Data do cliente
+          <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
+                <Repeat className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Recorrência</div>
+                <div className="mt-0.5 text-xs text-[var(--app-text-50)]">Frequência do envio</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">Recorrência</div>
+              <select
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&>option]:bg-white [&>option]:text-[var(--app-text-85)]"
+                {...register("recurrence")}
+              >
+                <option value="none">Uma vez</option>
+                <option value="monthly">Mensal</option>
+                <option value="yearly">Anual</option>
+              </select>
+            </div>
+          </section>
+
+          <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
+                <Clock className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Data e hora</div>
+                <div className="mt-0.5 text-xs text-[var(--app-text-50)]">Defina quando o disparo deve ocorrer</div>
+              </div>
+            </div>
+            <div className="grid gap-4">
+              <div>
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">Data do cliente</div>
+                {selectedDebtorReferenceOptions.length > 1 ? (
+                  <select
+                    className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&>option]:bg-white [&>option]:text-[var(--app-text-85)]"
+                    value={selectedDebtorReferenceKey}
+                    onChange={(e) => {
+                      const option =
+                        selectedDebtorReferenceOptions.find(
+                          (item) => debtorReferenceOptionKey(item) === e.target.value,
+                        ) ?? null;
+                      setValue("data_envio_date", option?.value ?? "", {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                        shouldValidate: true,
+                      });
+                      setValue("charge_id", option?.chargeId ?? "", {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                        shouldValidate: true,
+                      });
+                    }}
+                  >
+                    {selectedDebtorReferenceOptions.map((option) => (
+                      <option key={debtorReferenceOptionKey(option)} value={debtorReferenceOptionKey(option)}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div
+                    className="mt-2 flex min-h-[44px] items-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-2.5 text-[0.95rem] text-[var(--app-text-70)]"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {selectedDebtorReferenceDate ? (
+                      localDateBR(selectedDebtorReferenceDate)
+                    ) : (
+                      <span className="text-[var(--app-text-45)]">
+                        {noAvailableReferenceDates
+                          ? "Todas as datas deste cliente já estão em uso."
+                          : "Selecione um cliente com data cadastrada."}
+                      </span>
+                    )}
                   </div>
-                  {selectedDebtorReferenceOptions.length > 1 ? (
-                    <select
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&>option]:bg-[#070A10] [&>option]:text-white"
-                      value={selectedDebtorReferenceKey}
-                      onChange={(e) => {
-                        const option =
-                          selectedDebtorReferenceOptions.find(
-                            (item) => debtorReferenceOptionKey(item) === e.target.value,
-                          ) ?? null;
-                        setValue("data_envio_date", option?.value ?? "", {
-                          shouldDirty: true,
-                          shouldTouch: true,
-                          shouldValidate: true,
-                        });
-                        setValue("charge_id", option?.chargeId ?? "", {
-                          shouldDirty: true,
-                          shouldTouch: true,
-                          shouldValidate: true,
-                        });
-                      }}
-                    >
-                      {selectedDebtorReferenceOptions.map((option) => (
-                        <option key={debtorReferenceOptionKey(option)} value={debtorReferenceOptionKey(option)}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div
-                      className="mt-2 flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {selectedDebtorReferenceDate ? (
-                        localDateBR(selectedDebtorReferenceDate)
-                      ) : (
-                        <span className="text-white/45">
-                          {noAvailableReferenceDates
-                            ? "Todas as datas deste cliente já estão em uso."
-                            : "Selecione um cliente com data cadastrada."}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-white/60">
-                    Hora
-                  </div>
-                  <div className="relative mt-2">
-                    <input
-                      type="time"
-                      step={60}
-                      disabled={!selectedDebtorReferenceDate}
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:dark]"
-                      onClick={(e) => {
-                        if (!selectedDebtorReferenceDate) return;
-                        e.currentTarget.showPicker?.();
-                      }}
-                      {...timeField}
-                    />
-                  </div>
+                )}
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">Hora</div>
+                <div className="relative mt-2">
+                  <input
+                    type="time"
+                    step={60}
+                    disabled={!selectedDebtorReferenceDate}
+                    className="w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:light]"
+                    onClick={(e) => {
+                      if (!selectedDebtorReferenceDate) return;
+                      e.currentTarget.showPicker?.();
+                    }}
+                    {...timeField}
+                  />
                 </div>
               </div>
+            </div>
 
-              {hasRecurringSchedule ? (
-                <div className="mt-1">
-                  {isMonthlyRecurrence ? (
-                    <>
-                      {monthlyExtras.length > 0 ? (
-                        <div className="mt-3 grid gap-3">
-                          {monthlyExtras.map((c, idx) => (
-                            <div
-                              key={idx}
-                              className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
-                            >
-                              <div>
-                                <div className="text-xs font-semibold text-white/60">Data</div>
-                                <div className="relative mt-2">
-                                  <input
-                                    type="date"
-                                    min={scheduleDateMin}
-                                    value={c.date}
-                                    onChange={(e) =>
-                                      setMonthlyExtras((prev) =>
-                                        prev.map((x, i) => (i === idx ? { ...x, date: e.target.value } : x)),
-                                      )
-                                    }
-                                    onFocus={() => openExtraDatePicker(idx)}
-                                    onClick={() => openExtraDatePicker(idx)}
-                                    ref={(el) => {
-                                      extraDateInputRefs.current[idx] = el;
-                                    }}
-                                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => openExtraDatePicker(idx)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
-                                    aria-label="Selecionar data"
-                                  >
-                                    <Calendar className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-xs font-semibold text-white/60">Hora</div>
-                                <div
-                                  className="relative mt-2"
+            {hasRecurringSchedule ? (
+              <div className="mt-2 grid gap-4 border-t border-[var(--app-border)] pt-5">
+                {isMonthlyRecurrence ? (
+                  <>
+                    {monthlyExtras.length > 0 ? (
+                      <div className="grid gap-3">
+                        {monthlyExtras.map((c, idx) => (
+                          <div
+                            key={idx}
+                            className="grid gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4 md:grid-cols-[1fr_1fr_auto] md:items-end"
+                          >
+                            <div>
+                              <div className="text-xs font-semibold text-[var(--app-text-60)]">Data</div>
+                              <div className="relative mt-2">
+                                <input
+                                  type="date"
+                                  min={scheduleDateMin}
+                                  value={c.date}
+                                  onChange={(e) =>
+                                    setMonthlyExtras((prev) =>
+                                      prev.map((x, i) => (i === idx ? { ...x, date: e.target.value } : x)),
+                                    )
+                                  }
+                                  onFocus={() => openExtraDatePicker(idx)}
+                                  onClick={() => openExtraDatePicker(idx)}
                                   ref={(el) => {
-                                    extraTimeAnchorRefs.current[idx] = el;
+                                    extraDateInputRefs.current[idx] = el;
                                   }}
-                                >
-                                  <input
-                                    type="text"
-                                    readOnly
-                                    value={c.time}
-                                    placeholder="--:--"
-                                    onFocus={() =>
-                                      openTimePicker({
-                                        target: { kind: "extra", index: idx },
-                                        inputEl: extraTimeInputRefs.current[idx] ?? null,
-                                        anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
-                                      })
-                                    }
-                                    onClick={() =>
-                                      openTimePicker({
-                                        target: { kind: "extra", index: idx },
-                                        inputEl: extraTimeInputRefs.current[idx] ?? null,
-                                        anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
-                                      })
-                                    }
-                                    ref={(el) => {
-                                      extraTimeInputRefs.current[idx] = el;
-                                    }}
-                                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      openTimePicker({
-                                        target: { kind: "extra", index: idx },
-                                        inputEl: extraTimeInputRefs.current[idx] ?? null,
-                                        anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
-                                      })
-                                    }
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
-                                    aria-label="Selecionar hora"
-                                  >
-                                    <Clock className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="flex justify-end md:pb-0.5">
+                                  className="w-full rounded-xl border border-[var(--app-border)] bg-white py-2.5 pl-4 pr-10 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                                />
                                 <button
                                   type="button"
-                                  onClick={() => setMonthlyExtras((prev) => prev.filter((_, i) => i !== idx))}
-                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
-                                  aria-label="Remover cobrança"
-                                  title="Remover"
+                                  onClick={() => openExtraDatePicker(idx)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--app-text-55)] hover:text-[var(--app-text-85)]"
+                                  aria-label="Selecionar data"
                                 >
-                                  <X className="h-4 w-4" />
+                                  <Calendar className="h-4 w-4" />
                                 </button>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
 
-                  <div>
-                    <div className="text-xs font-semibold text-white/60">Encerrar em (Opcional)</div>
-                    <div className="relative mt-2">
-                      <input
-                        type="date"
-                        min={watch("data_envio_date") || undefined}
-                        max={recurrenceUntilMax || undefined}
-                        className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 pr-10 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0"
-                        {...recurrenceUntilField}
-                        onFocus={openRecurrenceUntilDatePicker}
-                        onClick={openRecurrenceUntilDatePicker}
-                        ref={(el) => {
-                          recurrenceUntilField.ref(el);
-                          recurrenceUntilInputRef.current = el;
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={openRecurrenceUntilDatePicker}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-white/80"
-                        aria-label="Selecionar data final"
-                      >
-                        <Calendar className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="text-xs font-semibold text-white/70">
-                  Reenvio de cobrança em atraso
-                </div>
-
-                <div className="mt-4">
-                  <div className="text-xs font-semibold text-white/60">Dias permitidos</div>
-                  <Controller
-                    control={control}
-                    name="retry_weekdays"
-                    render={({ field }) => {
-                      const current = normalizeRetryWeekdays(field.value);
-                      return (
-                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-                          {weekdayOptions.map((option) => {
-                            const active = current.includes(option.value);
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => {
-                                  const next = active
-                                    ? current.filter((item) => item !== option.value)
-                                    : [...current, option.value];
-                                  field.onChange(normalizeRetryWeekdays(next));
+                            <div>
+                              <div className="text-xs font-semibold text-[var(--app-text-60)]">Hora</div>
+                              <div
+                                className="relative mt-2"
+                                ref={(el) => {
+                                  extraTimeAnchorRefs.current[idx] = el;
                                 }}
-                                className={[
-                                  "rounded-xl border px-3 py-2 text-xs font-semibold",
-                                  active
-                                    ? "border-[var(--app-border)] bg-[var(--app-hover)] text-[var(--app-text-85)]"
-                                    : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.05]",
-                                ].join(" ")}
                               >
-                                {option.label}
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={c.time}
+                                  placeholder="--:--"
+                                  onFocus={() =>
+                                    openTimePicker({
+                                      target: { kind: "extra", index: idx },
+                                      inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                      anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                    })
+                                  }
+                                  onClick={() =>
+                                    openTimePicker({
+                                      target: { kind: "extra", index: idx },
+                                      inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                      anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                    })
+                                  }
+                                  ref={(el) => {
+                                    extraTimeInputRefs.current[idx] = el;
+                                  }}
+                                  className="w-full rounded-xl border border-[var(--app-border)] bg-white py-2.5 pl-4 pr-10 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openTimePicker({
+                                      target: { kind: "extra", index: idx },
+                                      inputEl: extraTimeInputRefs.current[idx] ?? null,
+                                      anchorEl: extraTimeAnchorRefs.current[idx] ?? null,
+                                    })
+                                  }
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--app-text-55)] hover:text-[var(--app-text-85)]"
+                                  aria-label="Selecionar hora"
+                                >
+                                  <Clock className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end md:pb-0.5">
+                              <button
+                                type="button"
+                                onClick={() => setMonthlyExtras((prev) => prev.filter((_, i) => i !== idx))}
+                                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)]"
+                                aria-label="Remover cobrança"
+                                title="Remover"
+                              >
+                                <X className="h-4 w-4" />
                               </button>
-                            );
-                          })}
-                        </div>
-                      );
-                    }}
-                  />
-                </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
 
-                <div className="mt-4 grid gap-3">
-                  <div>
-                    <div className="text-xs font-semibold text-white/60">Horário de reenvio</div>
+                <div>
+                  <div className="text-xs font-semibold text-[var(--app-text-60)]">Encerrar em (Opcional)</div>
+                  <div className="relative mt-2">
                     <input
-                      type="time"
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                      style={{ colorScheme: theme }}
-                      onClick={(e) => {
-                        e.currentTarget.showPicker?.();
+                      type="date"
+                      min={watch("data_envio_date") || undefined}
+                      max={recurrenceUntilMax || undefined}
+                      className="w-full rounded-xl border border-[var(--app-border)] bg-white py-2.5 px-4 pr-10 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                      {...recurrenceUntilField}
+                      onFocus={openRecurrenceUntilDatePicker}
+                      onClick={openRecurrenceUntilDatePicker}
+                      ref={(el) => {
+                        recurrenceUntilField.ref(el);
+                        recurrenceUntilInputRef.current = el;
                       }}
-                      {...register("retry_time")}
                     />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-white/60">Envios por dia</div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={MAX_RETRY_ATTEMPTS_PER_DAY}
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                      {...register("retry_max_attempts", { valueAsNumber: true })}
-                    />
-                  </div>
-                  <input type="hidden" {...register("retry_interval_days", { valueAsNumber: true })} />
-                </div>
-
-                <div className="mt-3">
-                  <div className="w-full">
-                    <div className="text-xs font-semibold text-white/60">Encerrar automaticamente após (dias)</div>
-                    <input
-                      type="number"
-                      min={1}
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none focus:border-white/20"
-                      {...register("retry_auto_close_days", { valueAsNumber: true })}
-                    />
+                    <button
+                      type="button"
+                      onClick={openRecurrenceUntilDatePicker}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--app-text-55)] hover:text-[var(--app-text-85)]"
+                      aria-label="Selecionar data final"
+                    >
+                      <Calendar className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               </div>
+            ) : null}
+          </section>
 
-              <button
-                type="submit"
-                disabled={isSubmitting || isPending}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
-              >
-                {editing ? "Salvar alterações" : "Criar agendamento"}
-              </button>
+          <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
+                  <RefreshCcw className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Reenvio de cobrança em atraso</div>
+                  <div className="mt-0.5 text-xs text-[var(--app-text-50)]">Tentativas automáticas após o vencimento</div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">Dias permitidos</div>
+              <Controller
+                control={control}
+                name="retry_weekdays"
+                render={({ field }) => {
+                  const current = normalizeRetryWeekdays(field.value);
+                  return (
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                      {weekdayOptions.map((option) => {
+                        const active = current.includes(option.value);
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                              const next = active
+                                ? current.filter((item) => item !== option.value)
+                                : [...current, option.value];
+                              field.onChange(normalizeRetryWeekdays(next));
+                            }}
+                            className={[
+                              "rounded-xl border px-3 py-2.5 text-xs font-semibold",
+                              active
+                                ? "border-[color:var(--app-active)] bg-[color:var(--app-active)] text-[#9a3412]"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-55)] hover:bg-[var(--app-hover)]",
+                            ].join(" ")}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                }}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">Horário de reenvio</div>
+                <input
+                  type="time"
+                  className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light]"
+                  onClick={(e) => {
+                    e.currentTarget.showPicker?.();
+                  }}
+                  {...register("retry_time")}
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-[var(--app-text-60)]">Envios por dia</div>
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_RETRY_ATTEMPTS_PER_DAY}
+                  className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0"
+                  {...register("retry_max_attempts", { valueAsNumber: true })}
+                />
+              </div>
+            </div>
+            <input type="hidden" {...register("retry_interval_days", { valueAsNumber: true })} />
+
+            <div>
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">Encerrar automaticamente após (dias)</div>
+              <input
+                type="number"
+                min={1}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0"
+                {...register("retry_auto_close_days", { valueAsNumber: true })}
+              />
+            </div>
+          </section>
+
+          <div className="sticky bottom-0 -mx-2 -mb-2 mt-2 border-t border-[var(--app-border)] bg-[var(--app-modal-bg)]/95 px-2 pt-3 pb-3 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
+            <button
+              type="submit"
+              disabled={isSubmitting || isPending}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-btn-primary-bg)]"
+            >
+              {editing ? "Salvar alterações" : "Criar agendamento"}
+            </button>
+          </div>
         </form>
       </AppModal>
 
