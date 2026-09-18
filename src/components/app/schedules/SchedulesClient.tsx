@@ -1634,30 +1634,29 @@ export function SchedulesClient({
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
-        <div className="min-[1201px]:hidden">
-          {filtered.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-[var(--app-text-60)]">
-              Nenhum agendamento encontrado.
-            </div>
-          ) : (
-            <div className="grid gap-3 p-3">
-              {pagedRows.map((r) => (
-                (() => {
-                  const visualStatus = displayStatus(r);
-                  const moments = displayMoments(r);
-                  return (
+      {filtered.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-10 text-center text-sm text-[var(--app-text-60)] shadow-none">
+          Nenhum agendamento encontrado.
+        </div>
+      ) : (
+        <>
+          <div className="grid w-full gap-4 py-3 min-[1201px]:hidden">
+            {pagedRows.map((r) => (
+              (() => {
+                const visualStatus = displayStatus(r);
+                const moments = displayMoments(r);
+                return (
                 <div
                   key={r.id}
-                  className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4"
+                  className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none"
                 >
                   <div className="min-w-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]">
+                        <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]" title={r.debtor_nome}>
                           {r.debtor_nome}
                         </div>
-                        <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                        <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">
                           Agendamento
                         </div>
                       </div>
@@ -1674,7 +1673,7 @@ export function SchedulesClient({
                     </div>
 
                     <div className="mt-4 space-y-3">
-                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                           Telefone
                         </div>
@@ -1684,7 +1683,7 @@ export function SchedulesClient({
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                             Template agendado
                           </div>
@@ -1695,7 +1694,7 @@ export function SchedulesClient({
                             {r.template_pending_nome ?? "-"}
                           </div>
                         </div>
-                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                             Template atrasado
                           </div>
@@ -1709,7 +1708,7 @@ export function SchedulesClient({
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                             Vencimento
                           </div>
@@ -1717,7 +1716,7 @@ export function SchedulesClient({
                             {moments.primaryDate}
                           </div>
                         </div>
-                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                             Hora
                           </div>
@@ -1727,7 +1726,7 @@ export function SchedulesClient({
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                           Agendado para
                         </div>
@@ -1736,41 +1735,60 @@ export function SchedulesClient({
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="mt-4">
-                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                      Ações
+                    <div className="mt-4 border-t border-[var(--app-border)] pt-4">
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                        Ações
+                      </div>
+                      {renderActionButtons(r, "mobile")}
                     </div>
-                    {renderActionButtons(r, "mobile")}
                   </div>
                 </div>
                   );
                 })()
               ))}
-            </div>
-          )}
-        </div>
 
-        <div className="hidden min-[1201px]:block">
-          <div className="overflow-x-auto">
-            <div className="min-w-[1080px] min-[1201px]:min-w-0">
-              <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_7rem_5rem_minmax(0,1fr)_8rem_11rem] gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
-                <div>Cliente</div>
-                <div className="text-center">Templates</div>
-                <div className="text-center">Vencimento</div>
-                <div className="text-center">Hora</div>
-                <div className="text-center">Agendado para</div>
-                <div className="text-center">Status</div>
-                <div className="text-right">Ações</div>
-              </div>
-
-              {filtered.length === 0 ? (
-                <div className="px-4 py-10 text-center text-sm text-white/55">
-                  Nenhum agendamento encontrado.
+            {filtered.length > pageSize ? (
+              <div className="grid grid-cols-3 items-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 shadow-none">
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Página anterior"
+                >
+                  {"<"}
+                </button>
+                <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
+                  {safePage} / {totalPages}
                 </div>
-              ) : (
-                <div className="divide-y divide-white/10">
+                <button
+                  type="button"
+                  className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  aria-label="Próxima página"
+                >
+                  {">"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="hidden min-[1201px]:block mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+            <div className="overflow-x-auto">
+              <div className="min-w-[1080px] min-[1201px]:min-w-0">
+                <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.15fr)_7rem_5rem_minmax(0,1fr)_8rem_11rem] gap-3 border-b border-[var(--app-border)] px-4 py-3 text-xs font-semibold text-[var(--app-text-60)]">
+                  <div>Cliente</div>
+                  <div className="text-center">Templates</div>
+                  <div className="text-center">Vencimento</div>
+                  <div className="text-center">Hora</div>
+                  <div className="text-center">Agendado para</div>
+                  <div className="text-center">Status</div>
+                  <div className="text-right">Ações</div>
+                </div>
+
+                <div className="divide-y divide-[var(--app-border)]">
                   {pagedRows.map((r) => (
                     (() => {
                       const visualStatus = displayStatus(r);
@@ -1824,36 +1842,37 @@ export function SchedulesClient({
                     })()
                   ))}
                 </div>
-              )}
+
+                {filtered.length > pageSize ? (
+                  <div className="grid grid-cols-3 items-center border-t border-[var(--app-border)] px-4 py-3">
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                      aria-label="Página anterior"
+                    >
+                      {"<"}
+                    </button>
+                    <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
+                      {safePage} / {totalPages}
+                    </div>
+                    <button
+                      type="button"
+                      className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage >= totalPages}
+                      aria-label="Próxima página"
+                    >
+                      {">"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
-        </div>
-        {filtered.length > pageSize ? (
-          <div className="grid grid-cols-3 items-center border-t border-white/10 px-4 py-3">
-            <button
-              type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-              aria-label="Página anterior"
-            >
-              {"<"}
-            </button>
-            <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
-              {safePage} / {totalPages}
-            </div>
-            <button
-              type="button"
-              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safePage >= totalPages}
-              aria-label="Próxima página"
-            >
-              {">"}
-            </button>
-          </div>
-        ) : null}
-      </div>
+        </>
+      )}
 
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
