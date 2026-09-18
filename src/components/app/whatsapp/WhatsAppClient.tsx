@@ -89,58 +89,52 @@ export function WhatsAppClient({
         </div>
       ) : null}
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
         <div className="text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]">
           Configuração
         </div>
-        <form onSubmit={onSubmit} className="mt-4 space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
+        <form onSubmit={onSubmit} className="mt-4 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="min-w-0">
-              <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                  Instance ID
-                </div>
-                <input
-                  className="mt-1 w-full min-w-0 bg-transparent text-[15px] font-semibold text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] autofill:bg-transparent autofill:text-[var(--app-text-85)] autofill:shadow-[inset_0_0_0px_1000px_var(--app-solid-surface-2)] autofill:[-webkit-text-fill-color:var(--app-text-85)]"
-                  placeholder="instance_xxx"
-                  {...register("instance_id", {
-                    validate: (value) => {
-                      const v = String(value ?? "").trim();
-                      if (!v) return "Informe o Instance ID.";
-                      return true;
-                    },
-                  })}
-                />
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">
+                Instance ID
               </div>
+              <input
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 autofill:bg-white autofill:text-[var(--app-text-85)] autofill:shadow-[inset_0_0_0px_1000px_#ffffff] autofill:[-webkit-text-fill-color:var(--app-text-85)]"
+                placeholder="instance_xxx"
+                {...register("instance_id", {
+                  validate: (value) => {
+                    const v = String(value ?? "").trim();
+                    if (!v) return "Informe o Instance ID.";
+                    return true;
+                  },
+                })}
+              />
               {errors.instance_id?.message ? (
-                <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 shadow-none">
+                <div className="mt-2 text-xs font-medium text-rose-500">
                   {String(errors.instance_id.message)}
                 </div>
               ) : null}
             </div>
             <div className="min-w-0">
-              <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                    Token
-                  </div>
-                </div>
-                <input
-                  type="password"
-                  className="mt-1 w-full min-w-0 bg-transparent text-[15px] font-semibold text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] autofill:bg-transparent autofill:text-[var(--app-text-85)] autofill:shadow-[inset_0_0_0px_1000px_var(--app-solid-surface-2)] autofill:[-webkit-text-fill-color:var(--app-text-85)]"
-                  placeholder={initial?.hasToken ? MASK : "token"}
-                  {...register("token", {
-                    validate: (value) => {
-                      const v = String(value ?? "").trim();
-                      if (!v) return initial?.hasToken ? true : "Informe o token.";
-                      if (v === MASK) return initial?.hasToken ? true : "Informe o token.";
-                      return true;
-                    },
-                  })}
-                />
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">
+                Token
               </div>
+              <input
+                type="password"
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 autofill:bg-white autofill:text-[var(--app-text-85)] autofill:shadow-[inset_0_0_0px_1000px_#ffffff] autofill:[-webkit-text-fill-color:var(--app-text-85)]"
+                placeholder={initial?.hasToken ? MASK : "token"}
+                {...register("token", {
+                  validate: (value) => {
+                    const v = String(value ?? "").trim();
+                    if (!v) return initial?.hasToken ? true : "Informe o token.";
+                    if (v === MASK) return initial?.hasToken ? true : "Informe o token.";
+                    return true;
+                  },
+                })}
+              />
               {errors.token?.message ? (
-                <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 shadow-none">
+                <div className="mt-2 text-xs font-medium text-rose-500">
                   {String(errors.token.message)}
                 </div>
               ) : null}
@@ -148,32 +142,30 @@ export function WhatsAppClient({
           </div>
 
           <div className="min-w-0">
-            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                  Client-Token
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-[var(--app-text-60)]">
+                Client-Token
+              </span>
+              <span className="group relative inline-flex">
+                <HelpCircle className="h-4 w-4 text-[var(--app-text-50)]" aria-hidden="true" />
+                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 w-[280px] -translate-y-1/2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[var(--app-text-70)] opacity-0 transition-opacity group-hover:opacity-100 shadow-none">
+                  Use o Client-Token para autenticar as requisições do AutoBot na sua instância da Z-API (header
+                  Client-Token). Algumas operações, como agendamentos, podem exigir esse token para funcionar.
                 </span>
-                <span className="group relative inline-flex">
-                  <HelpCircle className="h-4 w-4 text-[var(--app-text-50)]" aria-hidden="true" />
-                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 w-[280px] -translate-y-1/2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[var(--app-text-70)] opacity-0 transition-opacity group-hover:opacity-100 shadow-none">
-                    Use o Client-Token para autenticar as requisições do AutoBot na sua instância da Z-API (header
-                    Client-Token). Algumas operações, como agendamentos, podem exigir esse token para funcionar.
-                  </span>
-                </span>
-              </div>
-              <input
-                type="password"
-                className="mt-1 w-full min-w-0 bg-transparent text-[15px] font-semibold text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] autofill:bg-transparent autofill:text-[var(--app-text-85)] autofill:shadow-[inset_0_0_0px_1000px_var(--app-solid-surface-2)] autofill:[-webkit-text-fill-color:var(--app-text-85)]"
-                placeholder={initial?.hasClientToken ? MASK : "client-token"}
-                {...register("client_token")}
-              />
+              </span>
             </div>
+            <input
+              type="password"
+              className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 autofill:bg-white autofill:text-[var(--app-text-85)] autofill:shadow-[inset_0_0_0px_1000px_#ffffff] autofill:[-webkit-text-fill-color:var(--app-text-85)]"
+              placeholder={initial?.hasClientToken ? MASK : "client-token"}
+              {...register("client_token")}
+            />
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60 shadow-none"
+            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-btn-primary-bg)] shadow-none"
           >
             {isSubmitting ? "Salvando..." : "Salvar"}
           </button>
