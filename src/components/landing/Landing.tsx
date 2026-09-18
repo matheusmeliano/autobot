@@ -1,0 +1,835 @@
+"use client";
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  CalendarDays,
+  BarChart3,
+  CreditCard,
+  ChevronLeft,
+  ChevronRight,
+  MessageSquareText,
+  Shield,
+  Zap,
+  Bot,
+} from "lucide-react";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { Logo } from "@/components/ui/Logo";
+
+const chartData = [
+  { name: "Seg", value: 12 },
+  { name: "Ter", value: 18 },
+  { name: "Qua", value: 14 },
+  { name: "Qui", value: 26 },
+  { name: "Sex", value: 22 },
+  { name: "Sáb", value: 30 },
+  { name: "Dom", value: 28 },
+];
+
+const FEATURE_CARDS = [
+  {
+    title: "Envios automáticos",
+    description: "Automatize suas cobranças.",
+    icon: Zap,
+  },
+  {
+    title: "Relatórios",
+    description: "Relatórios completos e simples.",
+    icon: BarChart3,
+  },
+  {
+    title: "Templates",
+    description: "Mensagens prontas com variáveis.",
+    icon: MessageSquareText,
+  },
+  {
+    title: "Agenda inteligente",
+    description: "Disparos no horário certo.",
+    icon: CalendarDays,
+  },
+  {
+    title: "Controle e segurança",
+    description: "Operação simples e segura.",
+    icon: Shield,
+  },
+  {
+    title: "PIX no WhatsApp",
+    description: "Mensagens com chave PIX.",
+    icon: CreditCard,
+  },
+] as const;
+
+function Container({ children }: { children: React.ReactNode }) {
+  return <div className="mx-auto w-full max-w-6xl px-6">{children}</div>;
+}
+
+function SectionTitle({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mx-auto max-w-2xl text-center">
+      <div className="text-xs font-semibold tracking-[0.2em] text-white/50">
+        {eyebrow}
+      </div>
+      <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-4xl">
+        {title}
+      </h2>
+      <p className="mt-3 text-balance text-sm leading-relaxed text-white/60 md:text-base">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={[
+        "rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function Landing() {
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const lastCarouselInteractionAt = useRef(0);
+  const [carouselPaused, setCarouselPaused] = useState(false);
+
+  useEffect(() => {
+    const previousHtmlBackground = document.documentElement.style.backgroundColor;
+    const previousHtmlOverscroll = document.documentElement.style.overscrollBehaviorY;
+    const previousBodyBackground = document.body.style.backgroundColor;
+    const previousBodyOverscroll = document.body.style.overscrollBehaviorY;
+
+    document.documentElement.style.backgroundColor = "#070A10";
+    document.documentElement.style.overscrollBehaviorY = "none";
+    document.body.style.backgroundColor = "#070A10";
+    document.body.style.overscrollBehaviorY = "none";
+
+    return () => {
+      document.documentElement.style.backgroundColor = previousHtmlBackground;
+      document.documentElement.style.overscrollBehaviorY = previousHtmlOverscroll;
+      document.body.style.backgroundColor = previousBodyBackground;
+      document.body.style.overscrollBehaviorY = previousBodyOverscroll;
+    };
+  }, []);
+
+  const getCarouselStep = useCallback(() => {
+    const el = carouselRef.current;
+    if (!el) return 0;
+    const first = el.querySelector<HTMLElement>("[data-carousel-item]");
+    if (!first) return el.clientWidth;
+    const gap = parseFloat(getComputedStyle(el).gap || "0");
+    return first.offsetWidth + gap;
+  }, []);
+
+  const getCycleWidth = useCallback(() => {
+    const step = getCarouselStep();
+    if (!step) return 0;
+    return step * FEATURE_CARDS.length;
+  }, [getCarouselStep]);
+
+  const normalizeCarousel = useCallback(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const cycle = getCycleWidth();
+    if (!cycle) return;
+
+    const left = el.scrollLeft;
+    if (left < cycle * 0.5) {
+      el.scrollLeft = left + cycle;
+      return;
+    }
+    if (left > cycle * 1.5) {
+      el.scrollLeft = left - cycle;
+    }
+  }, [getCycleWidth]);
+
+  const scrollCarousel = useCallback(
+    (dir: -1 | 1) => {
+      const el = carouselRef.current;
+      if (!el) return;
+      const step = getCarouselStep();
+      if (!step) return;
+
+      el.scrollTo({ left: el.scrollLeft + dir * step, behavior: "smooth" });
+      window.setTimeout(() => normalizeCarousel(), 480);
+    },
+    [getCarouselStep, normalizeCarousel],
+  );
+
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+
+    const init = () => {
+      const cycle = getCycleWidth();
+      if (!cycle) return;
+      el.scrollLeft = cycle;
+    };
+
+    init();
+    window.setTimeout(init, 0);
+
+    window.addEventListener("resize", init);
+
+    return () => {
+      window.removeEventListener("resize", init);
+    };
+  }, [getCycleWidth]);
+
+  useEffect(() => {
+    if (carouselPaused) return;
+
+    const id = window.setInterval(() => {
+      if (Date.now() - lastCarouselInteractionAt.current < 1200) return;
+      scrollCarousel(1);
+    }, 4200);
+
+    return () => window.clearInterval(id);
+  }, [carouselPaused, scrollCarousel]);
+
+  return (
+    <div className="min-h-screen bg-[#070A10] text-white">
+      <header className="sticky top-0 z-30">
+        <Container>
+          <div className="pt-8 pb-5">
+            <div className="flex h-14 items-center justify-between rounded-full border border-black/10 bg-white px-5">
+              <Link href="/" className="flex items-center gap-2">
+                <Logo />
+                <div className="text-sm font-semibold tracking-tight text-black">
+                  AutoBot
+                </div>
+              </Link>
+
+              <nav className="hidden items-center gap-6 text-sm text-black/70 md:flex">
+                <a className="hover:text-black" href="#como-funciona">
+                  Como funciona o bot?
+                </a>
+                <a className="hover:text-black" href="#planos">
+                  Nossos planos
+                </a>
+                <a className="hover:text-black" href="#faq">
+                  FAQ
+                </a>
+              </nav>
+
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/login"
+                  className="hidden rounded-full border border-black/10 bg-black/[0.03] px-4 py-2 text-sm font-semibold text-black/70 hover:bg-black/[0.06] hover:text-black md:inline-flex"
+                >
+                  Entrar
+                </Link>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#070A10,rgba(99,102,241,0.85))] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+                >
+                  Fazer o teste <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </header>
+
+      <main className="relative">
+        <section className="pt-4 md:pt-12">
+          <Container>
+            <div className="grid items-start gap-10">
+              <div className="w-full text-center">
+                <motion.h1
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.55, delay: 0.05 }}
+                  className="mt-5 w-full text-balance text-[clamp(2rem,6vw,3.75rem)] font-semibold tracking-tight leading-[1.06]"
+                >
+                  Automatize cobranças no WhatsApp e receba mais no PIX.
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.55, delay: 0.1 }}
+                  className="mt-4 w-full text-pretty text-base leading-relaxed text-white/65 md:text-lg"
+                >
+                  Envie cobranças automáticas, reduza inadimplência e escale seu
+                  negócio com automação inteligente.
+                </motion.p>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+              >
+                <GlassCard className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-white/70">
+                      Painel
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-semibold text-white/70">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                      WhatsApp: Conectado
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 min-[1100px]:grid-cols-2">
+                    {[
+                      {
+                        label: "Agendamentos (mês)",
+                        value: "24",
+                        icon: <CalendarDays className="h-5 w-5" />,
+                      },
+                      {
+                        label: "Executados",
+                        value: "18",
+                        icon: <BadgeCheck className="h-5 w-5" />,
+                      },
+                      {
+                        label: "Templates (Mensagens)",
+                        value: "7",
+                        icon: <MessageSquareText className="h-5 w-5" />,
+                      },
+                    ].map((kpi) => (
+                      <div
+                        key={kpi.label}
+                        className={[
+                          "rounded-xl border border-white/10 bg-white/[0.03] p-3",
+                          kpi.label === "Templates (Mensagens)"
+                            ? "min-[1100px]:col-span-2"
+                            : "",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-white/55">
+                              {kpi.label}
+                            </div>
+                            <div className="mt-2 truncate text-2xl font-semibold tracking-tight">
+                              {kpi.value}
+                            </div>
+                          </div>
+                          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] ring-1 ring-white/10">
+                            {kpi.icon}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 grid gap-4 min-[1100px]:grid-cols-3">
+                    <div className="min-[1100px]:col-span-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold text-white/55">
+                        Agendamentos criados (7 dias)
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Dados reais dos agendamentos cadastrados.
+                      </div>
+                      <div className="mt-3 h-32">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData}>
+                            <defs>
+                              <linearGradient
+                                id="dashValue"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor="rgb(99 102 241)"
+                                  stopOpacity={0.55}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor="rgb(99 102 241)"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <XAxis
+                              dataKey="name"
+                              tick={{
+                                fill: "rgba(255,255,255,0.45)",
+                                fontSize: 10,
+                              }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: "rgba(15, 23, 42, 0.9)",
+                                border: "1px solid rgba(255,255,255,0.10)",
+                                borderRadius: 12,
+                              }}
+                              labelStyle={{ color: "rgba(255,255,255,0.7)" }}
+                              itemStyle={{ color: "white" }}
+                              formatter={(v: any) => [v, "Quantidade"]}
+                              labelFormatter={(l: any) => `Dia: ${l}`}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="value"
+                              stroke="rgb(99 102 241)"
+                              strokeWidth={2}
+                              fill="url(#dashValue)"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="text-[11px] font-semibold text-white/55">
+                        Atividades
+                      </div>
+                      <div className="mt-1 text-[11px] text-white/45">
+                        Histórico da agenda.
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        {[
+                          {
+                            id: "a1",
+                            debtorName: "Mariana Costa",
+                            status: "Executado",
+                            dateTime: "10/05 • 14:00",
+                          },
+                          {
+                            id: "a2",
+                            debtorName: "João Silva",
+                            status: "Agendado",
+                            dateTime: "12/05 • 09:30",
+                          },
+                        ].map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-xs font-semibold">
+                                  {item.debtorName}
+                                </div>
+                                <div className="mt-1 text-xs text-white/55">
+                                  {item.status} • {item.dateTime}
+                                </div>
+                              </div>
+                              <span
+                                className={[
+                                  "mt-0.5 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold",
+                                  item.status.toLowerCase() === "executado"
+                                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                                    : item.status.toLowerCase() === "cancelado"
+                                      ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                                      : item.status.toLowerCase() === "pausado"
+                                        ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                                        : "border-white/10 bg-white/[0.04] text-white/70",
+                                ].join(" ")}
+                              >
+                                {item.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            </div>
+          </Container>
+        </section>
+
+        <section className="pt-10 md:pt-16">
+          <Container>
+            <div className="relative flex items-center gap-3">
+              <button
+                type="button"
+                aria-label="Voltar"
+                onPointerEnter={() => setCarouselPaused(true)}
+                onPointerLeave={() => setCarouselPaused(false)}
+                onPointerDown={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(true);
+                }}
+                onPointerUp={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(false);
+                }}
+                onPointerCancel={() => setCarouselPaused(false)}
+                onClick={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  scrollCarousel(-1);
+                }}
+                className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 backdrop-blur-xl hover:bg-[#0B1220]/70"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+
+              <div className="relative min-w-0 flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-14 bg-gradient-to-r from-[#070A10] to-transparent sm:block" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-14 bg-gradient-to-l from-[#070A10] to-transparent sm:block" />
+
+                <div
+                  ref={carouselRef}
+                  className="pointer-events-none flex select-none gap-4 overflow-x-auto overflow-y-hidden snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {[...FEATURE_CARDS, ...FEATURE_CARDS, ...FEATURE_CARDS].map(
+                    (item, idx) => {
+                    const Icon = item.icon;
+
+                      return (
+                        <div
+                          key={`${item.title}-${idx}`}
+                          data-carousel-item
+                          className="w-full shrink-0 snap-center md:w-1/2 lg:w-1/3"
+                        >
+                          <GlassCard className="w-full p-4">
+                            <div className="flex items-center justify-center gap-2 text-center text-xs font-semibold text-white/70">
+                              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/10">
+                                <Icon className="h-4 w-4" />
+                              </span>
+                              {item.title}
+                            </div>
+                            <div className="mt-3 text-center text-sm text-white/60">
+                              {item.description}
+                            </div>
+                          </GlassCard>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Avançar"
+                onPointerEnter={() => setCarouselPaused(true)}
+                onPointerLeave={() => setCarouselPaused(false)}
+                onPointerDown={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(true);
+                }}
+                onPointerUp={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  setCarouselPaused(false);
+                }}
+                onPointerCancel={() => setCarouselPaused(false)}
+                onClick={() => {
+                  lastCarouselInteractionAt.current = Date.now();
+                  scrollCarousel(1);
+                }}
+                className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#070A10]/60 text-white/85 backdrop-blur-xl hover:bg-[#0B1220]/70"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </Container>
+        </section>
+
+        <section id="como-funciona" className="pt-20 md:pt-28">
+          <Container>
+            <SectionTitle
+              eyebrow="COMO FUNCIONA"
+              title="Da conexão ao envio: um fluxo simples."
+              description="Conecte seu WhatsApp, cadastre seus clientes e automatize cobranças com templates e agendamentos."
+            />
+
+            <div className="mt-12 grid gap-4 md:grid-cols-4">
+              {[
+                {
+                  step: "01",
+                  title: "Conecte seu WhatsApp (Via Z-API)",
+                  description:
+                    "Escaneie o QR Code com segurança e total estabilidade.",
+                },
+                {
+                  step: "02",
+                  title: "Cadastre clientes",
+                  description:
+                    "Organize contatos com telefone, valor e vencimento.",
+                },
+                {
+                  step: "03",
+                  title: "Configure mensagens",
+                  description:
+                    "Crie templates e personalize com variáveis.",
+                },
+                {
+                  step: "04",
+                  title: "Envio automático",
+                  description:
+                    "Agende cobranças e acompanhe em tempo real.",
+                },
+              ].map((item) => (
+                <GlassCard key={item.step} className="p-5">
+                  <div className="text-xs font-semibold text-white/45">
+                    {item.step}
+                  </div>
+                  <div className="mt-2 text-sm font-semibold">{item.title}</div>
+                  <div className="mt-2 text-sm text-white/60">
+                    {item.description}
+                  </div>
+                </GlassCard>
+              ))}
+            </div>
+          </Container>
+        </section>
+
+        <section id="planos" className="pt-20 md:pt-28">
+          <Container>
+            <SectionTitle
+              eyebrow="PLANOS"
+              title="Um plano para cada fase."
+              description="Comece com o teste gratuito de 3 meses e evolua para o plano ideal conforme aumentar o volume de cobranças e a sua operação."
+            />
+
+            <div className="mt-12 grid grid-cols-1 gap-4 min-[1001px]:grid-cols-3">
+              {[
+                {
+                  name: "Básico",
+                  price: "R$ 149/mês",
+                  highlight: false,
+                  items: [
+                    "Conexão via Z-API",
+                    "Até 15 cadastros",
+                    "Templates e variáveis",
+                    "Agendamento automático",
+                  ],
+                },
+                {
+                  name: "Pro",
+                  price: "R$ 199/mês",
+                  highlight: true,
+                  items: [
+                    "Tudo do Básico",
+                    "Cadastro ilimitado",
+                    "Relatório completo",
+                    "Suporte prioritário",
+                  ],
+                },
+                {
+                  name: "Vitalício",
+                  price: "R$ 2.490/único",
+                  highlight: false,
+                  items: [
+                    "Tudo do Básico e Pro",
+                    "Sem mensalidades. Seu para sempre!",
+                  ],
+                },
+              ].map((plan) => (
+                <GlassCard
+                  key={plan.name}
+                  className="flex h-full flex-col p-6"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">{plan.name}</div>
+                      <div className="mt-2 whitespace-nowrap text-[clamp(1.25rem,7vw,1.875rem)] font-semibold tracking-tight leading-none">
+                        {plan.price}
+                      </div>
+                    </div>
+                    {plan.highlight ? (
+                      <div className="shrink-0 whitespace-nowrap rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-semibold text-indigo-200 ring-1 ring-indigo-400/20">
+                        Mais escolhido
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-6 flex-1 space-y-3 text-sm text-white/70">
+                    {plan.items.map((item) => (
+                      <div key={item} className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-white/50" />
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+
+                  <Link
+                    href="/signup"
+                    className={[
+                      "mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold",
+                      plan.highlight
+                        ? "bg-white text-black hover:bg-white/90"
+                        : "border border-white/10 bg-white/[0.04] text-white/85 hover:bg-white/[0.06]",
+                    ].join(" ")}
+                  >
+                    {plan.name === "Vitalício" ? "Comprar vitalício" : "Assinar"}{" "}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </GlassCard>
+              ))}
+            </div>
+            <div className="mt-12 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-6">
+              <div className="text-sm font-semibold text-white/85">
+                Sobre a conexão com o WhatsApp
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-white/70">
+                Você precisará contratar a Z-API separadamente para conectar seu WhatsApp ao AutoBot e utilizar os envios automáticos e demais automações do sistema.
+              </p>
+            </div>
+          </Container>
+        </section>
+
+        <section id="faq" className="pt-20 md:pt-28">
+          <Container>
+            <SectionTitle
+              eyebrow="FAQ"
+              title="Perguntas frequentes."
+              description="Respostas rápidas e suporte pensado para você começar com segurança, testar a plataforma e evoluir sua operação com mais confiança."
+            />
+
+            <div className="mt-12 grid gap-4 md:grid-cols-2">
+              {[
+                {
+                  q: "Preciso instalar algo?",
+                  a: "Não. É 100% web. Você acessa pelo navegador e conecta seu WhatsApp.",
+                },
+                {
+                  q: "Funciona com qualquer WhatsApp?",
+                  a: "Funciona com WhatsApp comum. A conexão é feita via Z-API.",
+                },
+                {
+                  q: "Posso cancelar quando quiser?",
+                  a: "Sim. Você pode cancelar ou trocar de plano a qualquer momento.",
+                },
+                {
+                  q: "Tem teste grátis?",
+                  a: "Ao se cadastrar, seu teste grátis de 3 meses começa automaticamente.",
+                },
+              ].map((item) => (
+                <GlassCard key={item.q} className="p-5">
+                  <div className="text-sm font-semibold">{item.q}</div>
+                  <div className="mt-2 text-sm leading-relaxed text-white/60">
+                    {item.a}
+                  </div>
+                </GlassCard>
+              ))}
+            </div>
+          </Container>
+        </section>
+
+        <section className="pt-20 md:pt-28">
+          <Container>
+            <GlassCard className="p-8 md:p-10">
+              <div className="grid items-center gap-8 md:grid-cols-2">
+                <div>
+                  <div className="text-xs font-semibold tracking-[0.2em] text-white/50">
+                    PRONTO PARA ESCALAR
+                  </div>
+                  <div className="mt-3 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
+                    Pare de cobrar manualmente.
+                  </div>
+                  <div className="mt-3 text-sm leading-relaxed text-white/60">
+                    Automatize cobranças no WhatsApp com templates e agendamentos.
+                    Mais consistência, menos fricção, mais recebimentos.
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href="/signup"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-white/90"
+                  >
+                    Começar gratuitamente <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            </GlassCard>
+          </Container>
+        </section>
+
+        <footer className="pt-16">
+          <Container>
+            <div className="border-t border-white/5 py-10">
+              <div className="grid gap-10 md:grid-cols-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Logo />
+                    <div className="text-sm font-semibold tracking-tight">
+                      AutoBot
+                    </div>
+                  </div>
+                  <div className="mt-3 max-w-sm text-sm text-white/55">
+                    Plataforma SaaS que automatiza cobranças via WhatsApp.
+                  </div>
+                  <div className="mt-4 text-xs text-white/35">
+                    © {new Date().getFullYear()} AutoBot. Todos os direitos
+                    reservados.
+                  </div>
+                  <div className="mt-4 text-xs text-white/35">
+                    Desenvolvido pela{" "}
+                    <a
+                      href="https://heybrothers.vercel.app/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-white/60 hover:text-white"
+                    >
+                      HEYBROTHERS
+                    </a>
+                    .
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-6 text-sm text-white/60 md:grid-cols-3 md:justify-end md:text-right">
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold tracking-[0.2em] text-white/40">
+                      PRODUTO
+                    </div>
+                    <a className="block hover:text-white" href="#como-funciona">
+                      Como funciona?
+                    </a>
+                    <a className="block hover:text-white" href="#planos">
+                      Nossos planos
+                    </a>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold tracking-[0.2em] text-white/40">
+                      EMPRESA
+                    </div>
+                    <Link className="block hover:text-white" href="/termos">
+                      Termos
+                    </Link>
+                    <Link className="block hover:text-white" href="/privacidade">
+                      Privacidade
+                    </Link>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold tracking-[0.2em] text-white/40">
+                      SOCIAL
+                    </div>
+                    <Link className="block hover:text-white" href="/instagram">
+                      Instagram
+                    </Link>
+                    <Link className="block hover:text-white" href="/linkedin">
+                      LinkedIn
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Container>
+        </footer>
+      </main>
+    </div>
+  );
+}

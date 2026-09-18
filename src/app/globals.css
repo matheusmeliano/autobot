@@ -1,0 +1,819 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
+
+/* app/: ZERO shadow, ring, drop-shadow, outline-offset — SOMENTE borda visual, jamais profundidade projetada */
+.app-theme[data-theme="light"] *,
+.app-theme[data-theme="light"] *::before,
+.app-theme[data-theme="light"] *::after {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+  drop-shadow: none !important;
+  --tw-shadow: 0 0 #0000 !important;
+  --tw-shadow-colored: 0 0 #0000 !important;
+  --tw-ring-color: transparent !important;
+  --tw-ring-offset-color: transparent !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  text-shadow: none !important;
+  outline-offset: 0px !important;
+}
+
+:root {
+  --app-bg: #070a10;
+  --app-bg-soft: rgba(7, 10, 16, 0.8);
+  --app-fg: rgb(255, 255, 255);
+  --app-text-85: rgba(255, 255, 255, 0.85);
+  --app-text-80: rgba(255, 255, 255, 0.8);
+  --app-text-70: rgba(255, 255, 255, 0.7);
+  --app-text-60: rgba(255, 255, 255, 0.6);
+  --app-text-55: rgba(255, 255, 255, 0.55);
+  --app-text-50: rgba(255, 255, 255, 0.5);
+  --app-text-45: rgba(255, 255, 255, 0.45);
+  --app-text-35: rgba(255, 255, 255, 0.35);
+  --app-text-30: rgba(255, 255, 255, 0.3);
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-card: rgba(255, 255, 255, 0.04);
+  --app-card-2: rgba(255, 255, 255, 0.03);
+  --app-active: rgba(255, 255, 255, 0.08);
+  --app-hover: rgba(255, 255, 255, 0.06);
+  --app-ring: rgba(255, 255, 255, 0.1);
+  --app-modal-bg: rgba(7, 10, 16, 0.95);
+  --app-btn-primary-bg: #ffffff;
+  --app-btn-primary-fg: #000000;
+  --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
+  --app-option-bg: #070a10;
+  --app-solid-surface: #111827;
+  --app-solid-surface-2: #0f172a;
+  --app-solid-modal: #070a10;
+}
+
+html,
+body {
+  height: 100%;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+html.app-theme,
+html.app-theme body {
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
+body {
+  width: 100%;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-theme[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #070a10;
+  --app-bg-soft: rgba(7, 10, 16, 0.8);
+  --app-fg: rgb(255, 255, 255);
+  --app-text-85: rgba(255, 255, 255, 0.85);
+  --app-text-80: rgba(255, 255, 255, 0.8);
+  --app-text-70: rgba(255, 255, 255, 0.7);
+  --app-text-60: rgba(255, 255, 255, 0.6);
+  --app-text-55: rgba(255, 255, 255, 0.55);
+  --app-text-50: rgba(255, 255, 255, 0.5);
+  --app-text-45: rgba(255, 255, 255, 0.45);
+  --app-text-35: rgba(255, 255, 255, 0.35);
+  --app-text-30: rgba(255, 255, 255, 0.3);
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-card: rgba(255, 255, 255, 0.04);
+  --app-card-2: rgba(255, 255, 255, 0.03);
+  --app-active: rgba(255, 255, 255, 0.08);
+  --app-hover: rgba(255, 255, 255, 0.06);
+  --app-ring: rgba(255, 255, 255, 0.1);
+  --app-modal-bg: rgba(7, 10, 16, 0.95);
+  --app-btn-primary-bg: #ffffff;
+  --app-btn-primary-fg: #000000;
+  --app-btn-primary-bg-hover: rgba(255, 255, 255, 0.9);
+  --app-option-bg: #070a10;
+  --app-solid-surface: #111827;
+  --app-solid-surface-2: #0f172a;
+  --app-solid-modal: #070a10;
+  --app-accent-bg: rgba(255, 255, 255, 0.06);
+  --app-accent-ring: rgba(255, 255, 255, 0.14);
+  --app-accent-text: rgba(255, 255, 255, 0.8);
+  --app-accent-color: #94a3b8;
+  --app-success-bg: rgba(52, 211, 153, 0.14);
+  --app-success-border: rgba(52, 211, 153, 0.3);
+  --app-success-text: #a7f3d0;
+  --app-warning-bg: rgba(245, 158, 11, 0.12);
+  --app-warning-border: rgba(245, 158, 11, 0.3);
+  --app-warning-text: #fde68a;
+  --app-danger-bg: rgba(248, 113, 113, 0.14);
+  --app-danger-border: rgba(248, 113, 113, 0.3);
+  --app-danger-text: #fecaca;
+}
+
+.app-theme[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #efeeed;
+  --app-bg-soft: rgba(239, 238, 237, 0.88);
+  --app-fg: #18181b;
+  --app-text-85: rgba(24, 24, 27, 0.92);
+  --app-text-80: rgba(24, 24, 27, 0.82);
+  --app-text-70: rgba(24, 24, 27, 0.72);
+  --app-text-60: rgba(24, 24, 27, 0.62);
+  --app-text-55: rgba(24, 24, 27, 0.56);
+  --app-text-50: rgba(24, 24, 27, 0.5);
+  --app-text-45: rgba(24, 24, 27, 0.45);
+  --app-text-35: rgba(24, 24, 27, 0.35);
+  --app-text-30: rgba(24, 24, 27, 0.3);
+  --app-border: rgba(24, 24, 27, 0.085);
+  --app-card: rgba(255, 255, 255, 0.98);
+  --app-card-2: rgba(255, 255, 255, 0.98);
+  --app-active: rgba(234, 88, 12, 0.125);
+  --app-hover: rgba(24, 24, 27, 0.045);
+  --app-ring: rgba(234, 88, 12, 0.28);
+  --app-modal-bg: #f7f5f3;
+  --app-btn-primary-bg: #ea580c;
+  --app-btn-primary-fg: #ffffff;
+  --app-btn-primary-bg-hover: #c2410c;
+  --app-option-bg: #ffffff;
+  --app-solid-surface: #ffffff;
+  --app-solid-surface-2: #f5f3f0;
+  --app-solid-modal: #f7f5f3;
+  --app-select-bg: rgba(24, 24, 27, 0.04);
+  --app-accent-bg: rgba(234, 88, 12, 0.12);
+  --app-accent-ring: rgba(234, 88, 12, 0.2);
+  --app-accent-text: #9a3412;
+  --app-accent-color: #ea580c;
+  --app-success-bg: rgba(16, 185, 129, 0.12);
+  --app-success-border: rgba(5, 150, 105, 0.24);
+  --app-success-text: #166534;
+  --app-warning-bg: rgba(245, 158, 11, 0.12);
+  --app-warning-border: rgba(217, 119, 6, 0.24);
+  --app-warning-text: #92400e;
+  --app-danger-bg: rgba(239, 68, 68, 0.1);
+  --app-danger-border: rgba(220, 38, 38, 0.2);
+  --app-danger-text: #991b1b;
+}
+
+.app-theme {
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
+.app-theme[data-theme="light"] input[type="date"],
+.app-theme[data-theme="light"] input[type="email"],
+.app-theme[data-theme="light"] input[type="number"],
+.app-theme[data-theme="light"] input[type="password"],
+.app-theme[data-theme="light"] input[type="tel"],
+.app-theme[data-theme="light"] input[type="text"],
+.app-theme[data-theme="light"] input[type="time"],
+.app-theme[data-theme="light"] input:not([type]),
+.app-theme[data-theme="light"] textarea {
+  color-scheme: light !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: textfield !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: rgba(24, 24, 27, 0.92) !important;
+  -webkit-text-fill-color: rgba(24, 24, 27, 0.92) !important;
+  caret-color: rgba(24, 24, 27, 0.92) !important;
+  border-color: rgba(24, 24, 27, 0.085) !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  background-clip: padding-box !important;
+  isolation: isolate !important;
+}
+
+.app-theme[data-theme="light"] input[type="number"]::-webkit-inner-spin-button,
+.app-theme[data-theme="light"] input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: transparent !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="number"]::-moz-number-spin-box,
+.app-theme[data-theme="light"] input[type="number"]::-moz-number-spin-up,
+.app-theme[data-theme="light"] input[type="number"]::-moz-number-spin-down {
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: transparent !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: none !important;
+  box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="date"]::before,
+.app-theme[data-theme="light"] input[type="date"]::after,
+.app-theme[data-theme="light"] input[type="time"]::before,
+.app-theme[data-theme="light"] input[type="time"]::after,
+.app-theme[data-theme="light"] input[type="number"]::-webkit-calendar-picker-indicator,
+.app-theme[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+.app-theme[data-theme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+  background-color: transparent !important;
+  color: rgba(24, 24, 27, 0.72) !important;
+  background-image: none !important;
+  -webkit-text-fill-color: rgba(24, 24, 27, 0.92) !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+.app-theme[data-theme="light"] input[type="date"]:focus,
+.app-theme[data-theme="light"] input[type="email"]:focus,
+.app-theme[data-theme="light"] input[type="number"]:focus,
+.app-theme[data-theme="light"] input[type="password"]:focus,
+.app-theme[data-theme="light"] input[type="tel"]:focus,
+.app-theme[data-theme="light"] input[type="text"]:focus,
+.app-theme[data-theme="light"] input[type="time"]:focus,
+.app-theme[data-theme="light"] input:not([type]):focus,
+.app-theme[data-theme="light"] textarea:focus,
+.app-theme[data-theme="light"] input[type="date"]:focus-visible,
+.app-theme[data-theme="light"] input[type="email"]:focus-visible,
+.app-theme[data-theme="light"] input[type="number"]:focus-visible,
+.app-theme[data-theme="light"] input[type="password"]:focus-visible,
+.app-theme[data-theme="light"] input[type="tel"]:focus-visible,
+.app-theme[data-theme="light"] input[type="text"]:focus-visible,
+.app-theme[data-theme="light"] input[type="time"]:focus-visible,
+.app-theme[data-theme="light"] input:not([type]):focus-visible,
+.app-theme[data-theme="light"] textarea:focus-visible {
+  outline: none !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  filter: none !important;
+  border-color: rgba(234, 88, 12, 0.32) !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  )::placeholder {
+  color: rgba(24, 24, 27, 0.35) !important;
+  opacity: 1 !important;
+}
+
+.app-theme[data-theme="light"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill,
+.app-theme[data-theme="light"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:hover,
+.app-theme[data-theme="light"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:focus,
+.app-theme[data-theme="light"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:active,
+.app-theme[data-theme="light"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-internal-autofill-selected {
+  -webkit-text-fill-color: rgba(24, 24, 27, 0.92) !important;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  caret-color: rgba(24, 24, 27, 0.92) !important;
+  border-color: rgba(24, 24, 27, 0.085) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+  filter: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="checkbox"] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  position: relative !important;
+  width: 1.1rem !important;
+  height: 1.1rem !important;
+  min-width: 1.1rem !important;
+  min-height: 1.1rem !important;
+  border-radius: 0.375rem !important;
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  border-color: rgba(24, 24, 27, 0.18) !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+  cursor: pointer !important;
+  transition: all 150ms ease !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
+}
+
+.app-theme[data-theme="light"] input[type="checkbox"]:hover {
+  border-color: rgba(24, 24, 27, 0.18) !important;
+  background-color: #ffffff !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="checkbox"]:focus,
+.app-theme[data-theme="light"] input[type="checkbox"]:focus-visible {
+  outline: none !important;
+  border-color: rgba(24, 24, 27, 0.22) !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  background-color: #ffffff !important;
+}
+
+.app-theme[data-theme="light"] input[type="checkbox"]:checked {
+  border-color: #ea580c !important;
+  background-color: #ea580c !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-size: 0.78rem 0.78rem !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="checkbox"]:checked:hover {
+  border-color: #ea580c !important;
+  background-color: #ea580c !important;
+}
+
+.app-theme[data-theme="light"] input[type="checkbox"]:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="radio"] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  position: relative !important;
+  width: 1.1rem !important;
+  height: 1.1rem !important;
+  min-width: 1.1rem !important;
+  min-height: 1.1rem !important;
+  border-radius: 9999px !important;
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  border-color: rgba(24, 24, 27, 0.18) !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  outline: none !important;
+  cursor: pointer !important;
+  transition: all 150ms ease !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
+}
+
+.app-theme[data-theme="light"] input[type="radio"]:hover {
+  border-color: rgba(24, 24, 27, 0.18) !important;
+  box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="radio"]:focus,
+.app-theme[data-theme="light"] input[type="radio"]:focus-visible {
+  outline: none !important;
+  border-color: rgba(24, 24, 27, 0.22) !important;
+  box-shadow: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="radio"]:checked {
+  border-color: #ea580c !important;
+  background-color: #ffffff !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+.app-theme[data-theme="light"] input[type="radio"]:checked::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 0.5rem !important;
+  height: 0.5rem !important;
+  background-color: #ea580c !important;
+  border-radius: 9999px !important;
+  transform: translate(-50%, -50%) !important;
+  box-sizing: border-box !important;
+}
+
+.app-theme[data-theme="light"] input[type="radio"]:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+.app-theme[data-theme="dark"] select,
+.app-theme[data-theme="dark"] input[type="date"],
+.app-theme[data-theme="dark"] input[type="email"],
+.app-theme[data-theme="dark"] input[type="password"],
+.app-theme[data-theme="dark"] input[type="text"],
+.app-theme[data-theme="dark"] input:not([type]),
+.app-theme[data-theme="dark"] textarea {
+  color-scheme: dark !important;
+}
+
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ) {
+  background-color: var(--app-card-2) !important;
+  color: var(--app-text-85) !important;
+  -webkit-text-fill-color: var(--app-text-85) !important;
+  caret-color: var(--app-text-85) !important;
+  border-color: var(--app-border) !important;
+  border-style: solid !important;
+  background-image: none !important;
+}
+
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  )::placeholder {
+  color: var(--app-text-30) !important;
+  opacity: 1 !important;
+}
+
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill,
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:hover,
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:focus,
+.app-theme
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-webkit-autofill:active {
+  -webkit-text-fill-color: var(--app-text-85) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--app-card-2) inset !important;
+  box-shadow: 0 0 0px 1000px var(--app-card-2) inset !important;
+  background-color: var(--app-card-2) !important;
+  caret-color: var(--app-text-85) !important;
+  border-color: var(--app-border) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+.app-theme[data-theme="dark"]
+  :is(
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input:not([type]),
+    textarea
+  ):-internal-autofill-selected {
+  background-color: var(--app-card-2) !important;
+  color: var(--app-text-85) !important;
+}
+
+.app-theme input[type="date"],
+.app-theme input[type="time"] {
+  accent-color: var(--app-accent-color);
+}
+
+.app-theme select option {
+  background-color: var(--app-option-bg) !important;
+  color: var(--app-fg) !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-theme.theme-ready,
+  .app-theme.theme-ready *,
+  .app-theme.theme-ready *::before,
+  .app-theme.theme-ready *::after {
+    transition-duration: 180ms;
+    transition-timing-function: ease;
+    transition-property: background-color, border-color, color, fill, stroke;
+  }
+}
+
+.app-theme .text-white {
+  color: var(--app-fg) !important;
+}
+.app-theme .text-white\/90 {
+  color: var(--app-text-85) !important;
+}
+.app-theme .text-white\/85 {
+  color: var(--app-text-85) !important;
+}
+.app-theme .text-white\/80 {
+  color: var(--app-text-80) !important;
+}
+.app-theme .text-white\/75 {
+  color: var(--app-text-80) !important;
+}
+.app-theme .text-white\/70 {
+  color: var(--app-text-70) !important;
+}
+.app-theme .text-white\/60 {
+  color: var(--app-text-60) !important;
+}
+.app-theme .text-white\/55 {
+  color: var(--app-text-55) !important;
+}
+.app-theme .text-white\/50 {
+  color: var(--app-text-50) !important;
+}
+.app-theme .text-white\/45 {
+  color: var(--app-text-45) !important;
+}
+.app-theme .text-white\/35 {
+  color: var(--app-text-35) !important;
+}
+.app-theme .text-white\/30 {
+  color: var(--app-text-30) !important;
+}
+
+.app-theme .placeholder\:text-white\/30::placeholder {
+  color: var(--app-text-30) !important;
+}
+
+.app-theme .border-white\/10 {
+  border-color: var(--app-border) !important;
+}
+.app-theme .border-t.border-white\/10 {
+  border-top-color: var(--app-border) !important;
+}
+.app-theme .border-b.border-white\/10 {
+  border-bottom-color: var(--app-border) !important;
+}
+
+.app-theme .bg-white {
+  background-color: var(--app-btn-primary-bg) !important;
+}
+.app-theme .text-black {
+  color: var(--app-btn-primary-fg) !important;
+}
+.app-theme .hover\:bg-white\/90:hover {
+  background-color: var(--app-btn-primary-bg-hover) !important;
+}
+
+.app-theme[data-theme="light"] :is(button, a).bg-white {
+  border: 1px solid var(--app-border) !important;
+  background-color: var(--app-card) !important;
+}
+
+.app-theme[data-theme="light"] :is(button, a).text-black {
+  color: var(--app-text-85) !important;
+}
+
+.app-theme[data-theme="light"] :is(button, a).hover\:bg-white\/90:hover {
+  background-color: var(--app-hover) !important;
+}
+
+.app-theme[data-theme="light"] button.bg-white:disabled {
+  background-color: var(--app-card-2) !important;
+  color: var(--app-text-60) !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+}
+
+.app-theme[data-theme="light"] button.disabled\:opacity-60:disabled {
+  opacity: 1 !important;
+}
+
+.app-theme[data-theme="dark"] :is(button, a).bg-white {
+  border: 1px solid var(--app-border) !important;
+  background-color: var(--app-card) !important;
+}
+
+.app-theme[data-theme="dark"] :is(button, a).text-black {
+  color: var(--app-text-85) !important;
+}
+
+.app-theme[data-theme="dark"] :is(button, a).hover\:bg-white\/90:hover {
+  background-color: var(--app-hover) !important;
+}
+
+.app-theme[data-theme="dark"] button.bg-white:disabled {
+  background-color: var(--app-card-2) !important;
+  color: var(--app-text-60) !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+}
+
+.app-theme[data-theme="dark"] button.disabled\:opacity-60:disabled {
+  opacity: 1 !important;
+}
+
+.app-theme .bg-white\/\[0\.08\] {
+  background-color: var(--app-active) !important;
+}
+.app-theme .bg-white\/\[0\.06\] {
+  background-color: var(--app-hover) !important;
+}
+.app-theme .bg-white\/\[0\.05\] {
+  background-color: var(--app-card) !important;
+}
+.app-theme .bg-white\/\[0\.04\] {
+  background-color: var(--app-card) !important;
+}
+.app-theme .bg-white\/\[0\.03\] {
+  background-color: var(--app-card-2) !important;
+}
+.app-theme .bg-white\/\[0\.02\] {
+  background-color: var(--app-card-2) !important;
+}
+
+.app-theme .hover\:bg-white\/\[0\.06\]:hover {
+  background-color: var(--app-hover) !important;
+}
+.app-theme .disabled\:hover\:bg-white\/\[0\.04\]:disabled:hover {
+  background-color: var(--app-card) !important;
+}
+.app-theme .disabled\:hover\:bg-white\/\[0\.03\]:disabled:hover {
+  background-color: var(--app-card-2) !important;
+}
+
+.app-theme .ring-white\/10 {
+  --tw-ring-color: var(--app-border) !important;
+}
+.app-theme .focus\:ring-white\/10:focus {
+  --tw-ring-color: var(--app-ring) !important;
+}
+.app-theme .focus\:ring-white\/20:focus {
+  --tw-ring-color: var(--app-ring) !important;
+}
+
+.app-theme .focus\:border-white\/20:focus {
+  border-color: var(--app-border) !important;
+}
+
+.app-theme .divide-white\/10 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--app-border) !important;
+}
+
+.app-theme .bg-\[\#070A10\] {
+  background-color: var(--app-bg) !important;
+}
+.app-theme .bg-\[\#070A10\]\/80 {
+  background-color: var(--app-bg-soft) !important;
+}
+
+.mp-brick-wrapper [class*="value-prop"] {
+  display: none !important;
+}

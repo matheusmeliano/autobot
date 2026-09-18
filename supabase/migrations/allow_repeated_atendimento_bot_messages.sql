@@ -1,0 +1,1 @@
+drop index if exists public.atendimento_messages_unique_bot_content_per_conversation;

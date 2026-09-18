@@ -1,0 +1,110 @@
+"use server";
+
+import { headers } from "next/headers";
+import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { supabaseErrorToPt } from "@/lib/supabase/errors";
+import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
+
+const schema = z.object({
+  next: z.string().optional(),
+});
+
+export async function forgotPasswordAction(formData: FormData) {
+  const rawEmail = formData.get("email");
+  const normalizedEmail = String(rawEmail ?? "").trim().toLowerCase();
+
+  const parts = normalizedEmail.split("@");
+  const localPart = parts[0] ?? "";
+  const domainPart = parts[1] ?? "";
+  const domainSegments = domainPart.split(".");
+  const tld = domainSegments[domainSegments.length - 1] ?? "";
+
+  if (
+    !normalizedEmail ||
+    parts.length !== 2 ||
+    localPart.length === 0 ||
+    domainPart.length === 0 ||
+    domainSegments.length < 2 ||
+    tld.length < 2
+  ) {
+    return { ok: false, error: "Email inválido." };
+  }
+
+  const parsedNext = schema.safeParse({ next: formData.get("next") });
+  const requestedNext = String(parsedNext.success ? parsedNext.data.next ?? "" : "").trim();
+  const safeNext = /^\/(?!\/)/.test(requestedNext) ? requestedNext : "";
+
+  const hdrs = await headers();
+  const baseUrl = resolveBaseUrlFromHeaders(hdrs);
+
+  if (!baseUrl) {
+    return { ok: false, error: "Não foi possível gerar o link de retorno." };
+  }
+
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.SUPABASE_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    null;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE ??
+    process.env.SUPABASE_SERVICE ??
+    null;
+
+  if (url && serviceKey) {
+    const admin = createClient(url, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    const { data: existingProfile, error: profileErr } = await admin
+      .from("profiles")
+      .select("user_id")
+      .ilike("email", normalizedEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileErr) {
+      return { ok: false, error: profileErr.message };
+    }
+
+    if (!existingProfile?.user_id) {
+      return { ok: false, error: "Este e-mail não está cadastrado." };
+    }
+  }
+
+  const supabase = await createSupabaseServerClient({ canSetCookies: true });
+  const redirectUrl = new URL("/redefinir-senha", baseUrl);
+  if (safeNext) {
+    redirectUrl.searchParams.set("next", safeNext);
+  }
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: redirectUrl.toString(),
+  });
+
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    const isUserNotFound =
+      msg.includes("user_not_found") ||
+      msg.includes("user not found") ||
+      (msg.includes("not found") && msg.includes("user")) ||
+      (msg.includes("email") && msg.includes("not found")) ||
+      (msg.includes("email") && msg.includes("does not exist")) ||
+      (msg.includes("email") && msg.includes("doesn't exist")) ||
+      (msg.includes("no user") && msg.includes("email"));
+
+    if (isUserNotFound) {
+      return { ok: false, error: "Este e-mail não está cadastrado." };
+    }
+    return { ok: false, error: supabaseErrorToPt(error.message) };
+  }
+
+  return { ok: true };
+}

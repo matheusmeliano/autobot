@@ -1,0 +1,4 @@
+fix(bloco83v2): backfill enrollment_number leads antigas + fallback geracao local
+
+Motivo: commit 17c238d (bloco83 v1 fallbacks UI/ellipsis/copy) so adicionava fallbacks de LEITURA mas NUNCA gerava/persistia enrollment_number para leads antigas que nunca passaram pelo contract-finalize endpoint.
+Correcao: 1) backfill useEffect client POST /contract-finalize (gera e salva no banco). 2) fallback final de render: se ainda vazio, gera LB + ano + 6chars ID + CL, salva storage, atribui a variavel. Resultado: enrollmentNumber NUNCA fica vazio. Placeholder -- e Copy bloqueado NAO OCORREM MAIS.

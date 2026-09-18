@@ -1,0 +1,266 @@
+"use server";
+
+import { z } from "zod";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { tryCreateSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
+import { isGlobalAdminEmail, isProtectedAdminOrUserEmail } from "@/lib/auth/admin";
+import { supabaseErrorToPt } from "@/lib/supabase/errors";
+import { normalizePlan } from "@/lib/plans";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+async function assertAdmin() {
+  const supabase = await createSupabaseServerClient({ canSetCookies: true });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!isGlobalAdminEmail(user?.email)) {
+    return { ok: false as const, error: "Acesso negado." };
+  }
+
+  return { ok: true as const };
+}
+
+async function getTargetProfileScope(supabase: NonNullable<ReturnType<typeof tryCreateSupabaseAdminClient>>, userId: string) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("access_scope")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (profile as any)?.access_scope;
+}
+
+const updateSchema = z.object({
+  id: z.string().min(1),
+  nome: z.string().min(1).max(120),
+  plano: z.enum(["teste", "basico", "pro", "vitalicio"]),
+  assinatura_status: z.enum(["ativo", "cancelado"]),
+  vencimento: z.string().optional(),
+});
+
+export async function updateUserAdminAction(input: unknown) {
+  const admin = await assertAdmin();
+  if (!admin.ok) return admin;
+
+  const parsed = updateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: "Dados inválidos." };
+  }
+
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error: "Configuração do servidor incompleta. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+    };
+  }
+  const payload = parsed.data;
+  const plano = normalizePlan(payload.plano);
+
+  const { data: target } = await supabase.auth.admin.getUserById(payload.id);
+  if (isProtectedAdminOrUserEmail(target.user?.email)) {
+    return { ok: false as const, error: "Não é possível editar este admin." };
+  }
+  if (isAtendimentoOnlyAccessScope(await getTargetProfileScope(supabase, payload.id))) {
+    return { ok: false as const, error: "Usuários do Atendimento são gerenciados apenas no módulo Atendimento." };
+  }
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        user_id: payload.id,
+        nome: payload.nome,
+        plano,
+      },
+      { onConflict: "user_id" },
+    );
+
+  if (profileError) {
+    return { ok: false as const, error: supabaseErrorToPt(profileError.message) };
+  }
+
+  const { data: latestSub } = await supabase
+    .from("subscriptions")
+    .select("id")
+    .eq("user_id", payload.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error: subError } = latestSub?.id
+    ? await supabase
+        .from("subscriptions")
+        .update({
+          plano,
+          status: payload.assinatura_status,
+          vencimento:
+            payload.plano === "vitalicio"
+              ? null
+              : payload.vencimento
+                ? payload.vencimento
+                : null,
+        })
+        .eq("id", latestSub.id)
+    : await supabase.from("subscriptions").insert({
+        user_id: payload.id,
+        plano,
+        status: payload.assinatura_status,
+        vencimento:
+          payload.plano === "vitalicio"
+            ? null
+            : payload.vencimento
+              ? payload.vencimento
+              : null,
+      });
+
+  if (subError) {
+    return { ok: false as const, error: supabaseErrorToPt(subError.message) };
+  }
+
+  return { ok: true as const };
+}
+
+const resetSchema = z.object({
+  id: z.string().min(1),
+  password: z.string().min(8).max(72),
+});
+
+export async function resetPasswordAdminAction(input: unknown) {
+  const admin = await assertAdmin();
+  if (!admin.ok) return admin;
+
+  const parsed = resetSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: "Senha inválida." };
+  }
+
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error: "Configuração do servidor incompleta. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+    };
+  }
+  const { error } = await supabase.auth.admin.updateUserById(parsed.data.id, {
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    return { ok: false as const, error: supabaseErrorToPt(error.message) };
+  }
+
+  return { ok: true as const };
+}
+
+export async function deleteUserAdminAction(id: string) {
+  const admin = await assertAdmin();
+  if (!admin.ok) return admin;
+
+  if (!id) return { ok: false as const, error: "ID inválido." };
+
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error: "Configuração do servidor incompleta. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+    };
+  }
+  const { data: target } = await supabase.auth.admin.getUserById(id);
+  if (isProtectedAdminOrUserEmail(target.user?.email)) {
+    return { ok: false as const, error: "Não é possível excluir este admin." };
+  }
+  if (isAtendimentoOnlyAccessScope(await getTargetProfileScope(supabase, id))) {
+    return { ok: false as const, error: "Usuários do Atendimento são gerenciados apenas no módulo Atendimento." };
+  }
+  const { error } = await supabase.auth.admin.deleteUser(id);
+  if (error) {
+    return { ok: false as const, error: supabaseErrorToPt(error.message) };
+  }
+
+  return { ok: true as const };
+}
+
+const createSchema = z.object({
+  nome: z.string().min(2).max(120),
+  email: z.string().trim().regex(EMAIL_REGEX),
+  password: z.string().min(8).max(72),
+});
+
+export async function createUserAdminAction(input: unknown) {
+  const admin = await assertAdmin();
+  if (!admin.ok) return admin;
+
+  const parsed = createSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: "Dados inválidos." };
+  }
+  const supabase = tryCreateSupabaseAdminClient();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error: "Configuração do servidor incompleta. Configure SUPABASE_SERVICE_ROLE_KEY na Vercel.",
+    };
+  }
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
+
+  // Verifica duplicidade em profiles primeiro
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .ilike("email", normalizedEmail)
+    .limit(1)
+    .maybeSingle();
+  if (existingProfile?.user_id) {
+    return { ok: false as const, error: "Este e-mail já possui cadastro." };
+  }
+
+  // Cria usuario auth
+  const { data: createdUser, error: createUserError } =
+    await supabase.auth.admin.createUser({
+      email: normalizedEmail,
+      password: parsed.data.password,
+      email_confirm: true,
+      user_metadata: { name: parsed.data.nome },
+    });
+  if (createUserError) {
+    return { ok: false as const, error: supabaseErrorToPt(createUserError.message) };
+  }
+  const userId = createdUser.user?.id;
+  if (!userId) {
+    return { ok: false as const, error: "Falha ao criar usuário." };
+  }
+
+  // Profile
+  const { error: profileError } = await supabase.from("profiles").upsert(
+    {
+      user_id: userId,
+      email: normalizedEmail,
+      nome: parsed.data.nome,
+      plano: "teste",
+      access_scope: "app",
+    },
+    { onConflict: "user_id" },
+  );
+  if (profileError) {
+    return { ok: false as const, error: supabaseErrorToPt(profileError.message) };
+  }
+
+  // Assinatura teste 3 meses
+  const vencimento = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const { error: subError } = await supabase.from("subscriptions").insert({
+    user_id: userId,
+    plano: "teste",
+    status: "ativo",
+    vencimento,
+  });
+  if (subError) {
+    return { ok: false as const, error: supabaseErrorToPt(subError.message) };
+  }
+
+  return { ok: true as const };
+}

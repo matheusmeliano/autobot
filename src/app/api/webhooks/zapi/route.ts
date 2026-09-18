@@ -1,0 +1,6549 @@
+import crypto from "node:crypto";
+import OpenAI from "openai";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { confirmExecutedSchedulePaymentForUser } from "@/app/app/agenda/actions";
+import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
+import {
+  botReplyForLead,
+  firstTwoNamesFromFullName,
+  getNextMissingField,
+  isValidCPF,
+} from "@/lib/atendimento/bot";
+import {
+  ACTIVE_CAPTURED_FIELD_ORDER,
+  ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10,
+  buildExperimentalClassDatePromptMessages,
+  buildStatePrompt,
+  CAPTURED_FIELD_PROMPTS,
+  EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE,
+  EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE,
+  EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE,
+  LOCATION_STATE_INVALID_MESSAGE,
+  LOCATION_CITY_INVALID_MESSAGE,
+  POST_BOOKING_CPF_PROMPT,
+  POST_BOOKING_CPF_STAGE_ENABLED,
+  POST_BOOKING_CPF_SUCCESS_MESSAGE,
+  WHATSAPP_REGISTERED_SUCCESS_MESSAGE,
+  isDedicatedExclusiveBotPhone,
+  isOwnerPersonalPrivatePhone,
+  isZapiInternalBlocklistedPhone,
+} from "@/lib/atendimento/constants";
+import {
+  buildExperimentalClassBookingChatMessages,
+  buildExperimentalClassDatesMessages,
+  buildExperimentalClassFinalChatMessages,
+  buildExperimentalClassRegisteredAttendantWhatsAppMessage,
+  buildExperimentalClassStudentWhatsAppMessages,
+  buildExperimentalClassTimesMessages,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_DURATION_MINUTES,
+  EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE,
+  EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE,
+  findExperimentalClassDateOption,
+  findExperimentalClassTimeOption,
+  listExperimentalClassAvailability,
+  buildRecurringPlanIntroMessages,
+  buildRecurringSchedulePromptMessages,
+  buildRecurringCalendarDatesMessages,
+  buildExperimentalClassTimesMessages as buildRecurringCalendarTimesMessages,
+  findExperimentalClassDateOption as findRecurringCalendarDateOption,
+  findExperimentalClassTimeOption as findRecurringCalendarTimeOption,
+  listExperimentalClassAvailability as listRecurringCalendarAvailability,
+  resolveExperimentalClassAssignedProfessorPhone,
+} from "@/lib/atendimento/experimentalClass";
+import {
+  appendHistoryEvent,
+  ensureWhatsAppLeadAndConversation,
+  findLeadByPhone,
+  hasAnyBotMessage,
+  maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
+  maybeSendExperimentalClassConfirmationToStudent,
+  sendAtendimentoWhatsAppText,
+  sendAtendimentoWhatsAppTextBatch,
+  syncConversationPreview,
+  getZapiInstanceMeta,
+  detectLenientYesNo,
+} from "@/lib/atendimento/server";
+import {
+  inferBrazilianLocationFromDdd,
+  inferTimeZoneFromPhoneCountryCode,
+  resolveTimeZoneFromCityInput,
+  resolveTimeZoneFromStateInput,
+} from "@/lib/timezone";
+import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
+
+export const runtime = "nodejs";
+const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
+const WHATSAPP_INVALID_MESSAGE =
+  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
+const WHATSAPP_INVALID_FINAL_MESSAGE =
+  "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
+const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
+  "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
+
+function normalizePhone(phone: string) {
+  const raw = String(phone ?? "").trim();
+  const d = raw.replace(/\D/g, "");
+  if (!d) return "";
+  if (raw.startsWith("+")) return d;
+  if (d.startsWith("55")) return d;
+  if (d.startsWith("1") && d.length === 11) return d;
+  if (d.length === 11) return `55${d}`;
+  return d;
+}
+
+function isValidWhatsAppUserPhone(digitsOnly: string): boolean {
+  const d = String(digitsOnly ?? "").replace(/\D/g, "");
+  if (!d) return false;
+  if (!/^\d+$/.test(d)) return false;
+  if (/^0+$/.test(d)) return false;
+  if (d.length < 10) return false;
+  if (d.length > 15) return false;
+  if (d.startsWith("0")) return false;
+  if (d.startsWith("550")) return false;
+  if (d.startsWith("55")) {
+    if (d.length !== 12 && d.length !== 13) return false;
+    const rest = d.slice(2);
+    if (/^0+/.test(rest)) return false;
+    return true;
+  }
+  if (d.startsWith("1")) {
+    if (d.length !== 11) return false;
+    const npa = d.slice(1, 4);
+    if (!/^[2-9]\d{2}$/.test(npa)) return false;
+    return true;
+  }
+  const firstDigit = Number(d[0]);
+  if (!Number.isFinite(firstDigit) || firstDigit < 2) return false;
+  return true;
+}
+
+function normalizeAndValidateFromPhone(phone: unknown): {
+  normalized: string;
+  digitsOnly: string;
+  valid: boolean;
+  invalidReason?: string;
+} {
+  const raw = String(phone ?? "").trim();
+  if (!raw) {
+    return { normalized: "", digitsOnly: "", valid: false, invalidReason: "empty_phone" };
+  }
+  const normalized = normalizePhone(raw);
+  const digitsOnly = normalized.replace(/\D/g, "");
+  if (!digitsOnly) {
+    return { normalized: "", digitsOnly: "", valid: false, invalidReason: "empty_digits" };
+  }
+  if (!isValidWhatsAppUserPhone(digitsOnly)) {
+    return {
+      normalized,
+      digitsOnly,
+      valid: false,
+      invalidReason: "invalid_user_phone_format",
+    };
+  }
+  return { normalized, digitsOnly, valid: true };
+}
+
+function isAuthorized(req: Request) {
+  const secret = process.env.ZAPI_WEBHOOK_SECRET;
+  if (!secret) return true;
+  const url = new URL(req.url);
+  const q = url.searchParams.get("secret");
+  const auth = req.headers.get("authorization") ?? "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : "";
+  return q === secret || bearer === secret;
+}
+
+const CANCELLED_BOOKING_AUTO_REPLY_MSG =
+  "Seu agendamento foi cancelado. Estamos analisando seu caso e, em breve, nossa equipe entrará em contato.";
+
+function extractString(v: unknown) {
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  return "";
+}
+
+function getFirstNonEmpty(...values: Array<unknown>) {
+  for (const v of values) {
+    const s = extractString(v).trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+function equivalentBrazilianPhoneSuffix(aDigitsRaw: string | null | undefined, bDigitsRaw: string | null | undefined): boolean {
+  const a = String(aDigitsRaw ?? "").replace(/\D/g, "");
+  const b = String(bDigitsRaw ?? "").replace(/\D/g, "");
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const a10 = a.length >= 10 ? a.slice(-10) : "";
+  const b10 = b.length >= 10 ? b.slice(-10) : "";
+  if (a10 && b10 && a10 === b10) return true;
+  const c1: boolean = Boolean(a10) && b.endsWith(a10);
+  const c2: boolean = Boolean(b10) && a.endsWith(b10);
+  return c1 || c2;
+}
+
+function getEquivalentBrazilianPhoneSuffixKey(digitsRaw: string | null | undefined): string {
+  const a = String(digitsRaw ?? "").replace(/\D/g, "");
+  if (a.length >= 10) return a.slice(-10);
+  return a;
+}
+
+function normalizeText(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function buildPhoneValidationRetryMessage(attempts: number) {
+  return `${WHATSAPP_INVALID_MESSAGE}\n\nTentativa ${attempts} de ${MAX_PHONE_VALIDATION_ATTEMPTS}.`;
+}
+
+function normalizeValidationErrorText(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function isExplicitInvalidWhatsAppError(error: unknown) {
+  const message = normalizeValidationErrorText(error);
+  if (!message) return false;
+  return (
+    message.includes("phone number does not exist") ||
+    message.includes("numero nao existe") ||
+    message.includes("number does not exist") ||
+    message.includes("nao possui whatsapp") ||
+    message.includes("not on whatsapp") ||
+    message.includes("whatsapp number does not exist")
+  );
+}
+
+async function upsertCapturedPhoneField(params: {
+  leadId: string;
+  sourceMessageId: string;
+  phone: string;
+}) {
+  const admin = createSupabaseAdminClient();
+  const { data: existing } = await admin
+    .from("atendimento_captured_fields")
+    .select("id")
+    .eq("lead_id", params.leadId)
+    .eq("field_name", "phone")
+    .maybeSingle();
+
+  if (existing?.id) {
+    await admin
+      .from("atendimento_captured_fields")
+      .update({
+        field_value: params.phone,
+        source_message_id: params.sourceMessageId,
+        confidence: 0.92,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", String(existing.id));
+    return;
+  }
+
+  await admin.from("atendimento_captured_fields").insert({
+    lead_id: params.leadId,
+    field_name: "phone",
+    field_value: params.phone,
+    source_message_id: params.sourceMessageId,
+    confidence: 0.92,
+  });
+}
+
+async function listScheduledExperimentalClassProfessorStarts(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  nowIso: string;
+}) {
+  const { data, error } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", params.nowIso)
+    .order("professor_start_at", { ascending: true });
+
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  const tableMissing =
+    Boolean(error) &&
+    (code === "42P01" ||
+      code === "PGRST205" ||
+      /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+      /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(message));
+  if (error && !tableMissing) {
+    throw new Error(error.message || "Falha ao consultar horários ocupados da aula experimental.");
+  }
+
+  const { data: historyData, error: historyError } = await params.admin
+    .from("atendimento_history_events")
+    .select("details")
+    .eq("event_type", "experimental_class_scheduled")
+    .order("created_at", { ascending: true });
+
+  if (historyError) {
+    throw new Error(historyError.message || "Falha ao consultar horários ocupados da aula experimental.");
+  }
+
+  return Array.from(
+    new Set([
+      ...(!tableMissing ? (data ?? []).map((row) => String((row as any)?.professor_start_at ?? "").trim()) : []),
+      ...(historyData ?? []).map((row) => String(((row as any)?.details ?? {}).professor_start_at ?? "").trim()),
+    ]),
+  ).filter((value) => value && value >= params.nowIso);
+}
+
+async function findPendingPhoneValidationEvent(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  messageIds: string[];
+}) {
+  for (const messageId of params.messageIds) {
+    if (!messageId) continue;
+    const { data: byMessageId } = await params.admin
+      .from("atendimento_history_events")
+      .select("id, lead_id, conversation_id, details")
+      .eq("event_type", "phone_validation_pending")
+      .contains("details", { external_message_id: messageId })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byMessageId?.id) {
+      return byMessageId as any;
+    }
+
+    const { data: byZaapId } = await params.admin
+      .from("atendimento_history_events")
+      .select("id, lead_id, conversation_id, details")
+      .eq("event_type", "phone_validation_pending")
+      .contains("details", { external_zaap_id: messageId })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (byZaapId?.id) {
+      return byZaapId as any;
+    }
+  }
+
+  return null;
+}
+
+async function getPhoneValidationFailureCount(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+}) {
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .in("event_type", ["phone_validation_format_failed", "phone_validation_failed"]);
+
+  return Number(count ?? 0);
+}
+
+const POSITIVE_TEXT_SNIPPETS = [
+  "pagamento realizado",
+  "pix feito",
+  "pix realizado",
+  "pix pago",
+  "pagamento efetuado",
+  "ja paguei",
+  "acabei de pagar",
+  "efetuei o pagamento",
+  "transferencia realizada",
+  "valor pago",
+  "conta quitada",
+  "debito quitado",
+  "mensalidade paga",
+  "tudo certo com o pagamento",
+  "envio de comprovante",
+  "segue comprovante",
+  "comprovante em anexo",
+  "enviando comprovante",
+  "comprovante do pagamento",
+  "comprovante enviado",
+  "anexei o comprovante",
+  "print do pagamento",
+  "print do pix",
+  "comprovante pix",
+  "recibo do pagamento",
+  "evidencia do pagamento",
+  "anexo do pagamento",
+  "pago",
+  "paguei",
+  "ja foi pago",
+  "ja esta pago",
+  "feito",
+  "resolvido",
+  "tudo pago",
+  "esta quitado",
+  "pagamento concluido",
+  "pix enviado",
+  "transferido",
+  "acabei de fazer o pix",
+  "ok, pago",
+  "pago agora",
+  "enviei o pix",
+  "confira o pix",
+  "pode verificar",
+  "da uma olhada",
+  "confirma ai",
+  "recebeu?",
+];
+
+const NEGATIVE_TEXT_SNIPPETS = [
+  "vou pagar",
+  "pagarei",
+  "pago amanha",
+  "vou fazer o pix",
+  "vou fazer pix",
+  "manda o pix",
+  "manda sua chave",
+  "qual a chave",
+  "posso pagar",
+  "como posso pagar",
+];
+
+function extractMediaInfo(body: any) {
+  const mediaUrl = getFirstNonEmpty(
+    body?.image?.url,
+    body?.imageUrl,
+    body?.media?.url,
+    body?.file?.url,
+    body?.document?.url,
+    body?.message?.image?.url,
+    body?.message?.document?.url,
+    body?.message?.file?.url,
+    body?.data?.image?.url,
+    body?.data?.media?.url,
+    body?.data?.file?.url,
+    body?.data?.document?.url,
+    body?.data?.message?.image?.url,
+    body?.data?.message?.document?.url,
+    body?.data?.message?.file?.url,
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.image?.url : "",
+    Array.isArray(body?.messages) ? body?.messages?.[0]?.document?.url : "",
+  );
+
+  const typeSource = normalizeText(
+    getFirstNonEmpty(
+      body?.type,
+      body?.event,
+      body?.eventType,
+      body?.message?.type,
+      body?.message?.mimetype,
+      body?.message?.mimeType,
+      body?.data?.type,
+      body?.data?.event,
+      body?.data?.message?.type,
+      body?.data?.message?.mimetype,
+      body?.data?.message?.mimeType,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.type : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.mimetype : "",
+    ),
+  );
+
+  const hasImageFlag =
+    Boolean(body?.image || body?.message?.image || body?.data?.image || body?.data?.message?.image) ||
+    typeSource.includes("image") ||
+    typeSource.includes("imagem");
+  const hasDocumentFlag =
+    Boolean(body?.document || body?.message?.document || body?.data?.document || body?.data?.message?.document) ||
+    typeSource.includes("document") ||
+    typeSource.includes("arquivo") ||
+    typeSource.includes("application/");
+
+  return {
+    mediaUrl,
+    hasPaymentMedia: Boolean(mediaUrl || hasImageFlag || hasDocumentFlag),
+  };
+}
+
+function isInboundMessagePureNonTextAtNameStage(body: any): boolean {
+  if (!body || typeof body !== "object") return false;
+  const typeSource = normalizeText(
+    getFirstNonEmpty(
+      body?.type,
+      body?.event,
+      body?.eventType,
+      body?.message?.type,
+      body?.message?.mimetype,
+      body?.message?.mimeType,
+      body?.data?.type,
+      body?.data?.event,
+      body?.data?.message?.type,
+      body?.data?.message?.mimetype,
+      body?.data?.message?.mimeType,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.type : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.mimetype : "",
+    ),
+  );
+  const msgText = String(
+    getFirstNonEmpty(
+      (body as any).text?.message,
+      (body as any).text?.body,
+      (body as any).message,
+      (body as any).body,
+      (body as any).message?.text,
+      (body as any).message?.body,
+      (body as any).data?.message?.text,
+      (body as any).data?.message?.body,
+      Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.text : "",
+      Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.body : "",
+      (body as any).data?.text?.message,
+      (body as any).data?.message,
+      (body as any).data?.body,
+    ) || "",
+  ).trim();
+  if (msgText.length > 0) return false;
+  const has = (candidates: Array<any>): boolean => {
+    for (const c of candidates) {
+      if (!c) continue;
+      if (typeof c === "string") {
+        if (c.trim().length > 0) return true;
+      } else if (typeof c === "object") {
+        for (const k of Object.keys(c)) {
+          const v = (c as any)[k];
+          if (v == null) continue;
+          if (typeof v === "string" && v.trim().length > 0) return true;
+          if (typeof v === "number" && Number.isFinite(v)) return true;
+          if (typeof v === "boolean") return true;
+          if (Array.isArray(v) && v.length > 0) return true;
+          if (typeof v === "object") return true;
+        }
+        return Object.keys(c).length > 0;
+      }
+    }
+    return false;
+  };
+  const unifiedMediaUrl = (() => {
+    const candidates: Array<any> = [
+      body?.message?.mediaUrl, body?.message?.media, body?.mediaUrl, body?.media?.url,
+      body?.data?.message?.mediaUrl, body?.data?.message?.media, body?.data?.mediaUrl, body?.data?.media?.url,
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.mediaUrl : "",
+      Array.isArray(body?.messages) ? body?.messages?.[0]?.media : "",
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 4) return true;
+      if (c && typeof c === "object") {
+        for (const k of ["url", "mediaUrl", "link", "media", "imageUrl", "fileUrl", "downloadUrl", "download_link", "media_link", "direct_path"]) {
+          const v = (c as any)[k];
+          if (typeof v === "string" && v.trim().length > 4) return true;
+        }
+      }
+    }
+    return false;
+  })();
+  const isVoice = (() => {
+    const candidates: Array<any> = [body, body?.message, body?.data, body?.data?.message, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      for (const k of ["isVoice", "is_voice", "isAudio", "is_audio", "voice", "audio"]) {
+        const raw = (c as any)[k];
+        if (raw == null) continue;
+        if (typeof raw === "boolean" && raw) return true;
+        const s = String(raw).trim().toLowerCase();
+        if (s === "true" || s === "1" || s === "yes" || s === "on") return true;
+      }
+    }
+    return false;
+  })();
+  const hasImage = has([body?.image, body?.imageUrl, body?.message?.image, body?.data?.image, body?.data?.message?.image, Array.isArray(body?.messages) ? body?.messages?.[0]?.image : ""]);
+  const hasDocument = has([body?.document, body?.file, body?.message?.document, body?.message?.file, body?.data?.document, body?.data?.file, body?.data?.message?.document, body?.data?.message?.file, Array.isArray(body?.messages) ? body?.messages?.[0]?.document : "", Array.isArray(body?.messages) ? body?.messages?.[0]?.file : ""]);
+  const hasVideo = has([body?.video, body?.message?.video, body?.data?.video, body?.data?.message?.video, Array.isArray(body?.messages) ? body?.messages?.[0]?.video : ""]);
+  const hasAudio = has([body?.audio, body?.voice, body?.message?.audio, body?.message?.voice, body?.data?.audio, body?.data?.voice, body?.data?.message?.audio, Array.isArray(body?.messages) ? body?.messages?.[0]?.audio : "", Array.isArray(body?.messages) ? body?.messages?.[0]?.voice : ""]) || isVoice;
+  const hasSticker = has([body?.sticker, body?.message?.sticker, body?.data?.sticker, body?.data?.message?.sticker, Array.isArray(body?.messages) ? body?.messages?.[0]?.sticker : ""]);
+  const hasLocation = (() => {
+    const candidates: Array<any> = [body?.location, body?.message?.location, body?.data?.location, body?.data?.message?.location, Array.isArray(body?.messages) ? body?.messages?.[0]?.location : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      const lat = Number(getFirstNonEmpty(c?.latitude, c?.lat, c?.lati) || NaN);
+      const lng = Number(getFirstNonEmpty(c?.longitude, c?.lng, c?.longi, c?.lon) || NaN);
+      const addr = String(getFirstNonEmpty(c?.address, c?.label, c?.placeName, c?.place) || "").trim();
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return true;
+      if (addr.length >= 2) return true;
+    }
+    return false;
+  })();
+  const hasCall = (() => {
+    const typeMatch =
+      typeSource.includes("call") || typeSource.includes("ligacao") || typeSource.includes("ligação") ||
+      typeSource.includes("missed") || typeSource.includes("perdida") || typeSource.includes("voice_call") ||
+      typeSource.includes("phone_call") || typeSource.includes("chamada") ||
+      typeSource.includes("incoming_call") || typeSource.includes("incoming_missed");
+    if (!typeMatch) return false;
+    const candidates: Array<any> = [body, body?.data, body?.call, body?.message, body?.callInfo, body?.call_info, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      if (String(getFirstNonEmpty(c?.callId, c?.call_id, c?.id, c?.CallId) || "").trim()) return true;
+      if (String(getFirstNonEmpty(c?.duration, c?.Duration, c?.seconds, c?.callDuration) || "").trim()) return true;
+      const status = normalizeText(getFirstNonEmpty(c?.status, c?.callStatus, c?.state, c?.result) || "");
+      if (status && ["missed", "perdida", "incoming_call", "outgoing", "ended", "busy", "declined", "not_answered", "nao_atendida", "não_atendida"].some((s) => status.includes(s))) return true;
+      for (const k of ["fromMe", "from_me", "isFromMe"]) {
+        const raw = (c as any)[k];
+        if (raw === true) return true;
+      }
+    }
+    return true;
+  })();
+  const hasContact = (() => {
+    if (typeSource.includes("contact") || typeSource.includes("contato") || typeSource.includes("vcard")) return true;
+    const candidates: Array<any> = [body, body?.message, body?.data, body?.data?.message, Array.isArray(body?.messages) ? body?.messages?.[0] : null];
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      for (const k of ["contact", "contacts", "vcard", "vCard", "vCards"]) {
+        const arrOrObj = (c as any)[k];
+        if (!arrOrObj) continue;
+        const arr = Array.isArray(arrOrObj) ? arrOrObj : [arrOrObj];
+        for (const entry of arr) {
+          if (!entry || typeof entry !== "object") continue;
+          if (String(getFirstNonEmpty(entry?.name, entry?.displayName, entry?.formattedName, entry?.Name) || "").trim()) return true;
+          const phones = Array.isArray(entry?.phones) ? entry?.phones : (entry?.phone ? [entry?.phone] : []);
+          if (phones.length > 0 && phones.some((p: any) => String(getFirstNonEmpty(p?.number, p?.phone, p?.value, p) || "").trim())) return true;
+        }
+      }
+    }
+    return false;
+  })();
+  const hasGif =
+    (typeSource.includes("gif") || typeSource.includes("animated") || typeSource.includes("animado")) &&
+    (hasImage || hasSticker || hasVideo || unifiedMediaUrl);
+  const audioMimeOrType = typeSource.includes("audio") || typeSource.includes("voice") || typeSource.includes("voz") || typeSource.includes("ogg") || typeSource.includes("opus") || typeSource.includes("mpeg");
+  if (hasCall) return true;
+  if (hasLocation) return true;
+  if (hasContact) return true;
+  if (hasAudio || (audioMimeOrType && unifiedMediaUrl)) return true;
+  if (hasVideo) return true;
+  if (hasSticker) return true;
+  if (hasGif) return true;
+  if (hasImage) return true;
+  if (hasDocument) return true;
+  if (unifiedMediaUrl) return true;
+  const nonTextTypeMatch = ["audio", "image", "video", "document", "sticker", "gif", "location", "contact", "call", "media", "reaction", "order"].some((ty) => typeSource.includes(ty));
+  if (nonTextTypeMatch) return true;
+  return false;
+}
+
+function heuristicPaymentDetection(params: { text: string; mediaUrl?: string | null; hasPaymentMedia?: boolean }) {
+  const t = normalizeText(params.text || "");
+  const hasMedia = Boolean(params.hasPaymentMedia || (params.mediaUrl || "").trim());
+  const positive = POSITIVE_TEXT_SNIPPETS.some((snippet) => t.includes(snippet));
+  const negative = NEGATIVE_TEXT_SNIPPETS.some((snippet) => t.includes(snippet));
+
+  const isPayment = (positive || hasMedia) && !negative;
+  if (!isPayment) {
+    return { ok: false as const };
+  }
+  return {
+    ok: true as const,
+    result: {
+      is_payment_proof: true,
+      confidence: hasMedia ? 0.9 : 0.8,
+      reason: hasMedia ? "Imagem/anexo recebido como potencial comprovante." : "Confirmação textual de pagamento detectada.",
+      raw: { source: "heuristic", positive, negative, hasMedia },
+    },
+  };
+}
+
+const MAX_LOCATION_WHATSAPP_ATTEMPTS = 3;
+const MAX_SCHEDULE_WHATSAPP_ATTEMPTS = 3;
+
+function isValidCityInput(raw: string): { valid: boolean; reason?: string } {
+  const value = String(raw ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!value) return { valid: false, reason: "empty" };
+  if (value.length < 3) return { valid: false, reason: "too_short" };
+  if (/^[a-z]+$/.test(value) && value.length >= 10) {
+    const vowels = (value.match(/[aeiou]/g) ?? []).length;
+    const consonants = (value.match(/[bcdfghjklmnpqrstvwxyz]/g) ?? []).length;
+    const total = vowels + consonants;
+    if (total >= 10 && vowels / total < 0.2) return { valid: false, reason: "low_vowels" };
+    const unique = new Set(value.split("")).size;
+    if (unique / value.length < 0.55) return { valid: false, reason: "low_unique" };
+  }
+  if (!/[aeiou]/.test(value)) return { valid: false, reason: "no_vowels" };
+  return { valid: true };
+}
+
+function cityResolutionIsReliable(
+  resolution: ReturnType<typeof resolveTimeZoneFromCityInput> | null,
+  params?: { stateSoFarCountry?: "BR" | "US" | null },
+): resolution is NonNullable<ReturnType<typeof resolveTimeZoneFromCityInput>> {
+  if (!resolution) return false;
+  if (resolution.source !== "city_match") return false;
+  if (!String(resolution.city ?? "").trim()) return false;
+  const city = String(resolution.city ?? "").trim().toLowerCase();
+  const state = String(resolution.state ?? "").trim().toLowerCase();
+  if (city === state) return false;
+  const stateCountry = params?.stateSoFarCountry ?? null;
+  if (stateCountry && resolution.country && stateCountry !== resolution.country) return false;
+  return true;
+}
+
+const SUPPORT_FINAL_MESSAGE = `Não foi possível concluir este agendamento.
+
+Para continuar, entre em contato com nosso suporte pelo WhatsApp:
+
++55 (65) 9 9693-3336
+
+Nossa equipe dará continuidade ao seu atendimento o mais breve possível.`;
+
+async function sendSupportFinalAndMarkBlocked(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  normalizedPhoneOnly: string;
+  blockedStage: "state" | "city" | "date" | "time";
+  attempt: number;
+  contentText?: string | null;
+}) {
+  const nowIso = new Date().toISOString();
+  void params.admin
+    .from("atendimento_leads")
+    .update({ status: "encerrado", funnel_stage: "encerrado", updated_at: nowIso })
+    .eq("id", params.leadId);
+  void params.admin
+    .from("atendimento_conversations")
+    .update({ bot_enabled: false, updated_at: nowIso })
+    .eq("id", params.conversationId);
+
+  void appendHistoryEvent({
+    leadId: params.leadId,
+    conversationId: params.conversationId,
+    eventType: "whatsapp_flow_blocked_max_attempts",
+    title: "Fluxo WhatsApp encerrado por limite de tentativas",
+    details: {
+      stage: params.blockedStage,
+      attempt: params.attempt,
+      last_content: params.contentText || null,
+    },
+    actorType: "system",
+  });
+
+  const __insertSupport = insertWhatsAppBotTextMessage({
+    admin: params.admin,
+    conversationId: params.conversationId,
+    contentText: SUPPORT_FINAL_MESSAGE,
+  });
+  try {
+    await sendAtendimentoWhatsAppText({
+      phone: params.normalizedPhoneOnly,
+      message: SUPPORT_FINAL_MESSAGE,
+    });
+  } catch (_e) {}
+  void __insertSupport.catch(() => {});
+}
+
+function looksLikeWhatsAppDirectLeadFirstMessage(value: string) {
+  const clean = String(value ?? "").trim().toLowerCase();
+  if (!clean) return false;
+  if (/^\d+$/.test(clean) && clean.length >= 8) return false;
+  return true;
+}
+
+async function insertWhatsAppBotTextMessage(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+  contentText: string;
+  sentAt?: string;
+}) {
+  const sentAt = params.sentAt ?? new Date().toISOString();
+  const { data, error } = await params.admin
+    .from("atendimento_messages")
+    .insert({
+      conversation_id: params.conversationId,
+      sender_role: "bot",
+      content_text: params.contentText,
+      media_type: "text",
+      status: "entregue",
+      sent_at: sentAt,
+      delivered_at: sentAt,
+    })
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    const code = String((error as any)?.code ?? "").trim();
+    if (code !== "23505") {
+      throw new Error(error.message || "Falha ao inserir mensagem automática do bot.");
+    }
+  }
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
+async function getLastBotMessage(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+}) {
+  const { data } = await params.admin
+    .from("atendimento_messages")
+    .select("content_text, created_at")
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { content_text: string | null; created_at: string | null } | null) ?? null;
+}
+
+async function getRecentBotMessages(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  conversationId: string;
+  limit?: number;
+}) {
+  const limit = params.limit ?? 20;
+  const { data } = await params.admin
+    .from("atendimento_messages")
+    .select("content_text, created_at, id")
+    .eq("conversation_id", params.conversationId)
+    .eq("sender_role", "bot")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const rows = Array.isArray(data) ? (data as Array<{ content_text: string | null; created_at: string | null; id?: string | null }>) : [];
+  return rows.map((r) => String(r.content_text ?? "").trim()).filter(Boolean) as string[];
+}
+
+function inferExpectedWhatsAppFieldFromLastBot(lastBotText: string | null | undefined): "full_name" | "cpf" | "state" | "city" | "date" | "time" | null {
+  const raw = String(lastBotText ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith(LOCATION_STATE_INVALID_MESSAGE)) return "state" as const;
+  if (raw.startsWith(LOCATION_CITY_INVALID_MESSAGE)) return "city" as const;
+  if (
+    raw === CAPTURED_FIELD_PROMPTS.full_name ||
+    raw.includes("Qual é o seu nome?") ||
+    raw.includes("Qual seu nome?") ||
+    raw.includes("Seu nome?")
+  ) {
+    return "full_name" as const;
+  }
+  if (
+    raw === POST_BOOKING_CPF_PROMPT ||
+    raw.includes("Qual é o seu CPF") ||
+    raw.includes("qual é o seu cpf") ||
+    raw.includes("informe o seu CPF") ||
+    raw.includes("seu CPF")
+  ) {
+    return "cpf" as const;
+  }
+  if (
+    raw === CAPTURED_FIELD_PROMPTS.state ||
+    raw.includes("Em qual estado você mora?") ||
+    raw.includes("informe o estado onde você mora") ||
+    raw.includes("qual estado você mora")
+  ) {
+    return "state" as const;
+  }
+  if (
+    raw === CAPTURED_FIELD_PROMPTS.city ||
+    raw.includes("E a cidade?") ||
+    raw.includes("qual a sua cidade") ||
+    raw.includes("informe a cidade onde você mora")
+  ) {
+    return "city" as const;
+  }
+  if (
+    raw.startsWith("Datas disponíveis") ||
+    raw.startsWith("As datas disponíveis são:") ||
+    raw.startsWith("Dias disponíveis") ||
+    raw.startsWith("Os dias disponíveis são:") ||
+    raw.includes("qual data você prefere") ||
+    raw.includes("qual dia você prefere") ||
+    raw.includes("escolha a melhor data") ||
+    raw.includes("escolher o melhor dia") ||
+    raw.startsWith("Responda apenas com o dia desejado")
+  ) {
+    return "date" as const;
+  }
+  if (raw.startsWith(EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE)) return "date" as const;
+  if (
+    raw.startsWith("Horários disponíveis") ||
+    raw.startsWith("Os horários disponíveis são:") ||
+    raw.includes("qual horário você prefere") ||
+    raw.startsWith("Responda apenas com o horário desejado") ||
+    raw.startsWith("Responda apenas com o horario desejado") ||
+    raw.startsWith("Perfeito! E os horários disponíveis são:")
+  ) {
+    return "time" as const;
+  }
+  if (raw.startsWith(EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE)) return "time" as const;
+  return null;
+}
+
+async function countWhatsAppLocationFailures(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  field: "state" | "city";
+}) {
+  const eventType = params.field === "state" ? "state_validation_failed" : "city_validation_failed";
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", eventType);
+  return Number(count ?? 0);
+}
+
+async function countWhatsAppScheduleFailures(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  field: "date" | "time";
+}) {
+  const eventType =
+    params.field === "date"
+      ? "experimental_class_date_validation_failed"
+      : "experimental_class_time_validation_failed";
+  const { count } = await params.admin
+    .from("atendimento_history_events")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .eq("event_type", eventType);
+  return Number(count ?? 0);
+}
+
+async function isLeadBlockedByPreviousCancelledBooking(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  lead: any;
+  leadId: string;
+}) {
+  const rawCancelledAt = String(params?.lead?.latest_experimental_class_cancelled_at ?? "").trim();
+  if (rawCancelledAt && rawCancelledAt !== "null") return true;
+  const statusRaw = String(params?.lead?.experimental_class_booking?.status ?? params?.lead?.booking?.status ?? "").trim().toLowerCase();
+  if (statusRaw === "cancelled") return true;
+  try {
+    const { data: row } = await params.admin
+      .from("atendimento_experimental_class_bookings")
+      .select("id")
+      .eq("lead_id", params.leadId)
+      .eq("status", "cancelled")
+      .limit(1)
+      .maybeSingle();
+    if ((row as any)?.id) return true;
+  } catch (_e) {}
+  try {
+    const { data: leadRowFull } = await params.admin
+      .from("atendimento_leads")
+      .select("latest_experimental_class_cancelled_at")
+      .eq("id", params.leadId)
+      .limit(1)
+      .maybeSingle();
+    const fullRaw = String((leadRowFull as any)?.latest_experimental_class_cancelled_at ?? "").trim();
+    if (fullRaw && fullRaw !== "null") return true;
+  } catch (_e) {}
+  return false;
+}
+
+async function detectExpectedWhatsAppFieldFromHistory(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+}): Promise<"full_name" | "cpf" | "state" | "city" | "date" | "time" | null> {
+  const eventTypes = [
+    "full_name_collected",
+    "cpf_collected",
+    "cpf_validation_failed",
+    "cpf_prompt_presented",
+    "lead_timezone_collection_started",
+    "state_collected",
+    "city_prompt_presented",
+    "city_collected",
+    "lead_timezone_identified",
+    "state_validation_failed",
+    "city_validation_failed",
+    "experimental_class_date_options_presented",
+    "experimental_class_date_selected",
+    "experimental_class_date_validation_failed",
+    "experimental_class_time_options_presented",
+    "experimental_class_time_validation_failed",
+    "experimental_class_scheduled",
+  ];
+  const { data: events } = await params.admin
+    .from("atendimento_history_events")
+    .select("event_type, created_at")
+    .eq("lead_id", params.leadId)
+    .eq("conversation_id", params.conversationId)
+    .in("event_type", eventTypes)
+    .order("created_at", { ascending: false })
+    .limit(40);
+  if (!events || !events.length) return "full_name";
+  let blocked: "full_name" | "cpf" | "state" | "city" | "date" | "time" | null = null;
+  let hasStateCollected = false;
+  let hasCityCollected = false;
+  let hasNameCollected = false;
+  let hasCpfCollected = false;
+  let hasScheduled = false;
+  for (const evt of events as Array<{ event_type: string; created_at: string }>) {
+    const t = String(evt.event_type ?? "");
+    switch (t) {
+      case "experimental_class_scheduled":
+        hasScheduled = true;
+        if (POST_BOOKING_CPF_STAGE_ENABLED && !hasCpfCollected) {
+          if (blocked) return blocked;
+          return "cpf";
+        }
+        return null;
+      case "cpf_collected":
+        hasCpfCollected = true;
+        if (hasScheduled) return null;
+        break;
+      case "cpf_validation_failed":
+        blocked = "cpf";
+        break;
+      case "cpf_prompt_presented":
+        if (!blocked) return "cpf";
+        break;
+      case "experimental_class_time_validation_failed":
+        blocked = "time";
+        break;
+      case "experimental_class_time_options_presented":
+        return "time";
+      case "experimental_class_date_validation_failed":
+        blocked = "date";
+        break;
+      case "experimental_class_date_selected":
+      case "experimental_class_date_options_presented":
+        return "date";
+      case "lead_timezone_identified":
+      case "city_collected":
+        hasCityCollected = true;
+        if (!blocked) return null;
+        break;
+      case "city_validation_failed":
+        blocked = "city";
+        break;
+      case "city_prompt_presented":
+        if (!blocked) return "city";
+        break;
+      case "state_collected":
+        hasStateCollected = true;
+        if (!blocked && !hasCityCollected) return "city";
+        break;
+      case "state_validation_failed":
+        blocked = "state";
+        break;
+      case "full_name_collected":
+        hasNameCollected = true;
+        if (!blocked && !hasStateCollected) return "state";
+        break;
+      case "lead_timezone_collection_started":
+        if (hasStateCollected && !blocked && !hasCityCollected) return "city";
+        if (blocked) return blocked;
+        if (!hasNameCollected) return "full_name";
+        return "state";
+    }
+  }
+  if (!hasNameCollected) return "full_name";
+  if (hasScheduled && POST_BOOKING_CPF_STAGE_ENABLED && !hasCpfCollected) {
+    if (blocked) return blocked;
+    return "cpf";
+  }
+  return blocked;
+}
+
+function getWhatsAppNextMissingField(lead: any): "full_name" | "cpf" | "state" | "city" | null {
+  return getNextMissingField(lead, ACTIVE_CAPTURED_FIELD_ORDER as any) as any;
+}
+
+async function presentExperimentalClassDateOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  phone: string;
+  leadTimeZone?: string | null;
+  insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listExperimentalClassAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const messagesRaw = buildExperimentalClassDatesMessages(availability.dates);
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "experimental_class_date_options_presented",
+      title: "Datas disponíveis da aula experimental apresentadas",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        options: availability.dates,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return { lastOutbound, availability, messages };
+}
+
+async function presentExperimentalClassTimeOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  phone: string;
+  leadTimeZone?: string | null;
+  professorDate: string;
+  insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listExperimentalClassAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
+  const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
+  const messagesRaw = buildExperimentalClassTimesMessages({
+    dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
+    options: slots,
+  });
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "experimental_class_time_options_presented",
+      title: "Horários disponíveis da aula experimental apresentados",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        professor_date: params.professorDate,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return { lastOutbound, dateOption, slots, messages };
+}
+
+async function presentRecurringCalendarDateOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  phone: string;
+  leadTimeZone?: string | null;
+  insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listRecurringCalendarAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const messagesRaw = buildRecurringCalendarDatesMessages(availability.dates);
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "recurring_calendar_date_options_presented",
+      title: "Dias do calendario para aula recorrente apresentados",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        options: availability.dates,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return { lastOutbound, availability, messages };
+}
+
+async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string;
+  phone: string;
+  leadTimeZone?: string | null;
+  professorDate: string;
+  insertIntoConversation?: boolean;
+  skipWhatsAppSend?: boolean;
+}) {
+  const now = new Date();
+  const { data: bookedStartsRaw, error: bErr } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select("professor_start_at")
+    .eq("status", "scheduled")
+    .gte("professor_start_at", now.toISOString())
+    .order("professor_start_at", { ascending: true });
+  const bookedProfessorStarts = bErr
+    ? []
+    : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const availability = listRecurringCalendarAvailability({
+    now,
+    leadTimeZone: params.leadTimeZone,
+    bookedProfessorStartAts: bookedProfessorStarts,
+  });
+  const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
+  const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
+  const messagesRaw = buildRecurringCalendarTimesMessages({
+    dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
+    options: slots,
+  });
+  const messages = [messagesRaw.filter(Boolean).join("\n\n")];
+  const skipSend = Boolean(params.skipWhatsAppSend);
+  const shouldInsert = skipSend
+    ? false
+    : (typeof params.insertIntoConversation === "boolean" ? params.insertIntoConversation : true);
+  let lastOutbound: Record<string, unknown> | null = null;
+  if (!skipSend) {
+    const batch = await sendAtendimentoWhatsAppTextBatch({
+      phone: params.phone,
+      messages,
+      admin: params.admin,
+      conversationId: params.conversationId,
+      insertIntoConversation: shouldInsert,
+    });
+    lastOutbound = (batch.insertedRows[batch.insertedRows.length - 1]?.row as Record<string, unknown>) ?? null;
+    void appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId,
+      eventType: "recurring_calendar_time_options_presented",
+      title: "Horarios disponiveis da aula recorrente apresentados",
+      details: {
+        teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        professor_date: params.professorDate,
+      },
+      actorType: "system",
+    });
+    void syncConversationPreview({
+      conversationId: params.conversationId,
+      contentText: messages[messages.length - 1] ?? "",
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return { lastOutbound, dateOption, slots, messages };
+}
+
+async function getScheduledExperimentalClassBookingWhatsApp(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+}) {
+  const { data } = await params.admin
+    .from("atendimento_experimental_class_bookings")
+    .select(
+      "professor_start_at, id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_checked_at",
+    )
+    .eq("lead_id", params.leadId)
+    .eq("status", "scheduled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as any) ?? null;
+}
+
+async function analyzePayment(params: { text: string; mediaUrl?: string | null }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return { ok: false as const, error: "OPENAI_API_KEY não configurada" };
+  }
+
+  const openai = new OpenAI({ apiKey });
+  const system = `Você analisa mensagens do WhatsApp (texto e/ou comprovante) e decide se isso é MUITO PROVAVELMENTE uma evidência de pagamento referente a uma cobrança.
+
+Retorne sempre um JSON válido (sem texto fora do JSON) no formato:
+{
+  "is_payment_proof": boolean,
+  "confidence": number,
+  "reason": "string curta",
+  "extracted": {
+    "amount_brl": "string ou vazio",
+    "payment_date": "string ou vazio",
+    "payer_name": "string ou vazio",
+    "reference": "string ou vazio"
+  }
+}
+
+Regras:
+- confidence deve ser entre 0 e 1
+- Toda imagem ou documento enviado pelo cliente após uma cobrança deve ser tratado como potencial comprovante e pode gerar suspeita de pagamento mesmo sem texto.
+- is_payment_proof só pode ser true quando confidence >= 0.75 e existir evidência clara de pagamento, seja:
+  - comprovante/recibo/print (imagem) com sinais claros de transação, ou
+  - confirmação textual explícita de que JÁ PAGOU (ex: "paguei", "pix feito", "transferi", "já está pago"), preferencialmente com algum detalhe (valor, data/hora, banco, id/transação, referência).
+- Não marque como pagamento quando o texto indicar intenção futura ("vou pagar", "pagarei amanhã"), pedido de dados ("manda o pix"), ou dúvida ("posso pagar?").
+`;
+
+  const userText = params.text?.trim() ? params.text.trim() : "(sem texto)";
+
+  const content = params.mediaUrl
+    ? ([
+        {
+          type: "text",
+          text: `Mensagem: ${userText}\n\nSe houver imagem ou documento anexado, trate como potencial comprovante de pagamento.`,
+        },
+        { type: "image_url", image_url: { url: params.mediaUrl } },
+      ] as any)
+    : (`Mensagem: ${userText}\n\nResponda apenas com o JSON.` as any);
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.2,
+  });
+
+  const raw = completion.choices?.[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(raw);
+  const isPayment = Boolean((parsed as any)?.is_payment_proof);
+  const confidenceRaw = Number((parsed as any)?.confidence ?? 0);
+  const confidence = Number.isFinite(confidenceRaw) ? Math.max(0, Math.min(1, confidenceRaw)) : 0;
+  const reason = extractString((parsed as any)?.reason);
+  return {
+    ok: true as const,
+    result: {
+      is_payment_proof: isPayment,
+      confidence,
+      reason,
+      extracted: (parsed as any)?.extracted ?? null,
+      raw: parsed,
+    },
+  };
+}
+
+export async function POST(req: Request) {
+  if (!isAuthorized(req)) {
+    return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return Response.json({ ok: true, ignored: true });
+  }
+
+  const instanceId = getFirstNonEmpty(
+    url.searchParams.get("instanceId"),
+    url.searchParams.get("instance_id"),
+    (body as any).instanceId,
+    (body as any).instance_id,
+    (body as any).instance,
+    (body as any).id,
+    (body as any).data?.instanceId,
+    (body as any).data?.instance_id,
+  );
+
+  const eventType = getFirstNonEmpty(
+    (body as any).type,
+    (body as any).event,
+    (body as any).eventType,
+    (body as any).data?.type,
+    (body as any).data?.event,
+  );
+
+  const senderRaw = getFirstNonEmpty(
+    (body as any).sender,
+    (body as any).message?.sender,
+    (body as any).data?.sender,
+    (body as any).data?.message?.sender,
+  ).trim().toLowerCase();
+
+  const statusRaw = getFirstNonEmpty(
+    (body as any).status,
+    (body as any).message?.status,
+    (body as any).data?.status,
+    (body as any).data?.message?.status,
+  ).trim().toLowerCase();
+
+  let rawFromMe =
+    (body as any).fromMe === true ||
+    (body as any).fromMe === "true" ||
+    (body as any).fromMe === 1 ||
+    (body as any).fromMe === "1" ||
+    (body as any).from_me === true ||
+    (body as any).from_me === "true" ||
+    (body as any).from_me === 1 ||
+    (body as any).from_me === "1" ||
+    (body as any).is_from_me === true ||
+    (body as any).is_from_me === "true" ||
+    (body as any).is_from_me === 1 ||
+    (body as any).is_from_me === "1" ||
+    (body as any).message?.fromMe === true ||
+    (body as any).message?.fromMe === "true" ||
+    (body as any).message?.fromMe === 1 ||
+    (body as any).message?.fromMe === "1" ||
+    (body as any).message?.from_me === true ||
+    (body as any).message?.from_me === "true" ||
+    (body as any).message?.from_me === 1 ||
+    (body as any).message?.from_me === "1" ||
+    (body as any).message?.is_from_me === true ||
+    (body as any).message?.is_from_me === "true" ||
+    (body as any).message?.is_from_me === 1 ||
+    (body as any).message?.is_from_me === "1" ||
+    (body as any).data?.fromMe === true ||
+    (body as any).data?.fromMe === "true" ||
+    (body as any).data?.fromMe === 1 ||
+    (body as any).data?.fromMe === "1" ||
+    (body as any).data?.from_me === true ||
+    (body as any).data?.from_me === "true" ||
+    (body as any).data?.from_me === 1 ||
+    (body as any).data?.from_me === "1" ||
+    (body as any).data?.is_from_me === true ||
+    (body as any).data?.is_from_me === "true" ||
+    (body as any).data?.is_from_me === 1 ||
+    (body as any).data?.is_from_me === "1" ||
+    (body as any).data?.message?.fromMe === true ||
+    (body as any).data?.message?.fromMe === "true" ||
+    (body as any).data?.message?.fromMe === 1 ||
+    (body as any).data?.message?.fromMe === "1" ||
+    (body as any).data?.message?.from_me === true ||
+    (body as any).data?.message?.from_me === "true" ||
+    (body as any).data?.message?.from_me === 1 ||
+    (body as any).data?.message?.from_me === "1" ||
+    (body as any).data?.message?.is_from_me === true ||
+    (body as any).data?.message?.is_from_me === "true" ||
+    (body as any).data?.message?.is_from_me === 1 ||
+    (body as any).data?.message?.is_from_me === "1" ||
+    senderRaw === "me" ||
+    /sent_by_me|sentbyme|notify_sent_by_me|notifysentbyme|sentByMe|notifySentByMe/i.test(
+      String(eventType ?? "") + String((body as any)?.event ?? "") + String((body as any)?.eventType ?? ""),
+    );
+
+  const isOutboundOnlyEvent =
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String(eventType ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.event ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.eventType ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.data?.type ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.data?.event ?? ""),
+    );
+
+  const rawEventId = getFirstNonEmpty(
+    (body as any).messageId,
+    (body as any).message_id,
+    (body as any).idMessage,
+    (body as any).data?.messageId,
+    (body as any).data?.message_id,
+    (body as any).data?.idMessage,
+  );
+
+  const payloadString = JSON.stringify(body);
+  const eventId = rawEventId || crypto.createHash("sha256").update(payloadString).digest("hex");
+
+  const fromPhone = getFirstNonEmpty(
+    (body as any).from,
+    (body as any).sender?.phone,
+    (body as any).senderPhone,
+    (body as any).message?.from,
+    (body as any).message?.sender?.phone,
+    (body as any).data?.message?.from,
+    (body as any).data?.message?.sender?.phone,
+    (body as any).data?.from,
+    (body as any).data?.sender?.phone,
+    (body as any).phone,
+    (body as any).message?.phone,
+    (body as any).data?.phone,
+    (body as any).data?.message?.phone,
+  );
+
+  const toPhone = getFirstNonEmpty(
+    (body as any).to,
+    (body as any).recipient,
+    (body as any).receiver,
+    (body as any).destination,
+    (body as any).peer,
+    (body as any).chatId,
+    (body as any).chat_id,
+    (body as any).participant,
+    (body as any).message?.to,
+    (body as any).message?.recipient,
+    (body as any).message?.receiver,
+    (body as any).message?.chatId,
+    (body as any).message?.chat_id,
+    (body as any).data?.to,
+    (body as any).data?.recipient,
+    (body as any).data?.receiver,
+    (body as any).data?.message?.to,
+    (body as any).data?.message?.recipient,
+    (body as any).data?.message?.receiver,
+    (body as any).data?.message?.chatId,
+    (body as any).data?.message?.chat_id,
+    (body as any).data?.chatId,
+    (body as any).data?.chat_id,
+    (body as any).instance_phone,
+    (body as any).instancePhone,
+    (body as any).data?.instance_phone,
+    (body as any).data?.instancePhone,
+  );
+
+  {
+    const t0_from = String(fromPhone ?? "").replace(/\D/g, "");
+    const t0_to = String(toPhone ?? "").replace(/\D/g, "");
+    const t0_loopback =
+      t0_from && t0_to && t0_from.length >= 10 && t0_to.length >= 10 &&
+      (t0_from === t0_to ||
+        t0_from.slice(-10) === t0_to.slice(-10) ||
+        t0_to.endsWith(t0_from.slice(-10)) ||
+        t0_from.endsWith(t0_to.slice(-10)));
+    if (t0_loopback || rawFromMe || isOutboundOnlyEvent) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason:
+          t0_loopback
+            ? "tier_minus_1_loopback_from_equals_to_bot_conversation"
+            : rawFromMe
+              ? "tier_minus_1_fromMe_outbound_or_status"
+              : "tier_minus_1_status_only_event",
+      });
+    }
+  }
+
+  const messageText = getFirstNonEmpty(
+    (body as any).text?.message,
+    (body as any).text?.body,
+    (body as any).message,
+    (body as any).body,
+    (body as any).message?.text,
+    (body as any).message?.body,
+    (body as any).data?.message?.text,
+    (body as any).data?.message?.body,
+    Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.text : "",
+    Array.isArray((body as any).messages) ? (body as any).messages?.[0]?.body : "",
+    (body as any).data?.text?.message,
+    (body as any).data?.message,
+    (body as any).data?.body,
+  );
+
+  const mediaInfo = extractMediaInfo(body);
+  const mediaUrl = mediaInfo.mediaUrl;
+
+  if (!instanceId) {
+    return Response.json({ ok: true, ignored: true, reason: "missing_instance_id" });
+  }
+
+  const admin = createSupabaseAdminClient();
+  const instColsBase = ["user_id", "token"];
+  const firstInst = await admin
+    .from("whatsapp_instances")
+    .select([...instColsBase, "client_token", "phone", "display_name"].join(", "))
+    .eq("instance_id", instanceId)
+    .maybeSingle();
+
+  const missingClientTokenCol =
+    firstInst.error &&
+    /client_token/i.test(firstInst.error.message) &&
+    /column/i.test(firstInst.error.message);
+  const missingPhoneCol =
+    firstInst.error &&
+    /\bphone\b/i.test(firstInst.error.message) &&
+    /column/i.test(firstInst.error.message);
+  const missingDisplayNameCol =
+    firstInst.error &&
+    /display_name/i.test(firstInst.error.message) &&
+    /column/i.test(firstInst.error.message);
+
+  let instance: any = firstInst.data;
+  let instErr = firstInst.error;
+
+  if (firstInst.error && (missingClientTokenCol || missingPhoneCol || missingDisplayNameCol)) {
+    const retryCols = [...instColsBase];
+    if (!missingClientTokenCol) retryCols.push("client_token");
+    if (!missingPhoneCol) retryCols.push("phone");
+    if (!missingDisplayNameCol) retryCols.push("display_name");
+    const retryInst = await admin
+      .from("whatsapp_instances")
+      .select(retryCols.join(", "))
+      .eq("instance_id", instanceId)
+      .maybeSingle();
+    instance = retryInst.data;
+    instErr = retryInst.error;
+  }
+
+  if (instErr) {
+    return Response.json({ ok: false, error: instErr.message }, { status: 500 });
+  }
+
+  const userId = instance?.user_id ? String(instance.user_id) : "";
+  if (!userId) {
+    return Response.json({ ok: true, ignored: true, reason: "unknown_instance" });
+  }
+
+  {
+    const { data: userInstances, error: uiErr } = await admin
+      .from("whatsapp_instances")
+      .select("instance_id, created_at, status")
+      .eq("user_id", userId);
+    if (!uiErr && Array.isArray(userInstances) && userInstances.length > 1) {
+      const sorted = [...userInstances].sort((a, b) => {
+        const aT = a.created_at ? new Date(String(a.created_at)).getTime() : 0;
+        const bT = b.created_at ? new Date(String(b.created_at)).getTime() : 0;
+        return bT - aT;
+      });
+      const canonicalInstanceId = String(sorted[0].instance_id ?? "").trim();
+      const receivedInstanceId = String(instanceId ?? "").trim();
+      if (canonicalInstanceId && canonicalInstanceId !== receivedInstanceId) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "stale_instance_not_current_for_user",
+          current_instance_id: canonicalInstanceId,
+          received_instance_id: receivedInstanceId,
+        });
+      }
+    }
+  }
+
+  if (!missingPhoneCol) {
+    const currentPhoneRaw = String(instance?.phone ?? "").trim();
+    const currentDigits = currentPhoneRaw.replace(/\D/g, "");
+    const currentPhoneLooksValid = currentDigits.length >= 10 && currentDigits.length <= 15;
+    const shouldTryRefreshPhone = instance?.token;
+    if (shouldTryRefreshPhone) {
+      let cleanedFresh = "";
+      const token = String(instance.token ?? "");
+      const clientToken = missingClientTokenCol ? null : instance?.client_token ?? null;
+      const MAX_META_ATTEMPTS = 2;
+      for (let attempt = 1; attempt <= MAX_META_ATTEMPTS && !cleanedFresh; attempt++) {
+        try {
+          const meta = await getZapiInstanceMeta({
+            instance_id: instanceId,
+            token,
+            client_token: clientToken || undefined,
+          });
+          const meData = meta.ok ? meta.data : null;
+          if (meData) {
+            const candidates: string[] = [];
+            if (typeof meData.phone === "string") candidates.push(meData.phone);
+            if (typeof meData.telephone === "string") candidates.push(meData.telephone);
+            if (meData.whatsapp && typeof meData.whatsapp.phone === "string") candidates.push(meData.whatsapp.phone);
+            if (meData.me && typeof meData.me.phone === "string") candidates.push(meData.me.phone);
+            if (typeof meData.id === "string") candidates.push(meData.id);
+            for (let i = 0; i < candidates.length; i++) {
+              const raw = candidates[i];
+              if (!raw || typeof raw !== "string") continue;
+              const isLastCandidate = i === candidates.length - 1;
+              const pieces = raw.split(/[^0-9]+/).filter(Boolean);
+              for (const piece of pieces) {
+                if (piece.length >= 10 && piece.length <= 15) {
+                  cleanedFresh = piece;
+                  break;
+                }
+              }
+              if (cleanedFresh) break;
+              const fallbackDigits = raw.replace(/\D/g, "");
+              if (fallbackDigits.length >= 10 && fallbackDigits.length <= 15) {
+                cleanedFresh = fallbackDigits;
+                break;
+              }
+              if (isLastCandidate && fallbackDigits.length > 15) {
+                const cc2 = fallbackDigits.startsWith("55")
+                  || fallbackDigits.startsWith("34")
+                  || fallbackDigits.startsWith("44")
+                  || fallbackDigits.startsWith("52")
+                  || fallbackDigits.startsWith("54")
+                  || fallbackDigits.startsWith("56")
+                  || fallbackDigits.startsWith("57");
+                if (cc2 && fallbackDigits.length >= 12) {
+                  cleanedFresh = fallbackDigits.slice(0, 13);
+                  if (cleanedFresh.length >= 10) break;
+                }
+                if (fallbackDigits.startsWith("1") && fallbackDigits.length >= 11) {
+                  cleanedFresh = fallbackDigits.slice(0, 11);
+                  break;
+                }
+              }
+            }
+            if (cleanedFresh && cleanedFresh.length >= 10 && cleanedFresh.length <= 15) {
+              if (!currentPhoneLooksValid || cleanedFresh !== currentDigits) {
+                try {
+                  await admin
+                    .from("whatsapp_instances")
+                    .update({ phone: cleanedFresh })
+                    .eq("instance_id", instanceId);
+                } catch (_wrErr) {}
+              }
+              if (instance) instance.phone = cleanedFresh;
+            } else if (!cleanedFresh && !currentPhoneLooksValid && currentPhoneRaw) {
+              try {
+                await admin
+                  .from("whatsapp_instances")
+                  .update({ phone: null })
+                  .eq("instance_id", instanceId);
+              } catch (_clrErr) {}
+            }
+          }
+        } catch (_metaErr) {
+          // Falha no /me: tenta novamente (MAX_META_ATTEMPTS)
+        }
+      }
+    }
+  }
+
+  const pendingPhoneValidationRef: { id: string } = { id: "" };
+  const normalizedEventType = String(eventType ?? "").trim();
+  const normalizedEventField = String((body as any)?.event ?? "").trim();
+  const normalizedEventTypeField = String((body as any)?.eventType ?? "").trim();
+  const normalizedDataTypeField = String((body as any)?.data?.type ?? "").trim();
+  const normalizedDataEventField = String((body as any)?.data?.event ?? "").trim();
+  const eventStringUnion = [
+    normalizedEventType,
+    normalizedEventField,
+    normalizedEventTypeField,
+    normalizedDataTypeField,
+    normalizedDataEventField,
+  ].join("|");
+
+  const isOnlyStatusEvent =
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String(eventType ?? ""),
+    ) ||
+    /^(DeliveryCallback|MessageStatusCallback|DisconnectedCallback|notifySentByMe|notify_sent_by_me|sentByMe|sent_by_me|sendStatus|send_status|sended|status|read_receipt|readReceipt|deliveredReceipt|delivered_receipt|read|delivered|ack|sent|messageStatus|message_status|message_status_callback|delivery_callback|status_callback|delete|deleteMessage|delete_message|revoke|disconnected|connecting|connected)$/i.test(
+      String((body as any)?.event ?? ""),
+    );
+
+  const hasDisconnectedSignal =
+    /\bdisconnected\b|\bdesconectado\b|\bDisconnectedCallback\b/i.test(eventStringUnion);
+
+  const hasConnectedSignal =
+    /\breceived\b|\binbound\b|\bincoming\b|\bmessage\b|\bmessages\b|\bchat\b|\btext\b|\bnew_message\b|\bReceivedCallback\b|\bdelivered\b|\bread\b|\back\b|\bsent\b|\bsended\b|\bsendStatus\b|\bsend_status\b|\bMessageStatusCallback\b|\bDeliveryCallback\b|\bdelivery_callback\b|\bstatus_callback\b|\bmessage_status_callback\b|\breadReceipt\b|\bread_receipt\b|\bdeliveredReceipt\b|\bdelivered_receipt\b|\bnotifySentByMe\b|\bnotify_sent_by_me\b|\bsentByMe\b|\bsent_by_me\b|\bdeleteMessage\b|\bdelete_message\b|\brevoke\b|\bconnecting\b|\bconnected\b/i.test(
+      eventStringUnion,
+    );
+
+  const nextInstanceStatus = hasDisconnectedSignal
+    ? "disconnected"
+    : hasConnectedSignal
+      ? "connected"
+      : null;
+
+  if (nextInstanceStatus) {
+    try {
+      await admin
+        .from("whatsapp_instances")
+        .update({ status: nextInstanceStatus })
+        .eq("instance_id", instanceId);
+    } catch (_statusErr) {}
+  }
+
+  const connectedInstancePhoneDigits = String(instance?.phone ?? "").replace(/\D/g, "");
+  const toPhoneDigits = String(toPhone ?? "").replace(/\D/g, "");
+
+  if (connectedInstancePhoneDigits && toPhoneDigits && connectedInstancePhoneDigits.length >= 10 && toPhoneDigits.length >= 10) {
+    const toMatchInstance =
+      toPhoneDigits.endsWith(connectedInstancePhoneDigits) ||
+      connectedInstancePhoneDigits.endsWith(toPhoneDigits) ||
+      toPhoneDigits === connectedInstancePhoneDigits;
+    if (!toMatchInstance) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "stale_connected_phone_not_current_instance",
+        current_instance_phone_digits: connectedInstancePhoneDigits,
+        received_event_to_phone_digits: toPhoneDigits,
+      });
+    }
+  }
+
+  {
+    const resolvedConnectedDigitsOk = connectedInstancePhoneDigits.length >= 10;
+    const resolvedToDigitsOk = toPhoneDigits.length >= 10;
+    const looksLikeRealInbound = Boolean(messageText || mediaUrl) && !isOnlyStatusEvent && !rawFromMe;
+    if (!resolvedConnectedDigitsOk && !resolvedToDigitsOk && looksLikeRealInbound && !pendingPhoneValidationRef.id) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "cannot_verify_connected_phone_without_validating_stale_payload",
+      });
+    }
+  }
+
+  {
+    const rawTs: unknown = getFirstNonEmpty(
+      String((body as any)?.timestamp ?? ""),
+      String((body as any)?.message?.timestamp ?? ""),
+      String((body as any)?.date ?? ""),
+      String((body as any)?.message?.date ?? ""),
+      String((body as any)?.created_at ?? ""),
+      String((body as any)?.data?.timestamp ?? ""),
+      String((body as any)?.data?.message?.timestamp ?? ""),
+      String((body as any)?.data?.date ?? ""),
+      String((body as any)?.time ?? ""),
+    );
+    const ts = Number(rawTs || 0);
+    const nowMs = Date.now();
+    const tsMs = ts > 1_000_000_000_000 ? ts : ts * 1000;
+    if (tsMs > 0 && nowMs - tsMs > 6 * 60 * 60 * 1000) {
+      const diffHours = (nowMs - tsMs) / (60 * 60 * 1000);
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "stale_inbound_event_timestamp_too_old",
+        event_age_hours: Number(diffHours.toFixed(1)),
+      });
+    }
+  }
+
+  const fromPhoneDigits = String(fromPhone ?? "").replace(/\D/g, "");
+  const toPhoneDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
+
+  if (!rawFromMe && equivalentBrazilianPhoneSuffix(connectedInstancePhoneDigits, fromPhoneDigits)) {
+    rawFromMe = true;
+  }
+
+  {
+    const fromIsOur = equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits);
+    const toIsOur = equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+    if (fromIsOur || toIsOur) {
+      if (!rawFromMe && fromIsOur) rawFromMe = true;
+    }
+  }
+
+  const isToOrFromOurNumber =
+    equivalentBrazilianPhoneSuffix(fromPhoneDigits, connectedInstancePhoneDigits) ||
+    equivalentBrazilianPhoneSuffix(toPhoneDigitsBroad, connectedInstancePhoneDigits);
+
+  if (rawFromMe || equivalentBrazilianPhoneSuffix(fromPhoneDigits, toPhoneDigitsBroad)) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: rawFromMe
+        ? "outbound_from_me_message_or_status_never_creates_lead"
+        : "loopback_or_self_message_bot_number_not_registered_as_interessado",
+    });
+  }
+
+  const isPhoneValidationCallback =
+    normalizedEventType === "DeliveryCallback" || normalizedEventType === "MessageStatusCallback";
+
+  const isRealInboundEventType =
+    isPhoneValidationCallback ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      normalizedEventType,
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.event ?? ""),
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.eventType ?? ""),
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.data?.type ?? ""),
+    ) ||
+    /^(receivedcallback|received_message|inbound_message|inbound|message|new_message|messages|text|chat_message|incoming|incoming_message|chat|received)$/i.test(
+      String((body as any)?.data?.event ?? ""),
+    ) ||
+    Boolean(
+      String((body as any)?.isGroupMsg ?? "") === "false" &&
+        String((body as any)?.type ?? "") === "text" &&
+        (Boolean(messageText) || Boolean(mediaUrl)) &&
+        !rawFromMe &&
+        !/^(me|connected_number|bot)$/i.test(senderRaw),
+    );
+
+  const isMessageFromConnectedNumber =
+    Boolean(rawFromMe) &&
+    normalizedEventType !== "DeliveryCallback" &&
+    normalizedEventType !== "MessageStatusCallback" &&
+    normalizedEventType !== "DisconnectedCallback";
+
+  if (isMessageFromConnectedNumber) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "message_from_connected_number",
+    });
+  }
+
+  if (isOutboundOnlyEvent) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "outbound_only_status_event_no_inbound_reply_required",
+    });
+  }
+
+  if (Boolean(rawFromMe)) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "broad_from_me_outbound_message_or_status",
+    });
+  }
+
+  if (!isRealInboundEventType) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "ignored_event_type_not_inbound_message",
+    });
+  }
+
+  {
+    const { error: insertErr } = await admin
+      .from("whatsapp_events")
+      .insert({
+        user_id: userId,
+        provider: "zapi",
+        event_id: eventId,
+        instance_id: instanceId,
+        event_type: eventType || null,
+        payload: body,
+      });
+    if (insertErr) {
+      const code = String((insertErr as any)?.code ?? "").trim();
+      if (code === "23505") {
+        return Response.json({ ok: true, ignored: true, reason: "duplicate_event_already_processed" });
+      }
+      return Response.json({ ok: false, error: insertErr.message }, { status: 500 });
+    }
+  }
+
+  const callbackMessageIds = Array.from(
+    new Set(
+      [
+        rawEventId,
+        ...(Array.isArray((body as any).ids)
+          ? (body as any).ids.map((value: unknown) => String(value ?? "").trim())
+          : []),
+      ].filter(Boolean),
+    ),
+  );
+  if ((eventType === "DeliveryCallback" || eventType === "MessageStatusCallback") && callbackMessageIds.length > 0) {
+    const pendingEvent = await findPendingPhoneValidationEvent({
+      admin,
+      messageIds: callbackMessageIds,
+    });
+
+    pendingPhoneValidationRef.id = String((pendingEvent as any)?.id ?? "");
+    if (!pendingEvent?.id) {
+      return Response.json({ ok: true, ignored: true, reason: "no_pending_phone_validation" });
+    }
+
+    const pendingDetails = ((pendingEvent as any).details ?? {}) as Record<string, unknown>;
+    const pendingPhone = String(pendingDetails.phone ?? "").trim();
+    const deliveryError = getFirstNonEmpty((body as any).error, (body as any).data?.error);
+    const statusChange = normalizeText(
+      getFirstNonEmpty((body as any).status, (body as any).data?.status),
+    ).toUpperCase();
+    const nowIso = new Date().toISOString();
+
+    if (eventType === "DeliveryCallback" && deliveryError) {
+      const isRealInvalidWhatsApp = isExplicitInvalidWhatsAppError(deliveryError);
+      const { data: claimedFailureEvent } = await admin
+        .from("atendimento_history_events")
+        .update({
+          event_type: isRealInvalidWhatsApp ? "phone_validation_failed" : "phone_validation_timeout",
+          title: isRealInvalidWhatsApp
+            ? "WhatsApp informado não passou no teste"
+            : "Validacao do WhatsApp falhou por indisponibilidade tecnica",
+          details: {
+            ...pendingDetails,
+            final_status: isRealInvalidWhatsApp ? "DELIVERY_ERROR" : "DELIVERY_TECHNICAL_ERROR",
+            error: deliveryError,
+            failed_at: nowIso,
+          },
+        })
+        .eq("id", String((pendingEvent as any).id))
+        .eq("event_type", "phone_validation_pending")
+        .select("id")
+        .maybeSingle();
+
+      if (!claimedFailureEvent?.id) {
+        return Response.json({ ok: true, ignored: true, reason: "phone_validation_already_processed" });
+      }
+
+      const { data: leadRow } = await admin
+        .from("atendimento_leads")
+        .select("id, unread_count, status, funnel_stage")
+        .eq("id", String((pendingEvent as any).lead_id ?? ""))
+        .maybeSingle();
+
+      if (!isRealInvalidWhatsApp) {
+        const { data: technicalMessage } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+            sender_role: "bot",
+            content_text: WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE,
+            media_type: "text",
+            status: "entregue",
+            sent_at: nowIso,
+            delivered_at: nowIso,
+          })
+          .select("id, content_text")
+          .maybeSingle();
+
+        await admin
+          .from("atendimento_leads")
+          .update({
+            status: (leadRow as any)?.status ?? null,
+            funnel_stage: (leadRow as any)?.funnel_stage ?? null,
+            last_interaction_at: nowIso,
+            updated_at: nowIso,
+          })
+          .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+        await syncConversationPreview({
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          contentText: String((technicalMessage as any)?.content_text ?? WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE),
+          createdAt: nowIso,
+        });
+
+        return Response.json({ ok: true, validated: false, reason: "delivery_error_technical" });
+      }
+
+      const failureAttempts = await getPhoneValidationFailureCount({
+        admin,
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+      });
+      const shouldBlockConversation = failureAttempts >= MAX_PHONE_VALIDATION_ATTEMPTS;
+
+      const { data: failureMessage } = await admin
+        .from("atendimento_messages")
+        .insert({
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          sender_role: "bot",
+          content_text: shouldBlockConversation
+            ? WHATSAPP_INVALID_FINAL_MESSAGE
+            : buildPhoneValidationRetryMessage(failureAttempts),
+          media_type: "text",
+          status: "entregue",
+          sent_at: nowIso,
+          delivered_at: nowIso,
+        })
+        .select("id, content_text")
+        .maybeSingle();
+
+      await admin
+        .from("atendimento_leads")
+        .update({
+          status: shouldBlockConversation ? "encerrado" : (leadRow as any)?.status ?? null,
+          funnel_stage: shouldBlockConversation ? "encerrado" : (leadRow as any)?.funnel_stage ?? null,
+          last_interaction_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+      if (shouldBlockConversation) {
+        await admin
+          .from("atendimento_conversations")
+          .update({
+            bot_enabled: false,
+            updated_at: nowIso,
+          })
+          .eq("id", String((pendingEvent as any).conversation_id ?? ""));
+
+        await admin.from("atendimento_history_events").insert({
+          lead_id: String((pendingEvent as any).lead_id ?? ""),
+          conversation_id: String((pendingEvent as any).conversation_id ?? ""),
+          event_type: "conversation_closed",
+          title: "Atendimento encerrado após 3 tentativas inválidas de WhatsApp",
+          details: {
+            invalid_attempts: failureAttempts,
+            source: "delivery_callback",
+          },
+          actor_type: "system",
+          actor_email: null,
+        });
+      }
+
+      await syncConversationPreview({
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        contentText: String((failureMessage as any)?.content_text ?? ""),
+        createdAt: nowIso,
+      });
+
+      return Response.json({ ok: true, validated: false, reason: "delivery_error" });
+    }
+
+    const shouldConfirmPhoneValidation =
+      (eventType === "DeliveryCallback" && !deliveryError) ||
+      (eventType === "MessageStatusCallback" &&
+        (statusChange === "SENT" || statusChange === "RECEIVED" || statusChange === "READ"));
+
+    if (!shouldConfirmPhoneValidation) {
+      return Response.json({ ok: true, ignored: true, reason: "awaiting_final_phone_status" });
+    }
+
+    const { data: claimedSuccessEvent } = await admin
+      .from("atendimento_history_events")
+      .update({
+        event_type: "phone_validated",
+        title: "WhatsApp validado e salvo",
+        details: {
+          ...pendingDetails,
+          final_status: statusChange || eventType,
+          confirmed_at: nowIso,
+        },
+      })
+      .eq("id", String((pendingEvent as any).id))
+      .eq("event_type", "phone_validation_pending")
+      .select("id")
+      .maybeSingle();
+
+    if (!claimedSuccessEvent?.id) {
+      return Response.json({ ok: true, ignored: true, reason: "phone_validation_already_processed" });
+    }
+
+    const { data: leadRecord } = await admin
+      .from("atendimento_leads")
+      .select("*")
+      .eq("id", String((pendingEvent as any).lead_id ?? ""))
+      .maybeSingle();
+
+    if (!leadRecord?.id || !pendingPhone) {
+      return Response.json({ ok: true, ignored: true, reason: "missing_pending_lead_or_phone" });
+    }
+
+    const blockedByCancel = await isLeadBlockedByPreviousCancelledBooking({
+      admin,
+      lead: leadRecord,
+      leadId: String(leadRecord.id),
+    });
+    if (blockedByCancel) {
+      try {
+        await insertWhatsAppBotTextMessage({
+          admin,
+          conversationId: String((pendingEvent as any).conversation_id ?? ""),
+          contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+        });
+      } catch (_e) {}
+      try {
+        await sendAtendimentoWhatsAppText({
+          phone: pendingPhone,
+          message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+        });
+      } catch (_e) {}
+      return Response.json({
+        ok: true,
+        ignored: false,
+        replied: true,
+        reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+        reason: "cancelled_booking_auto_reply_sent",
+      });
+    }
+
+    const resolvedLeadLocation = String((leadRecord as any)?.city ?? "").trim()
+      ? resolveTimeZoneFromCityInput({
+          city: String((leadRecord as any)?.city ?? ""),
+          state: String((leadRecord as any)?.state ?? ""),
+          phone: pendingPhone,
+        })
+      : null;
+
+    const nextLead = {
+      ...(leadRecord as any),
+      phone: pendingPhone,
+      timezone: resolvedLeadLocation?.timeZone ?? (String((leadRecord as any)?.timezone ?? "").trim() || null),
+      country:
+        resolvedLeadLocation?.country === "BR"
+          ? "Brasil"
+          : resolvedLeadLocation?.country === "US"
+            ? "Estados Unidos"
+            : String((leadRecord as any)?.country ?? "").trim() || null,
+    };
+    const botResponse = botReplyForLead({
+      lead: nextLead,
+      messageText: "",
+    });
+    const successMessage = WHATSAPP_REGISTERED_SUCCESS_MESSAGE;
+    const nextStatus = botResponse.status;
+    const nextStage = botResponse.stage;
+
+    await admin
+      .from("atendimento_leads")
+      .update({
+        phone: pendingPhone,
+        ...(resolvedLeadLocation
+          ? {
+              state: resolvedLeadLocation.state,
+              city: resolvedLeadLocation.city,
+              timezone: resolvedLeadLocation.timeZone,
+              country: resolvedLeadLocation.country === "BR" ? "Brasil" : "Estados Unidos",
+            }
+          : {}),
+        status: nextStatus,
+        funnel_stage: nextStage,
+        last_interaction_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", String((pendingEvent as any).lead_id ?? ""));
+
+    await upsertCapturedPhoneField({
+      leadId: String((pendingEvent as any).lead_id ?? ""),
+      sourceMessageId: callbackMessageIds[0] ?? String((pendingEvent as any).id ?? ""),
+      phone: pendingPhone,
+    });
+
+    if (resolvedLeadLocation) {
+      await appendHistoryEvent({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        eventType: "lead_timezone_identified",
+        title: "Cidade e fuso do lead identificados automaticamente",
+        details: {
+          state: resolvedLeadLocation.state,
+          city: resolvedLeadLocation.city,
+          timezone: resolvedLeadLocation.timeZone,
+          teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          country: resolvedLeadLocation.country === "BR" ? "Brasil" : "Estados Unidos",
+          source: resolvedLeadLocation.source,
+        },
+        actorType: "system",
+      });
+    }
+
+    const outgoingMessages = [successMessage];
+    const followUpMessage = String(botResponse.message ?? "").trim();
+    if (followUpMessage && followUpMessage !== successMessage) {
+      if (followUpMessage === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
+        outgoingMessages.push(
+          ...buildExperimentalClassDatePromptMessages(String((nextLead as any)?.full_name ?? "").trim()),
+        );
+      } else if (followUpMessage === CAPTURED_FIELD_PROMPTS.state) {
+        outgoingMessages.push(
+          buildStatePrompt(String((nextLead as any)?.full_name ?? "").trim()),
+        );
+      } else {
+        outgoingMessages.push(followUpMessage);
+      }
+    }
+
+    const convIdForOutgoing = String((pendingEvent as any).conversation_id ?? "");
+    let previewText = successMessage;
+    if (outgoingMessages.length) {
+      const outs = await Promise.allSettled(
+        outgoingMessages.map((message) =>
+          admin
+            .from("atendimento_messages")
+            .insert({
+              conversation_id: convIdForOutgoing,
+              sender_role: "bot",
+              content_text: message,
+              media_type: "text",
+              status: "entregue",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            })
+            .select("content_text")
+            .maybeSingle(),
+        ),
+      );
+      const lastFulfilled = [...outs].reverse().find((o) => o.status === "fulfilled") as
+        | { status: "fulfilled"; value: { data?: unknown } }
+        | undefined;
+      const lastOutboundContent = lastFulfilled?.value?.data as
+        | { content_text?: string | null }
+        | null
+        | undefined;
+      previewText = String(
+        lastOutboundContent?.content_text ??
+          outgoingMessages[outgoingMessages.length - 1] ??
+          successMessage,
+      );
+    }
+
+    if (followUpMessage === EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE) {
+      const bookedProfessorStarts = await listScheduledExperimentalClassProfessorStarts({
+        admin,
+        nowIso,
+      });
+      const availability = listExperimentalClassAvailability({
+        leadTimeZone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        bookedProfessorStartAts: bookedProfessorStarts,
+      });
+      const availabilityMessages = buildExperimentalClassDatesMessages(availability.dates);
+
+      if (availabilityMessages.length) {
+        const dateOuts = await Promise.allSettled(
+          availabilityMessages.map((availabilityMessage) =>
+            admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: convIdForOutgoing,
+                sender_role: "bot",
+                content_text: availabilityMessage,
+                media_type: "text",
+                status: "entregue",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              })
+              .select("content_text")
+              .maybeSingle(),
+          ),
+        );
+        const lastDateFulfilled = [...dateOuts].reverse().find((o) => o.status === "fulfilled") as
+          | { status: "fulfilled"; value: { data?: unknown } }
+          | undefined;
+        const lastDateContent = lastDateFulfilled?.value?.data as
+          | { content_text?: string | null }
+          | null
+          | undefined;
+        previewText = String(
+          lastDateContent?.content_text ??
+            availabilityMessages[availabilityMessages.length - 1] ??
+            previewText,
+        );
+      }
+
+      void appendHistoryEvent({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        eventType: "experimental_class_date_options_presented",
+        title: "Datas disponíveis da aula experimental apresentadas",
+        details: {
+          teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          lead_timezone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          options: availability.dates,
+        },
+        actorType: "system",
+      });
+    }
+
+    if (
+      followUpMessage === CAPTURED_FIELD_PROMPTS.state ||
+      followUpMessage === CAPTURED_FIELD_PROMPTS.city
+    ) {
+      await appendHistoryEvent({
+        leadId: String((pendingEvent as any).lead_id ?? ""),
+        conversationId: String((pendingEvent as any).conversation_id ?? ""),
+        eventType: "lead_timezone_collection_started",
+        title: "Coleta de estado e cidade do lead iniciada após validação do WhatsApp",
+        details: {
+          teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        },
+        actorType: "system",
+      });
+    }
+
+    await syncConversationPreview({
+      conversationId: String((pendingEvent as any).conversation_id ?? ""),
+      contentText: previewText,
+      createdAt: nowIso,
+    });
+
+    await appendHistoryEvent({
+      leadId: String((pendingEvent as any).lead_id ?? ""),
+      conversationId: String((pendingEvent as any).conversation_id ?? ""),
+      eventType: "stage_changed",
+      title: "Etapa do funil atualizada automaticamente",
+      details: { status: nextStatus, funnel_stage: nextStage },
+      actorType: "bot",
+    });
+
+    return Response.json({ ok: true, validated: true, reason: "message_received" });
+  }
+
+  const hasContent = Boolean((messageText || "").trim() || mediaInfo.hasPaymentMedia);
+  if (!hasContent) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_recebido",
+      descricao: `Webhook recebido (sem conteúdo): instance=${instanceId} type=${eventType || "-"}`,
+    });
+    return Response.json({ ok: true, ignored: true });
+  }
+
+  await admin.from("logs").insert({
+    user_id: userId,
+    tipo: "zapi_webhook_recebido",
+    descricao: `Webhook recebido: instance=${instanceId} type=${eventType || "-"} from=${normalizePhone(fromPhone) || "-"}`,
+  });
+
+  const normalizedFrom = normalizePhone(fromPhone);
+  const validatedFrom = normalizeAndValidateFromPhone(fromPhone);
+  const normalizedPhoneOnly = validatedFrom.digitsOnly;
+  const isRealInboundMessage =
+    normalizedEventType === "ReceivedCallback" ||
+    normalizedEventType === "MESSAGE_RECEIVED" ||
+    normalizedEventType === "message_received" ||
+    normalizedEventType === "message" ||
+    normalizedEventType === "inbound" ||
+    (normalizedFrom !== "receivedcallback" && (Boolean(messageText?.trim()) || Boolean(mediaUrl?.trim())));
+
+  let experimentalClassBotDisabled = false;
+  try {
+    const { data: settingsData, error: settingsError } = await admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "experimental_class_bot_disabled")
+      .maybeSingle();
+    if (!settingsError || String((settingsError as any)?.code ?? "") === "42P01") {
+      const raw = (settingsData as any)?.value;
+      experimentalClassBotDisabled =
+        raw === true ||
+        raw === "true" ||
+        raw === 1 ||
+        raw === "1" ||
+        String(raw ?? "").trim().toLowerCase() === "true";
+    }
+  } catch {
+    experimentalClassBotDisabled = false;
+  }
+
+  if (normalizedFrom && !validatedFrom.valid) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "invalid_or_non_user_phone_not_processed",
+      invalidReason: validatedFrom.invalidReason,
+      phoneSample: validatedFrom.digitsOnly.slice(0, 8) || "-",
+      phoneLength: validatedFrom.digitsOnly.length,
+    });
+  }
+
+  {
+    const ourDigits = connectedInstancePhoneDigits;
+    const candidateDigits = validatedFrom.digitsOnly || String(fromPhone ?? "").replace(/\D/g, "");
+    if (equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "connected_bot_own_phone_must_not_be_registered_as_interessado",
+        phone: String(candidateDigits ?? "").slice(0, 8) || "-",
+      });
+    }
+    if (equivalentBrazilianPhoneSuffix(candidateDigits, String(toPhone ?? "").replace(/\D/g, ""))) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "from_and_to_phones_are_equivalent_loopback",
+        phone: String(candidateDigits ?? "").slice(0, 8) || "-",
+      });
+    }
+    if (isZapiInternalBlocklistedPhone(candidateDigits)) {
+      return Response.json({
+        ok: true,
+        ignored: true,
+        reason: "zapi_internal_phone_number_blocklisted_candidate",
+        phone: String(candidateDigits ?? "").slice(0, 8) || "-",
+      });
+    }
+
+    // --- INICIO: BLOQUEIOS CRITERIOSOS PARA GARANTIR QUE SO O REMETENTE DIRETO SEJA REGISTRADO ---
+
+    // (BLOQUEIO 1) Grupo / participant: mensagens de grupo ou com participant sao bloqueadas.
+    // Apenas conversas DIRETAS 1:1 entre o aluno/interessado e o BOT são aceitas.
+    {
+      const participantRaw = getFirstNonEmpty(
+        (body as any).participant,
+        (body as any).message?.participant,
+        (body as any).data?.participant,
+        (body as any).data?.message?.participant,
+        (body as any).mentioned_participant,
+        (body as any).participants?.[0],
+        (body as any).chat_participant,
+      );
+      const isGroupChat = Boolean(
+        getFirstNonEmpty(
+          (body as any).isGroup,
+          (body as any).is_group,
+          (body as any).chatIsGroup,
+          (body as any).chat_is_group,
+          (body as any).message?.isGroup,
+          (body as any).message?.is_group,
+          (body as any).data?.isGroup,
+          (body as any).data?.is_group,
+          (body as any).data?.message?.isGroup,
+          (body as any).data?.message?.is_group,
+          (body as any).fromMe === false && participantRaw,
+        ),
+      );
+      if (String(participantRaw ?? "").trim() || isGroupChat) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "group_or_participant_message_blocked_only_direct_1to1_allowed",
+          has_participant: Boolean(String(participantRaw ?? "").trim()),
+          is_group_chat: isGroupChat,
+        });
+      }
+    }
+
+    // (BLOQUEIO 2) Mencoes / mentionedPhones: qualquer telefone mencionado em 3os bloqueia a mensagem.
+    // Nunca podemos transformar contatos mencionados em leads.
+    {
+      const thirdPartyMentions: string[] = [];
+      const allMentionedArrays = [
+        (body as any).mentionedPhones,
+        (body as any).mentioned_phones,
+        (body as any).mentionedNumbers,
+        (body as any).mentioned_numbers,
+        (body as any).mentions,
+        (body as any).message?.mentionedPhones,
+        (body as any).message?.mentions,
+        (body as any).data?.mentionedPhones,
+        (body as any).data?.message?.mentionedPhones,
+        (body as any).data?.message?.mentions,
+      ];
+      for (const arr of allMentionedArrays) {
+        if (!arr || !Array.isArray(arr)) continue;
+        for (const mention of arr) {
+          try {
+            const digits = typeof mention === "string"
+              ? mention.replace(/\D/g, "")
+              : String((mention as any)?.phone ?? (mention as any)?.number ?? (mention as any)?.id ?? "")
+                  .replace(/\D/g, "");
+            if (digits.length >= 10 && !equivalentBrazilianPhoneSuffix(digits, candidateDigits)) {
+              thirdPartyMentions.push(digits.slice(0, 8));
+            }
+          } catch (_me) {}
+        }
+      }
+      if (thirdPartyMentions.length > 0) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "third_party_mentions_blocked_no_contacts_from_third_parties",
+          mention_count: thirdPartyMentions.length,
+        });
+      }
+    }
+
+    // (BLOQUEIO 3) Contacts array da agenda de terceiros: bloqueia mensagens que contem
+    // array de contatos (vcard/contacts) com telefones diferentes do proprio sender.
+    {
+      const thirdPartyContacts: string[] = [];
+      const allContactsArrays = [
+        (body as any).contacts,
+        (body as any).Contacts,
+        (body as any).message?.contacts,
+        (body as any).message?.vcards,
+        (body as any).data?.contacts,
+        (body as any).data?.message?.contacts,
+      ];
+      for (const arr of allContactsArrays) {
+        if (!arr || !Array.isArray(arr)) continue;
+        for (const contactItem of arr) {
+          try {
+            const innerPhones: string[] = [];
+            if (Array.isArray((contactItem as any)?.phones)) {
+              for (const ph of (contactItem as any).phones) {
+                const d = String((ph as any)?.phone ?? (ph as any)?.number ?? ph ?? "").replace(/\D/g, "");
+                if (d.length >= 10) innerPhones.push(d);
+              }
+            }
+            const flat = String(
+              (contactItem as any)?.phone ??
+              (contactItem as any)?.number ??
+              (contactItem as any)?.id ??
+              (contactItem as any)?.wa_id ??
+              "",
+            ).replace(/\D/g, "");
+            if (flat.length >= 10) innerPhones.push(flat);
+            for (const phoneDigits of innerPhones) {
+              if (!equivalentBrazilianPhoneSuffix(phoneDigits, candidateDigits)) {
+                thirdPartyContacts.push(phoneDigits.slice(0, 8));
+              }
+            }
+          } catch (_cme) {}
+        }
+      }
+      if (thirdPartyContacts.length > 0) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "third_party_vcard_contacts_blocked_cannot_register_sender_agenda_entries",
+          contact_count: thirdPartyContacts.length,
+        });
+      }
+    }
+
+    // (BLOQUEIO 4) Anti-spoofing: se sender.phone foi fornecido explicitamente,
+    // ELE TEM QUE SER IDENTICO ao fromPhone. Se forem diferentes, bloqueamos.
+    {
+      const explicitSenderPhone = getFirstNonEmpty(
+        (body as any).sender?.phone,
+        (body as any).sender?.number,
+        (body as any).senderPhone,
+        (body as any).sender_number,
+        (body as any).message?.sender?.phone,
+        (body as any).data?.sender?.phone,
+        (body as any).data?.message?.sender?.phone,
+        (body as any).from_number,
+      );
+      if (String(explicitSenderPhone ?? "").trim()) {
+        const senderDigits = String(explicitSenderPhone ?? "").replace(/\D/g, "");
+        const fromDigits = String(fromPhone ?? "").replace(/\D/g, "");
+        if (
+          senderDigits.length >= 10 &&
+          fromDigits.length >= 10 &&
+          !equivalentBrazilianPhoneSuffix(senderDigits, fromDigits)
+        ) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "anti_spoofing_sender_phone_mismatch_from_header",
+            sender_phone_sample: senderDigits.slice(0, 8) || "-",
+            from_phone_sample: fromDigits.slice(0, 8) || "-",
+          });
+        }
+      }
+    }
+
+    // (BLOQUEIO 5) DESTINATARIO como candidato bloqueado: NUNCA registramos toPhone
+    // (destinatario) como lead. O lead É SÓ quem ENVIOU (fromPhone).
+    // Isso garante contra qualquer erro futuro que possa inverter from/to.
+    {
+      const toDigitsBroad = String(toPhone ?? "").replace(/\D/g, "");
+      if (
+        toDigitsBroad.length >= 10 &&
+        equivalentBrazilianPhoneSuffix(candidateDigits, toDigitsBroad) &&
+        !equivalentBrazilianPhoneSuffix(candidateDigits, ourDigits)
+      ) {
+        // Caso extremamente raro: from === to (mas caiu fora do loopback). Bloqueia.
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason: "recipient_phone_cannot_become_lead_only_sender_is_registered",
+          candidate_sample: String(candidateDigits ?? "").slice(0, 8) || "-",
+        });
+      }
+    }
+
+    // --- FIM: BLOQUEIOS CRITERIOSOS ---
+  }
+
+  if (normalizedPhoneOnly && !isRealInboundMessage && !pendingPhoneValidationRef.id) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "non_inbound_event_skipped",
+      eventType: normalizedEventType || "unknown",
+    });
+  }
+
+  if (normalizedFrom) {
+    try {
+      const leadContext = await ensureWhatsAppLeadAndConversation({
+        phone: normalizedPhoneOnly,
+        userId,
+        creationOrigin: "zapi_from_header",
+        firstNameFromMessage: null,
+        initialState: null,
+        initialTimezone: null,
+        initialCountry: null,
+      });
+      if (!leadContext?.lead?.id || !leadContext?.conversation?.id) {
+        return Response.json({
+          ok: true,
+          ignored: true,
+          reason:
+            leadContext === null
+              ? "phone_hidden_blocklist_notification_number"
+              : "lead_or_conversation_missing",
+        });
+      }
+      const nowIso = new Date().toISOString();
+        const leadId = String(leadContext.lead.id);
+        const conversationId = String(leadContext.conversation.id);
+        const lead = leadContext.lead as any;
+        const conversation = leadContext.conversation as any;
+        const leadFullNameRaw = String((lead as any)?.full_name ?? "").trim();
+        const leadFirstName = leadFullNameRaw ? leadFullNameRaw.split(/\s+/)[0] || "" : "";
+
+        const earlyLeadBlockedByCancelledBooking = await isLeadBlockedByPreviousCancelledBooking({
+          admin,
+          lead,
+          leadId,
+        });
+        if (earlyLeadBlockedByCancelledBooking) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent",
+          });
+        }
+
+        const currentBooking = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+        const currentBookingId = currentBooking?.id ? String(currentBooking.id) : "";
+        const funnelStageRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+        const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
+        const isLeadRepescagemStatus =
+          funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem";
+
+        let postAttendanceHistoryConfirmedAttendedEvent = false;
+        let postAttendanceHistoryConfirmedNoShowEvent = false;
+        let postAttendanceHistoryMatriculaRecusadaEvent = false;
+        let postAttendanceHistoryMatriculaConfirmadaEvent = false;
+        try {
+          const { data: histAttAll } = await admin
+            .from("atendimento_history_events")
+            .select("event_type")
+            .eq("lead_id", leadId)
+            .eq("conversation_id", conversationId)
+            .in("event_type", [
+              "experimental_class_attendance_confirmed",
+              "experimental_class_attendance_follow_up_required",
+              "experimental_class_attendance_attended",
+              "experimental_class_attendance_no_show",
+              "matricula_pendente_resposta_nao_nuclear",
+              "whatsapp_matricula_recusada_fixed_reply",
+              "matricula_pendente_resposta_sim_nuclear",
+              "matricula_pendente_resposta_sim",
+              "matricula_pendente_resposta_nao",
+            ])
+            .limit(10);
+          const histAttEvents = Array.isArray((histAttAll as any)?.data ?? [])
+            ? ((histAttAll as any).data as Array<{ event_type: string }>)
+            : [];
+          postAttendanceHistoryConfirmedAttendedEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "experimental_class_attendance_confirmed" ||
+              e.event_type === "experimental_class_attendance_attended",
+          );
+          postAttendanceHistoryConfirmedNoShowEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "experimental_class_attendance_follow_up_required" ||
+              e.event_type === "experimental_class_attendance_no_show",
+          );
+          postAttendanceHistoryMatriculaRecusadaEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "matricula_pendente_resposta_nao_nuclear" ||
+              e.event_type === "whatsapp_matricula_recusada_fixed_reply" ||
+              e.event_type === "matricula_pendente_resposta_nao",
+          );
+          postAttendanceHistoryMatriculaConfirmadaEvent = histAttEvents.some(
+            (e) =>
+              e.event_type === "matricula_pendente_resposta_sim_nuclear" ||
+              e.event_type === "matricula_pendente_resposta_sim",
+          );
+        } catch (_e) {}
+
+        let lastBotTextNuclear: string | null = null;
+        let recentBotTextsNuclear: string[] = [];
+        try {
+          recentBotTextsNuclear = await getRecentBotMessages({
+            admin,
+            conversationId,
+            limit: 20,
+          });
+          const lastBotMsgNuclearSingle = await getLastBotMessage({ admin, conversationId });
+          lastBotTextNuclear = String(lastBotMsgNuclearSingle?.content_text ?? "").trim() || null;
+        } catch (_e) {
+          lastBotTextNuclear = null;
+          recentBotTextsNuclear = [];
+        }
+        const RESPOSTA_REPESCAGEM_FIXA = "Em breve nossa equipe entrará em contato.";
+        const MSG_SIM_NAO_INVALIDA = "Responda com sim ou não.";
+        const NAO_RECUSA_MSG_1_PREFIX = leadFirstName
+          ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
+          : "Tudo bem, entendemos que talvez ainda não seja o momento.";
+        const NAO_RECUSA_MSG_1 = NAO_RECUSA_MSG_1_PREFIX;
+
+        const inboundContentRaw = String(messageText ?? "").trim();
+        const inboundNormalizedNuclear = inboundContentRaw
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim()
+          .replace(/[.!?,\s]+$/g, "")
+          .toLowerCase();
+        const lenientYesNoNuclear = detectLenientYesNo(inboundContentRaw);
+        const isYesNuclear = lenientYesNoNuclear.result === "yes";
+        const isNoNuclear = lenientYesNoNuclear.result === "no";
+        const isAmbiguousNuclear = lenientYesNoNuclear.result === "ambiguous";
+
+        const recentBotHasMsgSimNao = recentBotTextsNuclear.some((text) => text.includes(MSG_SIM_NAO_INVALIDA));
+        const ultimaMsgBotPedeSimNao =
+          (lastBotTextNuclear && lastBotTextNuclear.includes(MSG_SIM_NAO_INVALIDA)) || recentBotHasMsgSimNao;
+        const bookingAttendanceAttendedByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "attended";
+        const bookingAttendanceNoShowByCol =
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === "no_show";
+        const flatLeadAttendanceAttendedByCol =
+          String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "attended";
+        const flatLeadAttendanceNoShowByCol =
+          String((lead as any)?.experimental_class_attendance_status ?? "").trim().toLowerCase() === "no_show";
+        const flatLeadCompletedStatus =
+          String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase() === "completed";
+        const leadEstaEmMatriculaPendentePosAttendance =
+          (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente" ||
+            funnelStageRaw === "matricula_pendente_recusada" || leadStatusRaw === "matricula_pendente_recusada" ||
+            funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem") &&
+          (postAttendanceHistoryConfirmedAttendedEvent ||
+            postAttendanceHistoryConfirmedNoShowEvent ||
+            postAttendanceHistoryMatriculaRecusadaEvent ||
+            Boolean(currentBookingId) ||
+            bookingAttendanceAttendedByCol ||
+            bookingAttendanceNoShowByCol ||
+            flatLeadAttendanceAttendedByCol ||
+            flatLeadAttendanceNoShowByCol ||
+            flatLeadCompletedStatus) &&
+          !postAttendanceHistoryMatriculaConfirmadaEvent;
+        const leadEstaEmMatriculaRecusadaPosAttendance =
+          postAttendanceHistoryMatriculaRecusadaEvent ||
+          ((funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada" ||
+            funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem") &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              Boolean(currentBookingId) ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol));
+        const leadEstaEmMatriculaConfirmadaPosAttendance =
+          postAttendanceHistoryMatriculaConfirmadaEvent ||
+          ((funnelStageRaw === "matricula_confirmada" || leadStatusRaw === "matricula_confirmada") &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              Boolean(currentBookingId) ||
+              bookingAttendanceAttendedByCol ||
+              flatLeadAttendanceAttendedByCol));
+        const leadEstaEmRepescagemNoShow =
+          (isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent) ||
+          (isLeadRepescagemStatus && bookingAttendanceNoShowByCol) ||
+          (isLeadRepescagemStatus && flatLeadAttendanceNoShowByCol) ||
+          (postAttendanceHistoryConfirmedNoShowEvent && (funnelStageRaw === "repescagem" || leadStatusRaw === "repescagem"));
+        const leadDirectlyInPosAttendanceStepNuclear =
+          (funnelStageRaw === "matricula_pendente" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId))) ||
+          (funnelStageRaw === "matricula_pendente_recusada" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId))) ||
+          (funnelStageRaw === "repescagem" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId))) ||
+          (leadStatusRaw === "matricula_pendente" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId))) ||
+          (leadStatusRaw === "matricula_pendente_recusada" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId))) ||
+          (leadStatusRaw === "repescagem" &&
+            (postAttendanceHistoryConfirmedAttendedEvent ||
+              postAttendanceHistoryConfirmedNoShowEvent ||
+              postAttendanceHistoryMatriculaRecusadaEvent ||
+              bookingAttendanceAttendedByCol ||
+              bookingAttendanceNoShowByCol ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadAttendanceNoShowByCol ||
+              Boolean(currentBookingId)));
+        const entrouNoFluxoPosAttendancePorForcaBruta =
+          ultimaMsgBotPedeSimNao &&
+          (isYesNuclear || isNoNuclear) &&
+          !postAttendanceHistoryMatriculaConfirmadaEvent &&
+          (funnelStageRaw === "matricula_pendente" ||
+            leadStatusRaw === "matricula_pendente" ||
+            funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada" ||
+            funnelStageRaw === "repescagem" ||
+            leadStatusRaw === "repescagem");
+
+        if (
+          postAttendanceHistoryMatriculaConfirmadaEvent
+        ) {
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: mediaInfo.hasPaymentMedia
+                ? mediaInfo.mediaUrl
+                  ? "document"
+                  : "text"
+                : "text",
+              media_url: mediaInfo.mediaUrl || null,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", leadId);
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "nuclear_sim_definitivo_ignora_nao_posterior",
+            flow: "nuclear_post_attendance_sim_prioridade_ignora_nao",
+          });
+        }
+
+        if (postAttendanceHistoryMatriculaRecusadaEvent && !isYesNuclear) {
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: mediaInfo.hasPaymentMedia
+                ? mediaInfo.mediaUrl
+                  ? "document"
+                  : "text"
+                : "text",
+              media_url: mediaInfo.mediaUrl || null,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "nuclear_resposta_ja_foi_nao_e_nova_nao_e_ambiguous",
+            flow: "nuclear_post_attendance_nao_mantido_ate_que_venha_sim",
+          });
+        }
+
+        if (
+          postAttendanceHistoryMatriculaRecusadaEvent ||
+          postAttendanceHistoryMatriculaConfirmadaEvent ||
+          leadEstaEmMatriculaRecusadaPosAttendance ||
+          leadEstaEmMatriculaConfirmadaPosAttendance ||
+          leadEstaEmRepescagemNoShow ||
+          entrouNoFluxoPosAttendancePorForcaBruta ||
+          leadDirectlyInPosAttendanceStepNuclear ||
+          (ultimaMsgBotPedeSimNao &&
+            (leadEstaEmMatriculaPendentePosAttendance ||
+              postAttendanceHistoryConfirmedAttendedEvent ||
+              flatLeadAttendanceAttendedByCol ||
+              flatLeadCompletedStatus ||
+              (Boolean(currentBookingId) &&
+                (bookingAttendanceAttendedByCol ||
+                  String((currentBooking as any)?.status ?? "").trim().toLowerCase() === "completed"))))
+        ) {
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? mediaInfo.mediaUrl
+              ? "document"
+              : "text"
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            await admin.from("atendimento_messages").insert({
+              conversation_id: conversationId,
+              sender_role: "lead",
+              content_text: inboundContentRaw || null,
+              media_type: inboundMediaType,
+              media_url: inboundMediaUrl,
+              status: "recebida",
+              sent_at: nowIso,
+              delivered_at: nowIso,
+            });
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+
+          const isRepescagemOrRecusadaZapiEarly =
+            leadEstaEmMatriculaRecusadaPosAttendance ||
+            leadEstaEmRepescagemNoShow ||
+            funnelStageRaw === "repescagem" ||
+            leadStatusRaw === "repescagem" ||
+            funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada" ||
+            postAttendanceHistoryMatriculaRecusadaEvent ||
+            postAttendanceHistoryConfirmedNoShowEvent ||
+            flatLeadAttendanceNoShowByCol ||
+            bookingAttendanceNoShowByCol;
+          const hasAnyAttendanceSignalZapiEarly =
+            postAttendanceHistoryConfirmedAttendedEvent ||
+            postAttendanceHistoryConfirmedNoShowEvent ||
+            postAttendanceHistoryMatriculaRecusadaEvent ||
+            bookingAttendanceAttendedByCol ||
+            bookingAttendanceNoShowByCol ||
+            flatLeadAttendanceAttendedByCol ||
+            flatLeadAttendanceNoShowByCol ||
+            flatLeadCompletedStatus ||
+            Boolean(currentBookingId);
+          if (
+            isYesNuclear &&
+            !postAttendanceHistoryMatriculaConfirmadaEvent &&
+            !leadEstaEmMatriculaConfirmadaPosAttendance &&
+            (isRepescagemOrRecusadaZapiEarly || hasAnyAttendanceSignalZapiEarly)
+          ) {
+            const safeFirstNameZapi =
+              (String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] ?? "").trim() || "Aluno(a)";
+            const safeFullNameForLinkZapi =
+              String((lead as any)?.full_name ?? "").trim() || safeFirstNameZapi || "Aluno(a)";
+            const baseUrlZapi =
+              resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) ||
+              "https://www.autobot.business";
+            const cadastroLinkZapi =
+              `${baseUrlZapi.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullNameForLinkZapi)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
+            const yesMsgZapi =
+              `Maravilha, ${safeFirstNameZapi}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkZapi}`;
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "pre_cadastro_concluido",
+                  status: "matricula_pendente",
+                  bot_enabled: false,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  experimental_class_attendance_status: "attended",
+                  experimental_class_status: "completed",
+                } as any)
+                .eq("id", leadId);
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: [yesMsgZapi],
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+                allowNoInbound: true,
+              });
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_pendente_resposta_sim_nuclear",
+                title: "Matricula pendente pos-attendance (zapi FORCE EARLY): lead respondeu SIM",
+                details: {
+                  inbound_text: inboundContentRaw || null,
+                  reply_messages: [yesMsgZapi],
+                  cadastro_link: cadastroLinkZapi,
+                  source: "zapi_post_attendance_force_early",
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              ignored: false,
+              handled: true,
+              flow: "zapi_post_attendance_sim_force_early_remove_repescagem",
+            });
+          }
+
+          if (leadEstaEmMatriculaConfirmadaPosAttendance) {
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "pre_cadastro_concluido",
+                  status: "matricula_pendente",
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "nuclear_post_attendance_matricula_confirmada_ignored_quiet",
+              flow: "nuclear_post_attendance_matricula_confirmada_ignored",
+            });
+          }
+
+          if (postAttendanceHistoryMatriculaConfirmadaEvent) {
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "pre_cadastro_concluido",
+                  status: "matricula_pendente",
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "redundant_sim_response_ignored_after_first_confirm",
+              flow: "post_attendance_first_answer_lock_confirm_only",
+            });
+          }
+
+          if (leadEstaEmRepescagemNoShow && !isYesNuclear) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "nuclear_post_attendance_repescagem_no_show_ignored_quiet",
+              flow: "nuclear_post_attendance_repescagem_no_show_ignored",
+            });
+          }
+
+          if (isNoNuclear) {
+            try {
+              const leadUpdatePatch: Record<string, unknown> = { updated_at: nowIso };
+              const funnelPatch: Record<string, unknown> = {
+                funnel_stage: "matricula_pendente_recusada",
+                status: "matricula_pendente_recusada",
+                ...leadUpdatePatch,
+              };
+              let patchAppliedOk = false;
+              try {
+                const { error: fullErr } = await admin
+                  .from("atendimento_leads")
+                  .update(funnelPatch)
+                  .eq("id", leadId);
+                if (!fullErr) patchAppliedOk = true;
+              } catch (_e) {}
+              if (!patchAppliedOk) {
+                try {
+                  const { error: partialErr } = await admin
+                    .from("atendimento_leads")
+                    .update(leadUpdatePatch)
+                    .eq("id", leadId);
+                  void partialErr;
+                } catch (_e) {}
+              }
+            } catch (_e) {}
+            const replies = [
+              [NAO_RECUSA_MSG_1, RESPOSTA_REPESCAGEM_FIXA].filter(Boolean).join("\n\n"),
+            ];
+            await sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: replies,
+              admin,
+              conversationId,
+              insertIntoConversation: true,
+              allowNoInbound: true,
+            });
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_pendente_resposta_nao_nuclear",
+                title: "Matricula pendente pos-attendance (nuclear): lead respondeu NAO",
+                details: {
+                  inbound_text: inboundContentRaw,
+                  reply_messages: replies,
+                  source: "whatsapp_zapi_nuclear",
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "nuclear_post_attendance_matricula_pendente_resposta_nao",
+            });
+          } else if (isYesNuclear) {
+            const leadTz = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+            const safeFirstName = leadFirstName || leadFullNameRaw || "Aluno(a)";
+            const safeFullNameForLink = leadFullNameRaw || safeFirstName || "Aluno(a)";
+            const baseUrl = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
+            const cadastroLink =
+              `${baseUrl.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullNameForLink)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
+            const allFinalMessages: string[] = [
+              `Maravilha, ${safeFirstName}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLink}`,
+            ];
+            await sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: allFinalMessages,
+              admin,
+              conversationId,
+              insertIntoConversation: true,
+              allowNoInbound: true,
+            });
+            try {
+              const patchNowSim = {
+                funnel_stage: "pre_cadastro_concluido",
+                status: "matricula_pendente",
+                bot_enabled: false,
+                updated_at: nowIso,
+              };
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update(patchNowSim)
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    experimental_class_attendance_status: "attended",
+                    experimental_class_status: "completed",
+                  } as any)
+                  .eq("id", leadId);
+              } catch (_e) {}
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_pendente_resposta_sim_nuclear",
+                title: "Matricula pendente pos-attendance (nuclear): lead respondeu SIM",
+                details: {
+                  inbound_text: inboundContentRaw,
+                  reply_messages: allFinalMessages,
+                  next_funnel_stage: "cadastro_recorrente_pendente_plataforma",
+                  cadastro_link: cadastroLink,
+                  source: "whatsapp_zapi_nuclear",
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "nuclear_post_attendance_matricula_pendente_resposta_sim_recurring_cadastro_plataforma",
+            });
+          } else {
+            let invalidYesNoAttemptsForAmbiguousOnly = 0;
+            try {
+              const { data: histInvalidAttempts } = await admin
+                .from("atendimento_history_events")
+                .select("event_type, details")
+                .eq("lead_id", leadId)
+                .eq("conversation_id", conversationId)
+                .in("event_type", [
+                  "matricula_pendente_sim_nao_invalida_ambiguous",
+                  "nuclear_matricula_pendente_sim_nao_invalida_ambiguous",
+                  "matricula_pendente_resposta_sim",
+                  "matricula_pendente_resposta_nao",
+                  "matricula_pendente_resposta_sim_nuclear",
+                  "matricula_pendente_resposta_nao_nuclear",
+                ])
+                .order("created_at", { ascending: false })
+                .limit(20);
+              const arrHist = (histInvalidAttempts ?? []) as any[];
+              const eventsAfterLastClear = [] as any[];
+              for (const ev of arrHist) {
+                const typ = String(ev?.event_type ?? "");
+                if (
+                  typ === "matricula_pendente_resposta_sim" ||
+                  typ === "matricula_pendente_resposta_nao" ||
+                  typ === "matricula_pendente_resposta_sim_nuclear" ||
+                  typ === "matricula_pendente_resposta_nao_nuclear"
+                ) {
+                  break;
+                }
+                if (
+                  typ === "matricula_pendente_sim_nao_invalida_ambiguous" ||
+                  typ === "nuclear_matricula_pendente_sim_nao_invalida_ambiguous"
+                ) {
+                  eventsAfterLastClear.push(ev);
+                }
+              }
+              invalidYesNoAttemptsForAmbiguousOnly = eventsAfterLastClear.length;
+            } catch (_e) {
+              invalidYesNoAttemptsForAmbiguousOnly = 0;
+            }
+
+            const ambiguousCount = invalidYesNoAttemptsForAmbiguousOnly + 1;
+            const maxAmbiguousAttempts = 3;
+            let maxExceeded = ambiguousCount > maxAmbiguousAttempts && isAmbiguousNuclear;
+
+            if (maxExceeded) {
+              try {
+                void appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "whatsapp_flow_blocked_max_attempts",
+                  title: "Fluxo pos-attendance matricula pendente bloqueado apos 3 tentativas ambiguas de sim/nao",
+                  details: {
+                    reason: "max_ambiguous_yes_no_attempts",
+                    ambiguous_attempts: ambiguousCount,
+                    max_ambiguous_attempts: maxAmbiguousAttempts,
+                    inbound_text: inboundContentRaw,
+                    lenient_yes_score: lenientYesNoNuclear.yesScore,
+                    lenient_no_score: lenientYesNoNuclear.noScore,
+                    source: "nuclear_post_attendance",
+                  },
+                  actorType: "system",
+                });
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_conversations")
+                  .update({ bot_enabled: false, updated_at: nowIso })
+                  .eq("id", conversationId);
+              } catch (_e) {}
+              return Response.json({
+                ok: true,
+                handled: true,
+                blocked: true,
+                reason: "max_ambiguous_yes_no_attempts_post_attendance_nuclear",
+                attempts: ambiguousCount,
+                flow: "nuclear_post_attendance_matricula_pendente_bloqueado_max_ambiguous",
+              });
+            }
+
+            const replyInvalid =
+              ambiguousCount > 1
+                ? `${MSG_SIM_NAO_INVALIDA}\n\nTentativa ${Math.min(ambiguousCount, maxAmbiguousAttempts)} de ${maxAmbiguousAttempts}.`
+                : MSG_SIM_NAO_INVALIDA;
+
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: replyInvalid,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: replyInvalid,
+              });
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "nuclear_matricula_pendente_sim_nao_invalida_ambiguous",
+                title: "Matricula pendente pos-attendance (nuclear): resposta ambigua, pedindo sim/não",
+                details: {
+                  inbound_text: inboundContentRaw,
+                  is_ambiguous_nuclear: isAmbiguousNuclear,
+                  ambiguous_attempt: ambiguousCount,
+                  max_ambiguous_attempts: maxAmbiguousAttempts,
+                  lenient_yes_score: lenientYesNoNuclear.yesScore,
+                  lenient_no_score: lenientYesNoNuclear.noScore,
+                  reply_invalid_message: replyInvalid,
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              ambiguous: isAmbiguousNuclear,
+              ambiguous_attempt: ambiguousCount,
+              flow: isAmbiguousNuclear
+                ? "nuclear_post_attendance_matricula_pendente_invalida_ambiguous"
+                : "nuclear_post_attendance_matricula_pendente_invalida",
+            });
+          }
+        }
+
+        if (leadEstaEmMatriculaRecusadaPosAttendance) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "fallback_matricula_recusada_ignored_quiet",
+            flow: "whatsapp_matricula_recusada_ignored",
+          });
+        }
+
+        if (leadEstaEmRepescagemNoShow && !isYesNuclear) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "fallback_repescagem_no_show_ignored_quiet",
+            flow: "whatsapp_repescagem_no_show_ignored",
+          });
+        }
+
+        const handledByPosAttendanceFlowNuclear =
+          leadEstaEmMatriculaPendentePosAttendance ||
+          leadEstaEmMatriculaRecusadaPosAttendance ||
+          leadEstaEmRepescagemNoShow;
+
+        const hasStudentNotificationCol = Boolean(currentBooking?.student_start_notification_sent_at);
+        const hasAttendantNotificationCol = Boolean(currentBooking?.attendant_start_notification_sent_at);
+        let hasAnyBookingNotificationSentByHistory = false;
+        if (currentBookingId && !(hasStudentNotificationCol || hasAttendantNotificationCol)) {
+          try {
+            const { data: hist } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .in("event_type", [
+                "experimental_class_student_start_notification_sent",
+                "experimental_class_attendant_start_notification_sent",
+              ])
+              .limit(2);
+            hasAnyBookingNotificationSentByHistory = Array.isArray(hist) && hist.length > 0;
+          } catch (_e) {}
+        }
+        const hasAttendanceStatusCol =
+          String(currentBooking?.attendance_status ?? "").trim() === "attended" ||
+          String(currentBooking?.attendance_status ?? "").trim() === "no_show" ||
+          Boolean(currentBooking?.attendance_checked_at);
+        let hasAnyAttendanceResolvedByHistory = false;
+        if (currentBookingId && !hasAttendanceStatusCol) {
+          try {
+            const { data: histAtt } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .in("event_type", [
+                "experimental_class_attendance_attended",
+                "experimental_class_attendance_no_show",
+                "experimental_class_attendance_follow_up_required",
+              ])
+              .limit(2);
+            hasAnyAttendanceResolvedByHistory = Array.isArray(histAtt) && histAtt.length > 0;
+          } catch (_e) {}
+        }
+        const anyNotificationSent =
+          hasStudentNotificationCol || hasAttendantNotificationCol || hasAnyBookingNotificationSentByHistory;
+        const anyAttendanceResolved = hasAttendanceStatusCol || hasAnyAttendanceResolvedByHistory;
+        const isBookingWaitingAttendance = currentBookingId && anyNotificationSent && !anyAttendanceResolved;
+
+        let bookingAttendanceNoShowByHistory = false;
+        if (
+          currentBookingId &&
+          anyAttendanceResolved &&
+          !bookingAttendanceNoShowByCol &&
+          hasAnyAttendanceResolvedByHistory &&
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === ""
+        ) {
+          try {
+            const { data: histAtt2 } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .eq("event_type", "experimental_class_attendance_no_show")
+              .limit(1);
+            bookingAttendanceNoShowByHistory =
+              Array.isArray((histAtt2 as any) ?? []) && (histAtt2 as any).length > 0;
+          } catch (_e) {
+            bookingAttendanceNoShowByHistory = false;
+          }
+        }
+
+        let bookingAttendanceAttendedByHistory = false;
+        if (
+          currentBookingId &&
+          anyAttendanceResolved &&
+          !bookingAttendanceAttendedByCol &&
+          hasAnyAttendanceResolvedByHistory &&
+          String(currentBooking?.attendance_status ?? "").trim().toLowerCase() === ""
+        ) {
+          try {
+            const { data: histAtt3 } = await admin
+              .from("atendimento_history_events")
+              .select("event_type")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .eq("event_type", "experimental_class_attendance_attended")
+              .limit(1);
+            bookingAttendanceAttendedByHistory =
+              Array.isArray((histAtt3 as any) ?? []) && (histAtt3 as any).length > 0;
+          } catch (_e) {
+            bookingAttendanceAttendedByHistory = false;
+          }
+        }
+
+        const postAttendanceMatriculaPendenteByLead =
+          (funnelStageRaw === "matricula_pendente" || leadStatusRaw === "matricula_pendente") &&
+          postAttendanceHistoryConfirmedAttendedEvent &&
+          !postAttendanceHistoryMatriculaRecusadaEvent;
+        const postAttendanceMatriculaRecusadaByLead =
+          postAttendanceHistoryMatriculaRecusadaEvent ||
+          ((funnelStageRaw === "matricula_pendente_recusada" ||
+            leadStatusRaw === "matricula_pendente_recusada") &&
+            postAttendanceHistoryConfirmedAttendedEvent);
+        const postAttendanceRepescagemByLead =
+          isLeadRepescagemStatus && postAttendanceHistoryConfirmedNoShowEvent;
+
+        const isLeadInRepescagemNoShowLocked =
+          isLeadRepescagemStatus ||
+          postAttendanceRepescagemByLead ||
+          (currentBookingId &&
+            anyAttendanceResolved &&
+            (bookingAttendanceNoShowByCol || bookingAttendanceNoShowByHistory));
+
+        const isLeadInMatriculaPendentePostAttendance =
+          (!isLeadInRepescagemNoShowLocked || postAttendanceMatriculaPendenteByLead) &&
+          (Boolean(currentBookingId) || postAttendanceMatriculaPendenteByLead) &&
+          (anyAttendanceResolved || postAttendanceMatriculaPendenteByLead) &&
+          (bookingAttendanceAttendedByCol ||
+            bookingAttendanceAttendedByHistory ||
+            postAttendanceMatriculaPendenteByLead) &&
+          (postAttendanceHistoryConfirmedAttendedEvent ||
+            bookingAttendanceAttendedByCol ||
+            bookingAttendanceAttendedByHistory);
+
+        const isLeadInMatriculaRecusadaPosAttendance =
+          postAttendanceMatriculaRecusadaByLead ||
+          ((!isLeadInRepescagemNoShowLocked || postAttendanceMatriculaRecusadaByLead) &&
+            (Boolean(currentBookingId) || postAttendanceMatriculaRecusadaByLead) &&
+            (anyAttendanceResolved || postAttendanceMatriculaRecusadaByLead) &&
+            (bookingAttendanceAttendedByCol ||
+              bookingAttendanceAttendedByHistory ||
+              postAttendanceMatriculaRecusadaByLead) &&
+            (funnelStageRaw === "matricula_pendente_recusada" ||
+              leadStatusRaw === "matricula_pendente_recusada"));
+
+        const handledByPosAttendanceFlowByLead =
+          postAttendanceMatriculaRecusadaByLead ||
+          postAttendanceMatriculaPendenteByLead ||
+          postAttendanceRepescagemByLead;
+
+        const effectiveWaitMessage = (() => {
+          if (
+            leadEstaEmMatriculaPendentePosAttendance ||
+            leadEstaEmMatriculaRecusadaPosAttendance ||
+            leadEstaEmRepescagemNoShow ||
+            postAttendanceMatriculaRecusadaByLead ||
+            postAttendanceMatriculaPendenteByLead ||
+            postAttendanceRepescagemByLead ||
+            handledByPosAttendanceFlowNuclear
+          ) {
+            return null;
+          }
+          return anyNotificationSent
+            ? EXPERIMENTAL_CLASS_POST_NOTIFICATION_WAIT_MESSAGE
+            : EXPERIMENTAL_CLASS_FINAL_WAIT_MESSAGE;
+        })();
+
+        const handledByPosAttendanceFlow =
+          isLeadInMatriculaRecusadaPosAttendance ||
+          isLeadInMatriculaPendentePostAttendance ||
+          isLeadInRepescagemNoShowLocked ||
+          handledByPosAttendanceFlowByLead ||
+          handledByPosAttendanceFlowNuclear;
+
+        if (isLeadInMatriculaRecusadaPosAttendance) {
+          const inboundContent = String(messageText ?? "").trim();
+          const detectAfterNo = detectLenientYesNo(inboundContent);
+          if (detectAfterNo.result === "yes") {
+            // Usuário recusou mas respondeu SIM depois -> deixar passar para fluxo de confirmar
+            // (nao grava msg nem envia resposta fixa; cai no bloco nuclear/geral a seguir)
+          } else {
+            const inboundMediaType = mediaInfo.hasPaymentMedia
+              ? (mediaInfo.mediaUrl ? "document" : "text")
+              : "text";
+            const inboundMediaUrl = mediaInfo.mediaUrl || null;
+            try {
+              const { error: inboundErr } = await admin
+                .from("atendimento_messages")
+                .insert({
+                  conversation_id: conversationId,
+                  sender_role: "lead",
+                  content_text: inboundContent || null,
+                  media_type: inboundMediaType,
+                  media_url: inboundMediaUrl,
+                  status: "recebida",
+                  sent_at: nowIso,
+                  delivered_at: nowIso,
+                });
+              if (!inboundErr) {
+                try {
+                  void admin
+                    .from("atendimento_leads")
+                    .update({
+                      unread_count: Number(lead.unread_count ?? 0) + 1,
+                      is_new_for_attendant: true,
+                      last_interaction_at: nowIso,
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {}
+                try {
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: inboundContent || "(mensagem recebida)",
+                    createdAt: nowIso,
+                  });
+                } catch (_e) {}
+              }
+            } catch (_e) {}
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: RESPOSTA_REPESCAGEM_FIXA,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: RESPOSTA_REPESCAGEM_FIXA,
+              });
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_matricula_recusada_fixed_reply",
+                title: "Fluxo encerrado: resposta fixa após recusa de matrícula",
+                details: {
+                  inbound_content_text: inboundContent || null,
+                  reply_text: RESPOSTA_REPESCAGEM_FIXA,
+                  source: "whatsapp_zapi",
+                  booking_attendance_attended_by_col: bookingAttendanceAttendedByCol,
+                  booking_attendance_attended_by_history: bookingAttendanceAttendedByHistory,
+                },
+                actorType: "bot",
+              });
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_matricula_recusada_locked",
+            });
+          }
+        }
+
+        const leadRawFunnel = String((lead as any)?.funnel_stage ?? "").trim();
+        const leadRawStatus = String((lead as any)?.status ?? "").trim();
+        const isLeadLockedByMatriculaStage =
+          leadRawFunnel === "matricula_confirmada" ||
+          leadRawStatus === "matricula_confirmada";
+        if (isLeadLockedByMatriculaStage) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            void admin
+              .from("atendimento_leads")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", leadId);
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "isolated_post_attendance_stage_lock_" + leadRawFunnel + "_" + leadRawStatus,
+            flow: "post_attendance_matricula_stage_locked_quiet",
+          });
+        }
+
+        if (isLeadInMatriculaPendentePostAttendance && !isLeadInRepescagemNoShowLocked) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+
+          const inboundNormalized = inboundContent
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim()
+            .replace(/[.!?,\s]+$/g, "")
+            .toLowerCase();
+
+          const lenientYesNo = detectLenientYesNo(inboundContent);
+          const isYes = lenientYesNo.result === "yes";
+          const isNo = lenientYesNo.result === "no";
+          const isAmbiguous = lenientYesNo.result === "ambiguous";
+
+          let replyText = MSG_SIM_NAO_INVALIDA;
+          let noReplies: string[] = [];
+          let nextLeadFunnel = "matricula_pendente";
+          let nextLeadStatus = "matricula_pendente";
+          let historyEventType = "matricula_pendente_sim_nao_invalida";
+          let historyTitle = "Matrícula pendente: resposta inválida, pedindo sim/não";
+          let historyDetailsPatch: Record<string, unknown> | undefined = undefined;
+
+          let invalidYesNoAttemptsGeneralAmbiguousOnly = 0;
+          if (isAmbiguous) {
+            try {
+              const { data: histGeneralAmb } = await admin
+                .from("atendimento_history_events")
+                .select("event_type, details, created_at")
+                .eq("lead_id", leadId)
+                .eq("conversation_id", conversationId)
+                .in("event_type", [
+                  "matricula_pendente_sim_nao_invalida",
+                  "matricula_pendente_sim_nao_invalida_ambiguous",
+                ])
+                .order("created_at", { ascending: false })
+                .limit(10);
+              const arrGeneral = (histGeneralAmb ?? []) as any[];
+              const afterReset = [] as any[];
+              for (const ev of arrGeneral) {
+                const typ = String(ev?.event_type ?? "");
+                if (
+                  typ === "matricula_pendente_resposta_sim" ||
+                  typ === "matricula_pendente_resposta_nao"
+                ) {
+                  break;
+                }
+                if (
+                  typ === "matricula_pendente_sim_nao_invalida" ||
+                  typ === "matricula_pendente_sim_nao_invalida_ambiguous"
+                ) {
+                  const details: any = (ev as any).details ?? null;
+                  const wasAmbiguous =
+                    details && typeof details === "object" && details.is_ambiguous === true;
+                  if (wasAmbiguous || typ === "matricula_pendente_sim_nao_invalida_ambiguous") {
+                    afterReset.push(ev);
+                  }
+                }
+              }
+              invalidYesNoAttemptsGeneralAmbiguousOnly = afterReset.length;
+            } catch (_e) {
+              invalidYesNoAttemptsGeneralAmbiguousOnly = 0;
+            }
+          }
+          const generalAmbiguousCount =
+            (isAmbiguous ? invalidYesNoAttemptsGeneralAmbiguousOnly + 1 : 0);
+          const maxAmbiguousAttemptsGeneral = 3;
+          const shouldStopAfterMaxAmbiguous =
+            isAmbiguous && generalAmbiguousCount > maxAmbiguousAttemptsGeneral;
+
+          if (shouldStopAfterMaxAmbiguous) {
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_flow_blocked_max_attempts",
+                title: "Fluxo pos-attendance matricula pendente bloqueado apos 3 tentativas ambiguas (geral)",
+                details: {
+                  reason: "max_ambiguous_yes_no_attempts_general",
+                  ambiguous_attempts: generalAmbiguousCount,
+                  max_ambiguous_attempts: maxAmbiguousAttemptsGeneral,
+                  inbound_text: inboundContent,
+                  inbound_normalized: inboundNormalized,
+                  lenient_yes_score: lenientYesNo.yesScore,
+                  lenient_no_score: lenientYesNo.noScore,
+                  source: "whatsapp_zapi_general",
+                },
+                actorType: "system",
+              });
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              blocked: true,
+              ambiguous: true,
+              ambiguous_attempt: generalAmbiguousCount,
+              reason: "max_ambiguous_yes_no_attempts_post_attendance_general",
+              flow: "whatsapp_post_attendance_matricula_pendente_bloqueado_max_ambiguous",
+            });
+          }
+
+          if (isAmbiguous && generalAmbiguousCount >= 1) {
+            replyText =
+              generalAmbiguousCount > 1
+                ? `${MSG_SIM_NAO_INVALIDA}\n\nTentativa ${Math.min(generalAmbiguousCount, maxAmbiguousAttemptsGeneral)} de ${maxAmbiguousAttemptsGeneral}.`
+                : MSG_SIM_NAO_INVALIDA;
+          }
+
+          if (isYes) {
+            historyEventType = "matricula_pendente_resposta_sim";
+            historyTitle = "Matrícula pendente: lead respondeu SIM";
+            const leadTzGeneral = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+            try {
+              const safeFirstGeneral = leadFirstName || String((lead as any)?.full_name ?? "") || "Aluno(a)";
+              const safeFullGeneral = String((lead as any)?.full_name ?? "").trim() || safeFirstGeneral || "Aluno(a)";
+              const baseUrlGeneral = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
+              const cadastroLinkGeneral =
+                `${baseUrlGeneral.replace(/\/$/, "")}/cadastro/recorrente?nome=${encodeURIComponent(safeFullGeneral)}&telefone=${encodeURIComponent(normalizedPhoneOnly)}`;
+              const allMessages: string[] = [
+                `Maravilha, ${safeFirstGeneral}! 🎉 Acesse o link abaixo e conclua sua matrícula na plataforma.\n\nLink: ${cadastroLinkGeneral}`,
+              ];
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: allMessages,
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+              });
+              replyText = allMessages.join("\n\n");
+              historyDetailsPatch = { ...(historyDetailsPatch ?? {}), cadastro_link: cadastroLinkGeneral };
+            } catch (_e) {
+              replyText =
+                "Perfeito! Em breve nossa equipe entrará em contato para finalizar sua matrícula.";
+            }
+          } else if (isNo) {
+            const refusalMsg1 = leadFirstName
+              ? `Tudo bem, ${leadFirstName}. Entendemos que talvez ainda não seja o momento.`
+              : "Tudo bem, entendemos que talvez ainda não seja o momento.";
+            noReplies = [
+              refusalMsg1,
+              "Em breve nossa equipe entrará em contato.",
+            ];
+            nextLeadFunnel = "matricula_pendente_recusada";
+            nextLeadStatus = "matricula_pendente_recusada";
+            historyEventType = "matricula_pendente_resposta_nao";
+            historyTitle = "Matrícula pendente: lead respondeu NÃO";
+          } else if (isAmbiguous) {
+            historyEventType = "matricula_pendente_sim_nao_invalida_ambiguous";
+            historyTitle = "Matrícula pendente: resposta ambígua, pedindo sim/não";
+          }
+
+          try {
+            const leadUpdate: Record<string, unknown> = {
+              funnel_stage: nextLeadFunnel,
+              status: nextLeadStatus,
+              updated_at: nowIso,
+            };
+            await admin.from("atendimento_leads").update(leadUpdate).eq("id", leadId);
+          } catch (_e) {
+            const msg = String((_e as any)?.message ?? "");
+            const code = String((_e as any)?.code ?? "");
+            if (
+              code !== "42703" &&
+              code !== "PGRST204" &&
+              code !== "PGRST205" &&
+              !/column|does not exist/i.test(msg)
+            ) {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "matricula_lead_update_failed",
+                title: "Falha ao atualizar lead (matrícula flow)",
+                details: {
+                  error_message: msg,
+                  error_code: code,
+                  try_next_funnel: nextLeadFunnel,
+                  try_next_status: nextLeadStatus,
+                },
+                actorType: "system",
+              });
+            }
+          }
+
+          if (isNo && noReplies.length > 0) {
+            for (const msgTxt of noReplies) {
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: msgTxt,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: msgTxt,
+                });
+              } catch (_e) {}
+            }
+          } else if (!isYes) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: replyText,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: replyText,
+              });
+            } catch (_e) {}
+          }
+
+          try {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: historyEventType,
+              title: historyTitle,
+              details: {
+                inbound_content_text: inboundContent || null,
+                inbound_normalized: inboundNormalized || null,
+                is_yes: isYes,
+                is_no: isNo,
+                is_ambiguous: isAmbiguous,
+                ambiguous_attempt: generalAmbiguousCount,
+                max_ambiguous_attempts: maxAmbiguousAttemptsGeneral,
+                lenient_yes_score: lenientYesNo.yesScore,
+                lenient_no_score: lenientYesNo.noScore,
+                reply_text: isNo ? noReplies.join("\n---\n") : replyText,
+                next_funnel_stage: nextLeadFunnel,
+                next_status: nextLeadStatus,
+                source: "whatsapp_zapi",
+                booking_attendance_attended_by_col: bookingAttendanceAttendedByCol,
+                booking_attendance_attended_by_history: bookingAttendanceAttendedByHistory,
+                ...(historyDetailsPatch ?? {}),
+              },
+              actorType: "bot",
+            });
+          } catch (_e) {}
+
+          if (isYes || isNo) {
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {
+              const msg = String((_e as any)?.message ?? "");
+              const code = String((_e as any)?.code ?? "");
+              if (
+                code !== "42703" &&
+                code !== "PGRST204" &&
+                code !== "PGRST205" &&
+                !/bot_enabled/i.test(msg)
+              ) {
+                // ignore missing column; rest flow already returned handled:true
+              }
+            }
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e) {}
+          }
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_post_attendance_matricula_pendente",
+            is_yes: isYes,
+            is_no: isNo,
+            is_ambiguous: isAmbiguous,
+            ambiguous_attempt: generalAmbiguousCount,
+            lenient_yes_score: lenientYesNo.yesScore,
+            lenient_no_score: lenientYesNo.noScore,
+          });
+        }
+
+        if (isLeadInRepescagemNoShowLocked) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: RESPOSTA_REPESCAGEM_FIXA,
+            });
+          } catch (_e) {}
+          try {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "whatsapp_repescagem_no_show_fixed_reply",
+              title: "Fluxo encerrado: resposta fixa de repescagem",
+              details: {
+                inbound_content_text: inboundContent || null,
+                reply_text: RESPOSTA_REPESCAGEM_FIXA,
+                source: "whatsapp_zapi",
+                is_lead_repescagem_status: isLeadRepescagemStatus,
+                booking_attendance_no_show_by_col: bookingAttendanceNoShowByCol,
+                booking_attendance_no_show_by_history: bookingAttendanceNoShowByHistory,
+              },
+              actorType: "bot",
+            });
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_repescagem_no_show_locked",
+          });
+        }
+
+        {
+          const lrf = String((lead as any)?.funnel_stage ?? "").trim();
+          const lrs = String((lead as any)?.status ?? "").trim();
+          const locked =
+            lrf === "matricula_confirmada" ||
+            lrs === "matricula_confirmada";
+          if (locked) {
+            const inboundContent = String(messageText ?? "").trim();
+            const inboundMediaType = mediaInfo.hasPaymentMedia
+              ? (mediaInfo.mediaUrl ? "document" : "text")
+              : "text";
+            const inboundMediaUrl = mediaInfo.mediaUrl || null;
+            try {
+              const { error: inboundErr } = await admin
+                .from("atendimento_messages")
+                .insert({
+                  conversation_id: conversationId,
+                  sender_role: "lead",
+                  content_text: inboundContent || null,
+                  media_type: inboundMediaType,
+                  media_url: inboundMediaUrl,
+                  status: "recebida",
+                  sent_at: nowIso,
+                  delivered_at: nowIso,
+                });
+              if (!inboundErr) {
+                try {
+                  void admin
+                    .from("atendimento_leads")
+                    .update({
+                      unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                      is_new_for_attendant: true,
+                      last_interaction_at: nowIso,
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {}
+                try {
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: inboundContent || "(mensagem recebida)",
+                    createdAt: nowIso,
+                  });
+                } catch (_e) {}
+              }
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "secondary_isolated_stage_lock_" + lrf + "_" + lrs,
+              flow: "post_attendance_matricula_stage_locked_quiet_secondary",
+            });
+          }
+        }
+
+        if (isBookingWaitingAttendance) {
+          const inboundContent = String(messageText ?? "").trim();
+          const inboundMediaType = mediaInfo.hasPaymentMedia
+            ? (mediaInfo.mediaUrl ? "document" : "text")
+            : "text";
+          const inboundMediaUrl = mediaInfo.mediaUrl || null;
+          try {
+            const { error: inboundErr } = await admin
+              .from("atendimento_messages")
+              .insert({
+                conversation_id: conversationId,
+                sender_role: "lead",
+                content_text: inboundContent || null,
+                media_type: inboundMediaType,
+                media_url: inboundMediaUrl,
+                status: "recebida",
+                sent_at: nowIso,
+                delivered_at: nowIso,
+              });
+            if (!inboundErr) {
+              try {
+                void admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              try {
+                void syncConversationPreview({
+                  conversationId,
+                  contentText: inboundContent || "(mensagem recebida)",
+                  createdAt: nowIso,
+                });
+              } catch (_e) {}
+              try {
+                void appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "message_received_class_in_progress",
+                  title: "Mensagem recebida (aula em andamento — bloqueada)",
+                  details: {
+                    content_text: inboundContent || null,
+                    media_type: inboundMediaType,
+                    media_url: inboundMediaUrl,
+                    booking_id: currentBookingId,
+                    source: "whatsapp_zapi",
+                  },
+                  actorType: "lead",
+                });
+              } catch (_e) {}
+            }
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "experimental_class_waiting_attendance_blocked",
+            booking_id: currentBookingId,
+            attendance_status: String(currentBooking.attendance_status ?? "") || null,
+            student_start_notification_sent_at: currentBooking.student_start_notification_sent_at || null,
+            attendant_start_notification_sent_at: currentBooking.attendant_start_notification_sent_at || null,
+          });
+        }
+
+        const leadHasCancelledBooking = await isLeadBlockedByPreviousCancelledBooking({
+          admin,
+          lead,
+          leadId,
+        });
+        if (leadHasCancelledBooking) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent",
+          });
+        }
+
+        if (!conversation.bot_enabled) {
+          if (isBookingWaitingAttendance || handledByPosAttendanceFlow) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: isBookingWaitingAttendance
+                ? "conversation_blocked_waiting_attendance_no_reply"
+                : "conversation_blocked_pos_attendance_handled_above",
+              booking_id: currentBookingId,
+            });
+          }
+          let finalReason = "conversation_blocked";
+          let responseMessage: string | null = null;
+          const hasBooking =
+            currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() !== "cancelled"
+              ? currentBooking
+              : null;
+          if (hasBooking?.id && !handledByPosAttendanceFlow && effectiveWaitMessage) {
+            finalReason = "conversation_blocked_echo_booking_scheduled";
+            responseMessage = effectiveWaitMessage;
+          } else {
+            const histFinal = await admin
+              .from("atendimento_history_events")
+              .select("event_type, created_at")
+              .eq("lead_id", leadId)
+              .eq("conversation_id", conversationId)
+              .in("event_type", [
+                "experimental_class_scheduled",
+                "whatsapp_flow_concluded_bot_disabled",
+                "whatsapp_flow_blocked_max_attempts",
+              ])
+              .order("created_at", { ascending: false })
+              .limit(5);
+            const events = (histFinal.data ?? []) as Array<{ event_type: string; created_at?: string | null }>;
+            const latestCancelledBookingCreatedAt = await (async () => {
+              try {
+                const { data: cancelledBooking } = await admin
+                  .from("atendimento_experimental_class_bookings")
+                  .select("updated_at, created_at")
+                  .eq("lead_id", leadId)
+                  .eq("status", "cancelled")
+                  .order("updated_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                if ((cancelledBooking as any)?.updated_at) return (cancelledBooking as any).updated_at;
+                if ((cancelledBooking as any)?.created_at) return (cancelledBooking as any).created_at;
+                return null;
+              } catch (_e) {
+                return null;
+              }
+            })();
+            const anyActiveBookingCancelled = Boolean(
+              String(currentBooking?.status ?? "").trim().toLowerCase() === "cancelled" ||
+                latestCancelledBookingCreatedAt,
+            );
+            if (anyActiveBookingCancelled) {
+              finalReason = "conversation_blocked_cancelled_booking";
+              responseMessage = CANCELLED_BOOKING_AUTO_REPLY_MSG;
+            } else {
+              const scheduledDates = events.filter((e) => e.event_type === "experimental_class_scheduled");
+              const scheduledOlderThanCancel = scheduledDates.some((ev) => {
+                if (!ev?.created_at) return false;
+                if (!latestCancelledBookingCreatedAt) return false;
+                return new Date(ev.created_at).getTime() <= new Date(latestCancelledBookingCreatedAt).getTime();
+              });
+              const safeHasScheduled = events.some(
+                (e) =>
+                  e.event_type === "experimental_class_scheduled" ||
+                  e.event_type === "whatsapp_flow_concluded_bot_disabled",
+              ) && !scheduledOlderThanCancel && !latestCancelledBookingCreatedAt;
+              const hasScheduled = safeHasScheduled;
+              const hasBlockedMaxAttempts = events.some(
+                (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
+              );
+              if (hasScheduled && !handledByPosAttendanceFlow && effectiveWaitMessage) {
+                finalReason = "conversation_blocked_echo_scheduled_by_history";
+                responseMessage = effectiveWaitMessage;
+              } else if (hasBlockedMaxAttempts) {
+                const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+                const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+                finalReason = "conversation_blocked_support_max_attempts";
+                if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+                  responseMessage = SUPPORT_FINAL_MESSAGE;
+                }
+              } else {
+                const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+                const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+                if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+                  responseMessage = SUPPORT_FINAL_MESSAGE;
+                }
+              }
+            }
+          }
+          if (responseMessage && !isBookingWaitingAttendance && !handledByPosAttendanceFlow) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: responseMessage,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: responseMessage,
+              });
+            } catch (_e) {}
+          }
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: finalReason,
+          });
+        }
+
+        const inboundContent = String(messageText ?? "").trim();
+        const inboundMediaType = mediaInfo.hasPaymentMedia
+          ? (mediaInfo.mediaUrl ? "document" : "text")
+          : "text";
+        const inboundMediaUrl = mediaInfo.mediaUrl || null;
+
+        const { data: inboundMsg, error: inboundErr } = await admin
+          .from("atendimento_messages")
+          .insert({
+            conversation_id: conversationId,
+            sender_role: "lead",
+            content_text: inboundContent || null,
+            media_type: inboundMediaType,
+            media_url: inboundMediaUrl,
+            status: "recebida",
+            sent_at: nowIso,
+            delivered_at: nowIso,
+          })
+          .select("*")
+          .maybeSingle();
+
+        if (!inboundErr && inboundMsg?.id) {
+          void admin
+            .from("atendimento_leads")
+            .update({
+              unread_count: Number(lead.unread_count ?? 0) + 1,
+              is_new_for_attendant: true,
+              last_interaction_at: nowIso,
+              updated_at: nowIso,
+            })
+            .eq("id", leadId);
+
+          void syncConversationPreview({
+            conversationId,
+            contentText: inboundContent || "(mensagem recebida)",
+            createdAt: nowIso,
+          });
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "message_received",
+            title: "Mensagem recebida do lead via WhatsApp",
+            details: {
+              content_text: inboundContent || null,
+              media_type: inboundMediaType,
+              media_url: inboundMediaUrl,
+              source: "whatsapp_zapi",
+            },
+            actorType: "lead",
+          });
+        }
+
+        const isFirstBotInteraction = !(await hasAnyBotMessage({ conversationId }));
+        const lastBot = await getLastBotMessage({ admin, conversationId });
+        const lastBotText = String(lastBot?.content_text ?? "").trim();
+        const expectedFieldByText = inferExpectedWhatsAppFieldFromLastBot(lastBotText);
+        const expectedFieldByHistory = await detectExpectedWhatsAppFieldFromHistory({
+          admin,
+          leadId,
+          conversationId,
+        });
+        let expectedField = expectedFieldByText ?? expectedFieldByHistory;
+        const nextMissingField = getWhatsAppNextMissingField(lead);
+
+        const existingBooking =
+          currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() !== "cancelled"
+            ? currentBooking
+            : null;
+        const existingBookingIsCancelled =
+          currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() === "cancelled";
+        const existingBookingCancelledHelper = await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId });
+        const existingScheduledBookingId = existingBooking?.id ? String(existingBooking.id) : "";
+        const bookingAttendanceFullyResolvedEcho =
+          bookingAttendanceAttendedByCol || bookingAttendanceNoShowByCol;
+        if (existingBookingIsCancelled || existingBookingCancelledHelper) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent_existing_booking_cancelled_or_blocked",
+          });
+        }
+        if (
+          existingScheduledBookingId &&
+          !isBookingWaitingAttendance &&
+          bookingAttendanceFullyResolvedEcho &&
+          conversation.bot_enabled !== false &&
+          !handledByPosAttendanceFlow
+        ) {
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({
+                bot_enabled: false,
+                updated_at: nowIso,
+              })
+              .eq("id", conversationId);
+          } catch (_e) {}
+        }
+        if (existingScheduledBookingId && !isBookingWaitingAttendance && bookingAttendanceFullyResolvedEcho) {
+          if (handledByPosAttendanceFlow) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "flow_concluded_pos_attendance_handled_skip_scheduled_echo",
+              booking_id: existingScheduledBookingId,
+            });
+          }
+          if (!effectiveWaitMessage) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "flow_concluded_scheduled_echo_wait_message_null_skip",
+              booking_id: existingScheduledBookingId,
+            });
+          }
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: effectiveWaitMessage,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: effectiveWaitMessage,
+            });
+          } catch (_e) {}
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "flow_concluded_aula_experimental_ja_agendada_echo",
+            booking_id: existingScheduledBookingId,
+          });
+        }
+
+        const histFlowRecent = await admin
+          .from("atendimento_history_events")
+          .select("event_type,created_at")
+          .eq("lead_id", leadId)
+          .eq("conversation_id", conversationId)
+          .in("event_type", [
+            "experimental_class_scheduled",
+            "whatsapp_flow_concluded_bot_disabled",
+            "whatsapp_flow_blocked_max_attempts",
+          ])
+          .order("created_at", { ascending: false })
+          .limit(5);
+        const eventsFlowRecent = (histFlowRecent.data ?? []) as Array<{ event_type: string; created_at?: string | null }>;
+        const flowBlockedByPrevCancel = await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId });
+        const cancelledBookingForFlowCreatedAt = flowBlockedByPrevCancel
+          ? await (async () => {
+              try {
+                const { data: cancelledRow } = await admin
+                  .from("atendimento_experimental_class_bookings")
+                  .select("updated_at, created_at")
+                  .eq("lead_id", leadId)
+                  .eq("status", "cancelled")
+                  .order("updated_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                if ((cancelledRow as any)?.updated_at) return (cancelledRow as any).updated_at;
+                if ((cancelledRow as any)?.created_at) return (cancelledRow as any).created_at;
+                return null;
+              } catch (_e) {
+                return null;
+              }
+            })()
+          : null;
+        const scheduledFlowEvents = eventsFlowRecent.filter((ev) => ev.event_type === "experimental_class_scheduled");
+        const scheduledFlowOlderThanCancel = scheduledFlowEvents.some((ev) => {
+          if (!cancelledBookingForFlowCreatedAt || !ev?.created_at) return false;
+          return new Date(ev.created_at).getTime() <= new Date(cancelledBookingForFlowCreatedAt).getTime();
+        });
+        const eventsFlowRecentAny = eventsFlowRecent.length > 0 && !scheduledFlowOlderThanCancel;
+        const recentFlowConclusion = eventsFlowRecentAny && !flowBlockedByPrevCancel;
+        const recentIsScheduled =
+          eventsFlowRecent.some(
+            (e) =>
+              e.event_type === "experimental_class_scheduled" ||
+              e.event_type === "whatsapp_flow_concluded_bot_disabled",
+          ) && !scheduledFlowOlderThanCancel && !flowBlockedByPrevCancel;
+        const recentIsMaxAttemptsBlocked = eventsFlowRecent.some(
+          (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
+        );
+        if (flowBlockedByPrevCancel || scheduledFlowOlderThanCancel) {
+          try {
+            await insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await sendAtendimentoWhatsAppText({
+              phone: normalizedPhoneOnly,
+              message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            });
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                unread_count: Number(lead.unread_count ?? 0) + 1,
+                is_new_for_attendant: true,
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+          void syncConversationPreview({
+            conversationId,
+            contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            createdAt: nowIso,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+            title: "Mensagem automática de cancelamento enviada ao lead",
+            details: {
+              content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              source: "whatsapp_zapi",
+            },
+            actorType: "bot",
+          });
+          return Response.json({
+            ok: true,
+            ignored: false,
+            replied: true,
+            reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+            reason: "cancelled_booking_auto_reply_sent_hist_flow",
+          });
+        }
+        if (
+          recentFlowConclusion &&
+          conversation.bot_enabled !== false &&
+          !handledByPosAttendanceFlow &&
+          bookingAttendanceFullyResolvedEcho
+        ) {
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({
+                bot_enabled: false,
+                updated_at: nowIso,
+              })
+              .eq("id", conversationId);
+          } catch (_e) {}
+        }
+        if (recentFlowConclusion) {
+          if (handledByPosAttendanceFlow) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "flow_concluded_pos_attendance_handled_skip_history",
+              event_types: eventsFlowRecent.map((e: any) => e.event_type),
+            });
+          }
+          if (!bookingAttendanceFullyResolvedEcho) {
+            return Response.json({
+              ok: true,
+              ignored: false,
+              reason: "flow_concluded_history_attendance_not_resolved_yet_continue_normal_flow",
+              event_types: eventsFlowRecent.map((e: any) => e.event_type),
+            });
+          }
+          if (isBookingWaitingAttendance) {
+            return Response.json({
+              ok: true,
+              ignored: false,
+              reason: "flow_concluded_history_waiting_attendance_continue_normal_flow",
+              booking_id: currentBookingId,
+              event_types: eventsFlowRecent.map((e: any) => e.event_type),
+            });
+          }
+          let finalMsg: string | null = null;
+          let finalReason = "flow_concluded_already_finalized_in_history_event";
+          if (recentIsScheduled) {
+            finalMsg = effectiveWaitMessage;
+            if (!finalMsg) {
+              return Response.json({
+                ok: true,
+                ignored: true,
+                reason: "flow_concluded_echo_scheduled_by_history_wait_message_null_skip",
+                event_types: eventsFlowRecent.map((e: any) => e.event_type),
+              });
+            }
+            finalReason = "flow_concluded_echo_scheduled_by_history";
+          } else if (recentIsMaxAttemptsBlocked) {
+            const lastBotMsg = await getLastBotMessage({ admin, conversationId });
+            const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
+            if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
+              finalMsg = SUPPORT_FINAL_MESSAGE;
+            }
+            finalReason = "flow_concluded_support_max_attempts_by_history";
+          }
+          if (finalMsg) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: finalMsg,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: finalMsg,
+              });
+            } catch (_e) {}
+          }
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: finalReason,
+            event_types: eventsFlowRecent.map((e: any) => e.event_type),
+          });
+        }
+
+        const histStateMatch = await admin
+          .from("atendimento_history_events")
+          .select("event_type,details,created_at")
+          .eq("lead_id", leadId)
+          .eq("conversation_id", conversationId)
+          .in("event_type", ["state_collected", "city_collected"])
+          .order("created_at", { ascending: false })
+          .limit(2);
+        const lastHistState =
+          histStateMatch.data?.find((e: any) => e.event_type === "state_collected") ?? null;
+        const lastHistCity =
+          histStateMatch.data?.find((e: any) => e.event_type === "city_collected") ?? null;
+        let histStateValue = String((lastHistState as any)?.details?.state ?? "").trim();
+        let histTimezone = String((lastHistState as any)?.details?.timezone ?? "").trim();
+        let histCityValue = String((lastHistCity as any)?.details?.city ?? "").trim();
+
+        const leadStateValue =
+          String((lead as any)?.state ?? "").trim() || histStateValue;
+        const leadTimezoneValue =
+          String((lead as any)?.timezone ?? "").trim() || histTimezone;
+        const leadCityValue = String((lead as any)?.city ?? "").trim() || histCityValue;
+        const leadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim();
+        const hasStateValidated = Boolean(leadStateValue && leadTimezoneValue);
+        const hasCityValidated = Boolean(leadCityValue && hasStateValidated);
+        const hasReachedPostCityStage =
+          hasCityValidated ||
+          (leadFunnelStage === "pre_cadastro_concluido" ||
+            leadFunnelStage === "aula_experimental_agendada" ||
+            leadFunnelStage === "em_atendimento") ||
+          Boolean(lastHistCity);
+
+
+        if (expectedField === "state" && hasStateValidated) {
+          expectedField = hasCityValidated ? (nextMissingField ?? null) : "city";
+        }
+        if (expectedFieldByText === "city" && hasStateValidated && !hasCityValidated) {
+          expectedField = "city";
+        }
+        if (expectedField === "city" && hasCityValidated) {
+          expectedField = nextMissingField ?? null;
+        }
+        if (!expectedField && hasReachedPostCityStage) {
+          expectedField = nextMissingField ?? expectedField;
+        }
+        if (expectedField === "state" && hasReachedPostCityStage) {
+          expectedField = nextMissingField ?? null;
+        }
+        if (expectedField === "city" && !hasStateValidated) {
+          expectedField = "state";
+        }
+
+        if (experimentalClassBotDisabled && !handledByPosAttendanceFlow && !isBookingWaitingAttendance) {
+          const wantsPreStage =
+            isFirstBotInteraction ||
+            expectedField === "full_name" ||
+            expectedField === "state" ||
+            expectedField === "city" ||
+            nextMissingField === "full_name" ||
+            nextMissingField === "state" ||
+            nextMissingField === "city" ||
+            (!expectedField && !hasReachedPostCityStage && String((lead as any)?.phone ?? "").trim());
+          if (wantsPreStage) {
+            try {
+              void admin
+                .from("atendimento_leads")
+                .update({
+                  bot_enabled: false,
+                  unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                  is_new_for_attendant: true,
+                  last_interaction_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            try {
+              void admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "bot_experimental_class_disabled",
+                title: "Bot de agendamento experimental desativado: atendimento humano assumido",
+                details: {
+                  is_first_interaction: Boolean(isFirstBotInteraction),
+                  expected_field: expectedField || null,
+                  phone: normalizedPhoneOnly,
+                  source: "whatsapp_zapi",
+                },
+                actorType: "system",
+              });
+            } catch (_e) {}
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_experimental_class_bot_disabled",
+              bot_enabled: false,
+            });
+          }
+        }
+
+        if (isFirstBotInteraction) {
+          const zeroMessage = "POR FAVOR, ENVIE SUA RESPOSTA SOMENTE EM TEXTO.";
+          const firstMessage =
+            "Olá, tudo bem? 😊 Esse atendimento é para agendar sua aula experimental. Bora lá? É bem rapidinho!";
+          const secondMessage = CAPTURED_FIELD_PROMPTS.full_name;
+          const welcomeSingleMessage = [zeroMessage, firstMessage, secondMessage].filter(Boolean).join("\n\n");
+
+          await sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: [welcomeSingleMessage],
+            admin,
+            conversationId,
+            insertIntoConversation: true,
+          });
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "lead_timezone_collection_started",
+            title: "Coleta de estado e cidade iniciada diretamente via WhatsApp",
+            details: {
+              phone: normalizedPhoneOnly,
+              source: "manual_collection_whatsapp",
+              first_message: inboundContent || null,
+            },
+            actorType: "system",
+          });
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_direct_lead_first",
+          });
+        }
+
+        const wantsNameStage = expectedField === "full_name" || (!expectedField && nextMissingField === "full_name");
+        const leadFullName = String((lead as any)?.full_name ?? "").trim();
+        if (wantsNameStage && !leadFullName) {
+          if (isInboundMessagePureNonTextAtNameStage(body)) {
+            const msg =
+              "Nessa etapa do atendimento, aceitamos apenas mensagens de texto. Por favor, digite seu primeiro e segundo nome.";
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+            try {
+              await admin
+                .from("atendimento_conversations").update({ updated_at: nowIso }).eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  unread_count: Number(lead.unread_count ?? 0) + 1,
+                  is_new_for_attendant: true,
+                  last_interaction_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            void syncConversationPreview({ conversationId, contentText: msg, createdAt: nowIso });
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_name_rejected_non_text",
+              blocked: false,
+            });
+          }
+          const nameCandidate = firstTwoNamesFromFullName(inboundContent || "");
+          const alphaMatches = nameCandidate.match(/[A-Za-zÀ-ÿ]/g);
+          const letterCount = Array.isArray(alphaMatches) ? alphaMatches.length : 0;
+          const isValidName =
+            letterCount >= 2 &&
+            nameCandidate.length >= 2 &&
+            !/\d/.test(nameCandidate) &&
+            !/[/:@\\{}[\]]/.test(nameCandidate) &&
+            nameCandidate.length <= 40;
+          if (!isValidName) {
+            const msg = "Não consegui identificar seu nome. Responda novamente com seu primeiro e segundo nome.";
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_name_retry",
+              blocked: false,
+            });
+          }
+
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({ full_name: nameCandidate, updated_at: nowIso })
+              .eq("id", leadId);
+          } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "full_name_collected",
+            title: "Primeiro e segundo nome do lead identificados e salvos via WhatsApp",
+            details: {
+              raw_value: inboundContent || null,
+              stored_name: nameCandidate,
+              phone: normalizedPhoneOnly,
+            },
+            actorType: "system",
+          });
+
+          const afterNameNextField: "state" | "city" | null =
+            !String((lead as any)?.state ?? "").trim()
+              ? "state"
+              : !String((lead as any)?.city ?? "").trim()
+                ? "city"
+                : null;
+          const nextMsg: string = afterNameNextField
+            ? afterNameNextField === "state"
+              ? buildStatePrompt(nameCandidate)
+              : CAPTURED_FIELD_PROMPTS.city
+            : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
+          const __botMsgInsertNext = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
+          } catch (_e) {}
+          void __botMsgInsertNext.catch(() => {});
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_name_collected",
+          });
+        }
+
+        const wantsStateStage = expectedField === "state" || (!expectedField && nextMissingField === "state");
+        if (wantsStateStage && !hasStateValidated && !hasReachedPostCityStage) {
+          const stateRawTokens = inboundContent.split(/\s+/).filter(Boolean).length;
+          const stateResolution =
+            stateRawTokens <= 8
+              ? resolveTimeZoneFromStateInput({
+                  state: inboundContent,
+                  phone: normalizedPhoneOnly,
+                })
+              : null;
+          if (!stateResolution) {
+            const nextFail =
+              (await countWhatsAppLocationFailures({ admin, leadId, conversationId, field: "state" })) + 1;
+            const blocked = nextFail >= MAX_LOCATION_WHATSAPP_ATTEMPTS;
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "state_validation_failed",
+              title: "Falha ao identificar estado informado via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+              },
+              actorType: "system",
+            });
+
+            if (blocked) {
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "state",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_state_blocked_support",
+                blocked: true,
+              });
+            }
+
+            const msg = `${LOCATION_STATE_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_state_retry",
+              blocked: false,
+            });
+          }
+
+          const stateUpdate = admin
+            .from("atendimento_leads")
+            .update({
+              state: stateResolution.state,
+              timezone: stateResolution.timeZone,
+              country: stateResolution.country === "BR" ? "Brasil" : "Estados Unidos",
+              updated_at: nowIso,
+            })
+            .eq("id", leadId);
+          try {
+            await stateUpdate;
+          } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "state_collected",
+            title: "Estado do lead identificado e salvo via WhatsApp",
+            details: {
+              state: stateResolution.state,
+              normalized_state: stateResolution.normalizedState,
+              timezone: stateResolution.timeZone,
+              country: stateResolution.country === "BR" ? "Brasil" : "Estados Unidos",
+            },
+            actorType: "system",
+          });
+
+          const nextMsg = CAPTURED_FIELD_PROMPTS.city;
+          const __botMsgInsertNext = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
+          } catch (_e) {}
+          void __botMsgInsertNext.catch(() => {});
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "city_prompt_presented",
+            title: "Solicitada cidade do lead após estado identificado",
+            details: {
+              prompt: nextMsg,
+              state: stateResolution.state,
+            },
+            actorType: "system",
+          });
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_state_collected",
+          });
+        }
+
+        const wantsCityStage = expectedField === "city" || (!expectedField && nextMissingField === "city");
+        if (wantsCityStage && hasStateValidated && !hasCityValidated && !hasReachedPostCityStage) {
+          const stateSoFar = String((lead as any)?.state ?? "").trim();
+          const stateSoFarCountryRaw = stateSoFar
+            ? resolveTimeZoneFromStateInput({ state: stateSoFar, phone: normalizedPhoneOnly })
+            : null;
+          const stateSoFarCountry = stateSoFarCountryRaw?.country ?? null;
+          const inputCheck = isValidCityInput(inboundContent);
+          const rawResolved = inputCheck.valid
+            ? resolveTimeZoneFromCityInput({
+                city: inboundContent,
+                state: stateSoFar || null,
+                phone: normalizedPhoneOnly,
+                allowPhoneCountryFallback: false,
+              })
+            : null;
+          const resolved = cityResolutionIsReliable(rawResolved, { stateSoFarCountry }) ? rawResolved : null;
+          const resolvedCityValue = String(resolved?.city ?? "").trim();
+          if (resolved && !resolvedCityValue) {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "city_validation_failed",
+              title: "Cidade nao resolvida por match real (prompt suspeito ou match apenas por estado/ddd - cidade mantida vazia)",
+              details: {
+                attempt: 1,
+                content_text: inboundContent || null,
+                blocked: false,
+                state: stateSoFar || null,
+                fallback_source: (resolved as any)?.source ?? null,
+                resolved_state: (resolved as any)?.state ?? null,
+              },
+              actorType: "system",
+            });
+          }
+
+          if (!resolved) {
+            const nextFail =
+              (await countWhatsAppLocationFailures({ admin, leadId, conversationId, field: "city" })) + 1;
+            const blocked = nextFail >= MAX_LOCATION_WHATSAPP_ATTEMPTS;
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "city_validation_failed",
+              title: "Falha ao identificar cidade informada via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+                state: stateSoFar || null,
+              },
+              actorType: "system",
+            });
+
+            if (blocked) {
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "city",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_city_blocked_support",
+                blocked: true,
+              });
+            }
+
+            const msg = `${LOCATION_CITY_INVALID_MESSAGE}\n\nTentativa ${nextFail} de ${MAX_LOCATION_WHATSAPP_ATTEMPTS}.`;
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_city_retry",
+              blocked: false,
+            });
+          }
+
+          const finalCityValue = resolved.city ? String(resolved.city).trim() : "";
+          if (!finalCityValue) {
+            const introMsgs = [] as string[];
+            const { messages: dateMessages, availability } = await presentExperimentalClassDateOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              phone: normalizedPhoneOnly,
+              leadTimeZone:
+                (String((lead as any)?.timezone ?? "").trim() ||
+                  inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
+                  ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
+              skipWhatsAppSend: true,
+            });
+            const introBuilder = buildExperimentalClassDatePromptMessages(
+              String((lead as any)?.full_name ?? "").trim() || null,
+            );
+            const combinedBatch = [[...introBuilder, ...dateMessages].filter(Boolean).join("\n\n")];
+            await sendAtendimentoWhatsAppTextBatch({
+              phone: normalizedPhoneOnly,
+              messages: combinedBatch,
+              admin,
+              conversationId,
+              insertIntoConversation: true,
+            });
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_class_date_options_presented",
+              title: "Datas disponíveis da aula experimental apresentadas",
+              details: {
+                teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                lead_timezone:
+                  (String((lead as any)?.timezone ?? "").trim() ||
+                    inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
+                    ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
+                options: availability.dates,
+              },
+              actorType: "system",
+            });
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_city_skipped_but_date_presented",
+            });
+          }
+
+          const finalStateValue = String(resolved?.state ?? (String((lead as any)?.state ?? "").trim() || "")).trim() || null;
+          const cityUpdate = admin
+            .from("atendimento_leads")
+            .update({
+              city: finalCityValue,
+              state: finalStateValue,
+              timezone: resolved?.timeZone ?? (String((lead as any)?.timezone ?? "").trim() || null),
+              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : (String((lead as any)?.country ?? "").trim() || null),
+              funnel_stage: "pre_cadastro_concluido",
+              status: "matricula_pendente",
+              updated_at: nowIso,
+            })
+            .eq("id", leadId);
+          try {
+            await cityUpdate;
+          } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "city_collected",
+            title: "Cidade do lead identificada e salva via WhatsApp",
+            details: {
+              state: finalStateValue,
+              city: finalCityValue,
+              timezone: resolved?.timeZone ?? null,
+              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : null,
+              source: (resolved as any)?.source ?? "city_match",
+            },
+            actorType: "system",
+          });
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "lead_timezone_identified",
+            title: "Cidade e fuso do lead identificados via WhatsApp",
+            details: {
+              state: finalStateValue,
+              city: finalCityValue,
+              timezone: resolved?.timeZone ?? null,
+              teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : null,
+              source: (resolved as any)?.source ?? "city_match",
+            },
+            actorType: "system",
+          });
+
+          const introMsgs = buildExperimentalClassDatePromptMessages(
+            String((lead as any)?.full_name ?? "").trim() || null,
+          );
+          const { messages: dateMessages, availability } = await presentExperimentalClassDateOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            phone: normalizedPhoneOnly,
+            leadTimeZone: resolved.timeZone,
+            skipWhatsAppSend: true,
+          });
+          const combinedBatch = [[...introMsgs, ...dateMessages].filter(Boolean).join("\n\n")];
+          await sendAtendimentoWhatsAppTextBatch({
+            phone: normalizedPhoneOnly,
+            messages: combinedBatch,
+            admin,
+            conversationId,
+            insertIntoConversation: true,
+          });
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_date_options_presented",
+            title: "Datas disponíveis da aula experimental apresentadas",
+            details: {
+              teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              lead_timezone: resolved.timeZone,
+              options: availability.dates,
+            },
+            actorType: "system",
+          });
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_city_collected_date_presented",
+          });
+        }
+
+        if (!expectedField && nextMissingField === null) {
+          const alreadyBooked = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+          if (alreadyBooked?.id) {
+            return Response.json({ ok: true, handled: true, flow: "whatsapp_already_booked" });
+          }
+          const normalizedInbound = String(inboundContent ?? "").trim();
+          const looksLikeDateOrTime = /\d/.test(normalizedInbound) || /hoje|amanha|amanhã|segunda|terca|quarta|quinta|sexta|sabado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(normalizedInbound);
+          const lastAskedAboutSchedule = Boolean(
+            lastBotText && (
+              /qual (dia|data|horário|hora|horario)/i.test(lastBotText) ||
+              lastBotText.startsWith("Datas disponíveis") ||
+              lastBotText.startsWith("As datas disponíveis são:") ||
+              lastBotText.startsWith("Dias disponíveis") ||
+              lastBotText.startsWith("Os dias disponíveis são:") ||
+              lastBotText.startsWith("Horários disponíveis") ||
+              lastBotText.startsWith("Os horários disponíveis são:") ||
+              lastBotText.startsWith("Responda apenas com o dia desejado") ||
+              lastBotText.startsWith("Responda apenas com o horário desejado")
+            )
+          );
+          if (hasReachedPostCityStage && !looksLikeDateOrTime && !lastAskedAboutSchedule) {
+            return Response.json({
+              ok: true,
+              ignored: true,
+              reason: "quiet_no_schedule_question_received_non_date_input",
+            });
+          }
+          const leadTz =
+            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const alreadyHasProfessorDate = String(
+            (lead as any)?.experimental_class_professor_date ?? "",
+          ).trim();
+          if (alreadyHasProfessorDate && /^\d{4}-\d{2}-\d{2}$/.test(alreadyHasProfessorDate)) {
+            const pres = await presentExperimentalClassTimeOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              phone: normalizedPhoneOnly,
+              leadTimeZone: leadTz,
+              professorDate: alreadyHasProfessorDate,
+              skipWhatsAppSend: true,
+            });
+            if (pres.slots && pres.slots.length) {
+              const chosenNow = findExperimentalClassTimeOption(inboundContent, pres.slots);
+              if (chosenNow) {
+                const professorDate = alreadyHasProfessorDate;
+
+                void appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "experimental_class_time_selected",
+                  title: "Horário da aula experimental selecionado via WhatsApp (fallback)",
+                  details: {
+                    professor_date: chosenNow.professorDate,
+                    professor_time: chosenNow.professorTime,
+                    professor_start_at: chosenNow.professorStartAt,
+                    lead_date: chosenNow.leadDate,
+                    lead_time: chosenNow.leadTime,
+                    label: chosenNow.displayLabel,
+                  },
+                  actorType: "system",
+                });
+
+                try {
+                  await admin
+                    .from("atendimento_leads")
+                    .update({
+                      experimental_class_professor_date: chosenNow.professorDate,
+                      experimental_class_lead_date: chosenNow.leadDate,
+                      experimental_class_professor_time: chosenNow.professorTime,
+                      experimental_class_lead_time: chosenNow.leadTime,
+                      experimental_class_professor_start_at: chosenNow.professorStartAt,
+                      experimental_class_lead_start_at: chosenNow.professorStartAt,
+                      experimental_class_status: "time_selected",
+                      updated_at: nowIso,
+                    })
+                    .eq("id", leadId);
+                } catch (_e) {
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({ updated_at: nowIso })
+                      .eq("id", leadId);
+                  } catch (_e2) {}
+                }
+
+                const already = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+                if (!already?.id) {
+                  const { data: booking } = await admin
+                    .from("atendimento_experimental_class_bookings")
+                    .insert({
+                      lead_id: leadId,
+                      conversation_id: conversationId,
+                      professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                      lead_timezone: leadTz,
+                      professor_date: chosenNow.professorDate,
+                      professor_time: chosenNow.professorTime,
+                      professor_start_at: chosenNow.professorStartAt,
+                      lead_date: chosenNow.leadDate,
+                      lead_time: chosenNow.leadTime,
+                      lead_start_at: chosenNow.professorStartAt,
+                      status: "scheduled",
+                    })
+                    .select("*")
+                    .maybeSingle();
+
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({
+                        experimental_class_booking_id: booking?.id ?? null,
+                        experimental_class_status: "booked",
+                        funnel_stage: "aula_experimental_agendada",
+                        updated_at: nowIso,
+                      })
+                      .eq("id", leadId);
+                  } catch (_e) {}
+                }
+
+                void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+                  leadId,
+                  leadName: String((lead as any)?.full_name ?? "").trim() || null,
+                  conversationId,
+                });
+                void maybeSendExperimentalClassConfirmationToStudent({
+                  leadId,
+                  leadName: String((lead as any)?.full_name ?? "").trim() || null,
+                  conversationId,
+                });
+
+                const firstName = String((lead as any)?.full_name ?? "").trim().split(" ")[0] || "Aluno";
+                const alreadyBookingCancelled =
+                  (already && String((already as any).status) === "cancelled") ||
+                  (await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId }));
+                if (alreadyBookingCancelled) {
+                  try {
+                    await insertWhatsAppBotTextMessage({
+                      admin,
+                      conversationId,
+                      contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: normalizedPhoneOnly,
+                      message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_conversations")
+                      .update({ updated_at: nowIso })
+                      .eq("id", conversationId);
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({
+                        unread_count: Number(lead.unread_count ?? 0) + 1,
+                        is_new_for_attendant: true,
+                        last_interaction_at: nowIso,
+                        updated_at: nowIso,
+                      })
+                      .eq("id", leadId);
+                  } catch (_e) {}
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    createdAt: nowIso,
+                  });
+                  void appendHistoryEvent({
+                    leadId,
+                    conversationId,
+                    eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+                    title: "Mensagem automática de cancelamento enviada ao lead",
+                    details: {
+                      content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                      source: "whatsapp_zapi",
+                    },
+                    actorType: "bot",
+                  });
+                  return Response.json({
+                    ok: true,
+                    ignored: false,
+                    replied: true,
+                    reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    reason: "cancelled_booking_auto_reply_sent_booking_success_blocked_fallback",
+                  });
+                }
+                const needsPostBookingCpf = !Boolean(String((lead as any)?.cpf ?? "").trim());
+
+                if (needsPostBookingCpf) {
+                  void appendHistoryEvent({
+                    leadId,
+                    conversationId,
+                    eventType: "cpf_prompt_presented",
+                    title: "Prompt pós-agendamento de CPF apresentado ao lead via WhatsApp (fallback)",
+                    details: { phone: normalizedPhoneOnly, stage: "immediately_after_booking" },
+                    actorType: "system",
+                  });
+
+                  const __cpfInsert = insertWhatsAppBotTextMessage({
+                    admin,
+                    conversationId,
+                    contentText: POST_BOOKING_CPF_PROMPT,
+                  });
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: normalizedPhoneOnly,
+                      message: POST_BOOKING_CPF_PROMPT,
+                    });
+                  } catch (_e) {}
+                  void __cpfInsert.catch(() => {});
+                } else {
+                  const zapiFallbackBookingRef = (already as any) ?? null;
+                  const zapiFallbackResolved =
+                    resolveExperimentalClassAssignedProfessorPhone({
+                      bookingAssignedPhone: String(zapiFallbackBookingRef?.assigned_professor_phone ?? "").trim(),
+                      bookingAssignedName: String(zapiFallbackBookingRef?.assigned_professor_name ?? "").trim(),
+                      flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+                      flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+                    });
+                }
+
+                return Response.json({
+                  ok: true,
+                  handled: true,
+                  flow: "whatsapp_fallback_date_present_then_booked",
+                });
+              }
+              const msgsRaw = buildExperimentalClassTimesMessages({
+                dayLabel: alreadyHasProfessorDate.slice(8, 10),
+                options: pres.slots,
+              });
+              const msgBatch = [msgsRaw.filter(Boolean).join("\n\n")];
+              await sendAtendimentoWhatsAppTextBatch({
+                phone: normalizedPhoneOnly,
+                messages: msgBatch,
+                admin,
+                conversationId,
+                insertIntoConversation: true,
+              });
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "experimental_class_time_options_presented",
+                title: "Horários disponíveis da aula experimental apresentados (fallback)",
+                details: {
+                  teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                  lead_timezone: leadTz,
+                  professor_date: alreadyHasProfessorDate,
+                  options: pres.slots.map((s: any) => ({
+                    label: s?.displayLabel ?? "",
+                    professor_time: s?.professorTime ?? "",
+                  })),
+                },
+                actorType: "system",
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_time_presented_fallback_already_has_date",
+              });
+            }
+          }
+          await presentExperimentalClassDateOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            phone: normalizedPhoneOnly,
+            leadTimeZone: leadTz,
+          });
+          return Response.json({ ok: true, handled: true, flow: "whatsapp_date_presented_fallback" });
+        }
+
+        if (expectedField === "date") {
+          const leadTz =
+            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const { availability } = await presentExperimentalClassDateOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            phone: normalizedPhoneOnly,
+            leadTimeZone: leadTz,
+            skipWhatsAppSend: true,
+          });
+          const chosen = findExperimentalClassDateOption(inboundContent, availability.dates);
+          if (!chosen) {
+            const nextFail =
+              (await countWhatsAppScheduleFailures({ admin, leadId, conversationId, field: "date" })) +
+              1;
+            const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_class_date_validation_failed",
+              title: "Falha ao identificar dia da aula experimental via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+              },
+              actorType: "system",
+            });
+
+            if (blocked) {
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "date",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_date_blocked_support",
+                blocked: true,
+              });
+            }
+
+            const messagesRaw = buildExperimentalClassDatesMessages(availability.dates);
+            const datesBlock = messagesRaw.filter(Boolean).join("\n\n");
+            const msg = `${EXPERIMENTAL_CLASS_DATE_INVALID_MESSAGE}\n\n${datesBlock}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_date_retry",
+              blocked: false,
+            });
+          }
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_date_selected",
+            title: "Data da aula experimental selecionada via WhatsApp",
+            details: {
+              professor_date: chosen.professorDate,
+              lead_date: chosen.leadDate,
+              label: chosen.displayLabel,
+            },
+            actorType: "system",
+          });
+
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                experimental_class_professor_date: chosen.professorDate,
+                experimental_class_lead_date: chosen.leadDate,
+                experimental_class_status: "date_selected",
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e2) {}
+          }
+
+          await presentExperimentalClassTimeOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            phone: normalizedPhoneOnly,
+            leadTimeZone: leadTz,
+            professorDate: chosen.professorDate,
+          });
+          return Response.json({ ok: true, handled: true, flow: "whatsapp_time_presented" });
+        }
+
+        if (expectedField === "time") {
+          const leadTz =
+            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const { data: latestTimeEvt } = await admin
+            .from("atendimento_history_events")
+            .select("details")
+            .eq("lead_id", leadId)
+            .eq("conversation_id", conversationId)
+            .eq("event_type", "experimental_class_time_options_presented")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          let professorDate = String(
+            (((latestTimeEvt as any)?.details ?? {}) as Record<string, unknown>).professor_date ?? "",
+          ).trim();
+
+          const hasAnyDateContext = Boolean(professorDate) ||
+            Boolean(String((lead as any)?.experimental_class_professor_date ?? "").trim()) ||
+            Boolean(String((lead as any)?.experimental_class_lead_date ?? "").trim());
+          if (!hasAnyDateContext) {
+            await presentExperimentalClassDateOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              phone: normalizedPhoneOnly,
+              leadTimeZone: leadTz,
+            });
+            return Response.json({ ok: true, handled: true, flow: "whatsapp_date_represented_missing_context" });
+          }
+          professorDate = professorDate ||
+            String((lead as any)?.experimental_class_professor_date ?? "").trim();
+
+          const pres = await presentExperimentalClassTimeOptionsWhatsApp({
+            admin,
+            leadId,
+            conversationId,
+            phone: normalizedPhoneOnly,
+            leadTimeZone: leadTz,
+            professorDate,
+            skipWhatsAppSend: true,
+          });
+
+          if (!pres.slots.length) {
+            await presentExperimentalClassDateOptionsWhatsApp({
+              admin,
+              leadId,
+              conversationId,
+              phone: normalizedPhoneOnly,
+              leadTimeZone: leadTz,
+            });
+            return Response.json({ ok: true, handled: true, flow: "whatsapp_no_more_times_returned_dates" });
+          }
+
+          const chosen = findExperimentalClassTimeOption(inboundContent, pres.slots);
+          if (!chosen) {
+            const nextFail =
+              (await countWhatsAppScheduleFailures({ admin, leadId, conversationId, field: "time" })) +
+              1;
+            const blocked = nextFail >= MAX_SCHEDULE_WHATSAPP_ATTEMPTS;
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_class_time_validation_failed",
+              title: "Falha ao identificar horário da aula experimental via WhatsApp",
+              details: {
+                attempt: nextFail,
+                content_text: inboundContent || null,
+                blocked,
+                professor_date: professorDate || null,
+                remaining_slot_labels: pres.slots.map((s: any) => String(s?.displayLabel ?? "")).filter(Boolean),
+              },
+              actorType: "system",
+            });
+
+            if (blocked) {
+              await sendSupportFinalAndMarkBlocked({
+                admin,
+                leadId,
+                conversationId,
+                normalizedPhoneOnly,
+                blockedStage: "time",
+                attempt: nextFail,
+                contentText: inboundContent,
+              });
+              return Response.json({
+                ok: true,
+                handled: true,
+                flow: "whatsapp_time_blocked_support",
+                blocked: true,
+              });
+            }
+
+            const msg = `${EXPERIMENTAL_CLASS_TIME_INVALID_MESSAGE}\n\nHorários disponíveis para esse dia:\n${pres.slots.map((s: any) => `• ${String(s?.displayLabel ?? "")}`).filter(Boolean).join("\n")}\n\nTentativa ${nextFail} de ${MAX_SCHEDULE_WHATSAPP_ATTEMPTS}.`;
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_time_retry",
+              blocked: false,
+            });
+          }
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_class_time_selected",
+            title: "Horário da aula experimental selecionado via WhatsApp",
+            details: {
+              professor_date: chosen.professorDate,
+              professor_time: chosen.professorTime,
+              professor_start_at: chosen.professorStartAt,
+              lead_date: chosen.leadDate,
+              lead_time: chosen.leadTime,
+              label: chosen.displayLabel,
+            },
+            actorType: "system",
+          });
+
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                experimental_class_professor_date: chosen.professorDate,
+                experimental_class_lead_date: chosen.leadDate,
+                experimental_class_professor_time: chosen.professorTime,
+                experimental_class_lead_time: chosen.leadTime,
+                experimental_class_professor_start_at: chosen.professorStartAt,
+                experimental_class_lead_start_at: chosen.professorStartAt,
+                experimental_class_status: "time_selected",
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({ updated_at: nowIso })
+                .eq("id", leadId);
+            } catch (_e2) {}
+          }
+
+          const already = await getScheduledExperimentalClassBookingWhatsApp({ admin, leadId });
+          if (!already?.id) {
+            const { data: booking } = await admin
+              .from("atendimento_experimental_class_bookings")
+              .insert({
+                lead_id: leadId,
+                conversation_id: conversationId,
+                professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                lead_timezone: leadTz,
+                professor_date: chosen.professorDate,
+                professor_time: chosen.professorTime,
+                professor_start_at: chosen.professorStartAt,
+                lead_date: chosen.leadDate,
+                lead_time: chosen.leadTime,
+                lead_start_at: chosen.professorStartAt,
+                status: "scheduled",
+              })
+              .select("*")
+              .maybeSingle();
+
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  funnel_stage: "aula_experimental_agendada",
+                  status: "em_atendimento",
+                  best_contact_time: chosen.leadTime,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+
+            const leadCPFBefore = String((lead as any)?.cpf ?? "").trim();
+            const needsPostBookingCpf =
+              POST_BOOKING_CPF_STAGE_ENABLED && !leadCPFBefore;
+
+            if (!needsPostBookingCpf) {
+              try {
+                await admin
+                  .from("atendimento_conversations")
+                  .update({
+                    bot_enabled: false,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", conversationId);
+              } catch (_e) {}
+            }
+
+            try {
+              await appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "experimental_class_scheduled",
+                title: "Aula experimental agendada via WhatsApp",
+                details: {
+                  booking_id: String((booking as any)?.id ?? ""),
+                  teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                  lead_timezone: leadTz,
+                  professor_date: chosen.professorDate,
+                  professor_time: chosen.professorTime,
+                  professor_start_at: chosen.professorStartAt,
+                  lead_date: chosen.leadDate,
+                  lead_time: chosen.leadTime,
+                  post_booking_cpf_required: needsPostBookingCpf,
+                },
+                actorType: "system",
+              });
+            } catch (_e) {}
+
+            void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({
+              leadId,
+              leadName: String((lead as any)?.full_name ?? "").trim() || null,
+              conversationId,
+            });
+            void maybeSendExperimentalClassConfirmationToStudent({
+              leadId,
+              leadName: String((lead as any)?.full_name ?? "").trim() || null,
+              conversationId,
+            });
+
+            if (!needsPostBookingCpf) {
+              try {
+                await appendHistoryEvent({
+                  leadId,
+                  conversationId,
+                  eventType: "whatsapp_flow_concluded_bot_disabled",
+                  title: "Fluxo WhatsApp de agendamento concluido — bot desativado para novos disparos",
+                  details: {
+                    reason: "aula_experimental_agendada",
+                    disabled_at: nowIso,
+                  },
+                  actorType: "system",
+                });
+              } catch (_e) {}
+            }
+
+            const firstName =
+              String((lead as any)?.full_name ?? "").trim().split(/\s+/)[0] || "Aluno";
+
+            const alreadyBookingCancelled2 =
+              (already && String((already as any).status) === "cancelled") ||
+              (await isLeadBlockedByPreviousCancelledBooking({ admin, lead, leadId }));
+            if (alreadyBookingCancelled2) {
+              try {
+                await insertWhatsAppBotTextMessage({
+                  admin,
+                  conversationId,
+                  contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                });
+              } catch (_e) {}
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                });
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_conversations")
+                  .update({ updated_at: nowIso })
+                  .eq("id", conversationId);
+              } catch (_e) {}
+              try {
+                await admin
+                  .from("atendimento_leads")
+                  .update({
+                    unread_count: Number(lead.unread_count ?? 0) + 1,
+                    is_new_for_attendant: true,
+                    last_interaction_at: nowIso,
+                    updated_at: nowIso,
+                  })
+                  .eq("id", leadId);
+              } catch (_e) {}
+              void syncConversationPreview({
+                conversationId,
+                contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                createdAt: nowIso,
+              });
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+                title: "Mensagem automática de cancelamento enviada ao lead",
+                details: {
+                  content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                  source: "whatsapp_zapi",
+                },
+                actorType: "bot",
+              });
+              return Response.json({
+                ok: true,
+                ignored: false,
+                replied: true,
+                reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                reason: "cancelled_booking_auto_reply_sent_booking_success_blocked_main",
+              });
+            }
+
+            if (needsPostBookingCpf) {
+              void appendHistoryEvent({
+                leadId,
+                conversationId,
+                eventType: "cpf_prompt_presented",
+                title: "Prompt pós-agendamento de CPF apresentado ao lead via WhatsApp",
+                details: { phone: normalizedPhoneOnly, stage: "immediately_after_booking" },
+                actorType: "system",
+              });
+
+              const __cpfInsert = insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: POST_BOOKING_CPF_PROMPT,
+              });
+              try {
+                await sendAtendimentoWhatsAppText({
+                  phone: normalizedPhoneOnly,
+                  message: POST_BOOKING_CPF_PROMPT,
+                });
+              } catch (_e) {}
+              void __cpfInsert.catch(() => {});
+            } else {
+              const zapiBookedBookingRef = (booking as any) ?? null;
+              const zapiBookedResolved =
+                resolveExperimentalClassAssignedProfessorPhone({
+                  bookingAssignedPhone: String(zapiBookedBookingRef?.assigned_professor_phone ?? "").trim(),
+                  bookingAssignedName: String(zapiBookedBookingRef?.assigned_professor_name ?? "").trim(),
+                  flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
+                  flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
+                });
+            }
+          }
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_booked",
+          });
+        }
+
+        const leadCPF = String((lead as any)?.cpf ?? "").trim();
+        const postBookingStage = String((lead as any)?.funnel_stage ?? "");
+        const isPostBookingStage =
+          postBookingStage === "aula_experimental_agendada" ||
+          expectedField === "cpf";
+        if (
+          POST_BOOKING_CPF_STAGE_ENABLED &&
+          isPostBookingStage &&
+          !leadCPF
+        ) {
+          const inboundIsExpectedCpf = expectedField === "cpf";
+          if (!inboundIsExpectedCpf && expectedField !== "cpf") {
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "cpf_prompt_presented",
+              title: "Prompt pós-agendamento de CPF apresentado ao lead via WhatsApp",
+              details: { phone: normalizedPhoneOnly, stage: "post_booking" },
+              actorType: "system",
+            });
+            const msg = POST_BOOKING_CPF_PROMPT;
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_post_booking_cpf_prompted",
+              blocked: false,
+            });
+          }
+
+          const cpfCheck = isValidCPF(inboundContent || "");
+          if (!cpfCheck.ok) {
+            const msg =
+              "Não consegui identificar um CPF válido. Responda novamente com os 11 dígitos (ex: 123.456.789-09).";
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: msg });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: msg });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "cpf_validation_failed",
+              title: "Falha ao validar CPF (pós-agendamento) informado via WhatsApp",
+              details: { raw_value: inboundContent || null, phone: normalizedPhoneOnly },
+              actorType: "system",
+            });
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_post_booking_cpf_retry",
+              blocked: false,
+            });
+          }
+          try {
+            await admin.from("atendimento_leads").update({ cpf: cpfCheck.formatted, updated_at: nowIso }).eq("id", leadId);
+          } catch (_e) {}
+
+          void appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "cpf_collected",
+            title: "CPF do lead coletado via WhatsApp (pós-agendamento da aula experimental)",
+            details: {
+              raw_value: inboundContent || null,
+              stored_cpf: cpfCheck.formatted,
+              digits: cpfCheck.digits,
+              phone: normalizedPhoneOnly,
+              stage: "post_booking",
+            },
+            actorType: "system",
+          });
+
+          const finalMsg = POST_BOOKING_CPF_SUCCESS_MESSAGE;
+          const __botMsgInsertFinal = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: finalMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: finalMsg });
+          } catch (_e) {}
+          void __botMsgInsertFinal.catch(() => {});
+
+          try {
+            await admin
+              .from("atendimento_conversations")
+              .update({ bot_enabled: false, updated_at: nowIso })
+              .eq("id", conversationId);
+          } catch (_e) {}
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_post_booking_cpf_collected",
+          });
+        }
+
+        if (hasReachedPostCityStage && !isFirstBotInteraction) {
+          return Response.json({
+            ok: true,
+            ignored: true,
+            reason: "flow_inattended_or_waiting_human_stage_quiet",
+            last_expected: expectedField,
+            next_missing: nextMissingField ?? null,
+          });
+        }
+    } catch (_whatsappLeadErr) {
+    }
+  }
+
+  if (!normalizedFrom) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_ignorado",
+      descricao: "Webhook ignorado: remetente sem telefone identificável.",
+    });
+    return Response.json({ ok: true, ignored: true, reason: "missing_sender_phone" });
+  }
+
+  const { data: debtors } = await admin
+    .from("debtors")
+    .select("id, telefone")
+    .eq("user_id", userId)
+    .limit(500);
+
+  const match = (debtors ?? []).find((d: any) => normalizePhone(String(d?.telefone ?? "")) === normalizedFrom);
+  const debtorId = match?.id ? String(match.id) : null;
+  if (!debtorId) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_ignorado",
+      descricao: `Webhook ignorado: telefone ${normalizedFrom} sem lead de atendimento e sem cliente cadastrado no financeiro.`,
+    });
+    return Response.json({ ok: true, ignored: true, reason: "unknown_debtor_or_lead" });
+  }
+
+  const { data: activeSchedule } = await admin
+    .from("schedules")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq("debtor_id", debtorId)
+    .in("status", ["pendente", "atrasado"])
+    .order("data_envio", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const scheduleId = activeSchedule?.id ? String(activeSchedule.id) : null;
+  if (!scheduleId) {
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "zapi_webhook_ignorado",
+      descricao: `Webhook financeiro ignorado: cliente ${debtorId} sem cobrança pendente/atrasada.`,
+    });
+    return Response.json({ ok: true, ignored: true, reason: "no_open_charge" });
+  }
+
+  const analysis =
+    (await analyzePayment({ text: messageText, mediaUrl: mediaUrl || null }).catch((e: any) => ({
+      ok: false as const,
+      error: String(e?.message ?? "Falha ao analisar"),
+    }))) || { ok: false as const, error: "Falha ao analisar" };
+
+  const fallbackRes = analysis.ok
+    ? null
+    : heuristicPaymentDetection({
+        text: messageText,
+        mediaUrl: mediaUrl || null,
+        hasPaymentMedia: mediaInfo.hasPaymentMedia,
+      });
+  if (!analysis.ok && (!fallbackRes || !fallbackRes.ok)) {
+    return Response.json({ ok: true, analyzed: false, error: analysis.error });
+  }
+
+  const fallbackResult = fallbackRes && fallbackRes.ok ? fallbackRes.result : null;
+  const finalResult = analysis.ok
+    ? analysis.result
+    : {
+        is_payment_proof: true,
+        confidence: fallbackResult?.confidence ?? 0,
+        reason: fallbackResult?.reason ?? "",
+        extracted: null,
+        raw: fallbackResult?.raw ?? null,
+      };
+
+  const shouldCreate = finalResult.is_payment_proof && finalResult.confidence >= 0.75;
+  if (!shouldCreate) {
+    return Response.json({
+      ok: true,
+      analyzed: true,
+      created: false,
+      confidence: finalResult.confidence,
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+
+  if (scheduleId) {
+    const paymentRes = await confirmExecutedSchedulePaymentForUser({ scheduleId, userId });
+    if (!paymentRes.ok) {
+      return Response.json(
+        { ok: false, error: paymentRes.error ?? "Falha ao confirmar pagamento." },
+        { status: 500 },
+      );
+    }
+
+    await admin.from("payment_suspicions").upsert(
+      {
+        user_id: userId,
+        schedule_id: scheduleId,
+        debtor_id: debtorId,
+        provider: "zapi",
+        event_id: eventId,
+        from_phone: normalizedFrom || fromPhone || null,
+        message_text: messageText || null,
+        media_url: mediaUrl || null,
+        ai_confidence: finalResult.confidence,
+        ai_reason: finalResult.reason || null,
+        ai_result: finalResult.raw,
+        status: "confirmed",
+        resolved_at: nowIso,
+      },
+      { onConflict: "provider,event_id" },
+    );
+
+    await admin.from("logs").insert({
+      user_id: userId,
+      tipo: "pagamento_confirmado",
+      descricao: `Pagamento confirmado automaticamente para o agendamento ${scheduleId}`,
+    });
+
+    return Response.json({ ok: true, analyzed: true, created: true, scheduleId, confirmed: true });
+  }
+
+  await admin.from("payment_suspicions").upsert(
+    {
+      user_id: userId,
+      schedule_id: scheduleId,
+      debtor_id: debtorId,
+      provider: "zapi",
+      event_id: eventId,
+      from_phone: normalizedFrom || fromPhone || null,
+      message_text: messageText || null,
+      media_url: mediaUrl || null,
+      ai_confidence: finalResult.confidence,
+      ai_reason: finalResult.reason || null,
+      ai_result: finalResult.raw,
+      status: "pending",
+    },
+    { onConflict: "provider,event_id" },
+  );
+
+  await admin.from("logs").insert({
+    user_id: userId,
+    tipo: "pagamento_suspeito",
+    descricao: "Suspeita de pagamento detectada (sem agendamento associado)",
+  });
+
+  return Response.json({ ok: true, analyzed: true, created: true, scheduleId });
+}
