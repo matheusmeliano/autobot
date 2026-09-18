@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Tag, Trash2, Type, X } from "lucide-react";
 import { AppModal } from "@/components/app/AppModal";
 import { modalToast } from "@/lib/modalToast";
 import {
@@ -281,67 +281,89 @@ export function TemplatesClient({ initial }: { initial: TemplateRow[] }) {
       <AppModal open={open} onClose={close} size="lg" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-[var(--app-text-85)]">
+            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">
               {editing ? "Editar template" : "Novo template"}
             </div>
-            <div className="mt-1 text-xs text-[var(--app-text-55)]">
+            <div className="mt-1 text-sm text-[var(--app-text-55)]">
               Monte sua mensagem com variáveis, PIX e link para copiar o PIX.
             </div>
           </div>
           <button
             onClick={close}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-4 grid gap-3">
-              <div>
-                <div className="text-xs font-semibold text-[var(--app-text-60)]">Nome</div>
-                <input
-                  className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
-                  placeholder="Ex: Cobrança amigável"
-                  {...register("nome", {
-                    validate: (value) =>
-                      String(value ?? "").trim().length >= 2 ||
-                      "Informe um nome com pelo menos 2 caracteres.",
-                  })}
-                />
-                {errors.nome?.message ? (
-                  <div className="mt-2 text-xs font-medium text-rose-300">{errors.nome.message}</div>
-                ) : null}
+        <form onSubmit={onSubmit} className="mt-6 grid gap-5">
+          <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
+                <Tag className="h-4 w-4" />
               </div>
-
               <div>
-                <div className="text-xs font-semibold text-[var(--app-text-60)]">
-                  Conteúdo
+                <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Identificação</div>
+                <div className="mt-0.5 text-xs text-[var(--app-text-50)]">Dados básicos do template</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">Nome</div>
+              <input
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
+                placeholder="Ex: Cobrança amigável"
+                {...register("nome", {
+                  validate: (value) =>
+                    String(value ?? "").trim().length >= 2 ||
+                    "Informe um nome com pelo menos 2 caracteres.",
+                })}
+              />
+              {errors.nome?.message ? (
+                <div className="mt-2 text-xs font-medium text-rose-500">{errors.nome.message}</div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="grid gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--app-accent-bg)] flex items-center justify-center text-[var(--app-accent-text)]">
+                <Type className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="text-[0.8rem] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Mensagem</div>
+                <div className="mt-0.5 text-xs text-[var(--app-text-50)]">Variáveis disponíveis: {'{nome}'}, {'{valor}'}, {'{vencimento}'}, {'{pix_link}'}</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-[var(--app-text-60)]">Conteúdo</div>
+              <textarea
+                rows={7}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
+                placeholder={
+                  "Olá {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPara copiar a chave PIX, acesse: {pix_link}\n\nObrigado!"
+                }
+                {...register("conteudo", {
+                  validate: (value) =>
+                    String(value ?? "").trim().length > 0 || "Informe o conteúdo do template.",
+                })}
+              />
+              {errors.conteudo?.message ? (
+                <div className="mt-2 text-xs font-medium text-rose-500">
+                  {errors.conteudo.message}
                 </div>
-                <textarea
-                  rows={7}
-                  className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-35)] focus:border-[var(--app-border)]"
-                  placeholder={
-                    "Olá {nome}, tudo bem?\n\nSeu pagamento de {valor} vence em {vencimento}.\nPara copiar a chave PIX, acesse: {pix_link}\n\nObrigado!"
-                  }
-                  {...register("conteudo", {
-                    validate: (value) =>
-                      String(value ?? "").trim().length > 0 || "Informe o conteúdo do template.",
-                  })}
-                />
-                {errors.conteudo?.message ? (
-                  <div className="mt-2 text-xs font-medium text-rose-300">
-                    {errors.conteudo.message}
-                  </div>
-                ) : null}
-              </div>
+              ) : null}
+            </div>
+          </section>
 
-              <button
-                type="submit"
-                disabled={isSubmitting || isPending}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
-              >
-                {editing ? "Salvar alterações" : "Criar template"}
-              </button>
+          <div className="sticky bottom-0 -mx-2 -mb-2 mt-2 border-t border-[var(--app-border)] bg-[var(--app-modal-bg)]/95 px-2 pt-3 pb-3 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
+            <button
+              type="submit"
+              disabled={isSubmitting || isPending}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-btn-primary-bg)]"
+            >
+              {editing ? "Salvar alterações" : "Criar template"}
+            </button>
+          </div>
         </form>
       </AppModal>
     </div>
