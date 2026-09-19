@@ -330,7 +330,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <button
             type="button"
             onClick={() => setOpenCreate(true)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-2.5 text-[15px] font-semibold text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-[1201px]:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-2.5 text-[0.95rem] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] min-[1201px]:w-auto"
           >
             <UserPlus className="h-4 w-4" />
             Criar usuário
