@@ -53,8 +53,7 @@ export function ChangePasswordForm() {
             type="button"
             aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-sky-700 hover:text-sky-800 focus:outline-none focus:ring-0 transition-colors"
-            style={{ color: "#0369a1" }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-[var(--app-text-65)] hover:text-[var(--app-text-85)] focus:outline-none focus:ring-0 transition-colors"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
