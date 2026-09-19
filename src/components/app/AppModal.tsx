@@ -107,7 +107,7 @@ export function AppModal({
           aria-label="Fechar"
           onClick={closeOnBackdrop ? onClose : undefined}
           className={[
-            "absolute inset-0 z-0 bg-transparent",
+            "absolute inset-0 z-0 bg-black/40 backdrop-blur-sm",
             "transition-opacity duration-200 ease-out",
             visible ? "opacity-100" : "opacity-0",
           ].join(" ")}
