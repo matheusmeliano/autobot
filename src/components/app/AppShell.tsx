@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams, useNavigation } from "next/navigation";
 import { Bot, Camera, Loader2, Menu, X } from "lucide-react";
 import { AppNav } from "@/components/app/AppNav";
 import { AvatarChangeModal } from "@/components/app/AvatarChangeModal";
@@ -86,6 +86,10 @@ export function AppShell({
   const [experimentalBotLoading, setExperimentalBotLoading] = useState(true);
   const [experimentalBotSaving, setExperimentalBotSaving] = useState(false);
   const [bootOverlayVisible, setBootOverlayVisible] = useState(true);
+  const [navHoldOverlayVisible, setNavHoldOverlayVisible] = useState(false);
+  const navigation = useNavigation();
+  const isNavigating = navigation.state !== "idle";
+  const prevPathnameRef = useRef<string | undefined | null>(undefined);
   const [showExperimentalBotPopover, setShowExperimentalBotPopover] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -570,6 +574,21 @@ export function AppShell({
   const themeProviderValue = { theme: resolvedTheme, themePreference, themeLoaded, saveTheme };
 
   useEffect(() => {
+    if (typeof pathname === "undefined" || pathname === null) return;
+    if (prevPathnameRef.current === undefined) {
+      prevPathnameRef.current = pathname;
+      return;
+    }
+    if (prevPathnameRef.current === pathname) return;
+
+    setNavHoldOverlayVisible(true);
+    prevPathnameRef.current = pathname;
+
+    const t = window.setTimeout(() => setNavHoldOverlayVisible(false), 120);
+    return () => window.clearTimeout(t);
+  }, [pathname]);
+
+  useEffect(() => {
     const ready =
       themeLoaded &&
       authChecked &&
@@ -580,15 +599,17 @@ export function AppShell({
     return () => window.clearTimeout(t);
   }, [themeLoaded, authChecked, pathname]);
 
+  const showLoadingOverlay = bootOverlayVisible || isNavigating || navHoldOverlayVisible;
+
   return (
     <AppThemeProvider value={themeProviderValue}>
       <div
-        aria-hidden={!bootOverlayVisible}
+        aria-hidden={!showLoadingOverlay}
         className={[
           "fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#efeeed]",
-          bootOverlayVisible ? "block opacity-100" : "pointer-events-none hidden opacity-0",
+          showLoadingOverlay ? "block opacity-100" : "pointer-events-none hidden opacity-0",
         ].join(" ")}
-        style={bootOverlayVisible ? undefined : { display: "none" }}
+        style={showLoadingOverlay ? undefined : { display: "none" }}
       >
         <Loader2 className="h-10 w-10 animate-spin text-[#ea580c]" />
         <div className="mt-4 text-[15px] font-semibold tracking-tight text-[#9a3412]">
@@ -596,7 +617,7 @@ export function AppShell({
         </div>
       </div>
 
-      {bootOverlayVisible ? null : (
+      {showLoadingOverlay ? null : (
         <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden transition-opacity duration-200 opacity-100" : "min-h-[100dvh] transition-opacity duration-200 opacity-100"}>
         <div
           className={[
