@@ -151,8 +151,10 @@ export function AppShell({
 
   useEffect(() => {
     const el = document.documentElement;
-    const isAppScope = typeof pathname === "string" && pathname.startsWith("/app");
-    if (isAppScope) {
+    const isLightForced =
+      typeof pathname === "string" &&
+      (pathname.startsWith("/app") || pathname.startsWith("/admin"));
+    if (isLightForced) {
       el.classList.add("app-theme");
       el.setAttribute("data-app-theme-scope", "app");
       el.setAttribute("data-theme", "light");
@@ -218,10 +220,15 @@ export function AppShell({
           storedTheme = normalizeStoredTheme(localStorage.getItem(getThemeStorageKey(userId)));
         } catch {}
       }
-      const resolvedTheme = savedTheme ?? storedTheme ?? initialTheme;
-      setThemePreference(savedTheme ?? resolvedTheme);
+      const isLightForced =
+        typeof pathname === "string" &&
+        (pathname.startsWith("/app") || pathname.startsWith("/admin"));
+      const resolvedTheme = isLightForced
+        ? "light"
+        : savedTheme ?? storedTheme ?? initialTheme;
+      setThemePreference(isLightForced ? null : savedTheme ?? resolvedTheme);
       setTheme(resolvedTheme);
-      if (userId) {
+      if (userId && !isLightForced) {
         try {
           localStorage.setItem(getThemeStorageKey(userId), resolvedTheme);
         } catch {}
@@ -263,7 +270,7 @@ export function AppShell({
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [authChecked, initialTheme, isAuthed, supabase, userId]);
+  }, [authChecked, initialTheme, isAuthed, pathname, supabase, userId]);
 
   useEffect(() => {
     if (!authChecked) return;
