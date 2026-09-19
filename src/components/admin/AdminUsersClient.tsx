@@ -366,7 +366,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                     className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-85)] hover:bg-[var(--app-hover)]/60 transition-colors"
                   >
                     <div className="col-span-5 min-w-0">
-                      <div className="truncate font-semibold text-[17px] leading-tight">{r.nome}</div>
+                      <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]">{r.nome}</div>
                       <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{r.email}</div>
                     </div>
                     <div className="col-span-2 flex justify-center">
