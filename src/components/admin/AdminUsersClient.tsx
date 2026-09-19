@@ -338,123 +338,245 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
-        {hasHorizontalOverflow ? (
-          <div className="px-4 pt-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)] min-[1201px]:hidden">
-            Role para o lado.
-          </div>
-        ) : null}
-        <div ref={tableScrollRef} className="overflow-x-auto">
-          <div className="min-w-[1080px] min-[1201px]:min-w-0">
-            <div className="grid grid-cols-14 gap-3 border-b border-[var(--app-border)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-              <div className="col-span-5">Usuário</div>
-              <div className="col-span-2 text-center">Plano</div>
-              <div className="col-span-2 text-center">Status</div>
-              <div className="col-span-2 text-center">Venc.</div>
-              <div className="col-span-3 text-right">Ações</div>
-            </div>
-
-            {filtered.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-[var(--app-text-55)]">
-                Nenhum usuário encontrado.
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--app-border)]">
-                {pagedRows.map((r) => (
-                  <div
-                    key={r.id}
-                    className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-85)] hover:bg-[var(--app-hover)]/60 transition-colors"
-                  >
-                    <div className="col-span-5 min-w-0">
-                      <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]">{r.nome}</div>
-                      <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{r.email}</div>
-                    </div>
-                    <div className="col-span-2 flex justify-center">
-                      <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--app-text-75)]">
-                        {planLabel(normalizePlan(r.plano))}
-                      </span>
-                    </div>
-                    <div className="col-span-2 flex justify-center">
-                      {r.assinatura_status === "-" ? (
-                        <span className="text-[13px] text-[var(--app-text-60)]">-</span>
-                      ) : (
+      {filtered.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-10 text-center text-sm text-[var(--app-text-60)] shadow-none">
+          Nenhum usuário encontrado.
+        </div>
+      ) : (
+        <>
+          <div className="grid w-full gap-4 py-3 min-[1201px]:hidden">
+            {pagedRows.map((r) => {
+              const displayVenc =
+                normalizePlan(r.plano) === "vitalicio"
+                  ? "-"
+                  : normalizePlan(r.plano) === "teste" &&
+                    normalizeStatus(r.assinatura_status) === "cancelado" &&
+                    r.vencimento &&
+                    r.vencimento < today
+                    ? "Expirado"
+                    : dateBR(r.vencimento);
+              return (
+                <div
+                  key={r.id}
+                  className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]" title={r.nome}>
+                          {r.nome}
+                        </div>
+                        <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">
+                          {r.email}
+                        </div>
+                      </div>
+                      {r.assinatura_status !== "-" ? (
                         <span
                           className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
                         >
                           {statusLabel(normalizeStatus(r.assinatura_status))}
                         </span>
-                      )}
-                    </div>
-                    <div className="col-span-2 text-center text-[14px] font-medium text-[var(--app-text-65)]">
-                      {normalizePlan(r.plano) === "vitalicio"
-                        ? "-"
-                        : normalizePlan(r.plano) === "teste" &&
-                      normalizeStatus(r.assinatura_status) === "cancelado" &&
-                      r.vencimento &&
-                      r.vencimento < today
-                          ? "Expirado"
-                          : dateBR(r.vencimento)}
-                    </div>
-                    <div className="col-span-3 flex justify-end gap-2">
-                      {!isSelfAdmin(r.email) ? (
-                        <button
-                          onClick={() => openEditModal(r)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
                       ) : null}
-                      <button
-                        onClick={() => openPasswordModal(r)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
-                        title="Redefinir senha"
-                      >
-                        <Key className="h-4 w-4" />
-                      </button>
-                      {!isSelfAdmin(r.email) ? (
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                            Plano
+                          </div>
+                          <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]">
+                            {planLabel(normalizePlan(r.plano))}
+                          </div>
+                        </div>
+                        <div className="min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 shadow-none">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                            Vencimento
+                          </div>
+                          <div className="mt-1 text-[15px] font-semibold text-[var(--app-text-85)]">
+                            {displayVenc}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 border-t border-[var(--app-border)] pt-4">
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                        Ações
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {!isSelfAdmin(r.email) ? (
+                          <button
+                            onClick={() => openEditModal(r)}
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[13px] font-semibold text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Editar
+                          </button>
+                        ) : (
+                          <div className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-transparent text-transparent" aria-hidden />
+                        )}
                         <button
-                          onClick={() => openDeleteModal(r)}
-                          disabled={isPending}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors disabled:opacity-60"
-                          title="Excluir"
+                          onClick={() => openPasswordModal(r)}
+                          className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[13px] font-semibold text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Key className="h-4 w-4" />
+                          Senha
                         </button>
-                      ) : null}
+                        {!isSelfAdmin(r.email) ? (
+                          <button
+                            onClick={() => openDeleteModal(r)}
+                            disabled={isPending}
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[13px] font-semibold text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors disabled:opacity-60"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Excluir
+                          </button>
+                        ) : (
+                          <div className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-transparent text-transparent" aria-hidden />
+                        )}
+                      </div>
                     </div>
                   </div>
-                ))}
+                </div>
+              );
+            })}
+
+            {filtered.length > pageSize ? (
+              <div className="grid grid-cols-3 items-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 shadow-none">
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Página anterior"
+                >
+                  {"<"}
+                </button>
+                <div className="text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                  {safePage} / {totalPages}
+                </div>
+                <button
+                  type="button"
+                  className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  aria-label="Próxima página"
+                >
+                  {">"}
+                </button>
               </div>
-            )}
+            ) : null}
           </div>
-        </div>
-        {filtered.length > pageSize ? (
-          <div className="grid grid-cols-3 items-center border-t border-[var(--app-border)] px-4 py-3">
-            <button
-              type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-              aria-label="Página anterior"
-            >
-              {"<"}
-            </button>
-            <div className="text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-              {safePage} / {totalPages}
+
+          <div className="hidden min-[1201px]:block mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+            <div className="overflow-x-auto">
+              <div className="min-w-[1080px] min-[1201px]:min-w-0">
+                <div className="grid grid-cols-14 gap-3 border-b border-[var(--app-border)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                  <div className="col-span-5">Usuário</div>
+                  <div className="col-span-2 text-center">Plano</div>
+                  <div className="col-span-2 text-center">Status</div>
+                  <div className="col-span-2 text-center">Venc.</div>
+                  <div className="col-span-3 text-right">Ações</div>
+                </div>
+
+                <div className="divide-y divide-[var(--app-border)]">
+                  {pagedRows.map((r) => (
+                    <div
+                      key={r.id}
+                      className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-85)] hover:bg-[var(--app-hover)]/60 transition-colors"
+                    >
+                      <div className="col-span-5 min-w-0">
+                        <div className="truncate text-[17px] font-semibold tracking-tight text-[var(--app-text-85)]">{r.nome}</div>
+                        <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{r.email}</div>
+                      </div>
+                      <div className="col-span-2 flex justify-center">
+                        <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--app-text-75)]">
+                          {planLabel(normalizePlan(r.plano))}
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex justify-center">
+                        {r.assinatura_status === "-" ? (
+                          <span className="text-[13px] text-[var(--app-text-60)]">-</span>
+                        ) : (
+                          <span
+                            className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
+                          >
+                            {statusLabel(normalizeStatus(r.assinatura_status))}
+                          </span>
+                        )}
+                      </div>
+                      <div className="col-span-2 text-center text-[14px] font-medium text-[var(--app-text-65)]">
+                        {normalizePlan(r.plano) === "vitalicio"
+                          ? "-"
+                          : normalizePlan(r.plano) === "teste" &&
+                        normalizeStatus(r.assinatura_status) === "cancelado" &&
+                        r.vencimento &&
+                        r.vencimento < today
+                            ? "Expirado"
+                            : dateBR(r.vencimento)}
+                      </div>
+                      <div className="col-span-3 flex justify-end gap-2">
+                        {!isSelfAdmin(r.email) ? (
+                          <button
+                            onClick={() => openEditModal(r)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                        <button
+                          onClick={() => openPasswordModal(r)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
+                          title="Redefinir senha"
+                        >
+                          <Key className="h-4 w-4" />
+                        </button>
+                        {!isSelfAdmin(r.email) ? (
+                          <button
+                            onClick={() => openDeleteModal(r)}
+                            disabled={isPending}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors disabled:opacity-60"
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safePage >= totalPages}
-              aria-label="Próxima página"
-            >
-              {">"}
-            </button>
+            {filtered.length > pageSize ? (
+              <div className="grid grid-cols-3 items-center border-t border-[var(--app-border)] px-4 py-3">
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Página anterior"
+                >
+                  {"<"}
+                </button>
+                <div className="text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                  {safePage} / {totalPages}
+                </div>
+                <button
+                  type="button"
+                  className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  aria-label="Próxima página"
+                >
+                  {">"}
+                </button>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
+        </>
+      )}
 
 
       <AppModal open={openCreate} onClose={closeCreate} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
