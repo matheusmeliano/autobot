@@ -718,7 +718,7 @@ export function AppShell({
               {children}
             </div>
           )}
-          {drawerOnlyNav || typeof pathname === "string" && pathname.startsWith("/admin") ? null : (
+          {drawerOnlyNav ? null : (
             <div className="mt-auto flex w-full justify-end pr-1 pb-1 pt-3 text-[11px] text-[var(--app-text-35)] min-[1201px]:pr-2 min-[1201px]:pb-1 min-[1201px]:pt-3">
               <span>
                 Desenvolvido pela

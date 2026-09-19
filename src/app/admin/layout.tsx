@@ -3,7 +3,7 @@ import {
   getDefaultAuthenticatedPath,
   isAtendimentoOnlyAccessScope,
 } from "@/lib/auth/access";
-import { getThemeStorageKey } from "@/lib/theme";
+import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -62,6 +62,7 @@ export default async function AdminLayout({
     redirect("/app");
   }
 
+  const savedTheme = null;
   const initialTheme = "light";
   const themeStorageKey = getThemeStorageKey(session.user.id);
   const initialBackground = "#efeeed";
@@ -75,16 +76,14 @@ export default async function AdminLayout({
           overscroll-behavior-y: none;
         }
       `}</style>
-      <Script id="autobot-admin-appshell-theme-init" strategy="beforeInteractive">
+      <Script id="autobot-app-theme-init" strategy="beforeInteractive">
         {`
           (function() {
             var fallbackTheme = "light";
             try {
               var storageKey = ${JSON.stringify(themeStorageKey)};
               var theme = "light";
-              try {
-                localStorage.setItem(storageKey, theme);
-              } catch (localStorageErr) {}
+              localStorage.setItem(storageKey, theme);
               var el = document.documentElement;
               el.classList.add("app-theme");
               el.setAttribute("data-app-theme-scope", "app");
