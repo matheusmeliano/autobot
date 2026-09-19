@@ -76,10 +76,10 @@ function brl(value: number, fmt: (v: any) => string) {
 function statusBadgeClassName(status: string) {
   const s = status.trim().toLowerCase();
   if (s === "executado" || s === "pago")
-    return "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/20";
+    return "bg-emerald-600 text-white";
   if (s === "atrasado" || s === "cancelado")
-    return "bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-600/20";
-  return "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/20";
+    return "bg-rose-600 text-white";
+  return "bg-yellow-500 text-white";
 }
 
 function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
