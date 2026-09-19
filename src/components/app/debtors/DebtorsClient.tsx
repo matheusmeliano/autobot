@@ -254,19 +254,19 @@ function debtorStatusClass(status: string | null | undefined, theme: "light" | "
     return theme === "dark" ? "bg-white/10 text-white/75" : "bg-black/5 text-[var(--app-text-65)] ring-1 ring-[var(--app-border)]";
   }
   if (s === "pago") {
-    return theme === "dark" ? "bg-emerald-600 text-[rgb(255,255,255)]" : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/20";
+    return "bg-emerald-600 text-[rgb(255,255,255)]";
   }
   if (s === "agendado") {
-    return theme === "dark" ? "bg-yellow-600 text-[rgb(255,255,255)]" : "bg-amber-50 text-amber-800 ring-1 ring-amber-600/20";
+    return `${theme === "dark" ? "bg-yellow-600" : "bg-yellow-500"} text-[rgb(255,255,255)]`;
   }
   if (s === "nao_pago") {
-    return theme === "dark" ? "bg-orange-600 text-[rgb(255,255,255)]" : "bg-orange-50 text-orange-900 ring-1 ring-orange-600/20";
+    return theme === "dark" ? "bg-orange-600 text-[rgb(255,255,255)]" : "bg-orange-500 text-[rgb(255,255,255)]";
   }
   if (s === "atrasado") {
-    return theme === "dark" ? "bg-rose-600 text-[rgb(255,255,255)]" : "bg-rose-50 text-rose-800 ring-1 ring-rose-600/20";
+    return "bg-rose-600 text-[rgb(255,255,255)]";
   }
   if (s === "pendente") {
-    return theme === "dark" ? "bg-rose-600 text-[rgb(255,255,255)]" : "bg-rose-50 text-rose-800 ring-1 ring-rose-600/20";
+    return "bg-rose-600 text-[rgb(255,255,255)]";
   }
   return theme === "dark" ? "bg-white/10 text-white/75" : "bg-black/5 text-[var(--app-text-65)] ring-1 ring-[var(--app-border)]";
 }
