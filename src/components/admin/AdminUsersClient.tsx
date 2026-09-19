@@ -71,8 +71,8 @@ function statusLabel(v: "ativo" | "cancelado") {
 }
 
 function statusClass(v: "ativo" | "cancelado") {
-  if (v === "ativo") return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/20";
-  return "bg-rose-50 text-rose-800 ring-1 ring-rose-600/20";
+  if (v === "ativo") return "bg-emerald-600 text-[rgb(255,255,255)]";
+  return "bg-rose-600 text-[rgb(255,255,255)]";
 }
 
 export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
