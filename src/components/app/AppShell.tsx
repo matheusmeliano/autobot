@@ -618,8 +618,10 @@ export function AppShell({
 
             <div className="mt-5 border-t border-[var(--app-border)]" />
 
-            <div className="mt-5 flex-1">
-              <AppNav variant="sidebar" restricted={restricted} plan={plan} userEmail={email} />
+            <div className="mt-5 flex-1 min-h-0 overflow-hidden">
+              <div className="h-full overflow-y-auto scrollbar-hide pr-1">
+                <AppNav variant="sidebar" restricted={restricted} plan={plan} userEmail={email} />
+              </div>
             </div>
 
             <div className="mt-5 border-t border-[var(--app-border)]" />
