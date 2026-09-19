@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { normalizePlan } from "@/lib/plans";
 import {
   ReportsClient,
-  type ReportChartPoint,
   type ReportStats,
 } from "@/components/app/reports/ReportsClient";
 import { buildAgendaRows } from "@/lib/agendaRows";
@@ -102,23 +101,9 @@ export default async function RelatoriosPage() {
     ).length,
   };
 
-  const days = Array.from({ length: 30 }).map((_, i) => {
-    const key = addDaysToLocalDate(start30LocalDate, i);
-    return {
-      key,
-      name: localDateLabel(key),
-    };
-  });
+  const createdAtDates = rows
+    .map((row) => String(row.created_at ?? "").trim())
+    .filter((value) => value.length > 0);
 
-  const chartRows = rows.filter((row) => {
-    const createdAt = String(row.created_at ?? "").trim();
-    if (!createdAt) return false;
-    return localDateInTimeZone(createdAt, timeZone) >= start30LocalDate;
-  });
-  const chart: ReportChartPoint[] = days.map((d) => ({
-    name: d.name,
-    value: chartRows.filter((row) => localDateInTimeZone(String(row.created_at ?? ""), timeZone) === d.key).length,
-  }));
-
-  return <ReportsClient stats={stats} chart={chart} />;
+  return <ReportsClient stats={stats} createdAtDates={createdAtDates} />;
 }
