@@ -12,8 +12,10 @@ import {
   LayoutDashboard,
   MessageSquareText,
   Settings,
+  Shield,
   Smartphone,
 } from "lucide-react";
+import { isGlobalAdminEmail } from "@/lib/auth/admin";
 
 export type AppPlan = "teste" | "basico" | "pro" | "vitalicio";
 
@@ -106,11 +108,23 @@ export function AppNav({
   const pathname = usePathname();
   const navGroups = getVisibleNavGroups({ restricted, plan, userEmail });
   const navItems = navGroups.flatMap((group) => group.items);
+  const showAdmin = isGlobalAdminEmail(userEmail);
+  const adminHref = "/app/admin";
 
   if (variant === "drawer") {
+    const finalGroups = showAdmin
+      ? [
+          ...navGroups,
+          {
+            label: "Admin",
+            items: [{ href: adminHref, label: "Usuários", icon: Shield }],
+          },
+        ]
+      : navGroups;
+
     return (
       <nav className="flex flex-col gap-5">
-        {navGroups.map((group) => (
+        {finalGroups.map((group) => (
           <div
             key={group.label}
             className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-2 shadow-none"
@@ -181,6 +195,24 @@ export function AppNav({
           </Link>
         );
       })}
+
+      {showAdmin ? (
+        <>
+          <div className="my-2 h-px w-full bg-[var(--app-border)]"></div>
+          <Link
+            href={adminHref}
+            className={[
+              "flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-[0.95rem] font-medium transition-colors duration-150",
+              pathname === adminHref
+                ? "bg-[var(--app-active)] text-[#9a3412] font-semibold"
+                : "text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
+            ].join(" ")}
+          >
+            <Shield className="h-[1.15rem] w-[1.15rem]" />
+            Admin
+          </Link>
+        </>
+      ) : null}
     </nav>
   );
 }
