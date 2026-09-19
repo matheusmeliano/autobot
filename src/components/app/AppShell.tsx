@@ -583,19 +583,12 @@ export function AppShell({
   return (
     <AppThemeProvider value={themeProviderValue}>
       <div
-        aria-hidden={!bootOverlayVisible}
         className={[
-          "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#efeeed] transition-opacity duration-200",
-          bootOverlayVisible ? "opacity-100" : "pointer-events-none opacity-0",
+          drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-[100dvh]",
+          "transition-opacity duration-200",
+          bootOverlayVisible ? "pointer-events-none opacity-0 invisible" : "opacity-100",
         ].join(" ")}
       >
-        <Loader2 className="h-10 w-10 animate-spin text-[#ea580c]" />
-        <div className="mt-4 text-[15px] font-semibold tracking-tight text-[#9a3412]">
-          Carregando AutoBot...
-        </div>
-      </div>
-
-      <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-[100dvh]"}>
         <div
           className={[
             "relative flex w-full",
@@ -1020,6 +1013,19 @@ export function AppShell({
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div
+        aria-hidden={!bootOverlayVisible}
+        className={[
+          "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#efeeed] transition-opacity duration-200",
+          bootOverlayVisible ? "opacity-100" : "pointer-events-none opacity-0",
+        ].join(" ")}
+      >
+        <Loader2 className="h-10 w-10 animate-spin text-[#ea580c]" />
+        <div className="mt-4 text-[15px] font-semibold tracking-tight text-[#9a3412]">
+          Carregando AutoBot...
+        </div>
       </div>
     </AppThemeProvider>
   );
