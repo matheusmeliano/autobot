@@ -536,7 +536,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <button
             type="submit"
             disabled={createForm.formState.isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-h-[44px] disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-btn-primary-bg)]"
           >
             {createForm.formState.isSubmitting ? "Criando..." : "Criar usuário"}
           </button>
@@ -629,9 +629,9 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <button
             type="submit"
             disabled={editForm.formState.isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-h-[44px] disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-btn-primary-bg)]"
           >
-            {editForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
+            {editForm.formState.isSubmitting ? "Salvando..." : "Salvar alterações"}
           </button>
         </form>
       </AppModal>
@@ -687,7 +687,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <button
             type="submit"
             disabled={passForm.formState.isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-h-[44px] disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-btn-primary-bg)]"
           >
             {passForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
           </button>
@@ -735,7 +735,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
               closeDelete();
               remove(deleting);
             }}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[rgb(225,29,72)] text-white hover:bg-[rgb(225,29,72)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[rgb(225,29,72)] px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-[rgb(225,29,72)]/90 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[rgb(225,29,72)]"
           >
             Excluir
           </button>
