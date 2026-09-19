@@ -76,10 +76,10 @@ function brl(value: number, fmt: (v: any) => string) {
 function statusBadgeClassName(status: string) {
   const s = status.trim().toLowerCase();
   if (s === "executado" || s === "pago")
-    return "bg-emerald-600 text-white";
+    return "bg-emerald-700 !text-white";
   if (s === "atrasado" || s === "cancelado")
-    return "bg-rose-600 text-white";
-  return "bg-yellow-500 text-white";
+    return "bg-rose-700 !text-white";
+  return "bg-yellow-600 !text-white";
 }
 
 function yearMonthKey(v: string, timeZone: BrazilTimeZone) {
@@ -338,7 +338,7 @@ export function DashboardClient({
                         </div>
                       </div>
                       <span
-                        className={`mt-0.5 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold text-white ${visualStatus.className}`}
+                        className={`mt-0.5 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold !text-white ${visualStatus.className}`}
                       >
                         {visualStatus.label}
                       </span>
