@@ -85,11 +85,19 @@ export function AppShell({
   const [experimentalBotDisabled, setExperimentalBotDisabled] = useState(false);
   const [experimentalBotLoading, setExperimentalBotLoading] = useState(true);
   const [experimentalBotSaving, setExperimentalBotSaving] = useState(false);
-  const [bootOverlayVisible, setBootOverlayVisible] = useState(true);
+  const [bootOverlayVisible, setBootOverlayVisible] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const inited = document.documentElement.getAttribute("data-app-already-booted") === "1";
+      if (inited) return false;
+    } catch {}
+    return true;
+  });
   const [navHoldOverlayVisible, setNavHoldOverlayVisible] = useState(false);
   const navigation = useNavigation();
   const isNavigating = navigation.state !== "idle";
   const prevPathnameRef = useRef<string | undefined | null>(undefined);
+  const isFirstBootSetRef = useRef(false);
   const [showExperimentalBotPopover, setShowExperimentalBotPopover] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -584,7 +592,7 @@ export function AppShell({
     setNavHoldOverlayVisible(true);
     prevPathnameRef.current = pathname;
 
-    const t = window.setTimeout(() => setNavHoldOverlayVisible(false), 120);
+    const t = window.setTimeout(() => setNavHoldOverlayVisible(false), 450);
     return () => window.clearTimeout(t);
   }, [pathname]);
 
@@ -595,7 +603,15 @@ export function AppShell({
       typeof pathname !== "undefined" &&
       pathname !== null;
     if (!ready) return;
-    const t = window.setTimeout(() => setBootOverlayVisible(false), 120);
+    const t = window.setTimeout(() => {
+      if (!isFirstBootSetRef.current) {
+        isFirstBootSetRef.current = true;
+        try {
+          document.documentElement.setAttribute("data-app-already-booted", "1");
+        } catch {}
+      }
+      setBootOverlayVisible(false);
+    }, 120);
     return () => window.clearTimeout(t);
   }, [themeLoaded, authChecked, pathname]);
 
