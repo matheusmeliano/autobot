@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { translateErrorMessage } from "@/lib/errorMessages";
 
 export default function GlobalError({
@@ -137,12 +136,6 @@ export default function GlobalError({
             >
               Tentar novamente
             </button>
-            <Link
-              href="/app"
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-5 text-[15px] font-semibold !text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] sm:w-auto"
-            >
-              Voltar ao painel
-            </Link>
           </div>
 
           {rawMsg ? (
