@@ -124,19 +124,19 @@ export default async function AssinaturaPage() {
           </div>
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Conexão via Z-API</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Até 15 cadastros</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Templates e variáveis</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Agendamento automático</div>
             </li>
           </ul>
@@ -175,19 +175,19 @@ export default async function AssinaturaPage() {
           </div>
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Tudo do Básico</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Cadastro ilimitado</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Relatório completo</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Suporte prioritário</div>
             </li>
           </ul>
@@ -223,11 +223,11 @@ export default async function AssinaturaPage() {
           </div>
           <ul className="mt-6 flex-1 space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Tudo do Básico e Pro</div>
             </li>
             <li className="flex items-start gap-2">
-              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]" />
+              <div className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ea580c]/50" />
               <div className="min-w-0">Sem mensalidades. Seu para sempre!</div>
             </li>
           </ul>
