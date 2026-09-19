@@ -18,6 +18,16 @@
   }
 }
 
+/* GARANTIA SCROLL FLUIDO EM TODOS OS OVERFLOWS (drawers, modais mobile, sidebar) */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+[style*="overflow-y:auto"],
+[class*="overflow-y-auto"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
 /* app/: ZERO shadow, ring, drop-shadow, outline-offset — SOMENTE borda visual, jamais profundidade projetada */
 .app-theme[data-theme="light"] *,
 .app-theme[data-theme="light"] *::before,
@@ -67,7 +77,11 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
+  height: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }

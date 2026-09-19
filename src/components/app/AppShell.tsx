@@ -588,18 +588,18 @@ export function AppShell({
         </div>
       </div>
 
-      <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-screen"}>
+      <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-[100dvh]"}>
         <div
           className={[
             "relative flex w-full",
             drawerOnlyNav
               ? "min-h-0 flex-col gap-4 overflow-visible px-4 pb-6 pt-6 min-[1201px]:px-6 lg:h-full lg:min-h-0 lg:gap-6 lg:overflow-hidden lg:py-6"
-              : "gap-6 px-4 py-6 min-[1201px]:px-6 min-[1201px]:h-[calc(100vh-3rem)]",
+              : "gap-6 px-4 py-6 min-[1201px]:px-6",
           ].join(" ")}
         >
         <aside
           className={[
-            "w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:h-[calc(100vh-3rem)]",
+            "w-72 shrink-0 min-[1201px]:sticky min-[1201px]:top-6 min-[1201px]:h-[calc(100dvh-3rem)]",
             drawerOnlyNav ? "hidden" : "hidden min-[1201px]:block",
           ].join(" ")}
         >
@@ -641,7 +641,7 @@ export function AppShell({
             "flex w-full flex-col",
             drawerOnlyNav
               ? "min-h-0 overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
-              : "h-[calc(100vh-3rem)] min-h-0 overflow-y-auto pb-0 min-[1201px]:pb-6",
+              : "pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
           {drawerOnlyNav ? (
