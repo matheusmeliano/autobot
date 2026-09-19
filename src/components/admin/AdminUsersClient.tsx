@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Key, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, Key, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { isProtectedAdminOrUserEmail } from "@/lib/auth/admin";
 import { normalizePlan, planLabel, type PlanKey } from "@/lib/plans";
 import { AppModal } from "@/components/app/AppModal";
@@ -701,29 +701,23 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         zIndexClass="z-[100]"
         panelClassName="max-w-md p-5 sm:p-5"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">Excluir usuário</div>
-            <div className="mt-1 truncate text-[13px] text-[var(--app-text-55)]">{deleting?.email ?? ""}</div>
+        <div className="flex items-start gap-4">
+          <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)]">
+            <AlertTriangle className="h-8 w-8" strokeWidth={1.75} />
           </div>
-          <button
-            onClick={closeDelete}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex-1 min-w-0">
+            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">Excluir usuário</div>
+            <div className="mt-4 text-[15px] leading-relaxed text-[var(--app-text-75)]">
+              Tem certeza que deseja excluir o usuário "{deleting?.nome ?? deleting?.email ?? ""}"?
+            </div>
+          </div>
         </div>
-
-        <div className="mt-6 text-[15px] leading-relaxed text-[var(--app-text-75)]">
-          Você tem certeza que deseja excluir esse usuário?
-        </div>
-        <div className="mt-1 text-[13px] text-[var(--app-text-55)]">Essa ação não pode ser desfeita.</div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={closeDelete}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[15px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-solid-surface)]"
           >
             Cancelar
           </button>
@@ -735,7 +729,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
               closeDelete();
               remove(deleting);
             }}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[rgb(225,29,72)] px-6 py-3 text-[0.95rem] font-semibold text-white hover:bg-[rgb(225,29,72)]/90 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[rgb(225,29,72)]"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-6 py-3 text-[0.95rem] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:opacity-60 disabled:hover:bg-[var(--app-solid-surface)]"
           >
             Excluir
           </button>
