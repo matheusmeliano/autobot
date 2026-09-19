@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams, useNavigation } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Bot, Camera, Loader2, Menu, X } from "lucide-react";
 import { AppNav } from "@/components/app/AppNav";
 import { AvatarChangeModal } from "@/components/app/AvatarChangeModal";
@@ -94,8 +94,6 @@ export function AppShell({
     return true;
   });
   const [navHoldOverlayVisible, setNavHoldOverlayVisible] = useState(false);
-  const navigation = useNavigation();
-  const isNavigating = navigation.state !== "idle";
   const prevPathnameRef = useRef<string | undefined | null>(undefined);
   const isFirstBootSetRef = useRef(false);
   const [showExperimentalBotPopover, setShowExperimentalBotPopover] = useState(false);
@@ -615,7 +613,7 @@ export function AppShell({
     return () => window.clearTimeout(t);
   }, [themeLoaded, authChecked, pathname]);
 
-  const showLoadingOverlay = bootOverlayVisible || isNavigating || navHoldOverlayVisible;
+  const showLoadingOverlay = bootOverlayVisible || navHoldOverlayVisible;
 
   return (
     <AppThemeProvider value={themeProviderValue}>
