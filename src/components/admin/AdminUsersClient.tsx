@@ -372,7 +372,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                       </div>
                       {r.assinatura_status !== "-" ? (
                         <span
-                          className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
+                          className={`inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
                         >
                           {statusLabel(normalizeStatus(r.assinatura_status))}
                         </span>
@@ -491,22 +491,22 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{r.email}</div>
                       </div>
                       <div className="col-span-2 flex justify-center">
-                        <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--app-text-75)]">
+                        <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2 py-1 text-[11px] font-semibold text-[var(--app-text-75)]">
                           {planLabel(normalizePlan(r.plano))}
                         </span>
                       </div>
                       <div className="col-span-2 flex justify-center">
                         {r.assinatura_status === "-" ? (
-                          <span className="text-[13px] text-[var(--app-text-60)]">-</span>
+                          <span className="text-sm text-[var(--app-text-70)]">-</span>
                         ) : (
                           <span
-                            className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
+                            className={`inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
                           >
                             {statusLabel(normalizeStatus(r.assinatura_status))}
                           </span>
                         )}
                       </div>
-                      <div className="col-span-2 text-center text-[14px] font-medium text-[var(--app-text-65)]">
+                      <div className="col-span-2 text-center text-sm text-[var(--app-text-70)]">
                         {normalizePlan(r.plano) === "vitalicio"
                           ? "-"
                           : normalizePlan(r.plano) === "teste" &&
@@ -520,7 +520,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         {!isSelfAdmin(r.email) ? (
                           <button
                             onClick={() => openEditModal(r)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] transition-colors"
                             title="Editar"
                           >
                             <Pencil className="h-4 w-4" />
@@ -528,7 +528,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         ) : null}
                         <button
                           onClick={() => openPasswordModal(r)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] transition-colors"
                           title="Redefinir senha"
                         >
                           <Key className="h-4 w-4" />
@@ -537,7 +537,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                           <button
                             onClick={() => openDeleteModal(r)}
                             disabled={isPending}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors disabled:opacity-60"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-80)] hover:bg-[var(--app-hover)] transition-colors disabled:opacity-60"
                             title="Excluir"
                           >
                             <Trash2 className="h-4 w-4" />
