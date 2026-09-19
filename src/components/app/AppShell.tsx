@@ -85,17 +85,7 @@ export function AppShell({
   const [experimentalBotDisabled, setExperimentalBotDisabled] = useState(false);
   const [experimentalBotLoading, setExperimentalBotLoading] = useState(true);
   const [experimentalBotSaving, setExperimentalBotSaving] = useState(false);
-  const [bootOverlayVisible, setBootOverlayVisible] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      const inited = document.documentElement.getAttribute("data-app-already-booted") === "1";
-      if (inited) return false;
-    } catch {}
-    return true;
-  });
-  const [navHoldOverlayVisible, setNavHoldOverlayVisible] = useState(false);
-  const prevPathnameRef = useRef<string | undefined | null>(undefined);
-  const isFirstBootSetRef = useRef(false);
+  const [bootOverlayVisible, setBootOverlayVisible] = useState(true);
   const [showExperimentalBotPopover, setShowExperimentalBotPopover] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -580,50 +570,24 @@ export function AppShell({
   const themeProviderValue = { theme: resolvedTheme, themePreference, themeLoaded, saveTheme };
 
   useEffect(() => {
-    if (typeof pathname === "undefined" || pathname === null) return;
-    if (prevPathnameRef.current === undefined) {
-      prevPathnameRef.current = pathname;
-      return;
-    }
-    if (prevPathnameRef.current === pathname) return;
-
-    setNavHoldOverlayVisible(true);
-    prevPathnameRef.current = pathname;
-
-    const t = window.setTimeout(() => setNavHoldOverlayVisible(false), 450);
-    return () => window.clearTimeout(t);
-  }, [pathname]);
-
-  useEffect(() => {
     const ready =
       themeLoaded &&
       authChecked &&
       typeof pathname !== "undefined" &&
       pathname !== null;
     if (!ready) return;
-    const t = window.setTimeout(() => {
-      if (!isFirstBootSetRef.current) {
-        isFirstBootSetRef.current = true;
-        try {
-          document.documentElement.setAttribute("data-app-already-booted", "1");
-        } catch {}
-      }
-      setBootOverlayVisible(false);
-    }, 120);
+    const t = window.setTimeout(() => setBootOverlayVisible(false), 120);
     return () => window.clearTimeout(t);
   }, [themeLoaded, authChecked, pathname]);
-
-  const showLoadingOverlay = bootOverlayVisible || navHoldOverlayVisible;
 
   return (
     <AppThemeProvider value={themeProviderValue}>
       <div
-        aria-hidden={!showLoadingOverlay}
+        aria-hidden={!bootOverlayVisible}
         className={[
-          "fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#efeeed]",
-          showLoadingOverlay ? "block opacity-100" : "pointer-events-none hidden opacity-0",
+          "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#efeeed] transition-opacity duration-200",
+          bootOverlayVisible ? "opacity-100" : "pointer-events-none opacity-0",
         ].join(" ")}
-        style={showLoadingOverlay ? undefined : { display: "none" }}
       >
         <Loader2 className="h-10 w-10 animate-spin text-[#ea580c]" />
         <div className="mt-4 text-[15px] font-semibold tracking-tight text-[#9a3412]">
@@ -631,8 +595,7 @@ export function AppShell({
         </div>
       </div>
 
-      {showLoadingOverlay ? null : (
-        <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-[100dvh]"}>
+      <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-[100dvh]"}>
         <div
           className={[
             "relative flex w-full",
@@ -821,6 +784,16 @@ export function AppShell({
                   </div>
                 </div>
               </div>
+              {showAdmin ? (
+                <Link
+                  href="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mt-3 flex items-center justify-between rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-solid-surface-2)]"
+                >
+                  <span>Admin</span>
+                  <span className="text-xs text-[var(--app-text-45)]">Painel administrativo</span>
+                </Link>
+              ) : null}
             </div>
 
             <div className="mt-2 flex-1 overflow-y-auto px-3 py-2 pb-3">
@@ -1048,7 +1021,6 @@ export function AppShell({
           </div>
         ) : null}
       </div>
-      )}
     </AppThemeProvider>
   );
 }
