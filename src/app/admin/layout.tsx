@@ -62,10 +62,9 @@ export default async function AdminLayout({
     redirect("/app");
   }
 
-  const savedTheme = null;
-  const initialTheme = "dark";
+  const initialTheme = "light";
   const themeStorageKey = getThemeStorageKey(session.user.id);
-  const initialBackground = "#070A10";
+  const initialBackground = "#efeeed";
 
   return (
     <>
@@ -79,11 +78,13 @@ export default async function AdminLayout({
       <Script id="autobot-admin-appshell-theme-init" strategy="beforeInteractive">
         {`
           (function() {
-            var fallbackTheme = "dark";
+            var fallbackTheme = "light";
             try {
               var storageKey = ${JSON.stringify(themeStorageKey)};
-              var theme = "dark";
-              localStorage.setItem(storageKey, theme);
+              var theme = "light";
+              try {
+                localStorage.setItem(storageKey, theme);
+              } catch (localStorageErr) {}
               var el = document.documentElement;
               el.classList.add("app-theme");
               el.setAttribute("data-app-theme-scope", "app");

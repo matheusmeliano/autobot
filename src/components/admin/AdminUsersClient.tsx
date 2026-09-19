@@ -71,8 +71,8 @@ function statusLabel(v: "ativo" | "cancelado") {
 }
 
 function statusClass(v: "ativo" | "cancelado") {
-  if (v === "ativo") return "bg-emerald-600 text-[rgb(255,255,255)]";
-  return "bg-rose-600 text-[rgb(255,255,255)]";
+  if (v === "ativo") return "bg-[rgb(16,185,129)] text-white";
+  return "bg-[rgb(244,63,94)] text-white";
 }
 
 export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
@@ -315,7 +315,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <h1 className="mt-0 text-xl font-bold tracking-tight whitespace-nowrap max-[420px]:whitespace-normal sm:text-2xl min-[1201px]:text-[1.6rem] leading-[1.15] text-[var(--app-text-85)]">
             Usuários
           </h1>
-          <div className="mt-2 truncate text-sm text-white/60">
+          <div className="mt-2 truncate text-sm text-[var(--app-text-60)]">
             Gestão global de contas e assinaturas.
           </div>
         </div>
@@ -325,12 +325,12 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por nome ou e-mail..."
-            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20 min-[1201px]:w-[360px]"
+            className="w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 min-[1201px]:w-[360px]"
           />
           <button
             type="button"
             onClick={() => setOpenCreate(true)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-white/90 min-[1201px]:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--app-btn-primary-bg)] px-4 py-2.5 text-[15px] font-semibold text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-[1201px]:w-auto"
           >
             <UserPlus className="h-4 w-4" />
             Criar usuário
@@ -338,15 +338,15 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03]">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
         {hasHorizontalOverflow ? (
-          <div className="px-4 pt-3 text-center text-[11px] font-semibold text-white/45 min-[1201px]:hidden">
+          <div className="px-4 pt-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)] min-[1201px]:hidden">
             Role para o lado.
           </div>
         ) : null}
         <div ref={tableScrollRef} className="overflow-x-auto">
           <div className="min-w-[1080px] min-[1201px]:min-w-0">
-            <div className="grid grid-cols-14 gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold text-white/55">
+            <div className="grid grid-cols-14 gap-3 border-b border-[var(--app-border)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
               <div className="col-span-5">Usuário</div>
               <div className="col-span-2 text-center">Plano</div>
               <div className="col-span-2 text-center">Status</div>
@@ -355,37 +355,37 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
             </div>
 
             {filtered.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-white/55">
+              <div className="px-4 py-10 text-center text-sm text-[var(--app-text-55)]">
                 Nenhum usuário encontrado.
               </div>
             ) : (
-              <div className="divide-y divide-white/10">
+              <div className="divide-y divide-[var(--app-border)]">
                 {pagedRows.map((r) => (
                   <div
                     key={r.id}
-                    className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-white/80"
+                    className="grid grid-cols-14 items-center gap-3 px-4 py-3 text-sm text-[var(--app-text-85)] hover:bg-[var(--app-hover)]/60 transition-colors"
                   >
                     <div className="col-span-5 min-w-0">
-                      <div className="truncate font-semibold">{r.nome}</div>
-                      <div className="mt-1 truncate text-xs text-white/50">{r.email}</div>
+                      <div className="truncate font-semibold text-[17px] leading-tight">{r.nome}</div>
+                      <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{r.email}</div>
                     </div>
                     <div className="col-span-2 flex justify-center">
-                      <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/70">
+                      <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-75)]">
                         {planLabel(normalizePlan(r.plano))}
                       </span>
                     </div>
                     <div className="col-span-2 flex justify-center">
                       {r.assinatura_status === "-" ? (
-                        <span className="text-white/60">-</span>
+                        <span className="text-[var(--app-text-60)]">-</span>
                       ) : (
                         <span
-                          className={`inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
+                          className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
                         >
                           {statusLabel(normalizeStatus(r.assinatura_status))}
                         </span>
                       )}
                     </div>
-                    <div className="col-span-2 text-center text-white/60">
+                    <div className="col-span-2 text-center text-[var(--app-text-60)] text-[13px]">
                       {normalizePlan(r.plano) === "vitalicio"
                         ? "-"
                         : normalizePlan(r.plano) === "teste" &&
@@ -399,7 +399,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                       {!isSelfAdmin(r.email) ? (
                         <button
                           onClick={() => openEditModal(r)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
                           title="Editar"
                         >
                           <Pencil className="h-4 w-4" />
@@ -407,7 +407,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                       ) : null}
                       <button
                         onClick={() => openPasswordModal(r)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06]"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors"
                         title="Redefinir senha"
                       >
                         <Key className="h-4 w-4" />
@@ -416,7 +416,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                         <button
                           onClick={() => openDeleteModal(r)}
                           disabled={isPending}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.06] disabled:opacity-60"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] transition-colors disabled:opacity-60"
                           title="Excluir"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -430,22 +430,22 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           </div>
         </div>
         {filtered.length > pageSize ? (
-          <div className="grid grid-cols-3 items-center border-t border-white/10 px-4 py-3">
+          <div className="grid grid-cols-3 items-center border-t border-[var(--app-border)] px-4 py-3">
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
               aria-label="Página anterior"
             >
               {"<"}
             </button>
-            <div className="text-center text-xs font-semibold text-[var(--app-text-60)]">
+            <div className="text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
               {safePage} / {totalPages}
             </div>
             <button
               type="button"
-              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-card)]"
+              className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-sm font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:opacity-40 disabled:hover:bg-[var(--app-solid-surface)]"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
               aria-label="Próxima página"
@@ -460,32 +460,32 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       <AppModal open={openCreate} onClose={closeCreate} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-white/90">Criar usuário</div>
-            <div className="mt-1 text-xs text-white/55">Plano teste (3 meses) com acesso ao painel.</div>
+            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">Criar usuário</div>
+            <div className="mt-1 text-[13px] text-[var(--app-text-55)]">Plano teste (3 meses) com acesso ao painel.</div>
           </div>
           <button
             onClick={closeCreate}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={saveCreate} className="mt-5 space-y-3">
+        <form onSubmit={saveCreate} className="mt-6 space-y-4">
           <div>
-            <label className="text-xs font-semibold text-white/60">Nome</label>
+            <label className="text-xs font-semibold text-[var(--app-text-60)]">Nome</label>
             <input
               type="text"
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
               placeholder="Nome do usuário"
               {...createForm.register("nome", { required: true, minLength: 2 })}
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-white/60">E-mail</label>
+            <label className="text-xs font-semibold text-[var(--app-text-60)]">E-mail</label>
             <input
               type="email"
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
               placeholder="voce@email.com"
               {...createForm.register("email", {
                 required: "Informe o e-mail.",
@@ -496,17 +496,17 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
               })}
             />
             {createForm.formState.errors.email?.message ? (
-              <div className="mt-2 text-xs font-semibold text-rose-200">
+              <div className="mt-2 text-xs font-semibold text-[rgb(225,29,72)]">
                 {String(createForm.formState.errors.email.message)}
               </div>
             ) : null}
           </div>
           <div>
-            <label className="text-xs font-semibold text-white/60">Senha</label>
+            <label className="text-xs font-semibold text-[var(--app-text-60)]">Senha</label>
             <div className="relative mt-2">
               <input
                 type={showNewPassword ? "text" : "password"}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 pr-12 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
                 placeholder="Mínimo 8 caracteres"
                 {...createForm.register("password", {
                   required: true,
@@ -517,7 +517,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                 type="button"
                 aria-label={showNewPassword ? "Ocultar senha" : "Mostrar senha"}
                 onClick={() => setShowNewPassword((v) => !v)}
-                className="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+                className="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
               >
                 {showNewPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -527,7 +527,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
               </button>
             </div>
             {createForm.formState.errors.password?.message ? (
-              <div className="mt-2 text-xs font-semibold text-rose-200">
+              <div className="mt-2 text-xs font-semibold text-[rgb(225,29,72)]">
                 {String(createForm.formState.errors.password.message)}
               </div>
             ) : null}
@@ -536,7 +536,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <button
             type="submit"
             disabled={createForm.formState.isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-h-[44px] disabled:opacity-60"
           >
             {createForm.formState.isSubmitting ? "Criando..." : "Criar usuário"}
           </button>
@@ -546,23 +546,23 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       <AppModal open={openEdit} onClose={closeEdit} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-white/90">Editar usuário</div>
-            <div className="mt-1 text-xs text-white/55">{editing?.email ?? ""}</div>
+            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">Editar usuário</div>
+            <div className="mt-1 text-[13px] text-[var(--app-text-55)]">{editing?.email ?? ""}</div>
           </div>
           <button
             onClick={closeEdit}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={saveEdit} className="mt-5 space-y-3">
+        <form onSubmit={saveEdit} className="mt-6 space-y-4">
           <input type="hidden" {...editForm.register("id", { required: true })} />
           <div>
-            <label className="text-xs font-semibold text-white/60">Nome</label>
+            <label className="text-xs font-semibold text-[var(--app-text-60)]">Nome</label>
             <input
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+              className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
               placeholder="Nome do usuário"
               {...editForm.register("nome", { required: true })}
             />
@@ -570,35 +570,35 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-semibold text-white/60">Plano</label>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">Plano</label>
               <select
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light]"
                 {...editForm.register("plano", { required: true })}
               >
-                <option value="teste" className="bg-[#070A10] text-white">
+                <option value="teste">
                   Teste
                 </option>
-                <option value="basico" className="bg-[#070A10] text-white">
+                <option value="basico">
                   Básico
                 </option>
-                <option value="pro" className="bg-[#070A10] text-white">
+                <option value="pro">
                   Pro
                 </option>
-                <option value="vitalicio" className="bg-[#070A10] text-white">
+                <option value="vitalicio">
                   Vitalício
                 </option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-white/60">Status</label>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">Status</label>
               <select
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light]"
                 {...editForm.register("assinatura_status", { required: true })}
               >
-                <option value="ativo" className="bg-[#070A10] text-white">
+                <option value="ativo">
                   Ativo
                 </option>
-                <option value="cancelado" className="bg-[#070A10] text-white">
+                <option value="cancelado">
                   Cancelado
                 </option>
               </select>
@@ -606,9 +606,9 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-white/60">Vencimento</label>
+            <label className="text-xs font-semibold text-[var(--app-text-60)]">Vencimento</label>
             {currentPlan === "vitalicio" ? (
-              <div className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-white/70">
+              <div className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-2.5 text-[0.95rem] font-semibold text-[var(--app-text-75)]">
                 -
               </div>
             ) : (
@@ -618,7 +618,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                   vencimentoInputRef.current = element;
                 }}
                 type="date"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
                 onClick={openVencimentoPicker}
                 onFocus={openVencimentoPicker}
                 {...vencimentoFieldProps}
@@ -629,7 +629,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <button
             type="submit"
             disabled={editForm.formState.isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-h-[44px] disabled:opacity-60"
           >
             {editForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
           </button>
@@ -639,25 +639,25 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       <AppModal open={openPassword} onClose={closePassword} size="md" zIndexClass="z-[320]" fullScreenOnMobile>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-white/90">Redefinir senha</div>
-            <div className="mt-1 text-xs text-white/55">{editing?.email ?? ""}</div>
+            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">Redefinir senha</div>
+            <div className="mt-1 text-[13px] text-[var(--app-text-55)]">{editing?.email ?? ""}</div>
           </div>
           <button
             onClick={closePassword}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={savePassword} className="mt-5 space-y-3">
+        <form onSubmit={savePassword} className="mt-6 space-y-4">
           <input type="hidden" {...passForm.register("id", { required: true })} />
           <div>
-            <label className="text-xs font-semibold text-white/60">Nova senha</label>
+            <label className="text-xs font-semibold text-[var(--app-text-60)]">Nova senha</label>
             <div className="relative mt-2">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                className="w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 pr-12 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
                 placeholder="Mínimo 8 caracteres"
                 {...passForm.register("password", {
                   required: true,
@@ -668,7 +668,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                 type="button"
                 aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+                className="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -678,7 +678,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
               </button>
             </div>
             {passForm.formState.errors.password?.message ? (
-              <div className="mt-2 text-xs font-semibold text-rose-200">
+              <div className="mt-2 text-xs font-semibold text-[rgb(225,29,72)]">
                 {String(passForm.formState.errors.password.message)}
               </div>
             ) : null}
@@ -687,7 +687,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
           <button
             type="submit"
             disabled={passForm.formState.isSubmitting}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[var(--app-btn-primary-bg)] text-[var(--app-btn-primary-text)] hover:bg-[var(--app-btn-primary-bg-hover)] min-h-[44px] disabled:opacity-60"
           >
             {passForm.formState.isSubmitting ? "Salvando..." : "Salvar"}
           </button>
@@ -703,27 +703,27 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-white/90">Excluir usuário</div>
-            <div className="mt-1 truncate text-xs text-white/55">{deleting?.email ?? ""}</div>
+            <div className="text-lg font-bold tracking-tight text-[var(--app-text-85)]">Excluir usuário</div>
+            <div className="mt-1 truncate text-[13px] text-[var(--app-text-55)]">{deleting?.email ?? ""}</div>
           </div>
           <button
             onClick={closeDelete}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.06]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-65)] hover:bg-[var(--app-hover)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="mt-5 text-sm text-white/80">
+        <div className="mt-6 text-[15px] leading-relaxed text-[var(--app-text-75)]">
           Você tem certeza que deseja excluir esse usuário?
         </div>
-        <div className="mt-1 text-xs text-white/55">Essa ação não pode ser desfeita.</div>
+        <div className="mt-1 text-[13px] text-[var(--app-text-55)]">Essa ação não pode ser desfeita.</div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={closeDelete}
-            className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.06]"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[15px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
           >
             Cancelar
           </button>
@@ -735,7 +735,7 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
               closeDelete();
               remove(deleting);
             }}
-            className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-card-2)] disabled:text-[var(--app-text-60)] disabled:hover:bg-[var(--app-card-2)] disabled:opacity-100"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold bg-[rgb(225,29,72)] text-white hover:bg-[rgb(225,29,72)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Excluir
           </button>
