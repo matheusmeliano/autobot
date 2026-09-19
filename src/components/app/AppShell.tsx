@@ -7,7 +7,6 @@ import { Bot, Camera, Loader2, Menu, X } from "lucide-react";
 import { AppNav } from "@/components/app/AppNav";
 import { AvatarChangeModal } from "@/components/app/AvatarChangeModal";
 import { logoutAction } from "@/app/app/actions";
-import { isGlobalAdminEmail } from "@/lib/auth/admin";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
 import { updateThemeAction } from "@/app/app/configuracoes/actions";
@@ -349,7 +348,6 @@ export function AppShell({
     };
   }, [mobileMenuOpen]);
 
-  const showAdmin = isGlobalAdminEmail(email);
   const displayName = profileName || email.split("@")[0] || "Usuário";
   const avatarLabel = displayName
     .split(/\s+/)
@@ -784,16 +782,6 @@ export function AppShell({
                   </div>
                 </div>
               </div>
-              {showAdmin ? (
-                <Link
-                  href="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="mt-3 flex items-center justify-between rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-solid-surface-2)]"
-                >
-                  <span>Admin</span>
-                  <span className="text-xs text-[var(--app-text-45)]">Painel administrativo</span>
-                </Link>
-              ) : null}
             </div>
 
             <div className="mt-2 flex-1 overflow-y-auto px-3 py-2 pb-3">
