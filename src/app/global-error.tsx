@@ -86,13 +86,13 @@ export default function GlobalError({
     <html lang="pt-BR">
       <body>
         <div
-          className="app-theme min-h-screen w-full bg-[#efeeed]"
+          className="app-theme min-h-screen w-full !bg-[#efeeed]"
           data-theme="light"
         >
           <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center px-4 py-10">
-            <div className="w-full rounded-2xl border border-[var(--app-border)] bg-white p-6 sm:p-8">
+            <div className="w-full rounded-2xl border border-[var(--app-border)] !bg-white p-6 sm:p-8 shadow-none">
               <div className="flex items-start gap-3">
-                <div className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--app-active)] bg-[color:var(--app-active)]">
+                <div className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--app-active)] !bg-[color:var(--app-active)]">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="22"
@@ -111,10 +111,10 @@ export default function GlobalError({
                   </svg>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-xl font-bold tracking-tight text-[var(--app-text-85)]">
+                  <h1 className="text-xl font-bold tracking-tight !text-[var(--app-text-85)]">
                     {title}
                   </h1>
-                  <p className="mt-2 text-[15px] leading-relaxed text-[var(--app-text-60)]">
+                  <p className="mt-2 text-[15px] leading-relaxed !text-[var(--app-text-60)]">
                     {body}
                   </p>
                 </div>
@@ -130,24 +130,24 @@ export default function GlobalError({
                       window.location.reload();
                     }
                   }}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-white px-5 text-[15px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] sm:w-auto"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] !bg-white px-5 text-[15px] font-semibold !text-[var(--app-text-85)] hover:bg-[var(--app-hover)] sm:w-auto"
                 >
                   Tentar novamente
                 </button>
                 <a
                   href="/app"
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#ea580c] px-5 text-[15px] font-semibold !text-white hover:bg-[#ea580c]/90 sm:w-auto"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--app-btn-primary-bg)] px-5 text-[15px] font-semibold !text-[var(--app-btn-primary-fg)] hover:bg-[var(--app-btn-primary-bg-hover)] sm:w-auto"
                 >
                   Voltar ao painel
                 </a>
               </div>
 
               {rawMsg ? (
-                <details className="mt-5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
-                  <summary className="cursor-pointer select-none text-[13px] font-semibold text-[var(--app-text-65)]">
+                <details className="mt-5 rounded-xl border border-[var(--app-border)] !bg-[var(--app-solid-surface-2)] p-3">
+                  <summary className="cursor-pointer select-none text-[13px] font-semibold !text-[var(--app-text-65)]">
                     Detalhes técnicos
                   </summary>
-                  <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-[var(--app-border)] bg-white p-3 text-[12px] leading-relaxed text-[var(--app-text-60)]">
+                  <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-[var(--app-border)] !bg-white p-3 text-[12px] leading-relaxed !text-[var(--app-text-60)]">
                     {rawMsg}
                   </pre>
                 </details>
