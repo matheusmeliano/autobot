@@ -95,8 +95,8 @@ export function ReportsClient({
             <AreaChart data={chart}>
               <defs>
                 <linearGradient id="repValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity={0.45} />
-                  <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#ea580c" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="#ea580c" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -117,7 +117,7 @@ export function ReportsClient({
                 formatter={(v: any) => [v, "Quantidade"]}
                 labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.label ?? ""}
               />
-              <Area type="monotone" dataKey="value" stroke="rgb(16 185 129)" strokeWidth={2} fill="url(#repValue)" />
+              <Area type="monotone" dataKey="value" stroke="#ea580c" strokeWidth={2.2} fill="url(#repValue)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
