@@ -338,7 +338,7 @@ export function DashboardClient({
                         </div>
                       </div>
                       <span
-                        className={`mt-0.5 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${visualStatus.className}`}
+                        className={`mt-0.5 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold text-white ${visualStatus.className}`}
                       >
                         {visualStatus.label}
                       </span>
