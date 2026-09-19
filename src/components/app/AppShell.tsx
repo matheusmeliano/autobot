@@ -632,7 +632,7 @@ export function AppShell({
       </div>
 
       {showLoadingOverlay ? null : (
-        <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden transition-opacity duration-200 opacity-100" : "min-h-[100dvh] transition-opacity duration-200 opacity-100"}>
+        <div className={drawerOnlyNav ? "min-h-0 lg:h-[100dvh] lg:overflow-hidden" : "min-h-[100dvh]"}>
         <div
           className={[
             "relative flex w-full",
