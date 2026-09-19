@@ -117,7 +117,7 @@ export function AppNav({
           ...navGroups,
           {
             label: "Admin",
-            items: [{ href: adminHref, label: "Usuários", icon: Shield }],
+            items: [{ href: adminHref, label: "Administração", icon: Shield }],
           },
         ]
       : navGroups;
@@ -209,7 +209,7 @@ export function AppNav({
             ].join(" ")}
           >
             <Shield className="h-[1.15rem] w-[1.15rem]" />
-            Admin
+            Administração
           </Link>
         </>
       ) : null}
