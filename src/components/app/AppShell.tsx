@@ -552,21 +552,6 @@ export function AppShell({
     [paymentResolving, pendingPayment, router],
   );
 
-  if (authChecked && !isAuthed) return null;
-  const shouldHoldRender =
-    restricted &&
-    currentPath !== "/app/assinatura" &&
-    !currentPath.startsWith("/app/assinatura/") &&
-    currentPath !== "/app/configuracoes" &&
-    !currentPath.startsWith("/app/configuracoes/") &&
-    currentPath !== "/app/whatsapp" &&
-    !currentPath.startsWith("/app/whatsapp/");
-  if (shouldHoldRender) return null;
-
-  const isAppThemeScope = typeof pathname === "string" && pathname.startsWith("/app");
-  const resolvedTheme: AppTheme = isAppThemeScope ? "light" : theme;
-  const themeProviderValue = { theme: resolvedTheme, themePreference, themeLoaded, saveTheme };
-
   useEffect(() => {
     const ready =
       themeLoaded &&
@@ -577,6 +562,21 @@ export function AppShell({
     const t = window.setTimeout(() => setBootOverlayVisible(false), 120);
     return () => window.clearTimeout(t);
   }, [themeLoaded, authChecked, pathname]);
+
+  const isAppThemeScope = typeof pathname === "string" && pathname.startsWith("/app");
+  const resolvedTheme: AppTheme = isAppThemeScope ? "light" : theme;
+  const themeProviderValue = { theme: resolvedTheme, themePreference, themeLoaded, saveTheme };
+
+  if (authChecked && !isAuthed) return null;
+  const shouldHoldRender =
+    restricted &&
+    currentPath !== "/app/assinatura" &&
+    !currentPath.startsWith("/app/assinatura/") &&
+    currentPath !== "/app/configuracoes" &&
+    !currentPath.startsWith("/app/configuracoes/") &&
+    currentPath !== "/app/whatsapp" &&
+    !currentPath.startsWith("/app/whatsapp/");
+  if (shouldHoldRender) return null;
 
   return (
     <AppThemeProvider value={themeProviderValue}>
