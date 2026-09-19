@@ -370,22 +370,22 @@ export function AdminUsersClient({ initial }: { initial: AdminUserRow[] }) {
                       <div className="mt-1 truncate text-[11px] text-[var(--app-text-55)]">{r.email}</div>
                     </div>
                     <div className="col-span-2 flex justify-center">
-                      <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-75)]">
+                      <span className="inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--app-text-75)]">
                         {planLabel(normalizePlan(r.plano))}
                       </span>
                     </div>
                     <div className="col-span-2 flex justify-center">
                       {r.assinatura_status === "-" ? (
-                        <span className="text-[var(--app-text-60)]">-</span>
+                        <span className="text-[13px] text-[var(--app-text-60)]">-</span>
                       ) : (
                         <span
-                          className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
+                          className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${statusClass(normalizeStatus(r.assinatura_status))}`}
                         >
                           {statusLabel(normalizeStatus(r.assinatura_status))}
                         </span>
                       )}
                     </div>
-                    <div className="col-span-2 text-center text-[var(--app-text-60)] text-[13px]">
+                    <div className="col-span-2 text-center text-[14px] font-medium text-[var(--app-text-65)]">
                       {normalizePlan(r.plano) === "vitalicio"
                         ? "-"
                         : normalizePlan(r.plano) === "teste" &&
