@@ -1033,11 +1033,6 @@ export function AtendimentoClient() {
               ].join(" ")}
             >
               <SlidersHorizontal className="h-4 w-4" />
-              {Object.values(activeFilters).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v)) ? (
-                <span className="pointer-events-none absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#ea580c] text-[9px] font-extrabold leading-none !text-white">
-                  •
-                </span>
-              ) : null}
             </button>
             <div className="relative">
               <button
