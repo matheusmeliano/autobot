@@ -1507,7 +1507,7 @@ export function AtendimentoClient() {
                       type="button"
                       onClick={() => void handleDeleteSelected()}
                       disabled={deletingSelectedLoading}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-red-500/40 bg-red-600 px-4 text-[13px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
                       aria-label="Excluir"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1929,7 +1929,7 @@ export function AtendimentoClient() {
                     type="button"
                     onClick={() => void handleDeleteSelected()}
                     disabled={deletingSelectedLoading}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-red-500/40 bg-red-600 px-4 text-[13px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
                     aria-label="Excluir"
                   >
                     <Trash2 className="h-4 w-4" />
