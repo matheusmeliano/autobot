@@ -8,6 +8,7 @@ import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendime
 import { modalToast } from "@/lib/modalToast";
 import { formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
 import { AppModal } from "@/components/app/AppModal";
+import { AppDateRangePicker, type AppDateRange } from "@/components/app/AppDateRangePicker";
 
 const EMPTY_SUMMARY: AtendimentoSummary = {
   totalLeads: 0,
@@ -1035,34 +1036,27 @@ export function AtendimentoClient() {
               </div>
             </div>
 
-            {/* BLOCO 4: Data de criação */}
+            {/* BLOCO 4: Data de criação — calendário customizado (NÃO usa input date nativo!) */}
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
               <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                 Data de cadastro
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold text-[var(--app-text-60)]">De</label>
-                  <input
-                    type="date"
-                    value={draftFilters.createdFrom}
-                    onChange={(e) =>
-                      setDraftFilters((p) => ({ ...p, createdFrom: e.target.value }) as LeadFilters)
-                    }
-                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Até</label>
-                  <input
-                    type="date"
-                    value={draftFilters.createdTo}
-                    onChange={(e) =>
-                      setDraftFilters((p) => ({ ...p, createdTo: e.target.value }) as LeadFilters)
-                    }
-                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
-                  />
-                </div>
+              <div className="mt-3">
+                <AppDateRangePicker
+                  placeholder="Selecione o período de cadastro..."
+                  value={{
+                    from: (draftFilters.createdFrom ?? null) as string | null,
+                    to: (draftFilters.createdTo ?? null) as string | null,
+                  }}
+                  onChange={(next: AppDateRange) => {
+                    setDraftFilters((p) => ({
+                      ...p,
+                      createdFrom: next.from ?? "",
+                      createdTo: next.to ?? "",
+                    })) as LeadFilters;
+                  }}
+                  showLabel={false}
+                />
               </div>
             </div>
 
