@@ -940,7 +940,7 @@ export function AtendimentoClient() {
         zIndexClass="z-[400]"
         fullScreenOnMobile={false}
       >
-        <div className="flex w-full flex-col gap-0">
+        <div className="h-full max-h-full flex w-full flex-col gap-0 overflow-hidden">
           {/* Header */}
           <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
             <div className="flex items-center gap-3 min-w-0">
@@ -966,8 +966,8 @@ export function AtendimentoClient() {
             </button>
           </div>
 
-          {/* Conteudo filtros (scroll interno) */}
-          <div className="mt-4 flex max-h-[65vh] min-h-0 w-full flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
+          {/* Conteudo filtros (scroll interno APENAS aqui, height responsivo por flex) */}
+          <div className="mt-4 flex flex-1 min-h-0 w-full flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
             {/* BLOCO 1: Status + Etapa (seleção rápida por chip/label) */}
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
               <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
