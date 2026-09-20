@@ -2,8 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Camera, Loader2, Menu, X } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  BarChart3,
+  CalendarDays,
+  CircleUserRound,
+  Camera,
+  Headset,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+  Menu,
+  MessageSquareText,
+  Settings,
+  Smartphone,
+  X,
+} from "lucide-react";
 import { AppNav } from "@/components/app/AppNav";
 import { AvatarChangeModal } from "@/components/app/AvatarChangeModal";
 import { logoutAction } from "@/app/app/actions";
@@ -593,27 +610,124 @@ export function AppShell({
           className={[
             "flex w-full flex-col",
             drawerOnlyNav
-              ? "min-h-0 overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
+              ? "pl-[112px] min-h-0 overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
               : "pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
           {drawerOnlyNav ? (
-            <div
+            // NAVIGATION RAIL (lado esquerdo fixo) — estilo imagem referencia
+            <aside
+              aria-label="Navegação principal"
               className={[
-                "fixed right-4 top-4 z-[250] flex flex-col items-end gap-2",
+                "fixed left-4 top-4 bottom-4 z-[250]",
+                "w-20",
+                "flex flex-col items-center gap-3 p-3",
+                "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none",
               ].join(" ")}
             >
+              {/* 1) Avatar topo */}
+              <div className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setAvatarModalOpen(true)}
+                  className="group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white shadow-sm transition hover:scale-[1.02]"
+                  style={{ backgroundColor: avatarUrl ? undefined : "var(--app-active)", color: "#9a3412" }}
+                  aria-label={avatarUrl ? "Alterar foto de perfil" : "Adicionar foto de perfil"}
+                  title={avatarUrl ? "Alterar foto" : "Adicionar foto"}
+                >
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt={displayName || "Avatar"}
+                      width={48}
+                      height={48}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="text-[15px] font-bold tracking-tight leading-none">
+                      {fallbackInitials}
+                    </span>
+                  )}
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/55 opacity-0 transition group-hover:opacity-100">
+                    <Camera className="h-4 w-4 text-white" />
+                  </span>
+                </button>
+              </div>
+
+              {/* 2) Botão Expandir / Abrir Drawer completo (seta direita grande, destaque accent) */}
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] transition-all hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-fg)]"
-                aria-label="Abrir menu"
+                aria-label="Abrir menu completo"
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-app-drawer"
+                className={[
+                  "inline-flex h-12 w-12 items-center justify-center rounded-full shadow-none transition-all",
+                  "border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] text-[#9a3412]",
+                  "hover:bg-[rgba(234,88,12,0.22)] active:scale-95",
+                ].join(" ")}
               >
-                <Menu className="h-5 w-5" />
+                <ArrowRight className="h-5 w-5" strokeWidth={2.5} />
               </button>
-            </div>
+
+              {/* 3) Separador */}
+              <div className="h-px w-full shrink-0 bg-[var(--app-border)]" />
+
+              {/* 4) Itens do menu (icones) — itens principais do AppNav */}
+              <nav className="flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto scrollbar-hide py-1">
+                {(
+                  [
+                    { href: "/app/dashboard", label: "Painel", icon: LayoutDashboard, section: "Principal" },
+                    { href: "/app/clientes", label: "Clientes", icon: CircleUserRound, section: "Principal" },
+                    { href: "/app/mensagens", label: "Mensagens", icon: MessageSquareText, section: "Principal" },
+                    { href: "/app/agendar", label: "Agendar", icon: CalendarDays, section: "Principal" },
+                    { href: "/app/atendimento", label: "Atendimento", icon: Headset, section: "Principal" },
+                    { href: "/app/whatsapp", label: "WhatsApp", icon: Smartphone, section: "Principal" },
+                    ...(restricted
+                      ? []
+                      : [
+                          { href: "/app/relatorios" as const, label: "Relatórios", icon: BarChart3, section: "Gestão" },
+                          { href: "/app/assinatura" as const, label: "Assinatura", icon: BadgeCheck, section: "Gestão" },
+                        ]),
+                    { href: "/app/configuracoes", label: "Configurações", icon: Settings, section: "Conta" },
+                  ] as Array<{ href: string; label: string; icon: any; section: string }>
+                ).map((item) => {
+                  const active = pathname === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      title={item.label}
+                      aria-label={item.label}
+                      className={[
+                        "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-all",
+                        active
+                          ? "bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none"
+                          : "text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]",
+                      ].join(" ")}
+                    >
+                      <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 2} />
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {/* 5) Separador final + Botão Sair */}
+              <div className="h-px w-full shrink-0 bg-[var(--app-border)]" />
+              <form action={logoutAction} className="w-full shrink-0" onSubmit={handleLogoutSubmit}>
+                <button
+                  type="submit"
+                  aria-label="Sair da conta"
+                  title="Sair"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-2xl text-[#9a3412] transition-all hover:bg-[color:var(--app-active)]"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
+              </form>
+            </aside>
           ) : (
             <div
               className={[
