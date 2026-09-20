@@ -1251,7 +1251,7 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Métricas | Adicionar | Bot Experimental */}
-          <div className="flex shrink-0 items-center justify-start gap-2 px-5 pt-5">
+          <div className="flex shrink-0 items-center justify-start gap-2 px-5 pt-5 min-w-0 overflow-x-auto overflow-y-visible overscroll-contain">
             <button
               type="button"
               onClick={() => void handleRefresh()}
@@ -1296,7 +1296,7 @@ export function AtendimentoClient() {
             >
               <Plus className="h-4 w-4" />
             </button>
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 aria-label="Alternar bot de agendamento experimental"
@@ -1304,7 +1304,7 @@ export function AtendimentoClient() {
                 disabled={botExperimentalLoading || loading}
                 onClick={() => void handleToggleBotExperimental()}
                 className={[
-                  "inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
+                  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
                   botExperimentalDisabled
                     ? "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
                     : "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20",
