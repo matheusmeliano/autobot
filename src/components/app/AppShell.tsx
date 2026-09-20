@@ -618,7 +618,7 @@ export function AppShell({
             <aside
               aria-label="Navegação principal"
               className={[
-                "fixed right-4 top-4 bottom-4 z-[250]",
+                "fixed right-4 top-[21.5px] bottom-[21.5px] z-[250]",
                 "w-20",
                 "flex flex-col items-center gap-3 p-3",
                 "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none",
