@@ -423,9 +423,6 @@ export function AtendimentoClient() {
               <h2 className="text-[1.15rem] font-bold tracking-tight text-[var(--app-text-85)] leading-[1.1]">
                 Interessados
               </h2>
-              <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                {loading ? "Carregando..." : `${filteredLeads.length} ${filteredLeads.length === 1 ? "interessado" : "interessados"}`}
-              </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -460,6 +457,9 @@ export function AtendimentoClient() {
                 placeholder="Pesquise por nome ou telefone..."
                 className="w-full !bg-white rounded-xl border border-[var(--app-border)] pl-10 pr-4 py-2.5 text-[14px] text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
               />
+            </div>
+            <div className="mt-2 text-[12px] text-[var(--app-text-55)]">
+              {loading ? "Carregando..." : `${filteredLeads.length} ${filteredLeads.length === 1 ? "interessado" : "interessados"}`}
             </div>
           </div>
 
