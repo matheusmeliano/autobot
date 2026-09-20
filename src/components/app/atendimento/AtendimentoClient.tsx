@@ -337,9 +337,6 @@ export function AtendimentoClient() {
     if (selectedLead && filteredLeads.findIndex((l) => l.id === selectedLead.id) === -1 && panelLeads.findIndex((l) => l.id === selectedLead.id) >= 0) {
       return;
     }
-    if (filteredLeads.length && !selectedLead) {
-      setSelectedLeadId(filteredLeads[0].id);
-    }
   }, [filteredLeads, selectedLead, panelLeads]);
 
   useEffect(() => {
