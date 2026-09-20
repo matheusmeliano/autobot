@@ -1306,7 +1306,7 @@ export function AtendimentoClient() {
                 className={[
                   "inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
                   botExperimentalDisabled
-                    ? "border-slate-300/80 bg-slate-500/10 text-slate-600 hover:bg-slate-500/15"
+                    ? "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
                     : "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20",
                 ].join(" ")}
               >
