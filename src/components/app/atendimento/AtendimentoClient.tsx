@@ -249,6 +249,7 @@ export function AtendimentoClient() {
   const fallbackRefreshIntervalRef = useRef<number | null>(null);
   const realtimeSubscribedRef = useRef(false);
   const initialLoadCompletedRef = useRef(false);
+  const skipNextAutoSelectRef = useRef(false);
 
   // Detecta viewport <1201px (tamanho MOBILE para layout atendimento)
   useEffect(() => {
@@ -326,6 +327,10 @@ export function AtendimentoClient() {
   }, [panelLeads, searchQuery, activeFilters]);
 
   useEffect(() => {
+    if (skipNextAutoSelectRef.current) {
+      skipNextAutoSelectRef.current = false;
+      return;
+    }
     if (selectedLead && filteredLeads.findIndex((l) => l.id === selectedLead.id) === -1 && panelLeads.findIndex((l) => l.id === selectedLead.id) >= 0) {
       return;
     }
@@ -534,6 +539,7 @@ export function AtendimentoClient() {
         modalToast.error(payload?.error ?? "Falha ao excluir registro.");
         return;
       }
+      skipNextAutoSelectRef.current = true;
       setPanelLeads((current) => current.filter((item) => item.id !== sl.id));
       setSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
       setSelectedLeadId(null);
