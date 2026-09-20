@@ -411,7 +411,7 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4 min-[1201px]:p-4">
+    <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4 min-[1201px]:py-4 min-[1201px]:pl-4 min-[1201px]:pr-[112px]">
       <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 min-[1201px]:flex-row">
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
