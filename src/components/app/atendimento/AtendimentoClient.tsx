@@ -412,24 +412,12 @@ export function AtendimentoClient() {
 
   return (
     <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4">
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => void handleRefresh()}
-          disabled={refreshing || loading}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold !text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Atualizar
-        </button>
-      </div>
-
       <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 min-[1201px]:flex-row">
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
         {/* ========================================================= */}
         <aside className="flex min-h-0 min-w-0 w-full shrink-0 min-[1201px]:w-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
-          {/* Header + Botão Adicionar */}
+          {/* Header + Botão Atualizar + Adicionar */}
           <div className="flex items-start justify-between gap-3 px-5 pt-5">
             <div>
               <h2 className="text-[1.15rem] font-bold tracking-tight text-[var(--app-text-85)] leading-[1.1]">
@@ -439,15 +427,26 @@ export function AtendimentoClient() {
                 {loading ? "Carregando..." : `${filteredLeads.length} ${filteredLeads.length === 1 ? "interessado" : "interessados"}`}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setCreateLeadOpen(true)}
-              disabled={loading}
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
-            >
-              <Plus className="h-4 w-4" />
-              Adicionar
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={refreshing || loading}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold !text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                Atualizar
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateLeadOpen(true)}
+                disabled={loading}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar
+              </button>
+            </div>
           </div>
 
           {/* Busca */}
