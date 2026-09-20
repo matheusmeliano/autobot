@@ -1157,16 +1157,7 @@ export function AtendimentoClient() {
             >
               <BarChart3 className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setCreateLeadOpen(true)}
-              disabled={loading}
-              aria-label="Adicionar registro"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-            {/* FILTROS AVANCADOS: ao lado ESQUERDO do Bot (usuário pediu!) */}
+            {/* FILTROS AVANCADOS: ao lado ESQUERDO de Adicionar registro (+) */}
             <button
               type="button"
               onClick={() => {
@@ -1182,6 +1173,15 @@ export function AtendimentoClient() {
               ].join(" ")}
             >
               <SlidersHorizontal className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateLeadOpen(true)}
+              disabled={loading}
+              aria-label="Adicionar registro"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
+            >
+              <Plus className="h-4 w-4" />
             </button>
             <div className="relative">
               <button
