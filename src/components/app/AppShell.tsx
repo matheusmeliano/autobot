@@ -609,7 +609,7 @@ export function AppShell({
           className={[
             "flex w-full flex-col",
             drawerOnlyNav
-              ? "pr-[112px] min-h-0 overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
+              ? "pr-[112px] min-h-0 overflow-visible pb-0 min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden min-[1201px]:pt-4 min-[1201px]:pb-4 min-[1201px]:pl-4"
               : "pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
