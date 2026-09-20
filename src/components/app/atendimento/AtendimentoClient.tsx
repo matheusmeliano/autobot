@@ -215,6 +215,8 @@ export function AtendimentoClient() {
   const [showMetricsModal, setShowMetricsModal] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [botExperimentalDisabled, setBotExperimentalDisabled] = useState<boolean>(false);
+  const [botExperimentalLoading, setBotExperimentalLoading] = useState<boolean>(false);
 
   type LeadFilters = {
     statusList: string[];
@@ -393,7 +395,7 @@ export function AtendimentoClient() {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      await Promise.all([loadSummary({ silent: true }), loadPanelLeads()]);
+      await Promise.all([loadSummary({ silent: true }), loadPanelLeads(), loadBotExperimentalSetting()]);
       modalToast.success("Painel atualizado.");
     } finally {
       setRefreshing(false);
@@ -420,6 +422,49 @@ export function AtendimentoClient() {
       } catch {
         modalToast.error("Falha ao copiar.");
       }
+    }
+  }
+
+  async function loadBotExperimentalSetting() {
+    try {
+      const res = await fetch("/api/atendimento/settings/experimental-class-bot", { cache: "no-store" });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (json?.ok) {
+        setBotExperimentalDisabled(Boolean((json as any).experimental_class_bot_disabled));
+      }
+    } catch {
+      /* noop */
+    }
+  }
+
+  async function handleToggleBotExperimental() {
+    if (botExperimentalLoading) return;
+    const nextDisabled = !botExperimentalDisabled;
+    setBotExperimentalLoading(true);
+    try {
+      setBotExperimentalDisabled(nextDisabled);
+      const res = await fetch("/api/atendimento/settings/experimental-class-bot", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ experimental_class_bot_disabled: nextDisabled }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        setBotExperimentalDisabled(!nextDisabled);
+        modalToast.error(String(json?.error ?? "Falha ao alternar bot experimental."));
+        return;
+      }
+      setBotExperimentalDisabled(Boolean((json as any).experimental_class_bot_disabled));
+      modalToast.success(
+        nextDisabled ? "Bot experimental desativado." : "Bot experimental ativado.",
+      );
+    } catch (e: any) {
+      setBotExperimentalDisabled(!nextDisabled);
+      modalToast.error(String(e?.message ?? "Falha ao alternar bot experimental."));
+    } finally {
+      setBotExperimentalLoading(false);
     }
   }
 
@@ -474,7 +519,7 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadSummary(), loadPanelLeads()])
+    Promise.all([loadSummary(), loadPanelLeads(), loadBotExperimentalSetting()])
       .then(() => {
         setLoadError(null);
         initialLoadCompletedRef.current = true;
@@ -1255,8 +1300,15 @@ export function AtendimentoClient() {
               <button
                 type="button"
                 aria-label="Alternar bot de agendamento experimental"
-                aria-pressed="true"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-none"
+                aria-pressed={!botExperimentalDisabled}
+                disabled={botExperimentalLoading || loading}
+                onClick={() => void handleToggleBotExperimental()}
+                className={[
+                  "inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
+                  botExperimentalDisabled
+                    ? "border-slate-300/80 bg-slate-500/10 text-slate-600 hover:bg-slate-500/15"
+                    : "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20",
+                ].join(" ")}
               >
                 <Bot className="h-5 w-5" />
               </button>
