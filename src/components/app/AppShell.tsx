@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Bot, Camera, Loader2, Menu, X } from "lucide-react";
+import { Camera, Loader2, Menu, X } from "lucide-react";
 import { AppNav } from "@/components/app/AppNav";
 import { AvatarChangeModal } from "@/components/app/AvatarChangeModal";
 import { logoutAction } from "@/app/app/actions";
@@ -81,11 +81,7 @@ export function AppShell({
   const [pendingPayment, setPendingPayment] = useState<any | null>(null);
   const [paymentResolving, setPaymentResolving] = useState<"confirm" | "reject" | null>(null);
   const lastPaymentSuspicionRealtimeIdRef = useRef<string>("");
-  const [experimentalBotDisabled, setExperimentalBotDisabled] = useState(false);
-  const [experimentalBotLoading, setExperimentalBotLoading] = useState(true);
-  const [experimentalBotSaving, setExperimentalBotSaving] = useState(false);
   const [bootOverlayVisible, setBootOverlayVisible] = useState(true);
-  const [showExperimentalBotPopover, setShowExperimentalBotPopover] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
 
@@ -474,56 +470,6 @@ export function AppShell({
   const drawerOnlyNav =
     currentPath === "/app/atendimento" || currentPath.startsWith("/app/atendimento/");
 
-  const loadExperimentalBotSetting = useCallback(async () => {
-    if (!authChecked || !isAuthed) return;
-    if (!drawerOnlyNav) {
-      setExperimentalBotLoading(false);
-      return;
-    }
-    try {
-      setExperimentalBotLoading(true);
-      const res = await fetch("/api/atendimento/settings/experimental-class-bot", {
-        method: "GET",
-      });
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.ok) {
-        setExperimentalBotDisabled(Boolean(json.experimental_class_bot_disabled));
-      }
-    } catch {
-    } finally {
-      setExperimentalBotLoading(false);
-    }
-  }, [authChecked, isAuthed, drawerOnlyNav]);
-
-  useEffect(() => {
-    loadExperimentalBotSetting();
-  }, [loadExperimentalBotSetting]);
-
-  const toggleExperimentalBot = useCallback(async () => {
-    if (experimentalBotSaving) return;
-    const prev = experimentalBotDisabled;
-    const newValue = !prev;
-    try {
-      setExperimentalBotSaving(true);
-      setExperimentalBotDisabled(newValue);
-      const res = await fetch("/api/atendimento/settings/experimental-class-bot", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ experimental_class_bot_disabled: newValue }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error ?? "Erro ao salvar.");
-      }
-      modalToast.success(newValue ? "Bot desabilitado." : "Bot habilitado.");
-    } catch (e: any) {
-      setExperimentalBotDisabled(prev);
-      modalToast.error(String(e?.message ?? "Erro ao salvar configuração."));
-    } finally {
-      setExperimentalBotSaving(false);
-    }
-  }, [experimentalBotDisabled, experimentalBotSaving]);
-
   const resolvePendingPayment = useCallback(
     async (decision: "confirm" | "reject") => {
       if (!pendingPayment?.id) return;
@@ -667,27 +613,6 @@ export function AppShell({
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={toggleExperimentalBot}
-                  disabled={experimentalBotSaving || experimentalBotLoading}
-                  className={[
-                    "inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition-all",
-                    experimentalBotDisabled
-                      ? "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-fg)] hover:bg-[var(--app-solid-surface-2)] disabled:opacity-60"
-                      : "border-emerald-500/35 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-60",
-                  ].join(" ")}
-                  aria-label="Alternar bot de agendamento experimental"
-                  aria-pressed={!experimentalBotDisabled}
-                >
-                  {experimentalBotSaving ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Bot className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
             </div>
           ) : (
             <div

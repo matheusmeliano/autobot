@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Calendar as CalendarIcon, ChevronRight, Copy, ExternalLink, MoreVertical, Pencil, Plus, RefreshCw, Search, UserRound } from "lucide-react";
+import { AlertCircle, Bot, Calendar as CalendarIcon, ChevronRight, Copy, ExternalLink, MoreVertical, Pencil, Plus, RefreshCw, Search, UserRound } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
@@ -417,7 +417,7 @@ export function AtendimentoClient() {
         {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
         {/* ========================================================= */}
         <aside className="flex min-h-0 min-w-0 w-full shrink-0 min-[1201px]:w-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
-          {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Adicionar */}
+          {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Adicionar | Bot Experimental */}
           <div className="flex items-center justify-end gap-2 px-5 pt-5">
             <button
               type="button"
@@ -437,6 +437,16 @@ export function AtendimentoClient() {
             >
               <Plus className="h-4 w-4" />
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                aria-label="Alternar bot de agendamento experimental"
+                aria-pressed="true"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-none"
+              >
+                <Bot className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* Busca */}
