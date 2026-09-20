@@ -665,7 +665,6 @@ export function AtendimentoClient() {
       { label: "Aulas experimentais agendadas", value: summary.aulasExperimentaisAgendadas, icon: <CalendarIcon className="h-5 w-5" />, tone: "success" },
       { label: "Matrículas pendentes", value: summary.matriculasPendentes, icon: <ExternalLink className="h-5 w-5" />, tone: "warning" },
       { label: "Matriculados", value: summary.matriculados, icon: <ExternalLink className="h-5 w-5" />, tone: "success" },
-      { label: "Conversas não lidas", value: summary.conversasNaoLidas, icon: <AlertCircle className="h-5 w-5" />, tone: "danger" },
     ];
     return (
       <AppModal
