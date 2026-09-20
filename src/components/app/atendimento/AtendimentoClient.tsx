@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Bot, Calendar as CalendarIcon, ChevronRight, Copy, ExternalLink, MoreVertical, Pencil, Plus, RefreshCw, Search, UserRound } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, ChevronRight, Copy, ExternalLink, MoreVertical, Pencil, Plus, RefreshCw, Search, UserRound } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
@@ -159,6 +159,7 @@ export function AtendimentoClient() {
   const [observacoesDraft, setObservacoesDraft] = useState<string>("");
   const [observacoesSaving, setObservacoesSaving] = useState(false);
   const [showMobileLeadModal, setShowMobileLeadModal] = useState(false);
+  const [showMetricsModal, setShowMetricsModal] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const fallbackRefreshIntervalRef = useRef<number | null>(null);
   const realtimeSubscribedRef = useRef(false);
@@ -429,6 +430,101 @@ export function AtendimentoClient() {
     return null;
   }
 
+  function renderMetricsModal() {
+    const items: Array<{ label: string; value: number; icon: React.ReactNode; tone: "default" | "success" | "warning" | "info" | "danger" }> = [
+      { label: "Total de interessados", value: summary.totalLeads, icon: <UserRound className="h-5 w-5" />, tone: "default" },
+      { label: "Novos interessados", value: summary.novosLeads, icon: <UserRound className="h-5 w-5" />, tone: "info" },
+      { label: "Em atendimento", value: summary.emAtendimento, icon: <Bot className="h-5 w-5" />, tone: "warning" },
+      { label: "Aulas experimentais agendadas", value: summary.aulasExperimentaisAgendadas, icon: <CalendarIcon className="h-5 w-5" />, tone: "success" },
+      { label: "Matrículas pendentes", value: summary.matriculasPendentes, icon: <ExternalLink className="h-5 w-5" />, tone: "warning" },
+      { label: "Matriculados", value: summary.matriculados, icon: <ExternalLink className="h-5 w-5" />, tone: "success" },
+      { label: "Conversas não lidas", value: summary.conversasNaoLidas, icon: <AlertCircle className="h-5 w-5" />, tone: "danger" },
+    ];
+    return (
+      <AppModal
+        open={showMetricsModal}
+        onClose={() => setShowMetricsModal(false)}
+        size="xl"
+        position="center"
+        zIndexClass="z-[400]"
+      >
+        <div className="flex w-full flex-col gap-0">
+          {/* Header modal */}
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <BarChart3 className="h-5 w-5 text-[#9a3412]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Métricas e resumo
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Visão geral dos interessados e do funil
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMetricsModal(false)}
+              aria-label="Fechar métricas"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Cards métricas */}
+          <div className="mt-4 grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((it) => {
+              const toneClasses =
+                it.tone === "success"
+                  ? "border-emerald-500/35 bg-emerald-500/10"
+                  : it.tone === "warning"
+                  ? "border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.10)]"
+                  : it.tone === "info"
+                  ? "border-sky-500/35 bg-sky-500/10"
+                  : it.tone === "danger"
+                  ? "border-rose-500/35 bg-rose-500/10"
+                  : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)]";
+              const iconTone =
+                it.tone === "success"
+                  ? "text-emerald-700"
+                  : it.tone === "warning"
+                  ? "text-[#9a3412]"
+                  : it.tone === "info"
+                  ? "text-sky-700"
+                  : it.tone === "danger"
+                  ? "text-rose-700"
+                  : "text-[var(--app-text-70)]";
+              return (
+                <div
+                  key={it.label}
+                  className={`flex items-start justify-between gap-3 overflow-hidden rounded-2xl border p-4 shadow-none ${toneClasses}`}
+                >
+                  <div className="min-w-0">
+                    <div className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${iconTone}`}>
+                      {it.label}
+                    </div>
+                    <div className="mt-1 text-[22px] font-extrabold leading-tight text-[var(--app-text-85)]">
+                      {it.value.toLocaleString("pt-BR")}
+                    </div>
+                  </div>
+                  <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] ${iconTone}`}>
+                    {it.icon}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </AppModal>
+    );
+  }
+
   return (
     <div className="flex h-auto w-full min-h-full min-h-0 min-w-0 flex-col gap-4 overflow-visible min-[1201px]:h-full min-[1201px]:overflow-hidden">
       <div className="flex min-h-0 min-w-0 h-auto w-full min-h-full flex-col gap-4 min-[1201px]:flex-row min-[1201px]:h-full min-[1201px]:overflow-hidden overflow-visible">
@@ -436,7 +532,7 @@ export function AtendimentoClient() {
         {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
         {/* ========================================================= */}
         <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
-          {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Adicionar | Bot Experimental */}
+          {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Métricas | Adicionar | Bot Experimental */}
           <div className="flex shrink-0 items-center justify-end gap-2 px-5 pt-5">
             <button
               type="button"
@@ -446,6 +542,15 @@ export function AtendimentoClient() {
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+            {/* MÉTRICAS: Ao lado ESQUERDO do "+ Adicionar" (usuário pediu) */}
+            <button
+              type="button"
+              onClick={() => setShowMetricsModal(true)}
+              aria-label="Métricas e resumo de interessados"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
+            >
+              <BarChart3 className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -479,9 +584,6 @@ export function AtendimentoClient() {
                 placeholder="Pesquise por nome ou telefone..."
                 className="w-full !bg-white rounded-xl border border-[var(--app-border)] pl-10 pr-4 py-2.5 text-[14px] text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
               />
-            </div>
-            <div className="mt-2 text-[12px] text-[var(--app-text-55)]">
-              {loading ? "Carregando..." : `${filteredLeads.length} ${filteredLeads.length === 1 ? "interessado" : "interessados"}`}
             </div>
           </div>
 
@@ -1398,6 +1500,9 @@ export function AtendimentoClient() {
 
       {/* Modal Criar Lead (placeholder para próxima etapa) */}
       {renderCreateLeadModal()}
+
+      {/* MODAL MÉTRICAS: Resumo dos interessados (clicou no ícone BarChart3 no header) */}
+      {renderMetricsModal()}
     </div>
   );
 }
