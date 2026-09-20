@@ -661,7 +661,7 @@ export function AtendimentoClient() {
                 required
                 value={createLeadPhone}
                 onChange={(e) => setCreateLeadPhone(applyPhoneMask(e.target.value))}
-                placeholder="Ex: +55 (65) 9 9693-3336"
+                placeholder="99 9 9999 9999"
                 disabled={createLeadSaving}
                 className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
