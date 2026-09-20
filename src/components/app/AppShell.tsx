@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   BarChart3,
@@ -610,16 +611,16 @@ export function AppShell({
           className={[
             "flex w-full flex-col",
             drawerOnlyNav
-              ? "pl-[112px] min-h-0 overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
+              ? "pr-[112px] min-h-0 overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
               : "pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
           {drawerOnlyNav ? (
-            // NAVIGATION RAIL (lado esquerdo fixo) — estilo imagem referencia
+            // NAVIGATION RAIL (lado direito fixo!) — estilo imagem referencia
             <aside
               aria-label="Navegação principal"
               className={[
-                "fixed left-4 top-4 bottom-4 z-[250]",
+                "fixed right-4 top-4 bottom-4 z-[250]",
                 "w-20",
                 "flex flex-col items-center gap-3 p-3",
                 "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none",
@@ -669,7 +670,7 @@ export function AppShell({
                 </button>
               </div>
 
-              {/* 2) Botão Expandir / Abrir Drawer completo (seta direita grande, destaque accent) */}
+              {/* 2) Botão Expandir / Abrir Drawer completo (seta ESQUERDA grande, destaque accent) */}
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
@@ -682,7 +683,7 @@ export function AppShell({
                   "hover:bg-[rgba(234,88,12,0.22)] active:scale-95",
                 ].join(" ")}
               >
-                <ArrowRight className="h-5 w-5" strokeWidth={2.5} />
+                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
               </button>
 
               {/* 3) Separador */}
