@@ -1414,7 +1414,7 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         {/* AVISO: Section SÓ é visível em DESKTOP (min-[1201px])! Em telas menores (mobile), */}
         {/* o usuário clica no item da lista → ABRE MODAL (abaixo, AppMobileLeadDetailModal) */}
-        <section className="hidden min-[1201px]:flex h-auto w-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none mb-4 min-[1201px]:mb-0">
+        <section className="hidden min-[1201px]:flex h-auto w-full min-h-0 min-w-0 flex-1 flex-col overflow-visible min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none mb-4 min-[1201px]:mb-0">
           {(() => {
             if (!selectedLead) {
               return (
@@ -1856,7 +1856,7 @@ export function AtendimentoClient() {
           const statusMeta = buildRecurringMetaForVisaoGeral(sl);
           const expMeta = buildExperimentalMetaForList(sl);
           return (
-            <div className="flex h-full max-h-full w-full flex-col gap-0 overflow-hidden">
+            <div className="flex w-full flex-col gap-0">
               {/* HEADER DO LEAD — MODAL MOBILE */}
               <div className="flex shrink-0 items-start justify-between gap-4 pt-1">
                 <div className="flex items-start gap-4 min-w-0">
