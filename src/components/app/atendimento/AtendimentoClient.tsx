@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronRight, Copy, ExternalLink, MoreVertical, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, UserRound, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronRight, Copy, ExternalLink, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
 import { STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
@@ -514,6 +514,35 @@ export function AtendimentoClient() {
       modalToast.error(e instanceof Error ? e.message : "Falha ao salvar observações.");
     } finally {
       setObservacoesSaving(false);
+    }
+  }
+
+  const [deletingSelectedLoading, setDeletingSelectedLoading] = useState(false);
+  async function handleDeleteSelected() {
+    if (!selectedLead || deletingSelectedLoading) return;
+    const sl = selectedLead;
+    const name = String(sl.full_name ?? "").trim() || "Registro sem nome";
+    const phone = String(sl.phone ?? "").trim() || "Sem telefone";
+    if (!window.confirm(`Excluir Registro?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
+      return;
+    }
+    try {
+      setDeletingSelectedLoading(true);
+      const response = await fetch(`/api/atendimento/leads/${sl.id}`, { method: "DELETE" });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao excluir registro.");
+        return;
+      }
+      setPanelLeads((current) => current.filter((item) => item.id !== sl.id));
+      setSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
+      setSelectedLeadId(null);
+      setShowMobileLeadModal(false);
+      modalToast.success("Registro excluído com sucesso.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao excluir registro.");
+    } finally {
+      setDeletingSelectedLoading(false);
     }
   }
 
@@ -1476,10 +1505,13 @@ export function AtendimentoClient() {
                     </button>
                     <button
                       type="button"
-                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
-                      aria-label="Mais opções"
+                      onClick={() => void handleDeleteSelected()}
+                      disabled={deletingSelectedLoading}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-red-500/40 bg-red-600 px-4 text-[13px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                      aria-label="Excluir"
                     >
-                      <MoreVertical className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
+                      Excluir
                     </button>
                   </div>
                 </div>
@@ -1895,11 +1927,13 @@ export function AtendimentoClient() {
                   </button>
                   <button
                     type="button"
-                    aria-label="Mais opções"
-                    onClick={() => setShowMobileLeadModal(false)}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                    onClick={() => void handleDeleteSelected()}
+                    disabled={deletingSelectedLoading}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-red-500/40 bg-red-600 px-4 text-[13px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                    aria-label="Excluir"
                   >
-                    <MoreVertical className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
+                    Excluir
                   </button>
                 </div>
               </div>
