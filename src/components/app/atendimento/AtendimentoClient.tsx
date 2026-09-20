@@ -1125,7 +1125,10 @@ export function AtendimentoClient() {
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
               <button
                 type="button"
-                onClick={() => setDraftFilters(EMPTY_FILTERS)}
+                onClick={() => {
+                  setDraftFilters(EMPTY_FILTERS);
+                  setActiveFilters(EMPTY_FILTERS);
+                }}
                 className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
               >
                 Limpar filtros
