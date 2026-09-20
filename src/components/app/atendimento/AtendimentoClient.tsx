@@ -753,6 +753,28 @@ export function AtendimentoClient() {
 
   function renderFiltersModal() {
     // Opcoes dinâmicas a partir dos leads carregados
+    // OPCOES ESSENCIAIS (ENXUGADAS): remove duplicadas/repetidas/menos usadas
+    // STATUS: foco em status do processo de matricula (pagamento, contrato, aluno, encerrado, etc)
+    const STATUS_ALLOWLIST = new Set([
+      "novo_lead",
+      "em_atendimento",
+      "matricula_pendente",
+      "contrato_aguardando_aceite",
+      "contrato_assinado",
+      "pagamento_pendente_confirmacao",
+      "pagamento_nao_realizado",
+      "matricula_confirmada",
+      "matriculado",
+      "aluno",
+      "encerrado",
+    ]);
+    // ETAPA DO FUNIL: foco no caminho do aluno (convidado → agendada → pré-cadastro etc); REMOVIDOS que ja aparecem em STATUS acima
+    const STAGE_ALLOWLIST = new Set([
+      "aula_experimental_convidada",
+      "aula_experimental_agendada",
+      "pre_cadastro_concluido",
+      "metodologia_apresentada",
+    ]);
     const countryOptions = Array.from(
       new Set(panelLeads.map((l) => String(l.country ?? "").trim()).filter(Boolean)),
     ).sort();
@@ -760,10 +782,10 @@ export function AtendimentoClient() {
       new Set(panelLeads.map((l) => String(l.state ?? "").trim()).filter(Boolean)),
     ).sort();
     const statusOptions = Object.entries(STATUS_LABELS)
-      .filter(([id, label]) => Boolean(id) && Boolean(String(label ?? "").trim()))
+      .filter(([id, label]) => STATUS_ALLOWLIST.has(id) && Boolean(id) && Boolean(String(label ?? "").trim()))
       .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR"));
     const stageOptions = Object.entries(STAGE_LABELS)
-      .filter(([id, label]) => Boolean(id) && Boolean(String(label ?? "").trim()))
+      .filter(([id, label]) => STAGE_ALLOWLIST.has(id) && Boolean(id) && Boolean(String(label ?? "").trim()))
       .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR"));
 
     const toggle = (key: keyof LeadFilters, value: string) => {
@@ -917,7 +939,6 @@ export function AtendimentoClient() {
                   [
                     ["onlyWithUnread", "Apenas com mensagens não lidas"],
                     ["onlyWithPhone", "Apenas com telefone cadastrado"],
-                    ["onlyWithEmail", "Apenas com e-mail cadastrado"],
                     ["onlyWithScheduledClass", "Apenas com aula experimental agendada"],
                     ["onlyWithContract", "Apenas com contrato iniciado"],
                   ] as Array<[keyof LeadFilters, string]>
