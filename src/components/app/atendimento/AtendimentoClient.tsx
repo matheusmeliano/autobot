@@ -531,7 +531,7 @@ export function AtendimentoClient() {
   function handleOpenEditSelected() {
     if (!selectedLead) return;
     setEditLeadName(String(selectedLead.full_name ?? "").trim());
-    setEditLeadPhone(String(selectedLead.phone ?? "").trim());
+    setEditLeadPhone(applyPhoneMask(String(selectedLead.phone ?? "").trim()));
     setEditLeadOpen(true);
   }
 
