@@ -547,7 +547,7 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         {/* COLUNA DIREITA: Detalhe do Lead selecionado */}
         {/* ========================================================= */}
-        <section className="flex h-auto w-full min-h-0 min-w-0 flex-1 flex-col overflow-visible min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+        <section className="flex h-auto w-full min-h-0 min-w-0 flex-1 flex-col overflow-visible min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none mb-4 min-[1201px]:mb-0">
           {!selectedLead ? (
             <div className="flex min-h-[420px] w-full items-center justify-center min-[1201px]:h-full">
               <div className="text-center px-6 max-w-md">
