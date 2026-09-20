@@ -250,6 +250,7 @@ export function AtendimentoClient() {
   const realtimeSubscribedRef = useRef(false);
   const initialLoadCompletedRef = useRef(false);
   const suppressAutoSelectUntilRef = useRef<number>(0);
+  const explicitSelectLockRef = useRef<boolean>(false);
 
   // Detecta viewport <1201px (tamanho MOBILE para layout atendimento)
   useEffect(() => {
@@ -327,6 +328,9 @@ export function AtendimentoClient() {
   }, [panelLeads, searchQuery, activeFilters]);
 
   useEffect(() => {
+    if (explicitSelectLockRef.current) {
+      return;
+    }
     if (Date.now() < suppressAutoSelectUntilRef.current) {
       return;
     }
@@ -539,6 +543,7 @@ export function AtendimentoClient() {
         return;
       }
       suppressAutoSelectUntilRef.current = Date.now() + 10000;
+      explicitSelectLockRef.current = true;
       setPanelLeads((current) => current.filter((item) => item.id !== sl.id));
       setSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
       setSelectedLeadId(null);
@@ -1383,6 +1388,8 @@ export function AtendimentoClient() {
                       key={lead.id}
                       type="button"
                       onClick={() => {
+                        explicitSelectLockRef.current = false;
+                        suppressAutoSelectUntilRef.current = 0;
                         setSelectedLeadId(lead.id);
                         // Em telas menores, clicar em registro ABRE MODAL de detalhe
                         if (isMobileViewport) setShowMobileLeadModal(true);
