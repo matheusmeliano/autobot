@@ -221,7 +221,7 @@ export function AppDateRangePicker({
       role="dialog"
       aria-label="Selecionar período"
     >
-        {/* Header: mês/ano + setas */}
+        {/* Header: mês/ano + setas + X fechar */}
         <div className="flex items-center justify-between gap-2 pb-3">
           <button
             type="button"
@@ -234,14 +234,24 @@ export function AppDateRangePicker({
           <div className="flex-1 text-center text-[14px] font-bold text-[var(--app-text-85)] tracking-tight">
             {format(viewDate, "MMMM 'de' yyyy", { locale: ptBR })}
           </div>
-          <button
-            type="button"
-            onClick={() => setViewDate((v) => addMonths(v, 1))}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
-            aria-label="Próximo mês"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setViewDate((v) => addMonths(v, 1))}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+              aria-label="Próximo mês"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Header dias semana */}
