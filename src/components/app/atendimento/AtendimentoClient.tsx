@@ -84,7 +84,7 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !expDraftDate) {
     return { label: "Falta dia e horário", tone: "warning" };
   }
-  return { label: "Novo interessado", tone: "default" };
+  return { label: "Novo registro", tone: "default" };
 }
 
 function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title: string; body: string; tone: "warning" | "success" | "default" } | null {
@@ -159,7 +159,6 @@ export function AtendimentoClient() {
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
   const [createLeadPhone, setCreateLeadPhone] = useState("");
   const [createLeadName, setCreateLeadName] = useState("");
-  const [createLeadEmail, setCreateLeadEmail] = useState("");
   const [createLeadSaving, setCreateLeadSaving] = useState(false);
   const [observacoesDraft, setObservacoesDraft] = useState<string>("");
   const [observacoesSaving, setObservacoesSaving] = useState(false);
@@ -511,7 +510,6 @@ export function AtendimentoClient() {
     function resetForm() {
       setCreateLeadPhone("");
       setCreateLeadName("");
-      setCreateLeadEmail("");
       setCreateLeadSaving(false);
     }
     async function handleSubmit(e: React.FormEvent) {
@@ -519,7 +517,7 @@ export function AtendimentoClient() {
       if (createLeadSaving) return;
       const phone = String(createLeadPhone ?? "").trim();
       if (!phone) {
-        modalToast.error("Informe o telefone do interessado.");
+        modalToast.error("Informe o telefone do registro.");
         return;
       }
       setCreateLeadSaving(true);
@@ -530,7 +528,6 @@ export function AtendimentoClient() {
           body: JSON.stringify({
             phone,
             full_name: String(createLeadName ?? "").trim() || null,
-            email: String(createLeadEmail ?? "").trim() || null,
           }),
         });
         if (handleForbiddenResponse(res)) return;
@@ -544,7 +541,7 @@ export function AtendimentoClient() {
           }
           return;
         }
-        modalToast.success("Interessado cadastrado com sucesso.");
+        modalToast.success("Registro cadastrado com sucesso.");
         setCreateLeadOpen(false);
         resetForm();
         await Promise.all([loadSummary({ silent: true }), loadPanelLeads()]);
@@ -581,7 +578,7 @@ export function AtendimentoClient() {
               </div>
               <div className="min-w-0">
                 <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
-                  Novo interessado
+                  Novo registro
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
                   Cadastre um número para iniciar o atendimento
@@ -633,18 +630,6 @@ export function AtendimentoClient() {
                 className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
-
-            <div>
-              <label className="text-xs font-semibold text-[var(--app-text-60)]">E-mail</label>
-              <input
-                type="email"
-                value={createLeadEmail}
-                onChange={(e) => setCreateLeadEmail(e.target.value)}
-                placeholder="email@exemplo.com (opcional)"
-                disabled={createLeadSaving}
-                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
           </div>
 
           <div className="mt-5 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -664,7 +649,7 @@ export function AtendimentoClient() {
               disabled={createLeadSaving || !String(createLeadPhone ?? "").trim()}
               className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {createLeadSaving ? "Cadastrando…" : "Cadastrar interessado"}
+              {createLeadSaving ? "Cadastrando…" : "Cadastrar registro"}
             </button>
           </div>
         </form>
@@ -674,8 +659,8 @@ export function AtendimentoClient() {
 
   function renderMetricsModal() {
     const items: Array<{ label: string; value: number; icon: React.ReactNode; tone: "default" | "success" | "warning" | "info" | "danger" }> = [
-      { label: "Total de interessados", value: summary.totalLeads, icon: <UserRound className="h-5 w-5" />, tone: "default" },
-      { label: "Novos interessados", value: summary.novosLeads, icon: <UserRound className="h-5 w-5" />, tone: "info" },
+      { label: "Total de registros", value: summary.totalLeads, icon: <UserRound className="h-5 w-5" />, tone: "default" },
+      { label: "Novos registros", value: summary.novosLeads, icon: <UserRound className="h-5 w-5" />, tone: "info" },
       { label: "Em atendimento", value: summary.emAtendimento, icon: <Bot className="h-5 w-5" />, tone: "warning" },
       { label: "Aulas experimentais agendadas", value: summary.aulasExperimentaisAgendadas, icon: <CalendarIcon className="h-5 w-5" />, tone: "success" },
       { label: "Matrículas pendentes", value: summary.matriculasPendentes, icon: <ExternalLink className="h-5 w-5" />, tone: "warning" },
@@ -702,7 +687,7 @@ export function AtendimentoClient() {
                   Métricas e resumo
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Visão geral dos interessados e do funil
+                  Visão geral dos registros e do funil
                 </div>
               </div>
             </div>
@@ -850,7 +835,7 @@ export function AtendimentoClient() {
                   Filtros avançados
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Filtre a lista de interessados por status, etapa, localização e mais
+                  Filtre a lista de registros por status, etapa, localização e mais
                 </div>
               </div>
             </div>
@@ -1119,7 +1104,7 @@ export function AtendimentoClient() {
           <div className="mt-4 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-[12px] text-[var(--app-text-55)]">
               Resultado filtrado: <strong className="text-[var(--app-text-85)]">{filteredLeads.length}</strong>{" "}
-              {filteredLeads.length === 1 ? "interessado" : "interessados"}
+              {filteredLeads.length === 1 ? "registro" : "registros"}
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
               <button
@@ -1150,7 +1135,7 @@ export function AtendimentoClient() {
     <div className="flex h-auto w-full min-h-full min-h-0 min-w-0 flex-col gap-4 overflow-visible min-[1201px]:h-full min-[1201px]:overflow-hidden">
       <div className="flex min-h-0 min-w-0 h-auto w-full min-h-full flex-col gap-4 min-[1201px]:flex-row min-[1201px]:h-full min-[1201px]:overflow-hidden overflow-visible">
         {/* ========================================================= */}
-        {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
+        {/* COLUNA ESQUERDA: Lista de Registros (sidebar fixa) */}
         {/* ========================================================= */}
         <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Métricas | Adicionar | Bot Experimental */}
@@ -1168,7 +1153,7 @@ export function AtendimentoClient() {
             <button
               type="button"
               onClick={() => setShowMetricsModal(true)}
-              aria-label="Métricas e resumo de interessados"
+              aria-label="Métricas e resumo de registros"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
               <BarChart3 className="h-4 w-4" />
@@ -1177,7 +1162,7 @@ export function AtendimentoClient() {
               type="button"
               onClick={() => setCreateLeadOpen(true)}
               disabled={loading}
-              aria-label="Adicionar interessado"
+              aria-label="Adicionar registro"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
               <Plus className="h-4 w-4" />
@@ -1189,7 +1174,7 @@ export function AtendimentoClient() {
                 setDraftFilters(activeFilters);
                 setShowFiltersModal(true);
               }}
-              aria-label="Filtros avançados de interessados"
+              aria-label="Filtros avançados de registros"
               className={[
                 "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all shadow-none",
                 Object.values(activeFilters).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v))
@@ -1230,11 +1215,11 @@ export function AtendimentoClient() {
             <div className="flex flex-col divide-y divide-[var(--app-border)]">
               {loading ? (
                 <div className="px-5 py-10 text-center text-[13px] text-[var(--app-text-55)]">
-                  Carregando interessados...
+                  Carregando registros...
                 </div>
               ) : filteredLeads.length === 0 ? (
                 <div className="px-5 py-10 text-center text-[13px] text-[var(--app-text-55)]">
-                  {searchQuery.trim() ? "Nenhum interessado encontrado na busca." : "Nenhum interessado ainda."}
+                  {searchQuery.trim() ? "Nenhum registro encontrado na busca." : "Nenhum registro ainda."}
                 </div>
               ) : (
                 filteredLeads.map((lead) => {
@@ -1246,7 +1231,7 @@ export function AtendimentoClient() {
                       type="button"
                       onClick={() => {
                         setSelectedLeadId(lead.id);
-                        // Em telas menores, clicar em interessado ABRE MODAL de detalhe
+                        // Em telas menores, clicar em registro ABRE MODAL de detalhe
                         if (isMobileViewport) setShowMobileLeadModal(true);
                       }}
                       className={[
@@ -1320,10 +1305,10 @@ export function AtendimentoClient() {
                       <UserRound className="h-6 w-6 text-[#9a3412]" />
                     </div>
                     <h3 className="mt-4 text-lg font-bold text-[var(--app-text-85)]">
-                      Selecione um interessado
+                      Selecione um registro
                     </h3>
                     <p className="mt-2 text-[13px] text-[var(--app-text-60)]">
-                      Clique em qualquer interessado ao lado para ver os detalhes, agendamentos, link de matrícula e mais.
+                      Clique em qualquer registro ao lado para ver os detalhes, agendamentos, link de matrícula e mais.
                     </p>
                   </div>
                 </div>
@@ -1568,7 +1553,7 @@ export function AtendimentoClient() {
                                   {expMeta.label}
                                 </div>
                                 <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                  Horário confirmado para o interessado.
+                                  Horário confirmado para o registro.
                                 </div>
                               </div>
                             </div>
@@ -1593,7 +1578,7 @@ export function AtendimentoClient() {
                                   Nenhuma aula agendada
                                 </div>
                                 <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
-                                  Este interessado ainda não possui aulas agendadas.
+                                  Este registro ainda não possui aulas agendadas.
                                 </div>
                               </div>
                             </div>
@@ -1627,7 +1612,7 @@ export function AtendimentoClient() {
                             {buildExperimentalMetaForList(sl).label}
                           </div>
                           <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                            Horário definido com o interessado.
+                            Horário definido com o registro.
                           </div>
                         </div>
                       </div>
@@ -1672,7 +1657,7 @@ export function AtendimentoClient() {
                   {activeTab === "historico" ? (
                     <div className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 text-center shadow-none">
                       <div className="text-[13px] text-[var(--app-text-60)]">
-                        Histórico de eventos e interações do interessado — em integração.
+                        Histórico de eventos e interações do registro — em integração.
                       </div>
                     </div>
                   ) : null}
@@ -1693,7 +1678,7 @@ export function AtendimentoClient() {
                           value={observacoesDraft}
                           onChange={(e) => setObservacoesDraft(e.target.value)}
                           rows={10}
-                          placeholder="Adicione anotações sobre esse interessado (só visíveis para o atendimento)..."
+                          placeholder="Adicione anotações sobre esse registro (só visíveis para o atendimento)..."
                           className="mt-4 min-h-[160px] w-full rounded-xl border border-[var(--app-border)] !bg-[var(--app-solid-surface-2)] px-4 py-3 text-[14px] font-medium leading-relaxed text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none resize-none"
                         />
                         <div className="mt-4 flex justify-end">
@@ -1718,7 +1703,7 @@ export function AtendimentoClient() {
       </div>
 
       {/* =========================================================================
-          MODAL MOBILE: Detalhe do interessado (abre ao clicar em item da lista!)
+          MODAL MOBILE: Detalhe do registro (abre ao clicar em item da lista!)
           Desktop (≥1201px): NUNCA ABRE (section esta visivel do lado esquerdo!)
           ========================================================================= */}
       <AppModal
@@ -1739,10 +1724,10 @@ export function AtendimentoClient() {
                     <UserRound className="h-6 w-6 text-[#9a3412]" />
                   </div>
                   <h3 className="mt-4 text-lg font-bold text-[var(--app-text-85)]">
-                    Selecione um interessado
+                    Selecione um registro
                   </h3>
                   <p className="mt-2 text-[13px] text-[var(--app-text-60)]">
-                    Clique em qualquer interessado na lista para ver os detalhes, agendamentos, link de matrícula e mais.
+                    Clique em qualquer registro na lista para ver os detalhes, agendamentos, link de matrícula e mais.
                   </p>
                 </div>
               </div>
@@ -1988,7 +1973,7 @@ export function AtendimentoClient() {
                                 {expMeta.label}
                               </div>
                               <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                Horário confirmado para o interessado.
+                                Horário confirmado para o registro.
                               </div>
                             </div>
                           </div>
@@ -2013,7 +1998,7 @@ export function AtendimentoClient() {
                                 Nenhuma aula agendada
                               </div>
                               <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
-                                Este interessado ainda não possui aulas agendadas.
+                                Este registro ainda não possui aulas agendadas.
                               </div>
                             </div>
                           </div>
@@ -2047,7 +2032,7 @@ export function AtendimentoClient() {
                           {buildExperimentalMetaForList(sl).label}
                         </div>
                         <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                          Horário definido com o interessado.
+                          Horário definido com o registro.
                         </div>
                       </div>
                     </div>
@@ -2092,7 +2077,7 @@ export function AtendimentoClient() {
                 {activeTab === "historico" ? (
                   <div className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 text-center shadow-none">
                     <div className="text-[13px] text-[var(--app-text-60)]">
-                      Histórico de eventos e interações do interessado — em integração.
+                      Histórico de eventos e interações do registro — em integração.
                     </div>
                   </div>
                 ) : null}
@@ -2113,7 +2098,7 @@ export function AtendimentoClient() {
                         value={observacoesDraft}
                         onChange={(e) => setObservacoesDraft(e.target.value)}
                         rows={10}
-                        placeholder="Adicione anotações sobre esse interessado (só visíveis para o atendimento)..."
+                        placeholder="Adicione anotações sobre esse registro (só visíveis para o atendimento)..."
                         className="mt-4 min-h-[160px] w-full rounded-xl border border-[var(--app-border)] !bg-[var(--app-solid-surface-2)] px-4 py-3 text-[14px] font-medium leading-relaxed text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none resize-none"
                       />
                       <div className="mt-4 flex justify-end">
@@ -2139,7 +2124,7 @@ export function AtendimentoClient() {
       {/* Modal Criar Lead (placeholder para próxima etapa) */}
       {renderCreateLeadModal()}
 
-      {/* MODAL MÉTRICAS: Resumo dos interessados (clicou no ícone BarChart3 no header) */}
+      {/* MODAL MÉTRICAS: Resumo dos registros (clicou no ícone BarChart3 no header) */}
       {renderMetricsModal()}
 
       {/* MODAL FILTROS AVANCADOS: Clicou no ícone SlidersHorizontal (ao lado ESQUERDO do Bot!) */}
