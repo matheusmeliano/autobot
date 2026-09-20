@@ -157,6 +157,10 @@ export function AtendimentoClient() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeTab, setActiveTab] = useState<LeadDetailsTab>("visao_geral");
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
+  const [createLeadPhone, setCreateLeadPhone] = useState("");
+  const [createLeadName, setCreateLeadName] = useState("");
+  const [createLeadEmail, setCreateLeadEmail] = useState("");
+  const [createLeadSaving, setCreateLeadSaving] = useState(false);
   const [observacoesDraft, setObservacoesDraft] = useState<string>("");
   const [observacoesSaving, setObservacoesSaving] = useState(false);
   const [showMobileLeadModal, setShowMobileLeadModal] = useState(false);
@@ -504,7 +508,168 @@ export function AtendimentoClient() {
   }, [loadPanelLeads, loadSummary]);
 
   function renderCreateLeadModal() {
-    return null;
+    function resetForm() {
+      setCreateLeadPhone("");
+      setCreateLeadName("");
+      setCreateLeadEmail("");
+      setCreateLeadSaving(false);
+    }
+    async function handleSubmit(e: React.FormEvent) {
+      e.preventDefault();
+      if (createLeadSaving) return;
+      const phone = String(createLeadPhone ?? "").trim();
+      if (!phone) {
+        modalToast.error("Informe o telefone do interessado.");
+        return;
+      }
+      setCreateLeadSaving(true);
+      try {
+        const res = await fetch("/api/atendimento/leads/criar-manual", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone,
+            full_name: String(createLeadName ?? "").trim() || null,
+            email: String(createLeadEmail ?? "").trim() || null,
+          }),
+        });
+        if (handleForbiddenResponse(res)) return;
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.ok) {
+          const msg = json?.error ?? "Não foi possível cadastrar.";
+          if (res.status === 409) {
+            modalToast.error(msg);
+          } else {
+            modalToast.error(msg);
+          }
+          return;
+        }
+        modalToast.success("Interessado cadastrado com sucesso.");
+        setCreateLeadOpen(false);
+        resetForm();
+        await Promise.all([loadSummary({ silent: true }), loadPanelLeads()]);
+        if (json?.lead?.id) {
+          setSelectedLeadId(String(json.lead.id));
+          if (isMobileViewport) setShowMobileLeadModal(true);
+        }
+      } catch (e) {
+        modalToast.error(e instanceof Error ? e.message : "Falha ao cadastrar.");
+      } finally {
+        setCreateLeadSaving(false);
+      }
+    }
+
+    return (
+      <AppModal
+        open={createLeadOpen}
+        onClose={() => {
+          setCreateLeadOpen(false);
+          resetForm();
+        }}
+        size="md"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+        closeOnBackdrop={!createLeadSaving}
+        closeOnEscape={!createLeadSaving}
+      >
+        <form className="flex w-full flex-col gap-0" onSubmit={handleSubmit}>
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <Plus className="h-5 w-5 text-[#9a3412]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Novo interessado
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Cadastre um número para iniciar o atendimento
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={createLeadSaving}
+              onClick={() => {
+                setCreateLeadOpen(false);
+                resetForm();
+              }}
+              aria-label="Fechar"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3">
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">
+                Telefone <span className="text-[#ea580c]">*</span>
+              </label>
+              <input
+                type="tel"
+                autoFocus
+                required
+                value={createLeadPhone}
+                onChange={(e) => setCreateLeadPhone(e.target.value)}
+                placeholder="Ex: 5565998511422 (com DDD e país)"
+                disabled={createLeadSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
+                Preencha com código do país + DDD + número. Ex: 5511999991111
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">Nome</label>
+              <input
+                type="text"
+                value={createLeadName}
+                onChange={(e) => setCreateLeadName(e.target.value)}
+                placeholder="Nome completo (opcional)"
+                disabled={createLeadSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">E-mail</label>
+              <input
+                type="email"
+                value={createLeadEmail}
+                onChange={(e) => setCreateLeadEmail(e.target.value)}
+                placeholder="email@exemplo.com (opcional)"
+                disabled={createLeadSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setCreateLeadOpen(false);
+                resetForm();
+              }}
+              disabled={createLeadSaving}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={createLeadSaving || !String(createLeadPhone ?? "").trim()}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {createLeadSaving ? "Cadastrando…" : "Cadastrar interessado"}
+            </button>
+          </div>
+        </form>
+      </AppModal>
+    );
   }
 
   function renderMetricsModal() {
