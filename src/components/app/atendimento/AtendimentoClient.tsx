@@ -1398,7 +1398,7 @@ export function AtendimentoClient() {
                       </h2>
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
                         <span className="text-[14px] font-semibold text-[var(--app-text-80)]">
-                          📞 {sl.phone?.trim() || "Sem telefone"}
+                          📞 {sl.phone?.trim() ? applyPhoneMask(sl.phone) : "Sem telefone"}
                         </span>
                         <button
                           type="button"
