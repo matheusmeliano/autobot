@@ -418,7 +418,7 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         <aside className="flex min-h-0 min-w-0 w-full shrink-0 min-[1201px]:w-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Adicionar | Bot Experimental */}
-          <div className="flex items-center justify-end gap-2 px-5 pt-5">
+          <div className="flex items-center justify-end gap-2 px-6 pt-6">
             <button
               type="button"
               onClick={() => void handleRefresh()}
@@ -450,7 +450,7 @@ export function AtendimentoClient() {
           </div>
 
           {/* Busca */}
-          <div className="mt-4 px-5">
+          <div className="mt-4 px-6">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--app-text-45)]" />
               <input
@@ -489,7 +489,7 @@ export function AtendimentoClient() {
                         setSelectedLeadId(lead.id);
                       }}
                       className={[
-                        "group flex w-full items-start gap-3 px-5 py-4 text-left transition-colors",
+                        "group flex w-full items-start gap-3 px-6 py-4 text-left transition-colors",
                         isSelected
                           ? "bg-[rgba(234,88,12,0.14)]"
                           : "hover:bg-[var(--app-hover)]",
