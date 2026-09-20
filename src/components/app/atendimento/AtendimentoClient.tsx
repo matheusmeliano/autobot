@@ -1053,7 +1053,7 @@ export function AtendimentoClient() {
                       ...p,
                       createdFrom: next.from ?? "",
                       createdTo: next.to ?? "",
-                    })) as LeadFilters;
+                    }));
                   }}
                   showLabel={false}
                 />
