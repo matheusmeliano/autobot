@@ -621,7 +621,7 @@ export function AppShell({
                 "fixed right-4 top-[21.5px] bottom-[21.5px] z-[300]",
                 "w-20",
                 "flex flex-col items-center gap-3 p-3",
-                "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none",
+                "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none overflow-hidden",
               ].join(" ")}
             >
               {/* 1) Avatar topo */}
