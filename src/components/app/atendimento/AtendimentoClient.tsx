@@ -221,54 +221,56 @@ export function AtendimentoClient() {
     return panelLeads.find((l) => l.id === selectedLeadId) ?? null;
   }, [panelLeads, selectedLeadId]);
 
+  const applyFiltersToLeads = (
+    leads: AtendimentoLeadListItem[],
+    f: LeadFilters,
+  ): AtendimentoLeadListItem[] => {
+    const hasAnyFilter = Object.values(f).some((v) =>
+      Array.isArray(v) ? v.length > 0 : Boolean(v),
+    );
+    if (!hasAnyFilter) return leads;
+    return leads.filter((l) => {
+      if (f.statusList.length > 0 && !f.statusList.includes(String(l.status ?? ""))) return false;
+      if (f.stageList.length > 0 && !f.stageList.includes(String(l.funnel_stage ?? ""))) return false;
+      if (f.countries.length > 0 && !f.countries.includes(String(l.country ?? "").trim())) return false;
+      if (f.states.length > 0 && !f.states.includes(String(l.state ?? "").trim())) return false;
+      if (f.onlyWithUnread && Number(l.unread_count ?? 0) <= 0) return false;
+      if (f.onlyWithPhone && !String(l.phone ?? "").trim()) return false;
+      if (f.onlyWithEmail && !String(l.email ?? "").trim()) return false;
+      if (f.onlyWithScheduledClass) {
+        const hasBooking = Boolean(
+          l.future_experimental_class_booking ??
+            l.latest_experimental_class_booking ??
+            l.experimental_class_booking,
+        );
+        if (!hasBooking) return false;
+      }
+      if (f.onlyWithContract) {
+        const hasContract = Boolean(l.contract_status ?? l.contract_signed_at ?? l.contract_pdf_url);
+        if (!hasContract) return false;
+      }
+      if (f.createdFrom) {
+        const fromMs = new Date(`${f.createdFrom}T00:00:00`).getTime();
+        const leadMs = new Date(String(l.created_at ?? "")).getTime();
+        if (!Number.isNaN(fromMs) && leadMs < fromMs) return false;
+      }
+      if (f.createdTo) {
+        const toMs = new Date(`${f.createdTo}T23:59:59`).getTime();
+        const leadMs = new Date(String(l.created_at ?? "")).getTime();
+        if (!Number.isNaN(toMs) && leadMs > toMs) return false;
+      }
+      return true;
+    });
+  };
+
+  // Contagem AO VIVO do rodapé do modal de filtros (baseado em DRAFT filters, NÃO os aplicados!)
+  const liveFilteredCount = useMemo<number>(() => {
+    return applyFiltersToLeads(panelLeads, draftFilters).length;
+  }, [panelLeads, draftFilters]);
+
   const filteredLeads = useMemo<AtendimentoLeadListItem[]>(() => {
     const q = searchQuery.trim().toLowerCase();
-    let out = panelLeads;
-    // Aplicar filtros avançados (se houver)
-    const f = activeFilters;
-    const hasAnyFilter = Object.values(f).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v));
-    if (hasAnyFilter) {
-      out = out.filter((l) => {
-        // Status
-        if (f.statusList.length > 0 && !f.statusList.includes(String(l.status ?? ""))) return false;
-        // Etapa (funnel_stage)
-        if (f.stageList.length > 0 && !f.stageList.includes(String(l.funnel_stage ?? ""))) return false;
-        // País
-        if (f.countries.length > 0 && !f.countries.includes(String(l.country ?? "").trim())) return false;
-        // Estado
-        if (f.states.length > 0 && !f.states.includes(String(l.state ?? "").trim())) return false;
-        // Apenas com não lidas
-        if (f.onlyWithUnread && Number(l.unread_count ?? 0) <= 0) return false;
-        // Apenas com telefone
-        if (f.onlyWithPhone && !String(l.phone ?? "").trim()) return false;
-        // Apenas com email
-        if (f.onlyWithEmail && !String(l.email ?? "").trim()) return false;
-        // Apenas com aula experimental agendada
-        if (f.onlyWithScheduledClass) {
-          const hasBooking = Boolean(l.future_experimental_class_booking ?? l.latest_experimental_class_booking ?? l.experimental_class_booking);
-          if (!hasBooking) return false;
-        }
-        // Apenas com contrato (qualquer status nao nulo)
-        if (f.onlyWithContract) {
-          const hasContract = Boolean(l.contract_status ?? l.contract_signed_at ?? l.contract_pdf_url);
-          if (!hasContract) return false;
-        }
-        // Data criacao DE
-        if (f.createdFrom) {
-          const fromMs = new Date(`${f.createdFrom}T00:00:00`).getTime();
-          const leadMs = new Date(String(l.created_at ?? "")).getTime();
-          if (!Number.isNaN(fromMs) && leadMs < fromMs) return false;
-        }
-        // Data criacao ATE
-        if (f.createdTo) {
-          const toMs = new Date(`${f.createdTo}T23:59:59`).getTime();
-          const leadMs = new Date(String(l.created_at ?? "")).getTime();
-          if (!Number.isNaN(toMs) && leadMs > toMs) return false;
-        }
-        return true;
-      });
-    }
-    // Busca textual (aplicada DEPOIS dos filtros
+    let out = applyFiltersToLeads(panelLeads, activeFilters);
     if (!q) return out;
     return out.filter((l) => leadMatchesSearchQuery(l, q));
   }, [panelLeads, searchQuery, activeFilters]);
@@ -1117,8 +1119,8 @@ export function AtendimentoClient() {
           {/* Rodapé ações */}
           <div className="mt-4 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-[12px] text-[var(--app-text-55)]">
-              Resultado filtrado: <strong className="text-[var(--app-text-85)]">{filteredLeads.length}</strong>{" "}
-              {filteredLeads.length === 1 ? "registro" : "registros"}
+              Resultado filtrado: <strong className="text-[var(--app-text-85)]">{liveFilteredCount}</strong>{" "}
+              {liveFilteredCount === 1 ? "registro" : "registros"}
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
               <button
