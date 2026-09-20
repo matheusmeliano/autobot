@@ -1244,12 +1244,12 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-auto w-full min-h-full min-h-0 min-w-0 flex-col gap-4 overflow-visible min-[1201px]:h-full min-[1201px]:overflow-hidden">
-      <div className="flex min-h-0 min-w-0 h-auto w-full min-h-full flex-col gap-4 min-[1201px]:flex-row min-[1201px]:h-full min-[1201px]:overflow-hidden overflow-visible">
+    <div className="flex h-auto w-full min-h-full min-h-0 min-w-0 flex-col gap-4 overflow-visible min-[1201px]:h-full min-[1201px]:overflow-hidden max-[1200px]:h-[calc(100dvh-43px)] max-[1200px]:min-h-[calc(100dvh-43px)] max-[1200px]:max-h-[calc(100dvh-43px)] max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:shrink-0 max-[1200px]:overflow-hidden max-[1200px]:p-0 max-[1200px]:m-0 max-[1200px]:gap-0 max-[1200px]:rounded-none max-[1200px]:border-0">
+      <div className="flex min-h-0 min-w-0 h-auto w-full min-h-full flex-col gap-4 min-[1201px]:flex-row min-[1201px]:h-full min-[1201px]:overflow-hidden overflow-visible max-[1200px]:h-full max-[1200px]:min-h-0 max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:shrink-0 max-[1200px]:overflow-hidden max-[1200px]:p-0 max-[1200px]:m-0 max-[1200px]:gap-0">
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Lista de Registros (sidebar fixa) */}
         {/* ========================================================= */}
-        <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none max-[1200px]:h-[calc(100dvh-43px)] max-[1200px]:overflow-hidden">
+        <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none max-[1200px]:h-full max-[1200px]:max-h-full max-[1200px]:min-h-0 max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:shrink-0 max-[1200px]:overflow-hidden max-[1200px]:rounded-none max-[1200px]:border-0 max-[1200px]:rounded-t-none max-[1200px]:rounded-b-none max-[1200px]:shadow-none max-[1200px]:p-0 max-[1200px]:m-0 max-[1200px]:flex max-[1200px]:flex-col max-[1200px]:items-stretch max-[1200px]:justify-start">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Métricas | Adicionar | Bot Experimental */}
           <div className="flex shrink-0 items-center justify-start gap-2 px-5 pt-5 min-w-0 overflow-x-auto overflow-y-visible overscroll-contain">
             <button

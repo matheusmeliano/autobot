@@ -609,7 +609,7 @@ export function AppShell({
           className={[
             "flex w-full flex-col",
             drawerOnlyNav
-              ? "pr-[90px] h-[calc(100dvh-43px)] min-h-0 overflow-y-auto pb-0 min-[1201px]:h-[calc(100dvh-43px)] min-[1201px]:min-h-0 min-[1201px]:overflow-hidden lg:h-[calc(100dvh-43px)] lg:min-h-0 lg:overflow-hidden"
+              ? "pr-[90px] h-[calc(100dvh-43px)] min-h-0 overflow-y-auto pb-0 min-[1201px]:h-[calc(100dvh-43px)] min-[1201px]:min-h-0 min-[1201px]:overflow-hidden lg:h-[calc(100dvh-43px)] lg:min-h-0 lg:overflow-hidden max-[1200px]:pr-0 max-[1200px]:h-[calc(100dvh-43px)] max-[1200px]:min-h-0 max-[1200px]:overflow-hidden max-[1200px]:p-0 max-[1200px]:gap-0 max-[1200px]:m-0 max-[1200px]:w-full max-[1200px]:max-w-none max-[1200px]:min-w-0 max-[1200px]:shrink-0 max-[1200px]:flex-none max-[1200px]:relative max-[1200px]:inset-0 max-[1200px]:flex max-[1200px]:flex-col max-[1200px]:items-stretch"
               : "pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
