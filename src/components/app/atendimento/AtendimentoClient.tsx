@@ -31,6 +31,54 @@ function buildInitials(name: string | null | undefined): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function applyPhoneMask(input: string): string {
+  const digits = String(input ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+
+  if (digits.startsWith("55")) {
+    const rest = digits.slice(2);
+    if (rest.length === 0) return "+55";
+    if (rest.length <= 2) return `+55 (${rest}`;
+    if (rest.length === 3) return `+55 (${rest.slice(0, 2)}) ${rest[2]}`;
+    if (rest.length <= 6) return `+55 (${rest.slice(0, 2)}) ${rest.slice(2)}`;
+    if (rest.length === 7) return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}`;
+    if (rest.length <= 10) return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}-${rest.slice(7)}`;
+    if (rest.length === 11) return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}-${rest.slice(7, 11)}`;
+    const extra = rest.slice(11);
+    return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}-${rest.slice(7, 11)} ${extra}`;
+  }
+
+  if (digits.startsWith("1")) {
+    const rest = digits.slice(1);
+    if (rest.length === 0) return "+1";
+    if (rest.length <= 3) return `+1 (${rest}`;
+    if (rest.length === 4) return `+1 (${rest.slice(0, 3)}) ${rest[3]}`;
+    if (rest.length <= 6) return `+1 (${rest.slice(0, 3)}) ${rest.slice(3)}`;
+    if (rest.length === 7) return `+1 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest[6]}`;
+    if (rest.length <= 10) return `+1 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    const extra = rest.slice(10);
+    return `+1 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6, 10)} ${extra}`;
+  }
+
+  if (digits.startsWith("7")) {
+    const rest = digits.slice(1);
+    if (rest.length === 0) return "+7";
+    if (rest.length <= 3) return `+7 (${rest}`;
+    if (rest.length <= 6) return `+7 (${rest.slice(0, 3)}) ${rest.slice(3)}`;
+    if (rest.length <= 10) return `+7 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    const extra = rest.slice(10);
+    return `+7 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6, 10)} ${extra}`;
+  }
+
+  if (digits.length <= 3) return `+${digits}`;
+  if (digits.length <= 4) return `+${digits.slice(0, 2)} ${digits.slice(2)}`;
+  const country = digits.slice(0, 2);
+  const num = digits.slice(2);
+  const groups: string[] = [];
+  for (let i = 0; i < num.length; i += 4) groups.push(num.slice(i, i + 4));
+  return `+${country} ${groups.join(" ")}`;
+}
+
 function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: string; tone: "success" | "warning" | "default" } {
   const booking = lead.experimental_class_booking;
   const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
@@ -518,7 +566,7 @@ export function AtendimentoClient() {
     async function handleSubmit(e: React.FormEvent) {
       e.preventDefault();
       if (createLeadSaving) return;
-      const phone = String(createLeadPhone ?? "").trim();
+      const phone = String(createLeadPhone ?? "").replace(/\D/g, "").trim();
       if (!phone) {
         modalToast.error("Informe o telefone do registro.");
         return;
@@ -612,13 +660,13 @@ export function AtendimentoClient() {
                 autoFocus
                 required
                 value={createLeadPhone}
-                onChange={(e) => setCreateLeadPhone(e.target.value)}
-                placeholder="Ex: 5565998511422 (com DDD e país)"
+                onChange={(e) => setCreateLeadPhone(applyPhoneMask(e.target.value))}
+                placeholder="Ex: +55 (65) 9 9693-3336"
                 disabled={createLeadSaving}
                 className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
               <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
-                Preencha com código do país + DDD + número. Ex: 5511999991111
+                Preencha ou cole o número. Formata automático: +55 (65) 9 9693-3336 / +1 (415) 555-9876
               </div>
             </div>
 
@@ -649,7 +697,7 @@ export function AtendimentoClient() {
             </button>
             <button
               type="submit"
-              disabled={createLeadSaving || !String(createLeadPhone ?? "").trim()}
+              disabled={createLeadSaving || !String(createLeadPhone ?? "").replace(/\D/g, "").trim()}
               className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
               {createLeadSaving ? "Cadastrando…" : "Cadastrar registro"}
