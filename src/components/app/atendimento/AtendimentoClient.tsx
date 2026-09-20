@@ -411,12 +411,12 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden">
-      <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 min-[1201px]:flex-row overflow-hidden">
+    <div className="flex h-auto w-full min-h-full min-h-0 min-w-0 flex-col gap-4 overflow-visible min-[1201px]:h-full min-[1201px]:overflow-hidden">
+      <div className="flex min-h-0 min-w-0 h-auto w-full min-h-full flex-col gap-4 min-[1201px]:flex-row min-[1201px]:h-full min-[1201px]:overflow-hidden overflow-visible">
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
         {/* ========================================================= */}
-        <aside className="flex min-h-0 min-w-0 w-full shrink-0 min-[1201px]:w-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+        <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Adicionar | Bot Experimental */}
           <div className="flex shrink-0 items-center justify-end gap-2 px-5 pt-5">
             <button
@@ -466,8 +466,8 @@ export function AtendimentoClient() {
             </div>
           </div>
 
-          {/* Lista Leads */}
-          <div className="mt-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-5">
+          {/* Lista Leads (scroll INTERNO só em DESKTOP; mobile: scroll de pagina toda!) */}
+          <div className="mt-4 flex-1 min-h-0 overflow-visible min-[1201px]:overflow-y-auto min-[1201px]:scrollbar-hide pb-5">
             <div className="flex flex-col divide-y divide-[var(--app-border)]">
               {loading ? (
                 <div className="px-5 py-10 text-center text-[13px] text-[var(--app-text-55)]">
@@ -547,9 +547,9 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         {/* COLUNA DIREITA: Detalhe do Lead selecionado */}
         {/* ========================================================= */}
-        <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+        <section className="flex h-auto w-full min-h-0 min-w-0 flex-1 flex-col overflow-visible min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
           {!selectedLead ? (
-            <div className="flex h-full w-full items-center justify-center">
+            <div className="flex min-h-[420px] w-full items-center justify-center min-[1201px]:h-full">
               <div className="text-center px-6 max-w-md">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
                   <UserRound className="h-6 w-6 text-[#9a3412]" />
@@ -640,8 +640,8 @@ export function AtendimentoClient() {
                 </div>
               </div>
 
-              {/* CONTEUDO TABS */}
-              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-6 py-6">
+              {/* CONTEUDO TABS (scroll INTERNO só em DESKTOP; mobile: scroll pagina toda!) */}
+              <div className="flex-1 min-h-0 overflow-visible min-[1201px]:overflow-y-auto min-[1201px]:scrollbar-hide px-6 py-6">
                 {/* ============== VISÃO GERAL ============== */}
                 {activeTab === "visao_geral" ? (
                   <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2">
