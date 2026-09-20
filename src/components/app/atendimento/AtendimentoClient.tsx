@@ -1249,7 +1249,7 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Lista de Registros (sidebar fixa) */}
         {/* ========================================================= */}
-        <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+        <aside className="flex h-auto w-full min-h-0 min-w-0 shrink-0 min-[1201px]:w-[360px] min-[1201px]:h-full min-[1201px]:min-h-0 flex-col overflow-visible min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none max-[1200px]:h-[calc(100dvh-43px)] max-[1200px]:overflow-hidden">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Métricas | Adicionar | Bot Experimental */}
           <div className="flex shrink-0 items-center justify-start gap-2 px-5 pt-5 min-w-0 overflow-x-auto overflow-y-visible overscroll-contain">
             <button
@@ -1329,8 +1329,8 @@ export function AtendimentoClient() {
             </div>
           </div>
 
-          {/* Lista Leads (scroll INTERNO só em DESKTOP; mobile: scroll de pagina toda!) */}
-          <div className="mt-4 flex-1 min-h-0 overflow-visible min-[1201px]:overflow-y-auto min-[1201px]:scrollbar-hide pb-5">
+          {/* Lista Leads (scroll INTERNO em desktop e mobile — header/busca ficam FIXOS no topo) */}
+          <div className="mt-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide max-[1200px]:overflow-y-auto pb-5 min-[1201px]:pb-5">
             <div className="flex flex-col divide-y divide-[var(--app-border)]">
               {loading ? (
                 <div className="px-5 py-10 text-center text-[13px] text-[var(--app-text-55)]">
