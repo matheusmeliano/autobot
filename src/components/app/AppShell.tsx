@@ -620,7 +620,7 @@ export function AppShell({
               className={[
                 "fixed right-4 top-4 bottom-4 z-[250]",
                 "w-20",
-                "flex flex-col items-center gap-3 p-3",
+                "flex flex-col items-center gap-2 p-2",
                 "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none",
               ].join(" ")}
             >
@@ -672,7 +672,7 @@ export function AppShell({
               <div className="h-px w-full shrink-0 bg-[var(--app-border)]" />
 
               {/* 2) Itens do menu (icones) — itens principais do AppNav */}
-              <nav className="flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto scrollbar-hide py-1">
+              <nav className="flex w-full flex-col items-center gap-1 overflow-y-auto scrollbar-hide py-0.5">
                 {(
                   [
                     { href: "/app/dashboard", label: "Painel", icon: LayoutDashboard, section: "Principal" },
@@ -712,7 +712,10 @@ export function AppShell({
                 })}
               </nav>
 
-              {/* 5) Separador final + Botão Sair */}
+              {/* Spacer VAZIO para icones ficarem NO TOPO e Sair ficar NO FIM (baixo) */}
+              <div className="w-full flex-1" />
+
+              {/* Separador final + Botão Sair */}
               <div className="h-px w-full shrink-0 bg-[var(--app-border)]" />
               <form action={logoutAction} className="w-full shrink-0" onSubmit={handleLogoutSubmit}>
                 <button
