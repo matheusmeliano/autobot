@@ -217,6 +217,10 @@ export function AtendimentoClient() {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [botExperimentalDisabled, setBotExperimentalDisabled] = useState<boolean>(false);
   const [botExperimentalLoading, setBotExperimentalLoading] = useState<boolean>(false);
+  const [editLeadOpen, setEditLeadOpen] = useState(false);
+  const [editLeadName, setEditLeadName] = useState("");
+  const [editLeadPhone, setEditLeadPhone] = useState("");
+  const [editLeadSaving, setEditLeadSaving] = useState(false);
 
   type LeadFilters = {
     statusList: string[];
@@ -523,6 +527,47 @@ export function AtendimentoClient() {
   }
 
   const [deletingSelectedLoading, setDeletingSelectedLoading] = useState(false);
+
+  function handleOpenEditSelected() {
+    if (!selectedLead) return;
+    setEditLeadName(String(selectedLead.full_name ?? "").trim());
+    setEditLeadPhone(String(selectedLead.phone ?? "").trim());
+    setEditLeadOpen(true);
+  }
+
+  async function handleSaveEditSelected() {
+    if (!selectedLead || editLeadSaving) return;
+    const phoneDigits = String(editLeadPhone ?? "").replace(/\D/g, "");
+    if (!phoneDigits) {
+      modalToast.error("Telefone é obrigatório.");
+      return;
+    }
+    try {
+      setEditLeadSaving(true);
+      const response = await fetch(`/api/atendimento/leads/${selectedLead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: String(editLeadName ?? "").trim() || null,
+          phone: phoneDigits,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao atualizar registro.");
+        return;
+      }
+      if (payload.lead) {
+        setPanelLeads((current) => current.map((item) => (item.id === selectedLead.id ? { ...item, ...payload.lead } : item)));
+      }
+      setEditLeadOpen(false);
+      modalToast.success("Registro atualizado com sucesso.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao atualizar registro.");
+    } finally {
+      setEditLeadSaving(false);
+    }
+  }
   async function handleDeleteSelected() {
     if (!selectedLead || deletingSelectedLoading) return;
     const sl = selectedLead;
@@ -782,6 +827,105 @@ export function AtendimentoClient() {
               className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
               {createLeadSaving ? "Cadastrando…" : "Cadastrar registro"}
+            </button>
+          </div>
+        </form>
+      </AppModal>
+    );
+  }
+
+  function renderEditLeadModal() {
+    return (
+      <AppModal
+        open={editLeadOpen}
+        onClose={() => {
+          setEditLeadOpen(false);
+        }}
+        size="md"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+        closeOnBackdrop={!editLeadSaving}
+        closeOnEscape={!editLeadSaving}
+      >
+        <form className="flex w-full flex-col gap-0" onSubmit={(e) => { e.preventDefault(); void handleSaveEditSelected(); }}>
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <Pencil className="h-5 w-5 text-[#9a3412]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Editar registro
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Atualize os dados do registro selecionado
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={editLeadSaving}
+              onClick={() => {
+                setEditLeadOpen(false);
+              }}
+              aria-label="Fechar"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3">
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">
+                Telefone <span className="text-[#ea580c]">*</span>
+              </label>
+              <input
+                type="tel"
+                autoFocus
+                required
+                value={editLeadPhone}
+                onChange={(e) => setEditLeadPhone(applyPhoneMask(e.target.value))}
+                placeholder="+99 (99) 9 9999-9999"
+                disabled={editLeadSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
+                Preencha ou cole o número. Formata automático: +55 (65) 9 9693-3336 / +1 (415) 555-9876
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">Nome</label>
+              <input
+                type="text"
+                value={editLeadName}
+                onChange={(e) => setEditLeadName(e.target.value)}
+                placeholder="Nome completo (opcional)"
+                disabled={editLeadSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setEditLeadOpen(false);
+              }}
+              disabled={editLeadSaving}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={editLeadSaving || !String(editLeadPhone ?? "").replace(/\D/g, "").trim()}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {editLeadSaving ? "Salvando…" : "Salvar alterações"}
             </button>
           </div>
         </form>
@@ -1507,6 +1651,7 @@ export function AtendimentoClient() {
                   <div className="flex shrink-0 items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => handleOpenEditSelected()}
                       className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                     >
                       <Pencil className="h-4 w-4" />
@@ -1939,6 +2084,7 @@ export function AtendimentoClient() {
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => handleOpenEditSelected()}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                   >
                     <Pencil className="h-4 w-4" />
@@ -2306,6 +2452,9 @@ export function AtendimentoClient() {
 
       {/* Modal Criar Lead (placeholder para próxima etapa) */}
       {renderCreateLeadModal()}
+
+      {/* Modal Editar Lead (clicou no botão Editar no header) */}
+      {renderEditLeadModal()}
 
       {/* MODAL MÉTRICAS: Resumo dos registros (clicou no ícone BarChart3 no header) */}
       {renderMetricsModal()}
