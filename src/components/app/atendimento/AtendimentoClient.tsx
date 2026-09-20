@@ -574,15 +574,15 @@ export function AtendimentoClient() {
           </div>
 
           {/* Busca */}
-          <div className="mt-4 px-5 shrink-0">
+          <div className="mt-4 pl-4 pr-5 shrink-0">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--app-text-45)]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--app-text-45)]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Pesquise por nome ou telefone..."
-                className="w-full !bg-white rounded-xl border border-[var(--app-border)] pl-10 pr-4 py-2.5 text-[14px] text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
+                className="w-full !bg-white rounded-xl border border-[var(--app-border)] pl-9 pr-4 py-2.5 text-[14px] text-left text-[var(--app-text-85)] placeholder:text-left placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
               />
             </div>
           </div>
