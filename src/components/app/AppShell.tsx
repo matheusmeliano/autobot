@@ -645,8 +645,22 @@ export function AppShell({
                       unoptimized
                     />
                   ) : (
-                    <span className="text-[15px] font-bold tracking-tight leading-none">
-                      {fallbackInitials}
+                    <span
+                      className="text-[15px] font-bold tracking-tight leading-none"
+                      style={{ color: "#9a3412" }}
+                    >
+                      {String(displayName ?? "")
+                        .trim()
+                        .split(/\s+/g)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((w) => w[0]?.toUpperCase() ?? "")
+                        .join("") ||
+                        String(email ?? "")
+                          .trim()
+                          .slice(0, 1)
+                          .toUpperCase() ||
+                        "U"}
                     </span>
                   )}
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/55 opacity-0 transition group-hover:opacity-100">
