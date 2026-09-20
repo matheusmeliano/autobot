@@ -411,12 +411,12 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4">
+    <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4 min-[1201px]:p-4">
       <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 min-[1201px]:flex-row">
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
         {/* ========================================================= */}
-        <aside className="flex min-h-0 min-w-0 w-full shrink-0 min-[1201px]:w-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+        <aside className="flex min-h-0 min-w-0 w-full shrink-0 min-[1201px]:w-[360px] flex-col overflow-hidden isolate rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] bg-clip-padding box-border ring-0 ring-inset shadow-none">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Adicionar | Bot Experimental */}
           <div className="flex items-center justify-end gap-2 px-5 pt-5">
             <button
@@ -547,7 +547,7 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         {/* COLUNA DIREITA: Detalhe do Lead selecionado */}
         {/* ========================================================= */}
-        <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
+        <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden isolate rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] bg-clip-padding box-border ring-0 ring-inset shadow-none">
           {!selectedLead ? (
             <div className="flex h-full w-full items-center justify-center">
               <div className="text-center px-6 max-w-md">
