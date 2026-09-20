@@ -47,7 +47,7 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
   const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
   const futureExpDateLabel = hasFutureExp
-    ? String(futureExp?.lead_date || futureExp?.professor_date ?? "").trim()
+    ? String((futureExp?.lead_date ?? futureExp?.professor_date) ?? "").trim()
     : "";
   const futureExpTimeLabel = hasFutureExp
     ? String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim()
