@@ -88,48 +88,20 @@ export function AppDateRangePicker({
     return new Date();
   });
 
-  // 1) Calcular POSICAO FIXA via getBoundingClientRect (abaixo do trigger, lado ESQUERDO alinhado)
+  // 1) Posiciona popover NO CENTRO EXATO da viewport. Fixo, move nunca.
+  // NÃO usa mais recalc em scroll/resize (isso causava a PISCADA FORTE bug!)
   useEffect(() => {
-    if (!open || !rootRef.current) return;
-    function recalc() {
-      const el = rootRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      // Tenta abrir ABAIXO do trigger
-      const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
-      const vh = typeof window !== "undefined" ? window.innerHeight : 768;
-      const preferredWidth = vw < 640 ? 320 : 340;
-      const belowTop = r.bottom + 12;
-      const overflowBottom = belowTop + 420 > vh;
-      let finalTop: number;
-      if (overflowBottom && r.top - 420 - 12 > 0) {
-        // Abre ACIMA do trigger se nao couber abaixo
-        finalTop = r.top - 420 - 12;
-      } else {
-        finalTop = belowTop;
-      }
-      let finalLeft = r.left;
-      if (finalLeft + preferredWidth > vw - 12) {
-        // Alinha DIREIRA se ultrapassar a tela
-        finalLeft = vw - preferredWidth - 12;
-      }
-      if (finalLeft < 12) finalLeft = 12;
-      setCoords({
-        top: finalTop,
-        left: finalLeft,
-        width: preferredWidth,
-        wMax: preferredWidth,
-      });
-    }
-    recalc();
-    const id1 = window.requestAnimationFrame(recalc);
-    window.addEventListener("resize", recalc, { passive: true });
-    window.addEventListener("scroll", recalc, { passive: true, capture: true });
-    return () => {
-      cancelAnimationFrame(id1);
-      window.removeEventListener("resize", recalc);
-      window.removeEventListener("scroll", recalc, { capture: true });
-    };
+    if (!open) return;
+    // Define coords FIXAS no CENTRO:
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const w = vw < 640 ? Math.min(320, vw - 16) : 360;
+    setCoords({
+      top: 0, // ignorado por style inline (usa 50vh + translate)
+      left: 0,
+      width: w,
+      wMax: w,
+    });
+    // cleanup (nada) — events de scroll/resized REMOVIDOS para PARAR DE PISCAR
   }, [open]);
 
   // 2) Fechar popover ao clicar FORA ou ESC
@@ -232,28 +204,23 @@ export function AppDateRangePicker({
   }
 
   const pickerJSX = (
-    <>
-      <div
-        id="app-date-range-popover-backdrop"
-        aria-hidden
-        className="fixed inset-0 z-[9998] h-screen w-screen bg-transparent"
-      />
-      <div
-        id="app-date-range-popover-inner"
-        style={{
-          top: coords.top,
-          left: coords.left,
-          width: coords.width,
-          maxWidth: coords.wMax,
-        }}
-        className={[
-          "fixed z-[9999]",
-          "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4",
-          "shadow-[0_14px_44px_-8px_rgba(0,0,0,0.22)]",
-        ].join(" ")}
-        role="dialog"
-        aria-label="Selecionar período"
-      >
+    <div
+      id="app-date-range-popover-inner"
+      style={{
+        top: "50vh",
+        left: "50vw",
+        width: coords.width,
+        maxWidth: coords.wMax,
+        transform: "translate(-50%, -50%)",
+      }}
+      className={[
+        "fixed z-[9999]",
+        "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4",
+        "shadow-[0_14px_44px_-8px_rgba(0,0,0,0.22)]",
+      ].join(" ")}
+      role="dialog"
+      aria-label="Selecionar período"
+    >
         {/* Header: mês/ano + setas */}
         <div className="flex items-center justify-between gap-2 pb-3">
           <button
@@ -365,7 +332,6 @@ export function AppDateRangePicker({
           </div>
         </div>
       </div>
-    </>
   );
 
   return (
