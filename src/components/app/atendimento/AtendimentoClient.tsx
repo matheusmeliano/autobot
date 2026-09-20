@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
 import { formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
+import { AppModal } from "@/components/app/AppModal";
 
 const EMPTY_SUMMARY: AtendimentoSummary = {
   totalLeads: 0,
@@ -157,9 +158,27 @@ export function AtendimentoClient() {
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
   const [observacoesDraft, setObservacoesDraft] = useState<string>("");
   const [observacoesSaving, setObservacoesSaving] = useState(false);
+  const [showMobileLeadModal, setShowMobileLeadModal] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const fallbackRefreshIntervalRef = useRef<number | null>(null);
   const realtimeSubscribedRef = useRef(false);
   const initialLoadCompletedRef = useRef(false);
+
+  // Detecta viewport <1201px (tamanho MOBILE para layout atendimento)
+  useEffect(() => {
+    function updateViewport() {
+      if (typeof window === "undefined") return;
+      setIsMobileViewport(window.innerWidth < 1201);
+    }
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
+
+  // Quando troca pra desktop, fecha modal (nao precisa mais, section esta visivel!)
+  useEffect(() => {
+    if (!isMobileViewport) setShowMobileLeadModal(false);
+  }, [isMobileViewport]);
 
   const selectedLead = useMemo<AtendimentoLeadListItem | null>(() => {
     if (!selectedLeadId) return null;
@@ -487,6 +506,8 @@ export function AtendimentoClient() {
                       type="button"
                       onClick={() => {
                         setSelectedLeadId(lead.id);
+                        // Em telas menores, clicar em interessado ABRE MODAL de detalhe
+                        if (isMobileViewport) setShowMobileLeadModal(true);
                       }}
                       className={[
                         "group flex w-full items-start gap-3 px-5 py-4 text-left transition-colors",
@@ -547,40 +568,468 @@ export function AtendimentoClient() {
         {/* ========================================================= */}
         {/* COLUNA DIREITA: Detalhe do Lead selecionado */}
         {/* ========================================================= */}
-        <section className="flex h-auto w-full min-h-0 min-w-0 flex-1 flex-col overflow-visible min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none mb-4 min-[1201px]:mb-0">
-          {!selectedLead ? (
-            <div className="flex min-h-[420px] w-full items-center justify-center min-[1201px]:h-full">
-              <div className="text-center px-6 max-w-md">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
-                  <UserRound className="h-6 w-6 text-[#9a3412]" />
+        {/* AVISO: Section SÓ é visível em DESKTOP (min-[1201px])! Em telas menores (mobile), */}
+        {/* o usuário clica no item da lista → ABRE MODAL (abaixo, AppMobileLeadDetailModal) */}
+        <section className="hidden min-[1201px]:flex h-auto w-full min-h-0 min-w-0 flex-1 flex-col overflow-visible min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none mb-4 min-[1201px]:mb-0">
+          {(() => {
+            if (!selectedLead) {
+              return (
+                <div className="flex min-h-[420px] w-full items-center justify-center min-[1201px]:h-full">
+                  <div className="text-center px-6 max-w-md">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                      <UserRound className="h-6 w-6 text-[#9a3412]" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-bold text-[var(--app-text-85)]">
+                      Selecione um interessado
+                    </h3>
+                    <p className="mt-2 text-[13px] text-[var(--app-text-60)]">
+                      Clique em qualquer interessado ao lado para ver os detalhes, agendamentos, link de matrícula e mais.
+                    </p>
+                  </div>
                 </div>
-                <h3 className="mt-4 text-lg font-bold text-[var(--app-text-85)]">
-                  Selecione um interessado
-                </h3>
-                <p className="mt-2 text-[13px] text-[var(--app-text-60)]">
-                  Clique em qualquer interessado ao lado para ver os detalhes, agendamentos, link de matrícula e mais.
-                </p>
+              );
+            }
+            const sl = selectedLead;
+            const statusMeta = buildRecurringMetaForVisaoGeral(sl);
+            const expMeta = buildExperimentalMetaForList(sl);
+            return (
+              <>
+                {/* HEADER DO LEAD (Avatar + Nome + Telefone + Botoes) — FIXO (shrink-0, nunca some!) */}
+                <div className="flex shrink-0 items-start justify-between gap-4 px-6 pt-6">
+                  <div className="flex items-start gap-4 min-w-0">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--app-active)] text-[24px] font-semibold text-[#9a3412]">
+                      {buildInitials(sl.full_name)}
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-[22px] font-bold leading-tight text-[var(--app-text-85)]">
+                        {sl.full_name?.trim() || "Sem nome"}
+                      </h2>
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <span className="text-[14px] font-semibold text-[var(--app-text-80)]">
+                          📞 {sl.phone?.trim() || "Sem telefone"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPhone(sl)}
+                          className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 text-[11px] font-semibold text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copiar
+                        </button>
+                      </div>
+                      <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                        Criado em: {formatAtendimentoDateTime(sl.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                      aria-label="Mais opções"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* TABS — FIXAS (shrink-0, abaixo do header, sempre fixo) */}
+                <div className="mt-6 border-b border-[var(--app-border)] px-6 shrink-0">
+                  <div className="-mb-px flex items-center gap-6 overflow-x-auto">
+                    {([
+                      { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
+                      { id: "agendamentos", label: "Agendamentos", icon: <CalendarIcon className="h-4 w-4" /> },
+                      { id: "historico", label: "Histórico", icon: <RefreshCw className="h-4 w-4" /> },
+                      { id: "observacoes", label: "Observações", icon: <Pencil className="h-4 w-4" /> },
+                    ] as const).map((tab) => {
+                      const isActive = tab.id === activeTab;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          className={[
+                            "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[14px] font-semibold transition-colors",
+                            isActive
+                              ? "border-[#ea580c] !text-[#9a3412]"
+                              : "border-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
+                          ].join(" ")}
+                        >
+                          {tab.icon}
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* CONTEUDO TABS (scroll INTERNO só em DESKTOP; mobile/modal: scroll natural) */}
+                <div className="flex-1 min-h-0 overflow-visible min-[1201px]:overflow-y-auto min-[1201px]:scrollbar-hide px-6 py-6">
+                  {/* ============== VISÃO GERAL ============== */}
+                  {activeTab === "visao_geral" ? (
+                    <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2">
+                      {/* CARD 1: Informações */}
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <UserRound className="h-5 w-5 text-[var(--app-text-70)]" />
+                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                              Informações
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Editar
+                          </button>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          {[
+                            { label: "Cidade", value: (sl as any).city ?? null },
+                            { label: "Estado", value: (sl as any).state ?? null },
+                            { label: "País", value: (sl as any).country ?? null },
+                            { label: "Fuso horário", value: (sl as any).timezone ?? null },
+                          ].map(({ label, value }) => (
+                            <div key={label}>
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                                {label}
+                              </div>
+                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                {value || "-"}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* CARD 2: Link de Matrícula */}
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-center gap-2">
+                          <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Link de Matrícula
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
+                            <div className="min-h-[44px] w-full truncate px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
+                              {buildRecurringClassUrl(sl)}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyMatriculaLink(sl)}
+                              className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+                              aria-label="Copiar link"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenMatriculaLink(sl)}
+                            className={[
+                              "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold !text-white shadow-none transition",
+                              isLeadMatriculaConcluida(sl)
+                                ? "bg-sky-600 hover:bg-sky-500"
+                                : "bg-emerald-600 hover:bg-emerald-500",
+                            ].join(" ")}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            {isLeadMatriculaConcluida(sl) ? "Abrir painel" : "Abrir matrícula"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyMatriculaLink(sl)}
+                            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                          >
+                            <Copy className="h-4 w-4" />
+                            Copiar link
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* CARD 3: Status */}
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-5 text-[var(--app-text-70)]">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                              <path d="M3 3v18h18" />
+                              <path d="M7 14l4-4 4 4 5-5" />
+                            </svg>
+                          </div>
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Status
+                          </div>
+                        </div>
+                        {!statusMeta ? (
+                          <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
+                            <div className="font-semibold text-emerald-800">
+                              Dados básicos coletados
+                            </div>
+                            <div className="mt-0.5 text-[13px] text-emerald-700/90">
+                              Nenhum passo pendente identificado.
+                            </div>
+                          </div>
+                        ) : statusMeta.tone === "success" ? (
+                          <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
+                            <div className="font-semibold text-emerald-800">
+                              {statusMeta.title}
+                            </div>
+                            <div className="mt-0.5 text-[13px] text-emerald-700/90">
+                              {statusMeta.body}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/20">
+                                <AlertCircle className="h-5 w-5 text-[#9a3412]" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold !text-[#9a3412]">
+                                  {statusMeta.title}
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-[#9a3412]/80">
+                                  {statusMeta.body}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* CARD 4: Próxima aula */}
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Próxima aula
+                          </div>
+                        </div>
+                        {expMeta.tone === "success" ? (
+                          <>
+                            <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
+                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
+                                <CalendarIcon className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-emerald-800 truncate">
+                                  {expMeta.label}
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-emerald-700/80">
+                                  Horário confirmado para o interessado.
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                type="button"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Reagendar aula
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-70)]">
+                                <CalendarIcon className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-[var(--app-text-85)]">
+                                  Nenhuma aula agendada
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
+                                  Este interessado ainda não possui aulas agendadas.
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                type="button"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Agendar aula
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* ============== AGENDAMENTOS ============== */}
+                  {activeTab === "agendamentos" ? (
+                    <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2">
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Aulas experimentais
+                          </div>
+                        </div>
+                        <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                          <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                            {buildExperimentalMetaForList(sl).label}
+                          </div>
+                          <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                            Horário definido com o interessado.
+                          </div>
+                        </div>
+                      </div>
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Aulas recorrentes
+                          </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* ============== HISTÓRICO ============== */}
+                  {activeTab === "historico" ? (
+                    <div className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 text-center shadow-none">
+                      <div className="text-[13px] text-[var(--app-text-60)]">
+                        Histórico de eventos e interações do interessado — em integração.
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* ============== OBSERVAÇÕES ============== */}
+                  {activeTab === "observacoes" ? (
+                    <div className="w-full">
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Pencil className="h-5 w-5 text-[var(--app-text-70)]" />
+                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                              Observações internas
+                            </div>
+                          </div>
+                        </div>
+                        <textarea
+                          value={observacoesDraft}
+                          onChange={(e) => setObservacoesDraft(e.target.value)}
+                          rows={10}
+                          placeholder="Adicione anotações sobre esse interessado (só visíveis para o atendimento)..."
+                          className="mt-4 min-h-[160px] w-full rounded-xl border border-[var(--app-border)] !bg-[var(--app-solid-surface-2)] px-4 py-3 text-[14px] font-medium leading-relaxed text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none resize-none"
+                        />
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => void handleSaveObservacoes()}
+                            disabled={observacoesSaving || observacoesDraft === String((sl as any).internal_notes ?? "").trim()}
+                            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {observacoesSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
+                            Salvar observações
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            );
+          })()}
+        </section>
+      </div>
+
+      {/* =========================================================================
+          MODAL MOBILE: Detalhe do interessado (abre ao clicar em item da lista!)
+          Desktop (≥1201px): NUNCA ABRE (section esta visivel do lado esquerdo!)
+          ========================================================================= */}
+      <AppModal
+        open={showMobileLeadModal}
+        onClose={() => setShowMobileLeadModal(false)}
+        size="xl"
+        fullScreenOnMobile={true}
+        position="center"
+        zIndexClass="z-[400]"
+      >
+        {/* Renderiza o MESMO conteúdo da section desktop! (via callback identico, não duplicado de propósito) */}
+        {(() => {
+          if (!selectedLead) {
+            return (
+              <div className="flex min-h-[420px] w-full items-center justify-center">
+                <div className="text-center px-6 max-w-md">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                    <UserRound className="h-6 w-6 text-[#9a3412]" />
+                  </div>
+                  <h3 className="mt-4 text-lg font-bold text-[var(--app-text-85)]">
+                    Selecione um interessado
+                  </h3>
+                  <p className="mt-2 text-[13px] text-[var(--app-text-60)]">
+                    Clique em qualquer interessado na lista para ver os detalhes, agendamentos, link de matrícula e mais.
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <>
-              {/* HEADER DO LEAD (Avatar + Nome + Telefone + Botoes) — FIXO (shrink-0, nunca some! */}
-              <div className="flex shrink-0 items-start justify-between gap-4 px-6 pt-6">
+            );
+          }
+          const sl = selectedLead;
+          const statusMeta = buildRecurringMetaForVisaoGeral(sl);
+          const expMeta = buildExperimentalMetaForList(sl);
+          return (
+            <div className="flex w-full flex-col gap-0">
+              {/* HEADER DO LEAD — MODAL MOBILE */}
+              <div className="flex shrink-0 items-start justify-between gap-4 pt-1">
                 <div className="flex items-start gap-4 min-w-0">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--app-active)] text-[24px] font-semibold text-[#9a3412]">
-                    {buildInitials(selectedLead.full_name)}
+                    {buildInitials(sl.full_name)}
                   </div>
                   <div className="min-w-0">
                     <h2 className="truncate text-[22px] font-bold leading-tight text-[var(--app-text-85)]">
-                      {selectedLead.full_name?.trim() || "Sem nome"}
+                      {sl.full_name?.trim() || "Sem nome"}
                     </h2>
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <span className="text-[14px] font-semibold text-[var(--app-text-80)]">
-                        📞 {selectedLead.phone?.trim() || "Sem telefone"}
+                        📞 {sl.phone?.trim() || "Sem telefone"}
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleCopyPhone(selectedLead)}
+                        onClick={() => handleCopyPhone(sl)}
                         className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 text-[11px] font-semibold text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
                       >
                         <Copy className="h-3 w-3" />
@@ -588,7 +1037,7 @@ export function AtendimentoClient() {
                       </button>
                     </div>
                     <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                      Criado em: {formatAtendimentoDateTime(selectedLead.created_at)}
+                      Criado em: {formatAtendimentoDateTime(sl.created_at)}
                     </div>
                   </div>
                 </div>
@@ -602,16 +1051,17 @@ export function AtendimentoClient() {
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
                     aria-label="Mais opções"
+                    onClick={() => setShowMobileLeadModal(false)}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
                   >
                     <MoreVertical className="h-4 w-4" />
                   </button>
                 </div>
               </div>
 
-              {/* TABS — FIXAS (shrink-0, abaixo do header, sempre fixo) */}
-              <div className="mt-6 border-b border-[var(--app-border)] px-6 shrink-0">
+              {/* TABS — MODAL MOBILE (shrink-0 sempre fixo) */}
+              <div className="mt-6 border-b border-[var(--app-border)] shrink-0 -mx-1 px-1">
                 <div className="-mb-px flex items-center gap-6 overflow-x-auto">
                   {([
                     { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
@@ -640,11 +1090,11 @@ export function AtendimentoClient() {
                 </div>
               </div>
 
-              {/* CONTEUDO TABS (scroll INTERNO só em DESKTOP; mobile: scroll pagina toda!) */}
-              <div className="flex-1 min-h-0 overflow-visible min-[1201px]:overflow-y-auto min-[1201px]:scrollbar-hide px-6 py-6">
+              {/* CONTEUDO TABS — MODAL MOBILE: scroll natural dentro do panel (overflow-y-auto do AppModal fullscreen!) */}
+              <div className="flex-1 min-h-0 pt-6">
                 {/* ============== VISÃO GERAL ============== */}
                 {activeTab === "visao_geral" ? (
-                  <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2">
+                  <div className="grid w-full grid-cols-1 gap-4">
                     {/* CARD 1: Informações */}
                     <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                       <div className="flex items-start justify-between gap-3">
@@ -664,10 +1114,10 @@ export function AtendimentoClient() {
                       </div>
                       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {[
-                          { label: "Cidade", value: (selectedLead as any).city ?? null },
-                          { label: "Estado", value: (selectedLead as any).state ?? null },
-                          { label: "País", value: (selectedLead as any).country ?? null },
-                          { label: "Fuso horário", value: (selectedLead as any).timezone ?? null },
+                          { label: "Cidade", value: (sl as any).city ?? null },
+                          { label: "Estado", value: (sl as any).state ?? null },
+                          { label: "País", value: (sl as any).country ?? null },
+                          { label: "Fuso horário", value: (sl as any).timezone ?? null },
                         ].map(({ label, value }) => (
                           <div key={label}>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
@@ -692,11 +1142,11 @@ export function AtendimentoClient() {
                       <div className="mt-4">
                         <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
                           <div className="min-h-[44px] w-full truncate px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
-                            {buildRecurringClassUrl(selectedLead)}
+                            {buildRecurringClassUrl(sl)}
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleCopyMatriculaLink(selectedLead)}
+                            onClick={() => handleCopyMatriculaLink(sl)}
                             className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
                             aria-label="Copiar link"
                           >
@@ -707,20 +1157,20 @@ export function AtendimentoClient() {
                       <div className="mt-4 grid grid-cols-2 gap-3">
                         <button
                           type="button"
-                          onClick={() => handleOpenMatriculaLink(selectedLead)}
+                          onClick={() => handleOpenMatriculaLink(sl)}
                           className={[
                             "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold !text-white shadow-none transition",
-                            isLeadMatriculaConcluida(selectedLead)
+                            isLeadMatriculaConcluida(sl)
                               ? "bg-sky-600 hover:bg-sky-500"
                               : "bg-emerald-600 hover:bg-emerald-500",
                           ].join(" ")}
                         >
                           <ExternalLink className="h-4 w-4" />
-                          {isLeadMatriculaConcluida(selectedLead) ? "Abrir painel" : "Abrir matrícula"}
+                          {isLeadMatriculaConcluida(sl) ? "Abrir painel" : "Abrir matrícula"}
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleCopyMatriculaLink(selectedLead)}
+                          onClick={() => handleCopyMatriculaLink(sl)}
                           className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                         >
                           <Copy className="h-4 w-4" />
@@ -742,50 +1192,41 @@ export function AtendimentoClient() {
                           Status
                         </div>
                       </div>
-                      {(() => {
-                        const statusMeta = buildRecurringMetaForVisaoGeral(selectedLead);
-                        if (!statusMeta) {
-                          return (
-                            <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
-                              <div className="font-semibold text-emerald-800">
-                                Dados básicos coletados
-                              </div>
-                              <div className="mt-0.5 text-[13px] text-emerald-700/90">
-                                Nenhum passo pendente identificado.
-                              </div>
+                      {!statusMeta ? (
+                        <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
+                          <div className="font-semibold text-emerald-800">
+                            Dados básicos coletados
+                          </div>
+                          <div className="mt-0.5 text-[13px] text-emerald-700/90">
+                            Nenhum passo pendente identificado.
+                          </div>
+                        </div>
+                      ) : statusMeta.tone === "success" ? (
+                        <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
+                          <div className="font-semibold text-emerald-800">
+                            {statusMeta.title}
+                          </div>
+                          <div className="mt-0.5 text-[13px] text-emerald-700/90">
+                            {statusMeta.body}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/20">
+                              <AlertCircle className="h-5 w-5 text-[#9a3412]" />
                             </div>
-                          );
-                        }
-                        if (statusMeta.tone === "success") {
-                          return (
-                            <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
-                              <div className="font-semibold text-emerald-800">
+                            <div className="min-w-0">
+                              <div className="font-semibold !text-[#9a3412]">
                                 {statusMeta.title}
                               </div>
-                              <div className="mt-0.5 text-[13px] text-emerald-700/90">
+                              <div className="mt-0.5 text-[13px] text-[#9a3412]/80">
                                 {statusMeta.body}
                               </div>
                             </div>
-                          );
-                        }
-                        return (
-                          <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
-                            <div className="flex items-start gap-3">
-                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/20">
-                                <AlertCircle className="h-5 w-5 text-[#9a3412]" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold !text-[#9a3412]">
-                                  {statusMeta.title}
-                                </div>
-                                <div className="mt-0.5 text-[13px] text-[#9a3412]/80">
-                                  {statusMeta.body}
-                                </div>
-                              </div>
-                            </div>
                           </div>
-                        );
-                      })()}
+                        </div>
+                      )}
                     </div>
 
                     {/* CARD 4: Próxima aula */}
@@ -796,70 +1237,64 @@ export function AtendimentoClient() {
                           Próxima aula
                         </div>
                       </div>
-                      {(() => {
-                        const meta = buildExperimentalMetaForList(selectedLead);
-                        if (meta.tone === "success") {
-                          return (
-                            <>
-                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
-                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
-                                  <CalendarIcon className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-emerald-800 truncate">
-                                    {meta.label}
-                                  </div>
-                                  <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                    Horário confirmado para o interessado.
-                                  </div>
-                                </div>
+                      {expMeta.tone === "success" ? (
+                        <>
+                          <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
+                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
+                              <CalendarIcon className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-emerald-800 truncate">
+                                {expMeta.label}
                               </div>
-                              <div className="mt-4 flex justify-end">
-                                <button
-                                  type="button"
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  Reagendar aula
-                                </button>
-                              </div>
-                            </>
-                          );
-                        }
-                        return (
-                          <>
-                            <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-70)]">
-                                <CalendarIcon className="h-5 w-5" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-[var(--app-text-85)]">
-                                  Nenhuma aula agendada
-                                </div>
-                                <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
-                                  Este interessado ainda não possui aulas agendadas.
-                                </div>
+                              <div className="mt-0.5 text-[13px] text-emerald-700/80">
+                                Horário confirmado para o interessado.
                               </div>
                             </div>
-                            <div className="mt-4 flex justify-end">
-                              <button
-                                type="button"
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                              >
-                                <Plus className="h-4 w-4" />
-                                Agendar aula
-                              </button>
+                          </div>
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Reagendar aula
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-70)]">
+                              <CalendarIcon className="h-5 w-5" />
                             </div>
-                          </>
-                        );
-                      })()}
+                            <div className="min-w-0">
+                              <div className="font-semibold text-[var(--app-text-85)]">
+                                Nenhuma aula agendada
+                              </div>
+                              <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
+                                Este interessado ainda não possui aulas agendadas.
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Agendar aula
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : null}
 
                 {/* ============== AGENDAMENTOS ============== */}
                 {activeTab === "agendamentos" ? (
-                  <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2">
+                  <div className="grid w-full grid-cols-1 gap-4">
                     <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                       <div className="flex items-center gap-2">
                         <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
@@ -869,7 +1304,7 @@ export function AtendimentoClient() {
                       </div>
                       <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
                         <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                          {buildExperimentalMetaForList(selectedLead).label}
+                          {buildExperimentalMetaForList(sl).label}
                         </div>
                         <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
                           Horário definido com o interessado.
@@ -885,35 +1320,27 @@ export function AtendimentoClient() {
                       </div>
                       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                            Dia
-                          </div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
                           <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            {String((selectedLead as any).recurring_class_weekday_label ?? (selectedLead as any).recurring_class_weekday ?? "-").trim() || "-"}
+                            {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
                           </div>
                         </div>
                         <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                            Horário
-                          </div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
                           <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            {String((selectedLead as any).recurring_class_professor_time ?? (selectedLead as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                            {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
                           </div>
                         </div>
                         <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                            Status
-                          </div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
                           <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            {String((selectedLead as any).recurring_class_status ?? "-").trim() || "-"}
+                            {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
                           </div>
                         </div>
                         <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                            Etapa
-                          </div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
                           <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            Passo {Number((selectedLead as any).recurring_registration_step ?? 0) || "-"}/12
+                            Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
                           </div>
                         </div>
                       </div>
@@ -953,7 +1380,7 @@ export function AtendimentoClient() {
                         <button
                           type="button"
                           onClick={() => void handleSaveObservacoes()}
-                          disabled={observacoesSaving || observacoesDraft === String((selectedLead as any).internal_notes ?? "").trim()}
+                          disabled={observacoesSaving || observacoesDraft === String((sl as any).internal_notes ?? "").trim()}
                           className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {observacoesSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
@@ -964,10 +1391,10 @@ export function AtendimentoClient() {
                   </div>
                 ) : null}
               </div>
-            </>
-          )}
-        </section>
-      </div>
+            </div>
+          );
+        })()}
+      </AppModal>
 
       {/* Modal Criar Lead (placeholder para próxima etapa) */}
       {renderCreateLeadModal()}
