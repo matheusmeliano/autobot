@@ -411,14 +411,14 @@ export function AtendimentoClient() {
   }
 
   return (
-    <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4">
-      <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 min-[1201px]:flex-row">
+    <div className="flex h-full w-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 h-full w-full flex-col gap-4 min-[1201px]:flex-row overflow-hidden">
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Lista de Interessados (sidebar fixa) */}
         {/* ========================================================= */}
         <aside className="flex min-h-0 min-w-0 w-full shrink-0 min-[1201px]:w-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none">
           {/* Header: Apenas ícones (otimizar espaço) — Atualizar | Adicionar | Bot Experimental */}
-          <div className="flex items-center justify-end gap-2 px-5 pt-5">
+          <div className="flex shrink-0 items-center justify-end gap-2 px-5 pt-5">
             <button
               type="button"
               onClick={() => void handleRefresh()}
@@ -450,7 +450,7 @@ export function AtendimentoClient() {
           </div>
 
           {/* Busca */}
-          <div className="mt-4 px-5">
+          <div className="mt-4 px-5 shrink-0">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--app-text-45)]" />
               <input
@@ -467,7 +467,7 @@ export function AtendimentoClient() {
           </div>
 
           {/* Lista Leads */}
-          <div className="mt-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+          <div className="mt-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-5">
             <div className="flex flex-col divide-y divide-[var(--app-border)]">
               {loading ? (
                 <div className="px-5 py-10 text-center text-[13px] text-[var(--app-text-55)]">
@@ -564,8 +564,8 @@ export function AtendimentoClient() {
             </div>
           ) : (
             <>
-              {/* HEADER DO LEAD (Avatar + Nome + Telefone + Botoes) */}
-              <div className="flex items-start justify-between gap-4 px-6 pt-6">
+              {/* HEADER DO LEAD (Avatar + Nome + Telefone + Botoes) — FIXO (shrink-0, nunca some! */}
+              <div className="flex shrink-0 items-start justify-between gap-4 px-6 pt-6">
                 <div className="flex items-start gap-4 min-w-0">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--app-active)] text-[24px] font-semibold text-[#9a3412]">
                     {buildInitials(selectedLead.full_name)}
@@ -610,8 +610,8 @@ export function AtendimentoClient() {
                 </div>
               </div>
 
-              {/* TABS */}
-              <div className="mt-6 border-b border-[var(--app-border)] px-6">
+              {/* TABS — FIXAS (shrink-0, abaixo do header, sempre fixo) */}
+              <div className="mt-6 border-b border-[var(--app-border)] px-6 shrink-0">
                 <div className="-mb-px flex items-center gap-6 overflow-x-auto">
                   {([
                     { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
