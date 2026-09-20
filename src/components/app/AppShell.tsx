@@ -5,8 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
-  ArrowRight,
   BadgeCheck,
   BarChart3,
   CalendarDays,
@@ -664,32 +662,16 @@ export function AppShell({
                         "U"}
                     </span>
                   )}
-                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/55 opacity-0 transition group-hover:opacity-100">
-                    <Camera className="h-4 w-4 text-white" />
+                  <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full !bg-black/55 opacity-0 transition group-hover:opacity-100">
+                    <Camera className="h-4 w-4 !text-white" style={{ color: "#ffffff", stroke: "#ffffff" }} />
                   </span>
                 </button>
               </div>
 
-              {/* 2) Botão Expandir / Abrir Drawer completo (seta ESQUERDA grande, destaque accent) */}
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Abrir menu completo"
-                aria-expanded={mobileMenuOpen}
-                aria-controls="mobile-app-drawer"
-                className={[
-                  "inline-flex h-12 w-12 items-center justify-center rounded-full shadow-none transition-all",
-                  "border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] text-[#9a3412]",
-                  "hover:bg-[rgba(234,88,12,0.22)] active:scale-95",
-                ].join(" ")}
-              >
-                <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-
-              {/* 3) Separador */}
+              {/* Separador */}
               <div className="h-px w-full shrink-0 bg-[var(--app-border)]" />
 
-              {/* 4) Itens do menu (icones) — itens principais do AppNav */}
+              {/* 2) Itens do menu (icones) — itens principais do AppNav */}
               <nav className="flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto scrollbar-hide py-1">
                 {(
                   [
