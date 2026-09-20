@@ -610,8 +610,12 @@ export function AtendimentoClient() {
     const stateOptions = Array.from(
       new Set(panelLeads.map((l) => String(l.state ?? "").trim()).filter(Boolean)),
     ).sort();
-    const statusOptions = Object.entries(STATUS_LABELS).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-    const stageOptions = Object.entries(STAGE_LABELS).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+    const statusOptions = Object.entries(STATUS_LABELS)
+      .filter(([id, label]) => Boolean(id) && Boolean(String(label ?? "").trim()))
+      .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR"));
+    const stageOptions = Object.entries(STAGE_LABELS)
+      .filter(([id, label]) => Boolean(id) && Boolean(String(label ?? "").trim()))
+      .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR"));
 
     const toggle = (key: keyof LeadFilters, value: string) => {
       setDraftFilters((prev) => {
@@ -704,6 +708,7 @@ export function AtendimentoClient() {
               </div>
               <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {statusOptions.map(([id, label]) => {
+                  const lbl = String(label ?? id ?? "").trim() || String(id);
                   const sel = draftFilters.statusList.includes(id);
                   return (
                     <button
@@ -717,7 +722,7 @@ export function AtendimentoClient() {
                           : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      <span className="min-w-0 truncate">{label}</span>
+                      <span className="min-w-0 truncate">{lbl}</span>
                       {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
                     </button>
                   );
@@ -731,6 +736,7 @@ export function AtendimentoClient() {
               </div>
               <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {stageOptions.map(([id, label]) => {
+                  const lbl = String(label ?? id ?? "").trim() || String(id);
                   const sel = draftFilters.stageList.includes(id);
                   return (
                     <button
@@ -744,7 +750,7 @@ export function AtendimentoClient() {
                           : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
                       ].join(" ")}
                     >
-                      <span className="min-w-0 truncate">{label}</span>
+                      <span className="min-w-0 truncate">{lbl}</span>
                       {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
                     </button>
                   );
@@ -964,7 +970,7 @@ export function AtendimentoClient() {
                   setActiveFilters(draftFilters);
                   setShowFiltersModal(false);
                 }}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-5 text-[13px] font-semibold !text-white shadow-none app-btn-primary-bg"
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors"
               >
                 Aplicar filtros
               </button>
