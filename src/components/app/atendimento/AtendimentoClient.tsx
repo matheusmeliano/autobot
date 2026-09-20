@@ -453,16 +453,16 @@ export function AtendimentoClient() {
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         setBotExperimentalDisabled(!nextDisabled);
-        modalToast.error(String(json?.error ?? "Falha ao alternar bot experimental."));
+        modalToast.error(String(json?.error ?? "Falha ao alternar bot."));
         return;
       }
       setBotExperimentalDisabled(Boolean((json as any).experimental_class_bot_disabled));
       modalToast.success(
-        nextDisabled ? "Bot experimental desativado." : "Bot experimental ativado.",
+        nextDisabled ? "Bot desativado." : "Bot ativado.",
       );
     } catch (e: any) {
       setBotExperimentalDisabled(!nextDisabled);
-      modalToast.error(String(e?.message ?? "Falha ao alternar bot experimental."));
+      modalToast.error(String(e?.message ?? "Falha ao alternar bot."));
     } finally {
       setBotExperimentalLoading(false);
     }
