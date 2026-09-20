@@ -1449,13 +1449,13 @@ export function AtendimentoClient() {
               return (
                 <div className="flex min-h-[420px] w-full items-center justify-center min-[1201px]:h-full">
                   <div className="text-center px-6 max-w-md">
-                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
-                      <UserRound className="h-10 w-10 text-[#9a3412]" />
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                      <UserRound className="h-6 w-6 text-[#9a3412]" />
                     </div>
-                    <h3 className="text-2xl font-bold text-[var(--app-text-85)]">
+                    <h3 className="mt-4 text-lg font-bold text-[var(--app-text-85)]">
                       Selecione um registro
                     </h3>
-                    <p className="mt-3 text-[15px] leading-relaxed text-[var(--app-text-60)]">
+                    <p className="mt-2 text-[13px] text-[var(--app-text-60)]">
                       Clique em qualquer registro ao lado para ver os detalhes, agendamentos, link de matrícula e mais.
                     </p>
                   </div>
