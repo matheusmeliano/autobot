@@ -609,7 +609,7 @@ export function AppShell({
           className={[
             "flex w-full flex-col",
             drawerOnlyNav
-              ? "pr-[112px] min-h-0 overflow-visible pb-0 min-[1201px]:h-full min-[1201px]:min-h-0 min-[1201px]:overflow-hidden min-[1201px]:pt-4 min-[1201px]:pb-4 min-[1201px]:pl-4"
+              ? "pr-[112px] min-h-0 overflow-visible pb-0 lg:h-full lg:min-h-0 lg:overflow-hidden"
               : "pb-0 min-[1201px]:pb-6",
           ].join(" ")}
         >
@@ -620,7 +620,7 @@ export function AppShell({
               className={[
                 "fixed right-4 top-4 bottom-4 z-[250]",
                 "w-20",
-                "flex flex-col items-center gap-2 p-2",
+                "flex flex-col items-center gap-3 p-3",
                 "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-solid-surface)] shadow-none",
               ].join(" ")}
             >
@@ -672,7 +672,7 @@ export function AppShell({
               <div className="h-px w-full shrink-0 bg-[var(--app-border)]" />
 
               {/* 2) Itens do menu (icones) — itens principais do AppNav */}
-              <nav className="flex w-full flex-col items-center gap-1 overflow-y-auto scrollbar-hide py-0.5">
+              <nav className="flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto scrollbar-hide py-1">
                 {(
                   [
                     { href: "/app/dashboard", label: "Painel", icon: LayoutDashboard, section: "Principal" },
@@ -712,10 +712,7 @@ export function AppShell({
                 })}
               </nav>
 
-              {/* Spacer VAZIO para icones ficarem NO TOPO e Sair ficar NO FIM (baixo) */}
-              <div className="w-full flex-1" />
-
-              {/* Separador final + Botão Sair */}
+              {/* 5) Separador final + Botão Sair */}
               <div className="h-px w-full shrink-0 bg-[var(--app-border)]" />
               <form action={logoutAction} className="w-full shrink-0" onSubmit={handleLogoutSubmit}>
                 <button
