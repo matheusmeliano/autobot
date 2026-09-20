@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, ChevronRight, Copy, ExternalLink, MoreVertical, Pencil, Plus, RefreshCw, Search, UserRound } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronRight, Copy, ExternalLink, MoreVertical, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, UserRound, X } from "lucide-react";
+import { STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
@@ -160,7 +161,37 @@ export function AtendimentoClient() {
   const [observacoesSaving, setObservacoesSaving] = useState(false);
   const [showMobileLeadModal, setShowMobileLeadModal] = useState(false);
   const [showMetricsModal, setShowMetricsModal] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  type LeadFilters = {
+    statusList: string[];
+    stageList: string[];
+    countries: string[];
+    states: string[];
+    onlyWithUnread: boolean;
+    onlyWithPhone: boolean;
+    onlyWithEmail: boolean;
+    onlyWithScheduledClass: boolean;
+    onlyWithContract: boolean;
+    createdFrom: string;
+    createdTo: string;
+  };
+  const EMPTY_FILTERS: LeadFilters = {
+    statusList: [],
+    stageList: [],
+    countries: [],
+    states: [],
+    onlyWithUnread: false,
+    onlyWithPhone: false,
+    onlyWithEmail: false,
+    onlyWithScheduledClass: false,
+    onlyWithContract: false,
+    createdFrom: "",
+    createdTo: "",
+  };
+  const [activeFilters, setActiveFilters] = useState<LeadFilters>(EMPTY_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<LeadFilters>(EMPTY_FILTERS);
   const fallbackRefreshIntervalRef = useRef<number | null>(null);
   const realtimeSubscribedRef = useRef(false);
   const initialLoadCompletedRef = useRef(false);
@@ -188,9 +219,55 @@ export function AtendimentoClient() {
 
   const filteredLeads = useMemo<AtendimentoLeadListItem[]>(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return panelLeads;
-    return panelLeads.filter((l) => leadMatchesSearchQuery(l, q));
-  }, [panelLeads, searchQuery]);
+    let out = panelLeads;
+    // Aplicar filtros avançados (se houver)
+    const f = activeFilters;
+    const hasAnyFilter = Object.values(f).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v));
+    if (hasAnyFilter) {
+      out = out.filter((l) => {
+        // Status
+        if (f.statusList.length > 0 && !f.statusList.includes(String(l.status ?? ""))) return false;
+        // Etapa (funnel_stage)
+        if (f.stageList.length > 0 && !f.stageList.includes(String(l.funnel_stage ?? ""))) return false;
+        // País
+        if (f.countries.length > 0 && !f.countries.includes(String(l.country ?? "").trim())) return false;
+        // Estado
+        if (f.states.length > 0 && !f.states.includes(String(l.state ?? "").trim())) return false;
+        // Apenas com não lidas
+        if (f.onlyWithUnread && Number(l.unread_count ?? 0) <= 0) return false;
+        // Apenas com telefone
+        if (f.onlyWithPhone && !String(l.phone ?? "").trim()) return false;
+        // Apenas com email
+        if (f.onlyWithEmail && !String(l.email ?? "").trim()) return false;
+        // Apenas com aula experimental agendada
+        if (f.onlyWithScheduledClass) {
+          const hasBooking = Boolean(l.future_experimental_class_booking ?? l.latest_experimental_class_booking ?? l.experimental_class_booking);
+          if (!hasBooking) return false;
+        }
+        // Apenas com contrato (qualquer status nao nulo)
+        if (f.onlyWithContract) {
+          const hasContract = Boolean(l.contract_status ?? l.contract_signed_at ?? l.contract_pdf_url);
+          if (!hasContract) return false;
+        }
+        // Data criacao DE
+        if (f.createdFrom) {
+          const fromMs = new Date(`${f.createdFrom}T00:00:00`).getTime();
+          const leadMs = new Date(String(l.created_at ?? "")).getTime();
+          if (!Number.isNaN(fromMs) && leadMs < fromMs) return false;
+        }
+        // Data criacao ATE
+        if (f.createdTo) {
+          const toMs = new Date(`${f.createdTo}T23:59:59`).getTime();
+          const leadMs = new Date(String(l.created_at ?? "")).getTime();
+          if (!Number.isNaN(toMs) && leadMs > toMs) return false;
+        }
+        return true;
+      });
+    }
+    // Busca textual (aplicada DEPOIS dos filtros
+    if (!q) return out;
+    return out.filter((l) => leadMatchesSearchQuery(l, q));
+  }, [panelLeads, searchQuery, activeFilters]);
 
   useEffect(() => {
     if (selectedLead && filteredLeads.findIndex((l) => l.id === selectedLead.id) === -1 && panelLeads.findIndex((l) => l.id === selectedLead.id) >= 0) {
@@ -525,6 +602,379 @@ export function AtendimentoClient() {
     );
   }
 
+  function renderFiltersModal() {
+    // Opcoes dinâmicas a partir dos leads carregados
+    const countryOptions = Array.from(
+      new Set(panelLeads.map((l) => String(l.country ?? "").trim()).filter(Boolean)),
+    ).sort();
+    const stateOptions = Array.from(
+      new Set(panelLeads.map((l) => String(l.state ?? "").trim()).filter(Boolean)),
+    ).sort();
+    const statusOptions = Object.entries(STATUS_LABELS).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+    const stageOptions = Object.entries(STAGE_LABELS).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+
+    const toggle = (key: keyof LeadFilters, value: string) => {
+      setDraftFilters((prev) => {
+        const arr = Array.isArray(prev[key]) ? [...(prev[key] as string[])] : [];
+        const idx = arr.indexOf(value);
+        if (idx >= 0) arr.splice(idx, 1);
+        else arr.push(value);
+        return { ...prev, [key]: arr } as LeadFilters;
+      });
+    };
+
+    const isFilled = Object.values(draftFilters).some((v) =>
+      Array.isArray(v) ? v.length > 0 : Boolean(v),
+    );
+
+    function headerPill(title: string, items: string[], key: keyof LeadFilters) {
+      return (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)] mr-1">
+            {title}
+          </span>
+          {items.length === 0 ? (
+            <span className="text-[12px] text-[var(--app-text-50)]">Todos</span>
+          ) : (
+            items.map((v) => {
+              const label =
+                key === "statusList"
+                  ? STATUS_LABELS[v] ?? v
+                  : key === "stageList"
+                  ? STAGE_LABELS[v] ?? v
+                  : v;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => toggle(key, v)}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                >
+                  {label}
+                  <span className="text-[var(--app-text-45)]">×</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <AppModal
+        open={showFiltersModal}
+        onClose={() => setShowFiltersModal(false)}
+        size="xl"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+      >
+        <div className="flex w-full flex-col gap-0">
+          {/* Header */}
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <SlidersHorizontal className="h-5 w-5 text-[#9a3412]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Filtros avançados
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Filtre a lista de interessados por status, etapa, localização e mais
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFiltersModal(false)}
+              aria-label="Fechar filtros"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Conteudo filtros (scroll interno) */}
+          <div className="mt-4 flex max-h-[65vh] min-h-0 w-full flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
+            {/* BLOCO 1: Status + Etapa (seleção rápida por chip/label) */}
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                Status
+              </div>
+              <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {statusOptions.map(([id, label]) => {
+                  const sel = draftFilters.statusList.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggle("statusList", id)}
+                      className={[
+                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
+                        sel
+                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                    >
+                      <span className="min-w-0 truncate">{label}</span>
+                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                Etapa do funil
+              </div>
+              <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {stageOptions.map(([id, label]) => {
+                  const sel = draftFilters.stageList.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggle("stageList", id)}
+                      className={[
+                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
+                        sel
+                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                    >
+                      <span className="min-w-0 truncate">{label}</span>
+                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* BLOCO 2: Checkboxes booleanos (rápidos) */}
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                Dados obrigatórios
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    ["onlyWithUnread", "Apenas com mensagens não lidas"],
+                    ["onlyWithPhone", "Apenas com telefone cadastrado"],
+                    ["onlyWithEmail", "Apenas com e-mail cadastrado"],
+                    ["onlyWithScheduledClass", "Apenas com aula experimental agendada"],
+                    ["onlyWithContract", "Apenas com contrato iniciado"],
+                  ] as Array<[keyof LeadFilters, string]>
+                ).map(([key, label]) => {
+                  const val = Boolean((draftFilters as any)[key]);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        setDraftFilters((p) => ({ ...p, [key]: !(p as any)[key] } as LeadFilters))
+                      }
+                      className={[
+                        "flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-[13px] font-medium text-left shadow-none",
+                        val
+                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                    >
+                      <span>{label}</span>
+                      {val ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* BLOCO 3: País + Estado */}
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                Localização
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">País</label>
+                  {countryOptions.length === 0 ? (
+                    <div className="mt-1.5 text-[12px] text-[var(--app-text-50)]">
+                      Sem países na lista ainda.
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {countryOptions.map((c) => {
+                        const sel = draftFilters.countries.includes(c);
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => toggle("countries", c)}
+                            className={[
+                              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-none",
+                              sel
+                                ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.12)] text-[var(--app-text-85)]"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                            ].join(" ")}
+                          >
+                            {c}
+                            {sel ? <X className="h-3 w-3 opacity-70" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Estado</label>
+                  {stateOptions.length === 0 ? (
+                    <div className="mt-1.5 text-[12px] text-[var(--app-text-50)]">
+                      Sem estados na lista ainda.
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {stateOptions.map((c) => {
+                        const sel = draftFilters.states.includes(c);
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => toggle("states", c)}
+                            className={[
+                              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-none",
+                              sel
+                                ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.12)] text-[var(--app-text-85)]"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                            ].join(" ")}
+                          >
+                            {c}
+                            {sel ? <X className="h-3 w-3 opacity-70" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* BLOCO 4: Data de criação */}
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                Data de cadastro
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">De</label>
+                  <input
+                    type="date"
+                    value={draftFilters.createdFrom}
+                    onChange={(e) =>
+                      setDraftFilters((p) => ({ ...p, createdFrom: e.target.value }) as LeadFilters)
+                    }
+                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Até</label>
+                  <input
+                    type="date"
+                    value={draftFilters.createdTo}
+                    onChange={(e) =>
+                      setDraftFilters((p) => ({ ...p, createdTo: e.target.value }) as LeadFilters)
+                    }
+                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Resumo filtros ativos (chips rápidos para remover) */}
+            {isFilled ? (
+              <div className="rounded-2xl border border-[rgba(234,88,12,0.3)] bg-[rgba(234,88,12,0.08)] p-3.5 shadow-none">
+                <div className="flex flex-col gap-2">
+                  {headerPill("Status", draftFilters.statusList, "statusList")}
+                  {draftFilters.stageList.length > 0
+                    ? headerPill("Etapa", draftFilters.stageList, "stageList")
+                    : null}
+                  {draftFilters.countries.length > 0
+                    ? headerPill("País", draftFilters.countries, "countries")
+                    : null}
+                  {draftFilters.states.length > 0
+                    ? headerPill("Estado", draftFilters.states, "states")
+                    : null}
+                  {Object.entries(draftFilters)
+                    .filter(([k, v]) => typeof v === "boolean" && v)
+                    .map(([k]) => {
+                      const lbl = (
+                        {
+                          onlyWithUnread: "🔔 Com não lidas",
+                          onlyWithPhone: "📞 Com telefone",
+                          onlyWithEmail: "✉️ Com e-mail",
+                          onlyWithScheduledClass: "📅 Com aula",
+                          onlyWithContract: "📝 Com contrato",
+                        } as Record<string, string>
+                      )[k] ?? k;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() =>
+                            setDraftFilters((p) => ({ ...p, [k]: false }) as LeadFilters)
+                          }
+                          className="mr-auto inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                        >
+                          {lbl}
+                          <span className="text-[var(--app-text-45)]">×</span>
+                        </button>
+                      );
+                    })}
+                  {(draftFilters.createdFrom || draftFilters.createdTo) ? (
+                    <div className="text-[11px] font-semibold text-[var(--app-text-75)]">
+                      📆 Cadastro:{" "}
+                      <span className="text-[var(--app-text-85)]">
+                        {draftFilters.createdFrom ?? "—"} até{" "}
+                        {draftFilters.createdTo ?? "—"}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Rodapé ações */}
+          <div className="mt-4 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-[12px] text-[var(--app-text-55)]">
+              Resultado filtrado: <strong className="text-[var(--app-text-85)]">{filteredLeads.length}</strong>{" "}
+              {filteredLeads.length === 1 ? "interessado" : "interessados"}
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => setDraftFilters(EMPTY_FILTERS)}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+              >
+                Limpar filtros
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveFilters(draftFilters);
+                  setShowFiltersModal(false);
+                }}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-5 text-[13px] font-semibold !text-white shadow-none app-btn-primary-bg"
+              >
+                Aplicar filtros
+              </button>
+            </div>
+          </div>
+        </div>
+      </AppModal>
+    );
+  }
+
   return (
     <div className="flex h-auto w-full min-h-full min-h-0 min-w-0 flex-col gap-4 overflow-visible min-[1201px]:h-full min-[1201px]:overflow-hidden">
       <div className="flex min-h-0 min-w-0 h-auto w-full min-h-full flex-col gap-4 min-[1201px]:flex-row min-[1201px]:h-full min-[1201px]:overflow-hidden overflow-visible">
@@ -560,6 +1010,28 @@ export function AtendimentoClient() {
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
               <Plus className="h-4 w-4" />
+            </button>
+            {/* FILTROS AVANCADOS: ao lado ESQUERDO do Bot (usuário pediu!) */}
+            <button
+              type="button"
+              onClick={() => {
+                setDraftFilters(activeFilters);
+                setShowFiltersModal(true);
+              }}
+              aria-label="Filtros avançados de interessados"
+              className={[
+                "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all shadow-none",
+                Object.values(activeFilters).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v))
+                  ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.12)] text-[#9a3412] hover:bg-[rgba(234,88,12,0.18)]"
+                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60",
+              ].join(" ")}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {Object.values(activeFilters).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v)) ? (
+                <span className="pointer-events-none absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#ea580c] text-[9px] font-extrabold leading-none !text-white">
+                  •
+                </span>
+              ) : null}
             </button>
             <div className="relative">
               <button
@@ -1503,6 +1975,9 @@ export function AtendimentoClient() {
 
       {/* MODAL MÉTRICAS: Resumo dos interessados (clicou no ícone BarChart3 no header) */}
       {renderMetricsModal()}
+
+      {/* MODAL FILTROS AVANCADOS: Clicou no ícone SlidersHorizontal (ao lado ESQUERDO do Bot!) */}
+      {renderFiltersModal()}
     </div>
   );
 }
