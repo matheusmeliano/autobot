@@ -447,9 +447,6 @@ export function AtendimentoClient() {
         size="xl"
         position="center"
         zIndexClass="z-[400]"
-        fullScreenOnMobile={false}
-        closeOnBackdrop={true}
-        closeOnEscape={true}
       >
         <div className="flex w-full flex-col gap-0">
           {/* Header modal */}
