@@ -949,7 +949,7 @@ export function AtendimentoClient() {
           </div>
         </aside>
 
-        <div className="hidden min-[1201px]:contents">
+        <div className="hidden min-[1201px]:flex min-h-0 min-w-0 w-full flex-1 h-0 overflow-hidden">
           {renderLeadDetailSection()}
         </div>
       </div>
