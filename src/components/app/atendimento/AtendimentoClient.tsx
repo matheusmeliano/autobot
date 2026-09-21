@@ -691,6 +691,11 @@ export function AtendimentoClient() {
   }
 
   function handleOpenExperimentalBooking(lead: AtendimentoLeadListItem) {
+    const fullNameRaw = String(lead?.full_name ?? "").trim();
+    if (!fullNameRaw) {
+      modalToast.error("Cadastre o nome do aluno antes de agendar uma aula.");
+      return;
+    }
     setEditingExperimentalLead(lead);
     setSelectedExperimentalDateId(null);
     setSelectedExperimentalSlotId(null);
