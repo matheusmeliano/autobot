@@ -3305,25 +3305,25 @@ export function AtendimentoClient() {
                             className={
                               "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition " +
                               (isSelected
-                                ? "border-transparent bg-[#ea580c] text-white shadow"
+                                ? "!border-transparent !bg-[#ea580c] !text-white shadow"
                                 : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]")
                             }
                           >
                             <div className={
                               "text-[11px] uppercase tracking-wide " +
-                              (isSelected ? "text-white/90" : "text-[var(--app-text-50)]")
+                              (isSelected ? "!text-white" : "text-[var(--app-text-50)]")
                             }>
                               {displayLabel ? displayLabel.split(",")[0] ?? "Dia" : "Dia"}
                             </div>
                             <div className={
                               "text-lg font-black leading-none " +
-                              (isSelected ? "text-white" : "text-[var(--app-text-90)]")
+                              (isSelected ? "!text-white" : "text-[var(--app-text-90)]")
                             }>
                               {dayLabel}
                             </div>
                             <div className={
                               "text-[10px] font-semibold " +
-                              (isSelected ? "text-white/85" : "text-[var(--app-text-45)]")
+                              (isSelected ? "!text-white" : "text-[var(--app-text-45)]")
                             }>
                               {slotCount > 0
                                 ? `${slotCount} ${slotCount === 1 ? "horário" : "horários"}`
@@ -3385,7 +3385,7 @@ export function AtendimentoClient() {
                                 className={
                                   "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-black transition " +
                                   (isSelected
-                                    ? "border-transparent bg-[#ea580c] text-white shadow"
+                                    ? "!border-transparent !bg-[#ea580c] !text-white shadow"
                                     : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]")
                                 }
                               >
