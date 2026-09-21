@@ -716,22 +716,10 @@ export function AtendimentoClient() {
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-semibold text-[var(--app-text-60)]">Cidade</label>
-              <input
-                type="text"
-                autoFocus
-                value={editLocationCity}
-                onChange={(e) => setEditLocationCity(e.target.value)}
-                placeholder="Ex: Cuiabá, Orlando, Lisboa"
-                disabled={editLocationSaving}
-                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-
-            <div>
               <label className="text-xs font-semibold text-[var(--app-text-60)]">Estado</label>
               <input
                 type="text"
+                autoFocus
                 value={editLocationState}
                 onChange={(e) => setEditLocationState(e.target.value)}
                 placeholder="Ex: MT, SP, FL, CA, Nova York"
@@ -739,19 +727,17 @@ export function AtendimentoClient() {
                 className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
-          </div>
 
-          <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
-            <div className="text-[11px] font-semibold text-[var(--app-text-60)]">
-              💡 Com base em <span className="text-[#9a3412]">Cidade + Estado</span>, o sistema preenche automaticamente:
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-70)]">
-                🌎 País
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-70)]">
-                🕐 Fuso horário
-              </span>
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">Cidade</label>
+              <input
+                type="text"
+                value={editLocationCity}
+                onChange={(e) => setEditLocationCity(e.target.value)}
+                placeholder="Ex: Cuiabá, Orlando, Lisboa"
+                disabled={editLocationSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
             </div>
           </div>
 
