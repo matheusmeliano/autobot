@@ -320,6 +320,13 @@ export function AtendimentoClient() {
     return panelLeads.find((l) => l.id === selectedLeadId) ?? null;
   }, [panelLeads, selectedLeadId]);
 
+  const bookingLocationOk = useMemo<boolean>(() => {
+    if (!selectedLead) return false;
+    const stateRaw = String((selectedLead as any)?.state ?? "").trim();
+    const cityRaw = String((selectedLead as any)?.city ?? "").trim();
+    return Boolean(stateRaw) && Boolean(cityRaw);
+  }, [selectedLead]);
+
   const applyFiltersToLeads = (
     leads: AtendimentoLeadListItem[],
     f: LeadFilters,
@@ -2532,7 +2539,12 @@ export function AtendimentoClient() {
                       </div>
 
                       {/* CARD 4: Próxima aula */}
-                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                      <div className={
+                        "overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none transition-opacity " +
+                        (bookingLocationOk
+                          ? ""
+                          : "opacity-50 pointer-events-none select-none cursor-not-allowed")
+                      }>
                         <div className="flex items-center gap-2">
                           <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
                           <div className="text-[15px] font-bold text-[var(--app-text-85)]">
@@ -3041,7 +3053,12 @@ export function AtendimentoClient() {
                     </div>
 
                     {/* CARD 4: Próxima aula */}
-                    <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                    <div className={
+                      "overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none transition-opacity " +
+                      (bookingLocationOk
+                        ? ""
+                        : "opacity-50 pointer-events-none select-none cursor-not-allowed")
+                    }>
                       <div className="flex items-center gap-2">
                         <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
                         <div className="text-[15px] font-bold text-[var(--app-text-85)]">
