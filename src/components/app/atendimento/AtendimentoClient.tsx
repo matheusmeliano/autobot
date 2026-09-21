@@ -1164,7 +1164,7 @@ export function AtendimentoClient() {
                   Métricas e resumo
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Visão geral dos registros e do funil
+                  Visão geral dos registros e do funil.
                 </div>
               </div>
             </div>
