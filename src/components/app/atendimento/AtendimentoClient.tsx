@@ -720,7 +720,7 @@ export function AtendimentoClient() {
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-3">
             <div>
               <label className="text-xs font-semibold text-[var(--app-text-60)]">Estado</label>
               <input
@@ -1080,7 +1080,7 @@ export function AtendimentoClient() {
           </div>
 
           <div className="mt-4 flex flex-col gap-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="text-xs font-semibold text-[var(--app-text-60)]">
                   Telefone <span className="text-[#ea580c]">*</span>
