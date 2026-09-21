@@ -1081,9 +1081,6 @@ export function AtendimentoClient() {
                   disabled={editLeadSaving}
                   className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
-                  Formata automático: +55 (65) 9 9693-3336 / +1 (415) 555-9876
-                </div>
               </div>
 
               <div>
