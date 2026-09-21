@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, MapPin, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
 import { STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
@@ -237,6 +237,11 @@ export function AtendimentoClient() {
   const [editLeadCountry, setEditLeadCountry] = useState("");
   const [editLeadTimezone, setEditLeadTimezone] = useState("");
   const [editLeadSaving, setEditLeadSaving] = useState(false);
+
+  const [editLocationOpen, setEditLocationOpen] = useState(false);
+  const [editLocationCity, setEditLocationCity] = useState("");
+  const [editLocationState, setEditLocationState] = useState("");
+  const [editLocationSaving, setEditLocationSaving] = useState(false);
 
   type LeadFilters = {
     statusList: string[];
@@ -630,6 +635,150 @@ export function AtendimentoClient() {
       setEditLeadSaving(false);
     }
   }
+
+  function handleOpenEditLocationSelected() {
+    if (!selectedLead) return;
+    setEditLocationCity(String((selectedLead as any).city ?? "").trim());
+    setEditLocationState(String((selectedLead as any).state ?? "").trim());
+    setEditLocationOpen(true);
+  }
+
+  async function handleSaveEditLocationSelected() {
+    if (!selectedLead || editLocationSaving) return;
+    try {
+      setEditLocationSaving(true);
+      const response = await fetch(`/api/atendimento/leads/${selectedLead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          city: String(editLocationCity ?? "").trim() || null,
+          state: String(editLocationState ?? "").trim() || null,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao atualizar localização.");
+        return;
+      }
+      if (payload.lead) {
+        setPanelLeads((current) => current.map((item) => (item.id === selectedLead.id ? { ...item, ...payload.lead } : item)));
+      }
+      setEditLocationOpen(false);
+      modalToast.success("Localização atualizada com sucesso.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao atualizar localização.");
+    } finally {
+      setEditLocationSaving(false);
+    }
+  }
+
+  function renderEditLocationModal() {
+    return (
+      <AppModal
+        open={editLocationOpen}
+        onClose={() => {
+          setEditLocationOpen(false);
+        }}
+        size="md"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+        closeOnBackdrop={!editLocationSaving}
+        closeOnEscape={!editLocationSaving}
+      >
+        <form className="flex w-full flex-col gap-0" onSubmit={(e) => { e.preventDefault(); void handleSaveEditLocationSelected(); }}>
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <MapPin className="h-5 w-5 text-[#9a3412]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Editar localização
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  País e fuso horário são preenchidos automaticamente
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={editLocationSaving}
+              onClick={() => {
+                setEditLocationOpen(false);
+              }}
+              aria-label="Fechar"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">Cidade</label>
+              <input
+                type="text"
+                autoFocus
+                value={editLocationCity}
+                onChange={(e) => setEditLocationCity(e.target.value)}
+                placeholder="Ex: Cuiabá, Orlando, Lisboa"
+                disabled={editLocationSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[var(--app-text-60)]">Estado</label>
+              <input
+                type="text"
+                value={editLocationState}
+                onChange={(e) => setEditLocationState(e.target.value)}
+                placeholder="Ex: MT, SP, FL, CA, Nova York"
+                disabled={editLocationSaving}
+                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3">
+            <div className="text-[11px] font-semibold text-[var(--app-text-60)]">
+              💡 Com base em <span className="text-[#9a3412]">Cidade + Estado</span>, o sistema preenche automaticamente:
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-70)]">
+                🌎 País
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-70)]">
+                🕐 Fuso horário
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-5 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setEditLocationOpen(false);
+              }}
+              disabled={editLocationSaving}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={editLocationSaving}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {editLocationSaving ? "Salvando…" : "Salvar localização"}
+            </button>
+          </div>
+        </form>
+      </AppModal>
+    );
+  }
+
   async function handleDeleteSelected() {
     if (!selectedLead || deletingSelectedLoading) return;
     const sl = selectedLead;
@@ -1920,7 +2069,7 @@ export function AtendimentoClient() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleOpenEditSelected()}
+                            onClick={() => handleOpenEditLocationSelected()}
                             className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -2723,6 +2872,9 @@ export function AtendimentoClient() {
 
       {/* Modal Editar Lead (clicou no botão Editar no header) */}
       {renderEditLeadModal()}
+
+      {/* Modal Editar LOCALIZAÇÃO (clicou no botão Editar DENTRO do card Informações — SÓ Cidade + Estado) */}
+      {renderEditLocationModal()}
 
       {/* MODAL MÉTRICAS: Resumo dos registros (clicou no ícone BarChart3 no header) */}
       {renderMetricsModal()}
