@@ -144,31 +144,27 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
 
 function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title: string; body: string; tone: "warning" | "success" | "default" } | null {
   const st = String(lead.status ?? "").trim().toLowerCase();
-  const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
-  const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
-  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
-  const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
-  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
   const stateRaw = String((lead as any)?.state ?? "").trim();
   const cityRaw = String((lead as any)?.city ?? "").trim();
   const locationOk = Boolean(stateRaw) && Boolean(cityRaw);
   const ps = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
-  const payConfirmed = ps === "confirmado" || ps === "matriculado" || st === "matriculado" || st === "aluno" || fs === "matriculado" || fs === "matricula_confirmada";
+  const payConfirmed = ps === "confirmado" || ps === "matriculado" || st === "matriculado" || st === "aluno";
   if (payConfirmed) return { title: "Matrícula concluída", body: "Todos os dados foram confirmados.", tone: "success" };
-  const rec = recurringWeekdayOk || recurringTimeOk || regStepOk || Boolean(rcsRaw);
-  if (rec && !locationOk && regStepOk && regStepRaw >= 1) {
-    return { title: "Falta estado e cidade", body: "Complete as informações para avançar.", tone: "warning" };
+  if (!locationOk) {
+    return { title: "Falta estado e cidade", body: "Clique em Editar no card Informações para preencher.", tone: "warning" };
   }
+  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
+  const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
+  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
+  const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+  const rec = recurringWeekdayOk || recurringTimeOk || regStepOk || Boolean(rcsRaw);
   if (rec && !recurringWeekdayOk && !recurringTimeOk) {
     return { title: "Falta dia e horário recorrentes", body: "Defina dia e horário para continuar.", tone: "warning" };
   }
   const expMeta = buildExperimentalMetaForList(lead);
   if (!rec && expMeta.tone === "warning") {
     return { title: expMeta.label, body: "Complete os dados para agendar a aula experimental.", tone: "warning" };
-  }
-  if (!locationOk && st !== "aluno" && !rec) {
-    return null;
   }
   return null;
 }
