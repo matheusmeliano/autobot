@@ -146,14 +146,10 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
   const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
   const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
-  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
   const stateRaw = String((lead as any)?.state ?? "").trim();
   const cityRaw = String((lead as any)?.city ?? "").trim();
-  const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
-  const hasAnyRecurring = recurringWeekdayOk || recurringTimeOk || regStepOk || Boolean(rcsRaw);
-  if (hasAnyRecurring && !(Boolean(stateRaw) && Boolean(cityRaw)) && regStepOk && regStepRaw >= 1) {
-    return { label: "Falta estado e cidade", tone: "warning" };
-  }
+  const locationOk = Boolean(stateRaw) && Boolean(cityRaw);
+  if (!locationOk) return { label: "Falta estado e cidade", tone: "warning" };
   if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !expDraftDate) {
     return { label: "Falta dia e horário", tone: "warning" };
   }
