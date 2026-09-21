@@ -1755,7 +1755,7 @@ export function AtendimentoClient() {
                     DESKTOP (sm+): scroll horizontal com setas laranjas overlap (mantém anterior).
                 */}
                 <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative px-4 py-3 sm:px-0 sm:py-0">
-                  {/* MOBILE (< sm): pills segmented control */}
+                  {/* MOBILE (< sm): segmented control SÓ ÍCONES (sem label, economiza espaço) */}
                   <div className="flex sm:hidden w-full items-center gap-1.5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-1.5">
                     {LEAD_DETAILS_TABS.map((tab) => {
                       const isActive = tab.id === activeTab;
@@ -1765,15 +1765,15 @@ export function AtendimentoClient() {
                           type="button"
                           onClick={() => setActiveTab(tab.id)}
                           className={[
-                            "group inline-flex min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-semibold transition-all",
+                            "group inline-flex min-h-[40px] min-w-0 flex-1 shrink-0 items-center justify-center rounded-xl transition-all",
                             isActive
                               ? "bg-[var(--app-solid-surface)] text-[#9a3412] shadow-sm ring-1 ring-[var(--app-border)]"
                               : "bg-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
                           ].join(" ")}
                           title={tab.label}
+                          aria-label={tab.label}
                         >
                           <span className="shrink-0">{tab.icon}</span>
-                          <span className="truncate">{tab.label}</span>
                         </button>
                       );
                     })}
@@ -2262,7 +2262,7 @@ export function AtendimentoClient() {
                   DESKTOP (sm+): scroll horizontal com setas laranjas overlap (mantém anterior).
               */}
               <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative px-4 py-3 sm:px-0 sm:py-0">
-                {/* MOBILE (< sm): pills segmented control */}
+                {/* MOBILE (< sm): segmented control SÓ ÍCONES (sem label, economiza espaço) */}
                 <div className="flex sm:hidden w-full items-center gap-1.5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-1.5">
                   {LEAD_DETAILS_TABS.map((tab) => {
                     const isActive = tab.id === activeTab;
@@ -2272,15 +2272,15 @@ export function AtendimentoClient() {
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
                         className={[
-                          "group inline-flex min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-semibold transition-all",
+                          "group inline-flex min-h-[40px] min-w-0 flex-1 shrink-0 items-center justify-center rounded-xl transition-all",
                           isActive
                             ? "bg-[var(--app-solid-surface)] text-[#9a3412] shadow-sm ring-1 ring-[var(--app-border)]"
                             : "bg-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
                         ].join(" ")}
                         title={tab.label}
+                        aria-label={tab.label}
                       >
                         <span className="shrink-0">{tab.icon}</span>
-                        <span className="truncate">{tab.label}</span>
                       </button>
                     );
                   })}
