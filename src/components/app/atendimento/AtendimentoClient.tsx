@@ -3268,7 +3268,7 @@ export function AtendimentoClient() {
               <>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs font-semibold text-[var(--app-text-60)]">
+                    <label className="text-xs font-semibold text-[var(--app-text-70)]">
                       Dias disponíveis
                       {experimentalAvailability?.dates?.length ? (
                         <span className="ml-2 font-normal text-[var(--app-text-45)]">
@@ -3276,8 +3276,8 @@ export function AtendimentoClient() {
                         </span>
                       ) : null}
                     </label>
-                    <div className="text-[11px] text-[var(--app-text-50)]">
-                      Fuso: {String(experimentalAvailability?.lead_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
+                    <div className="text-[11px] font-medium text-[var(--app-text-55)]">
+                      Fuso horário: {String(experimentalAvailability?.lead_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
                     </div>
                   </div>
 
@@ -3294,6 +3294,25 @@ export function AtendimentoClient() {
                         const displayLabel = String(dateOption?.displayLabel ?? "").trim();
                         const slotCount = Number(dateOption?.slotCount ?? 0);
                         const isSelected = selectedExperimentalDateId === dateId;
+                        const dateRaw = String(dateOption?.professorDate ?? dateId ?? "").slice(0, 10);
+                        let weekdayShort = displayLabel
+                          ? displayLabel.split(",")[0]?.trim() ?? ""
+                          : "";
+                        if (!weekdayShort || /^\d+$/.test(weekdayShort.replace(/\s/g, "")) || weekdayShort.length > 4) {
+                          try {
+                            if (/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
+                              const d = new Date(dateRaw + "T00:00:00");
+                              weekdayShort = new Intl.DateTimeFormat("pt-BR", { weekday: "short" })
+                                .format(d)
+                                .replace(/\./g, "")
+                                .slice(0, 3)
+                                .toLowerCase();
+                              weekdayShort =
+                                weekdayShort.charAt(0).toUpperCase() + weekdayShort.slice(1);
+                            }
+                          } catch {}
+                        }
+                        if (!weekdayShort) weekdayShort = "Dia";
                         return (
                           <button
                             key={dateId}
@@ -3303,27 +3322,27 @@ export function AtendimentoClient() {
                               setSelectedExperimentalSlotId(null);
                             }}
                             className={
-                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition " +
+                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 " +
                               (isSelected
-                                ? "!border-transparent !bg-[#ea580c] !text-white shadow"
-                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]")
+                                ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
                             }
                           >
                             <div className={
-                              "text-[11px] uppercase tracking-wide " +
-                              (isSelected ? "!text-white" : "text-[var(--app-text-50)]")
+                              "text-[11px] uppercase tracking-wide font-semibold " +
+                              (isSelected ? "!text-white/95" : "text-[var(--app-text-50)]")
                             }>
-                              {displayLabel ? displayLabel.split(",")[0] ?? "Dia" : "Dia"}
+                              {weekdayShort}
                             </div>
                             <div className={
-                              "text-lg font-black leading-none " +
-                              (isSelected ? "!text-white" : "text-[var(--app-text-90)]")
+                              "text-[20px] font-black leading-none " +
+                              (isSelected ? "!text-white" : "text-[var(--app-text-92)]")
                             }>
                               {dayLabel}
                             </div>
                             <div className={
                               "text-[10px] font-semibold " +
-                              (isSelected ? "!text-white" : "text-[var(--app-text-45)]")
+                              (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
                             }>
                               {slotCount > 0
                                 ? `${slotCount} ${slotCount === 1 ? "horário" : "horários"}`
@@ -3337,7 +3356,7 @@ export function AtendimentoClient() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-[var(--app-text-60)]">
+                  <label className="text-xs font-semibold text-[var(--app-text-70)]">
                     Horários disponíveis
                     {selectedExperimentalDateId ? (
                       <span className="ml-2 font-normal text-[var(--app-text-45)]">
@@ -3351,7 +3370,7 @@ export function AtendimentoClient() {
                   </label>
 
                   {!selectedExperimentalDateId ? (
-                    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-[13px] text-[var(--app-text-55)]">
+                    <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
                       Clique em um dia acima para ver os horários disponíveis.
                     </div>
                   ) : (
@@ -3365,7 +3384,7 @@ export function AtendimentoClient() {
                         : [];
                       if (!slots.length) {
                         return (
-                          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-[13px] text-[var(--app-text-55)]">
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
                             Não há horários livres para este dia. Selecione outro dia disponível.
                           </div>
                         );
@@ -3383,10 +3402,10 @@ export function AtendimentoClient() {
                                 type="button"
                                 onClick={() => setSelectedExperimentalSlotId(slotId)}
                                 className={
-                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-black transition " +
+                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-black transition duration-150 " +
                                   (isSelected
-                                    ? "!border-transparent !bg-[#ea580c] !text-white shadow"
-                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]")
+                                    ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
                                 }
                               >
                                 {label || "Horário"}
