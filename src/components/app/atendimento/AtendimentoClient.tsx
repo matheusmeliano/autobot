@@ -1845,6 +1845,7 @@ export function AtendimentoClient() {
                           </div>
                           <button
                             type="button"
+                            onClick={() => handleOpenEditSelected()}
                             className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                           >
                             <Pencil className="h-3.5 w-3.5" />
