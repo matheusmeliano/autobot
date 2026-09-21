@@ -1706,7 +1706,7 @@ export function AtendimentoClient() {
                             Copiar
                           </button>
                         </div>
-                        <div className="mt-1 text-[11px] text-[var(--app-text-55)] sm:text-[12px]">
+                      <div className="mt-1 text-[12px] text-[var(--app-text-55)] sm:text-[13px]">
                           Criado em: {formatAtendimentoDateTime(sl.created_at)}
                         </div>
                       </div>
