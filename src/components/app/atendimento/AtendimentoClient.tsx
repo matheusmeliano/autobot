@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, MapPin, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, MapPin, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
