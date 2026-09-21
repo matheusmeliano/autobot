@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, MapPin, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
@@ -267,6 +267,9 @@ export function AtendimentoClient() {
   } | null>(null);
   const [selectedExperimentalDateId, setSelectedExperimentalDateId] = useState<string | null>(null);
   const [selectedExperimentalSlotId, setSelectedExperimentalSlotId] = useState<string | null>(null);
+
+  const [isExpInfoOpen, setIsExpInfoOpen] = useState(false);
+  const [expInfoLead, setExpInfoLead] = useState<AtendimentoLeadListItem | null>(null);
 
   type LeadFilters = {
     statusList: string[];
@@ -765,6 +768,17 @@ export function AtendimentoClient() {
     setExperimentalAvailability(null);
     setSelectedExperimentalDateId(null);
     setSelectedExperimentalSlotId(null);
+  }
+
+  function handleOpenExpInfo(lead: AtendimentoLeadListItem | null) {
+    if (!lead) return;
+    setExpInfoLead(lead);
+    setIsExpInfoOpen(true);
+  }
+
+  function handleCloseExpInfo() {
+    setIsExpInfoOpen(false);
+    setExpInfoLead(null);
   }
 
   async function handleSaveExperimentalBooking() {
@@ -2569,7 +2583,15 @@ export function AtendimentoClient() {
                                 </div>
                               </div>
                             </div>
-                            <div className="mt-4 flex justify-end">
+                            <div className="mt-4 flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenExpInfo(selectedLead)}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              >
+                                <Info className="h-4 w-4" />
+                                Mais informações
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleOpenExperimentalBooking(selectedLead)}
@@ -3083,7 +3105,15 @@ export function AtendimentoClient() {
                               </div>
                             </div>
                           </div>
-                          <div className="mt-4 flex justify-end">
+                          <div className="mt-4 flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenExpInfo(selectedLead)}
+                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                            >
+                              <Info className="h-4 w-4" />
+                              Mais informações
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleOpenExperimentalBooking(selectedLead)}
@@ -3474,6 +3504,250 @@ export function AtendimentoClient() {
                 ) : (
                   "Salvar aula"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </AppModal>
+
+      {/* Modal MAIS INFORMAÇÕES: Resumo do agendamento aula experimental (só quando existe) */}
+      <AppModal
+        open={isExpInfoOpen}
+        onClose={handleCloseExpInfo}
+        size="md"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+        closeOnBackdrop={true}
+        closeOnEscape={true}
+      >
+        <div className="flex w-full flex-col gap-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <Info className="h-5 w-5 text-[#9a3412]" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Agendamento aula experimental
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Resumo completo do horário marcado para o registro.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Fechar"
+              onClick={handleCloseExpInfo}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {(() => {
+              const lead = expInfoLead ?? selectedLead;
+              if (!lead) {
+                return (
+                  <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
+                    Dados indisponíveis no momento.
+                  </div>
+                );
+              }
+
+              const bookingObj =
+                (lead as any)?.future_experimental_class_booking ??
+                (lead as any)?.experimental_class_booking ??
+                null;
+
+              const leadDateRaw = String(
+                (lead as any)?.experimental_class_lead_date ??
+                  (bookingObj as any)?.lead_date ??
+                  "",
+              ).trim();
+              const leadTimeRaw = String(
+                (lead as any)?.experimental_class_lead_time ??
+                  (bookingObj as any)?.lead_time ??
+                  "",
+              ).trim();
+              const profDateRaw = String(
+                (lead as any)?.experimental_class_professor_date ??
+                  (bookingObj as any)?.professor_date ??
+                  "",
+              ).trim();
+              const profTimeRaw = String(
+                (lead as any)?.experimental_class_professor_time ??
+                  (bookingObj as any)?.professor_time ??
+                  "",
+              ).trim();
+              const leadTz = String(
+                (bookingObj as any)?.lead_timezone ??
+                  (lead as any)?.timezone ??
+                  "",
+              ).trim();
+              const profTz = String(
+                (bookingObj as any)?.professor_timezone ??
+                  ATENDIMENTO_PROFESSOR_TIME_ZONE ??
+                  "",
+              ).trim();
+              const lessonLink = String(
+                (bookingObj as any)?.lesson_link ??
+                  "",
+              ).trim();
+              const statusRaw = String(
+                (bookingObj as any)?.status ??
+                  (lead as any)?.experimental_class_status ??
+                  "",
+              ).trim();
+              const attendanceRaw = String(
+                (bookingObj as any)?.attendance_status ??
+                  "",
+              ).trim();
+              const createdAtRaw = String(
+                (bookingObj as any)?.created_at ??
+                  "",
+              ).trim();
+              const updatedAtRaw = String(
+                (bookingObj as any)?.updated_at ??
+                  "",
+              ).trim();
+
+              const formatTime = (raw: string) => {
+                if (!raw) return "—";
+                const clean = raw.replace(/h/gi, "").trim();
+                return clean ? `${clean}h` : "—";
+              };
+
+              const statusLabel = (() => {
+                const s = statusRaw.toLowerCase();
+                if (!s) return "—";
+                if (s === "scheduled") return "Agendada";
+                if (s === "completed" || s === "concluida" || s === "concluída") return "Concluída";
+                if (s === "cancelled" || s === "cancelada" || s === "cancelado") return "Cancelada";
+                if (s === "draft") return "Rascunho";
+                if (s === "rescheduled") return "Reagendada";
+                if (s === "no_show") return "Não compareceu";
+                if (s === "attended") return "Compareceu";
+                return statusRaw;
+              })();
+
+              const attendanceLabel = (() => {
+                const s = attendanceRaw.toLowerCase();
+                if (!s) return "—";
+                if (s === "presente" || s === "attended" || s === "present") return "Presente";
+                if (s === "ausente" || s === "absent" || s === "no_show") return "Ausente";
+                return attendanceRaw;
+              })();
+
+              const rowClass =
+                "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3";
+              const labelClass = "text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)] min-w-0 shrink-0";
+              const valueClass = "text-[14px] font-semibold text-[var(--app-text-85)] min-w-0 break-words sm:text-right";
+
+              return (
+                <>
+                  <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4 space-y-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                          Dia (aluno)
+                        </div>
+                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                          {leadDateRaw ? formatAtendimentoDate(leadDateRaw) : "—"}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                          Horário (aluno)
+                        </div>
+                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                          {formatTime(leadTimeRaw)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                          Dia (professor)
+                        </div>
+                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                          {profDateRaw ? formatAtendimentoDate(profDateRaw) : "—"}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                          Horário (professor)
+                        </div>
+                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                          {formatTime(profTimeRaw)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className={rowClass}>
+                      <div className={labelClass}>Fuso horário (aluno)</div>
+                      <div className={valueClass}>{leadTz || "—"}</div>
+                    </div>
+                    <div className={rowClass}>
+                      <div className={labelClass}>Fuso horário (professor)</div>
+                      <div className={valueClass}>{profTz || "—"}</div>
+                    </div>
+                    <div className={rowClass}>
+                      <div className={labelClass}>Status</div>
+                      <div className={valueClass}>{statusLabel}</div>
+                    </div>
+                    <div className={rowClass}>
+                      <div className={labelClass}>Presença</div>
+                      <div className={valueClass}>{attendanceLabel}</div>
+                    </div>
+                    <div className={rowClass}>
+                      <div className={labelClass}>Link da sala de aula</div>
+                      <div className={valueClass}>
+                        {lessonLink ? (
+                          <a
+                            href={lessonLink}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#ea580c] hover:text-[#c2410c] underline-offset-2 hover:underline"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Abrir sala de aula
+                          </a>
+                        ) : (
+                          <span className="text-[var(--app-text-50)]">Não definido</span>
+                        )}
+                      </div>
+                    </div>
+                    {createdAtRaw ? (
+                      <div className={rowClass}>
+                        <div className={labelClass}>Agendado em</div>
+                        <div className={valueClass}>
+                          {formatAtendimentoDateTime(createdAtRaw)}
+                        </div>
+                      </div>
+                    ) : null}
+                    {updatedAtRaw && updatedAtRaw !== createdAtRaw ? (
+                      <div className={rowClass}>
+                        <div className={labelClass}>Atualizado em</div>
+                        <div className={valueClass}>
+                          {formatAtendimentoDateTime(updatedAtRaw)}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              );
+            })()}
+
+            <div className="mt-2 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCloseExpInfo}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Fechar
               </button>
             </div>
           </div>
