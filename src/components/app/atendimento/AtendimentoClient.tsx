@@ -1621,62 +1621,65 @@ export function AtendimentoClient() {
             return (
               <>
                 {/* HEADER DO LEAD (Avatar + Nome + Telefone + Botoes) — FIXO (shrink-0, nunca some!) */}
-                <div className="flex shrink-0 items-start justify-between gap-4 px-6 pt-6">
-                  <div className="flex items-start gap-4 min-w-0">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--app-active)] text-[24px] font-semibold text-[#9a3412]">
-                      {buildInitials(sl.full_name)}
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="truncate text-[22px] font-bold leading-tight text-[var(--app-text-85)]">
-                        {sl.full_name?.trim() || "Sem nome"}
-                      </h2>
-                      <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        <span className="text-[14px] font-semibold text-[var(--app-text-80)]">
-                          📞 {sl.phone?.trim() ? applyPhoneMask(sl.phone) : "Sem telefone"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyPhone(sl)}
-                          className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 text-[11px] font-semibold text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
-                        >
-                          <Copy className="h-3 w-3" />
-                          Copiar
-                        </button>
+                <div className="flex shrink-0 flex-col gap-4 px-5 pt-5 sm:px-6 sm:pt-6">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-4 min-w-0">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[20px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
+                        {buildInitials(sl.full_name)}
                       </div>
-                      <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                        Criado em: {formatAtendimentoDateTime(sl.created_at)}
+                      <div className="min-w-0 flex-1">
+                        <h2 className="truncate text-[20px] font-bold leading-tight text-[var(--app-text-85)] sm:text-[22px]">
+                          {sl.full_name?.trim() || "Sem nome"}
+                        </h2>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <span className="truncate text-[13px] font-semibold text-[var(--app-text-80)] sm:text-[14px]">
+                            📞 {sl.phone?.trim() ? applyPhoneMask(sl.phone) : "Sem telefone"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPhone(sl)}
+                            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 text-[11px] font-semibold text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            Copiar
+                          </button>
+                        </div>
+                        <div className="mt-1 text-[11px] text-[var(--app-text-55)] sm:text-[12px]">
+                          Criado em: {formatAtendimentoDateTime(sl.created_at)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditSelected()}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                    >
-                      <Pencil className="h-4 w-4" />
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteSelected()}
-                      disabled={deletingSelectedLoading}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
-                      aria-label="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Excluir
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedLeadId(null);
-                      }}
-                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
-                      aria-label="Fechar"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+
+                    <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditSelected()}
+                        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSelected()}
+                        disabled={deletingSelectedLoading}
+                        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
+                        aria-label="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLeadId(null);
+                        }}
+                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                        aria-label="Fechar"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -2054,63 +2057,66 @@ export function AtendimentoClient() {
           return (
             <div className="h-full max-h-full overflow-auto flex w-full flex-col gap-0">
               {/* HEADER DO LEAD — MODAL MOBILE */}
-              <div className="flex shrink-0 items-start justify-between gap-4 pt-1">
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--app-active)] text-[24px] font-semibold text-[#9a3412]">
-                    {buildInitials(sl.full_name)}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="truncate text-[22px] font-bold leading-tight text-[var(--app-text-85)]">
-                      {sl.full_name?.trim() || "Sem nome"}
-                    </h2>
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      <span className="text-[14px] font-semibold text-[var(--app-text-80)]">
-                        📞 {sl.phone?.trim() || "Sem telefone"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyPhone(sl)}
-                        className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 text-[11px] font-semibold text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
-                      >
-                        <Copy className="h-3 w-3" />
-                        Copiar
-                      </button>
+              <div className="flex shrink-0 flex-col gap-4 pt-1">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-4 min-w-0">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[20px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
+                      {buildInitials(sl.full_name)}
                     </div>
-                    <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                      Criado em: {formatAtendimentoDateTime(sl.created_at)}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-[20px] font-bold leading-tight text-[var(--app-text-85)] sm:text-[22px]">
+                        {sl.full_name?.trim() || "Sem nome"}
+                      </h2>
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <span className="truncate text-[13px] font-semibold text-[var(--app-text-80)] sm:text-[14px]">
+                          📞 {sl.phone?.trim() ? applyPhoneMask(sl.phone) : "Sem telefone"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPhone(sl)}
+                          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 text-[11px] font-semibold text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          Copiar
+                        </button>
+                      </div>
+                      <div className="mt-1 text-[11px] text-[var(--app-text-55)] sm:text-[12px]">
+                        Criado em: {formatAtendimentoDateTime(sl.created_at)}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditSelected()}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDeleteSelected()}
-                    disabled={deletingSelectedLoading}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
-                    aria-label="Excluir"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Excluir
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedLeadId(null);
-                      setShowMobileLeadModal(false);
-                    }}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
-                    aria-label="Fechar"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+
+                  <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditSelected()}
+                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteSelected()}
+                      disabled={deletingSelectedLoading}
+                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
+                      aria-label="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLeadId(null);
+                        setShowMobileLeadModal(false);
+                      }}
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                      aria-label="Fechar"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
