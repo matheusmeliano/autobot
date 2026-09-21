@@ -3582,162 +3582,49 @@ export function AtendimentoClient() {
                   (bookingObj as any)?.professor_time ??
                   "",
               ).trim();
-              const leadTz = String(
-                (bookingObj as any)?.lead_timezone ??
-                  (lead as any)?.timezone ??
-                  "",
-              ).trim();
-              const profTz = String(
-                (bookingObj as any)?.professor_timezone ??
-                  ATENDIMENTO_PROFESSOR_TIME_ZONE ??
-                  "",
-              ).trim();
-              const lessonLink = String(
-                (bookingObj as any)?.lesson_link ??
-                  "",
-              ).trim();
-              const statusRaw = String(
-                (bookingObj as any)?.status ??
-                  (lead as any)?.experimental_class_status ??
-                  "",
-              ).trim();
-              const attendanceRaw = String(
-                (bookingObj as any)?.attendance_status ??
-                  "",
-              ).trim();
-              const createdAtRaw = String(
-                (bookingObj as any)?.created_at ??
-                  "",
-              ).trim();
-              const updatedAtRaw = String(
-                (bookingObj as any)?.updated_at ??
-                  "",
-              ).trim();
-
               const formatTime = (raw: string) => {
                 if (!raw) return "—";
                 const clean = raw.replace(/h/gi, "").trim();
                 return clean ? `${clean}h` : "—";
               };
 
-              const statusLabel = (() => {
-                const s = statusRaw.toLowerCase();
-                if (!s) return "—";
-                if (s === "scheduled") return "Agendada";
-                if (s === "completed" || s === "concluida" || s === "concluída") return "Concluída";
-                if (s === "cancelled" || s === "cancelada" || s === "cancelado") return "Cancelada";
-                if (s === "draft") return "Rascunho";
-                if (s === "rescheduled") return "Reagendada";
-                if (s === "no_show") return "Não compareceu";
-                if (s === "attended") return "Compareceu";
-                return statusRaw;
-              })();
-
-              const attendanceLabel = (() => {
-                const s = attendanceRaw.toLowerCase();
-                if (!s) return "—";
-                if (s === "presente" || s === "attended" || s === "present") return "Presente";
-                if (s === "ausente" || s === "absent" || s === "no_show") return "Ausente";
-                return attendanceRaw;
-              })();
-
-              const rowClass =
-                "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3";
-              const labelClass = "text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)] min-w-0 shrink-0";
-              const valueClass = "text-[14px] font-semibold text-[var(--app-text-85)] min-w-0 break-words sm:text-right";
-
               return (
-                <>
-                  <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4 space-y-3">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
-                          Dia (aluno)
-                        </div>
-                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
-                          {leadDateRaw ? formatAtendimentoDate(leadDateRaw) : "—"}
-                        </div>
+                <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4 space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Dia (aluno)
                       </div>
-                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
-                          Horário (aluno)
-                        </div>
-                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
-                          {formatTime(leadTimeRaw)}
-                        </div>
+                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                        {leadDateRaw ? formatAtendimentoDate(leadDateRaw) : "—"}
                       </div>
-                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
-                          Dia (professor)
-                        </div>
-                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
-                          {profDateRaw ? formatAtendimentoDate(profDateRaw) : "—"}
-                        </div>
+                    </div>
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Horário (aluno)
                       </div>
-                      <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
-                          Horário (professor)
-                        </div>
-                        <div className="text-[15px] font-black text-[var(--app-text-88)]">
-                          {formatTime(profTimeRaw)}
-                        </div>
+                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                        {formatTime(leadTimeRaw)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Dia (professor)
+                      </div>
+                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                        {profDateRaw ? formatAtendimentoDate(profDateRaw) : "—"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Horário (professor)
+                      </div>
+                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                        {formatTime(profTimeRaw)}
                       </div>
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className={rowClass}>
-                      <div className={labelClass}>Fuso horário (aluno)</div>
-                      <div className={valueClass}>{leadTz || "—"}</div>
-                    </div>
-                    <div className={rowClass}>
-                      <div className={labelClass}>Fuso horário (professor)</div>
-                      <div className={valueClass}>{profTz || "—"}</div>
-                    </div>
-                    <div className={rowClass}>
-                      <div className={labelClass}>Status</div>
-                      <div className={valueClass}>{statusLabel}</div>
-                    </div>
-                    <div className={rowClass}>
-                      <div className={labelClass}>Presença</div>
-                      <div className={valueClass}>{attendanceLabel}</div>
-                    </div>
-                    <div className={rowClass}>
-                      <div className={labelClass}>Link da sala de aula</div>
-                      <div className={valueClass}>
-                        {lessonLink ? (
-                          <a
-                            href={lessonLink}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#ea580c] hover:text-[#c2410c] underline-offset-2 hover:underline"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            Abrir sala de aula
-                          </a>
-                        ) : (
-                          <span className="text-[var(--app-text-50)]">Não definido</span>
-                        )}
-                      </div>
-                    </div>
-                    {createdAtRaw ? (
-                      <div className={rowClass}>
-                        <div className={labelClass}>Agendado em</div>
-                        <div className={valueClass}>
-                          {formatAtendimentoDateTime(createdAtRaw)}
-                        </div>
-                      </div>
-                    ) : null}
-                    {updatedAtRaw && updatedAtRaw !== createdAtRaw ? (
-                      <div className={rowClass}>
-                        <div className={labelClass}>Atualizado em</div>
-                        <div className={valueClass}>
-                          {formatAtendimentoDateTime(updatedAtRaw)}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </>
+                </div>
               );
             })()}
 
