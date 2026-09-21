@@ -1062,7 +1062,7 @@ export function AtendimentoClient() {
                   Editar registro
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Atualize os dados do registro selecionado
+                  Atualize os dados do registro selecionado.
                 </div>
               </div>
             </div>
