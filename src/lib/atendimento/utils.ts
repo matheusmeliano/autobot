@@ -15,7 +15,18 @@ export function atendimentoStatusLabel(status: unknown) {
 export function formatAtendimentoDateTime(value: unknown) {
   const raw = String(value ?? "").trim();
   if (!raw) return "-";
-  const date = new Date(raw);
+  const onlyDate = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+  let date: Date;
+  if (onlyDate) {
+    const [y, m, d] = raw.split("-");
+    if (y && m && d) {
+      const hm = "00:00";
+      return `${d}/${m}/${y} · ${hm}`;
+    }
+    date = new Date(raw);
+  } else {
+    date = new Date(raw);
+  }
   if (Number.isNaN(date.getTime())) return raw;
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
@@ -23,7 +34,11 @@ export function formatAtendimentoDateTime(value: unknown) {
 export function formatAtendimentoDate(value: unknown) {
   const raw = String(value ?? "").trim();
   if (!raw) return "-";
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00`) : new Date(raw);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [yyyy, mm, dd] = raw.split("-");
+    if (yyyy && mm && dd) return `${dd}/${mm}/${yyyy}`;
+  }
+  const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return raw;
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(date);
 }

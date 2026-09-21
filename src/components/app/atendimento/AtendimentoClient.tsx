@@ -6,7 +6,7 @@ import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
-import { formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
+import { formatAtendimentoDate, formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
 import { AppModal } from "@/components/app/AppModal";
 import { AppDateRangePicker, type AppDateRange } from "@/components/app/AppDateRangePicker";
 
@@ -128,19 +128,22 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
     ? String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim()
     : "";
   if (hasFutureExp && futureExpDateLabel && futureExpTimeLabel) {
-    const dmy = new Date(futureExpDateLabel).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-    return { label: `Aula em: ${dmy}, ${futureExpTimeLabel.replace("h", "")}h`, tone: "success" };
+    const dmy = formatAtendimentoDate(futureExpDateLabel);
+    const hm = String(futureExpTimeLabel).replace(/h/gi, "").trim();
+    return { label: `Aula em: ${dmy}, ${hm}h`, tone: "success" };
   }
   if (expDraftDate && expDraftTime) {
-    const dmy = new Date(expDraftDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-    return { label: `Aula em: ${dmy}, ${expDraftTime.replace("h", "")}h`, tone: "success" };
+    const dmy = formatAtendimentoDate(expDraftDate);
+    const hm = String(expDraftTime).replace(/h/gi, "").trim();
+    return { label: `Aula em: ${dmy}, ${hm}h`, tone: "success" };
   }
   if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled") {
     const dateRaw = String((lead as any)?.experimental_class_lead_date ?? "").trim() || String((lead as any)?.experimental_class_professor_date ?? "").trim();
     const timeRaw = String((lead as any)?.experimental_class_lead_time ?? "").trim() || String((lead as any)?.experimental_class_professor_time ?? "").trim();
     if (dateRaw && timeRaw) {
-      const dmy = new Date(dateRaw).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-      return { label: `Aula em: ${dmy}, ${timeRaw.replace("h", "")}h`, tone: "success" };
+      const dmy = formatAtendimentoDate(dateRaw);
+      const hm = String(timeRaw).replace(/h/gi, "").trim();
+      return { label: `Aula em: ${dmy}, ${hm}h`, tone: "success" };
     }
   }
   const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
