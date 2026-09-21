@@ -961,7 +961,7 @@ export function AtendimentoClient() {
                   Novo registro
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Cadastre um número para iniciar o atendimento
+                  Cadastre um número para iniciar o atendimento.
                 </div>
               </div>
             </div>
