@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronRight, Copy, ExternalLink, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
+import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
 import { STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
@@ -21,6 +21,12 @@ const EMPTY_SUMMARY: AtendimentoSummary = {
 };
 
 type LeadDetailsTab = "visao_geral" | "agendamentos" | "historico" | "observacoes";
+const LEAD_DETAILS_TABS: ReadonlyArray<{ id: LeadDetailsTab; label: string; icon: JSX.Element }> = [
+  { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
+  { id: "agendamentos", label: "Agendamentos", icon: <CalendarIcon className="h-4 w-4" /> },
+  { id: "historico", label: "Histórico", icon: <RefreshCw className="h-4 w-4" /> },
+  { id: "observacoes", label: "Observações", icon: <Pencil className="h-4 w-4" /> },
+];
 
 function buildInitials(name: string | null | undefined): string {
   const clean = String(name ?? "").trim();
@@ -205,6 +211,12 @@ export function AtendimentoClient() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeTab, setActiveTab] = useState<LeadDetailsTab>("visao_geral");
+  const tabsScrollDesktopRef = useRef<HTMLDivElement | null>(null);
+  const tabsScrollMobileRef = useRef<HTMLDivElement | null>(null);
+  const [desktopTabsCanLeft, setDesktopTabsCanLeft] = useState(false);
+  const [desktopTabsCanRight, setDesktopTabsCanRight] = useState(false);
+  const [mobileTabsCanLeft, setMobileTabsCanLeft] = useState(false);
+  const [mobileTabsCanRight, setMobileTabsCanRight] = useState(false);
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
   const [createLeadPhone, setCreateLeadPhone] = useState("");
   const [createLeadName, setCreateLeadName] = useState("");
@@ -347,8 +359,43 @@ export function AtendimentoClient() {
     if (selectedLead) {
       setObservacoesDraft(String((selectedLead as any).internal_notes ?? "").trim());
       setActiveTab("visao_geral");
+      requestAnimationFrame(() => {
+        const desk = tabsScrollDesktopRef.current;
+        const mob = tabsScrollMobileRef.current;
+        if (desk) {
+          desk.scrollLeft = 0;
+          updateTabsArrowsState(desk, setDesktopTabsCanLeft, setDesktopTabsCanRight);
+        }
+        if (mob) {
+          mob.scrollLeft = 0;
+          updateTabsArrowsState(mob, setMobileTabsCanLeft, setMobileTabsCanRight);
+        }
+      });
     }
   }, [selectedLead?.id]);
+
+  function updateTabsArrowsState(
+    el: HTMLDivElement,
+    setLeft: (v: boolean) => void,
+    setRight: (v: boolean) => void,
+  ) {
+    const canLeft = el.scrollLeft > 2;
+    const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setLeft(canLeft);
+    setRight(canRight);
+  }
+
+  function scrollTabsBy(
+    el: HTMLDivElement | null,
+    direction: -1 | 1,
+    setLeft: (v: boolean) => void,
+    setRight: (v: boolean) => void,
+  ) {
+    if (!el) return;
+    const step = Math.max(Math.round(el.clientWidth * 0.7), 160);
+    el.scrollBy({ left: direction * step, behavior: "smooth" });
+    window.setTimeout(() => updateTabsArrowsState(el, setLeft, setRight), 280);
+  }
 
   function handleForbiddenResponse(res: Response) {
     if (res.status !== 401 && res.status !== 403) return false;
@@ -1684,14 +1731,33 @@ export function AtendimentoClient() {
                 </div>
 
                 {/* TABS — FIXAS (shrink-0, abaixo do header, sempre fixo) */}
-                <div className="mt-6 border-b border-[var(--app-border)] px-6 shrink-0">
-                  <div className="-mb-px flex items-center gap-6 overflow-x-auto">
-                    {([
-                      { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
-                      { id: "agendamentos", label: "Agendamentos", icon: <CalendarIcon className="h-4 w-4" /> },
-                      { id: "historico", label: "Histórico", icon: <RefreshCw className="h-4 w-4" /> },
-                      { id: "observacoes", label: "Observações", icon: <Pencil className="h-4 w-4" /> },
-                    ] as const).map((tab) => {
+                <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative">
+                  {desktopTabsCanLeft ? (
+                    <button
+                      type="button"
+                      onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, -1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
+                      className="absolute left-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:inline-flex"
+                      aria-label="Tabs anteriores"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  {desktopTabsCanRight ? (
+                    <button
+                      type="button"
+                      onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, +1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
+                      className="absolute right-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:inline-flex"
+                      aria-label="Próximas tabs"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  <div
+                    ref={tabsScrollDesktopRef}
+                    onScroll={(e) => updateTabsArrowsState(e.currentTarget as HTMLDivElement, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
+                    className="-mb-px flex items-center gap-5 sm:gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-6"
+                  >
+                    {LEAD_DETAILS_TABS.map((tab) => {
                       const isActive = tab.id === activeTab;
                       return (
                         <button
@@ -1699,7 +1765,7 @@ export function AtendimentoClient() {
                           type="button"
                           onClick={() => setActiveTab(tab.id)}
                           className={[
-                            "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[14px] font-semibold transition-colors",
+                            "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[13px] font-semibold transition-colors sm:text-[14px]",
                             isActive
                               ? "border-[#ea580c] !text-[#9a3412]"
                               : "border-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
@@ -1710,6 +1776,7 @@ export function AtendimentoClient() {
                         </button>
                       );
                     })}
+                    <div className="shrink-0 w-4 sm:hidden" />
                   </div>
                 </div>
 
@@ -2121,14 +2188,33 @@ export function AtendimentoClient() {
               </div>
 
               {/* TABS — MODAL MOBILE (shrink-0 sempre fixo) */}
-              <div className="mt-6 border-b border-[var(--app-border)] shrink-0 -mx-1 px-1">
-                <div className="-mb-px flex items-center gap-6 overflow-x-auto">
-                  {([
-                    { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
-                    { id: "agendamentos", label: "Agendamentos", icon: <CalendarIcon className="h-4 w-4" /> },
-                    { id: "historico", label: "Histórico", icon: <RefreshCw className="h-4 w-4" /> },
-                    { id: "observacoes", label: "Observações", icon: <Pencil className="h-4 w-4" /> },
-                  ] as const).map((tab) => {
+              <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative">
+                {mobileTabsCanLeft ? (
+                  <button
+                    type="button"
+                    onClick={() => scrollTabsBy(tabsScrollMobileRef.current, -1, setMobileTabsCanLeft, setMobileTabsCanRight)}
+                    className="absolute left-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:hidden"
+                    aria-label="Tabs anteriores"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                ) : null}
+                {mobileTabsCanRight ? (
+                  <button
+                    type="button"
+                    onClick={() => scrollTabsBy(tabsScrollMobileRef.current, +1, setMobileTabsCanLeft, setMobileTabsCanRight)}
+                    className="absolute right-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:hidden"
+                    aria-label="Próximas tabs"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                ) : null}
+                <div
+                  ref={tabsScrollMobileRef}
+                  onScroll={(e) => updateTabsArrowsState(e.currentTarget as HTMLDivElement, setMobileTabsCanLeft, setMobileTabsCanRight)}
+                  className="-mb-px flex items-center gap-5 sm:gap-6 overflow-x-auto scrollbar-hide px-4"
+                >
+                  {LEAD_DETAILS_TABS.map((tab) => {
                     const isActive = tab.id === activeTab;
                     return (
                       <button
@@ -2136,7 +2222,7 @@ export function AtendimentoClient() {
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
                         className={[
-                          "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[14px] font-semibold transition-colors",
+                          "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[13px] font-semibold transition-colors sm:text-[14px]",
                           isActive
                             ? "border-[#ea580c] !text-[#9a3412]"
                             : "border-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
@@ -2147,6 +2233,7 @@ export function AtendimentoClient() {
                       </button>
                     );
                   })}
+                  <div className="shrink-0 w-4 sm:hidden" />
                 </div>
               </div>
 
