@@ -2060,8 +2060,8 @@ export function AtendimentoClient() {
                         </div>
                         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                           {[
-                            { label: "Cidade", value: (sl as any).city ?? null },
                             { label: "Estado", value: (sl as any).state ?? null },
+                            { label: "Cidade", value: (sl as any).city ?? null },
                             { label: "País", value: (sl as any).country ?? null },
                             { label: "Fuso horário", value: (sl as any).timezone ?? null },
                           ].map(({ label, value }) => (
