@@ -703,7 +703,7 @@ export function AtendimentoClient() {
                   Editar localização
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  País e fuso horário são preenchidos automaticamente
+                  País e fuso horário são preenchidos automaticamente.
                 </div>
               </div>
             </div>
