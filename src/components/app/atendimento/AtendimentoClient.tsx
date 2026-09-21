@@ -3438,7 +3438,7 @@ export function AtendimentoClient() {
                     Salvando...
                   </>
                 ) : (
-                  "Salvar aula experimental"
+                  "Salvar aula"
                 )}
               </button>
             </div>
