@@ -3398,16 +3398,6 @@ export function AtendimentoClient() {
                     })())
                   )}
                 </div>
-
-                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 text-[11px] text-[var(--app-text-55)] space-y-1">
-                  <div>
-                    Os horários já são exibidos no <span className="text-[var(--app-text-80)] font-semibold">fuso horário do aluno</span>,
-                    calculados automaticamente com base no estado e cidade registrados no sistema.
-                  </div>
-                  <div>
-                    O link da sala de aula, se já cadastrado, é preservado automaticamente ao salvar.
-                  </div>
-                </div>
               </>
             )}
 
