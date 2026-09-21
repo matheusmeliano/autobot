@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, MapPin, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
-import { STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
@@ -252,6 +252,18 @@ export function AtendimentoClient() {
   const [editLocationCity, setEditLocationCity] = useState("");
   const [editLocationState, setEditLocationState] = useState("");
   const [editLocationSaving, setEditLocationSaving] = useState(false);
+
+  const [isEditExperimentalOpen, setIsEditExperimentalOpen] = useState(false);
+  const [editingExperimentalLead, setEditingExperimentalLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [savingExperimentalLeadId, setSavingExperimentalLeadId] = useState<string | null>(null);
+  const [loadingExperimentalAvailability, setLoadingExperimentalAvailability] = useState<boolean>(false);
+  const [experimentalAvailability, setExperimentalAvailability] = useState<{
+    dates: any[];
+    slotsByDate: Record<string, any[]>;
+    lead_timezone: string;
+  } | null>(null);
+  const [selectedExperimentalDateId, setSelectedExperimentalDateId] = useState<string | null>(null);
+  const [selectedExperimentalSlotId, setSelectedExperimentalSlotId] = useState<string | null>(null);
 
   type LeadFilters = {
     statusList: string[];
@@ -675,6 +687,396 @@ export function AtendimentoClient() {
       modalToast.error(error instanceof Error ? error.message : "Falha ao atualizar localização.");
     } finally {
       setEditLocationSaving(false);
+    }
+  }
+
+  function handleOpenExperimentalBooking(lead: AtendimentoLeadListItem) {
+    setEditingExperimentalLead(lead);
+    setSelectedExperimentalDateId(null);
+    setSelectedExperimentalSlotId(null);
+    setExperimentalAvailability(null);
+    setIsEditExperimentalOpen(true);
+    void (async () => {
+      try {
+        setLoadingExperimentalAvailability(true);
+        const resp = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}/experimental-booking/availability`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        const json = (await resp.json().catch(() => null)) as any;
+        if (resp.ok && json?.ok) {
+          const dates = Array.isArray(json.dates) ? (json.dates as any[]) : [];
+          const slotsByDate =
+            json.slotsByDate && typeof json.slotsByDate === "object"
+              ? (json.slotsByDate as Record<string, any[]>)
+              : {};
+          const lead_timezone =
+            String(json.lead_timezone ?? lead.timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+            ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          setExperimentalAvailability({
+            dates,
+            slotsByDate,
+            lead_timezone,
+          });
+          const booking = (lead as any)?.experimental_class_booking as any;
+          const pDate = String(booking?.professor_date ?? "").slice(0, 10);
+          const pTime = String(booking?.professor_time ?? "").trim();
+          if (pDate && pTime) {
+            const slotId = `${pDate}|${pTime}`;
+            const maybeSlots = Array.isArray(slotsByDate?.[pDate]) ? (slotsByDate[pDate] as any[]) : [];
+            const maybeDate = dates.find((d) => String(d?.id ?? d?.professorDate ?? "") === pDate);
+            if (maybeDate) {
+              setSelectedExperimentalDateId(String(maybeDate.id));
+            }
+            if (maybeSlots.length && maybeSlots.some((s) => String(s?.id ?? "") === slotId)) {
+              setSelectedExperimentalSlotId(slotId);
+            }
+          }
+        } else {
+          const err = json?.error ? String(json.error) : "Falha ao carregar dias disponíveis.";
+          modalToast.error(err);
+        }
+      } catch (e) {
+        modalToast.error(e instanceof Error ? e.message : "Falha ao carregar disponibilidade.");
+      } finally {
+        setLoadingExperimentalAvailability(false);
+      }
+    })();
+  }
+
+  function handleCloseExperimentalBooking() {
+    setIsEditExperimentalOpen(false);
+    setEditingExperimentalLead(null);
+    setExperimentalAvailability(null);
+    setSelectedExperimentalDateId(null);
+    setSelectedExperimentalSlotId(null);
+  }
+
+  async function handleSaveExperimentalBooking() {
+    const leadId = String(editingExperimentalLead?.id ?? "").trim();
+    if (!leadId) {
+      modalToast.error("Lead indisponível para editar aula experimental.");
+      return;
+    }
+    const dates = experimentalAvailability?.dates ?? [];
+    const slotsByDate = experimentalAvailability?.slotsByDate ?? {};
+    if (!dates.length) {
+      modalToast.error("Não há dias disponíveis para agendamento.");
+      return;
+    }
+    if (!selectedExperimentalDateId) {
+      modalToast.error("Selecione um dia disponível.");
+      return;
+    }
+    const selectedDate = dates.find((d) => String(d?.id ?? "") === selectedExperimentalDateId);
+    if (!selectedDate) {
+      modalToast.error("Dia selecionado não está mais disponível.");
+      return;
+    }
+    if (!selectedExperimentalSlotId) {
+      modalToast.error("Selecione um horário disponível.");
+      return;
+    }
+    const daySlots = Array.isArray(slotsByDate[String(selectedDate.professorDate ?? selectedDate.id ?? "")])
+      ? (slotsByDate[String(selectedDate.professorDate ?? selectedDate.id ?? "")] as any[])
+      : [];
+    const selectedSlot = daySlots.find((s) => String(s?.id ?? "") === selectedExperimentalSlotId);
+    if (!selectedSlot) {
+      modalToast.error("Horário selecionado não está mais disponível.");
+      return;
+    }
+
+    try {
+      setSavingExperimentalLeadId(leadId);
+      const existingBooking = (editingExperimentalLead as any)?.experimental_class_booking as any;
+      const preservedLessonLink = String(existingBooking?.lesson_link ?? "").trim();
+      const professorTimezone =
+        String(existingBooking?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+        ATENDIMENTO_PROFESSOR_TIME_ZONE;
+      const leadTimezone =
+        String(experimentalAvailability?.lead_timezone ?? editingExperimentalLead?.timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+        ATENDIMENTO_PROFESSOR_TIME_ZONE;
+
+      const professorDate = String(selectedSlot.professorDate ?? selectedDate.professorDate ?? "").slice(0, 10);
+      const professorTime = String(selectedSlot.professorTime ?? "").trim();
+      const leadDate = String(selectedSlot.leadDate ?? selectedDate.leadDate ?? professorDate).slice(0, 10);
+      const leadTime = String(selectedSlot.leadTime ?? selectedSlot.displayLabel ?? professorTime).trim();
+      let leadStartAtIso = "";
+      let professorStartAtIso = "";
+      try {
+        const safeBuild = (d: string, t: string, tz: string) => {
+          const dm = `${String(d ?? "").slice(0, 10)}`;
+          const tm = `${String(t ?? "").trim()}`;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dm) || !/^\d{1,2}:\d{2}(:\d{2})?$/.test(tm)) return "";
+          try {
+            const z = (globalThis as any).Intl?.DateTimeFormat
+              ? { timeZone: tz }
+              : (void 0 as any);
+            if (!z) return "";
+            const ymd = dm.split("-");
+            const hhmm = tm.split(":");
+            const iso = new Date(
+              Date.UTC(
+                Number(ymd[0] ?? 0),
+                Number(ymd[1] ?? 1) - 1,
+                Number(ymd[2] ?? 1),
+                Number(hhmm[0] ?? 0),
+                Number(hhmm[1] ?? 0),
+                Number(hhmm[2] ?? 0),
+                0,
+              ),
+            );
+            if (!Number.isFinite(iso.getTime())) return "";
+            const utcIso = iso.toISOString();
+            if (!tz || tz === "UTC" || tz === "Etc/UTC") return utcIso;
+            if (typeof Intl !== "undefined" && typeof Intl.DateTimeFormat === "function") {
+              const parts = new Intl.DateTimeFormat("en-US", {
+                timeZone: tz,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+              }).formatToParts(iso);
+              const map: Record<string, string> = {};
+              for (const p of parts as any[]) {
+                const tp = String(p?.type ?? "");
+                const vl = String(p?.value ?? "");
+                if (tp && vl) map[tp] = vl;
+              }
+              const y = map.year;
+              const mo = map.month;
+              const da = map.day;
+              const hr = map.hour === "24" ? "00" : map.hour;
+              const mi = map.minute;
+              const se = map.second || "00";
+              if (y && mo && da && hr && mi) {
+                const asLocal = new Date(
+                  Date.UTC(Number(y), Number(mo) - 1, Number(da), Number(hr), Number(mi), Number(se), 0),
+                );
+                const offMs = asLocal.getTime() - iso.getTime();
+                const offsetMinutes = Math.round(offMs / 60000);
+                if (Number.isFinite(offsetMinutes)) {
+                  const newMs = iso.getTime() + offMs;
+                  const result = new Date(newMs);
+                  if (Number.isFinite(result.getTime())) {
+                    return result.toISOString();
+                  }
+                }
+              }
+            }
+            return utcIso;
+          } catch {
+            return "";
+          }
+        };
+        leadStartAtIso = safeBuild(leadDate, leadTime, leadTimezone);
+        professorStartAtIso = safeBuild(professorDate, professorTime, professorTimezone);
+      } catch {
+        leadStartAtIso = "";
+        professorStartAtIso = "";
+      }
+
+      const body: Record<string, unknown> = {
+        status: "scheduled",
+        professor_date: professorDate,
+        professor_time: professorTime,
+        lead_date: leadDate,
+        lead_time: leadTime,
+        professor_timezone: professorTimezone,
+        lead_timezone: leadTimezone,
+      };
+      if (preservedLessonLink) {
+        body.lesson_link = preservedLessonLink;
+      }
+
+      const response = await fetch(`/api/atendimento/leads/${leadId}/experimental-booking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            booking?: Record<string, unknown> | null;
+            lead_update?: {
+              funnel_stage?: string | null;
+              experimental_class_status?: string | null;
+              updated_at?: string;
+            } | null;
+          }
+        | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao salvar a aula experimental.");
+        return;
+      }
+
+      setPanelLeads((current) =>
+        current.map((item) => {
+          if (item.id !== leadId) return item;
+          const patch: any = { ...item };
+          const applyLeadUpdateField = (targetKey: keyof any, srcKey: string) => {
+            const v1 = String((payload?.lead_update as any)?.[srcKey] ?? "").trim();
+            if (v1) (patch as any)[targetKey] = v1;
+          };
+          applyLeadUpdateField("funnel_stage", "funnel_stage");
+          applyLeadUpdateField("experimental_class_status", "experimental_class_status");
+          applyLeadUpdateField("updated_at", "updated_at");
+          applyLeadUpdateField("experimental_class_lead_date", "experimental_class_lead_date");
+          applyLeadUpdateField("experimental_class_lead_time", "experimental_class_lead_time");
+          applyLeadUpdateField("experimental_class_professor_date", "experimental_class_professor_date");
+          applyLeadUpdateField("experimental_class_professor_time", "experimental_class_professor_time");
+          applyLeadUpdateField("experimental_class_lead_start_at", "experimental_class_lead_start_at");
+          applyLeadUpdateField("experimental_class_professor_start_at", "experimental_class_professor_start_at");
+          const fallbacks = [
+            ["experimental_class_lead_date", leadDate],
+            ["experimental_class_lead_time", leadTime],
+            ["experimental_class_professor_date", professorDate],
+            ["experimental_class_professor_time", professorTime],
+            ["experimental_class_lead_start_at", leadStartAtIso],
+            ["experimental_class_professor_start_at", professorStartAtIso],
+          ] as const;
+          for (const [k, v] of fallbacks) {
+            if (!String((patch as any)?.[k] ?? "").trim() && String(v ?? "").trim()) {
+              (patch as any)[k] = v;
+            }
+          }
+          if (payload?.booking) {
+            patch.experimental_class_booking = payload.booking;
+            const bk = payload.booking as Record<string, unknown>;
+            const bkProfessorDate = String(bk.professor_date ?? professorDate ?? "").trim();
+            const bkProfessorTime = String(bk.professor_time ?? professorTime ?? "").trim();
+            const bkLeadDate = String(bk.lead_date ?? leadDate ?? bkProfessorDate ?? "").trim();
+            const bkLeadTime = String(bk.lead_time ?? leadTime ?? bkProfessorTime ?? "").trim();
+            if (bkLeadDate && !String(patch.experimental_class_lead_date ?? "").trim()) patch.experimental_class_lead_date = bkLeadDate;
+            if (bkLeadTime && !String(patch.experimental_class_lead_time ?? "").trim()) patch.experimental_class_lead_time = bkLeadTime;
+            if (bkProfessorDate && !String(patch.experimental_class_professor_date ?? "").trim()) patch.experimental_class_professor_date = bkProfessorDate;
+            if (bkProfessorTime && !String(patch.experimental_class_professor_time ?? "").trim()) patch.experimental_class_professor_time = bkProfessorTime;
+            const bkLeadStartAt = String(bk.lead_start_at ?? "").trim();
+            const bkProfessorStartAt = String(bk.professor_start_at ?? "").trim();
+            if (bkLeadStartAt && !String(patch.experimental_class_lead_start_at ?? "").trim()) patch.experimental_class_lead_start_at = bkLeadStartAt;
+            if (bkProfessorStartAt && !String(patch.experimental_class_professor_start_at ?? "").trim()) patch.experimental_class_professor_start_at = bkProfessorStartAt;
+            if (bkLeadDate || bkLeadTime || bkProfessorDate || bkProfessorTime) {
+              const bkIdOk = String(bk.id ?? "fallback").trim() || "fallback";
+              patch.future_experimental_class_booking = {
+                id: bkIdOk,
+                status: String(bk.status ?? "scheduled").trim() || "scheduled",
+                lead_date: bkLeadDate || null,
+                lead_time: bkLeadTime || null,
+                professor_date: bkProfessorDate || null,
+                professor_time: bkProfessorTime || null,
+                lesson_link: String(bk.lesson_link ?? preservedLessonLink ?? "").trim() || null,
+                lead_timezone: String(bk.lead_timezone ?? leadTimezone ?? "").trim() || null,
+                professor_timezone: String(bk.professor_timezone ?? professorTimezone ?? "").trim() || null,
+                attendance_status: String(bk.attendance_status ?? "").trim() || null,
+                created_at: String(bk.created_at ?? new Date().toISOString()).trim(),
+              };
+            }
+            if (!patch.funnel_stage || String(patch.funnel_stage).trim() === "") {
+              patch.funnel_stage = "aula_experimental_agendada";
+            }
+            if (!patch.experimental_class_status || String(patch.experimental_class_status).trim() === "") {
+              patch.experimental_class_status = "scheduled";
+            }
+          } else {
+            if (!patch.funnel_stage || String(patch.funnel_stage).trim() === "") patch.funnel_stage = "aula_experimental_agendada";
+            if (!patch.experimental_class_status || String(patch.experimental_class_status).trim() === "") patch.experimental_class_status = "scheduled";
+            const hasAny =
+              String(patch.experimental_class_lead_date ?? "").trim() ||
+              String(patch.experimental_class_lead_time ?? "").trim() ||
+              String(patch.experimental_class_professor_date ?? "").trim() ||
+              String(patch.experimental_class_professor_time ?? "").trim();
+            if (hasAny && !patch.future_experimental_class_booking) {
+              patch.future_experimental_class_booking = {
+                id: "fallback",
+                status: "scheduled",
+                lead_date: String(patch.experimental_class_lead_date ?? "").trim() || null,
+                lead_time: String(patch.experimental_class_lead_time ?? "").trim() || null,
+                professor_date: String(patch.experimental_class_professor_date ?? "").trim() || null,
+                professor_time: String(patch.experimental_class_professor_time ?? "").trim() || null,
+                lesson_link: String(preservedLessonLink ?? "").trim() || null,
+                lead_timezone: String(leadTimezone ?? "").trim() || null,
+                professor_timezone: String(professorTimezone ?? "").trim() || null,
+                attendance_status: null,
+                created_at: new Date().toISOString(),
+              };
+              if (!patch.experimental_class_booking) {
+                patch.experimental_class_booking = { ...patch.future_experimental_class_booking };
+              }
+            }
+          }
+          if (!String(patch.updated_at ?? "").trim()) patch.updated_at = new Date().toISOString();
+          return patch as AtendimentoLeadListItem;
+        }),
+      );
+
+      try {
+        const fresh = await fetch(`/api/atendimento/leads/${leadId}?skipEvents=1`, { cache: "no-store" })
+          .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+          .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+        if (fresh?.ok && fresh.lead?.id) {
+          setPanelLeads((current) =>
+            current.map((item) => {
+              if (item.id !== leadId) return item;
+              const prior = { ...item } as Record<string, unknown>;
+              const incoming = { ...(fresh.lead as Record<string, unknown>) };
+              const merged: Record<string, unknown> = { ...prior, ...incoming };
+              const keepLocalIfIncomingEmpty = [
+                "experimental_class_lead_date",
+                "experimental_class_lead_time",
+                "experimental_class_professor_date",
+                "experimental_class_professor_time",
+                "experimental_class_lead_start_at",
+                "experimental_class_professor_start_at",
+                "experimental_class_status",
+                "funnel_stage",
+              ];
+              for (const k of keepLocalIfIncomingEmpty) {
+                const incV = String((incoming as any)?.[k] ?? "").trim();
+                const locV = String((prior as any)?.[k] ?? "").trim();
+                if (!incV && locV) (merged as any)[k] = locV;
+              }
+              if (
+                !merged.experimental_class_booking &&
+                prior.experimental_class_booking
+              ) {
+                merged.experimental_class_booking = prior.experimental_class_booking;
+              }
+              if (
+                !merged.future_experimental_class_booking &&
+                prior.future_experimental_class_booking
+              ) {
+                merged.future_experimental_class_booking = prior.future_experimental_class_booking;
+              }
+              if (
+                !String((merged as any).funnel_stage ?? "").trim() &&
+                String((prior as any).funnel_stage ?? "").trim()
+              ) {
+                (merged as any).funnel_stage = (prior as any).funnel_stage;
+              }
+              if (
+                !String((merged as any).experimental_class_status ?? "").trim() &&
+                String((prior as any).experimental_class_status ?? "").trim()
+              ) {
+                (merged as any).experimental_class_status = (prior as any).experimental_class_status;
+              }
+              return merged as AtendimentoLeadListItem;
+            }),
+          );
+        }
+      } catch {
+        // ignore fresh refetch error (optimistic patch already applied)
+      }
+
+      modalToast.success("Aula experimental atualizada.");
+      handleCloseExperimentalBooking();
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao salvar a aula experimental.");
+    } finally {
+      setSavingExperimentalLeadId(null);
     }
   }
 
@@ -2150,6 +2552,7 @@ export function AtendimentoClient() {
                             <div className="mt-4 flex justify-end">
                               <button
                                 type="button"
+                                onClick={() => handleOpenExperimentalBooking(selectedLead)}
                                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                               >
                                 <Plus className="h-4 w-4" />
@@ -2175,6 +2578,7 @@ export function AtendimentoClient() {
                             <div className="mt-4 flex justify-end">
                               <button
                                 type="button"
+                                onClick={() => handleOpenExperimentalBooking(selectedLead)}
                                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                               >
                                 <Plus className="h-4 w-4" />
@@ -2657,6 +3061,7 @@ export function AtendimentoClient() {
                           <div className="mt-4 flex justify-end">
                             <button
                               type="button"
+                              onClick={() => handleOpenExperimentalBooking(selectedLead)}
                               className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                             >
                               <Plus className="h-4 w-4" />
@@ -2682,6 +3087,7 @@ export function AtendimentoClient() {
                           <div className="mt-4 flex justify-end">
                             <button
                               type="button"
+                              onClick={() => handleOpenExperimentalBooking(selectedLead)}
                               className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                             >
                               <Plus className="h-4 w-4" />
@@ -2812,6 +3218,233 @@ export function AtendimentoClient() {
 
       {/* MODAL FILTROS AVANCADOS: Clicou no ícone SlidersHorizontal (ao lado ESQUERDO do Bot!) */}
       {renderFiltersModal()}
+
+      {/* Modal Agendar / Reagendar aula experimental */}
+      <AppModal
+        open={isEditExperimentalOpen}
+        onClose={handleCloseExperimentalBooking}
+        size="md"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+        closeOnBackdrop={savingExperimentalLeadId === null}
+        closeOnEscape={savingExperimentalLeadId === null}
+      >
+        <div className="flex w-full flex-col gap-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <CalendarIcon className="h-5 w-5 text-[#9a3412]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  {editingExperimentalLead && (editingExperimentalLead as any)?.experimental_class_booking?.status === "scheduled"
+                    ? "Reagendar aula experimental"
+                    : "Agendar aula experimental"}
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Selecione dia e horário para a aula.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={savingExperimentalLeadId !== null}
+              onClick={handleCloseExperimentalBooking}
+              aria-label="Fechar"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {loadingExperimentalAvailability ? (
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-8 text-[13px] text-[var(--app-text-70)]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#ea580c]" />
+                Carregando disponibilidade...
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-semibold text-[var(--app-text-60)]">
+                      Dias disponíveis
+                      {experimentalAvailability?.dates?.length ? (
+                        <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                          ({String(experimentalAvailability.dates.length)})
+                        </span>
+                      ) : null}
+                    </label>
+                    <div className="text-[11px] text-[var(--app-text-50)]">
+                      Fuso: {String(experimentalAvailability?.lead_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
+                    </div>
+                  </div>
+
+                  {!experimentalAvailability?.dates?.length ? (
+                    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
+                      No momento, não há dias disponíveis para aula experimental até o fim do mês atual.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                      {experimentalAvailability.dates.map((dateOption) => {
+                        const dateId = String(dateOption?.id ?? "");
+                        if (!dateId) return null;
+                        const dayLabel = String(dateOption?.dayLabel ?? dateId).slice(0, 6);
+                        const displayLabel = String(dateOption?.displayLabel ?? "").trim();
+                        const slotCount = Number(dateOption?.slotCount ?? 0);
+                        const isSelected = selectedExperimentalDateId === dateId;
+                        return (
+                          <button
+                            key={dateId}
+                            type="button"
+                            onClick={() => {
+                              setSelectedExperimentalDateId(dateId);
+                              setSelectedExperimentalSlotId(null);
+                            }}
+                            className={
+                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition " +
+                              (isSelected
+                                ? "border-transparent bg-[#ea580c] text-white shadow"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]")
+                            }
+                          >
+                            <div className={
+                              "text-[11px] uppercase tracking-wide " +
+                              (isSelected ? "text-white/90" : "text-[var(--app-text-50)]")
+                            }>
+                              {displayLabel ? displayLabel.split(",")[0] ?? "Dia" : "Dia"}
+                            </div>
+                            <div className={
+                              "text-lg font-black leading-none " +
+                              (isSelected ? "text-white" : "text-[var(--app-text-90)]")
+                            }>
+                              {dayLabel}
+                            </div>
+                            <div className={
+                              "text-[10px] font-semibold " +
+                              (isSelected ? "text-white/85" : "text-[var(--app-text-45)]")
+                            }>
+                              {slotCount > 0
+                                ? `${slotCount} ${slotCount === 1 ? "horário" : "horários"}`
+                                : "—"}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">
+                    Horários disponíveis
+                    {selectedExperimentalDateId ? (
+                      <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                        (dia selecionado)
+                      </span>
+                    ) : (
+                      <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                        (selecione um dia primeiro)
+                      </span>
+                    )}
+                  </label>
+
+                  {!selectedExperimentalDateId ? (
+                    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-[13px] text-[var(--app-text-55)]">
+                      Clique em um dia acima para ver os horários disponíveis.
+                    </div>
+                  ) : (
+                    ((() => {
+                      const selectedDate = (experimentalAvailability?.dates ?? []).find(
+                        (d) => String(d?.id ?? "") === selectedExperimentalDateId,
+                      );
+                      const keyForSlots = String(selectedDate?.professorDate ?? selectedDate?.id ?? "");
+                      const slots = Array.isArray(experimentalAvailability?.slotsByDate?.[keyForSlots])
+                        ? (experimentalAvailability!.slotsByDate[keyForSlots] as any[])
+                        : [];
+                      if (!slots.length) {
+                        return (
+                          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-[13px] text-[var(--app-text-55)]">
+                            Não há horários livres para este dia. Selecione outro dia disponível.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                          {slots.map((slot) => {
+                            const slotId = String(slot?.id ?? "");
+                            if (!slotId) return null;
+                            const label = String(slot?.displayLabel ?? slot?.leadTime ?? "").trim();
+                            const isSelected = selectedExperimentalSlotId === slotId;
+                            return (
+                              <button
+                                key={slotId}
+                                type="button"
+                                onClick={() => setSelectedExperimentalSlotId(slotId)}
+                                className={
+                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-black transition " +
+                                  (isSelected
+                                    ? "border-transparent bg-[#ea580c] text-white shadow"
+                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]")
+                                }
+                              >
+                                {label || "Horário"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })())
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-3 text-[11px] text-[var(--app-text-55)] space-y-1">
+                  <div>
+                    Os horários já são exibidos no <span className="text-[var(--app-text-80)] font-semibold">fuso horário do aluno</span>,
+                    calculados automaticamente com base no estado e cidade registrados no sistema.
+                  </div>
+                  <div>
+                    O link da sala de aula, se já cadastrado, é preservado automaticamente ao salvar.
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="mt-2 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCloseExperimentalBooking}
+                disabled={savingExperimentalLeadId !== null}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  loadingExperimentalAvailability ||
+                  savingExperimentalLeadId !== null ||
+                  !experimentalAvailability?.dates?.length ||
+                  !selectedExperimentalDateId ||
+                  !selectedExperimentalSlotId
+                }
+                onClick={() => void handleSaveExperimentalBooking()}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingExperimentalLeadId !== null ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar aula experimental"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </AppModal>
     </div>
   );
 }
