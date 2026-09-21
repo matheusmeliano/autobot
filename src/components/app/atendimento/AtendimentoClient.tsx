@@ -232,6 +232,10 @@ export function AtendimentoClient() {
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [editLeadName, setEditLeadName] = useState("");
   const [editLeadPhone, setEditLeadPhone] = useState("");
+  const [editLeadCity, setEditLeadCity] = useState("");
+  const [editLeadState, setEditLeadState] = useState("");
+  const [editLeadCountry, setEditLeadCountry] = useState("");
+  const [editLeadTimezone, setEditLeadTimezone] = useState("");
   const [editLeadSaving, setEditLeadSaving] = useState(false);
 
   type LeadFilters = {
@@ -579,6 +583,10 @@ export function AtendimentoClient() {
     if (!selectedLead) return;
     setEditLeadName(String(selectedLead.full_name ?? "").trim());
     setEditLeadPhone(applyPhoneMask(String(selectedLead.phone ?? "").trim()));
+    setEditLeadCity(String((selectedLead as any).city ?? "").trim());
+    setEditLeadState(String((selectedLead as any).state ?? "").trim());
+    setEditLeadCountry(String((selectedLead as any).country ?? "").trim());
+    setEditLeadTimezone(String((selectedLead as any).timezone ?? "").trim());
     setEditLeadOpen(true);
   }
 
@@ -597,6 +605,10 @@ export function AtendimentoClient() {
         body: JSON.stringify({
           full_name: String(editLeadName ?? "").trim() || null,
           phone: phoneDigits,
+          city: String(editLeadCity ?? "").trim() || null,
+          state: String(editLeadState ?? "").trim() || null,
+          country: String(editLeadCountry ?? "").trim() || null,
+          timezone: String(editLeadTimezone ?? "").trim() || null,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
@@ -606,6 +618,9 @@ export function AtendimentoClient() {
       }
       if (payload.lead) {
         setPanelLeads((current) => current.map((item) => (item.id === selectedLead.id ? { ...item, ...payload.lead } : item)));
+        if (selectedLead?.id === payload.lead.id) {
+          setSelectedLeadId((prev) => prev);
+        }
       }
       setEditLeadOpen(false);
       modalToast.success("Registro atualizado com sucesso.");
@@ -924,35 +939,95 @@ export function AtendimentoClient() {
           </div>
 
           <div className="mt-4 flex flex-col gap-3">
-            <div>
-              <label className="text-xs font-semibold text-[var(--app-text-60)]">
-                Telefone <span className="text-[#ea580c]">*</span>
-              </label>
-              <input
-                type="tel"
-                autoFocus
-                required
-                value={editLeadPhone}
-                onChange={(e) => setEditLeadPhone(applyPhoneMask(e.target.value))}
-                placeholder="+99 (99) 9 9999-9999"
-                disabled={editLeadSaving}
-                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              />
-              <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
-                Preencha ou cole o número. Formata automático: +55 (65) 9 9693-3336 / +1 (415) 555-9876
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold text-[var(--app-text-60)]">
+                  Telefone <span className="text-[#ea580c]">*</span>
+                </label>
+                <input
+                  type="tel"
+                  autoFocus
+                  required
+                  value={editLeadPhone}
+                  onChange={(e) => setEditLeadPhone(applyPhoneMask(e.target.value))}
+                  placeholder="+99 (99) 9 9999-9999"
+                  disabled={editLeadSaving}
+                  className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
+                  Formata automático: +55 (65) 9 9693-3336 / +1 (415) 555-9876
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[var(--app-text-60)]">Nome</label>
+                <input
+                  type="text"
+                  value={editLeadName}
+                  onChange={(e) => setEditLeadName(e.target.value)}
+                  placeholder="Nome completo (opcional)"
+                  disabled={editLeadSaving}
+                  className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                />
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-[var(--app-text-60)]">Nome</label>
-              <input
-                type="text"
-                value={editLeadName}
-                onChange={(e) => setEditLeadName(e.target.value)}
-                placeholder="Nome completo (opcional)"
-                disabled={editLeadSaving}
-                className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              />
+            <div className="pt-2 border-t border-[var(--app-border)]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)] mb-3">
+                Localização
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Cidade</label>
+                  <input
+                    type="text"
+                    value={editLeadCity}
+                    onChange={(e) => setEditLeadCity(e.target.value)}
+                    placeholder="Ex: Cuiabá, Orlando, Lisboa"
+                    disabled={editLeadSaving}
+                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Estado</label>
+                  <input
+                    type="text"
+                    value={editLeadState}
+                    onChange={(e) => setEditLeadState(e.target.value)}
+                    placeholder="Ex: MT, SP, FL, CA, Nova York"
+                    disabled={editLeadSaving}
+                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">País</label>
+                  <input
+                    type="text"
+                    value={editLeadCountry}
+                    onChange={(e) => setEditLeadCountry(e.target.value)}
+                    placeholder="Ex: Brasil, Estados Unidos, Portugal"
+                    disabled={editLeadSaving}
+                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Fuso horário</label>
+                  <input
+                    type="text"
+                    value={editLeadTimezone}
+                    onChange={(e) => setEditLeadTimezone(e.target.value)}
+                    placeholder="Ex: America/Sao_Paulo, America/New_York"
+                    disabled={editLeadSaving}
+                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
+                    Ao preencher Estado/Cidade, País e Fuso são preenchidos automaticamente.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
