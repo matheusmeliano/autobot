@@ -1334,7 +1334,7 @@ export function AtendimentoClient() {
                   Filtros avançados
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Filtre a lista de registros por status, etapa, localização e mais
+                  Filtre a lista de registros por status, etapa, localização e mais.
                 </div>
               </div>
             </div>
