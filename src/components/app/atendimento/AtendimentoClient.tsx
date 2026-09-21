@@ -1669,16 +1669,31 @@ export function AtendimentoClient() {
               <>
                 {/* HEADER DO LEAD (Avatar + Nome + Telefone + Botoes) — FIXO (shrink-0, nunca some!) */}
                 <div className="flex shrink-0 flex-col gap-4 px-5 pt-5 sm:px-6 sm:pt-6">
+                  {/* MOBILE (< sm): X no CANTO SUPERIOR DIREITO (layout centralizado) */}
+                  <div className="flex sm:hidden shrink-0 items-start justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLeadId(null);
+                      }}
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                      aria-label="Fechar"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* MOBILE (< sm): CONTEÚDO CENTRALIZADO. DESKTOP (sm+): layout lateral original */}
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-4 min-w-0">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[20px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
+                    <div className="flex flex-col items-center gap-4 text-center min-w-0 sm:flex-row sm:items-start sm:justify-start sm:text-left">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[22px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
                         {buildInitials(sl.full_name)}
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 w-full">
                         <h2 className="truncate text-[20px] font-bold leading-tight text-[var(--app-text-85)] sm:text-[22px]">
                           {sl.full_name?.trim() || "Sem nome"}
                         </h2>
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <div className="mt-2 flex flex-col items-center justify-center gap-2 sm:flex-row sm:items-center sm:justify-start sm:flex-wrap">
                           <span className="truncate text-[13px] font-semibold text-[var(--app-text-80)] sm:text-[14px]">
                             📞 {sl.phone?.trim() ? applyPhoneMask(sl.phone) : "Sem telefone"}
                           </span>
@@ -1697,11 +1712,13 @@ export function AtendimentoClient() {
                       </div>
                     </div>
 
-                    <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
+                    {/* MOBILE (< sm): botões Editar/Excluir OCUPAM TUDO centralizados lado a lado (X já tá no topo direito!) */}
+                    {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
+                    <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
                       <button
                         type="button"
                         onClick={() => handleOpenEditSelected()}
-                        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                        className="inline-flex h-10 shrink-0 flex-1 sm:flex-none items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] sm:flex-none"
                       >
                         <Pencil className="h-4 w-4" />
                         Editar
@@ -1710,18 +1727,19 @@ export function AtendimentoClient() {
                         type="button"
                         onClick={() => void handleDeleteSelected()}
                         disabled={deletingSelectedLoading}
-                        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
+                        className="inline-flex h-10 shrink-0 flex-1 sm:flex-none items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
                         aria-label="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />
                         Excluir
                       </button>
+                      {/* X só visível em DESKTOP (sm+). No mobile já tá no topo direito! */}
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedLeadId(null);
                         }}
-                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                        className="hidden sm:inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
                         aria-label="Fechar"
                       >
                         <X className="h-4 w-4" />
@@ -1731,32 +1749,14 @@ export function AtendimentoClient() {
                 </div>
 
                 {/* TABS — FIXAS (shrink-0, abaixo do header, sempre fixo) */}
-                <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative">
-                  {desktopTabsCanLeft ? (
-                    <button
-                      type="button"
-                      onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, -1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
-                      className="absolute left-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:inline-flex"
-                      aria-label="Tabs anteriores"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                  {desktopTabsCanRight ? (
-                    <button
-                      type="button"
-                      onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, +1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
-                      className="absolute right-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:inline-flex"
-                      aria-label="Próximas tabs"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                  <div
-                    ref={tabsScrollDesktopRef}
-                    onScroll={(e) => updateTabsArrowsState(e.currentTarget as HTMLDivElement, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
-                    className="-mb-px flex items-center gap-5 sm:gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-6"
-                  >
+                {/*
+                    MOBILE (< sm): SEGMENTED CONTROL (pills com 4 abas lado a lado / grid-cols-4),
+                    SEM setas, SEM overlap, SEM overflow-x — bonito, centralizado, responsivo.
+                    DESKTOP (sm+): scroll horizontal com setas laranjas overlap (mantém anterior).
+                */}
+                <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative px-4 py-3 sm:px-0 sm:py-0">
+                  {/* MOBILE (< sm): pills segmented control */}
+                  <div className="flex sm:hidden w-full items-center gap-1.5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-1.5">
                     {LEAD_DETAILS_TABS.map((tab) => {
                       const isActive = tab.id === activeTab;
                       return (
@@ -1765,18 +1765,67 @@ export function AtendimentoClient() {
                           type="button"
                           onClick={() => setActiveTab(tab.id)}
                           className={[
-                            "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[13px] font-semibold transition-colors sm:text-[14px]",
+                            "group inline-flex min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-semibold transition-all",
                             isActive
-                              ? "border-[#ea580c] !text-[#9a3412]"
-                              : "border-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
+                              ? "bg-[var(--app-solid-surface)] text-[#9a3412] shadow-sm ring-1 ring-[var(--app-border)]"
+                              : "bg-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
                           ].join(" ")}
+                          title={tab.label}
                         >
-                          {tab.icon}
-                          {tab.label}
+                          <span className="shrink-0">{tab.icon}</span>
+                          <span className="truncate">{tab.label}</span>
                         </button>
                       );
                     })}
-                    <div className="shrink-0 w-4 sm:hidden" />
+                  </div>
+
+                  {/* DESKTOP (sm+): setas overlap + scroll horizontal */}
+                  <div className="hidden sm:block">
+                    {desktopTabsCanLeft ? (
+                      <button
+                        type="button"
+                        onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, -1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
+                        className="absolute left-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60"
+                        aria-label="Tabs anteriores"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                    {desktopTabsCanRight ? (
+                      <button
+                        type="button"
+                        onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, +1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
+                        className="absolute right-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60"
+                        aria-label="Próximas tabs"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                    <div
+                      ref={tabsScrollDesktopRef}
+                      onScroll={(e) => updateTabsArrowsState(e.currentTarget as HTMLDivElement, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
+                      className="-mb-px flex items-center gap-5 sm:gap-6 overflow-x-auto scrollbar-hide px-6"
+                    >
+                      {LEAD_DETAILS_TABS.map((tab) => {
+                        const isActive = tab.id === activeTab;
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            className={[
+                              "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[13px] font-semibold transition-colors sm:text-[14px]",
+                              isActive
+                                ? "border-[#ea580c] !text-[#9a3412]"
+                                : "border-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
+                            ].join(" ")}
+                          >
+                            {tab.icon}
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -2125,16 +2174,32 @@ export function AtendimentoClient() {
             <div className="h-full max-h-full overflow-auto flex w-full flex-col gap-0">
               {/* HEADER DO LEAD — MODAL MOBILE */}
               <div className="flex shrink-0 flex-col gap-4 pt-1">
+                {/* MOBILE (< sm): X no CANTO SUPERIOR DIREITO (layout centralizado) */}
+                <div className="flex sm:hidden shrink-0 items-start justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLeadId(null);
+                      setShowMobileLeadModal(false);
+                    }}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                    aria-label="Fechar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* MOBILE (< sm): CONTEÚDO CENTRALIZADO. DESKTOP (sm+): layout lateral original */}
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-4 min-w-0">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[20px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
+                  <div className="flex flex-col items-center gap-4 text-center min-w-0 sm:flex-row sm:items-start sm:justify-start sm:text-left">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[22px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
                       {buildInitials(sl.full_name)}
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 w-full">
                       <h2 className="truncate text-[20px] font-bold leading-tight text-[var(--app-text-85)] sm:text-[22px]">
                         {sl.full_name?.trim() || "Sem nome"}
                       </h2>
-                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <div className="mt-2 flex flex-col items-center justify-center gap-2 sm:flex-row sm:items-center sm:justify-start sm:flex-wrap">
                         <span className="truncate text-[13px] font-semibold text-[var(--app-text-80)] sm:text-[14px]">
                           📞 {sl.phone?.trim() ? applyPhoneMask(sl.phone) : "Sem telefone"}
                         </span>
@@ -2153,11 +2218,13 @@ export function AtendimentoClient() {
                     </div>
                   </div>
 
-                  <div className="flex w-full shrink-0 items-center gap-2 overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
+                  {/* MOBILE (< sm): botões Editar/Excluir OCUPAM TUDO centralizados lado a lado (X já tá no topo direito!) */}
+                  {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
+                  <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
                     <button
                       type="button"
                       onClick={() => handleOpenEditSelected()}
-                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                      className="inline-flex h-10 shrink-0 flex-1 sm:flex-none items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] sm:flex-none"
                     >
                       <Pencil className="h-4 w-4" />
                       Editar
@@ -2166,19 +2233,20 @@ export function AtendimentoClient() {
                       type="button"
                       onClick={() => void handleDeleteSelected()}
                       disabled={deletingSelectedLoading}
-                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
+                      className="inline-flex h-10 shrink-0 flex-1 sm:flex-none items-center justify-center gap-2 rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none px-4 text-[13px] font-semibold disabled:opacity-60"
                       aria-label="Excluir"
                     >
                       <Trash2 className="h-4 w-4" />
                       Excluir
                     </button>
+                    {/* X só visível em DESKTOP (sm+). No mobile já tá no topo direito! */}
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedLeadId(null);
                         setShowMobileLeadModal(false);
                       }}
-                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+                      className="hidden sm:inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
                       aria-label="Fechar"
                     >
                       <X className="h-4 w-4" />
@@ -2188,32 +2256,14 @@ export function AtendimentoClient() {
               </div>
 
               {/* TABS — MODAL MOBILE (shrink-0 sempre fixo) */}
-              <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative">
-                {mobileTabsCanLeft ? (
-                  <button
-                    type="button"
-                    onClick={() => scrollTabsBy(tabsScrollMobileRef.current, -1, setMobileTabsCanLeft, setMobileTabsCanRight)}
-                    className="absolute left-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:hidden"
-                    aria-label="Tabs anteriores"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                ) : null}
-                {mobileTabsCanRight ? (
-                  <button
-                    type="button"
-                    onClick={() => scrollTabsBy(tabsScrollMobileRef.current, +1, setMobileTabsCanLeft, setMobileTabsCanRight)}
-                    className="absolute right-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:hidden"
-                    aria-label="Próximas tabs"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                ) : null}
-                <div
-                  ref={tabsScrollMobileRef}
-                  onScroll={(e) => updateTabsArrowsState(e.currentTarget as HTMLDivElement, setMobileTabsCanLeft, setMobileTabsCanRight)}
-                  className="-mb-px flex items-center gap-5 sm:gap-6 overflow-x-auto scrollbar-hide px-4"
-                >
+              {/*
+                  MOBILE (< sm): SEGMENTED CONTROL (pills com 4 abas lado a lado),
+                  SEM setas, SEM overlap, SEM overflow-x — bonito, centralizado, responsivo.
+                  DESKTOP (sm+): scroll horizontal com setas laranjas overlap (mantém anterior).
+              */}
+              <div className="mt-6 border-b border-[var(--app-border)] shrink-0 relative px-4 py-3 sm:px-0 sm:py-0">
+                {/* MOBILE (< sm): pills segmented control */}
+                <div className="flex sm:hidden w-full items-center gap-1.5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-1.5">
                   {LEAD_DETAILS_TABS.map((tab) => {
                     const isActive = tab.id === activeTab;
                     return (
@@ -2222,18 +2272,67 @@ export function AtendimentoClient() {
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
                         className={[
-                          "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[13px] font-semibold transition-colors sm:text-[14px]",
+                          "group inline-flex min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-semibold transition-all",
                           isActive
-                            ? "border-[#ea580c] !text-[#9a3412]"
-                            : "border-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
+                            ? "bg-[var(--app-solid-surface)] text-[#9a3412] shadow-sm ring-1 ring-[var(--app-border)]"
+                            : "bg-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
                         ].join(" ")}
+                        title={tab.label}
                       >
-                        {tab.icon}
-                        {tab.label}
+                        <span className="shrink-0">{tab.icon}</span>
+                        <span className="truncate">{tab.label}</span>
                       </button>
                     );
                   })}
-                  <div className="shrink-0 w-4 sm:hidden" />
+                </div>
+
+                {/* DESKTOP (sm+): setas overlap + scroll horizontal */}
+                <div className="hidden sm:block">
+                  {mobileTabsCanLeft ? (
+                    <button
+                      type="button"
+                      onClick={() => scrollTabsBy(tabsScrollMobileRef.current, -1, setMobileTabsCanLeft, setMobileTabsCanRight)}
+                      className="absolute left-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60"
+                      aria-label="Tabs anteriores"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  {mobileTabsCanRight ? (
+                    <button
+                      type="button"
+                      onClick={() => scrollTabsBy(tabsScrollMobileRef.current, +1, setMobileTabsCanLeft, setMobileTabsCanRight)}
+                      className="absolute right-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60"
+                      aria-label="Próximas tabs"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  <div
+                    ref={tabsScrollMobileRef}
+                    onScroll={(e) => updateTabsArrowsState(e.currentTarget as HTMLDivElement, setMobileTabsCanLeft, setMobileTabsCanRight)}
+                    className="-mb-px flex items-center gap-5 sm:gap-6 overflow-x-auto scrollbar-hide px-4"
+                  >
+                    {LEAD_DETAILS_TABS.map((tab) => {
+                      const isActive = tab.id === activeTab;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          className={[
+                            "group inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-4 text-[13px] font-semibold transition-colors sm:text-[14px]",
+                            isActive
+                              ? "border-[#ea580c] !text-[#9a3412]"
+                              : "border-transparent text-[var(--app-text-60)] hover:text-[var(--app-text-85)]",
+                          ].join(" ")}
+                        >
+                          {tab.icon}
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
