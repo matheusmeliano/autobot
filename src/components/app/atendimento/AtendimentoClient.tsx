@@ -44,45 +44,63 @@ function applyPhoneMask(input: string): string {
   if (digits.startsWith("55")) {
     const rest = digits.slice(2);
     if (rest.length === 0) return "+55";
-    if (rest.length <= 2) return `+55 (${rest}`;
-    if (rest.length === 3) return `+55 (${rest.slice(0, 2)}) ${rest[2]}`;
-    if (rest.length <= 6) return `+55 (${rest.slice(0, 2)}) ${rest.slice(2)}`;
-    if (rest.length === 7) return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}`;
-    if (rest.length <= 10) return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}-${rest.slice(7)}`;
-    if (rest.length === 11) return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}-${rest.slice(7, 11)}`;
-    const extra = rest.slice(11);
-    return `+55 (${rest.slice(0, 2)}) ${rest[2]} ${rest.slice(3, 7)}-${rest.slice(7, 11)} ${extra}`;
+    if (rest.length <= 2) return `+55 ${rest}`;
+    const ddd = rest.slice(0, 2);
+    const local = rest.slice(2);
+    const has9 = local.length >= 9 && local.startsWith("9");
+    if (rest.length === 3) return `+55 ${ddd} ${local}`;
+    if (has9) {
+      if (local.length <= 5) return `+55 (${ddd}) 9 ${local.slice(1)}`;
+      if (local.length <= 9)
+        return `+55 (${ddd}) 9 ${local.slice(1, 5)}-${local.slice(5)}`;
+      const extra = local.slice(10);
+      return `+55 (${ddd}) 9 ${local.slice(1, 5)}-${local.slice(5, 9)} ${extra}`;
+    } else {
+      if (local.length <= 4) return `+55 ${ddd} ${local}`;
+      if (local.length <= 8) return `+55 ${ddd} ${local.slice(0, 4)}-${local.slice(4)}`;
+      const extra = local.slice(8);
+      return `+55 ${ddd} ${local.slice(0, 4)}-${local.slice(4, 8)} ${extra}`;
+    }
   }
 
   if (digits.startsWith("1")) {
     const rest = digits.slice(1);
     if (rest.length === 0) return "+1";
-    if (rest.length <= 3) return `+1 (${rest}`;
-    if (rest.length === 4) return `+1 (${rest.slice(0, 3)}) ${rest[3]}`;
-    if (rest.length <= 6) return `+1 (${rest.slice(0, 3)}) ${rest.slice(3)}`;
-    if (rest.length === 7) return `+1 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest[6]}`;
-    if (rest.length <= 10) return `+1 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    if (rest.length <= 3) return `+1 ${rest}`;
+    const area = rest.slice(0, 3);
+    const local = rest.slice(3);
+    if (rest.length === 4) return `+1 ${area} ${local}`;
+    if (rest.length <= 6) return `+1 ${area} ${local}`;
+    if (rest.length === 7) return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
+    if (rest.length <= 10)
+      return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
     const extra = rest.slice(10);
-    return `+1 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6, 10)} ${extra}`;
+    return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${extra}`;
   }
 
   if (digits.startsWith("7")) {
     const rest = digits.slice(1);
     if (rest.length === 0) return "+7";
-    if (rest.length <= 3) return `+7 (${rest}`;
-    if (rest.length <= 6) return `+7 (${rest.slice(0, 3)}) ${rest.slice(3)}`;
-    if (rest.length <= 10) return `+7 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    if (rest.length <= 3) return `+7 ${rest}`;
+    const area = rest.slice(0, 3);
+    const local = rest.slice(3);
+    if (rest.length <= 6) return `+7 ${area} ${local}`;
+    if (rest.length <= 10) return `+7 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
     const extra = rest.slice(10);
-    return `+7 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6, 10)} ${extra}`;
+    return `+7 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${extra}`;
   }
 
   if (digits.length <= 3) return `+${digits}`;
   if (digits.length <= 4) return `+${digits.slice(0, 2)} ${digits.slice(2)}`;
   const country = digits.slice(0, 2);
   const num = digits.slice(2);
+  if (num.length <= 4) return `+${country} ${num}`;
+  if (num.length <= 8) return `+${country} ${num.slice(0, 4)}-${num.slice(4)}`;
   const groups: string[] = [];
-  for (let i = 0; i < num.length; i += 4) groups.push(num.slice(i, i + 4));
-  return `+${country} ${groups.join(" ")}`;
+  groups.push(num.slice(0, 4));
+  const restG = num.slice(4);
+  for (let i = 0; i < restG.length; i += 4) groups.push(restG.slice(i, i + 4));
+  return `+${country} ${groups.join("-")}`;
 }
 
 function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: string; tone: "success" | "warning" | "default" } {
