@@ -1736,7 +1736,7 @@ export function AtendimentoClient() {
                     <button
                       type="button"
                       onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, -1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
-                      className="absolute left-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:inline-flex"
+                      className="absolute left-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:inline-flex"
                       aria-label="Tabs anteriores"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -1746,7 +1746,7 @@ export function AtendimentoClient() {
                     <button
                       type="button"
                       onClick={() => scrollTabsBy(tabsScrollDesktopRef.current, +1, setDesktopTabsCanLeft, setDesktopTabsCanRight)}
-                      className="absolute right-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:inline-flex"
+                      className="absolute right-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:inline-flex"
                       aria-label="Próximas tabs"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -2193,7 +2193,7 @@ export function AtendimentoClient() {
                   <button
                     type="button"
                     onClick={() => scrollTabsBy(tabsScrollMobileRef.current, -1, setMobileTabsCanLeft, setMobileTabsCanRight)}
-                    className="absolute left-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:hidden"
+                    className="absolute left-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:hidden"
                     aria-label="Tabs anteriores"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -2203,7 +2203,7 @@ export function AtendimentoClient() {
                   <button
                     type="button"
                     onClick={() => scrollTabsBy(tabsScrollMobileRef.current, +1, setMobileTabsCanLeft, setMobileTabsCanRight)}
-                    className="absolute right-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] shadow-[0_0_0_6px_var(--app-solid-surface)] hover:bg-[var(--app-hover)] sm:hidden"
+                    className="absolute right-0 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-all bg-[var(--app-btn-primary-bg)] !text-[var(--app-btn-primary-fg)] shadow-none shadow-[0_0_0_6px_var(--app-solid-surface)] disabled:opacity-60 sm:hidden"
                     aria-label="Próximas tabs"
                   >
                     <ChevronRight className="h-4 w-4" />
