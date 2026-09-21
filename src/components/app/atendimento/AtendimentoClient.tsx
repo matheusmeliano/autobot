@@ -606,10 +606,6 @@ export function AtendimentoClient() {
         body: JSON.stringify({
           full_name: String(editLeadName ?? "").trim() || null,
           phone: phoneDigits,
-          city: String(editLeadCity ?? "").trim() || null,
-          state: String(editLeadState ?? "").trim() || null,
-          country: String(editLeadCountry ?? "").trim() || null,
-          timezone: String(editLeadTimezone ?? "").trim() || null,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
@@ -1100,64 +1096,6 @@ export function AtendimentoClient() {
                   disabled={editLeadSaving}
                   className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-[var(--app-border)]">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)] mb-3">
-                Localização
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Cidade</label>
-                  <input
-                    type="text"
-                    value={editLeadCity}
-                    onChange={(e) => setEditLeadCity(e.target.value)}
-                    placeholder="Ex: Cuiabá, Orlando, Lisboa"
-                    disabled={editLeadSaving}
-                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Estado</label>
-                  <input
-                    type="text"
-                    value={editLeadState}
-                    onChange={(e) => setEditLeadState(e.target.value)}
-                    placeholder="Ex: MT, SP, FL, CA, Nova York"
-                    disabled={editLeadSaving}
-                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-[var(--app-text-60)]">País</label>
-                  <input
-                    type="text"
-                    value={editLeadCountry}
-                    onChange={(e) => setEditLeadCountry(e.target.value)}
-                    placeholder="Ex: Brasil, Estados Unidos, Portugal"
-                    disabled={editLeadSaving}
-                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-[var(--app-text-60)]">Fuso horário</label>
-                  <input
-                    type="text"
-                    value={editLeadTimezone}
-                    onChange={(e) => setEditLeadTimezone(e.target.value)}
-                    placeholder="Ex: America/Sao_Paulo, America/New_York"
-                    disabled={editLeadSaving}
-                    className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                  <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
-                    Ao preencher Estado/Cidade, País e Fuso são preenchidos automaticamente.
-                  </div>
-                </div>
               </div>
             </div>
           </div>
