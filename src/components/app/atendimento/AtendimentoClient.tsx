@@ -3595,7 +3595,7 @@ export function AtendimentoClient() {
                       <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
                         Dia (aluno)
                       </div>
-                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
                         {leadDateRaw ? formatAtendimentoDate(leadDateRaw) : "—"}
                       </div>
                     </div>
@@ -3603,7 +3603,7 @@ export function AtendimentoClient() {
                       <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
                         Horário (aluno)
                       </div>
-                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
                         {formatTime(leadTimeRaw)}
                       </div>
                     </div>
@@ -3611,7 +3611,7 @@ export function AtendimentoClient() {
                       <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
                         Dia (professor)
                       </div>
-                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
                         {profDateRaw ? formatAtendimentoDate(profDateRaw) : "—"}
                       </div>
                     </div>
@@ -3619,7 +3619,7 @@ export function AtendimentoClient() {
                       <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
                         Horário (professor)
                       </div>
-                      <div className="text-[15px] font-black text-[var(--app-text-88)]">
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
                         {formatTime(profTimeRaw)}
                       </div>
                     </div>
