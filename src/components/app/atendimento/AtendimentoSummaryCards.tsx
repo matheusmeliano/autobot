@@ -3288,7 +3288,7 @@ export function AtendimentoSummaryCards({
         // ignore fresh refetch error (optimistic patch already applied)
       }
 
-      modalToast.success("Aula experimental atualizada.");
+      modalToast.success("Aula agendada.");
       closeEditExperimental();
     } catch (error) {
       modalToast.error(error instanceof Error ? error.message : "Falha ao salvar a aula experimental.");
