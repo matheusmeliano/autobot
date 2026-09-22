@@ -3190,22 +3190,22 @@ export function AtendimentoClient() {
                           const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                           return (
                             <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="flex flex-col gap-3 min-w-0 sm:flex-1">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
-                                    <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
-                                      Aulas experimentais
-                                    </div>
-                                    {!expAssigned ? (
-                                      <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
-                                        <AlertTriangle className="h-3 w-3 shrink-0" />
-                                        Escolha
-                                      </div>
-                                    ) : null}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                  <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
+                                    Aulas experimentais
                                   </div>
+                                  {!expAssigned ? (
+                                    <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
+                                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                                      Escolha
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="flex w-full sm:w-auto items-stretch sm:items-start justify-end flex-col sm:flex-row gap-2 sm:gap-3">
                                   {expCanShowDisparar ? (
-                                    <div className="flex w-full sm:max-w-[320px]">
+                                    <div className="flex w-full sm:w-auto shrink-0 sm:shrink">
                                       <button
                                         type="button"
                                         onClick={() => void handleSendStudentNotificationExperimental(sl)}
@@ -3225,15 +3225,14 @@ export function AtendimentoClient() {
                                           }
                                           return "Disparar notificações agora.";
                                         })()}
-                                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55"
+                                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                       >
                                         <Zap className="h-4 w-4 shrink-0" />
                                         {expSendingNotification ? "Disparando..." : "Disparar agora"}
                                       </button>
                                     </div>
                                   ) : null}
-                                </div>
-                                <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
+                                  <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -3341,6 +3340,7 @@ export function AtendimentoClient() {
                                       })}
                                     </div>
                                   ) : null}
+                                </div>
                                 </div>
                               </div>
                               {!expAssigned ? (
@@ -3993,22 +3993,22 @@ export function AtendimentoClient() {
                         const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                         return (
                           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex flex-col gap-3 min-w-0 sm:flex-1">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
-                                  <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
-                                    Aulas experimentais
-                                  </div>
-                                  {!expAssigned ? (
-                                    <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
-                                      <AlertTriangle className="h-3 w-3 shrink-0" />
-                                      Escolha
-                                    </div>
-                                  ) : null}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
+                                  Aulas experimentais
                                 </div>
+                                {!expAssigned ? (
+                                  <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
+                                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                                    Escolha
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="flex w-full sm:w-auto items-stretch sm:items-start justify-end flex-col sm:flex-row gap-2 sm:gap-3">
                                 {expCanShowDisparar ? (
-                                  <div className="flex w-full sm:max-w-[320px]">
+                                  <div className="flex w-full sm:w-auto shrink-0 sm:shrink">
                                     <button
                                       type="button"
                                       onClick={() => void handleSendStudentNotificationExperimental(sl)}
@@ -4028,15 +4028,14 @@ export function AtendimentoClient() {
                                         }
                                         return "Disparar notificações agora.";
                                       })()}
-                                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55"
+                                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     >
                                       <Zap className="h-4 w-4 shrink-0" />
                                       {expSendingNotification ? "Disparando..." : "Disparar agora"}
                                     </button>
                                   </div>
                                 ) : null}
-                              </div>
-                              <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
+                                <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -4144,6 +4143,7 @@ export function AtendimentoClient() {
                                     })}
                                   </div>
                                 ) : null}
+                              </div>
                               </div>
                             </div>
                             {!expAssigned ? (
