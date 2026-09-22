@@ -110,41 +110,34 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   const bookingIsNotDraft = bookingHasId && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
   const latestCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
   const hasLatestCancelledMarker = Boolean(latestCancelledAt && latestCancelledAt !== "null");
-  const expDraftDate = hasLatestCancelledMarker
-    ? ""
-    : String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
-      String((lead as any)?.experimental_class_professor_date ?? "").trim();
-  const expDraftTime = hasLatestCancelledMarker
-    ? ""
-    : String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
-      String((lead as any)?.experimental_class_professor_time ?? "").trim();
   const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
   const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
   const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
-  const futureExpDateLabel = hasFutureExp
-    ? String((futureExp?.lead_date ?? futureExp?.professor_date) ?? "").trim()
+  const leadFlatDate = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_lead_date ?? "").trim();
+  const leadFlatTime = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_lead_time ?? "").trim();
+  const futureBookingLeadDate = hasFutureExp
+    ? String((futureExp as any)?.lead_date ?? "").trim()
     : "";
-  const futureExpTimeLabel = hasFutureExp
-    ? String(futureExp?.lead_time ?? futureExp?.professor_time ?? "").trim()
+  const futureBookingLeadTime = hasFutureExp
+    ? String((futureExp as any)?.lead_time ?? "").trim()
     : "";
-  if (hasFutureExp && futureExpDateLabel && futureExpTimeLabel) {
-    const dmy = formatAtendimentoDate(futureExpDateLabel);
-    const hm = String(futureExpTimeLabel).replace(/h/gi, "").trim();
+  const bookingLeadDate = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((booking as any)?.lead_date ?? "").trim()
+    : "";
+  const bookingLeadTime = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((booking as any)?.lead_time ?? "").trim()
+    : "";
+
+  const dateRawOk = leadFlatDate || futureBookingLeadDate || bookingLeadDate;
+  const timeRawOk = leadFlatTime || futureBookingLeadTime || bookingLeadTime;
+  if (dateRawOk && timeRawOk) {
+    const dmy = formatAtendimentoDate(dateRawOk);
+    const hm = String(timeRawOk).replace(/h/gi, "").trim();
     return { label: `Aula em: ${dmy}, ${hm}h`, tone: "success" };
-  }
-  if (expDraftDate && expDraftTime) {
-    const dmy = formatAtendimentoDate(expDraftDate);
-    const hm = String(expDraftTime).replace(/h/gi, "").trim();
-    return { label: `Aula em: ${dmy}, ${hm}h`, tone: "success" };
-  }
-  if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled") {
-    const dateRaw = String((lead as any)?.experimental_class_lead_date ?? "").trim() || String((lead as any)?.experimental_class_professor_date ?? "").trim();
-    const timeRaw = String((lead as any)?.experimental_class_lead_time ?? "").trim() || String((lead as any)?.experimental_class_professor_time ?? "").trim();
-    if (dateRaw && timeRaw) {
-      const dmy = formatAtendimentoDate(dateRaw);
-      const hm = String(timeRaw).replace(/h/gi, "").trim();
-      return { label: `Aula em: ${dmy}, ${hm}h`, tone: "success" };
-    }
   }
   const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
   const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
