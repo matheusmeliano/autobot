@@ -3656,7 +3656,7 @@ export function AtendimentoClient() {
                   Agendamento da aula
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Resumo completo do horário marcado para o registro.
+                  Resumo completo do horário marcado para a aula.
                 </div>
               </div>
             </div>
