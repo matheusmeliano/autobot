@@ -2830,7 +2830,7 @@ export function AtendimentoClient() {
                               {buildExperimentalMetaForList(sl).label}
                             </div>
                             <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                              Horário definido com o registro.
+                              Horário definido para esse registro.
                             </div>
                           </div>
                         </div>
@@ -3398,7 +3398,7 @@ export function AtendimentoClient() {
                             {buildExperimentalMetaForList(sl).label}
                           </div>
                           <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                            Horário definido com o registro.
+                            Horário definido para esse registro.
                           </div>
                         </div>
                       </div>
