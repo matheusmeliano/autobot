@@ -287,6 +287,9 @@ export function AtendimentoClient() {
   const [editSenhaValue, setEditSenhaValue] = useState("");
   const [editSenhaSaving, setEditSenhaSaving] = useState(false);
 
+  const LIST_PAGE_SIZE = 20;
+  const [leadListPage, setLeadListPage] = useState(1);
+
   type LeadFilters = {
     statusList: string[];
     stageList: string[];
@@ -402,6 +405,17 @@ export function AtendimentoClient() {
     if (!q) return out;
     return out.filter((l) => leadMatchesSearchQuery(l, q));
   }, [panelLeads, searchQuery, activeFilters]);
+
+  useEffect(() => {
+    setLeadListPage(1);
+  }, [searchQuery, activeFilters, panelLeads.length]);
+
+  const totalLeads = filteredLeads.length;
+  const totalPages = Math.max(1, Math.ceil(totalLeads / LIST_PAGE_SIZE));
+  const safePage = Math.min(leadListPage, totalPages);
+  const pagedStart = (safePage - 1) * LIST_PAGE_SIZE;
+  const pagedEnd = pagedStart + LIST_PAGE_SIZE;
+  const pagedFilteredLeads = filteredLeads.slice(pagedStart, pagedEnd);
 
   useEffect(() => {
     if (explicitSelectLockRef.current) {
@@ -2217,71 +2231,98 @@ export function AtendimentoClient() {
                   {searchQuery.trim() ? "Nenhum registro encontrado na busca." : "Nenhum registro ainda."}
                 </div>
               ) : (
-                filteredLeads.map((lead) => {
-                  const isSelected = lead.id === selectedLeadId;
-                  const meta = buildExperimentalMetaForList(lead);
-                  return (
-                    <button
-                      key={lead.id}
-                      type="button"
-                      onClick={() => {
-                        explicitSelectLockRef.current = false;
-                        suppressAutoSelectUntilRef.current = 0;
-                        setSelectedLeadId(lead.id);
-                        // Em telas menores, clicar em registro ABRE MODAL de detalhe
-                        if (isMobileViewport) setShowMobileLeadModal(true);
-                      }}
-                      className={[
-                        "group flex w-full items-start gap-3 px-5 py-4 text-left transition-colors",
-                        isSelected
-                          ? "bg-[rgba(234,88,12,0.14)]"
-                          : "hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                    >
-                      {/* Avatar 2 letras */}
-                      <div
+                <>
+                  {pagedFilteredLeads.map((lead) => {
+                    const isSelected = lead.id === selectedLeadId;
+                    const meta = buildExperimentalMetaForList(lead);
+                    return (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => {
+                          explicitSelectLockRef.current = false;
+                          suppressAutoSelectUntilRef.current = 0;
+                          setSelectedLeadId(lead.id);
+                          if (isMobileViewport) setShowMobileLeadModal(true);
+                        }}
                         className={[
-                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold",
+                          "group flex w-full items-start gap-3 px-5 py-4 text-left transition-colors",
                           isSelected
-                            ? "bg-[#ea580c] !text-white"
-                            : "bg-[var(--app-active)] text-[#9a3412]",
+                            ? "bg-[rgba(234,88,12,0.14)]"
+                            : "hover:bg-[var(--app-hover)]",
                         ].join(" ")}
                       >
-                        {buildInitials(lead.full_name)}
-                      </div>
-
-                      {/* Nome + Subtítulo + Criado em */}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[15px] font-semibold leading-tight !text-[var(--app-text-85)]">
-                          {lead.full_name?.trim() || "Sem nome"}
-                        </div>
                         <div
                           className={[
-                            "mt-1 truncate text-[12px] font-medium",
-                            meta.tone === "success"
-                              ? "text-emerald-700"
-                              : meta.tone === "warning"
-                              ? "text-[#9a3412]"
-                              : "text-[var(--app-text-60)]",
+                            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold",
+                            isSelected
+                              ? "bg-[#ea580c] !text-white"
+                              : "bg-[var(--app-active)] text-[#9a3412]",
                           ].join(" ")}
                         >
-                          {meta.label}
+                          {buildInitials(lead.full_name)}
                         </div>
-                        <div className="mt-1 text-[11px] text-[var(--app-text-45)]">
-                          Criado em: {formatAtendimentoDateTime(lead.created_at)}
-                        </div>
-                      </div>
 
-                      {/* Seta direita */}
-                      <ChevronRight
-                        className={[
-                          "mt-2 h-4 w-4 shrink-0 transition-colors",
-                          isSelected ? "text-[#9a3412]" : "text-[var(--app-text-45)] group-hover:text-[var(--app-text-70)]",
-                        ].join(" ")}
-                      />
-                    </button>
-                  );
-                })
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[15px] font-semibold leading-tight !text-[var(--app-text-85)]">
+                            {lead.full_name?.trim() || "Sem nome"}
+                          </div>
+                          <div
+                            className={[
+                              "mt-1 truncate text-[12px] font-medium",
+                              meta.tone === "success"
+                                ? "text-emerald-700"
+                                : meta.tone === "warning"
+                                ? "text-[#9a3412]"
+                                : "text-[var(--app-text-60)]",
+                            ].join(" ")}
+                          >
+                            {meta.label}
+                          </div>
+                          <div className="mt-1 text-[11px] text-[var(--app-text-45)]">
+                            Criado em: {formatAtendimentoDateTime(lead.created_at)}
+                          </div>
+                        </div>
+
+                        <ChevronRight
+                          className={[
+                            "mt-2 h-4 w-4 shrink-0 transition-colors",
+                            isSelected ? "text-[#9a3412]" : "text-[var(--app-text-45)] group-hover:text-[var(--app-text-70)]",
+                          ].join(" ")}
+                        />
+                      </button>
+                    );
+                  })}
+                  {totalPages > 1 ? (
+                    <div className="flex shrink-0 items-center justify-between gap-3 px-5 py-4 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/40">
+                      <div className="text-[11px] font-semibold text-[var(--app-text-55)]">
+                        Exibindo {pagedStart + 1}–{Math.min(pagedEnd, totalLeads)} de{" "}
+                        <span className="text-[var(--app-text-85)] font-bold">{totalLeads}</span>{" "}
+                        · Página {safePage} / {totalPages}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setLeadListPage((p) => Math.max(1, p - 1))}
+                          disabled={safePage <= 1}
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label="Página anterior"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLeadListPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={safePage >= totalPages}
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label="Próxima página"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           </div>
