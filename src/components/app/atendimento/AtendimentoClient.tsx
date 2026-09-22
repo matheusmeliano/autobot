@@ -3724,8 +3724,7 @@ export function AtendimentoClient() {
         open={isEditSenhaOpen}
         onClose={handleCloseEditSenha}
         size="md"
-        showCloseButton={false}
-        closeOnBackdropClick={!editSenhaSaving}
+        closeOnBackdrop={!editSenhaSaving}
         closeOnEscape={!editSenhaSaving}
       >
         <form
