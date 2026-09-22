@@ -144,10 +144,17 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
   const stateRaw = String((lead as any)?.state ?? "").trim();
   const cityRaw = String((lead as any)?.city ?? "").trim();
-  const locationOk = Boolean(stateRaw) && Boolean(cityRaw);
-  if (!locationOk) return { label: "Falta estado e cidade", tone: "warning" };
-  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !dateRawOk) {
+  if (!stateRaw && !cityRaw) return { label: "Falta estado e cidade", tone: "warning" };
+  if (stateRaw && !cityRaw) return { label: "Falta cidade", tone: "warning" };
+  if (!stateRaw && cityRaw) return { label: "Falta estado", tone: "warning" };
+  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !dateRawOk && !timeRawOk) {
     return { label: "Falta dia e horário", tone: "warning" };
+  }
+  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && dateRawOk && !timeRawOk) {
+    return { label: "Falta horário", tone: "warning" };
+  }
+  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !dateRawOk && timeRawOk) {
+    return { label: "Falta dia", tone: "warning" };
   }
   return { label: "Novo registro", tone: "default" };
 }
@@ -160,8 +167,14 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
   const ps = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
   const payConfirmed = ps === "confirmado" || ps === "matriculado" || st === "matriculado" || st === "aluno";
   if (payConfirmed) return { title: "Matrícula concluída", body: "Todos os dados foram confirmados.", tone: "success" };
-  if (!locationOk) {
+  if (!stateRaw && !cityRaw) {
     return { title: "Falta estado e cidade", body: "Clique em Editar no card Informações para preencher.", tone: "warning" };
+  }
+  if (stateRaw && !cityRaw) {
+    return { title: "Falta cidade", body: "Clique em Editar no card Informações para preencher a cidade.", tone: "warning" };
+  }
+  if (!stateRaw && cityRaw) {
+    return { title: "Falta estado", body: "Clique em Editar no card Informações para preencher o estado.", tone: "warning" };
   }
   const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
   const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
@@ -171,6 +184,12 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
   const rec = recurringWeekdayOk || recurringTimeOk || regStepOk || Boolean(rcsRaw);
   if (rec && !recurringWeekdayOk && !recurringTimeOk) {
     return { title: "Falta dia e horário recorrentes", body: "Defina dia e horário para continuar.", tone: "warning" };
+  }
+  if (rec && recurringWeekdayOk && !recurringTimeOk) {
+    return { title: "Falta horário recorrente", body: "Defina o horário da aula recorrente.", tone: "warning" };
+  }
+  if (rec && !recurringWeekdayOk && recurringTimeOk) {
+    return { title: "Falta dia recorrente", body: "Defina o dia da semana da aula recorrente.", tone: "warning" };
   }
   const expMeta = buildExperimentalMetaForList(lead);
   if (!rec && expMeta.tone === "warning") {
