@@ -3721,7 +3721,7 @@ export function AtendimentoClient() {
       </AppModal>
 
       <AppModal
-        isOpen={isEditSenhaOpen}
+        open={isEditSenhaOpen}
         onClose={handleCloseEditSenha}
         size="md"
         showCloseButton={false}
