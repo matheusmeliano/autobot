@@ -3723,7 +3723,7 @@ export function AtendimentoClient() {
       <AppModal
         isOpen={isEditSenhaOpen}
         onClose={handleCloseEditSenha}
-        size="sm"
+        size="md"
         showCloseButton={false}
         closeOnBackdropClick={!editSenhaSaving}
         closeOnEscape={!editSenhaSaving}
