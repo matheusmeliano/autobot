@@ -543,6 +543,7 @@ export function AtendimentoClient() {
   const [expAssigningProfessor, setExpAssigningProfessor] = useState<boolean>(false);
   const [expSavingLessonLink, setExpSavingLessonLink] = useState<boolean>(false);
   const [expSendingNotification, setExpSendingNotification] = useState<boolean>(false);
+  const [expCancellingBookingId, setExpCancellingBookingId] = useState<string | null>(null);
   const [expLessonLinkDraftByLeadId, setExpLessonLinkDraftByLeadId] = useState<Record<string, string>>({});
 
   const experimentalLessonLinkDraft = useMemo<string>(() => {
@@ -698,6 +699,89 @@ export function AtendimentoClient() {
       modalToast.success("Notificações disparadas.");
     } finally {
       setExpSendingNotification(false);
+    }
+  }
+
+  async function handleCancelExperimentalBooking(lead: AtendimentoLeadListItem) {
+    const bk = (lead as any).experimental_class_booking as any;
+    const bookingId = String(bk?.id ?? "").trim();
+    const statusRaw = String(bk?.status ?? "").trim().toLowerCase();
+    if (!bookingId) {
+      modalToast.warning("Nenhum agendamento encontrado para cancelar.");
+      return;
+    }
+    if (statusRaw === "cancelled") {
+      modalToast.info("Agendamento já está cancelado.");
+      return;
+    }
+    if (statusRaw !== "scheduled") {
+      modalToast.warning("Apenas agendamentos confirmados podem ser cancelados.");
+      return;
+    }
+    const assigned = experimentalAssignedProfessorForLead(lead);
+    if (!assigned) {
+      modalToast.error("Selecione o professor responsável antes de cancelar o agendamento.");
+      return;
+    }
+    if (!window.confirm("Deseja realmente cancelar este agendamento de aula experimental?")) {
+      return;
+    }
+    try {
+      setExpCancellingBookingId(bookingId);
+      const res = await fetch(`/api/atendimento/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: lead.id,
+          conversationId: String((lead as any).conversation?.id ?? (lead as any).conversation_id ?? "").trim() || null,
+          professorDate: bk?.professor_date ?? null,
+          professorTime: bk?.professor_time ?? null,
+          professorStartAt: bk?.professor_start_at ?? null,
+          leadDate: bk?.lead_date ?? null,
+          leadTime: bk?.lead_time ?? null,
+          leadTimeZone: bk?.lead_timezone ?? null,
+          professorTimeZone: bk?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; message?: string | null }
+        | null;
+      if (!res.ok || !payload?.ok) {
+        if (payload?.error === "missing_experimental_professor_for_cancel") {
+          modalToast.error(
+            payload?.message ??
+              "Selecione o professor responsável antes de cancelar o agendamento.",
+          );
+        } else {
+          modalToast.error(payload?.error ?? "Falha ao cancelar agendamento.");
+        }
+        return;
+      }
+      setPanelLeads((cur) =>
+        cur.map((l) => {
+          if (l.id !== lead.id) return l;
+          const next = { ...l } as any;
+          if (next.experimental_class_booking && typeof next.experimental_class_booking === "object") {
+            next.experimental_class_booking = {
+              ...next.experimental_class_booking,
+              status: "cancelled",
+            };
+          }
+          next.latest_experimental_class_cancelled_at = new Date().toISOString();
+          next.latest_experimental_class_event = "experimental_class_cancelled";
+          next.experimental_class_status = "cancelled";
+          return next as AtendimentoLeadListItem;
+        }),
+      );
+      setSummary((cur) => ({
+        ...cur,
+        aulasExperimentaisAgendadas: Math.max(0, cur.aulasExperimentaisAgendadas - 1),
+      }));
+      modalToast.success("Agendamento cancelado.");
+    } catch (err) {
+      modalToast.error(err instanceof Error ? err.message : "Falha ao cancelar agendamento.");
+    } finally {
+      setExpCancellingBookingId(null);
     }
   }
 
@@ -3066,24 +3150,57 @@ export function AtendimentoClient() {
                         </div>
                         {expMeta.tone === "success" ? (
                           <>
-                            <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
-                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
-                                <CalendarIcon className="h-5 w-5" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-emerald-800 truncate">
-                                  {expMeta.label}
+                            {(() => {
+                              const bk = (selectedLead as any)?.experimental_class_booking;
+                              const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                              return cancelled ? (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
+                                    <CalendarIcon className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-red-800 truncate">
+                                      {(() => {
+                                        const label = String(expMeta.label ?? "").trim();
+                                        if (!label) return "Aula cancelada";
+                                        if (label.toLowerCase().startsWith("aula em:")) {
+                                          return "Aula cancelada em:" + label.slice("aula em:".length);
+                                        }
+                                        return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                      })()}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-red-700/80">
+                                      Horário cancelado.
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                  Horário confirmado para o registro.
+                              ) : (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
+                                    <CalendarIcon className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-emerald-800 truncate">
+                                      {expMeta.label}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-emerald-700/80">
+                                      Horário confirmado para o registro.
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
+                              );
+                            })()}
+                            {(() => {
+                              const bk = (selectedLead as any)?.experimental_class_booking;
+                              const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                              return (
                             <div className="mt-4 flex justify-end gap-2">
                               <button
                                 type="button"
                                 onClick={() => handleOpenExpInfo(selectedLead)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                disabled={cancelled}
+                                title={cancelled ? "Agendamento cancelado." : undefined}
                               >
                                 <Info className="h-4 w-4" />
                                 Mais informações
@@ -3091,12 +3208,16 @@ export function AtendimentoClient() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                disabled={cancelled || experimentalLockedProf}
+                                title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
                               >
                                 <Plus className="h-4 w-4" />
                                 Reagendar aula
                               </button>
                             </div>
+                              );
+                            })()}
                           </>
                         ) : (
                           <>
@@ -3176,18 +3297,18 @@ export function AtendimentoClient() {
                           const expAssigned = experimentalAssignedProfessorForLead(sl);
                           const expSavedLink = experimentalLessonLinkForLead(sl);
                           const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
-                          const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl);
-                          const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf);
+                          const bk = (sl as any).experimental_class_booking as any;
+                          const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
+                          const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                          const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
+                          const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
                           const expLessonLinkSaveDisabled = (() => {
                             const d = experimentalLessonLinkDraft.trim();
                             if (!d && !expSavedLink) return true;
                             if (d === expSavedLink) return true;
-                            if (expSavingLessonLink || experimentalLockedProf) return true;
+                            if (expSavingLessonLink || experimentalLockedProf || expBookingIsCancelled) return true;
                             return false;
                           })();
-                          const bk = (sl as any).experimental_class_booking as any;
-                          const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
-                          const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                           return (
                             <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                               <div className="flex items-start justify-between gap-3">
@@ -3341,6 +3462,43 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                 </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCancelExperimentalBooking(sl)}
+                                    disabled={(() => {
+                                      if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
+                                      if (expBookingIsCancelled) return true;
+                                      if (expHasAttendanceStatus) return true;
+                                      if (experimentalLockedProf) return true;
+                                      if (!expAssigned) return true;
+                                      return false;
+                                    })()}
+                                    title={(() => {
+                                      if (expBookingIsCancelled) {
+                                        return "Agendamento já foi cancelado.";
+                                      }
+                                      if (expHasAttendanceStatus) {
+                                        return "Agendamento não pode ser cancelado após comparecimento marcado.";
+                                      }
+                                      if (experimentalLockedProf) {
+                                        return "Agendamento não pode ser cancelado após o disparo ser realizado.";
+                                      }
+                                      if (!expAssigned) {
+                                        return "Selecione o professor responsável antes de cancelar o agendamento.";
+                                      }
+                                      if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
+                                        return "Cancelando agendamento...";
+                                      }
+                                      return "Cancelar este agendamento de aula experimental.";
+                                    })()}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                  >
+                                    {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                    ) : (
+                                      <X className="h-4 w-4 shrink-0" />
+                                    )}
+                                  </button>
                                 </div>
                               </div>
                               {!expAssigned ? (
@@ -3351,14 +3509,32 @@ export function AtendimentoClient() {
                                   </div>
                                 </div>
                               ) : null}
-                              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                                <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                                  {buildExperimentalMetaForList(sl).label}
+                              {expBookingIsCancelled ? (
+                                <div className="mt-4 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
+                                  <div className="text-[13px] font-semibold text-red-800">
+                                    {(() => {
+                                      const label = String(buildExperimentalMetaForList(sl).label ?? "").trim();
+                                      if (!label) return "Aula cancelada";
+                                      if (label.toLowerCase().startsWith("aula em:")) {
+                                        return "Aula cancelada em:" + label.slice("aula em:".length);
+                                      }
+                                      return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                    })()}
+                                  </div>
+                                  <div className="mt-1 text-[12px] text-red-700/80">
+                                    Horário cancelado.
+                                  </div>
                                 </div>
-                                <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                                  Horário definido para esse registro.
+                              ) : (
+                                <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                                  <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                                    {buildExperimentalMetaForList(sl).label}
+                                  </div>
+                                  <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                                    Horário definido para esse registro.
+                                  </div>
                                 </div>
-                              </div>
+                              )}
 
                               <div className="mt-5">
                                 <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
@@ -3869,24 +4045,57 @@ export function AtendimentoClient() {
                       </div>
                       {expMeta.tone === "success" ? (
                         <>
-                          <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
-                              <CalendarIcon className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-semibold text-emerald-800 truncate">
-                                {expMeta.label}
+                          {(() => {
+                            const bk = (selectedLead as any)?.experimental_class_booking;
+                            const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                            return cancelled ? (
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
+                                  <CalendarIcon className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-red-800 truncate">
+                                    {(() => {
+                                      const label = String(expMeta.label ?? "").trim();
+                                      if (!label) return "Aula cancelada";
+                                      if (label.toLowerCase().startsWith("aula em:")) {
+                                        return "Aula cancelada em:" + label.slice("aula em:".length);
+                                      }
+                                      return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                    })()}
+                                  </div>
+                                  <div className="mt-0.5 text-[13px] text-red-700/80">
+                                    Horário cancelado.
+                                  </div>
+                                </div>
                               </div>
-                              <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                Horário confirmado para o registro.
+                            ) : (
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
+                                  <CalendarIcon className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-emerald-800 truncate">
+                                    {expMeta.label}
+                                  </div>
+                                  <div className="mt-0.5 text-[13px] text-emerald-700/80">
+                                    Horário confirmado para o registro.
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
+                            );
+                          })()}
+                          {(() => {
+                            const bk = (selectedLead as any)?.experimental_class_booking;
+                            const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                            return (
                           <div className="mt-4 flex justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => handleOpenExpInfo(selectedLead)}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              disabled={cancelled}
+                              title={cancelled ? "Agendamento cancelado." : undefined}
                             >
                               <Info className="h-4 w-4" />
                               Mais informações
@@ -3894,12 +4103,16 @@ export function AtendimentoClient() {
                             <button
                               type="button"
                               onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              disabled={cancelled || experimentalLockedProf}
+                              title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
                             >
                               <Plus className="h-4 w-4" />
                               Reagendar aula
                             </button>
                           </div>
+                            );
+                          })()}
                         </>
                       ) : (
                         <>
@@ -3979,18 +4192,18 @@ export function AtendimentoClient() {
                         const expAssigned = experimentalAssignedProfessorForLead(sl);
                         const expSavedLink = experimentalLessonLinkForLead(sl);
                         const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
-                        const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl);
-                        const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf);
+                        const bk = (sl as any).experimental_class_booking as any;
+                        const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
+                        const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                        const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
+                        const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
                         const expLessonLinkSaveDisabled = (() => {
                           const d = experimentalLessonLinkDraft.trim();
                           if (!d && !expSavedLink) return true;
                           if (d === expSavedLink) return true;
-                          if (expSavingLessonLink || experimentalLockedProf) return true;
+                          if (expSavingLessonLink || experimentalLockedProf || expBookingIsCancelled) return true;
                           return false;
                         })();
-                        const bk = (sl as any).experimental_class_booking as any;
-                        const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
-                        const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                         return (
                           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex items-start justify-between gap-3">
@@ -4144,6 +4357,43 @@ export function AtendimentoClient() {
                                   </div>
                                 ) : null}
                               </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCancelExperimentalBooking(sl)}
+                                  disabled={(() => {
+                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
+                                    if (expBookingIsCancelled) return true;
+                                    if (expHasAttendanceStatus) return true;
+                                    if (experimentalLockedProf) return true;
+                                    if (!expAssigned) return true;
+                                    return false;
+                                  })()}
+                                  title={(() => {
+                                    if (expBookingIsCancelled) {
+                                      return "Agendamento já foi cancelado.";
+                                    }
+                                    if (expHasAttendanceStatus) {
+                                      return "Agendamento não pode ser cancelado após comparecimento marcado.";
+                                    }
+                                    if (experimentalLockedProf) {
+                                      return "Agendamento não pode ser cancelado após o disparo ser realizado.";
+                                    }
+                                    if (!expAssigned) {
+                                      return "Selecione o professor responsável antes de cancelar o agendamento.";
+                                    }
+                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
+                                      return "Cancelando agendamento...";
+                                    }
+                                    return "Cancelar este agendamento de aula experimental.";
+                                  })()}
+                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                >
+                                  {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4 shrink-0" />
+                                  )}
+                                </button>
                               </div>
                             </div>
                             {!expAssigned ? (
@@ -4154,14 +4404,32 @@ export function AtendimentoClient() {
                                 </div>
                               </div>
                             ) : null}
-                            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                              <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                                {buildExperimentalMetaForList(sl).label}
+                            {expBookingIsCancelled ? (
+                              <div className="mt-4 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
+                                <div className="text-[13px] font-semibold text-red-800">
+                                  {(() => {
+                                    const label = String(buildExperimentalMetaForList(sl).label ?? "").trim();
+                                    if (!label) return "Aula cancelada";
+                                    if (label.toLowerCase().startsWith("aula em:")) {
+                                      return "Aula cancelada em:" + label.slice("aula em:".length);
+                                    }
+                                    return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                  })()}
+                                </div>
+                                <div className="mt-1 text-[12px] text-red-700/80">
+                                  Horário cancelado.
+                                </div>
                               </div>
-                              <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                                Horário definido para esse registro.
+                            ) : (
+                              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                                <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                                  {buildExperimentalMetaForList(sl).label}
+                                </div>
+                                <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                                  Horário definido para esse registro.
+                                </div>
                               </div>
-                            </div>
+                            )}
 
                             <div className="mt-5">
                               <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
