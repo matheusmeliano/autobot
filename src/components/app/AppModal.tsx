@@ -24,7 +24,7 @@ export function AppModal({
   children,
   position = "center",
   size = "lg",
-  zIndexClass = "z-[100]",
+  zIndexClass = "z-[1000]",
   panelClassName = "",
   fullScreenOnMobile = false,
   closeOnBackdrop = true,
