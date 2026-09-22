@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BarChart3, Bot, Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, UserRound, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, SlidersHorizontal, Trash2, UserRound, X, Zap } from "lucide-react";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
@@ -19,6 +19,67 @@ const EMPTY_SUMMARY: AtendimentoSummary = {
   matriculados: 0,
   conversasNaoLidas: 0,
 };
+
+const EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT: Array<{ name: string; phone: string; short: string }> = [
+  { name: "Lucas Brum", phone: "+55 65 9807-9407", short: "9807-9407" },
+  { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
+];
+
+function experimentalAssignedProfessorForLead(lead: AtendimentoLeadListItem | null | undefined): { name: string; phone: string; short: string } | null {
+  if (!lead) return null;
+  const flatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
+  const flatPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+  if (flatName && flatPhone) {
+    const m = EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.find((p) => p.phone === flatPhone && p.name === flatName);
+    if (m) return m;
+  }
+  if (flatPhone) {
+    const m = EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.find((p) => p.phone === flatPhone);
+    if (m) return m;
+  }
+  const bk = lead.experimental_class_booking as any;
+  const bkName = String(bk?.assigned_professor_name ?? "").trim();
+  const bkPhone = String(bk?.assigned_professor_phone ?? "").trim();
+  if (bkName && bkPhone) {
+    const m = EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.find((p) => p.phone === bkPhone && p.name === bkName);
+    if (m) return m;
+  }
+  if (bkPhone) {
+    const m = EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.find((p) => p.phone === bkPhone);
+    if (m) return m;
+  }
+  return null;
+}
+
+function experimentalLessonLinkForLead(lead: AtendimentoLeadListItem | null | undefined): string {
+  if (!lead) return "";
+  const bk = lead.experimental_class_booking as any;
+  const fromBk = String(bk?.lesson_link ?? "").trim();
+  if (fromBk) return fromBk;
+  return String((lead as any)?.experimental_class_link ?? "").trim();
+}
+
+function experimentalBookingIdForLead(lead: AtendimentoLeadListItem | null | undefined): string {
+  if (!lead) return "";
+  const idFromLead = String((lead as any)?.experimental_class_booking_id ?? "").trim();
+  if (idFromLead) return idFromLead;
+  const bk = lead.experimental_class_booking as any;
+  const fromBk = String(bk?.id ?? "").trim();
+  if (fromBk) return fromBk;
+  return "";
+}
+
+function experimentalHasAnyDisparoConcluido(lead: AtendimentoLeadListItem | null | undefined): boolean {
+  if (!lead) return false;
+  const bk = lead.experimental_class_booking as any;
+  const sStu = String(bk?.student_start_notification_sent_at ?? "").trim();
+  const sAtt = String(bk?.attendant_start_notification_sent_at ?? "").trim();
+  const att = String(bk?.attendance_status ?? "").trim();
+  const st = String(bk?.status ?? "").trim().toLowerCase();
+  const flatStu = String((lead as any)?.experimental_class_student_notification_sent_at ?? "").trim();
+  const flatAtt = String((lead as any)?.experimental_class_attendant_notification_sent_at ?? "").trim();
+  return Boolean(sStu || sAtt || flatStu || flatAtt || att === "attended" || att === "no_show" || st === "cancelled");
+}
 
 type LeadDetailsTab = "visao_geral" | "agendamentos" | "historico" | "observacoes";
 const LEAD_DETAILS_TABS: ReadonlyArray<{ id: LeadDetailsTab; label: string; icon: JSX.Element }> = [
@@ -385,6 +446,169 @@ export function AtendimentoClient() {
       ps === "confirmado"
     );
   }, [selectedLead]);
+
+  // ---- Controladores do card "Aulas experimentais" (tab Agendamentos) DESKTOP + MOBILE ----
+  const [expAssignProfDropdownOpen, setExpAssignProfDropdownOpen] = useState<boolean>(false);
+  const [expAssigningProfessor, setExpAssigningProfessor] = useState<boolean>(false);
+  const [expSavingLessonLink, setExpSavingLessonLink] = useState<boolean>(false);
+  const [expSendingNotification, setExpSendingNotification] = useState<boolean>(false);
+  const [expLessonLinkDraftByLeadId, setExpLessonLinkDraftByLeadId] = useState<Record<string, string>>({});
+
+  const experimentalLessonLinkDraft = useMemo<string>(() => {
+    const current = expLessonLinkDraftByLeadId[selectedLead?.id ?? ""];
+    if (typeof current === "string") return current;
+    return experimentalLessonLinkForLead(selectedLead);
+  }, [expLessonLinkDraftByLeadId, selectedLead]);
+
+  useEffect(() => {
+    if (!selectedLead?.id) return;
+    setExpAssignProfDropdownOpen(false);
+    setExpLessonLinkDraftByLeadId((prev) => {
+      if (typeof prev[selectedLead.id] === "string") return prev;
+      return { ...prev, [selectedLead.id]: experimentalLessonLinkForLead(selectedLead) };
+    });
+  }, [selectedLead?.id]);
+
+  const experimentalLockedProf = useMemo<boolean>(() => {
+    return experimentalHasAnyDisparoConcluido(selectedLead);
+  }, [selectedLead]);
+
+  async function handleAssignProfessorExperimental(lead: AtendimentoLeadListItem, prof: { name: string; phone: string }) {
+    if (expAssigningProfessor) return;
+    if (experimentalLockedProf) {
+      modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+      return;
+    }
+    setExpAssigningProfessor(true);
+    try {
+      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}/experimental-booking/assign-professor`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ professor_name: prof.name, professor_phone: prof.phone, scope: "experimental" }),
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao vincular professor à aula experimental.");
+        return;
+      }
+      setPanelLeads((cur) =>
+        cur.map((l) =>
+          l.id === lead.id
+            ? ({
+                ...l,
+                experimental_class_professor_name: prof.name,
+                experimental_class_professor_phone: prof.phone,
+              } as AtendimentoLeadListItem)
+            : l,
+        ),
+      );
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+      modalToast.success("Professor vinculado à aula experimental.");
+    } finally {
+      setExpAssigningProfessor(false);
+    }
+  }
+
+  async function handleSaveLessonLinkExperimental(lead: AtendimentoLeadListItem) {
+    if (expSavingLessonLink) return;
+    const saved = experimentalLessonLinkForLead(lead);
+    const draft = experimentalLessonLinkDraft.trim();
+    if (experimentalLockedProf) {
+      modalToast.warning("Link não pode ser alterado após o disparo ser realizado.");
+      return;
+    }
+    if (!draft && !saved) {
+      modalToast.warning("Informe o link da aula antes de salvar.");
+      return;
+    }
+    if (draft === saved) {
+      modalToast.info("Nenhuma alteração no link da aula.");
+      return;
+    }
+    const bookingId = experimentalBookingIdForLead(lead);
+    const safeBookingId = bookingId || `draft-${lead.id}`;
+    setExpSavingLessonLink(true);
+    try {
+      const res = await fetch(`/api/atendimento/bookings/${encodeURIComponent(safeBookingId)}/lesson-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonLink: draft || null,
+          leadId: lead.id,
+          conversationId: String((lead as any).conversation_id ?? "").trim() || null,
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao salvar o link da aula.");
+        return;
+      }
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+      modalToast.success(draft ? "Link da aula salvo." : "Link da aula removido.");
+    } finally {
+      setExpSavingLessonLink(false);
+    }
+  }
+
+  async function handleSendStudentNotificationExperimental(lead: AtendimentoLeadListItem) {
+    if (expSendingNotification) return;
+    const professorOk = experimentalAssignedProfessorForLead(lead);
+    const linkOk = experimentalLessonLinkForLead(lead);
+    if (!professorOk) {
+      modalToast.warning("Selecione o professor responsável antes de disparar agora.");
+      return;
+    }
+    if (!linkOk) {
+      modalToast.warning("Adicione o link da aula experimental antes de disparar a notificação.");
+      return;
+    }
+    if (!String(lead.phone ?? "").trim()) {
+      modalToast.warning("Registro não possui telefone cadastrado para receber a notificação.");
+      return;
+    }
+    const bookingId = experimentalBookingIdForLead(lead);
+    const safeBookingId = bookingId || `draft-${lead.id}`;
+    setExpSendingNotification(true);
+    try {
+      const res = await fetch(`/api/atendimento/bookings/${encodeURIComponent(safeBookingId)}/send-student-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: lead.id,
+          conversationId: String((lead as any).conversation_id ?? "").trim() || null,
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+        student_notification_sent?: boolean;
+        attendant_notification_sent?: boolean;
+      } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao disparar as notificações.");
+        return;
+      }
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+      modalToast.success("Notificações disparadas.");
+    } finally {
+      setExpSendingNotification(false);
+    }
+  }
 
   const applyFiltersToLeads = (
     leads: AtendimentoLeadListItem[],
@@ -2858,6 +3082,21 @@ export function AtendimentoClient() {
                         }
                         const expTone = buildExperimentalMetaForList(sl).tone;
                         if (expTone === "success") {
+                          const expAssigned = experimentalAssignedProfessorForLead(sl);
+                          const expSavedLink = experimentalLessonLinkForLead(sl);
+                          const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
+                          const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl);
+                          const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf);
+                          const expLessonLinkSaveDisabled = (() => {
+                            const d = experimentalLessonLinkDraft.trim();
+                            if (!d && !expSavedLink) return true;
+                            if (d === expSavedLink) return true;
+                            if (expSavingLessonLink || experimentalLockedProf) return true;
+                            return false;
+                          })();
+                          const bk = (sl as any).experimental_class_booking as any;
+                          const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
+                          const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                           return (
                             <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                               <div className="flex items-center gap-2">
@@ -2874,6 +3113,212 @@ export function AtendimentoClient() {
                                   Horário definido para esse registro.
                                 </div>
                               </div>
+
+                              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+                                <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                                    Aula experimental
+                                  </div>
+                                  <div className="ml-auto flex w-full flex-wrap items-center gap-2 min-[600px]:w-auto min-[600px]:justify-end">
+                                    {(() => {
+                                      if (expAssigned) return null;
+                                      return (
+                                        <div className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 min-[600px]:w-auto min-[600px]:px-3 min-[600px]:py-1 min-[600px]:text-[11px]">
+                                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                                          <span className="hidden sm:inline">Escolha o professor</span>
+                                          <span className="sm:hidden">Escolha professor</span>
+                                        </div>
+                                      );
+                                    })()}
+                                    <div className="relative w-full min-[600px]:w-auto">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (experimentalLockedProf) {
+                                            if (expHasAttendanceStatus) {
+                                              modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                            } else if (expBookingIsCancelled) {
+                                              modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                            } else {
+                                              modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                            }
+                                            return;
+                                          }
+                                          setExpAssignProfDropdownOpen((v) => !v);
+                                        }}
+                                        onBlur={() => {
+                                          setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
+                                        }}
+                                        disabled={expAssigningProfessor || experimentalLockedProf}
+                                        className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
+                                        title={(() => {
+                                          if (experimentalLockedProf) {
+                                            if (expHasAttendanceStatus) {
+                                              return "Professor não pode ser alterado após comparecimento marcado.";
+                                            } else if (expBookingIsCancelled) {
+                                              return "Professor não pode ser alterado após a aula experimental ser cancelada.";
+                                            }
+                                            return "Professor não pode ser alterado após o disparo ser realizado.";
+                                          }
+                                          return expAssigned
+                                            ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
+                                            : "Selecionar professor responsável pela aula experimental";
+                                        })()}
+                                      >
+                                        {expAssigningProfessor ? (
+                                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                                        ) : (
+                                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                                        )}
+                                        {expAssigned
+                                          ? `${expAssigned.name} (${expAssigned.short})`
+                                          : "Selecionar professor"}
+                                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                                      </button>
+                                      {expAssignProfDropdownOpen ? (
+                                        <div
+                                          className="absolute right-0 top-full z-[380] mt-2 flex w-[280px] flex-col gap-1.5 overflow-hidden rounded-2xl border border-[var(--app-border)] p-2"
+                                          style={{ backgroundColor: "#18181b", opacity: 1, backdropFilter: "none" }}
+                                        >
+                                          {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
+                                            const isActive = expAssigned?.phone === opt.phone && expAssigned?.name === opt.name;
+                                            const optionDisabled = expAssigningProfessor || experimentalLockedProf;
+                                            return (
+                                              <button
+                                                key={opt.phone}
+                                                type="button"
+                                                disabled={optionDisabled}
+                                                onClick={() => {
+                                                  if (experimentalLockedProf) {
+                                                    if (expHasAttendanceStatus) {
+                                                      modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                                    } else if (expBookingIsCancelled) {
+                                                      modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                                    } else {
+                                                      modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                                    }
+                                                    setExpAssignProfDropdownOpen(false);
+                                                    return;
+                                                  }
+                                                  setExpAssignProfDropdownOpen(false);
+                                                  void handleAssignProfessorExperimental(sl, { name: opt.name, phone: opt.phone });
+                                                }}
+                                                className={[
+                                                  "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
+                                                  isActive
+                                                    ? "bg-[var(--app-warning-bg)]"
+                                                    : "bg-[#23232a] hover:bg-[#2a2a32]",
+                                                  "disabled:cursor-not-allowed disabled:opacity-60",
+                                                ].join(" ")}
+                                                title={
+                                                  experimentalLockedProf
+                                                    ? expHasAttendanceStatus
+                                                      ? "Professor não pode ser alterado após comparecimento marcado."
+                                                      : expBookingIsCancelled
+                                                        ? "Professor não pode ser alterado após a aula experimental ser cancelada."
+                                                        : "Professor não pode ser alterado após o disparo ser realizado."
+                                                    : ""
+                                                }
+                                              >
+                                                <div className="min-w-0 flex-1">
+                                                  <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                                                    {opt.name}
+                                                  </div>
+                                                  <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--app-text-55)]">
+                                                    {opt.phone}
+                                                  </div>
+                                                </div>
+                                                {isActive ? (
+                                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-yellow-200">
+                                                    <Check className="h-3 w-3 shrink-0" />
+                                                    Atual
+                                                  </div>
+                                                ) : null}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+                                <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                                    Link da aula
+                                  </div>
+                                </div>
+                                <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                                  <div className="min-w-0 flex-1">
+                                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                                      URL
+                                    </label>
+                                    <input
+                                      type="url"
+                                      inputMode="url"
+                                      placeholder="https://meet.google.com/..."
+                                      value={experimentalLessonLinkDraft}
+                                      onChange={(e) =>
+                                        setExpLessonLinkDraftByLeadId((prev) => ({
+                                          ...prev,
+                                          [sl.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                                      disabled={expSavingLessonLink || experimentalLockedProf}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSaveLessonLinkExperimental(sl)}
+                                    disabled={expLessonLinkSaveDisabled}
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {expSavingLessonLink ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                        Salvando...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Save className="h-4 w-4 shrink-0" />
+                                        {expSavedLink ? "Atualizar" : "Salvar"}
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {expCanShowDisparar ? (
+                                <div className="mt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSendStudentNotificationExperimental(sl)}
+                                    disabled={!expCanSendDisparo}
+                                    title={(() => {
+                                      if (!expSavedLink && !expAssigned) {
+                                        return "Adicione o link da aula e selecione o professor antes de disparar.";
+                                      }
+                                      if (!expSavedLink) {
+                                        return "Adicione o link da aula experimental antes de disparar a notificação.";
+                                      }
+                                      if (!expAssigned) {
+                                        return "Selecione o professor responsável antes de disparar agora.";
+                                      }
+                                      if (!expHasPhone) {
+                                        return "Registro não possui telefone cadastrado para receber a notificação.";
+                                      }
+                                      return "Disparar notificações agora.";
+                                    })()}
+                                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    <Zap className="h-3.5 w-3.5 shrink-0" />
+                                    {expSendingNotification ? "Disparando..." : "Disparar agora"}
+                                  </button>
+                                </div>
+                              ) : null}
                             </div>
                           );
                         }
@@ -3449,6 +3894,21 @@ export function AtendimentoClient() {
                       }
                       const expTone = buildExperimentalMetaForList(sl).tone;
                       if (expTone === "success") {
+                        const expAssigned = experimentalAssignedProfessorForLead(sl);
+                        const expSavedLink = experimentalLessonLinkForLead(sl);
+                        const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
+                        const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl);
+                        const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf);
+                        const expLessonLinkSaveDisabled = (() => {
+                          const d = experimentalLessonLinkDraft.trim();
+                          if (!d && !expSavedLink) return true;
+                          if (d === expSavedLink) return true;
+                          if (expSavingLessonLink || experimentalLockedProf) return true;
+                          return false;
+                        })();
+                        const bk = (sl as any).experimental_class_booking as any;
+                        const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
+                        const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                         return (
                           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex items-center gap-2">
@@ -3465,6 +3925,212 @@ export function AtendimentoClient() {
                                 Horário definido para esse registro.
                               </div>
                             </div>
+
+                            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+                              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                                  Aula experimental
+                                </div>
+                                <div className="ml-auto flex w-full flex-wrap items-center gap-2 min-[600px]:w-auto min-[600px]:justify-end">
+                                  {(() => {
+                                    if (expAssigned) return null;
+                                    return (
+                                      <div className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 min-[600px]:w-auto min-[600px]:px-3 min-[600px]:py-1 min-[600px]:text-[11px]">
+                                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                                        <span className="hidden sm:inline">Escolha o professor</span>
+                                        <span className="sm:hidden">Escolha professor</span>
+                                      </div>
+                                    );
+                                  })()}
+                                  <div className="relative w-full min-[600px]:w-auto">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (experimentalLockedProf) {
+                                          if (expHasAttendanceStatus) {
+                                            modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                          } else if (expBookingIsCancelled) {
+                                            modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                          } else {
+                                            modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                          }
+                                          return;
+                                        }
+                                        setExpAssignProfDropdownOpen((v) => !v);
+                                      }}
+                                      onBlur={() => {
+                                        setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
+                                      }}
+                                      disabled={expAssigningProfessor || experimentalLockedProf}
+                                      className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
+                                      title={(() => {
+                                        if (experimentalLockedProf) {
+                                          if (expHasAttendanceStatus) {
+                                            return "Professor não pode ser alterado após comparecimento marcado.";
+                                          } else if (expBookingIsCancelled) {
+                                            return "Professor não pode ser alterado após a aula experimental ser cancelada.";
+                                          }
+                                          return "Professor não pode ser alterado após o disparo ser realizado.";
+                                        }
+                                        return expAssigned
+                                          ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
+                                          : "Selecionar professor responsável pela aula experimental";
+                                      })()}
+                                    >
+                                      {expAssigningProfessor ? (
+                                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                                      )}
+                                      {expAssigned
+                                        ? `${expAssigned.name} (${expAssigned.short})`
+                                        : "Selecionar professor"}
+                                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
+                                    </button>
+                                    {expAssignProfDropdownOpen ? (
+                                      <div
+                                        className="absolute right-0 top-full z-[380] mt-2 flex w-[280px] flex-col gap-1.5 overflow-hidden rounded-2xl border border-[var(--app-border)] p-2"
+                                        style={{ backgroundColor: "#18181b", opacity: 1, backdropFilter: "none" }}
+                                      >
+                                        {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
+                                          const isActive = expAssigned?.phone === opt.phone && expAssigned?.name === opt.name;
+                                          const optionDisabled = expAssigningProfessor || experimentalLockedProf;
+                                          return (
+                                            <button
+                                              key={opt.phone}
+                                              type="button"
+                                              disabled={optionDisabled}
+                                              onClick={() => {
+                                                if (experimentalLockedProf) {
+                                                  if (expHasAttendanceStatus) {
+                                                    modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                                  } else if (expBookingIsCancelled) {
+                                                    modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                                  } else {
+                                                    modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                                  }
+                                                  setExpAssignProfDropdownOpen(false);
+                                                  return;
+                                                }
+                                                setExpAssignProfDropdownOpen(false);
+                                                void handleAssignProfessorExperimental(sl, { name: opt.name, phone: opt.phone });
+                                              }}
+                                              className={[
+                                                "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
+                                                isActive
+                                                  ? "bg-[var(--app-warning-bg)]"
+                                                  : "bg-[#23232a] hover:bg-[#2a2a32]",
+                                                "disabled:cursor-not-allowed disabled:opacity-60",
+                                              ].join(" ")}
+                                              title={
+                                                experimentalLockedProf
+                                                  ? expHasAttendanceStatus
+                                                    ? "Professor não pode ser alterado após comparecimento marcado."
+                                                    : expBookingIsCancelled
+                                                      ? "Professor não pode ser alterado após a aula experimental ser cancelada."
+                                                      : "Professor não pode ser alterado após o disparo ser realizado."
+                                                  : ""
+                                              }
+                                            >
+                                              <div className="min-w-0 flex-1">
+                                                <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
+                                                  {opt.name}
+                                                </div>
+                                                <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--app-text-55)]">
+                                                  {opt.phone}
+                                                </div>
+                                              </div>
+                                              {isActive ? (
+                                                <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-yellow-200">
+                                                  <Check className="h-3 w-3 shrink-0" />
+                                                  Atual
+                                                </div>
+                                              ) : null}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+                              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                                  Link da aula
+                                </div>
+                              </div>
+                              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                                <div className="min-w-0 flex-1">
+                                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
+                                    URL
+                                  </label>
+                                  <input
+                                    type="url"
+                                    inputMode="url"
+                                    placeholder="https://meet.google.com/..."
+                                    value={experimentalLessonLinkDraft}
+                                    onChange={(e) =>
+                                      setExpLessonLinkDraftByLeadId((prev) => ({
+                                        ...prev,
+                                        [sl.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={expSavingLessonLink || experimentalLockedProf}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSaveLessonLinkExperimental(sl)}
+                                  disabled={expLessonLinkSaveDisabled}
+                                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {expSavingLessonLink ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                      Salvando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="h-4 w-4 shrink-0" />
+                                      {expSavedLink ? "Atualizar" : "Salvar"}
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {expCanShowDisparar ? (
+                              <div className="mt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSendStudentNotificationExperimental(sl)}
+                                  disabled={!expCanSendDisparo}
+                                  title={(() => {
+                                    if (!expSavedLink && !expAssigned) {
+                                      return "Adicione o link da aula e selecione o professor antes de disparar.";
+                                    }
+                                    if (!expSavedLink) {
+                                      return "Adicione o link da aula experimental antes de disparar a notificação.";
+                                    }
+                                    if (!expAssigned) {
+                                      return "Selecione o professor responsável antes de disparar agora.";
+                                    }
+                                    if (!expHasPhone) {
+                                      return "Registro não possui telefone cadastrado para receber a notificação.";
+                                    }
+                                    return "Disparar notificações agora.";
+                                  })()}
+                                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  <Zap className="h-3.5 w-3.5 shrink-0" />
+                                  {expSendingNotification ? "Disparando..." : "Disparar agora"}
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                         );
                       }
