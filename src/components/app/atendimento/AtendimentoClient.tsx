@@ -3114,146 +3114,134 @@ export function AtendimentoClient() {
                                 </div>
                               </div>
 
-                              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-                                <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                                    Aula experimental
+                              <div className="mt-5 flex flex-wrap items-center gap-3 min-[600px]:justify-between">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <div className="text-[12px] font-semibold text-[var(--app-text-70)]">
+                                    Professor
                                   </div>
-                                  <div className="ml-auto flex w-full flex-wrap items-center gap-2 min-[600px]:w-auto min-[600px]:justify-end">
-                                    {(() => {
-                                      if (expAssigned) return null;
-                                      return (
-                                        <div className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 min-[600px]:w-auto min-[600px]:px-3 min-[600px]:py-1 min-[600px]:text-[11px]">
-                                          <AlertTriangle className="h-3 w-3 shrink-0" />
-                                          <span className="hidden sm:inline">Escolha o professor</span>
-                                          <span className="sm:hidden">Escolha professor</span>
-                                        </div>
-                                      );
-                                    })()}
-                                    <div className="relative w-full min-[600px]:w-auto">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (experimentalLockedProf) {
-                                            if (expHasAttendanceStatus) {
-                                              modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                                            } else if (expBookingIsCancelled) {
-                                              modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
-                                            } else {
-                                              modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
-                                            }
-                                            return;
-                                          }
-                                          setExpAssignProfDropdownOpen((v) => !v);
-                                        }}
-                                        onBlur={() => {
-                                          setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
-                                        }}
-                                        disabled={expAssigningProfessor || experimentalLockedProf}
-                                        className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
-                                        title={(() => {
-                                          if (experimentalLockedProf) {
-                                            if (expHasAttendanceStatus) {
-                                              return "Professor não pode ser alterado após comparecimento marcado.";
-                                            } else if (expBookingIsCancelled) {
-                                              return "Professor não pode ser alterado após a aula experimental ser cancelada.";
-                                            }
-                                            return "Professor não pode ser alterado após o disparo ser realizado.";
-                                          }
-                                          return expAssigned
-                                            ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
-                                            : "Selecionar professor responsável pela aula experimental";
-                                        })()}
-                                      >
-                                        {expAssigningProfessor ? (
-                                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                                        ) : (
-                                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
-                                        )}
-                                        {expAssigned
-                                          ? `${expAssigned.name} (${expAssigned.short})`
-                                          : "Selecionar professor"}
-                                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
-                                      </button>
-                                      {expAssignProfDropdownOpen ? (
-                                        <div
-                                          className="absolute right-0 top-full z-[380] mt-2 flex w-[280px] flex-col gap-1.5 overflow-hidden rounded-2xl border border-[var(--app-border)] p-2"
-                                          style={{ backgroundColor: "#18181b", opacity: 1, backdropFilter: "none" }}
-                                        >
-                                          {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
-                                            const isActive = expAssigned?.phone === opt.phone && expAssigned?.name === opt.name;
-                                            const optionDisabled = expAssigningProfessor || experimentalLockedProf;
-                                            return (
-                                              <button
-                                                key={opt.phone}
-                                                type="button"
-                                                disabled={optionDisabled}
-                                                onClick={() => {
-                                                  if (experimentalLockedProf) {
-                                                    if (expHasAttendanceStatus) {
-                                                      modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                                                    } else if (expBookingIsCancelled) {
-                                                      modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
-                                                    } else {
-                                                      modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
-                                                    }
-                                                    setExpAssignProfDropdownOpen(false);
-                                                    return;
-                                                  }
-                                                  setExpAssignProfDropdownOpen(false);
-                                                  void handleAssignProfessorExperimental(sl, { name: opt.name, phone: opt.phone });
-                                                }}
-                                                className={[
-                                                  "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
-                                                  isActive
-                                                    ? "bg-[var(--app-warning-bg)]"
-                                                    : "bg-[#23232a] hover:bg-[#2a2a32]",
-                                                  "disabled:cursor-not-allowed disabled:opacity-60",
-                                                ].join(" ")}
-                                                title={
-                                                  experimentalLockedProf
-                                                    ? expHasAttendanceStatus
-                                                      ? "Professor não pode ser alterado após comparecimento marcado."
-                                                      : expBookingIsCancelled
-                                                        ? "Professor não pode ser alterado após a aula experimental ser cancelada."
-                                                        : "Professor não pode ser alterado após o disparo ser realizado."
-                                                    : ""
-                                                }
-                                              >
-                                                <div className="min-w-0 flex-1">
-                                                  <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
-                                                    {opt.name}
-                                                  </div>
-                                                  <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--app-text-55)]">
-                                                    {opt.phone}
-                                                  </div>
-                                                </div>
-                                                {isActive ? (
-                                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-yellow-200">
-                                                    <Check className="h-3 w-3 shrink-0" />
-                                                    Atual
-                                                  </div>
-                                                ) : null}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : null}
+                                  {!expAssigned ? (
+                                    <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                                      Escolha o professor
                                     </div>
-                                  </div>
+                                  ) : null}
+                                </div>
+                                <div className="relative w-full min-[600px]:ml-auto min-[600px]:w-auto">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (experimentalLockedProf) {
+                                        if (expHasAttendanceStatus) {
+                                          modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                        } else if (expBookingIsCancelled) {
+                                          modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                        } else {
+                                          modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                        }
+                                        return;
+                                      }
+                                      setExpAssignProfDropdownOpen((v) => !v);
+                                    }}
+                                    onBlur={() => {
+                                      setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
+                                    }}
+                                    disabled={expAssigningProfessor || experimentalLockedProf}
+                                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 min-[600px]:w-auto"
+                                    title={(() => {
+                                      if (experimentalLockedProf) {
+                                        if (expHasAttendanceStatus) {
+                                          return "Professor não pode ser alterado após comparecimento marcado.";
+                                        } else if (expBookingIsCancelled) {
+                                          return "Professor não pode ser alterado após a aula experimental ser cancelada.";
+                                        }
+                                        return "Professor não pode ser alterado após o disparo ser realizado.";
+                                      }
+                                      return expAssigned
+                                        ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
+                                        : "Selecionar professor responsável pela aula experimental";
+                                    })()}
+                                  >
+                                    {expAssigningProfessor ? (
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                                    )}
+                                    <span className="truncate">
+                                      {expAssigned
+                                        ? `${expAssigned.name} (${expAssigned.short})`
+                                        : "Selecionar professor"}
+                                    </span>
+                                    <ChevronDown className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                                  </button>
+                                  {expAssignProfDropdownOpen ? (
+                                    <div className="absolute right-0 top-full z-[380] mt-2 flex w-[300px] flex-col gap-1 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1.5 shadow-lg">
+                                      {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
+                                        const isActive = expAssigned?.phone === opt.phone && expAssigned?.name === opt.name;
+                                        const optionDisabled = expAssigningProfessor || experimentalLockedProf;
+                                        return (
+                                          <button
+                                            key={opt.phone}
+                                            type="button"
+                                            disabled={optionDisabled}
+                                            onClick={() => {
+                                              if (experimentalLockedProf) {
+                                                if (expHasAttendanceStatus) {
+                                                  modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                                } else if (expBookingIsCancelled) {
+                                                  modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                                } else {
+                                                  modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                                }
+                                                setExpAssignProfDropdownOpen(false);
+                                                return;
+                                              }
+                                              setExpAssignProfDropdownOpen(false);
+                                              void handleAssignProfessorExperimental(sl, { name: opt.name, phone: opt.phone });
+                                            }}
+                                            className={[
+                                              "flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition",
+                                              isActive
+                                                ? "border border-emerald-500/30 bg-emerald-500/10"
+                                                : "border border-transparent hover:bg-[var(--app-hover)]",
+                                              "disabled:cursor-not-allowed disabled:opacity-55",
+                                            ].join(" ")}
+                                            title={
+                                              experimentalLockedProf
+                                                ? expHasAttendanceStatus
+                                                  ? "Professor não pode ser alterado após comparecimento marcado."
+                                                  : expBookingIsCancelled
+                                                    ? "Professor não pode ser alterado após a aula experimental ser cancelada."
+                                                    : "Professor não pode ser alterado após o disparo ser realizado."
+                                                : ""
+                                            }
+                                          >
+                                            <div className="min-w-0 flex-1">
+                                              <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
+                                                {opt.name}
+                                              </div>
+                                              <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--app-text-60)]">
+                                                {opt.phone}
+                                              </div>
+                                            </div>
+                                            {isActive ? (
+                                              <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                                                <Check className="h-3 w-3 shrink-0" />
+                                                Atual
+                                              </div>
+                                            ) : null}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
 
-                              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-                                <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                                    Link da aula
-                                  </div>
-                                </div>
-                                <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                              <div className="mt-5">
+                                <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
                                   <div className="min-w-0 flex-1">
-                                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                                      URL
+                                    <label className="mb-1.5 block text-[12px] font-semibold text-[var(--app-text-70)]">
+                                      Link da aula
                                     </label>
                                     <input
                                       type="url"
@@ -3266,7 +3254,7 @@ export function AtendimentoClient() {
                                           [sl.id]: e.target.value,
                                         }))
                                       }
-                                      className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                                      className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-55"
                                       disabled={expSavingLessonLink || experimentalLockedProf}
                                     />
                                   </div>
@@ -3274,7 +3262,7 @@ export function AtendimentoClient() {
                                     type="button"
                                     onClick={() => void handleSaveLessonLinkExperimental(sl)}
                                     disabled={expLessonLinkSaveDisabled}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55"
                                   >
                                     {expSavingLessonLink ? (
                                       <>
@@ -3292,7 +3280,7 @@ export function AtendimentoClient() {
                               </div>
 
                               {expCanShowDisparar ? (
-                                <div className="mt-3">
+                                <div className="mt-5 flex w-full justify-end">
                                   <button
                                     type="button"
                                     onClick={() => void handleSendStudentNotificationExperimental(sl)}
@@ -3312,9 +3300,9 @@ export function AtendimentoClient() {
                                       }
                                       return "Disparar notificações agora.";
                                     })()}
-                                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-[13px] font-semibold !text-white shadow-none transition hover:bg-sky-500 min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-sky-600"
                                   >
-                                    <Zap className="h-3.5 w-3.5 shrink-0" />
+                                    <Zap className="h-4 w-4 shrink-0" />
                                     {expSendingNotification ? "Disparando..." : "Disparar agora"}
                                   </button>
                                 </div>
@@ -3926,146 +3914,134 @@ export function AtendimentoClient() {
                               </div>
                             </div>
 
-                            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-                              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                                  Aula experimental
+                            <div className="mt-5 flex flex-wrap items-center gap-3 min-[600px]:justify-between">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <div className="text-[12px] font-semibold text-[var(--app-text-70)]">
+                                  Professor
                                 </div>
-                                <div className="ml-auto flex w-full flex-wrap items-center gap-2 min-[600px]:w-auto min-[600px]:justify-end">
-                                  {(() => {
-                                    if (expAssigned) return null;
-                                    return (
-                                      <div className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-200 min-[600px]:w-auto min-[600px]:px-3 min-[600px]:py-1 min-[600px]:text-[11px]">
-                                        <AlertTriangle className="h-3 w-3 shrink-0" />
-                                        <span className="hidden sm:inline">Escolha o professor</span>
-                                        <span className="sm:hidden">Escolha professor</span>
-                                      </div>
-                                    );
-                                  })()}
-                                  <div className="relative w-full min-[600px]:w-auto">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (experimentalLockedProf) {
-                                          if (expHasAttendanceStatus) {
-                                            modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                                          } else if (expBookingIsCancelled) {
-                                            modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
-                                          } else {
-                                            modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
-                                          }
-                                          return;
-                                        }
-                                        setExpAssignProfDropdownOpen((v) => !v);
-                                      }}
-                                      onBlur={() => {
-                                        setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
-                                      }}
-                                      disabled={expAssigningProfessor || experimentalLockedProf}
-                                      className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-3 py-1 text-[11px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 min-[600px]:w-auto min-[600px]:justify-start"
-                                      title={(() => {
-                                        if (experimentalLockedProf) {
-                                          if (expHasAttendanceStatus) {
-                                            return "Professor não pode ser alterado após comparecimento marcado.";
-                                          } else if (expBookingIsCancelled) {
-                                            return "Professor não pode ser alterado após a aula experimental ser cancelada.";
-                                          }
-                                          return "Professor não pode ser alterado após o disparo ser realizado.";
-                                        }
-                                        return expAssigned
-                                          ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
-                                          : "Selecionar professor responsável pela aula experimental";
-                                      })()}
-                                    >
-                                      {expAssigningProfessor ? (
-                                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                                      ) : (
-                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
-                                      )}
-                                      {expAssigned
-                                        ? `${expAssigned.name} (${expAssigned.short})`
-                                        : "Selecionar professor"}
-                                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--app-text-65)]" />
-                                    </button>
-                                    {expAssignProfDropdownOpen ? (
-                                      <div
-                                        className="absolute right-0 top-full z-[380] mt-2 flex w-[280px] flex-col gap-1.5 overflow-hidden rounded-2xl border border-[var(--app-border)] p-2"
-                                        style={{ backgroundColor: "#18181b", opacity: 1, backdropFilter: "none" }}
-                                      >
-                                        {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
-                                          const isActive = expAssigned?.phone === opt.phone && expAssigned?.name === opt.name;
-                                          const optionDisabled = expAssigningProfessor || experimentalLockedProf;
-                                          return (
-                                            <button
-                                              key={opt.phone}
-                                              type="button"
-                                              disabled={optionDisabled}
-                                              onClick={() => {
-                                                if (experimentalLockedProf) {
-                                                  if (expHasAttendanceStatus) {
-                                                    modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                                                  } else if (expBookingIsCancelled) {
-                                                    modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
-                                                  } else {
-                                                    modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
-                                                  }
-                                                  setExpAssignProfDropdownOpen(false);
-                                                  return;
-                                                }
-                                                setExpAssignProfDropdownOpen(false);
-                                                void handleAssignProfessorExperimental(sl, { name: opt.name, phone: opt.phone });
-                                              }}
-                                              className={[
-                                                "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
-                                                isActive
-                                                  ? "bg-[var(--app-warning-bg)]"
-                                                  : "bg-[#23232a] hover:bg-[#2a2a32]",
-                                                "disabled:cursor-not-allowed disabled:opacity-60",
-                                              ].join(" ")}
-                                              title={
-                                                experimentalLockedProf
-                                                  ? expHasAttendanceStatus
-                                                    ? "Professor não pode ser alterado após comparecimento marcado."
-                                                    : expBookingIsCancelled
-                                                      ? "Professor não pode ser alterado após a aula experimental ser cancelada."
-                                                      : "Professor não pode ser alterado após o disparo ser realizado."
-                                                  : ""
-                                              }
-                                            >
-                                              <div className="min-w-0 flex-1">
-                                                <div className="truncate text-sm font-semibold text-[var(--app-text-85)]">
-                                                  {opt.name}
-                                                </div>
-                                                <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--app-text-55)]">
-                                                  {opt.phone}
-                                                </div>
-                                              </div>
-                                              {isActive ? (
-                                                <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-yellow-200">
-                                                  <Check className="h-3 w-3 shrink-0" />
-                                                  Atual
-                                                </div>
-                                              ) : null}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : null}
+                                {!expAssigned ? (
+                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                                    Escolha o professor
                                   </div>
-                                </div>
+                                ) : null}
+                              </div>
+                              <div className="relative w-full min-[600px]:ml-auto min-[600px]:w-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (experimentalLockedProf) {
+                                      if (expHasAttendanceStatus) {
+                                        modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                      } else if (expBookingIsCancelled) {
+                                        modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                      } else {
+                                        modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                      }
+                                      return;
+                                    }
+                                    setExpAssignProfDropdownOpen((v) => !v);
+                                  }}
+                                  onBlur={() => {
+                                    setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
+                                  }}
+                                  disabled={expAssigningProfessor || experimentalLockedProf}
+                                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 min-[600px]:w-auto"
+                                  title={(() => {
+                                    if (experimentalLockedProf) {
+                                      if (expHasAttendanceStatus) {
+                                        return "Professor não pode ser alterado após comparecimento marcado.";
+                                      } else if (expBookingIsCancelled) {
+                                        return "Professor não pode ser alterado após a aula experimental ser cancelada.";
+                                      }
+                                      return "Professor não pode ser alterado após o disparo ser realizado.";
+                                    }
+                                    return expAssigned
+                                      ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
+                                      : "Selecionar professor responsável pela aula experimental";
+                                  })()}
+                                >
+                                  {expAssigningProfessor ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                                  )}
+                                  <span className="truncate">
+                                    {expAssigned
+                                      ? `${expAssigned.name} (${expAssigned.short})`
+                                      : "Selecionar professor"}
+                                  </span>
+                                  <ChevronDown className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                                </button>
+                                {expAssignProfDropdownOpen ? (
+                                  <div className="absolute right-0 top-full z-[380] mt-2 flex w-[300px] flex-col gap-1 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1.5 shadow-lg">
+                                    {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
+                                      const isActive = expAssigned?.phone === opt.phone && expAssigned?.name === opt.name;
+                                      const optionDisabled = expAssigningProfessor || experimentalLockedProf;
+                                      return (
+                                        <button
+                                          key={opt.phone}
+                                          type="button"
+                                          disabled={optionDisabled}
+                                          onClick={() => {
+                                            if (experimentalLockedProf) {
+                                              if (expHasAttendanceStatus) {
+                                                modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
+                                              } else if (expBookingIsCancelled) {
+                                                modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
+                                              } else {
+                                                modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
+                                              }
+                                              setExpAssignProfDropdownOpen(false);
+                                              return;
+                                            }
+                                            setExpAssignProfDropdownOpen(false);
+                                            void handleAssignProfessorExperimental(sl, { name: opt.name, phone: opt.phone });
+                                          }}
+                                          className={[
+                                            "flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition",
+                                            isActive
+                                              ? "border border-emerald-500/30 bg-emerald-500/10"
+                                              : "border border-transparent hover:bg-[var(--app-hover)]",
+                                            "disabled:cursor-not-allowed disabled:opacity-55",
+                                          ].join(" ")}
+                                          title={
+                                            experimentalLockedProf
+                                              ? expHasAttendanceStatus
+                                                ? "Professor não pode ser alterado após comparecimento marcado."
+                                                : expBookingIsCancelled
+                                                  ? "Professor não pode ser alterado após a aula experimental ser cancelada."
+                                                  : "Professor não pode ser alterado após o disparo ser realizado."
+                                              : ""
+                                          }
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
+                                              {opt.name}
+                                            </div>
+                                            <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--app-text-60)]">
+                                              {opt.phone}
+                                            </div>
+                                          </div>
+                                          {isActive ? (
+                                            <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                                              <Check className="h-3 w-3 shrink-0" />
+                                              Atual
+                                            </div>
+                                          ) : null}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
 
-                            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-                              <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                                  Link da aula
-                                </div>
-                              </div>
-                              <div className="mt-4 flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                            <div className="mt-5">
+                              <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
                                 <div className="min-w-0 flex-1">
-                                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
-                                    URL
+                                  <label className="mb-1.5 block text-[12px] font-semibold text-[var(--app-text-70)]">
+                                    Link da aula
                                   </label>
                                   <input
                                     type="url"
@@ -4078,7 +4054,7 @@ export function AtendimentoClient() {
                                         [sl.id]: e.target.value,
                                       }))
                                     }
-                                    className="w-full min-w-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-55"
                                     disabled={expSavingLessonLink || experimentalLockedProf}
                                   />
                                 </div>
@@ -4086,7 +4062,7 @@ export function AtendimentoClient() {
                                   type="button"
                                   onClick={() => void handleSaveLessonLinkExperimental(sl)}
                                   disabled={expLessonLinkSaveDisabled}
-                                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-card-2)] px-4 py-3 text-sm font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55"
                                 >
                                   {expSavingLessonLink ? (
                                     <>
@@ -4104,7 +4080,7 @@ export function AtendimentoClient() {
                             </div>
 
                             {expCanShowDisparar ? (
-                              <div className="mt-3">
+                              <div className="mt-5 flex w-full justify-end">
                                 <button
                                   type="button"
                                   onClick={() => void handleSendStudentNotificationExperimental(sl)}
@@ -4124,9 +4100,9 @@ export function AtendimentoClient() {
                                     }
                                     return "Disparar notificações agora.";
                                   })()}
-                                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-[13px] font-semibold !text-white shadow-none transition hover:bg-sky-500 min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-sky-600"
                                 >
-                                  <Zap className="h-3.5 w-3.5 shrink-0" />
+                                  <Zap className="h-4 w-4 shrink-0" />
                                   {expSendingNotification ? "Disparando..." : "Disparar agora"}
                                 </button>
                               </div>
