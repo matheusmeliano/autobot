@@ -2638,7 +2638,7 @@ export function AtendimentoClient() {
                               Dados básicos coletados
                             </div>
                             <div className="mt-0.5 text-[13px] text-emerald-700/90">
-                              Nenhum passo pendente identificado.
+                              Nenhum passo pendente nessa etapa.
                             </div>
                           </div>
                         ) : statusMeta.tone === "success" ? (
@@ -3170,7 +3170,7 @@ export function AtendimentoClient() {
                             Dados básicos coletados
                           </div>
                           <div className="mt-0.5 text-[13px] text-emerald-700/90">
-                            Nenhum passo pendente identificado.
+                            Nenhum passo pendente nessa etapa.
                           </div>
                         </div>
                       ) : statusMeta.tone === "success" ? (
