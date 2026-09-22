@@ -146,7 +146,7 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   const cityRaw = String((lead as any)?.city ?? "").trim();
   const locationOk = Boolean(stateRaw) && Boolean(cityRaw);
   if (!locationOk) return { label: "Falta estado e cidade", tone: "warning" };
-  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !expDraftDate) {
+  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !dateRawOk) {
     return { label: "Falta dia e horário", tone: "warning" };
   }
   return { label: "Novo registro", tone: "default" };
