@@ -3311,8 +3311,8 @@ export function AtendimentoClient() {
                           })();
                           return (
                             <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                              <div className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 sm:gap-4">
-                                <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
                                   <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                   <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
                                     Aulas experimentais
@@ -3324,7 +3324,7 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                 </div>
-                                <div className="flex flex-wrap sm:flex-nowrap w-full sm:w-auto items-center sm:items-start justify-start sm:justify-end gap-2 sm:gap-3">
+                                <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
                                   {expCanShowDisparar ? (
                                     <div className="flex w-full sm:w-auto shrink-0">
                                       <button
@@ -4234,8 +4234,8 @@ export function AtendimentoClient() {
                         })();
                         return (
                           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 sm:gap-4">
-                              <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
                                 <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                 <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
                                   Aulas experimentais
@@ -4247,7 +4247,7 @@ export function AtendimentoClient() {
                                   </div>
                                 ) : null}
                               </div>
-                              <div className="flex flex-wrap sm:flex-nowrap w-full sm:w-auto items-center sm:items-start justify-start sm:justify-end gap-2 sm:gap-3">
+                              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
                                 {expCanShowDisparar ? (
                                   <div className="flex w-full sm:w-auto shrink-0">
                                     <button
