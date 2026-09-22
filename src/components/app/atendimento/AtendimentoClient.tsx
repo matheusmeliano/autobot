@@ -4570,17 +4570,95 @@ export function AtendimentoClient() {
                 (lead as any)?.future_experimental_class_booking ??
                 (lead as any)?.experimental_class_booking ??
                 null;
+              const bookingStatus = String((bookingObj as any)?.status ?? "").trim().toLowerCase();
+              const bookingHasId = Boolean(String((bookingObj as any)?.id ?? "").trim());
+              const bookingIsNotDraft =
+                bookingHasId &&
+                String((bookingObj as any)?.source ?? "draft").trim().toLowerCase() !== "draft";
+              const latestCancelledAt = String(
+                (lead as any)?.latest_experimental_class_cancelled_at ?? "",
+              ).trim();
+              const hasLatestCancelledMarker =
+                Boolean(latestCancelledAt) && latestCancelledAt !== "null";
 
-              const leadDateRaw = String(
-                (lead as any)?.experimental_class_lead_date ??
-                  (bookingObj as any)?.lead_date ??
-                  "",
-              ).trim();
-              const leadTimeRaw = String(
-                (lead as any)?.experimental_class_lead_time ??
-                  (bookingObj as any)?.lead_time ??
-                  "",
-              ).trim();
+              const bookingProfDate =
+                bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled"
+                  ? String((bookingObj as any)?.professor_date ?? "").slice(0, 10).trim()
+                  : "";
+              const bookingProfTime =
+                bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled"
+                  ? String((bookingObj as any)?.professor_time ?? "").trim()
+                  : "";
+              const futureBookingProfDate =
+                (lead as any)?.future_experimental_class_booking &&
+                String(
+                  ((lead as any).future_experimental_class_booking as any)?.status ?? "",
+                ).trim().toLowerCase() !== "cancelled"
+                  ? String(
+                      ((lead as any).future_experimental_class_booking as any)?.professor_date ??
+                        "",
+                    )
+                      .slice(0, 10)
+                      .trim()
+                  : "";
+              const futureBookingProfTime =
+                (lead as any)?.future_experimental_class_booking &&
+                String(
+                  ((lead as any).future_experimental_class_booking as any)?.status ?? "",
+                ).trim().toLowerCase() !== "cancelled"
+                  ? String(
+                      ((lead as any).future_experimental_class_booking as any)?.professor_time ??
+                        "",
+                    ).trim()
+                  : "";
+              const leadFlatProfDate = hasLatestCancelledMarker
+                ? ""
+                : String((lead as any)?.experimental_class_professor_date ?? "").slice(0, 10).trim();
+              const leadFlatProfTime = hasLatestCancelledMarker
+                ? ""
+                : String((lead as any)?.experimental_class_professor_time ?? "").trim();
+              const bestProfDate = bookingProfDate || futureBookingProfDate || leadFlatProfDate;
+              const bestProfTime = bookingProfTime || futureBookingProfTime || leadFlatProfTime;
+
+              const fallbackLeadDateRaw = hasLatestCancelledMarker
+                ? ""
+                : String(
+                    (lead as any)?.experimental_class_lead_date ??
+                      (bookingObj as any)?.lead_date ??
+                      "",
+                  ).trim();
+              const fallbackLeadTimeRaw = hasLatestCancelledMarker
+                ? ""
+                : String(
+                    (lead as any)?.experimental_class_lead_time ??
+                      (bookingObj as any)?.lead_time ??
+                      "",
+                  ).trim();
+
+              let leadDateRaw = "";
+              let leadTimeRaw = "";
+              if (bestProfDate && bestProfTime) {
+                try {
+                  const leadEffectiveTz = deriveLeadEffectiveTimeZone(lead);
+                  const utcIso = zonedDateTimeToUtcIso({
+                    date: bestProfDate,
+                    time: bestProfTime,
+                    timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                  });
+                  if (utcIso) {
+                    leadDateRaw = extractLocalDateFromUtcIso(utcIso, leadEffectiveTz);
+                    leadTimeRaw = extractLocalTimeFromUtcIso(utcIso, leadEffectiveTz);
+                  }
+                } catch {
+                  leadDateRaw = "";
+                  leadTimeRaw = "";
+                }
+              }
+              if (!leadDateRaw || !leadTimeRaw) {
+                leadDateRaw = fallbackLeadDateRaw;
+                leadTimeRaw = fallbackLeadTimeRaw;
+              }
+
               const profDateRaw = String(
                 (lead as any)?.experimental_class_professor_date ??
                   (bookingObj as any)?.professor_date ??
