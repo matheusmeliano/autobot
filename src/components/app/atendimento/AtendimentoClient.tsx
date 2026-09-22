@@ -352,6 +352,40 @@ export function AtendimentoClient() {
     return Boolean(stateRaw) && Boolean(cityRaw);
   }, [selectedLead]);
 
+  // Quando TRUE: interessado acessou link matricula, concluiu cadastro inicial e VIRou ALUNO recorrente
+  // Nesse momento:
+  //   1. CARD RECORRENTE PASSA A EXISTIR (antes ficava oculto para interessados/experimental)
+  //   2. CARD EXPERIMENTAL some completamente (é substituido pelo recorrente)
+  // Regra 100% igual ao SummaryCards::isLeadInAlunosSection — garantir consistencia visual
+  const showRecurringCard = useMemo<boolean>(() => {
+    const lead = selectedLead as any;
+    if (!lead) return false;
+    const st = String(lead.status ?? "").trim().toLowerCase();
+    const fs = String(lead?.funnel_stage ?? "").trim().toLowerCase();
+    const rcs = String(lead?.recurring_class_status ?? "").trim().toLowerCase();
+    const ps = String(lead?.payment_status ?? "").trim().toLowerCase();
+    return (
+      st === "aluno" ||
+      st === "matriculado" ||
+      st === "cadastro_recorrente_pendente_plataforma" ||
+      st === "contrato_coletando_dados" ||
+      st === "contrato_aguardando_aceite" ||
+      st === "contrato_assinado" ||
+      st === "matricula_confirmada" ||
+      st === "pagamento_pendente_confirmacao" ||
+      st === "pagamento_nao_realizado" ||
+      fs === "aluno_recorrente_cadastrado" ||
+      fs === "cadastro_recorrente_pendente_plataforma" ||
+      fs === "pagamento_pendente_confirmacao" ||
+      fs === "pagamento_nao_realizado" ||
+      rcs === "cadastro_plataforma_pendente" ||
+      rcs === "confirmado" ||
+      ps === "pendente_confirmacao" ||
+      ps === "nao_realizado" ||
+      ps === "confirmado"
+    );
+  }, [selectedLead]);
+
   const applyFiltersToLeads = (
     leads: AtendimentoLeadListItem[],
     f: LeadFilters,
@@ -2782,57 +2816,60 @@ export function AtendimentoClient() {
 
                   {/* ============== AGENDAMENTOS ============== */}
                   {activeTab === "agendamentos" ? (
-                    <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2">
-                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                            Aulas experimentais
-                          </div>
-                        </div>
-                        <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                          <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                            {buildExperimentalMetaForList(sl).label}
-                          </div>
-                          <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                            Horário definido com o registro.
-                          </div>
-                        </div>
-                      </div>
-                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                        <div className="flex items-center gap-2">
-                          <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
-                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                            Aulas recorrentes
-                          </div>
-                        </div>
-                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
-                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                              {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                    <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-1">
+                      {!showRecurringCard ? (
+                        <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                              Aulas experimentais
                             </div>
                           </div>
-                          <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
-                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                              {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                          <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                            <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                              {buildExperimentalMetaForList(sl).label}
                             </div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
-                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                              {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
-                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                              Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
+                            <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                              Horário definido com o registro.
                             </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                          <div className="flex items-center gap-2">
+                            <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
+                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                              Aulas recorrentes
+                            </div>
+                          </div>
+                          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
+                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
+                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
+                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
+                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
@@ -3348,56 +3385,59 @@ export function AtendimentoClient() {
                 {/* ============== AGENDAMENTOS ============== */}
                 {activeTab === "agendamentos" ? (
                   <div className="grid w-full grid-cols-1 gap-4">
-                    <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                        <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                          Aulas experimentais
-                        </div>
-                      </div>
-                      <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                        <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                          {buildExperimentalMetaForList(sl).label}
-                        </div>
-                        <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                          Horário definido com o registro.
-                        </div>
-                      </div>
-                    </div>
-                    <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                      <div className="flex items-center gap-2">
-                        <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
-                        <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                          Aulas recorrentes
-                        </div>
-                      </div>
-                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
-                          <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                    {!showRecurringCard ? (
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Aulas experimentais
                           </div>
                         </div>
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
-                          <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                        <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                          <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                            {buildExperimentalMetaForList(sl).label}
                           </div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
-                          <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
-                          <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                            Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
+                          <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                            Horário definido com o registro.
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Aulas recorrentes
+                          </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
+                            <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                              Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : null}
 
