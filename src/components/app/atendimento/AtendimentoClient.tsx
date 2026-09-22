@@ -3418,8 +3418,8 @@ export function AtendimentoClient() {
               <div className="min-w-0">
                 <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
                   {editingExperimentalLead && (editingExperimentalLead as any)?.experimental_class_booking?.status === "scheduled"
-                    ? "Reagendar aula experimental"
-                    : "Agendar aula experimental"}
+                    ? "Reagendamento de aula"
+                    : "Agendamento de aula"}
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
                   Selecione dia e horário para a aula.
