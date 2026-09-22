@@ -2279,7 +2279,7 @@ export function AtendimentoClient() {
                           >
                             {meta.label}
                           </div>
-                          <div className="mt-1 text-[11px] text-[var(--app-text-45)]">
+                          <div className="mt-1 text-[12px] font-medium text-[var(--app-text-55)]">
                             Criado em: {formatAtendimentoDateTime(lead.created_at)}
                           </div>
                         </div>
