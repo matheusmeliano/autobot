@@ -3325,6 +3325,34 @@ export function AtendimentoClient() {
                                   ) : null}
                                 </div>
                                 <div className="flex w-full sm:w-auto items-stretch sm:items-start justify-end flex-col sm:flex-row gap-2 sm:gap-3">
+                                  <div className="flex w-full sm:w-auto shrink-0 sm:shrink">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenExperimentalBooking(sl)}
+                                      disabled={(() => {
+                                        if (expBookingIsCancelled) return true;
+                                        if (expHasAttendanceStatus) return true;
+                                        if (experimentalLockedProf) return true;
+                                        return false;
+                                      })()}
+                                      title={(() => {
+                                        if (expBookingIsCancelled) {
+                                          return "Aula experimental cancelada. Não é possível reagendar.";
+                                        }
+                                        if (expHasAttendanceStatus) {
+                                          return "Aula experimental não pode ser reagendada após comparecimento marcado.";
+                                        }
+                                        if (experimentalLockedProf) {
+                                          return "Aula experimental não pode ser editada após o disparo ser realizado.";
+                                        }
+                                        return "Reagendar esta aula experimental.";
+                                      })()}
+                                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      Reagendar aula
+                                    </button>
+                                  </div>
                                   {expCanShowDisparar ? (
                                     <div className="flex w-full sm:w-auto shrink-0 sm:shrink">
                                       <button
@@ -3339,7 +3367,7 @@ export function AtendimentoClient() {
                                             return "Adicione o link da aula experimental antes de disparar a notificação.";
                                           }
                                           if (!expAssigned) {
-                                            return "Selecione o professor responsável antes de disparar agora.";
+                                            return "Selecione o professor responsável antes de disparar.";
                                           }
                                           if (!expHasPhone) {
                                             return "Registro não possui telefone cadastrado para receber a notificação.";
@@ -3349,7 +3377,7 @@ export function AtendimentoClient() {
                                         className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                       >
                                         <Zap className="h-4 w-4 shrink-0" />
-                                        {expSendingNotification ? "Disparando..." : "Disparar agora"}
+                                        {expSendingNotification ? "Disparando..." : "Disparar"}
                                       </button>
                                     </div>
                                   ) : null}
@@ -4220,6 +4248,34 @@ export function AtendimentoClient() {
                                 ) : null}
                               </div>
                               <div className="flex w-full sm:w-auto items-stretch sm:items-start justify-end flex-col sm:flex-row gap-2 sm:gap-3">
+                                <div className="flex w-full sm:w-auto shrink-0 sm:shrink">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenExperimentalBooking(sl)}
+                                    disabled={(() => {
+                                      if (expBookingIsCancelled) return true;
+                                      if (expHasAttendanceStatus) return true;
+                                      if (experimentalLockedProf) return true;
+                                      return false;
+                                    })()}
+                                    title={(() => {
+                                      if (expBookingIsCancelled) {
+                                        return "Aula experimental cancelada. Não é possível reagendar.";
+                                      }
+                                      if (expHasAttendanceStatus) {
+                                        return "Aula experimental não pode ser reagendada após comparecimento marcado.";
+                                      }
+                                      if (experimentalLockedProf) {
+                                        return "Aula experimental não pode ser editada após o disparo ser realizado.";
+                                      }
+                                      return "Reagendar esta aula experimental.";
+                                    })()}
+                                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    Reagendar aula
+                                  </button>
+                                </div>
                                 {expCanShowDisparar ? (
                                   <div className="flex w-full sm:w-auto shrink-0 sm:shrink">
                                     <button
@@ -4234,7 +4290,7 @@ export function AtendimentoClient() {
                                           return "Adicione o link da aula experimental antes de disparar a notificação.";
                                         }
                                         if (!expAssigned) {
-                                          return "Selecione o professor responsável antes de disparar agora.";
+                                          return "Selecione o professor responsável antes de disparar.";
                                         }
                                         if (!expHasPhone) {
                                           return "Registro não possui telefone cadastrado para receber a notificação.";
@@ -4244,7 +4300,7 @@ export function AtendimentoClient() {
                                       className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     >
                                       <Zap className="h-4 w-4 shrink-0" />
-                                      {expSendingNotification ? "Disparando..." : "Disparar agora"}
+                                      {expSendingNotification ? "Disparando..." : "Disparar"}
                                     </button>
                                   </div>
                                 ) : null}
