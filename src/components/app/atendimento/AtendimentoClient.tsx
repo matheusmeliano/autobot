@@ -3390,7 +3390,7 @@ export function AtendimentoClient() {
                               {weekdayShort}
                             </div>
                             <div className={
-                              "text-[20px] font-black leading-none " +
+                              "text-[20px] font-semibold leading-none " +
                               (isSelected ? "!text-white" : "text-[var(--app-text-92)]")
                             }>
                               {dayLabel}
@@ -3457,7 +3457,7 @@ export function AtendimentoClient() {
                                 type="button"
                                 onClick={() => setSelectedExperimentalSlotId(slotId)}
                                 className={
-                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-black transition duration-150 " +
+                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-semibold transition duration-150 " +
                                   (isSelected
                                     ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
                                     : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
