@@ -3190,34 +3190,20 @@ export function AtendimentoClient() {
                           const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                           return (
                             <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                              <div className="flex items-center gap-2">
-                                <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                                <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                                  Aulas experimentais
-                                </div>
-                              </div>
-                              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                                <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                                  {buildExperimentalMetaForList(sl).label}
-                                </div>
-                                <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                                  Horário definido para esse registro.
-                                </div>
-                              </div>
-
-                              <div className="mt-5 flex flex-wrap items-center gap-3 min-[600px]:justify-between">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <div className="text-[12px] font-semibold text-[var(--app-text-70)]">
-                                    Professor
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                  <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
+                                    Aulas experimentais
                                   </div>
                                   {!expAssigned ? (
-                                    <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                                    <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
                                       <AlertTriangle className="h-3 w-3 shrink-0" />
-                                      Escolha o professor
+                                      Escolha
                                     </div>
                                   ) : null}
                                 </div>
-                                <div className="relative w-full min-[600px]:ml-auto min-[600px]:w-auto">
+                                <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -3237,7 +3223,7 @@ export function AtendimentoClient() {
                                       setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
                                     }}
                                     disabled={expAssigningProfessor || experimentalLockedProf}
-                                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 min-[600px]:w-auto"
+                                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     title={(() => {
                                       if (experimentalLockedProf) {
                                         if (expHasAttendanceStatus) {
@@ -3325,6 +3311,22 @@ export function AtendimentoClient() {
                                       })}
                                     </div>
                                   ) : null}
+                                </div>
+                              </div>
+                              {!expAssigned ? (
+                                <div className="mt-3 flex sm:hidden min-w-0 items-center gap-2">
+                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                                    Escolha o professor
+                                  </div>
+                                </div>
+                              ) : null}
+                              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                                <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                                  {buildExperimentalMetaForList(sl).label}
+                                </div>
+                                <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                                  Horário definido para esse registro.
                                 </div>
                               </div>
 
@@ -3990,34 +3992,20 @@ export function AtendimentoClient() {
                         const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                         return (
                           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                            <div className="flex items-center gap-2">
-                              <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                              <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                                Aulas experimentais
-                              </div>
-                            </div>
-                            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                              <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                                {buildExperimentalMetaForList(sl).label}
-                              </div>
-                              <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                                Horário definido para esse registro.
-                              </div>
-                            </div>
-
-                            <div className="mt-5 flex flex-wrap items-center gap-3 min-[600px]:justify-between">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <div className="text-[12px] font-semibold text-[var(--app-text-70)]">
-                                  Professor
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
+                                  Aulas experimentais
                                 </div>
                                 {!expAssigned ? (
-                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                                  <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
                                     <AlertTriangle className="h-3 w-3 shrink-0" />
-                                    Escolha o professor
+                                    Escolha
                                   </div>
                                 ) : null}
                               </div>
-                              <div className="relative w-full min-[600px]:ml-auto min-[600px]:w-auto">
+                              <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -4037,7 +4025,7 @@ export function AtendimentoClient() {
                                     setTimeout(() => setExpAssignProfDropdownOpen(false), 180);
                                   }}
                                   disabled={expAssigningProfessor || experimentalLockedProf}
-                                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 min-[600px]:w-auto"
+                                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   title={(() => {
                                     if (experimentalLockedProf) {
                                       if (expHasAttendanceStatus) {
@@ -4125,6 +4113,22 @@ export function AtendimentoClient() {
                                     })}
                                   </div>
                                 ) : null}
+                              </div>
+                            </div>
+                            {!expAssigned ? (
+                              <div className="mt-3 flex sm:hidden min-w-0 items-center gap-2">
+                                <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                                  Escolha o professor
+                                </div>
+                              </div>
+                            ) : null}
+                            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                              <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                                {buildExperimentalMetaForList(sl).label}
+                              </div>
+                              <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                                Horário definido para esse registro.
                               </div>
                             </div>
 
