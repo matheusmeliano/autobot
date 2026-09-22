@@ -5900,7 +5900,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                                 type="button"
                                 onClick={() => setSelectedExperimentalSlotId(slotId)}
                                 className={
-                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-black transition " +
+                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-sm font-semibold transition " +
                                   (isSelected
                                     ? "border-amber-500/60 bg-amber-500/20 text-amber-100 shadow"
                                     : "border-white/10 bg-white/[0.03] text-white/90 hover:border-white/25 hover:bg-white/[0.06]")

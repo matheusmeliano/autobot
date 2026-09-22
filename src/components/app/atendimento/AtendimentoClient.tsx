@@ -1644,7 +1644,7 @@ export function AtendimentoClient() {
                     <div className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${iconTone}`}>
                       {it.label}
                     </div>
-                    <div className="mt-1 text-[22px] font-extrabold leading-tight text-[var(--app-text-85)]">
+                    <div className="mt-1 text-[22px] font-semibold leading-tight text-[var(--app-text-85)]">
                       {it.value.toLocaleString("pt-BR")}
                     </div>
                   </div>
