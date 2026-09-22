@@ -283,6 +283,10 @@ export function AtendimentoClient() {
   const [isExpInfoOpen, setIsExpInfoOpen] = useState(false);
   const [expInfoLead, setExpInfoLead] = useState<AtendimentoLeadListItem | null>(null);
 
+  const [isEditSenhaOpen, setIsEditSenhaOpen] = useState(false);
+  const [editSenhaValue, setEditSenhaValue] = useState("");
+  const [editSenhaSaving, setEditSenhaSaving] = useState(false);
+
   type LeadFilters = {
     statusList: string[];
     stageList: string[];
@@ -791,6 +795,49 @@ export function AtendimentoClient() {
   function handleCloseExpInfo() {
     setIsExpInfoOpen(false);
     setExpInfoLead(null);
+  }
+
+  function handleOpenEditSenha() {
+    if (!selectedLead) return;
+    setEditSenhaValue(String((selectedLead as any).recurring_registration_password ?? "").trim());
+    setIsEditSenhaOpen(true);
+  }
+
+  function handleCloseEditSenha() {
+    if (editSenhaSaving) return;
+    setIsEditSenhaOpen(false);
+    setEditSenhaValue("");
+  }
+
+  async function handleSaveEditSenha() {
+    if (!selectedLead || editSenhaSaving) return;
+    const raw = String(editSenhaValue ?? "").trim();
+    try {
+      setEditSenhaSaving(true);
+      const response = await fetch(`/api/atendimento/leads/${selectedLead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recurring_registration_password: raw || null,
+          signup_password_raw_temp: raw || null,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
+      if (!response.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao atualizar senha.");
+        return;
+      }
+      if (payload.lead) {
+        setPanelLeads((current) => current.map((item) => (item.id === selectedLead.id ? { ...item, ...payload.lead } : item)));
+      }
+      setIsEditSenhaOpen(false);
+      setEditSenhaValue("");
+      modalToast.success("Senha atualizada com sucesso.");
+    } catch (error) {
+      modalToast.error(error instanceof Error ? error.message : "Falha ao atualizar senha.");
+    } finally {
+      setEditSenhaSaving(false);
+    }
   }
 
   async function handleSaveExperimentalBooking() {
@@ -2471,11 +2518,21 @@ export function AtendimentoClient() {
 
                       {/* CARD 2: Link de Matrícula */}
                       <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                        <div className="flex items-center gap-2">
-                          <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
-                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                            Link de Matrícula
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
+                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                              Link de Matrícula
+                            </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={handleOpenEditSenha}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Editar senha
+                          </button>
                         </div>
                         <div className="mt-4">
                           <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
@@ -2993,11 +3050,21 @@ export function AtendimentoClient() {
 
                     {/* CARD 2: Link de Matrícula */}
                     <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                      <div className="flex items-center gap-2">
-                        <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
-                        <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                          Link de Matrícula
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Link de Matrícula
+                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={handleOpenEditSenha}
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Editar senha
+                        </button>
                       </div>
                       <div className="mt-4">
                         <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
@@ -3651,6 +3718,90 @@ export function AtendimentoClient() {
             </div>
           </div>
         </div>
+      </AppModal>
+
+      <AppModal
+        isOpen={isEditSenhaOpen}
+        onClose={handleCloseEditSenha}
+        size="sm"
+        showCloseButton={false}
+        closeOnBackdropClick={!editSenhaSaving}
+        closeOnEscape={!editSenhaSaving}
+      >
+        <form
+          className="flex w-full flex-col gap-0"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSaveEditSenha();
+          }}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <Pencil className="h-5 w-5 text-[#9a3412]" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Editar senha
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Atualize a senha de acesso ao fluxo de matrícula.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Fechar"
+              onClick={handleCloseEditSenha}
+              disabled={editSenhaSaving}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 w-full space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                Senha
+                <span className="ml-2 font-normal text-[var(--app-text-45)]">(mín. 4 caracteres)</span>
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={editSenhaValue}
+                onChange={(e) => setEditSenhaValue(e.target.value)}
+                placeholder="Digite a senha do aluno..."
+                disabled={editSenhaSaving}
+                className="min-h-[44px] w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 text-[14px] font-semibold text-[var(--app-text-90)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-ring)] focus:outline-none focus:ring-4 focus:ring-[var(--app-ring)]/10 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <div className="text-[11px] font-medium text-[var(--app-text-50)]">
+                Deixe em branco para remover a senha cadastrada.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              onClick={handleCloseEditSenha}
+              disabled={editSenhaSaving}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={editSenhaSaving}
+              className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none transition-colors hover:bg-[#c2410c] active:bg-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {editSenhaSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : null}
+              Salvar
+            </button>
+          </div>
+        </form>
       </AppModal>
     </div>
   );
