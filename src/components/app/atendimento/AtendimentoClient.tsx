@@ -3653,7 +3653,7 @@ export function AtendimentoClient() {
               </div>
               <div className="min-w-0">
                 <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
-                  Agendamento aula experimental
+                  Agendamento da aula
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
                   Resumo completo do horário marcado para o registro.
