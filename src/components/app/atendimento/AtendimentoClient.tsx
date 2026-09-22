@@ -812,14 +812,18 @@ export function AtendimentoClient() {
   async function handleSaveEditSenha() {
     if (!selectedLead || editSenhaSaving) return;
     const raw = String(editSenhaValue ?? "").trim();
+    if (raw.length < 4) {
+      modalToast.error("Senha inválida. Digite pelo menos 4 caracteres.");
+      return;
+    }
     try {
       setEditSenhaSaving(true);
       const response = await fetch(`/api/atendimento/leads/${selectedLead.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recurring_registration_password: raw || null,
-          signup_password_raw_temp: raw || null,
+          recurring_registration_password: raw,
+          signup_password_raw_temp: raw,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
@@ -3763,20 +3767,19 @@ export function AtendimentoClient() {
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[var(--app-text-70)]">
                 Senha
-                <span className="ml-2 font-normal text-[var(--app-text-45)]">(mín. 4 caracteres)</span>
+                <span className="ml-2 font-normal text-[var(--app-text-45)]">(mín. 4 caracteres, obrigatório)</span>
               </label>
               <input
                 autoFocus
                 type="text"
+                required
+                minLength={4}
                 value={editSenhaValue}
                 onChange={(e) => setEditSenhaValue(e.target.value)}
                 placeholder="Digite a senha do aluno..."
                 disabled={editSenhaSaving}
                 className="min-h-[44px] w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 text-[14px] font-semibold text-[var(--app-text-90)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-ring)] focus:outline-none focus:ring-4 focus:ring-[var(--app-ring)]/10 disabled:cursor-not-allowed disabled:opacity-60"
               />
-              <div className="text-[11px] font-medium text-[var(--app-text-50)]">
-                Deixe em branco para remover a senha cadastrada.
-              </div>
             </div>
           </div>
 
@@ -3791,7 +3794,7 @@ export function AtendimentoClient() {
             </button>
             <button
               type="submit"
-              disabled={editSenhaSaving}
+              disabled={editSenhaSaving || String(editSenhaValue ?? "").trim().length < 4}
               className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none transition-colors hover:bg-[#c2410c] active:bg-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {editSenhaSaving ? (
