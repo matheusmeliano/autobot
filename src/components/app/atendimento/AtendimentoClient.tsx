@@ -1223,7 +1223,7 @@ export function AtendimentoClient() {
                 const offMs = asLocal.getTime() - iso.getTime();
                 const offsetMinutes = Math.round(offMs / 60000);
                 if (Number.isFinite(offsetMinutes)) {
-                  const newMs = iso.getTime() + offMs;
+                  const newMs = iso.getTime() - offMs;
                   const result = new Date(newMs);
                   if (Number.isFinite(result.getTime())) {
                     return result.toISOString();
