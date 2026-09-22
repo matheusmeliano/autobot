@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, SlidersHorizontal, Trash2, UserRound, X, Zap } from "lucide-react";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { resolveTimeZoneFromCityInput, zonedDateTimeToUtcIso } from "@/lib/timezone";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
 import { formatAtendimentoDate, formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
@@ -98,6 +99,53 @@ function buildInitials(name: string | null | undefined): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function deriveLeadEffectiveTimeZone(lead: AtendimentoLeadListItem | null | undefined): string {
+  if (!lead) return ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const cityRaw = String((lead as any).city ?? "").trim();
+  const stateRaw = String((lead as any).state ?? "").trim();
+  const phoneRaw = String(lead.phone ?? "").trim();
+  if (cityRaw) {
+    const r = resolveTimeZoneFromCityInput({
+      city: cityRaw,
+      state: stateRaw || null,
+      phone: phoneRaw || null,
+      allowPhoneCountryFallback: true,
+    });
+    if (r?.timeZone) return r.timeZone;
+  }
+  const savedTz = String((lead as any).timezone ?? "").trim();
+  return savedTz || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+}
+
+function extractLocalDateFromUtcIso(iso: string, timeZone: string): string {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return fmt.format(new Date(iso));
+  } catch {
+    return "";
+  }
+}
+
+function extractLocalTimeFromUtcIso(iso: string, timeZone: string): string {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const out = fmt.format(new Date(iso));
+    return out.replace(/\s+/g, "");
+  } catch {
+    return "";
+  }
+}
+
 function applyPhoneMask(input: string): string {
   const digits = String(input ?? "").replace(/\D/g, "");
   if (!digits) return "";
@@ -174,27 +222,70 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
   const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
   const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
-  const leadFlatDate = hasLatestCancelledMarker
-    ? ""
-    : String((lead as any)?.experimental_class_lead_date ?? "").trim();
-  const leadFlatTime = hasLatestCancelledMarker
-    ? ""
-    : String((lead as any)?.experimental_class_lead_time ?? "").trim();
-  const futureBookingLeadDate = hasFutureExp
-    ? String((futureExp as any)?.lead_date ?? "").trim()
-    : "";
-  const futureBookingLeadTime = hasFutureExp
-    ? String((futureExp as any)?.lead_time ?? "").trim()
-    : "";
-  const bookingLeadDate = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
-    ? String((booking as any)?.lead_date ?? "").trim()
-    : "";
-  const bookingLeadTime = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
-    ? String((booking as any)?.lead_time ?? "").trim()
-    : "";
 
-  const dateRawOk = leadFlatDate || futureBookingLeadDate || bookingLeadDate;
-  const timeRawOk = leadFlatTime || futureBookingLeadTime || bookingLeadTime;
+  const bookingProfDate = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((booking as any)?.professor_date ?? "").slice(0, 10).trim()
+    : "";
+  const bookingProfTime = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((booking as any)?.professor_time ?? "").trim()
+    : "";
+  const futureBookingProfDate = hasFutureExp
+    ? String((futureExp as any)?.professor_date ?? "").slice(0, 10).trim()
+    : "";
+  const futureBookingProfTime = hasFutureExp
+    ? String((futureExp as any)?.professor_time ?? "").trim()
+    : "";
+  const leadFlatProfDate = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_professor_date ?? "").slice(0, 10).trim();
+  const leadFlatProfTime = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_professor_time ?? "").trim();
+
+  const bestProfDate = bookingProfDate || futureBookingProfDate || leadFlatProfDate;
+  const bestProfTime = bookingProfTime || futureBookingProfTime || leadFlatProfTime;
+
+  let dateRawOk = "";
+  let timeRawOk = "";
+  if (bestProfDate && bestProfTime) {
+    try {
+      const leadEffectiveTz = deriveLeadEffectiveTimeZone(lead);
+      const utcIso = zonedDateTimeToUtcIso({
+        date: bestProfDate,
+        time: bestProfTime,
+        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      });
+      if (utcIso) {
+        dateRawOk = extractLocalDateFromUtcIso(utcIso, leadEffectiveTz);
+        timeRawOk = extractLocalTimeFromUtcIso(utcIso, leadEffectiveTz);
+      }
+    } catch {
+      dateRawOk = "";
+      timeRawOk = "";
+    }
+  }
+  if (!dateRawOk || !timeRawOk) {
+    const leadFlatDate = hasLatestCancelledMarker
+      ? ""
+      : String((lead as any)?.experimental_class_lead_date ?? "").trim();
+    const leadFlatTime = hasLatestCancelledMarker
+      ? ""
+      : String((lead as any)?.experimental_class_lead_time ?? "").trim();
+    const futureBookingLeadDate = hasFutureExp
+      ? String((futureExp as any)?.lead_date ?? "").trim()
+      : "";
+    const futureBookingLeadTime = hasFutureExp
+      ? String((futureExp as any)?.lead_time ?? "").trim()
+      : "";
+    const bookingLeadDate = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+      ? String((booking as any)?.lead_date ?? "").trim()
+      : "";
+    const bookingLeadTime = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+      ? String((booking as any)?.lead_time ?? "").trim()
+      : "";
+    dateRawOk = leadFlatDate || futureBookingLeadDate || bookingLeadDate;
+    timeRawOk = leadFlatTime || futureBookingLeadTime || bookingLeadTime;
+  }
   if (dateRawOk && timeRawOk) {
     const dmy = formatAtendimentoDate(dateRawOk);
     const hm = String(timeRawOk).replace(/h/gi, "").trim();
@@ -914,7 +1005,7 @@ export function AtendimentoClient() {
     setEditLeadCity(String((selectedLead as any).city ?? "").trim());
     setEditLeadState(String((selectedLead as any).state ?? "").trim());
     setEditLeadCountry(String((selectedLead as any).country ?? "").trim());
-    setEditLeadTimezone(String((selectedLead as any).timezone ?? "").trim());
+    setEditLeadTimezone(deriveLeadEffectiveTimeZone(selectedLead));
     setEditLeadOpen(true);
   }
 
@@ -1017,7 +1108,7 @@ export function AtendimentoClient() {
               ? (json.slotsByDate as Record<string, any[]>)
               : {};
           const lead_timezone =
-            String(json.lead_timezone ?? lead.timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+            String(json.lead_timezone ?? deriveLeadEffectiveTimeZone(lead) ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
             ATENDIMENTO_PROFESSOR_TIME_ZONE;
           setExperimentalAvailability({
             dates,
@@ -1158,7 +1249,7 @@ export function AtendimentoClient() {
         String(existingBooking?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
         ATENDIMENTO_PROFESSOR_TIME_ZONE;
       const leadTimezone =
-        String(experimentalAvailability?.lead_timezone ?? editingExperimentalLead?.timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
+        String(experimentalAvailability?.lead_timezone ?? deriveLeadEffectiveTimeZone(editingExperimentalLead) ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() ||
         ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
       const professorDate = String(selectedSlot.professorDate ?? selectedDate.professorDate ?? "").slice(0, 10);
@@ -2805,7 +2896,7 @@ export function AtendimentoClient() {
                             { label: "Estado", value: (sl as any).state ?? null },
                             { label: "Cidade", value: (sl as any).city ?? null },
                             { label: "País", value: (sl as any).country ?? null },
-                            { label: "Fuso horário", value: (sl as any).timezone ?? null },
+                            { label: "Fuso horário", value: deriveLeadEffectiveTimeZone(sl) ?? null },
                           ].map(({ label, value }) => (
                             <div key={label}>
                               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
@@ -3605,7 +3696,7 @@ export function AtendimentoClient() {
                           { label: "Cidade", value: (sl as any).city ?? null },
                           { label: "Estado", value: (sl as any).state ?? null },
                           { label: "País", value: (sl as any).country ?? null },
-                          { label: "Fuso horário", value: (sl as any).timezone ?? null },
+                          { label: "Fuso horário", value: deriveLeadEffectiveTimeZone(sl) ?? null },
                         ].map(({ label, value }) => (
                           <div key={label}>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
