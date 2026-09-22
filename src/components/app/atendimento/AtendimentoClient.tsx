@@ -2676,11 +2676,44 @@ export function AtendimentoClient() {
                           ? ""
                           : "opacity-50 pointer-events-none select-none cursor-not-allowed")
                       }>
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                            Próxima aula
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                              Próxima aula
+                            </div>
                           </div>
+                          {(() => {
+                            const lead = selectedLead as any;
+                            const hasExp = Boolean(
+                              lead?.future_experimental_class_booking ||
+                                lead?.experimental_class_booking ||
+                                String(lead?.experimental_class_lead_date ?? "").trim() ||
+                                String(lead?.experimental_class_lead_time ?? "").trim()
+                            );
+                            const weekdayRaw = String(lead?.recurring_weekday ?? "").trim();
+                            const timeRaw = String(lead?.recurring_start_time ?? "").trim();
+                            const freqRaw = String(lead?.recurring_frequency ?? "").trim();
+                            const hasRec = Boolean(weekdayRaw || timeRaw || freqRaw);
+                            const isExpFirst = !hasRec && hasExp;
+                            const isRecFirst = hasRec && !hasExp;
+                            if (isExpFirst) return (
+                              <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                                Experimental
+                              </div>
+                            );
+                            if (isRecFirst) return (
+                              <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-[#ea580c]/30 bg-[rgba(234,88,12,0.12)] px-3 text-[11px] font-bold uppercase tracking-wide text-[#9a3412]">
+                                Recorrente
+                              </div>
+                            );
+                            if (hasExp && hasRec) return (
+                              <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                                Experimental
+                              </div>
+                            );
+                            return null;
+                          })()}
                         </div>
                         {expMeta.tone === "success" ? (
                           <>
@@ -3208,11 +3241,44 @@ export function AtendimentoClient() {
                         ? ""
                         : "opacity-50 pointer-events-none select-none cursor-not-allowed")
                     }>
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                        <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                          Próxima aula
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Próxima aula
+                          </div>
                         </div>
+                        {(() => {
+                          const lead = selectedLead as any;
+                          const hasExp = Boolean(
+                            lead?.future_experimental_class_booking ||
+                              lead?.experimental_class_booking ||
+                              String(lead?.experimental_class_lead_date ?? "").trim() ||
+                              String(lead?.experimental_class_lead_time ?? "").trim()
+                          );
+                          const weekdayRaw = String(lead?.recurring_weekday ?? "").trim();
+                          const timeRaw = String(lead?.recurring_start_time ?? "").trim();
+                          const freqRaw = String(lead?.recurring_frequency ?? "").trim();
+                          const hasRec = Boolean(weekdayRaw || timeRaw || freqRaw);
+                          const isExpFirst = !hasRec && hasExp;
+                          const isRecFirst = hasRec && !hasExp;
+                          if (isExpFirst) return (
+                            <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                              Experimental
+                            </div>
+                          );
+                          if (isRecFirst) return (
+                            <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-[#ea580c]/30 bg-[rgba(234,88,12,0.12)] px-3 text-[11px] font-bold uppercase tracking-wide text-[#9a3412]">
+                              Recorrente
+                            </div>
+                          );
+                          if (hasExp && hasRec) return (
+                            <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                              Experimental
+                            </div>
+                          );
+                          return null;
+                        })()}
                       </div>
                       {expMeta.tone === "success" ? (
                         <>
