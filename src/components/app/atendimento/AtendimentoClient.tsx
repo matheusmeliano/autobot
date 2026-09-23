@@ -3555,14 +3555,14 @@ export function AtendimentoClient() {
                                       onClick={() => handleOpenExperimentalBooking(sl)}
                                       disabled={(() => {
                                         if (expBookingIsCancelled) return true;
-                                        if (expHasAttendanceStatus) return true;
+                                        if (Boolean(expEffectiveAttendance)) return true;
                                         return false;
                                       })()}
                                       title={(() => {
                                         if (expBookingIsCancelled) {
                                           return "Aula experimental cancelada. Não é possível reagendar.";
                                         }
-                                        if (expHasAttendanceStatus) {
+                                        if (Boolean(expEffectiveAttendance)) {
                                           return "Aula experimental não pode ser reagendada após comparecimento marcado.";
                                         }
                                         return "Reagendar esta aula experimental.";
@@ -4583,14 +4583,14 @@ export function AtendimentoClient() {
                                     onClick={() => handleOpenExperimentalBooking(sl)}
                                     disabled={(() => {
                                         if (expBookingIsCancelled) return true;
-                                        if (expHasAttendanceStatus) return true;
+                                        if (Boolean(expEffectiveAttendance)) return true;
                                         return false;
                                       })()}
                                       title={(() => {
                                         if (expBookingIsCancelled) {
                                           return "Aula experimental cancelada. Não é possível reagendar.";
                                         }
-                                        if (expHasAttendanceStatus) {
+                                        if (Boolean(expEffectiveAttendance)) {
                                           return "Aula experimental não pode ser reagendada após comparecimento marcado.";
                                         }
                                         return "Reagendar esta aula experimental.";
