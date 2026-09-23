@@ -791,7 +791,11 @@ export function AtendimentoClient() {
     const conversationIdRaw =
       String((lead as any).conversation?.id ?? (lead as any).conversation_id ?? "").trim() || null;
     const phoneRaw = String(lead.phone ?? "").trim();
-    const bk = (lead as any).experimental_class_booking as any;
+    const expBestBooking =
+      (lead as any).latest_experimental_class_booking ??
+      (lead as any).experimental_class_booking ??
+      (lead as any).future_experimental_class_booking;
+    const bk = expBestBooking as any;
     const att = String(bk?.attendance_status ?? "").trim();
     if (!att) {
       modalToast.warning("Marque o comparecimento da aula experimental antes de enviar a mensagem de matrícula.");
@@ -3257,7 +3261,12 @@ export function AtendimentoClient() {
                               );
                             })()}
                             {(() => {
-                              const bk = (selectedLead as any)?.experimental_class_booking;
+                              const sl = selectedLead;
+                              const expBestBooking =
+                                (sl as any).latest_experimental_class_booking ??
+                                (sl as any).experimental_class_booking ??
+                                (sl as any).future_experimental_class_booking;
+                              const bk = expBestBooking as any;
                               const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                               return (
                             <div className="mt-4 flex justify-end gap-2">
@@ -3272,7 +3281,6 @@ export function AtendimentoClient() {
                                 Mais informações
                               </button>
                               {(() => {
-                                const sl = selectedLead;
                                 const hasAtt = Boolean(String(bk?.attendance_status ?? "").trim());
                                 const hasPhone = Boolean(String(sl?.phone ?? "").trim());
                                 if (!hasAtt) return null;
@@ -3400,7 +3408,11 @@ export function AtendimentoClient() {
                           const expAssigned = experimentalAssignedProfessorForLead(sl);
                           const expSavedLink = experimentalLessonLinkForLead(sl);
                           const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
-                          const bk = (sl as any).experimental_class_booking as any;
+                          const expBestBooking =
+                            (sl as any).latest_experimental_class_booking ??
+                            (sl as any).experimental_class_booking ??
+                            (sl as any).future_experimental_class_booking;
+                          const bk = expBestBooking as any;
                           const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
                           const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                           const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
@@ -4250,7 +4262,12 @@ export function AtendimentoClient() {
                             );
                           })()}
                           {(() => {
-                            const bk = (selectedLead as any)?.experimental_class_booking;
+                            const sl = selectedLead;
+                            const expBestBooking =
+                              (sl as any).latest_experimental_class_booking ??
+                              (sl as any).experimental_class_booking ??
+                              (sl as any).future_experimental_class_booking;
+                            const bk = expBestBooking as any;
                             const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                             return (
                           <div className="mt-4 flex justify-end gap-2">
@@ -4265,7 +4282,6 @@ export function AtendimentoClient() {
                               Mais informações
                             </button>
                             {(() => {
-                              const sl = selectedLead;
                               const hasAtt = Boolean(String(bk?.attendance_status ?? "").trim());
                               const hasPhone = Boolean(String(sl?.phone ?? "").trim());
                               if (!hasAtt) return null;
@@ -4393,7 +4409,11 @@ export function AtendimentoClient() {
                         const expAssigned = experimentalAssignedProfessorForLead(sl);
                         const expSavedLink = experimentalLessonLinkForLead(sl);
                         const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
-                        const bk = (sl as any).experimental_class_booking as any;
+                        const expBestBooking =
+                          (sl as any).latest_experimental_class_booking ??
+                          (sl as any).experimental_class_booking ??
+                          (sl as any).future_experimental_class_booking;
+                        const bk = expBestBooking as any;
                         const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
                         const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                         const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
