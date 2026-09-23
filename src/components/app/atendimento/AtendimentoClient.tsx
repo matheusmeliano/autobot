@@ -3484,7 +3484,7 @@ export function AtendimentoClient() {
                                 <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full min-[1201px]:self-center">
                                   <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                   <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
-                                    Aulas experimentais
+                                    Aula experimental
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 sm:mt-0 mt-6">
@@ -3874,7 +3874,7 @@ export function AtendimentoClient() {
                             <div className="flex items-center gap-2">
                               <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
                               <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                                Aulas experimentais
+                                Aula experimental
                               </div>
                             </div>
                             <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
@@ -4515,7 +4515,7 @@ export function AtendimentoClient() {
                               <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full min-[1201px]:self-center">
                                 <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                 <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
-                                  Aulas experimentais
+                                  Aula experimental
                                 </div>
                               </div>
                               <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 sm:mt-0 mt-6">
@@ -4905,7 +4905,7 @@ export function AtendimentoClient() {
                           <div className="flex items-center gap-2">
                             <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
                             <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                              Aulas experimentais
+                              Aula experimental
                             </div>
                           </div>
                           <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
