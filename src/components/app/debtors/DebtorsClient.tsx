@@ -953,7 +953,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     ) : null}
                   </div>
                   <div className="col-span-2 truncate text-center text-[var(--app-text-70)]">
-                    {r.telefone ?? "-"}
+                    {formatPhoneDisplayForEmail(r.telefone, usaMusicAccount)}
                   </div>
                   <div className="col-span-2 text-center">{money(chargesTotal(r, currentRecurrence), fmt)}</div>
                   <div className="col-span-2 text-center text-[var(--app-text-70)]">
