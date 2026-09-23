@@ -3481,7 +3481,7 @@ export function AtendimentoClient() {
                           return (
                             <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                               <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
+                                <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full min-[1201px]:self-center">
                                   <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                   <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
                                     Aulas experimentais
@@ -4512,7 +4512,7 @@ export function AtendimentoClient() {
                         return (
                           <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
+                              <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full min-[1201px]:self-center">
                                 <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                 <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
                                   Aulas experimentais
