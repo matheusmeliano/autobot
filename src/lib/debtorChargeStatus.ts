@@ -301,7 +301,7 @@ function hasOpenOverdueSchedule(params: {
   });
 }
 
-function deriveReferenceMonthDebtorStatus(
+export function deriveReferenceMonthDebtorStatus(
   charges: DebtorChargeRow[],
   schedules: DebtorScheduleStatusRow[],
   nowUtcIso = new Date().toISOString(),
