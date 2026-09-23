@@ -147,6 +147,52 @@ function extractLocalTimeFromUtcIso(iso: string, timeZone: string): string {
   }
 }
 
+function isExperimentalClassPast(lead: AtendimentoLeadListItem | null | undefined): boolean {
+  if (!lead) return false;
+  const l = lead as any;
+  const nowMs = Date.now();
+  const tryIso = (iso: unknown): number | null => {
+    const s = String(iso ?? "").trim();
+    if (!s) return null;
+    const d = new Date(s).getTime();
+    if (!Number.isFinite(d) || d <= 0) return null;
+    return d;
+  };
+  const tryFromDateParts = (date: unknown, time: unknown, tz: unknown): number | null => {
+    const d = String(date ?? "").trim();
+    const t = String(time ?? "").trim();
+    if (!d || !t) return null;
+    try {
+      const utcIso = zonedDateTimeToUtcIso({ date: d, time: t }, String(tz ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE);
+      const n = new Date(utcIso).getTime();
+      if (!Number.isFinite(n) || n <= 0) return null;
+      return n;
+    } catch {
+      return null;
+    }
+  };
+  let bestMs: number | null = null;
+  const profStartMs = tryIso(l.experimental_class_professor_start_at ?? l.professor_start_at);
+  if (profStartMs) bestMs = bestMs == null ? profStartMs : Math.min(bestMs, profStartMs);
+  const leadStartMs = tryIso(l.experimental_class_lead_start_at ?? l.lead_start_at);
+  if (leadStartMs) bestMs = bestMs == null ? leadStartMs : Math.min(bestMs, leadStartMs);
+  const bkProfStartMs = tryIso(l.experimental_class_booking?.professor_start_at ?? l.latest_experimental_class_booking?.professor_start_at ?? l.future_experimental_class_booking?.professor_start_at);
+  if (bkProfStartMs) bestMs = bestMs == null ? bkProfStartMs : Math.min(bestMs, bkProfStartMs);
+  const bkLeadStartMs = tryIso(l.experimental_class_booking?.lead_start_at ?? l.latest_experimental_class_booking?.lead_start_at ?? l.future_experimental_class_booking?.lead_start_at);
+  if (bkLeadStartMs) bestMs = bestMs == null ? bkLeadStartMs : Math.min(bestMs, bkLeadStartMs);
+  if (bestMs == null) {
+    const profTz = String(l.experimental_class_booking?.professor_timezone ?? l.latest_experimental_class_booking?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+    const flatProfMs = tryFromDateParts(l.experimental_class_professor_date, l.experimental_class_professor_time, profTz);
+    if (flatProfMs) bestMs = bestMs == null ? flatProfMs : Math.min(bestMs, flatProfMs);
+    const bkProfDate = String(l.experimental_class_booking?.professor_date ?? l.latest_experimental_class_booking?.professor_date ?? "").trim();
+    const bkProfTime = String(l.experimental_class_booking?.professor_time ?? l.latest_experimental_class_booking?.professor_time ?? "").trim();
+    const bkProfMs = tryFromDateParts(bkProfDate, bkProfTime, profTz);
+    if (bkProfMs) bestMs = bestMs == null ? bkProfMs : Math.min(bestMs, bkProfMs);
+  }
+  if (bestMs == null) return false;
+  return bestMs < nowMs;
+}
+
 function applyPhoneMask(input: string): string {
   const digits = String(input ?? "").replace(/\D/g, "");
   if (!digits) return "";
@@ -796,8 +842,31 @@ export function AtendimentoClient() {
       (lead as any).experimental_class_booking ??
       (lead as any).future_experimental_class_booking;
     const bk = expBestBooking as any;
-    const att =
+    let att =
       String(bk?.attendance_status ?? (lead as any).experimental_class_attendance_status ?? "").trim();
+    if (!att) {
+      const bookingIdCandidate =
+        String(bk?.id ?? (lead as any).experimental_class_booking_id ?? "").trim() ||
+        `draft-${String(lead.id ?? "").trim()}`;
+      if (bookingIdCandidate && bookingIdCandidate !== "draft-") {
+        try {
+          const resAtt = await fetch(`/api/atendimento/bookings/${encodeURIComponent(bookingIdCandidate)}/attendance`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              attendance: "attended",
+              leadId: String(lead.id ?? "").trim() || null,
+              conversationId: conversationIdRaw,
+            }),
+          });
+          if (resAtt.ok) {
+            att = "attended";
+          }
+        } catch {
+          att = "";
+        }
+      }
+    }
     if (!att) {
       modalToast.warning("Marque o comparecimento da aula experimental antes de enviar a mensagem de matrícula.");
       return;
@@ -837,12 +906,21 @@ export function AtendimentoClient() {
           if (l.id !== lead.id) return l;
           const next = { ...l } as any;
           next.experimental_class_post_attendance_message_sent_at = nowIso;
+          next.experimental_class_attendance_status = next.experimental_class_attendance_status || att;
           next.last_interaction_at = nowIso;
           next.updated_at = nowIso;
           if (typeof next.experimental_class_booking === "object" && next.experimental_class_booking) {
             next.experimental_class_booking = {
               ...next.experimental_class_booking,
               post_attendance_message_sent_at: nowIso,
+              attendance_status: next.experimental_class_booking.attendance_status || att,
+            };
+          }
+          if (typeof next.latest_experimental_class_booking === "object" && next.latest_experimental_class_booking) {
+            next.latest_experimental_class_booking = {
+              ...next.latest_experimental_class_booking,
+              post_attendance_message_sent_at: nowIso,
+              attendance_status: next.latest_experimental_class_booking.attendance_status || att,
             };
           }
           return next as AtendimentoLeadListItem;
@@ -3272,6 +3350,8 @@ export function AtendimentoClient() {
                                 String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
                               const expEffectiveAttendance =
                                 String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
+                              const expClassJaPassou = isExperimentalClassPast(sl);
+                              const hasAtt = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
                               const cancelled = expEffectiveStatus === "cancelled";
                               return (
                             <div className="mt-4 flex justify-end gap-2">
@@ -3286,7 +3366,6 @@ export function AtendimentoClient() {
                                 Mais informações
                               </button>
                               {(() => {
-                                const hasAtt = Boolean(expEffectiveAttendance);
                                 const hasPhone = Boolean(String(sl?.phone ?? "").trim());
                                 if (!hasAtt) return null;
                                 const sentFlag = Boolean(
@@ -3422,7 +3501,8 @@ export function AtendimentoClient() {
                             String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
                           const expEffectiveStatus =
                             String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
-                          const expHasAttendanceStatus = Boolean(expEffectiveAttendance);
+                          const expClassJaPassou = isExperimentalClassPast(sl);
+                          const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
                           const expBookingIsCancelled = expEffectiveStatus === "cancelled";
                           const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
                           const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
@@ -4275,6 +4355,8 @@ export function AtendimentoClient() {
                               String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
                             const expEffectiveAttendance =
                               String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
+                            const expClassJaPassou = isExperimentalClassPast(sl);
+                            const hasAtt = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
                             const cancelled = expEffectiveStatus === "cancelled";
                             return (
                           <div className="mt-4 flex justify-end gap-2">
@@ -4289,7 +4371,6 @@ export function AtendimentoClient() {
                               Mais informações
                             </button>
                             {(() => {
-                              const hasAtt = Boolean(expEffectiveAttendance);
                               const hasPhone = Boolean(String(sl?.phone ?? "").trim());
                               if (!hasAtt) return null;
                               const sentFlag = Boolean(
@@ -4425,7 +4506,8 @@ export function AtendimentoClient() {
                           String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
                         const expEffectiveStatus =
                           String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
-                        const expHasAttendanceStatus = Boolean(expEffectiveAttendance);
+                        const expClassJaPassou = isExperimentalClassPast(sl);
+                        const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
                         const expBookingIsCancelled = expEffectiveStatus === "cancelled";
                         const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
                         const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
