@@ -358,10 +358,10 @@ function maskPhoneUS(v: string) {
   const ac = d.slice(0, 3);
   const p1 = d.slice(3, 6);
   const p2 = d.slice(6, 10);
-  if (!ac) return "";
-  if (d.length <= 3) return `(${ac}`;
-  if (d.length <= 6) return `(${ac}) ${p1}`;
-  return `(${ac}) ${p1}-${p2}`;
+  if (!ac) return "+1 ";
+  if (d.length <= 3) return `+1 (${ac}`;
+  if (d.length <= 6) return `+1 (${ac}) ${p1}`;
+  return `+1 (${ac}) ${p1}-${p2}`;
 }
 
 function maskPixPhone(v: string) {
@@ -1061,7 +1061,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     <input
                       inputMode="tel"
                       className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
-                      placeholder={usaMusicAccount ? "(XXX) XXX-XXXX" : "(DD) 9XXXX-XXXX"}
+                      placeholder={usaMusicAccount ? "+1 (XXX) XXX-XXXX" : "(DD) 9XXXX-XXXX"}
                       value={field.value ?? ""}
                       onChange={(e) => {
                         const raw = e.currentTarget.value;
