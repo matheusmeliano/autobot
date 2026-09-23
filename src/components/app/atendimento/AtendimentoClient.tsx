@@ -163,7 +163,11 @@ function isExperimentalClassPast(lead: AtendimentoLeadListItem | null | undefine
     const t = String(time ?? "").trim();
     if (!d || !t) return null;
     try {
-      const utcIso = zonedDateTimeToUtcIso({ date: d, time: t }, String(tz ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE);
+      const utcIso = zonedDateTimeToUtcIso({
+        date: d,
+        time: t,
+        timeZone: String(tz ?? ATENDIMENTO_PROFESSOR_TIME_ZONE).trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      });
       const n = new Date(utcIso).getTime();
       if (!Number.isFinite(n) || n <= 0) return null;
       return n;
