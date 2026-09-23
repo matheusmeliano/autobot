@@ -3413,43 +3413,47 @@ export function AtendimentoClient() {
                   {/* ============== AGENDAMENTOS ============== */}
                   {activeTab === "agendamentos" ? (
                     <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-1">
-                      {showRecurringCard ? (
-                        <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                          <div className="flex items-center gap-2">
-                            <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
-                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                              Aulas recorrentes
-                            </div>
-                          </div>
-                          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
-                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                      {(() => {
+                        if (showRecurringCard) {
+                          return (
+                            <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                              <div className="flex items-center gap-2">
+                                <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
+                                <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                  Aulas recorrentes
+                                </div>
+                              </div>
+                              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
+                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                    {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
+                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                    {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
+                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                    {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
+                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                    Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
-                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
-                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
-                              <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : buildExperimentalMetaForList(sl).tone === "success" ? (
-                        (() => {
+                          );
+                        }
+                        const expTone = buildExperimentalMetaForList(sl).tone;
+                        if (expTone === "success") {
                           const expAssigned = experimentalAssignedProfessorForLead(sl);
                           const expSavedLink = experimentalLessonLinkForLead(sl);
                           const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
@@ -3483,44 +3487,7 @@ export function AtendimentoClient() {
                                     Aulas experimentais
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleCancelExperimentalBooking(sl)}
-                                  disabled={(() => {
-                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
-                                    if (expBookingIsCancelled) return true;
-                                    if (expHasAttendanceStatus) return true;
-                                    if (experimentalLockedProf) return true;
-                                    if (!expAssigned) return true;
-                                    return false;
-                                  })()}
-                                  title={(() => {
-                                    if (expBookingIsCancelled) {
-                                      return "Agendamento já foi cancelado.";
-                                    }
-                                    if (expHasAttendanceStatus) {
-                                      return "Agendamento não pode ser cancelado após comparecimento marcado.";
-                                    }
-                                    if (experimentalLockedProf) {
-                                      return "Agendamento não pode ser cancelado após o disparo ser realizado.";
-                                    }
-                                    if (!expAssigned) {
-                                      return "Selecione o professor responsável antes de cancelar o agendamento.";
-                                    }
-                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
-                                      return "Cancelando agendamento...";
-                                    }
-                                    return "Cancelar este agendamento de aula experimental.";
-                                  })()}
-                                  className="order-2 sm:order-3 shrink-0 inline-flex h-10 w-10 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                                >
-                                  {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
-                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                  ) : (
-                                    <X className="h-4 w-4 shrink-0" />
-                                  )}
-                                </button>
-                                <div className="order-3 sm:order-2 w-full sm:w-auto flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
+                                <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
                                   {expCanShowDisparar ? (
                                     <div className="flex w-full sm:w-auto shrink-0">
                                       <button
@@ -3715,6 +3682,44 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                 </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCancelExperimentalBooking(sl)}
+                                    disabled={(() => {
+                                      if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
+                                      if (expBookingIsCancelled) return true;
+                                      if (expHasAttendanceStatus) return true;
+                                      if (experimentalLockedProf) return true;
+                                      if (!expAssigned) return true;
+                                      return false;
+                                    })()}
+                                    title={(() => {
+                                      if (expBookingIsCancelled) {
+                                        return "Agendamento já foi cancelado.";
+                                      }
+                                      if (expHasAttendanceStatus) {
+                                        return "Agendamento não pode ser cancelado após comparecimento marcado.";
+                                      }
+                                      if (experimentalLockedProf) {
+                                        return "Agendamento não pode ser cancelado após o disparo ser realizado.";
+                                      }
+                                      if (!expAssigned) {
+                                        return "Selecione o professor responsável antes de cancelar o agendamento.";
+                                      }
+                                      if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
+                                        return "Cancelando agendamento...";
+                                      }
+                                      return "Cancelar este agendamento de aula experimental.";
+                                    })()}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                  >
+                                    {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                    ) : (
+                                      <X className="h-4 w-4 shrink-0" />
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                               {!expAssigned ? (
                                 <div className="mt-3 flex sm:hidden min-w-0 items-center gap-2">
@@ -3794,22 +3799,23 @@ export function AtendimentoClient() {
                               </div>
                             </div>
                           );
-                        })()
-                      ) : (
-                        <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                          <div className="flex items-center gap-2">
-                            <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                              Aulas experimentais
+                        }
+                        return (
+                          <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                            <div className="flex items-center gap-2">
+                              <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                              <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                Aulas experimentais
+                              </div>
+                            </div>
+                            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
+                              <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
+                                Esse registro não possuí agendamentos em aberto.
+                              </div>
                             </div>
                           </div>
-                          <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
-                            <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
-                              Esse registro não possuí agendamentos em aberto.
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   ) : null}
 
@@ -4443,44 +4449,7 @@ export function AtendimentoClient() {
                                   Aulas experimentais
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => void handleCancelExperimentalBooking(sl)}
-                                disabled={(() => {
-                                  if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
-                                  if (expBookingIsCancelled) return true;
-                                  if (expHasAttendanceStatus) return true;
-                                  if (experimentalLockedProf) return true;
-                                  if (!expAssigned) return true;
-                                  return false;
-                                })()}
-                                title={(() => {
-                                  if (expBookingIsCancelled) {
-                                    return "Agendamento já foi cancelado.";
-                                  }
-                                  if (expHasAttendanceStatus) {
-                                    return "Agendamento não pode ser cancelado após comparecimento marcado.";
-                                  }
-                                  if (experimentalLockedProf) {
-                                    return "Agendamento não pode ser cancelado após o disparo ser realizado.";
-                                  }
-                                  if (!expAssigned) {
-                                    return "Selecione o professor responsável antes de cancelar o agendamento.";
-                                  }
-                                  if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
-                                    return "Cancelando agendamento...";
-                                  }
-                                  return "Cancelar este agendamento de aula experimental.";
-                                })()}
-                                className="order-2 sm:order-3 shrink-0 inline-flex h-10 w-10 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                              >
-                                {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
-                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                ) : (
-                                  <X className="h-4 w-4 shrink-0" />
-                                )}
-                              </button>
-                              <div className="order-3 sm:order-2 w-full sm:w-auto flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
+                              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
                                 {expCanShowDisparar ? (
                                   <div className="flex w-full sm:w-auto shrink-0">
                                     <button
@@ -4662,6 +4631,9 @@ export function AtendimentoClient() {
                                             <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
                                               {opt.name}
                                             </div>
+                                            <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--app-text-60)]">
+                                              {opt.phone}
+                                            </div>
                                           </div>
                                           {isActive ? (
                                             <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
@@ -4674,6 +4646,44 @@ export function AtendimentoClient() {
                                     })}
                                   </div>
                                 ) : null}
+                              </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCancelExperimentalBooking(sl)}
+                                  disabled={(() => {
+                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
+                                    if (expBookingIsCancelled) return true;
+                                    if (expHasAttendanceStatus) return true;
+                                    if (experimentalLockedProf) return true;
+                                    if (!expAssigned) return true;
+                                    return false;
+                                  })()}
+                                  title={(() => {
+                                    if (expBookingIsCancelled) {
+                                      return "Agendamento já foi cancelado.";
+                                    }
+                                    if (expHasAttendanceStatus) {
+                                      return "Agendamento não pode ser cancelado após comparecimento marcado.";
+                                    }
+                                    if (experimentalLockedProf) {
+                                      return "Agendamento não pode ser cancelado após o disparo ser realizado.";
+                                    }
+                                    if (!expAssigned) {
+                                      return "Selecione o professor responsável antes de cancelar o agendamento.";
+                                    }
+                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
+                                      return "Cancelando agendamento...";
+                                    }
+                                    return "Cancelar este agendamento de aula experimental.";
+                                  })()}
+                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                >
+                                  {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4 shrink-0" />
+                                  )}
+                                </button>
                               </div>
                             </div>
                             {!expAssigned ? (
