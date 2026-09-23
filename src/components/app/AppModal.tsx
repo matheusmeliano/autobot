@@ -84,8 +84,8 @@ export function AppModal({
   const centerPanel = [
     panelBase,
     fullScreenOnMobile
-      ? `flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-y-auto rounded-none border-0 p-3 ${FULLSCREEN_MOBILE_DESKTOP_SIZE_CLASS[size]} lg:h-auto lg:max-h-[calc(100vh-8rem)] lg:rounded-2xl lg:border lg:p-5`
-      : `${SIZE_CLASS[size]} flex flex-col overflow-hidden max-h-[calc(100vh-13rem)] overscroll-contain p-4 sm:max-h-[calc(100vh-8rem)] sm:p-5`,
+      ? `flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-y-auto rounded-none border-0 p-3 pb-6 ${FULLSCREEN_MOBILE_DESKTOP_SIZE_CLASS[size]} lg:h-auto lg:max-h-[calc(100dvh-8rem)] lg:rounded-2xl lg:border lg:p-5 lg:pb-8`
+      : `${SIZE_CLASS[size]} flex flex-col overflow-y-auto overscroll-contain max-h-[calc(100dvh-5rem)] sm:max-h-[calc(100dvh-8rem)] p-4 pb-7 sm:p-5 sm:pb-8`,
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
     panelClassName,
@@ -93,7 +93,7 @@ export function AppModal({
 
   const bottomPanel = [
     panelBase,
-    "mx-auto flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 p-3 sm:p-4",
+    "mx-auto flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 p-3 pb-5 sm:p-4 sm:pb-6",
     "transition-all duration-200 ease-out",
     visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
     panelClassName,
