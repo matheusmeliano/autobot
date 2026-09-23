@@ -3720,7 +3720,7 @@ export function AtendimentoClient() {
                                     )}
                                   </button>
                                 </div>
-                                <div className="min-[1201px]:hidden absolute top-5 right-5 z-10 flex items-center gap-2">
+                                <div className="min-[640px]:hidden absolute top-5 right-5 z-10 flex items-center gap-2">
                                   {expHasAttendanceStatus ? (
                                     <button
                                       type="button"
@@ -4751,7 +4751,7 @@ export function AtendimentoClient() {
                                   )}
                                 </button>
                               </div>
-                              <div className="min-[1201px]:hidden absolute top-5 right-5 z-10 flex items-center gap-2">
+                              <div className="min-[640px]:hidden absolute top-5 right-5 z-10 flex items-center gap-2">
                                 {expHasAttendanceStatus ? (
                                   <button
                                     type="button"
