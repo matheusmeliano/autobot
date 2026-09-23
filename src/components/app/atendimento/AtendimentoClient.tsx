@@ -8,6 +8,7 @@ import { resolveTimeZoneFromCityInput, zonedDateTimeToUtcIso } from "@/lib/timez
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
 import { formatAtendimentoDate, formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
+import { buildExperimentalClassPostAttendanceWhatsAppMessages } from "@/lib/atendimento/experimentalClass";
 import { AppModal } from "@/components/app/AppModal";
 import { AppDateRangePicker, type AppDateRange } from "@/components/app/AppDateRangePicker";
 
@@ -544,6 +545,7 @@ export function AtendimentoClient() {
   const [expSavingLessonLink, setExpSavingLessonLink] = useState<boolean>(false);
   const [expSendingNotification, setExpSendingNotification] = useState<boolean>(false);
   const [expCancellingBookingId, setExpCancellingBookingId] = useState<string | null>(null);
+  const [expSendingPostAttendanceId, setExpSendingPostAttendanceId] = useState<string | null>(null);
   const [expLessonLinkDraftByLeadId, setExpLessonLinkDraftByLeadId] = useState<Record<string, string>>({});
 
   const experimentalLessonLinkDraft = useMemo<string>(() => {
@@ -782,6 +784,70 @@ export function AtendimentoClient() {
       modalToast.error(err instanceof Error ? err.message : "Falha ao cancelar agendamento.");
     } finally {
       setExpCancellingBookingId(null);
+    }
+  }
+
+  async function handleSendExperimentalPostAttendanceMessage(lead: AtendimentoLeadListItem) {
+    const conversationIdRaw =
+      String((lead as any).conversation?.id ?? (lead as any).conversation_id ?? "").trim() || null;
+    const phoneRaw = String(lead.phone ?? "").trim();
+    const bk = (lead as any).experimental_class_booking as any;
+    const att = String(bk?.attendance_status ?? "").trim();
+    if (!att) {
+      modalToast.warning("Marque o comparecimento da aula experimental antes de enviar a mensagem de matrícula.");
+      return;
+    }
+    if (!conversationIdRaw) {
+      modalToast.warning("Nenhuma conversa vinculada a este registro para enviar a mensagem.");
+      return;
+    }
+    if (!phoneRaw) {
+      modalToast.warning("Registro não possui telefone cadastrado para receber a mensagem.");
+      return;
+    }
+    if (expSendingPostAttendanceId) return;
+    const nowIso = new Date().toISOString();
+    setExpSendingPostAttendanceId(lead.id);
+    try {
+      const safeOrigin =
+        typeof window !== "undefined" && window?.location?.origin ? String(window.location.origin) : "https://www.autobot.business";
+      const [message] = buildExperimentalClassPostAttendanceWhatsAppMessages(String(lead.full_name ?? "").trim(), {
+        phone: phoneRaw,
+        baseUrl: safeOrigin || "https://www.autobot.business",
+      });
+      const res = await fetch(`/api/atendimento/conversas/${encodeURIComponent(conversationIdRaw)}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content_text: String(message ?? "").trim() }),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; message?: Record<string, unknown> | null }
+        | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao enviar a mensagem de matrícula.");
+        return;
+      }
+      setPanelLeads((cur) =>
+        cur.map((l) => {
+          if (l.id !== lead.id) return l;
+          const next = { ...l } as any;
+          next.experimental_class_post_attendance_message_sent_at = nowIso;
+          next.last_interaction_at = nowIso;
+          next.updated_at = nowIso;
+          if (typeof next.experimental_class_booking === "object" && next.experimental_class_booking) {
+            next.experimental_class_booking = {
+              ...next.experimental_class_booking,
+              post_attendance_message_sent_at: nowIso,
+            };
+          }
+          return next as AtendimentoLeadListItem;
+        }),
+      );
+      modalToast.success("Mensagem de matrícula enviada.");
+    } catch (err) {
+      modalToast.error(err instanceof Error ? err.message : "Falha ao enviar a mensagem de matrícula.");
+    } finally {
+      setExpSendingPostAttendanceId(null);
     }
   }
 
@@ -3205,6 +3271,43 @@ export function AtendimentoClient() {
                                 <Info className="h-4 w-4" />
                                 Mais informações
                               </button>
+                              {(() => {
+                                const sl = selectedLead;
+                                const hasAtt = Boolean(String(bk?.attendance_status ?? "").trim());
+                                const hasPhone = Boolean(String(sl?.phone ?? "").trim());
+                                if (!hasAtt) return null;
+                                const sentFlag = Boolean(
+                                  (sl as any)?.experimental_class_post_attendance_message_sent_at ||
+                                    bk?.post_attendance_message_sent_at,
+                                );
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
+                                    disabled={Boolean(expSendingPostAttendanceId) || sentFlag || !hasPhone}
+                                    title={(() => {
+                                      if (expSendingPostAttendanceId) {
+                                        return "Enviando a mensagem de matrícula para este registro.";
+                                      }
+                                      if (sentFlag) {
+                                        return "A mensagem de matrícula já foi enviada para este registro.";
+                                      }
+                                      if (!hasPhone) {
+                                        return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
+                                      }
+                                      return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
+                                    })()}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                  >
+                                    {expSendingPostAttendanceId ? (
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                    ) : (
+                                      <Check className="h-4 w-4 shrink-0 text-emerald-700" />
+                                    )}
+                                    {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
+                                  </button>
+                                );
+                              })()}
                               <button
                                 type="button"
                                 onClick={() => handleOpenExperimentalBooking(selectedLead)}
@@ -3350,6 +3453,39 @@ export function AtendimentoClient() {
                                       >
                                         <Zap className="h-4 w-4 shrink-0" />
                                         {expSendingNotification ? "Disparando..." : "Disparar"}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                  {expHasAttendanceStatus ? (
+                                    <div className="flex w-full sm:w-auto shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
+                                        disabled={Boolean(expSendingPostAttendanceId) || Boolean((sl as any)?.experimental_class_post_attendance_message_sent_at || (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at) || !expHasPhone}
+                                        title={(() => {
+                                          const alreadySent = Boolean(
+                                            (sl as any)?.experimental_class_post_attendance_message_sent_at ||
+                                              (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at,
+                                          );
+                                          if (expSendingPostAttendanceId) {
+                                            return "Enviando a mensagem de matrícula para este registro.";
+                                          }
+                                          if (alreadySent) {
+                                            return "A mensagem de matrícula já foi enviada para este registro.";
+                                          }
+                                          if (!expHasPhone) {
+                                            return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
+                                          }
+                                          return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
+                                        })()}
+                                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                      >
+                                        {expSendingPostAttendanceId ? (
+                                          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                        ) : (
+                                          <Check className="h-4 w-4 shrink-0 text-emerald-700" />
+                                        )}
+                                        {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
                                       </button>
                                     </div>
                                   ) : null}
@@ -4128,6 +4264,43 @@ export function AtendimentoClient() {
                               <Info className="h-4 w-4" />
                               Mais informações
                             </button>
+                            {(() => {
+                              const sl = selectedLead;
+                              const hasAtt = Boolean(String(bk?.attendance_status ?? "").trim());
+                              const hasPhone = Boolean(String(sl?.phone ?? "").trim());
+                              if (!hasAtt) return null;
+                              const sentFlag = Boolean(
+                                (sl as any)?.experimental_class_post_attendance_message_sent_at ||
+                                  bk?.post_attendance_message_sent_at,
+                              );
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
+                                  disabled={Boolean(expSendingPostAttendanceId) || sentFlag || !hasPhone}
+                                  title={(() => {
+                                    if (expSendingPostAttendanceId) {
+                                      return "Enviando a mensagem de matrícula para este registro.";
+                                    }
+                                    if (sentFlag) {
+                                      return "A mensagem de matrícula já foi enviada para este registro.";
+                                    }
+                                    if (!hasPhone) {
+                                      return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
+                                    }
+                                    return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
+                                  })()}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                >
+                                  {expSendingPostAttendanceId ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4 shrink-0 text-emerald-700" />
+                                  )}
+                                  {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
+                                </button>
+                              );
+                            })()}
                             <button
                               type="button"
                               onClick={() => handleOpenExperimentalBooking(selectedLead)}
@@ -4273,6 +4446,39 @@ export function AtendimentoClient() {
                                     >
                                       <Zap className="h-4 w-4 shrink-0" />
                                       {expSendingNotification ? "Disparando..." : "Disparar"}
+                                    </button>
+                                  </div>
+                                ) : null}
+                                {expHasAttendanceStatus ? (
+                                  <div className="flex w-full sm:w-auto shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
+                                      disabled={Boolean(expSendingPostAttendanceId) || Boolean((sl as any)?.experimental_class_post_attendance_message_sent_at || (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at) || !expHasPhone}
+                                      title={(() => {
+                                        const alreadySent = Boolean(
+                                          (sl as any)?.experimental_class_post_attendance_message_sent_at ||
+                                            (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at,
+                                        );
+                                        if (expSendingPostAttendanceId) {
+                                          return "Enviando a mensagem de matrícula para este registro.";
+                                        }
+                                        if (alreadySent) {
+                                          return "A mensagem de matrícula já foi enviada para este registro.";
+                                        }
+                                        if (!expHasPhone) {
+                                          return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
+                                        }
+                                        return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
+                                      })()}
+                                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                    >
+                                      {expSendingPostAttendanceId ? (
+                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                      ) : (
+                                        <Check className="h-4 w-4 shrink-0 text-emerald-700" />
+                                      )}
+                                      {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
                                     </button>
                                   </div>
                                 ) : null}
