@@ -3487,7 +3487,7 @@ export function AtendimentoClient() {
                                     Aulas experimentais
                                   </div>
                                 </div>
-                                <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
+                                <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full min-w-0">
                                   {expCanShowDisparar ? (
                                     <div className="flex w-full sm:w-auto shrink-0">
                                       <button
@@ -3517,7 +3517,7 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                   {expHasAttendanceStatus ? (
-                                    <div className="flex w-full sm:w-auto shrink-0">
+                                    <div className="flex shrink-0">
                                       <button
                                         type="button"
                                         onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
@@ -4449,7 +4449,7 @@ export function AtendimentoClient() {
                                   Aulas experimentais
                                 </div>
                               </div>
-                              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
+                              <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full min-w-0">
                                 {expCanShowDisparar ? (
                                   <div className="flex w-full sm:w-auto shrink-0">
                                     <button
@@ -4479,7 +4479,7 @@ export function AtendimentoClient() {
                                   </div>
                                 ) : null}
                                 {expHasAttendanceStatus ? (
-                                  <div className="flex w-full sm:w-auto shrink-0">
+                                  <div className="flex shrink-0">
                                     <button
                                       type="button"
                                       onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
@@ -4630,9 +4630,6 @@ export function AtendimentoClient() {
                                           <div className="min-w-0 flex-1">
                                             <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
                                               {opt.name}
-                                            </div>
-                                            <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--app-text-60)]">
-                                              {opt.phone}
                                             </div>
                                           </div>
                                           {isActive ? (
