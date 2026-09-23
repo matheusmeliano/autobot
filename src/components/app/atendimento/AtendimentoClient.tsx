@@ -3479,7 +3479,7 @@ export function AtendimentoClient() {
                             return false;
                           })();
                           return (
-                            <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                            <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
                                   <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
@@ -3517,7 +3517,7 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                   {expHasAttendanceStatus ? (
-                                    <div className="flex shrink-0">
+                                    <div className="flex shrink-0 max-[1200px]:hidden">
                                       <button
                                         type="button"
                                         onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
@@ -3682,6 +3682,75 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                 </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCancelExperimentalBooking(sl)}
+                                    disabled={(() => {
+                                      if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
+                                      if (expBookingIsCancelled) return true;
+                                      if (expHasAttendanceStatus) return true;
+                                      if (experimentalLockedProf) return true;
+                                      if (!expAssigned) return true;
+                                      return false;
+                                    })()}
+                                    title={(() => {
+                                      if (expBookingIsCancelled) {
+                                        return "Agendamento já foi cancelado.";
+                                      }
+                                      if (expHasAttendanceStatus) {
+                                        return "Agendamento não pode ser cancelado após comparecimento marcado.";
+                                      }
+                                      if (experimentalLockedProf) {
+                                        return "Agendamento não pode ser cancelado após o disparo ser realizado.";
+                                      }
+                                      if (!expAssigned) {
+                                        return "Selecione o professor responsável antes de cancelar o agendamento.";
+                                      }
+                                      if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
+                                        return "Cancelando agendamento...";
+                                      }
+                                      return "Cancelar este agendamento de aula experimental.";
+                                    })()}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 max-[1200px]:hidden"
+                                  >
+                                    {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                    ) : (
+                                      <X className="h-4 w-4 shrink-0" />
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="min-[1201px]:hidden absolute top-5 right-5 z-10 flex items-center gap-2">
+                                  {expHasAttendanceStatus ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
+                                      disabled={Boolean(expSendingPostAttendanceId) || Boolean((sl as any)?.experimental_class_post_attendance_message_sent_at || (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at) || !expHasPhone}
+                                      title={(() => {
+                                        const alreadySent = Boolean(
+                                          (sl as any)?.experimental_class_post_attendance_message_sent_at ||
+                                            (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at,
+                                        );
+                                        if (expSendingPostAttendanceId) {
+                                          return "Enviando a mensagem de matrícula para este registro.";
+                                        }
+                                        if (alreadySent) {
+                                          return "A mensagem de matrícula já foi enviada para este registro.";
+                                        }
+                                        if (!expHasPhone) {
+                                          return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
+                                        }
+                                        return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
+                                      })()}
+                                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                    >
+                                      {expSendingPostAttendanceId ? (
+                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                      ) : (
+                                        <Check className="h-4 w-4 shrink-0 text-emerald-700" />
+                                      )}
+                                    </button>
+                                  ) : null}
                                   <button
                                     type="button"
                                     onClick={() => void handleCancelExperimentalBooking(sl)}
@@ -4441,7 +4510,7 @@ export function AtendimentoClient() {
                           return false;
                         })();
                         return (
-                          <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                          <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
                                 <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
@@ -4479,7 +4548,7 @@ export function AtendimentoClient() {
                                   </div>
                                 ) : null}
                                 {expHasAttendanceStatus ? (
-                                  <div className="flex shrink-0">
+                                  <div className="flex shrink-0 max-[1200px]:hidden">
                                     <button
                                       type="button"
                                       onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
@@ -4644,6 +4713,75 @@ export function AtendimentoClient() {
                                   </div>
                                 ) : null}
                               </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCancelExperimentalBooking(sl)}
+                                  disabled={(() => {
+                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) return true;
+                                    if (expBookingIsCancelled) return true;
+                                    if (expHasAttendanceStatus) return true;
+                                    if (experimentalLockedProf) return true;
+                                    if (!expAssigned) return true;
+                                    return false;
+                                  })()}
+                                  title={(() => {
+                                    if (expBookingIsCancelled) {
+                                      return "Agendamento já foi cancelado.";
+                                    }
+                                    if (expHasAttendanceStatus) {
+                                      return "Agendamento não pode ser cancelado após comparecimento marcado.";
+                                    }
+                                    if (experimentalLockedProf) {
+                                      return "Agendamento não pode ser cancelado após o disparo ser realizado.";
+                                    }
+                                    if (!expAssigned) {
+                                      return "Selecione o professor responsável antes de cancelar o agendamento.";
+                                    }
+                                    if (expCancellingBookingId === String(bk?.id ?? "").trim()) {
+                                      return "Cancelando agendamento...";
+                                    }
+                                    return "Cancelar este agendamento de aula experimental.";
+                                  })()}
+                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 max-[1200px]:hidden"
+                                >
+                                  {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4 shrink-0" />
+                                  )}
+                                </button>
+                              </div>
+                              <div className="min-[1201px]:hidden absolute top-5 right-5 z-10 flex items-center gap-2">
+                                {expHasAttendanceStatus ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
+                                    disabled={Boolean(expSendingPostAttendanceId) || Boolean((sl as any)?.experimental_class_post_attendance_message_sent_at || (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at) || !expHasPhone}
+                                    title={(() => {
+                                      const alreadySent = Boolean(
+                                        (sl as any)?.experimental_class_post_attendance_message_sent_at ||
+                                          (sl as any)?.experimental_class_booking?.post_attendance_message_sent_at,
+                                      );
+                                      if (expSendingPostAttendanceId) {
+                                        return "Enviando a mensagem de matrícula para este registro.";
+                                      }
+                                      if (alreadySent) {
+                                        return "A mensagem de matrícula já foi enviada para este registro.";
+                                      }
+                                      if (!expHasPhone) {
+                                        return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
+                                      }
+                                      return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
+                                    })()}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                  >
+                                    {expSendingPostAttendanceId ? (
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                    ) : (
+                                      <Check className="h-4 w-4 shrink-0 text-emerald-700" />
+                                    )}
+                                  </button>
+                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() => void handleCancelExperimentalBooking(sl)}
