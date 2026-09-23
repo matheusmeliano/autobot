@@ -25,6 +25,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null);
   const phoneRaw = String(body?.phone ?? "").trim();
+  const fullNameRaw = String(body?.full_name ?? "").trim() || null;
   const normalizedPhone = normalizePhoneDigitsOnly(phoneRaw);
 
   if (!isValidWhatsAppUserPhone(normalizedPhone)) {
@@ -85,7 +86,8 @@ export async function POST(req: Request) {
     .insert({
       phone: normalizedPhone,
       origin: "painel_manual",
-      status: "aguardando_nome",
+      full_name: fullNameRaw,
+      status: fullNameRaw ? "aguardando_horario_aula" : "aguardando_nome",
       funnel_stage: "aula_experimental_antecipada",
       assigned_user_email: ATENDIMENTO_EMAIL,
       unread_count: 0,
