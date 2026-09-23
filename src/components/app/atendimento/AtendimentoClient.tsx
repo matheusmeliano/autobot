@@ -3798,7 +3798,6 @@ export function AtendimentoClient() {
                               </div>
                             </div>
                           );
-                        }
                         return (
                           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex items-center gap-2">
