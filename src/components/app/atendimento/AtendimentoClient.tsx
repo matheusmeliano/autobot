@@ -3373,7 +3373,7 @@ export function AtendimentoClient() {
                                 title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
                               >
                                 <Plus className="h-4 w-4" />
-                                Reagendar aula
+                                Reagendar
                               </button>
                             </div>
                               );
@@ -3401,7 +3401,7 @@ export function AtendimentoClient() {
                                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                               >
                                 <Plus className="h-4 w-4" />
-                                Agendar aula
+                                Agendar
                               </button>
                             </div>
                           </>
@@ -4405,7 +4405,7 @@ export function AtendimentoClient() {
                               title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
                             >
                               <Plus className="h-4 w-4" />
-                              Reagendar aula
+                              Reagendar
                             </button>
                           </div>
                             );
@@ -4433,7 +4433,7 @@ export function AtendimentoClient() {
                               className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                             >
                               <Plus className="h-4 w-4" />
-                              Agendar aula
+                              Agendar
                             </button>
                           </div>
                         </>
@@ -4606,7 +4606,7 @@ export function AtendimentoClient() {
                                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   >
                                     <Plus className="h-4 w-4" />
-                                    Reagendar aula
+                                    Reagendar
                                   </button>
                                 </div>
                                 <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
