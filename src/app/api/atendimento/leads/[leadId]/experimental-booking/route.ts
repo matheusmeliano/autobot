@@ -292,7 +292,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       const { data: activeBookingState, error: stateErr } = await admin
         .from("atendimento_experimental_class_bookings")
         .select(
-          "id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at",
+          "id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, lead_start_at, professor_start_at",
         )
         .eq("id", activeId)
         .maybeSingle();
@@ -304,13 +304,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         const attendantSent = Boolean(String((activeBookingState as any).attendant_start_notification_sent_at ?? "").trim());
         const isCancelled = statusRaw === "cancelled";
         const hasAttendance = attendanceRaw === "attended" || attendanceRaw === "no_show";
-        const isLocked = isCancelled || hasAttendance || studentSent || attendantSent;
+        (globalThis as any).__experimentalBookingHadAnyNotificationBeforeEdit = studentSent || attendantSent;
+        (globalThis as any).__experimentalBookingPreviousLeadStartAt = String((activeBookingState as any).lead_start_at ?? "").trim() || null;
+        (globalThis as any).__experimentalBookingPreviousProfessorStartAt = String((activeBookingState as any).professor_start_at ?? "").trim() || null;
+        const isLocked = isCancelled || hasAttendance;
         if (isLocked) {
           const reason = isCancelled
             ? "após a aula experimental ser cancelada."
-            : hasAttendance
-              ? "após comparecimento marcado."
-              : "após o disparo ser realizado.";
+            : "após comparecimento marcado.";
           return Response.json(
             { ok: false, error: `A aula experimental não pode ser editada ${reason}` },
             { status: 409 },
@@ -326,6 +327,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         .eq("lead_id", leadId)
         .eq("status", "scheduled")
         .neq("id", activeId ?? "00000000-0000-0000-0000-000000000000");
+    } catch {
+    }
+
+    const bookingHadAnyNotification = Boolean((globalThis as any).__experimentalBookingHadAnyNotificationBeforeEdit);
+    const previousLeadStartAt = (globalThis as any).__experimentalBookingPreviousLeadStartAt ?? null;
+    const previousProfessorStartAt = (globalThis as any).__experimentalBookingPreviousProfessorStartAt ?? null;
+    try {
+      delete (globalThis as any).__experimentalBookingHadAnyNotificationBeforeEdit;
+      delete (globalThis as any).__experimentalBookingPreviousLeadStartAt;
+      delete (globalThis as any).__experimentalBookingPreviousProfessorStartAt;
     } catch {
     }
 
@@ -345,6 +356,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     if (leadConversationId) insertOrUpdateData.conversation_id = leadConversationId;
     if (safeLessonLink !== undefined) insertOrUpdateData.lesson_link = safeLessonLink;
     if (safeAttendance !== undefined) insertOrUpdateData.attendance_status = safeAttendance;
+
+    if (bookingHadAnyNotification) {
+      insertOrUpdateData.student_start_notification_sent_at = null;
+      insertOrUpdateData.attendant_start_notification_sent_at = null;
+      insertOrUpdateData.registered_attendant_start_notification_sent_at = null;
+      insertOrUpdateData.professor_start_notification_sent_at = null;
+      insertOrUpdateData.student_start_notification_sent_via = null;
+      insertOrUpdateData.attendant_start_notification_sent_via = null;
+      insertOrUpdateData.registered_attendant_start_notification_sent_via = null;
+      insertOrUpdateData.professor_start_notification_sent_via = null;
+    }
 
     let bookingOut: Record<string, unknown> | null = null;
 
@@ -444,7 +466,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       }
     }
 
-    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null; experimental_class_booking_id?: string | null; experimental_class_link?: string | null } | null = null;
+    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null; experimental_class_booking_id?: string | null; experimental_class_link?: string | null; experimental_class_student_notification_sent_at?: string | null; experimental_class_attendant_notification_sent_at?: string | null; experimental_class_registered_attendant_notification_sent_at?: string | null } | null = null;
     {
       const bookingIdStr = bookingOut?.id != null ? String(bookingOut.id) : null;
       const fullUpdateData: Record<string, any> = {
@@ -460,7 +482,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         ...(safeLessonLink ? { experimental_class_link: safeLessonLink } : {}),
         updated_at: new Date().toISOString(),
       };
-      const selectFull = "id, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at";
+      if (bookingHadAnyNotification) {
+        fullUpdateData.experimental_class_student_notification_sent_at = null;
+        fullUpdateData.experimental_class_attendant_notification_sent_at = null;
+        fullUpdateData.experimental_class_registered_attendant_notification_sent_at = null;
+      }
+      const selectFull = "id, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at" + (bookingHadAnyNotification ? ", experimental_class_student_notification_sent_at, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at" : "");
       const fallback = () => ({
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
@@ -473,6 +500,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         experimental_class_professor_time: safeProfessorTime,
         experimental_class_lead_start_at: leadStartAt,
         experimental_class_professor_start_at: professorStartAt,
+        ...(bookingHadAnyNotification ? {
+          experimental_class_student_notification_sent_at: null,
+          experimental_class_attendant_notification_sent_at: null,
+          experimental_class_registered_attendant_notification_sent_at: null,
+        } : {}),
       });
       type LeadRun = { err: any | null; data: any | null };
       async function attempt(updateData: Record<string, any>, select: string): Promise<LeadRun> {
@@ -489,7 +521,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         }
       }
       function runOkToLeadUpdate(leadRow: any) {
-        return {
+        const base: Record<string, any> = {
           funnel_stage: String((leadRow as any).funnel_stage ?? "aula_experimental_agendada").trim() || null,
           experimental_class_status: String((leadRow as any).experimental_class_status ?? safeStatus).trim() || null,
           experimental_class_booking_id: String((leadRow as any).experimental_class_booking_id ?? bookingIdStr ?? "").trim() || bookingIdStr,
@@ -502,6 +534,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           experimental_class_lead_start_at: String((leadRow as any).experimental_class_lead_start_at ?? leadStartAt ?? "").trim() || leadStartAt,
           experimental_class_professor_start_at: String((leadRow as any).experimental_class_professor_start_at ?? professorStartAt ?? "").trim() || professorStartAt,
         };
+        if (bookingHadAnyNotification) {
+          base.experimental_class_student_notification_sent_at = null;
+          base.experimental_class_attendant_notification_sent_at = null;
+          base.experimental_class_registered_attendant_notification_sent_at = null;
+        }
+        return base;
       }
       function stripColumnFromSelect(selectStr: string, columnName: string): string {
         const keys = selectStr.split(",").map((s) => s.trim()).filter(Boolean);
@@ -560,6 +598,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
             experimental_class_professor_time: safeProfessorTime,
             experimental_class_lead_start_at: leadStartAt,
             experimental_class_professor_start_at: professorStartAt,
+            ...(bookingHadAnyNotification ? {
+              experimental_class_student_notification_sent_at: null,
+              experimental_class_attendant_notification_sent_at: null,
+              experimental_class_registered_attendant_notification_sent_at: null,
+            } : {}),
           };
         } catch {
           leadUpdate = fallback();
@@ -589,6 +632,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       });
     } catch {
       // ignore
+    }
+
+    if (bookingHadAnyNotification) {
+      try {
+        await admin.from("atendimento_history_events").insert({
+          lead_id: leadId,
+          event_type: "experimental_class_rescheduled_after_notification",
+          assigned_user_email: "atendimento.usa.music@gmail.com",
+          details: {
+            booking_id: bookingOut?.id ? String(bookingOut.id) : null,
+            previous_lead_start_at: previousLeadStartAt,
+            previous_professor_start_at: previousProfessorStartAt,
+            new_lead_start_at: leadStartAt,
+            new_professor_start_at: professorStartAt,
+            notifications_reset: true,
+            source: "painel_atendimento_reagendamento_pos_disparo",
+          },
+        });
+      } catch {
+        // ignore
+      }
     }
 
     void maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled({

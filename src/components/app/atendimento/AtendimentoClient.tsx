@@ -3369,8 +3369,8 @@ export function AtendimentoClient() {
                                 type="button"
                                 onClick={() => handleOpenExperimentalBooking(selectedLead)}
                                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                disabled={cancelled || experimentalLockedProf}
-                                title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
+                                disabled={cancelled}
+                                title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : undefined}
                               >
                                 <Plus className="h-4 w-4" />
                                 Reagendar
@@ -3556,7 +3556,6 @@ export function AtendimentoClient() {
                                       disabled={(() => {
                                         if (expBookingIsCancelled) return true;
                                         if (expHasAttendanceStatus) return true;
-                                        if (experimentalLockedProf) return true;
                                         return false;
                                       })()}
                                       title={(() => {
@@ -3565,9 +3564,6 @@ export function AtendimentoClient() {
                                         }
                                         if (expHasAttendanceStatus) {
                                           return "Aula experimental não pode ser reagendada após comparecimento marcado.";
-                                        }
-                                        if (experimentalLockedProf) {
-                                          return "Aula experimental não pode ser editada após o disparo ser realizado.";
                                         }
                                         return "Reagendar esta aula experimental.";
                                       })()}
@@ -4401,8 +4397,8 @@ export function AtendimentoClient() {
                               type="button"
                               onClick={() => handleOpenExperimentalBooking(selectedLead)}
                               className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                              disabled={cancelled || experimentalLockedProf}
-                              title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
+                              disabled={cancelled}
+                              title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : undefined}
                             >
                               <Plus className="h-4 w-4" />
                               Reagendar
@@ -4586,23 +4582,19 @@ export function AtendimentoClient() {
                                     type="button"
                                     onClick={() => handleOpenExperimentalBooking(sl)}
                                     disabled={(() => {
-                                      if (expBookingIsCancelled) return true;
-                                      if (expHasAttendanceStatus) return true;
-                                      if (experimentalLockedProf) return true;
-                                      return false;
-                                    })()}
-                                    title={(() => {
-                                      if (expBookingIsCancelled) {
-                                        return "Aula experimental cancelada. Não é possível reagendar.";
-                                      }
-                                      if (expHasAttendanceStatus) {
-                                        return "Aula experimental não pode ser reagendada após comparecimento marcado.";
-                                      }
-                                      if (experimentalLockedProf) {
-                                        return "Aula experimental não pode ser editada após o disparo ser realizado.";
-                                      }
-                                      return "Reagendar esta aula experimental.";
-                                    })()}
+                                        if (expBookingIsCancelled) return true;
+                                        if (expHasAttendanceStatus) return true;
+                                        return false;
+                                      })()}
+                                      title={(() => {
+                                        if (expBookingIsCancelled) {
+                                          return "Aula experimental cancelada. Não é possível reagendar.";
+                                        }
+                                        if (expHasAttendanceStatus) {
+                                          return "Aula experimental não pode ser reagendada após comparecimento marcado.";
+                                        }
+                                        return "Reagendar esta aula experimental.";
+                                      })()}
                                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   >
                                     <Plus className="h-4 w-4" />
