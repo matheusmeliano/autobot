@@ -3441,12 +3441,6 @@ export function AtendimentoClient() {
                                   <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
                                     Aulas experimentais
                                   </div>
-                                  {!expAssigned ? (
-                                    <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
-                                      <AlertTriangle className="h-3 w-3 shrink-0" />
-                                      Escolha
-                                    </div>
-                                  ) : null}
                                 </div>
                                 <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
                                   {expCanShowDisparar ? (
@@ -4450,12 +4444,6 @@ export function AtendimentoClient() {
                                 <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
                                   Aulas experimentais
                                 </div>
-                                {!expAssigned ? (
-                                  <div className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 sm:ml-2">
-                                    <AlertTriangle className="h-3 w-3 shrink-0" />
-                                    Escolha
-                                  </div>
-                                ) : null}
                               </div>
                               <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 min-w-0">
                                 {expCanShowDisparar ? (
