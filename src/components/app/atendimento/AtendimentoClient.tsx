@@ -3517,7 +3517,7 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                   {expHasAttendanceStatus ? (
-                                    <div className="flex shrink-0 max-[1200px]:hidden">
+                                    <div className="flex shrink-0 max-[639px]:hidden">
                                       <button
                                         type="button"
                                         onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
@@ -3711,7 +3711,7 @@ export function AtendimentoClient() {
                                       }
                                       return "Cancelar este agendamento de aula experimental.";
                                     })()}
-                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 max-[1200px]:hidden"
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 max-[639px]:hidden"
                                   >
                                     {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
                                       <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
@@ -4548,7 +4548,7 @@ export function AtendimentoClient() {
                                   </div>
                                 ) : null}
                                 {expHasAttendanceStatus ? (
-                                  <div className="flex shrink-0 max-[1200px]:hidden">
+                                  <div className="flex shrink-0 max-[639px]:hidden">
                                     <button
                                       type="button"
                                       onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
@@ -4742,7 +4742,7 @@ export function AtendimentoClient() {
                                     }
                                     return "Cancelar este agendamento de aula experimental.";
                                   })()}
-                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 max-[1200px]:hidden"
+                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 max-[639px]:hidden"
                                 >
                                   {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
                                     <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
