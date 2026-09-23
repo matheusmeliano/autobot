@@ -3479,7 +3479,7 @@ export function AtendimentoClient() {
                             return false;
                           })();
                           return (
-                            <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                            <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
                                   <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
@@ -3711,7 +3711,7 @@ export function AtendimentoClient() {
                                       }
                                       return "Cancelar este agendamento de aula experimental.";
                                     })()}
-                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 absolute top-5 right-5 z-10 min-[1201px]:static min-[1201px]:top-auto min-[1201px]:right-auto min-[1201px]:z-auto"
                                   >
                                     {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
                                       <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
@@ -4441,7 +4441,7 @@ export function AtendimentoClient() {
                           return false;
                         })();
                         return (
-                          <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                          <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full">
                                 <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
@@ -4676,7 +4676,7 @@ export function AtendimentoClient() {
                                     }
                                     return "Cancelar este agendamento de aula experimental.";
                                   })()}
-                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55 absolute top-5 right-5 z-10 min-[1201px]:static min-[1201px]:top-auto min-[1201px]:right-auto min-[1201px]:z-auto"
                                 >
                                   {expCancellingBookingId === String(bk?.id ?? "").trim() ? (
                                     <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
