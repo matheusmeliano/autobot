@@ -2880,8 +2880,8 @@ export function AtendimentoClient() {
                     );
                   })}
                   {totalPages > 1 ? (
-                    <div className="flex shrink-0 items-center justify-center sm:justify-end gap-2 px-4 py-3 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/45 sm:px-5 sm:py-3.5">
-                      <div className="flex shrink-0 items-center justify-center sm:justify-end gap-2">
+                    <div className="flex shrink-0 items-center justify-center gap-2 px-4 pt-3 pb-0 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/45 sm:px-5 sm:pt-3.5 sm:pb-0">
+                      <div className="flex shrink-0 items-center justify-center gap-2">
                         <button
                           type="button"
                           onClick={() => setLeadListPage((p) => Math.max(1, p - 1))}
