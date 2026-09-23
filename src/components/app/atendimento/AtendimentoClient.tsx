@@ -3918,9 +3918,9 @@ export function AtendimentoClient() {
 
                   {/* ============== HISTÓRICO ============== */}
                   {activeTab === "historico" ? (
-                    <div className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 text-center shadow-none">
-                      <div className="text-[13px] text-[var(--app-text-60)]">
-                        Histórico de eventos e interações do registro — em integração.
+                    <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
+                      <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
+                        Esse registro não possuí históricos em aberto.
                       </div>
                     </div>
                   ) : null}
