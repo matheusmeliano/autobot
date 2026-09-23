@@ -3467,7 +3467,8 @@ export function AtendimentoClient() {
                           const expEffectiveStatus =
                             String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
                           const expClassJaPassou = isExperimentalClassPast(sl);
-                          const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
+                          const expDisparoJaFoiFeito = experimentalHasAnyDisparoConcluido(sl);
+                          const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || expDisparoJaFoiFeito || (expClassJaPassou && experimentalLockedProf);
                           const expBookingIsCancelled = expEffectiveStatus === "cancelled";
                           const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
                           const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
@@ -4498,7 +4499,8 @@ export function AtendimentoClient() {
                         const expEffectiveStatus =
                           String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
                         const expClassJaPassou = isExperimentalClassPast(sl);
-                        const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
+                        const expDisparoJaFoiFeito = experimentalHasAnyDisparoConcluido(sl);
+                        const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || expDisparoJaFoiFeito || (expClassJaPassou && experimentalLockedProf);
                         const expBookingIsCancelled = expEffectiveStatus === "cancelled";
                         const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
                         const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
