@@ -210,11 +210,6 @@ export default async function DashboardPage() {
   });
 
   const schedules = schedulesFiltered as any[];
-  const schedulesWithLatestRun = schedules.map((s) => ({
-    ...s,
-    last_executed_scheduled_for:
-      latestExecutedRunBySchedule.get(String((s as any).id ?? "")) ?? null,
-  }));
   const latestExecutedRunBySchedule = new Map<string, string>();
   for (const run of scheduleRunsRes.data ?? []) {
     const scheduleId = String((run as any)?.schedule_id ?? "");
@@ -222,6 +217,11 @@ export default async function DashboardPage() {
     if (!scheduleId || !scheduledFor || latestExecutedRunBySchedule.has(scheduleId)) continue;
     latestExecutedRunBySchedule.set(scheduleId, scheduledFor);
   }
+  const schedulesWithLatestRun = schedules.map((s) => ({
+    ...s,
+    last_executed_scheduled_for:
+      latestExecutedRunBySchedule.get(String((s as any).id ?? "")) ?? null,
+  }));
   const tzRaw = (profileRes as any)?.data?.timezone;
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
