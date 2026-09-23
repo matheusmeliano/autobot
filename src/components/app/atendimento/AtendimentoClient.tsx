@@ -3352,10 +3352,6 @@ export function AtendimentoClient() {
                               const bk = expBestBooking as any;
                               const expEffectiveStatus =
                                 String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
-                              const expEffectiveAttendance =
-                                String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
-                              const expClassJaPassou = isExperimentalClassPast(sl);
-                              const hasAtt = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
                               const cancelled = expEffectiveStatus === "cancelled";
                               return (
                             <div className="mt-4 flex justify-end gap-2">
@@ -3369,41 +3365,6 @@ export function AtendimentoClient() {
                                 <Info className="h-4 w-4" />
                                 Mais informações
                               </button>
-                              {(() => {
-                                const hasPhone = Boolean(String(sl?.phone ?? "").trim());
-                                if (!hasAtt) return null;
-                                const sentFlag = Boolean(
-                                  (sl as any)?.experimental_class_post_attendance_message_sent_at ||
-                                    bk?.post_attendance_message_sent_at,
-                                );
-                                return (
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
-                                    disabled={Boolean(expSendingPostAttendanceId) || sentFlag || !hasPhone}
-                                    title={(() => {
-                                      if (expSendingPostAttendanceId) {
-                                        return "Enviando a mensagem de matrícula para este registro.";
-                                      }
-                                      if (sentFlag) {
-                                        return "A mensagem de matrícula já foi enviada para este registro.";
-                                      }
-                                      if (!hasPhone) {
-                                        return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
-                                      }
-                                      return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
-                                    })()}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                                  >
-                                    {expSendingPostAttendanceId ? (
-                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                    ) : (
-                                      <Check className="h-4 w-4 shrink-0 text-emerald-700" />
-                                    )}
-                                    {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
-                                  </button>
-                                );
-                              })()}
                               <button
                                 type="button"
                                 onClick={() => handleOpenExperimentalBooking(selectedLead)}
@@ -4357,10 +4318,6 @@ export function AtendimentoClient() {
                             const bk = expBestBooking as any;
                             const expEffectiveStatus =
                               String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
-                            const expEffectiveAttendance =
-                              String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
-                            const expClassJaPassou = isExperimentalClassPast(sl);
-                            const hasAtt = Boolean(expEffectiveAttendance) || (expClassJaPassou && experimentalLockedProf);
                             const cancelled = expEffectiveStatus === "cancelled";
                             return (
                           <div className="mt-4 flex justify-end gap-2">
@@ -4374,41 +4331,6 @@ export function AtendimentoClient() {
                               <Info className="h-4 w-4" />
                               Mais informações
                             </button>
-                            {(() => {
-                              const hasPhone = Boolean(String(sl?.phone ?? "").trim());
-                              if (!hasAtt) return null;
-                              const sentFlag = Boolean(
-                                (sl as any)?.experimental_class_post_attendance_message_sent_at ||
-                                  bk?.post_attendance_message_sent_at,
-                              );
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleSendExperimentalPostAttendanceMessage(sl)}
-                                  disabled={Boolean(expSendingPostAttendanceId) || sentFlag || !hasPhone}
-                                  title={(() => {
-                                    if (expSendingPostAttendanceId) {
-                                      return "Enviando a mensagem de matrícula para este registro.";
-                                    }
-                                    if (sentFlag) {
-                                      return "A mensagem de matrícula já foi enviada para este registro.";
-                                    }
-                                    if (!hasPhone) {
-                                      return "Registro não possui telefone cadastrado para receber a mensagem de matrícula.";
-                                    }
-                                    return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
-                                  })()}
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                                >
-                                  {expSendingPostAttendanceId ? (
-                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                  ) : (
-                                    <Check className="h-4 w-4 shrink-0 text-emerald-700" />
-                                  )}
-                                  {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
-                                </button>
-                              );
-                            })()}
                             <button
                               type="button"
                               onClick={() => handleOpenExperimentalBooking(selectedLead)}
