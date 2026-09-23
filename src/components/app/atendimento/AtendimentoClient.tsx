@@ -2880,16 +2880,8 @@ export function AtendimentoClient() {
                     );
                   })}
                   {totalPages > 1 ? (
-                    <div className="flex shrink-0 flex-col-reverse items-stretch gap-3 px-4 py-3 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/45 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5">
-                      <div className="flex w-full sm:w-auto shrink-0 items-center gap-2 text-[12px] font-medium text-[var(--app-text-60)]">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1">
-                          <span className="text-[var(--app-text-85)] font-semibold tabular-nums">{pagedStart + 1}–{Math.min(pagedEnd, totalLeads)}</span>
-                          <span className="text-[var(--app-text-40)]">/</span>
-                          <span className="text-[var(--app-text-85)] font-semibold tabular-nums">{totalLeads}</span>
-                        </span>
-                        <span className="text-[var(--app-text-45)]">registros</span>
-                      </div>
-                      <div className="flex w-full sm:w-auto shrink-0 items-center justify-between sm:justify-end gap-2">
+                    <div className="flex shrink-0 items-center justify-center sm:justify-end gap-2 px-4 py-3 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/45 sm:px-5 sm:py-3.5">
+                      <div className="flex shrink-0 items-center justify-center sm:justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setLeadListPage((p) => Math.max(1, p - 1))}
