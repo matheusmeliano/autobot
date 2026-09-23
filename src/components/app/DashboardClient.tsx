@@ -167,14 +167,7 @@ export function DashboardClient({
 
   const chart = useMemo(() => buildChartPoints(chartFilter, chartDates), [chartDates, chartFilter]);
 
-  const visibleStats = hasCurrentMonthSchedules
-    ? stats
-    : {
-        ...stats,
-        receivableMonthTotal: 0,
-        receivableMonthPaid: 0,
-        receivableMonthRemaining: 0,
-      };
+  const visibleStats = stats;
   const operationMonthLabel = useMemo(() => {
     const month = new Intl.DateTimeFormat("pt-BR", {
       timeZone: effectiveTimeZone,
