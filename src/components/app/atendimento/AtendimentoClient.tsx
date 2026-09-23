@@ -2880,29 +2880,68 @@ export function AtendimentoClient() {
                     );
                   })}
                   {totalPages > 1 ? (
-                    <div className="flex shrink-0 items-center justify-between gap-3 px-5 py-4 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/40">
-                      <div className="text-[11px] font-semibold text-[var(--app-text-55)]">
-                        Exibindo {pagedStart + 1}–{Math.min(pagedEnd, totalLeads)} de{" "}
-                        <span className="text-[var(--app-text-85)] font-bold">{totalLeads}</span>{" "}
-                        · Página {safePage} / {totalPages}
+                    <div className="flex shrink-0 flex-col-reverse items-stretch gap-3 px-4 py-3 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/45 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3.5">
+                      <div className="flex w-full sm:w-auto shrink-0 items-center gap-2 text-[12px] font-medium text-[var(--app-text-60)]">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1">
+                          <span className="text-[var(--app-text-85)] font-semibold tabular-nums">{pagedStart + 1}–{Math.min(pagedEnd, totalLeads)}</span>
+                          <span className="text-[var(--app-text-40)]">/</span>
+                          <span className="text-[var(--app-text-85)] font-semibold tabular-nums">{totalLeads}</span>
+                        </span>
+                        <span className="text-[var(--app-text-45)]">registros</span>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
+                      <div className="flex w-full sm:w-auto shrink-0 items-center justify-between sm:justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setLeadListPage((p) => Math.max(1, p - 1))}
                           disabled={safePage <= 1}
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex h-9 items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] pl-2.5 pr-3 text-[12px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                           aria-label="Página anterior"
                         >
                           <ChevronLeft className="h-4 w-4" />
+                          <span className="hidden sm:inline">Anterior</span>
                         </button>
+                        <div className="inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-1.5 py-1">
+                          {(() => {
+                            const pages: number[] = [];
+                            const startP = Math.max(1, Math.min(totalPages - 2, safePage - 1));
+                            const endP = Math.min(totalPages, startP + 2);
+                            const firstAdj = Math.max(1, endP - 2);
+                            for (let p = firstAdj; p <= endP; p++) pages.push(p);
+                            return pages.map((p) => {
+                              const isCur = p === safePage;
+                              return (
+                                <button
+                                  key={p}
+                                  type="button"
+                                  onClick={() => setLeadListPage(p)}
+                                  disabled={isCur}
+                                  className={
+                                    "inline-flex h-7 min-w-[28px] items-center justify-center rounded-full px-2 text-[12px] font-bold tabular-nums transition-colors " +
+                                    (isCur
+                                      ? "!bg-[#ea580c] !text-white shadow-[0_1px_2px_rgba(234,88,12,0.25)] disabled:opacity-100"
+                                      : "text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
+                                  }
+                                  aria-label={`Página ${p}`}
+                                >
+                                  {p}
+                                </button>
+                              );
+                            });
+                          })()}
+                          {totalPages > 3 ? (
+                            <span className="px-1 text-[11px] font-bold text-[var(--app-text-40)] tabular-nums">
+                              · {totalPages}
+                            </span>
+                          ) : null}
+                        </div>
                         <button
                           type="button"
                           onClick={() => setLeadListPage((p) => Math.min(totalPages, p + 1))}
                           disabled={safePage >= totalPages}
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex h-9 items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] pl-3 pr-2.5 text-[12px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                           aria-label="Próxima página"
                         >
+                          <span className="hidden sm:inline">Próxima</span>
                           <ChevronRight className="h-4 w-4" />
                         </button>
                       </div>
