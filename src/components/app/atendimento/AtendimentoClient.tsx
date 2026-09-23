@@ -3487,7 +3487,7 @@ export function AtendimentoClient() {
                                     Aulas experimentais
                                   </div>
                                 </div>
-                                <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full min-w-0">
+                                <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0">
                                   {expCanShowDisparar ? (
                                     <div className="flex w-full sm:w-auto shrink-0">
                                       <button
@@ -4518,7 +4518,7 @@ export function AtendimentoClient() {
                                   Aulas experimentais
                                 </div>
                               </div>
-                              <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full min-w-0">
+                              <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0">
                                 {expCanShowDisparar ? (
                                   <div className="flex w-full sm:w-auto shrink-0">
                                     <button
