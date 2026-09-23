@@ -3607,7 +3607,7 @@ export function AtendimentoClient() {
                                         return "Professor não pode ser alterado após o disparo ser realizado.";
                                       }
                                       return expAssigned
-                                        ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
+                                        ? `Professor vinculado: ${expAssigned.name}`
                                         : "Selecionar professor responsável pela aula experimental";
                                     })()}
                                   >
@@ -3618,7 +3618,7 @@ export function AtendimentoClient() {
                                     )}
                                     <span className="truncate">
                                       {expAssigned
-                                        ? `${expAssigned.name} (${expAssigned.short})`
+                                        ? `${expAssigned.name}`
                                         : "Selecionar professor"}
                                     </span>
                                     <ChevronDown className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
@@ -3668,9 +3668,6 @@ export function AtendimentoClient() {
                                             <div className="min-w-0 flex-1">
                                               <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
                                                 {opt.name}
-                                              </div>
-                                              <div className="mt-0.5 truncate text-[12px] font-medium text-[var(--app-text-60)]">
-                                                {opt.phone}
                                               </div>
                                             </div>
                                             {isActive ? (
@@ -4572,7 +4569,7 @@ export function AtendimentoClient() {
                                       return "Professor não pode ser alterado após o disparo ser realizado.";
                                     }
                                     return expAssigned
-                                      ? `Professor vinculado: ${expAssigned.name} (${expAssigned.short})`
+                                      ? `Professor vinculado: ${expAssigned.name}`
                                       : "Selecionar professor responsável pela aula experimental";
                                   })()}
                                 >
@@ -4583,7 +4580,7 @@ export function AtendimentoClient() {
                                   )}
                                   <span className="truncate">
                                     {expAssigned
-                                      ? `${expAssigned.name} (${expAssigned.short})`
+                                      ? `${expAssigned.name}`
                                       : "Selecionar professor"}
                                   </span>
                                   <ChevronDown className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
