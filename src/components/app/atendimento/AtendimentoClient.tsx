@@ -796,7 +796,8 @@ export function AtendimentoClient() {
       (lead as any).experimental_class_booking ??
       (lead as any).future_experimental_class_booking;
     const bk = expBestBooking as any;
-    const att = String(bk?.attendance_status ?? "").trim();
+    const att =
+      String(bk?.attendance_status ?? (lead as any).experimental_class_attendance_status ?? "").trim();
     if (!att) {
       modalToast.warning("Marque o comparecimento da aula experimental antes de enviar a mensagem de matrícula.");
       return;
@@ -3267,7 +3268,11 @@ export function AtendimentoClient() {
                                 (sl as any).experimental_class_booking ??
                                 (sl as any).future_experimental_class_booking;
                               const bk = expBestBooking as any;
-                              const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                              const expEffectiveStatus =
+                                String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
+                              const expEffectiveAttendance =
+                                String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
+                              const cancelled = expEffectiveStatus === "cancelled";
                               return (
                             <div className="mt-4 flex justify-end gap-2">
                               <button
@@ -3281,7 +3286,7 @@ export function AtendimentoClient() {
                                 Mais informações
                               </button>
                               {(() => {
-                                const hasAtt = Boolean(String(bk?.attendance_status ?? "").trim());
+                                const hasAtt = Boolean(expEffectiveAttendance);
                                 const hasPhone = Boolean(String(sl?.phone ?? "").trim());
                                 if (!hasAtt) return null;
                                 const sentFlag = Boolean(
@@ -3413,8 +3418,12 @@ export function AtendimentoClient() {
                             (sl as any).experimental_class_booking ??
                             (sl as any).future_experimental_class_booking;
                           const bk = expBestBooking as any;
-                          const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
-                          const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                          const expEffectiveAttendance =
+                            String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
+                          const expEffectiveStatus =
+                            String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
+                          const expHasAttendanceStatus = Boolean(expEffectiveAttendance);
+                          const expBookingIsCancelled = expEffectiveStatus === "cancelled";
                           const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
                           const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
                           const expLessonLinkSaveDisabled = (() => {
@@ -4268,7 +4277,11 @@ export function AtendimentoClient() {
                               (sl as any).experimental_class_booking ??
                               (sl as any).future_experimental_class_booking;
                             const bk = expBestBooking as any;
-                            const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                            const expEffectiveStatus =
+                              String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
+                            const expEffectiveAttendance =
+                              String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
+                            const cancelled = expEffectiveStatus === "cancelled";
                             return (
                           <div className="mt-4 flex justify-end gap-2">
                             <button
@@ -4282,7 +4295,7 @@ export function AtendimentoClient() {
                               Mais informações
                             </button>
                             {(() => {
-                              const hasAtt = Boolean(String(bk?.attendance_status ?? "").trim());
+                              const hasAtt = Boolean(expEffectiveAttendance);
                               const hasPhone = Boolean(String(sl?.phone ?? "").trim());
                               if (!hasAtt) return null;
                               const sentFlag = Boolean(
@@ -4414,8 +4427,12 @@ export function AtendimentoClient() {
                           (sl as any).experimental_class_booking ??
                           (sl as any).future_experimental_class_booking;
                         const bk = expBestBooking as any;
-                        const expHasAttendanceStatus = Boolean(String(bk?.attendance_status ?? "").trim());
-                        const expBookingIsCancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                        const expEffectiveAttendance =
+                          String(bk?.attendance_status ?? (sl as any).experimental_class_attendance_status ?? "").trim();
+                        const expEffectiveStatus =
+                          String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
+                        const expHasAttendanceStatus = Boolean(expEffectiveAttendance);
+                        const expBookingIsCancelled = expEffectiveStatus === "cancelled";
                         const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
                         const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
                         const expLessonLinkSaveDisabled = (() => {
