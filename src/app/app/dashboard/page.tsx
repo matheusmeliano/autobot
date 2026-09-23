@@ -251,125 +251,74 @@ export default async function DashboardPage() {
   let receivableMonthTotal = 0;
   let receivableMonthPaid = 0;
 
-  const debtorStatuses = new Map<string, string>();
-  {
-    const schedulesByDebtor = new Map<string, any[]>();
-    for (const schedule of schedulesWithLatestRun) {
-      const debtorId = String(schedule?.debtor_id ?? "");
-      if (!debtorId) continue;
-      const list = schedulesByDebtor.get(debtorId) ?? [];
-      list.push(schedule);
-      schedulesByDebtor.set(debtorId, list);
-    }
-    for (const debtor of debtorsFiltered as any[]) {
-      const debtorId = String(debtor?.id ?? "");
-      if (!debtorId) continue;
-      const charges = Array.isArray(debtor?.debtor_charges) ? (debtor.debtor_charges as any[]) : [];
-      const debtorSchedules = schedulesByDebtor.get(debtorId) ?? [];
-      if (!debtorSchedules.length) {
-        const raw = String(debtor?.status ?? "").trim().toLowerCase();
-        debtorStatuses.set(debtorId, raw || "-");
-        continue;
-      }
-      const openSchedules = debtorSchedules.filter((row) => !String(row.closed_at ?? "").trim());
-      const derived = deriveReferenceMonthDebtorStatus(charges, debtorSchedules, now.toISOString());
-      const next = !openSchedules.length && derived !== "pago" ? "-" : derived;
-      debtorStatuses.set(debtorId, next);
-    }
+  const schedulesByDebtor = new Map<string, any[]>();
+  for (const schedule of schedulesWithLatestRun) {
+    const debtorId = String(schedule?.debtor_id ?? "");
+    if (!debtorId) continue;
+    const list = schedulesByDebtor.get(debtorId) ?? [];
+    list.push(schedule);
+    schedulesByDebtor.set(debtorId, list);
   }
 
-  {
-    const schedulesByDebtor = new Map<string, any[]>();
-    for (const schedule of schedulesWithLatestRun) {
-      const debtorId = String(schedule?.debtor_id ?? "");
-      if (!debtorId) continue;
-      const list = schedulesByDebtor.get(debtorId) ?? [];
-      list.push(schedule);
-      schedulesByDebtor.set(debtorId, list);
+  const nowUtcIso = now.toISOString();
+
+  for (const debtor of debtorsFiltered as any[]) {
+    const debtorId = String(debtor?.id ?? "");
+    if (!debtorId) continue;
+    const baseAmountRaw = debtor?.valor;
+    const baseAmount =
+      typeof baseAmountRaw === "number" && !Number.isNaN(baseAmountRaw) ? baseAmountRaw : null;
+    if (baseAmount == null || baseAmount <= 0) continue;
+
+    const charges = Array.isArray(debtor?.debtor_charges) ? (debtor.debtor_charges as any[]) : [];
+    const debtorSchedules = schedulesByDebtor.get(debtorId) ?? [];
+
+    let chargeMultiplier = 1;
+    if (Boolean(debtor?.accumulate_open_monthly_charges) && debtorSchedules.length) {
+      let maxInstallments = 1;
+      for (const s of debtorSchedules) {
+        const recurrence = String(s?.recurrence ?? "").trim().toLowerCase();
+        if (recurrence !== "monthly") continue;
+        const closedAt = s?.closed_at ?? null;
+        const status = String(s?.status ?? "").trim().toLowerCase();
+        if (Boolean(String(closedAt ?? "").trim()) || status === "pago") continue;
+        const scheduleTimeZone = String(s?.schedule_timezone ?? "") || effectiveTimeZone;
+        const inst = getOpenMonthlyInstallments({
+          chargeDueAt: s?.charge_due_at ?? null,
+          dataEnvio: s?.data_envio ?? null,
+          nowUtcIso,
+          timeZone: scheduleTimeZone,
+        });
+        if (inst > maxInstallments) maxInstallments = inst;
+      }
+      chargeMultiplier = maxInstallments;
+    } else if (charges.length) {
+      const progress = deriveReferenceMonthDebtorChargeProgress(charges, debtorSchedules, nowUtcIso);
+      if (progress.total > 0) chargeMultiplier = progress.total;
     }
 
-    for (const debtor of debtorsFiltered as any[]) {
-      const debtorId = String(debtor?.id ?? "");
-      if (!debtorId) continue;
-      const baseAmountRaw = debtor?.valor;
-      const baseAmount =
-        typeof baseAmountRaw === "number" && !Number.isNaN(baseAmountRaw) ? baseAmountRaw : null;
-      if (baseAmount == null || baseAmount <= 0) continue;
-      const accumulate = Boolean(debtor?.accumulate_open_monthly_charges);
-      const debtorStatus = String(debtorStatuses.get(debtorId) ?? "").trim().toLowerCase();
+    const monthTotal = baseAmount * chargeMultiplier;
 
-      const debtorSchedules = schedulesByDebtor.get(debtorId) ?? [];
-      const charges = Array.isArray(debtor?.debtor_charges) ? (debtor.debtor_charges as any[]) : [];
-      const progress = deriveReferenceMonthDebtorChargeProgress(
-        charges,
-        debtorSchedules,
-        now.toISOString(),
-      );
-
+    const debtorRawStatus = String(debtor?.status ?? "").trim().toLowerCase();
+    let paidMultiplier = 0;
+    if (charges.length || debtorSchedules.length) {
+      const progress = deriveReferenceMonthDebtorChargeProgress(charges, debtorSchedules, nowUtcIso);
       if (progress.total > 0) {
-        const chargeMultiplier = Math.max(1, progress.total);
-        const monthTotal = baseAmount * chargeMultiplier;
-        const paidCount = Math.min(progress.total, progress.paid);
-        const monthPaid = baseAmount * paidCount;
-        receivableMonthTotal += monthTotal;
-        receivableMonthPaid += monthPaid;
-        continue;
+        paidMultiplier = Math.min(progress.total, progress.paid);
+      } else {
+        const derived = deriveReferenceMonthDebtorStatus(charges, debtorSchedules, nowUtcIso);
+        if (debtorRawStatus === "pago" || derived === "pago") paidMultiplier = chargeMultiplier;
       }
-
-      const scheduleRef = debtorSchedules.find((s) => {
-        const tz = String(s?.schedule_timezone ?? "") || effectiveTimeZone;
-        const ref =
-          scheduleLocalMonthKey(s?.charge_due_at, tz) ??
-          scheduleLocalMonthKey(s?.data_envio, tz) ??
-          scheduleLocalMonthKey(s?.last_executed_scheduled_for, tz);
-        return ref === currentMonthKey;
-      }) ?? debtorSchedules[0];
-
-      const scheduleTimeZone = String(scheduleRef?.schedule_timezone ?? "") || effectiveTimeZone;
-      const recurrence = String(scheduleRef?.recurrence ?? "monthly").trim().toLowerCase();
-      const status = String(scheduleRef?.status ?? "").trim().toLowerCase();
-      const closedAt = scheduleRef?.closed_at ?? null;
-      const chargeDueAt = scheduleRef?.charge_due_at ?? null;
-      const dataEnvio = scheduleRef?.data_envio ?? null;
-
-      let chargeMultiplier = 1;
-      if (accumulate && recurrence === "monthly") {
-        const closed = Boolean(String(closedAt ?? "").trim());
-        if (!closed && status !== "pago") {
-          chargeMultiplier = getOpenMonthlyInstallments({
-            chargeDueAt,
-            dataEnvio,
-            nowUtcIso: now.toISOString(),
-            timeZone: scheduleTimeZone,
-          });
-        }
+      if (debtorRawStatus === "pago" && paidMultiplier <= 0) {
+        paidMultiplier = chargeMultiplier;
       }
-
-      const monthTotal = baseAmount * chargeMultiplier;
-      const isPaid =
-        debtorStatus === "pago" ||
-        Boolean(
-          debtorSchedules.some((s: any) => {
-            const tz = String(s?.schedule_timezone ?? "") || effectiveTimeZone;
-            const statusNorm = String(s?.status ?? "").trim().toLowerCase();
-            if (statusNorm === "pago") return true;
-            const paymentMoment = String(s?.payment_received_at ?? "").trim();
-            if (!paymentMoment) return false;
-            const pmKey = scheduleLocalMonthKey(paymentMoment, tz);
-            if (pmKey === currentMonthKey) return true;
-            const closedMoment = String(s?.closed_at ?? "").trim();
-            if (closedMoment) {
-              const closedKey = scheduleLocalMonthKey(closedMoment, tz);
-              if (closedKey === currentMonthKey) return true;
-            }
-            return false;
-          }),
-        );
-      receivableMonthTotal += monthTotal;
-      if (isPaid) {
-        receivableMonthPaid += monthTotal;
-      }
+    } else if (debtorRawStatus === "pago") {
+      paidMultiplier = chargeMultiplier;
     }
+
+    const monthPaid = baseAmount * paidMultiplier;
+    receivableMonthTotal += monthTotal;
+    receivableMonthPaid += monthPaid;
   }
 
   const receivableMonthRemaining = Math.max(0, receivableMonthTotal - receivableMonthPaid);
