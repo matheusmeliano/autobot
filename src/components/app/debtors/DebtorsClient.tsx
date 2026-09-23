@@ -405,6 +405,18 @@ function maskPixPhoneUS(v: string) {
   return `+1 (${ac}) ${p1}-${p2}`;
 }
 
+function formatPhoneDisplayForEmail(rawPhone: string | null | undefined, usaMusicAccount: boolean) {
+  const val = String(rawPhone ?? "").trim();
+  if (!val) return "-";
+  if (!usaMusicAccount) return val;
+  const digits = digitsOnly(val);
+  if (!digits) return val;
+  if (val.startsWith("+1") || digits.startsWith("11")) {
+    return maskPixPhoneUS(val);
+  }
+  return maskPhoneUS(val);
+}
+
 type PixKeyType = "cpf" | "cnpj" | "email" | "telefone" | "aleatoria" | "desconhecida";
 
 function detectPixKeyType(raw: string): PixKeyType {
@@ -627,7 +639,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
     reset({
       id: row.id,
       nome: row.nome,
-      telefone: row.telefone ?? "",
+      telefone: formatPhoneDisplayForEmail(row.telefone ?? "", usaMusicAccount),
       charges,
       pix_key: row.pix_key ? formatPixKey(row.pix_key) : "",
       observacoes: row.observacoes ?? "",
@@ -834,7 +846,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                         Telefone
                       </div>
                       <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]">
-                        {r.telefone ?? "-"}
+                        {formatPhoneDisplayForEmail(r.telefone, usaMusicAccount)}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
