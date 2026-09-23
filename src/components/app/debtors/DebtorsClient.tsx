@@ -323,7 +323,26 @@ function maskCnpj(v: string) {
 
 function maskPhone(v: string) {
   const d0 = digitsOnly(v);
-  const d = d0.startsWith("55") ? d0.slice(2) : d0;
+  if (d0.startsWith("55")) {
+    const d = d0.slice(2);
+    const dd = d.slice(0, 2);
+    const rest = d.slice(2);
+    if (!dd) return d0;
+    if (rest.length <= 4) return `(${dd}) ${rest}`;
+    if (rest.length <= 8) return `(${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+    return `(${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+  }
+  if (d0.startsWith("1")) {
+    const d = d0.slice(1).slice(0, 10);
+    const ac = d.slice(0, 3);
+    const p1 = d.slice(3, 6);
+    const p2 = d.slice(6, 10);
+    if (!ac) return `+1 ${d0}`;
+    if (d.length <= 3) return `(${ac}`;
+    if (d.length <= 6) return `(${ac}) ${p1}`;
+    return `(${ac}) ${p1}-${p2}`;
+  }
+  const d = d0;
   const dd = d.slice(0, 2);
   const rest = d.slice(2);
   if (!dd) return d0;
@@ -332,20 +351,58 @@ function maskPhone(v: string) {
   return `(${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
 }
 
+function maskPhoneUS(v: string) {
+  const d0 = digitsOnly(v);
+  const dNorm = d0.startsWith("1") ? d0.slice(1) : d0;
+  const d = dNorm.slice(0, 10);
+  const ac = d.slice(0, 3);
+  const p1 = d.slice(3, 6);
+  const p2 = d.slice(6, 10);
+  if (!ac) return "";
+  if (d.length <= 3) return `(${ac}`;
+  if (d.length <= 6) return `(${ac}) ${p1}`;
+  return `(${ac}) ${p1}-${p2}`;
+}
+
 function maskPixPhone(v: string) {
   const raw = v.trimStart();
   if (!raw.startsWith("+")) return v;
   const d = digitsOnly(raw);
-  if (!d.startsWith("55")) return v;
-  const local = d.slice(2);
-  if (!local) return "+55";
-  if (local.length <= 2) return `+55 ${local}`;
-  const dd = local.slice(0, 2);
-  const rest = local.slice(2);
-  if (!rest) return `+55 (${dd})`;
-  if (rest.length <= 4) return `+55 (${dd}) ${rest}`;
-  if (rest.length <= 8) return `+55 (${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
-  return `+55 (${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+  if (d.startsWith("55")) {
+    const local = d.slice(2);
+    if (!local) return "+55";
+    if (local.length <= 2) return `+55 ${local}`;
+    const dd = local.slice(0, 2);
+    const rest = local.slice(2);
+    if (!rest) return `+55 (${dd})`;
+    if (rest.length <= 4) return `+55 (${dd}) ${rest}`;
+    if (rest.length <= 8) return `+55 (${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+    return `+55 (${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+  }
+  if (d.startsWith("1")) {
+    const local = d.slice(1).slice(0, 10);
+    if (!local) return "+1";
+    if (local.length <= 3) return `+1 (${local}`;
+    const ac = local.slice(0, 3);
+    const p1 = local.slice(3, 6);
+    const p2 = local.slice(6, 10);
+    if (local.length <= 6) return `+1 (${ac}) ${p1}`;
+    return `+1 (${ac}) ${p1}-${p2}`;
+  }
+  return v;
+}
+
+function maskPixPhoneUS(v: string) {
+  const raw = v.trimStart();
+  const d = digitsOnly(raw);
+  const local = (d.startsWith("1") ? d.slice(1) : d).slice(0, 10);
+  if (!local) return "+1";
+  if (local.length <= 3) return `+1 (${local}`;
+  const ac = local.slice(0, 3);
+  const p1 = local.slice(3, 6);
+  const p2 = local.slice(6, 10);
+  if (local.length <= 6) return `+1 (${ac}) ${p1}`;
+  return `+1 (${ac}) ${p1}-${p2}`;
 }
 
 type PixKeyType = "cpf" | "cnpj" | "email" | "telefone" | "aleatoria" | "desconhecida";
@@ -356,11 +413,12 @@ function detectPixKeyType(raw: string): PixKeyType {
   if (v.includes("@")) return "email";
   if (isUuidLike(v)) return "aleatoria";
   const d = digitsOnly(v);
-  if (v.startsWith("+55") && d.startsWith("55")) {
-    return "telefone";
+  if (v.startsWith("+")) {
+    if (d.startsWith("55") || d.startsWith("1")) return "telefone";
   }
   if (d.length === 14) return "cnpj";
   if (d.length === 11) return "cpf";
+  if (d.length === 10) return "telefone";
   return "desconhecida";
 }
 
@@ -389,6 +447,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
   const fmt = useFormatCurrency();
   const currencySym = useCurrencySymbolValue();
   const usrEmail = useCurrentUserEmail();
+  const usaMusicAccount = String(usrEmail ?? "").trim().toLowerCase() === "atendimento.usa.music@gmail.com";
   const { theme } = useAppTheme();
   const pageSize = 5;
   const currentDate = useMemo(() => new Date(), []);
@@ -1002,11 +1061,11 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                     <input
                       inputMode="tel"
                       className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0"
-                      placeholder="(DD) 9XXXX-XXXX"
+                      placeholder={usaMusicAccount ? "(XXX) XXX-XXXX" : "(DD) 9XXXX-XXXX"}
                       value={field.value ?? ""}
                       onChange={(e) => {
                         const raw = e.currentTarget.value;
-                        field.onChange(maskPhone(raw));
+                        field.onChange(usaMusicAccount ? maskPhoneUS(raw) : maskPhone(raw));
                       }}
                       onBlur={field.onBlur}
                       name={field.name}
@@ -1139,7 +1198,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           ? "Detectado: Telefone"
                           : pixKeyType === "aleatoria"
                             ? "Detectado: Chave aleatória"
-                            : "Se for telefone, use no formato +55DD9XXXXXXXX."}
+                            : usaMusicAccount
+                              ? "Se for telefone, use no formato +1 (XXX) XXX-XXXX."
+                              : "Se for telefone, use no formato +55DD9XXXXXXXX."}
                 </div>
               </div>
             </div>
