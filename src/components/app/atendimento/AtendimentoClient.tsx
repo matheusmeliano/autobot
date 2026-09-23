@@ -3354,11 +3354,11 @@ export function AtendimentoClient() {
                                 String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
                               const cancelled = expEffectiveStatus === "cancelled";
                               return (
-                            <div className="mt-4 flex justify-end gap-2">
+                            <div className="mt-4 flex flex-col justify-end gap-2 w-full">
                               <button
                                 type="button"
                                 onClick={() => handleOpenExpInfo(selectedLead)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                                 disabled={cancelled}
                                 title={cancelled ? "Agendamento cancelado." : undefined}
                               >
@@ -3368,7 +3368,7 @@ export function AtendimentoClient() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                                 disabled={cancelled || experimentalLockedProf}
                                 title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
                               >
@@ -4386,11 +4386,11 @@ export function AtendimentoClient() {
                               String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
                             const cancelled = expEffectiveStatus === "cancelled";
                             return (
-                          <div className="mt-4 flex justify-end gap-2">
+                          <div className="mt-4 flex flex-col justify-end gap-2 w-full">
                             <button
                               type="button"
                               onClick={() => handleOpenExpInfo(selectedLead)}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                               disabled={cancelled}
                               title={cancelled ? "Agendamento cancelado." : undefined}
                             >
@@ -4400,7 +4400,7 @@ export function AtendimentoClient() {
                             <button
                               type="button"
                               onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                               disabled={cancelled || experimentalLockedProf}
                               title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : experimentalLockedProf ? "Aula experimental não pode ser editada após o disparo ser realizado." : undefined}
                             >
