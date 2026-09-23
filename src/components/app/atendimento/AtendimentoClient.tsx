@@ -3538,14 +3538,13 @@ export function AtendimentoClient() {
                                           }
                                           return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
                                         })()}
-                                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
                                       >
                                         {expSendingPostAttendanceId ? (
                                           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                                         ) : (
                                           <Check className="h-4 w-4 shrink-0 text-emerald-700" />
                                         )}
-                                        {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
                                       </button>
                                     </div>
                                   ) : null}
@@ -4504,14 +4503,13 @@ export function AtendimentoClient() {
                                         }
                                         return "Enviar a mensagem de matrícula para o aluno após a aula experimental.";
                                       })()}
-                                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-[13px] font-semibold text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
                                     >
                                       {expSendingPostAttendanceId ? (
                                         <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                                       ) : (
                                         <Check className="h-4 w-4 shrink-0 text-emerald-700" />
                                       )}
-                                      {expSendingPostAttendanceId ? "Enviando..." : "Matrícula"}
                                     </button>
                                   </div>
                                 ) : null}
