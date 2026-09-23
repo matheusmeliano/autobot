@@ -3449,7 +3449,7 @@ export function AtendimentoClient() {
                           </div>
                         </div>
                       ) : buildExperimentalMetaForList(sl).tone === "success" ? (
-                        {(() => {
+                        (() => {
                           const expAssigned = experimentalAssignedProfessorForLead(sl);
                           const expSavedLink = experimentalLessonLinkForLead(sl);
                           const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
@@ -3794,7 +3794,7 @@ export function AtendimentoClient() {
                               </div>
                             </div>
                           );
-                        })()}
+                        })()
                       ) : (
                         <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                           <div className="flex items-center gap-2">
