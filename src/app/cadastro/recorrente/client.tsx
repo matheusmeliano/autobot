@@ -2463,7 +2463,7 @@ export default function CadastroRecorrenteBody() {
                     >
                       (65) 9 9949-5594
                     </a>
-                    . Nossa equipe estará à disposição para ajudar.
+                    .
                   </div>
                 </div>
               </div>
