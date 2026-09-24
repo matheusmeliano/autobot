@@ -1,6 +1,8 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled, maybeSendExperimentalClassConfirmationToStudent } from "@/lib/atendimento/server";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
+import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
 import { z } from "zod";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
@@ -28,6 +30,35 @@ function isUndefinedColumnError(error: unknown): boolean {
   if (code === "42703") return true;
   const msg = String(error instanceof Error ? error.message : (error as any)?.message ?? "").toLowerCase();
   return msg.includes("column") && msg.includes("does not exist");
+}
+
+function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .*lesson_link.* does not exist/i.test(message) ||
+    /could not find the 'lesson_link' column of 'atendimento_experimental_class_bookings' in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
+function datePlusNDaysIso(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseStartAtMs(value: unknown): number {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) && t > 0 ? t : 0;
 }
 
 export const runtime = "nodejs";
@@ -86,12 +117,470 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       return Response.json({ ok: false, error: conversationError.message }, { status: 500 });
     }
 
+    const nowMs = Date.now();
+
+    let bookings: any[] | null = null;
+    let bookingsError: any = null;
+    const bookingsSelectWithLessonLink =
+      "id, lead_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, created_at, updated_at";
+    const bookingsSelectWithoutLessonLink =
+      "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, created_at, updated_at";
+    try {
+      const bookingsWithLessonLinkResult = await admin
+        .from("atendimento_experimental_class_bookings")
+        .select(bookingsSelectWithLessonLink)
+        .eq("lead_id", leadId)
+        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (bookingsWithLessonLinkResult.error && isExperimentalClassBookingsLessonLinkColumnUnavailable(bookingsWithLessonLinkResult.error)) {
+        const bookingsWithoutLessonLinkResult = await admin
+          .from("atendimento_experimental_class_bookings")
+          .select(bookingsSelectWithoutLessonLink)
+          .eq("lead_id", leadId)
+          .order("updated_at", { ascending: false })
+          .order("created_at", { ascending: false });
+        bookings = bookingsWithoutLessonLinkResult.data as any[] | null;
+        bookingsError = bookingsWithoutLessonLinkResult.error;
+      } else {
+        bookings = bookingsWithLessonLinkResult.data as any[] | null;
+        bookingsError = bookingsWithLessonLinkResult.error;
+      }
+    } catch (e) {
+      bookingsError = e;
+    }
+    if (bookingsError && !isExperimentalClassBookingsTableUnavailable(bookingsError)) {
+      return Response.json({ ok: false, error: String((bookingsError as any)?.message ?? bookingsError) }, { status: 500 });
+    }
+
+    const bookingsById = new Map<string, any>();
+    let preferredBooking: any = null;
+    let existingBookingRaw: any = null;
+    let existingIncludingCancelled: any = null;
+    let futureExpBooking: any = null;
+    let latestPastExpBooking: any = null;
+    let isCancelledFromTable = false;
+
+    for (const b of bookings ?? []) {
+      const id = String((b as any)?.id ?? "");
+      const status = String((b as any)?.status ?? "").trim().toLowerCase();
+      const candidate = {
+        ...(b as any),
+        lesson_link: String((b as any)?.lesson_link ?? "").trim() || null,
+        student_start_notification_sent_at: String((b as any)?.student_start_notification_sent_at ?? "").trim() || null,
+        attendant_start_notification_sent_at: String((b as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
+        attendance_status: String((b as any)?.attendance_status ?? "").trim() || null,
+        attendance_checked_at: null,
+        professor_timezone: String((b as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        source: "table",
+      };
+      if (id) bookingsById.set(id, candidate);
+      const curIncludingStr = String(
+        (existingIncludingCancelled as any)?.updated_at || (existingIncludingCancelled as any)?.created_at || "",
+      );
+      const newStr = String((b as any).updated_at || (b as any).created_at || "");
+      if (!existingIncludingCancelled || newStr > curIncludingStr) {
+        existingIncludingCancelled = candidate;
+      }
+      if (status === "cancelled") {
+        isCancelledFromTable = true;
+        continue;
+      }
+      if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
+      if (!existingBookingRaw) existingBookingRaw = candidate;
+    }
+
+    const preferredBookingId = String((lead as any)?.experimental_class_booking_id ?? "").trim();
+    if (preferredBookingId) {
+      preferredBooking = bookingsById.get(preferredBookingId) ?? null;
+    }
+    existingBookingRaw = preferredBooking ?? existingBookingRaw ?? existingIncludingCancelled ?? null;
+
+    for (const b of bookings ?? []) {
+      const status = String((b as any)?.status ?? "").trim().toLowerCase();
+      if (status === "cancelled") continue;
+      if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
+      const cMs = parseStartAtMs((b as any).professor_start_at || (b as any).lead_start_at);
+      if (cMs >= nowMs) {
+        const curFutureMs = futureExpBooking
+          ? parseStartAtMs(futureExpBooking.professor_start_at || futureExpBooking.lead_start_at)
+          : 0;
+        if (curFutureMs <= 0 || (cMs > 0 && cMs < curFutureMs)) {
+          futureExpBooking = {
+            ...(b as any),
+            lesson_link: String((b as any)?.lesson_link ?? "").trim() || null,
+            student_start_notification_sent_at: String((b as any)?.student_start_notification_sent_at ?? "").trim() || null,
+            attendant_start_notification_sent_at: String((b as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
+            attendance_status: String((b as any)?.attendance_status ?? "").trim() || null,
+            attendance_checked_at: null,
+            professor_timezone: String((b as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            source: "table",
+          };
+        }
+      } else if (cMs > 0 && cMs < nowMs) {
+        const curPastMs = latestPastExpBooking
+          ? parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at)
+          : 0;
+        if (cMs > curPastMs) {
+          latestPastExpBooking = {
+            ...(b as any),
+            lesson_link: String((b as any)?.lesson_link ?? "").trim() || null,
+            student_start_notification_sent_at: String((b as any)?.student_start_notification_sent_at ?? "").trim() || null,
+            attendant_start_notification_sent_at: String((b as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
+            attendance_status: String((b as any)?.attendance_status ?? "").trim() || null,
+            attendance_checked_at: null,
+            professor_timezone: String((b as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            source: "table",
+          };
+        }
+      }
+    }
+
+    let cancelledAt: string | null = null;
+    let cancelledProfSnap: {
+      name: string; phone: string; leadDate: string; leadTime: string;
+      professorDate: string; professorTime: string; leadStartAt: string;
+      professorStartAt: string; leadTimezone: string; professorTimezone: string;
+      lessonLink: string;
+    } | null = null;
+    let isCancelledFromHistory = false;
+    let latestClassEvent: string | null = null;
+    let synthStudentNotif: string | null = null;
+    let synthAttendantNotif: string | null = null;
+    let synthAttendance: string | null = null;
+    let synthAttendanceChecked: string | null = null;
+    let historyBookingFromScheduled: any = null;
+    const allHistoryForLead = (events ?? []).concat([]);
+    try {
+      const extraHistory = await admin
+        .from("atendimento_history_events")
+        .select("id, lead_id, event_type, conversation_id, created_at, details")
+        .eq("lead_id", leadId)
+        .in("event_type", [
+          "experimental_class_date_selected",
+          "experimental_class_time_selected",
+          "experimental_class_scheduled",
+          "experimental_class_cancelled",
+          "experimental_class_link_updated",
+          "experimental_class_student_start_notification_sent",
+          "experimental_class_attendant_start_notification_sent",
+          "experimental_class_attendance_confirmed",
+          "experimental_class_attendance_follow_up_required",
+        ])
+        .order("created_at", { ascending: false });
+      if (!extraHistory.error && Array.isArray(extraHistory.data)) {
+        for (const e of extraHistory.data) {
+          const found = allHistoryForLead.some((x) => String((x as any)?.id ?? "") === String((e as any)?.id ?? ""));
+          if (!found) allHistoryForLead.push(e as any);
+        }
+      }
+    } catch (_) { /* ignore */ }
+
+    for (const ev of allHistoryForLead) {
+      const eventType = String((ev as any)?.event_type ?? "").trim().toLowerCase();
+      const eca = String((ev as any)?.created_at ?? "").trim() || null;
+      const details = ((ev as any)?.details ?? {}) as Record<string, unknown>;
+      if (eventType === "experimental_class_cancelled") {
+        isCancelledFromHistory = true;
+        if (!cancelledAt) cancelledAt = String(eca ?? "").trim();
+        if (!cancelledProfSnap) {
+          const n = String(details?.professor_name_before ?? "").trim();
+          const p = String(details?.professor_phone_before ?? "").trim();
+          const ld = String(details?.lead_date_before ?? "").trim();
+          const lt = String(details?.lead_time_before ?? "").trim();
+          const pd = String(details?.professor_date_before ?? "").trim();
+          const pt = String(details?.professor_time_before ?? "").trim();
+          const lsa = String(details?.lead_start_at_before ?? details?.lead_start_at ?? "").trim();
+          const psa = String(details?.professor_start_at_before ?? details?.professor_start_at ?? "").trim();
+          const ltz = String(details?.lead_timezone_before ?? details?.lead_timezone ?? "").trim();
+          const ptz = String(details?.professor_timezone_before ?? details?.teacher_timezone ?? details?.professor_timezone ?? "").trim();
+          const llink = String(details?.lesson_link_before ?? details?.lesson_link ?? "").trim();
+          if (n || p || ld || lt || pd || pt || lsa || psa || ltz || ptz || llink) {
+            cancelledProfSnap = { name: n, phone: p, leadDate: ld, leadTime: lt, professorDate: pd, professorTime: pt, leadStartAt: lsa, professorStartAt: psa, leadTimezone: ltz, professorTimezone: ptz, lessonLink: llink };
+          }
+        }
+      }
+      if (eventType.startsWith("experimental_class_") && !latestClassEvent) {
+        latestClassEvent = eventType;
+      }
+      if (eventType === "experimental_class_student_start_notification_sent" && !synthStudentNotif) {
+        synthStudentNotif = eca;
+      }
+      if (eventType === "experimental_class_attendant_start_notification_sent" && !synthAttendantNotif) {
+        synthAttendantNotif = eca;
+      }
+      if (eventType === "experimental_class_attendance_confirmed" && !synthAttendance) {
+        synthAttendance = "attended";
+        synthAttendanceChecked = eca;
+      }
+      if (eventType === "experimental_class_attendance_follow_up_required" && !synthAttendance) {
+        synthAttendance = "no_show";
+        synthAttendanceChecked = eca;
+      }
+      if (
+        !existingBookingRaw &&
+        !historyBookingFromScheduled &&
+        eventType === "experimental_class_scheduled" &&
+        !isCancelledFromTable &&
+        !isCancelledFromHistory
+      ) {
+        const bookingStatus = String(details.status ?? "").trim().toLowerCase() || "scheduled";
+        if (bookingStatus !== "cancelled") {
+          historyBookingFromScheduled = {
+            id: String((ev as any)?.id ?? ""),
+            status: bookingStatus,
+            lesson_link: String(details.lesson_link ?? "").trim() || null,
+            student_start_notification_sent_at: null,
+            attendant_start_notification_sent_at: null,
+            attendance_status: null,
+            attendance_checked_at: null,
+            professor_timezone: String(details.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: String(details.lead_timezone ?? ""),
+            professor_date: String(details.professor_date ?? ""),
+            professor_time: String(details.professor_time ?? ""),
+            professor_start_at: String(details.professor_start_at ?? ""),
+            lead_date: String(details.lead_date ?? ""),
+            lead_time: String(details.lead_time ?? ""),
+            lead_start_at: String(details.lead_start_at ?? ""),
+            conversation_id: String((ev as any)?.conversation_id ?? ""),
+            created_at: String((ev as any)?.created_at ?? ""),
+            source: "history",
+          };
+        }
+      }
+    }
+    if (!existingBookingRaw && historyBookingFromScheduled) {
+      existingBookingRaw = historyBookingFromScheduled;
+    }
+    const isCancelledLead = isCancelledFromTable || isCancelledFromHistory;
+    const snapProfName = cancelledProfSnap?.name ?? "";
+    const snapProfPhone = cancelledProfSnap?.phone ?? "";
+    const snapLeadDate = cancelledProfSnap?.leadDate ?? "";
+    const snapLeadTime = cancelledProfSnap?.leadTime ?? "";
+    const snapProfessorDate = cancelledProfSnap?.professorDate ?? "";
+    const snapProfessorTime = cancelledProfSnap?.professorTime ?? "";
+    const snapLeadStartAt = cancelledProfSnap?.leadStartAt ?? "";
+    const snapProfessorStartAt = cancelledProfSnap?.professorStartAt ?? "";
+    const snapLeadTimezone = cancelledProfSnap?.leadTimezone ?? "";
+    const snapProfessorTimezone = cancelledProfSnap?.professorTimezone ?? "";
+    const snapLessonLink = cancelledProfSnap?.lessonLink ?? "";
+
+    const existingBooking =
+      existingBookingRaw ??
+      (isCancelledLead
+        ? ({
+            id: "",
+            status: "cancelled",
+            lesson_link: snapLessonLink || null,
+            student_start_notification_sent_at: null,
+            attendant_start_notification_sent_at: null,
+            attendance_status: null,
+            attendance_checked_at: null,
+            professor_timezone: snapProfessorTimezone || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone:
+              snapLeadTimezone ||
+              String((lead as any)?.timezone ?? "").trim() ||
+              ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            professor_date: snapProfessorDate || "",
+            professor_time: snapProfessorTime || "",
+            professor_start_at: snapProfessorStartAt || "",
+            lead_date: snapLeadDate || "",
+            lead_time: snapLeadTime || "",
+            lead_start_at: snapLeadStartAt || "",
+            assigned_professor_name:
+              String((lead as any)?.experimental_class_professor_name ?? "").trim() ||
+              snapProfName ||
+              null,
+            assigned_professor_phone:
+              String((lead as any)?.experimental_class_professor_phone ?? "").trim() ||
+              snapProfPhone ||
+              null,
+            conversation_id: String((lead as any)?.conversation_id ?? ""),
+            created_at: cancelledAt || String((lead as any).updated_at ?? (lead as any).created_at ?? ""),
+            updated_at: cancelledAt || String((lead as any).updated_at ?? (lead as any).created_at ?? ""),
+            source: "cancelled_history",
+            cancelled_action: "deleted_and_unlinked",
+          } as any)
+        : null);
+
+    const rowExperimentalProfName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
+    const rowExperimentalProfPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+    const bookingExpProfName = String((existingBooking as any)?.assigned_professor_name ?? "").trim();
+    const bookingExpProfPhone = String((existingBooking as any)?.assigned_professor_phone ?? "").trim();
+    const mergedExperimentalProfName = rowExperimentalProfName || bookingExpProfName || snapProfName || "";
+    const mergedExperimentalProfPhone = rowExperimentalProfPhone || bookingExpProfPhone || snapProfPhone || "";
+    const cleanDraftDate = isCancelledLead ? null : null;
+    const cleanDraftTime = isCancelledLead ? null : null;
+    const mergedRowExperimentalClassStatus = isCancelledLead
+      ? ""
+      : String((lead as any)?.experimental_class_status ?? "").trim();
+    const mergedProfessorDate =
+      String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
+      String((existingBooking as any)?.professor_date ?? "").trim() ||
+      (isCancelledLead ? snapProfessorDate : "") ||
+      (cleanDraftTime?.professor_date ?? "") ||
+      (cleanDraftDate?.professor_date ?? "");
+    const mergedLeadDate =
+      String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+      String((existingBooking as any)?.lead_date ?? "").trim() ||
+      (isCancelledLead ? snapLeadDate : "") ||
+      (cleanDraftTime?.lead_date ?? "") ||
+      (cleanDraftDate?.lead_date ?? "");
+    const mergedProfessorTime =
+      String((lead as any)?.experimental_class_professor_time ?? "").trim() ||
+      String((existingBooking as any)?.professor_time ?? "").trim() ||
+      (isCancelledLead ? snapProfessorTime : "") ||
+      (cleanDraftTime?.professor_time ?? "");
+    const mergedLeadTime =
+      String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+      String((existingBooking as any)?.lead_time ?? "").trim() ||
+      (isCancelledLead ? snapLeadTime : "") ||
+      (cleanDraftTime?.lead_time ?? "");
+    const mergedProfessorStartAt =
+      String((lead as any)?.experimental_class_professor_start_at ?? "").trim() ||
+      String((existingBooking as any)?.professor_start_at ?? "").trim() ||
+      (isCancelledLead ? snapProfessorStartAt : "") ||
+      (cleanDraftTime?.professor_start_at ?? "");
+    const mergedLeadStartAt =
+      String((lead as any)?.experimental_class_lead_start_at ?? "").trim() ||
+      String((existingBooking as any)?.lead_start_at ?? "").trim() ||
+      (isCancelledLead ? snapLeadStartAt : "") ||
+      (cleanDraftTime?.lead_start_at ?? "");
+    const mergedStatus = isCancelledLead
+      ? ""
+      : mergedRowExperimentalClassStatus ||
+        (existingBooking ? "booked" : cleanDraftTime ? "time_selected" : cleanDraftDate ? "date_selected" : "");
+
+    const recWeekdayRaw = String((lead as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
+    const recWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recWeekdayRaw);
+    const recWeekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+    const recWeekdayLabelOk =
+      /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(recWeekdayLabel);
+    const hasRecWeekdayAny = recWeekdayOk || recWeekdayLabelOk;
+    const recTimeOk =
+      Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) ||
+      Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
+
+    const bookingWithFallback = existingBooking
+      ? existingBooking
+      : (!isCancelledLead && mergedStatus && (mergedProfessorDate || mergedProfessorTime))
+        ? ({
+            id: "",
+            status: (hasRecWeekdayAny && recTimeOk) ? "booked" : "draft",
+            lesson_link: null,
+            student_start_notification_sent_at: synthStudentNotif,
+            attendant_start_notification_sent_at: synthAttendantNotif,
+            attendance_status: synthAttendance,
+            attendance_checked_at: synthAttendanceChecked,
+            professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            professor_date: mergedProfessorDate,
+            professor_time: mergedProfessorTime,
+            professor_start_at: mergedProfessorStartAt,
+            lead_date: mergedLeadDate,
+            lead_time: mergedLeadTime,
+            lead_start_at: mergedLeadStartAt,
+            conversation_id: String((lead as any)?.conversation_id ?? ""),
+            created_at: String((lead as any).updated_at ?? (lead as any).created_at ?? ""),
+            source: (hasRecWeekdayAny && recTimeOk) ? "manual" : "draft",
+            draft_stage: mergedStatus,
+            assigned_professor_name: mergedExperimentalProfName || null,
+            assigned_professor_phone: mergedExperimentalProfPhone || null,
+          } as any)
+          : (hasRecWeekdayAny && recTimeOk)
+            ? ({
+                id: "",
+                status: "booked",
+                lesson_link: null,
+                student_start_notification_sent_at: synthStudentNotif,
+                attendant_start_notification_sent_at: synthAttendantNotif,
+                attendance_status: synthAttendance,
+                attendance_checked_at: synthAttendanceChecked,
+                professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                lead_timezone: String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                professor_date: datePlusNDaysIso(3),
+                professor_time: String((lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time ?? "08:00").trim(),
+                professor_start_at: "",
+                lead_date: datePlusNDaysIso(3),
+                lead_time: String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "08:00").trim(),
+                lead_start_at: "",
+                conversation_id: String((lead as any)?.conversation_id ?? ""),
+                created_at: String((lead as any).updated_at ?? (lead as any).created_at ?? ""),
+                source: "manual",
+                draft_stage: "",
+              } as any)
+            : null;
+
+    let latestPastClassMeta: { date: string; time: string; startAtMs: number } | null = null;
+    if (recWeekdayOk && recTimeOk) {
+      try {
+        const recOcc = calculatePastRecurringOccurrences({
+          weekday: recWeekdayRaw as any,
+          professorTimeHHMM: String((lead as any)?.recurring_class_professor_time ?? "").trim() || String((lead as any)?.recurring_class_lead_time ?? "").trim(),
+          professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          leadTimeZone: String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          fromDate: String((lead as any)?.recurring_class_created_at ?? (lead as any).created_at ?? "").trim(),
+        });
+        const lastRec = recOcc[0] ?? null;
+        const recMs = lastRec ? Number((lastRec as any).professorStartAt ?? 0) : 0;
+        const expMs = latestPastExpBooking
+          ? parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at)
+          : 0;
+        if (recMs > 0 && recMs >= expMs && lastRec) {
+          latestPastClassMeta = {
+            date: String((lastRec as any).professorDate ?? ""),
+            time: String((lastRec as any).professorTime ?? ""),
+            startAtMs: recMs,
+          };
+        } else if (expMs > 0 && latestPastExpBooking) {
+          latestPastClassMeta = {
+            date: String(latestPastExpBooking.professor_date ?? latestPastExpBooking.lead_date ?? ""),
+            time: String(latestPastExpBooking.professor_time ?? latestPastExpBooking.lead_time ?? ""),
+            startAtMs: expMs,
+          };
+        }
+      } catch {
+        const expMs = latestPastExpBooking
+          ? parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at)
+          : 0;
+        if (expMs > 0 && latestPastExpBooking) {
+          latestPastClassMeta = {
+            date: String(latestPastExpBooking.professor_date ?? latestPastExpBooking.lead_date ?? ""),
+            time: String(latestPastExpBooking.professor_time ?? latestPastExpBooking.lead_time ?? ""),
+            startAtMs: expMs,
+          };
+        }
+      }
+    } else if (latestPastExpBooking) {
+      const expMs = parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at);
+      if (expMs > 0) {
+        latestPastClassMeta = {
+          date: String(latestPastExpBooking.professor_date ?? latestPastExpBooking.lead_date ?? ""),
+          time: String(latestPastExpBooking.professor_time ?? latestPastExpBooking.lead_time ?? ""),
+          startAtMs: expMs,
+        };
+      }
+    }
+
+    const finalBookingForField = bookingWithFallback
+      ? {
+          ...bookingWithFallback,
+          assigned_professor_name: (bookingWithFallback as any).assigned_professor_name || mergedExperimentalProfName || null,
+          assigned_professor_phone: (bookingWithFallback as any).assigned_professor_phone || mergedExperimentalProfPhone || null,
+        }
+      : null;
+
     return Response.json({
       ok: true,
       lead: {
         ...(lead as any),
         is_new_for_attendant: (lead as any)?.is_new_for_attendant ?? false,
         conversation: conversation ?? null,
+        experimental_class_booking: finalBookingForField,
+        latest_experimental_class_booking: existingBookingRaw ?? existingBooking ?? null,
+        future_experimental_class_booking: futureExpBooking,
+        latest_past_class_meta: latestPastClassMeta,
+        latest_experimental_class_cancelled_at: cancelledAt,
+        latest_experimental_class_event: latestClassEvent,
       },
       events: (events ?? []) as any[],
     });

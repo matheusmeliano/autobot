@@ -1725,6 +1725,10 @@ export function AtendimentoClient() {
                 "experimental_class_professor_start_at",
                 "experimental_class_status",
                 "funnel_stage",
+                "experimental_class_booking_id",
+                "experimental_class_link",
+                "experimental_class_professor_name",
+                "experimental_class_professor_phone",
               ];
               for (const k of keepLocalIfIncomingEmpty) {
                 const incV = String((incoming as any)?.[k] ?? "").trim();
@@ -1742,6 +1746,30 @@ export function AtendimentoClient() {
                 prior.future_experimental_class_booking
               ) {
                 merged.future_experimental_class_booking = prior.future_experimental_class_booking;
+              }
+              if (
+                !merged.latest_experimental_class_booking &&
+                prior.latest_experimental_class_booking
+              ) {
+                merged.latest_experimental_class_booking = prior.latest_experimental_class_booking;
+              }
+              if (
+                !merged.latest_past_class_meta &&
+                prior.latest_past_class_meta
+              ) {
+                merged.latest_past_class_meta = prior.latest_past_class_meta;
+              }
+              if (
+                !merged.latest_experimental_class_cancelled_at &&
+                prior.latest_experimental_class_cancelled_at
+              ) {
+                merged.latest_experimental_class_cancelled_at = prior.latest_experimental_class_cancelled_at;
+              }
+              if (
+                !merged.latest_experimental_class_event &&
+                prior.latest_experimental_class_event
+              ) {
+                merged.latest_experimental_class_event = prior.latest_experimental_class_event;
               }
               if (
                 !String((merged as any).funnel_stage ?? "").trim() &&
