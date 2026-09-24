@@ -370,95 +370,266 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
 
     let bookingOut: Record<string, unknown> | null = null;
 
-    if (activeId) {
+    const STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_BOOKINGS = [
+      "status",
+      "lead_id",
+      "source",
+      "professor_date",
+      "professor_time",
+      "lead_date",
+      "lead_time",
+      "professor_timezone",
+      "lead_timezone",
+      "professor_start_at",
+      "lead_start_at",
+      "lesson_link",
+      "attendance_status",
+      "assigned_professor_name",
+      "assigned_professor_phone",
+      "student_start_notification_sent_at",
+      "attendant_start_notification_sent_at",
+      "registered_attendant_start_notification_sent_at",
+      "professor_start_notification_sent_at",
+      "student_start_notification_sent_via",
+      "attendant_start_notification_sent_via",
+      "registered_attendant_start_notification_sent_via",
+      "professor_start_notification_sent_via",
+      "attendance_checked_at",
+      "conversation_id",
+      "updated_at",
+      "created_at",
+    ] as const;
+
+    type BookingRun = { err: any | null; data: any | null };
+    function stripUndefinedColumnFromBookingsPatch(
+      patchObj: Record<string, unknown>,
+      missingColName: string | null,
+    ): Record<string, unknown> {
+      const next = { ...patchObj };
+      if (missingColName && next[missingColName] !== undefined) {
+        delete next[missingColName];
+        return next;
+      }
+      for (const sus of STRIP_UNDEFINED_COLUMN__SUSPECT_MISSING_COLS_BOOKINGS) {
+        if (next[sus] !== undefined) {
+          delete next[sus];
+          return next;
+        }
+      }
+      return next;
+    }
+    async function attemptBookingUpdate(
+      updateData: Record<string, any>,
+      active: string,
+      lead: string,
+    ): Promise<BookingRun> {
       try {
         const { data, error } = await admin
           .from("atendimento_experimental_class_bookings")
-          .update(insertOrUpdateData)
-          .eq("id", activeId)
-          .eq("lead_id", leadId)
+          .update(updateData)
+          .eq("id", active)
+          .eq("lead_id", lead)
           .select("*")
           .maybeSingle();
-        if (error) {
-          if (isUndefinedRelationError(error)) {
+        return { err: error ?? null, data: data ?? null };
+      } catch (e) {
+        return { err: e, data: null };
+      }
+    }
+    async function attemptBookingInsert(insertData: Record<string, any>): Promise<BookingRun> {
+      try {
+        const { data, error } = await admin
+          .from("atendimento_experimental_class_bookings")
+          .insert(insertData)
+          .select("*")
+          .maybeSingle();
+        return { err: error ?? null, data: data ?? null };
+      } catch (e) {
+        return { err: e, data: null };
+      }
+    }
+    function stripBookingsSelectUndefined(selectStr: string, columnName: string): string {
+      const keys = selectStr.split(",").map((s) => s.trim()).filter(Boolean);
+      const filtered = keys.filter((k) => k.toLowerCase() !== columnName.toLowerCase());
+      return filtered.length > 0 ? filtered.join(", ") : "id, updated_at";
+    }
+
+    if (activeId) {
+      try {
+        let pendingPatch: Record<string, any> | null = { ...insertOrUpdateData };
+        let run: BookingRun | null = null;
+        let attempts = 0;
+        while (pendingPatch && attempts < 10) {
+          attempts += 1;
+          run = await attemptBookingUpdate(pendingPatch, activeId, leadId);
+          if (!run.err && run.data) {
+            bookingOut = run.data as Record<string, unknown>;
+            break;
+          }
+          if (!run.err && pendingPatch && Object.keys(pendingPatch).length === 0) {
+            bookingOut = { id: activeId, ...insertOrUpdateData };
+            break;
+          }
+          const errMsg = run?.err;
+          const code = String((errMsg as any)?.code ?? "").trim();
+          const isRelationMissing = code === "42P01" || isUndefinedRelationError(errMsg) || code === "23502";
+          const isColMissing = code === "42703" || isUndefinedColumnError(errMsg);
+          if (isColMissing || isRelationMissing) {
+            const stripped = stripUndefinedColumnFromBookingsPatch(
+              pendingPatch,
+              extractUndefinedColumnName((errMsg as any)?.message || String(errMsg ?? "")),
+            );
+            if (Object.keys(stripped).length === Object.keys(pendingPatch).length) {
+              break;
+            }
+            if (Object.keys(stripped).length === 0) {
+              bookingOut = { id: activeId, ...insertOrUpdateData };
+              break;
+            }
+            pendingPatch = stripped;
+            continue;
+          }
+          break;
+        }
+        if (!bookingOut && run?.err) {
+          if (isUndefinedRelationError(run.err)) {
             bookingOut = { id: "fallback", ...insertOrUpdateData };
           } else {
-            return Response.json({ ok: false, error: error.message }, { status: 500 });
+            return Response.json({ ok: false, error: (run.err as any)?.message ?? "Falha ao salvar agendamento." }, { status: 500 });
           }
-        } else {
-          bookingOut = data ? (data as Record<string, unknown>) : null;
         }
       } catch (err) {
         if (isUndefinedRelationError(err)) {
           bookingOut = { id: "fallback", ...insertOrUpdateData };
+        } else if (isUndefinedColumnError(err)) {
+          bookingOut = { id: activeId ?? "fallback", ...insertOrUpdateData };
         } else {
           throw err;
         }
       }
     } else {
       try {
-        const { data, error } = await admin
-          .from("atendimento_experimental_class_bookings")
-          .insert(insertOrUpdateData)
-          .select("*")
-          .maybeSingle();
-        if (error) {
-          const code = String((error as any)?.code ?? "");
-          if (isUndefinedRelationError(error)) {
-            bookingOut = { id: "fallback", ...insertOrUpdateData };
-          } else if (code === "23505") {
-            let firstId: string | null = null;
-            try {
-              const res = await admin
-                .from("atendimento_experimental_class_bookings")
-                .select("id, status")
-                .eq("lead_id", leadId)
-                .order("created_at", { ascending: false })
-                .limit(1);
-              if (!res.error) {
-                firstId = ((Array.isArray(res.data) ? res.data : []) as any[])?.[0]?.id ?? null;
-              } else if (!isUndefinedRelationError(res.error)) {
-                return Response.json({ ok: false, error: res.error.message }, { status: 500 });
-              }
-            } catch (err2) {
-              if (!isUndefinedRelationError(err2)) throw err2;
-            }
-            if (firstId) {
-              try {
-                const { data: upd2, error: updErr } = await admin
-                  .from("atendimento_experimental_class_bookings")
-                  .update(insertOrUpdateData)
-                  .eq("id", firstId)
-                  .eq("lead_id", leadId)
-                  .select("*")
-                  .maybeSingle();
-                if (updErr) {
-                  if (isUndefinedRelationError(updErr)) {
-                    bookingOut = { id: firstId, ...insertOrUpdateData };
-                  } else {
-                    return Response.json({ ok: false, error: updErr.message }, { status: 500 });
-                  }
-                } else {
-                  bookingOut = upd2 ? (upd2 as Record<string, unknown>) : null;
-                }
-              } catch (err2) {
-                if (isUndefinedRelationError(err2)) {
-                  bookingOut = { id: firstId, ...insertOrUpdateData };
-                } else {
-                  throw err2;
-                }
-              }
-            } else {
-              return Response.json({ ok: false, error: error.message }, { status: 500 });
-            }
-          } else {
-            return Response.json({ ok: false, error: error.message }, { status: 500 });
+        let pendingInsert: Record<string, any> | null = { ...insertOrUpdateData };
+        let run: BookingRun | null = null;
+        let attempts = 0;
+        let insertFailed23505 = false;
+        while (pendingInsert && attempts < 10) {
+          attempts += 1;
+          run = await attemptBookingInsert(pendingInsert);
+          if (!run.err && run.data) {
+            bookingOut = run.data as Record<string, unknown>;
+            break;
           }
-        } else {
-          bookingOut = data ? (data as Record<string, unknown>) : null;
+          if (!run.err && pendingInsert && Object.keys(pendingInsert).length === 0) {
+            bookingOut = { id: "fallback", ...insertOrUpdateData };
+            break;
+          }
+          const errMsg = run?.err;
+          const code = String((errMsg as any)?.code ?? "").trim();
+          const isRelationMissing = code === "42P01" || isUndefinedRelationError(errMsg) || code === "23502";
+          const isColMissing = code === "42703" || isUndefinedColumnError(errMsg);
+          if (code === "23505") {
+            insertFailed23505 = true;
+            break;
+          }
+          if (isColMissing || isRelationMissing) {
+            const stripped = stripUndefinedColumnFromBookingsPatch(
+              pendingInsert,
+              extractUndefinedColumnName((errMsg as any)?.message || String(errMsg ?? "")),
+            );
+            if (Object.keys(stripped).length === Object.keys(pendingInsert).length) {
+              break;
+            }
+            if (Object.keys(stripped).length === 0) {
+              bookingOut = { id: "fallback", ...insertOrUpdateData };
+              break;
+            }
+            pendingInsert = stripped;
+            continue;
+          }
+          break;
+        }
+        if (!bookingOut && insertFailed23505) {
+          const originalError = run?.err ?? null;
+          let firstId: string | null = null;
+          try {
+            const res = await admin
+              .from("atendimento_experimental_class_bookings")
+              .select("id, status")
+              .eq("lead_id", leadId)
+              .order("created_at", { ascending: false })
+              .limit(1);
+            if (!res.error) {
+              firstId = ((Array.isArray(res.data) ? res.data : []) as any[])?.[0]?.id ?? null;
+            } else if (!isUndefinedRelationError(res.error)) {
+              return Response.json({ ok: false, error: res.error.message }, { status: 500 });
+            }
+          } catch (err2) {
+            if (!isUndefinedRelationError(err2)) throw err2;
+          }
+          if (firstId) {
+            let pendingUpd: Record<string, any> | null = { ...insertOrUpdateData };
+            let runUpd: BookingRun | null = null;
+            let attemptsUpd = 0;
+            while (pendingUpd && attemptsUpd < 10) {
+              attemptsUpd += 1;
+              runUpd = await attemptBookingUpdate(pendingUpd, firstId, leadId);
+              if (!runUpd.err && runUpd.data) {
+                bookingOut = runUpd.data as Record<string, unknown>;
+                break;
+              }
+              if (!runUpd.err && pendingUpd && Object.keys(pendingUpd).length === 0) {
+                bookingOut = { id: firstId, ...insertOrUpdateData };
+                break;
+              }
+              const errMsgUpd = runUpd?.err;
+              const codeUpd = String((errMsgUpd as any)?.code ?? "").trim();
+              const isRelationMissingUpd = codeUpd === "42P01" || isUndefinedRelationError(errMsgUpd) || codeUpd === "23502";
+              const isColMissingUpd = codeUpd === "42703" || isUndefinedColumnError(errMsgUpd);
+              if (isColMissingUpd || isRelationMissingUpd) {
+                const stripped = stripUndefinedColumnFromBookingsPatch(
+                  pendingUpd,
+                  extractUndefinedColumnName((errMsgUpd as any)?.message || String(errMsgUpd ?? "")),
+                );
+                if (Object.keys(stripped).length === Object.keys(pendingUpd).length) {
+                  break;
+                }
+                if (Object.keys(stripped).length === 0) {
+                  bookingOut = { id: firstId, ...insertOrUpdateData };
+                  break;
+                }
+                pendingUpd = stripped;
+                continue;
+              }
+              break;
+            }
+            if (!bookingOut && runUpd?.err) {
+              if (isUndefinedRelationError(runUpd.err) || isUndefinedColumnError(runUpd.err)) {
+                bookingOut = { id: firstId, ...insertOrUpdateData };
+              } else {
+                return Response.json({ ok: false, error: (runUpd.err as any)?.message ?? "Falha ao salvar agendamento." }, { status: 500 });
+              }
+            }
+          } else if (originalError) {
+            if (isUndefinedRelationError(originalError)) {
+              bookingOut = { id: "fallback", ...insertOrUpdateData };
+            } else {
+              return Response.json({ ok: false, error: (originalError as any)?.message ?? "Falha ao salvar agendamento." }, { status: 500 });
+            }
+          }
+        } else if (!bookingOut && run?.err) {
+          if (isUndefinedRelationError(run.err)) {
+            bookingOut = { id: "fallback", ...insertOrUpdateData };
+          } else if (isUndefinedColumnError(run.err)) {
+            bookingOut = { id: "fallback", ...insertOrUpdateData };
+          } else {
+            return Response.json({ ok: false, error: (run.err as any)?.message ?? "Falha ao salvar agendamento." }, { status: 500 });
+          }
         }
       } catch (err) {
         if (isUndefinedRelationError(err)) {
+          bookingOut = { id: "fallback", ...insertOrUpdateData };
+        } else if (isUndefinedColumnError(err)) {
           bookingOut = { id: "fallback", ...insertOrUpdateData };
         } else {
           throw err;
