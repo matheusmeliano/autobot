@@ -88,7 +88,7 @@ export function buildContractData(params: {
     classWeekdayLabel: classWeekdayLabel || "-",
     classTimeLabel: classTimeLabel || "-",
     signedAtIso,
-    durationMin: 40,
+    durationMin: 60,
     weeklyFrequency: 1,
     monthlyUsd: "US$ 119,00",
     initialPlannedMonths: 6,
@@ -171,7 +171,7 @@ export function buildContractHtml(data: ContractData): string {
   <p class="block"><span class="k"><strong>Dia da aula:</strong></span><strong>${diaAula}</strong></p>
   <p class="block" style="margin-top:4px;"><span class="k"><strong>Horário:</strong></span><strong>${horarioAula}</strong></p>
   <p class="block" style="margin-top:4px;"><span class="k"><strong>Frequência:</strong></span>${data.weeklyFrequency} aula por semana</p>
-  <p class="block" style="margin-top:4px;"><span class="k"><strong>Duração:</strong></span>${data.durationMin} minutos por aula</p>
+  <p class="block" style="margin-top:4px;"><span class="k"><strong>Duração:</strong></span>${data.durationMin === 60 ? "1 hora" : `${data.durationMin} minutos`} por aula</p>
 
   <p class="block"><span class="k"><strong>Plano:</strong></span>Inicialmente previsto para ${data.initialPlannedMonths} meses, podendo ser cancelado a qualquer momento, sem multa.</p>
 
@@ -297,7 +297,9 @@ export async function buildContractPdfBytes(data: ContractData): Promise<Uint8Ar
   );
   addKeyValuePair(
     "Duração:",
-    `${data.durationMin} minutos por aula`,
+    data.durationMin === 60
+      ? "1 hora por aula"
+      : `${data.durationMin} minutos por aula`,
     { valueBold: false },
   );
 

@@ -2857,7 +2857,7 @@ export default function CadastroRecorrenteBody() {
                         <b>Frequência:</b> 1 aula por semana
                       </p>
                       <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
-                        <b>Duração:</b> 40 minutos por aula
+                        <b>Duração:</b> 1 hora por aula
                       </p>
                       <p className="text-[13px] sm:text-[14px] leading-[1.6] text-justify mb-2 text-black/90">
                         <b>Plano:</b> Inicialmente previsto para 6 meses, podendo ser cancelado a qualquer momento, sem multa.
