@@ -3,31 +3,27 @@ import { zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 export const EXPERIMENTAL_CLASS_SLOT_TIMES = [
   "08:00",
-  "09:30",
+  "09:00",
+  "10:00",
   "11:00",
-  "12:30",
+  "12:00",
+  "13:00",
   "14:00",
-  "15:30",
+  "15:00",
+  "16:00",
   "17:00",
-  "18:30",
+  "18:00",
+  "19:00",
   "20:00",
+  "21:00",
+  "22:00",
 ] as const;
 
-export const PROFESSOR_SATURDAY_CUTOFF_TIME = "12:00";
 function professorTimeIsAllowed({ weekdayShort, professorTimeHHMM }: { weekdayShort: string; professorTimeHHMM: string }): boolean {
-  if (weekdayShort !== "sat") return true;
-  const cutoff = PROFESSOR_SATURDAY_CUTOFF_TIME.split(":").map(Number);
-  const slot = String(professorTimeHHMM ?? "").split(":").map(Number);
-  if (cutoff.length !== 2 || slot.length !== 2) return true;
-  const [cutHH, cutMM] = cutoff;
-  const [slotHH, slotMM] = slot;
-  if (!Number.isFinite(cutHH) || !Number.isFinite(cutMM) || !Number.isFinite(slotHH) || !Number.isFinite(slotMM)) return true;
-  const slotTotal = slotHH * 60 + slotMM;
-  const cutTotal = cutHH * 60 + cutMM;
-  return slotTotal <= cutTotal;
+  return true;
 }
 
-export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 90;
+export const EXPERIMENTAL_CLASS_DURATION_MINUTES = 60;
 export const EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9807-9407";
 export const EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE = "+55 65 9949-5594";
 export const EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST = [
