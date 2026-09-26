@@ -981,11 +981,22 @@ export function AtendimentoClient() {
           Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status)
         );
       }
+      if (sid === "aula_experimental_agendada") {
+        return (
+          st === "aula_experimental_agendada" ||
+          fs === "aula_experimental_agendada" ||
+          Boolean(
+            (l as any)?.future_experimental_class_booking ??
+              (l as any)?.latest_experimental_class_booking ??
+              (l as any)?.experimental_class_booking,
+          )
+        );
+      }
       return st === sid || fs === sid;
     };
     return leads.filter((l) => {
       if (f.statusList.length > 0 && !f.statusList.some((sid) => statusMatches(sid, l))) return false;
-      if (f.stageList.length > 0 && !f.stageList.includes(String(l.funnel_stage ?? ""))) return false;
+      if (f.stageList.length > 0 && !f.stageList.some((sid) => statusMatches(sid, l))) return false;
       if (f.countries.length > 0 && !f.countries.includes(String(l.country ?? "").trim())) return false;
       if (f.states.length > 0 && !f.states.includes(String(l.state ?? "").trim())) return false;
       if (f.onlyWithUnread && Number(l.unread_count ?? 0) <= 0) return false;
@@ -2397,10 +2408,7 @@ export function AtendimentoClient() {
     ]);
     // ETAPA DO FUNIL: foco no caminho do aluno (convidado → agendada → pré-cadastro etc); REMOVIDOS que ja aparecem em STATUS acima
     const STAGE_ALLOWLIST = new Set([
-      "aula_experimental_convidada",
       "aula_experimental_agendada",
-      "pre_cadastro_concluido",
-      "metodologia_apresentada",
     ]);
     const countryOptions = Array.from(
       new Set(panelLeads.map((l) => String(l.country ?? "").trim()).filter(Boolean)),
