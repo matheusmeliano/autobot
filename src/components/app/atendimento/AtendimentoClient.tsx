@@ -2474,24 +2474,24 @@ export function AtendimentoClient() {
       <AppModal
         open={showFiltersModal}
         onClose={() => setShowFiltersModal(false)}
-        size="xl"
+        size="lg"
         position="center"
         zIndexClass="z-[400]"
-        fullScreenOnMobile={false}
+        fullScreenOnMobile={true}
       >
         <div className="h-full max-h-full flex w-full flex-col gap-0 overflow-hidden">
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+          <div className="flex shrink-0 items-center justify-between gap-3 py-2 px-1">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
                 <SlidersHorizontal className="h-5 w-5 text-[#9a3412]" />
               </div>
               <div className="min-w-0">
-                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                <h3 className="truncate text-[17px] font-bold leading-tight text-[var(--app-text-85)]">
                   Filtros avançados
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Filtre a lista de registros por status, etapa, localização e mais.
+                  Filtre a lista por status, etapa, localização e data.
                 </div>
               </div>
             </div>
@@ -2499,110 +2499,77 @@ export function AtendimentoClient() {
               type="button"
               onClick={() => setShowFiltersModal(false)}
               aria-label="Fechar filtros"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Conteudo filtros (scroll interno APENAS aqui, height responsivo por flex) */}
-          <div className="mt-4 flex flex-1 min-h-0 w-full flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
-            {/* BLOCO 1: Status + Etapa (seleção rápida por chip/label) */}
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
-              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                Status
-              </div>
-              <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                {statusOptions.map(([id, label]) => {
-                  const lbl = String(label ?? id ?? "").trim() || String(id);
-                  const sel = draftFilters.statusList.includes(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => toggle("statusList", id)}
-                      className={[
-                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
-                        sel
-                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                    >
-                      <span className="min-w-0 truncate">{lbl}</span>
-                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
-              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                Etapa do funil
-              </div>
-              <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                {stageOptions.map(([id, label]) => {
-                  const lbl = String(label ?? id ?? "").trim() || String(id);
-                  const sel = draftFilters.stageList.includes(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => toggle("stageList", id)}
-                      className={[
-                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
-                        sel
-                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                    >
-                      <span className="min-w-0 truncate">{lbl}</span>
-                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* BLOCO 2: Checkboxes booleanos (rápidos) */}
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
-              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                Dados obrigatórios
-              </div>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {(
-                  [
-                    ["onlyWithUnread", "Apenas com mensagens não lidas"],
-                    ["onlyWithPhone", "Apenas com telefone cadastrado"],
-                    ["onlyWithScheduledClass", "Apenas com aula experimental agendada"],
-                    ["onlyWithContract", "Apenas com contrato iniciado"],
-                  ] as Array<[keyof LeadFilters, string]>
-                ).map(([key, label]) => {
-                  const val = Boolean((draftFilters as any)[key]);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() =>
-                        setDraftFilters((p) => ({ ...p, [key]: !(p as any)[key] } as LeadFilters))
-                      }
-                      className={[
-                        "flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-[13px] font-medium text-left shadow-none",
-                        val
-                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                    >
-                      <span>{label}</span>
-                      {val ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
-                    </button>
-                  );
-                })}
+          {/* Conteudo filtros (compacto, sem espacos vazios) */}
+          <div className="mt-3 flex flex-1 min-h-0 w-full flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
+            {/* BLOCO 1: Status (1 coluna soh 1 botao) + Etapa (1 coluna soh 1 botao) em UM BLOCO SOH para enxugar */}
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-3 shadow-none">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                    Status
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-1.5">
+                    {statusOptions.map(([id, label]) => {
+                      const lbl = String(label ?? id ?? "").trim() || String(id);
+                      const sel = draftFilters.statusList.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => toggle("statusList", id)}
+                          className={[
+                            "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
+                            sel
+                              ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
+                              : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                          ].join(" ")}
+                        >
+                          <span className="min-w-0 truncate">{lbl}</span>
+                          {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="h-px w-full bg-[var(--app-border)]" />
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                    Etapa do funil
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-1.5">
+                    {stageOptions.map(([id, label]) => {
+                      const lbl = String(label ?? id ?? "").trim() || String(id);
+                      const sel = draftFilters.stageList.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => toggle("stageList", id)}
+                          className={[
+                            "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
+                            sel
+                              ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
+                              : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                          ].join(" ")}
+                        >
+                          <span className="min-w-0 truncate">{lbl}</span>
+                          {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* BLOCO 3: País + Estado */}
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+            {/* BLOCO 2: Pais + Estado (reduzir padding) */}
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-3 shadow-none">
               <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                 Localização
               </div>
@@ -2670,12 +2637,12 @@ export function AtendimentoClient() {
               </div>
             </div>
 
-            {/* BLOCO 4: Data de criação — calendário customizado (NÃO usa input date nativo!) */}
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 shadow-none">
+            {/* BLOCO 3: Data de criacao (compacto) */}
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-3 shadow-none">
               <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
                 Data de cadastro
               </div>
-              <div className="mt-3">
+              <div className="mt-2">
                 <AppDateRangePicker
                   placeholder="Selecione o período de cadastro..."
                   value={{
@@ -2694,9 +2661,9 @@ export function AtendimentoClient() {
               </div>
             </div>
 
-            {/* Resumo filtros ativos (chips rápidos para remover) */}
+            {/* Resumo filtros ativos (compacto) */}
             {isFilled ? (
-              <div className="rounded-2xl border border-[rgba(234,88,12,0.3)] bg-[rgba(234,88,12,0.08)] p-3.5 shadow-none">
+              <div className="rounded-2xl border border-[rgba(234,88,12,0.3)] bg-[rgba(234,88,12,0.08)] p-3 shadow-none">
                 <div className="flex flex-col gap-2">
                   {headerPill("Status", draftFilters.statusList, "statusList")}
                   {draftFilters.stageList.length > 0
@@ -2708,32 +2675,6 @@ export function AtendimentoClient() {
                   {draftFilters.states.length > 0
                     ? headerPill("Estado", draftFilters.states, "states")
                     : null}
-                  {Object.entries(draftFilters)
-                    .filter(([k, v]) => typeof v === "boolean" && v)
-                    .map(([k]) => {
-                      const lbl = (
-                        {
-                          onlyWithUnread: "🔔 Com não lidas",
-                          onlyWithPhone: "📞 Com telefone",
-                          onlyWithEmail: "✉️ Com e-mail",
-                          onlyWithScheduledClass: "📅 Com aula",
-                          onlyWithContract: "📝 Com contrato",
-                        } as Record<string, string>
-                      )[k] ?? k;
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() =>
-                            setDraftFilters((p) => ({ ...p, [k]: false }) as LeadFilters)
-                          }
-                          className="mr-auto inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                        >
-                          {lbl}
-                          <span className="text-[var(--app-text-45)]">×</span>
-                        </button>
-                      );
-                    })}
                   {(draftFilters.createdFrom || draftFilters.createdTo) ? (
                     <div className="text-[11px] font-semibold text-[var(--app-text-75)]">
                       📆 Cadastro:{" "}
@@ -2748,8 +2689,8 @@ export function AtendimentoClient() {
             ) : null}
           </div>
 
-          {/* Rodapé ações */}
-          <div className="mt-4 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {/* Rodapé ações (reduzir espaco em branco) */}
+          <div className="mt-3 flex shrink-0 flex-col gap-2 py-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-[12px] text-[var(--app-text-55)]">
               Resultado filtrado: <strong className="text-[var(--app-text-85)]">{liveFilteredCount}</strong>{" "}
               {liveFilteredCount === 1 ? "registro" : "registros"}
@@ -2761,9 +2702,9 @@ export function AtendimentoClient() {
                   setDraftFilters(EMPTY_FILTERS);
                   setActiveFilters(EMPTY_FILTERS);
                 }}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
               >
-                Limpar filtros
+                Limpar
               </button>
               <button
                 type="button"
@@ -2771,9 +2712,9 @@ export function AtendimentoClient() {
                   setActiveFilters(draftFilters);
                   setShowFiltersModal(false);
                 }}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors"
+                className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors"
               >
-                Aplicar filtros
+                Aplicar
               </button>
             </div>
           </div>
