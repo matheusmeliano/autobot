@@ -509,10 +509,9 @@ export function SchedulesClient({
     return rows
       .filter((r) => (!q ? true : r.debtor_nome.toLowerCase().includes(q)))
       .slice()
-      .sort((a, b) =>
-        String(a.operational_due_at ?? a.charge_due_at ?? a.data_envio).localeCompare(
-          String(b.operational_due_at ?? b.charge_due_at ?? b.data_envio),
-        ),
+      .sort(
+        (a, b) =>
+          new Date(String(b.created_at ?? "")).getTime() - new Date(String(a.created_at ?? "")).getTime(),
       );
   }, [query, rows]);
   const operationalMonthKey = useMemo(
