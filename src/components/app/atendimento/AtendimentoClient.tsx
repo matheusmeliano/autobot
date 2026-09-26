@@ -2505,64 +2505,54 @@ export function AtendimentoClient() {
 
           {/* Conteudo filtros (compacto, sem espacos vazios) */}
           <div className="mt-3 flex flex-1 min-h-0 w-full flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
-            {/* BLOCO 1: Status (1 coluna soh 1 botao) + Etapa (1 coluna soh 1 botao) em UM BLOCO SOH para enxugar */}
+            {/* BLOCO 1: Status unificado (sem secao separada de etapa do funil). Ordem: Aula Experimental Agendada PRIMEIRO, depois Aluno. */}
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-3 shadow-none">
-              <div className="flex flex-col gap-3">
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                    Status
-                  </div>
-                  <div className="mt-2 grid grid-cols-1 gap-1.5">
-                    {statusOptions.map(([id, label]) => {
-                      const lbl = String(label ?? id ?? "").trim() || String(id);
-                      const sel = draftFilters.statusList.includes(id);
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => toggle("statusList", id)}
-                          className={[
-                            "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
-                            sel
-                              ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
-                              : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
-                          ].join(" ")}
-                        >
-                          <span className="min-w-0 truncate">{lbl}</span>
-                          {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="h-px w-full bg-[var(--app-border)]" />
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
-                    Etapa do funil
-                  </div>
-                  <div className="mt-2 grid grid-cols-1 gap-1.5">
-                    {stageOptions.map(([id, label]) => {
-                      const lbl = String(label ?? id ?? "").trim() || String(id);
-                      const sel = draftFilters.stageList.includes(id);
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => toggle("stageList", id)}
-                          className={[
-                            "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
-                            sel
-                              ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
-                              : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
-                          ].join(" ")}
-                        >
-                          <span className="min-w-0 truncate">{lbl}</span>
-                          {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                Status
+              </div>
+              <div className="mt-2 grid grid-cols-1 gap-1.5">
+                {/* Primeiro: Aula Experimental Agendada (stage) */}
+                {stageOptions.map(([id, label]) => {
+                  const lbl = String(label ?? id ?? "").trim() || String(id);
+                  const sel = draftFilters.stageList.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggle("stageList", id)}
+                      className={[
+                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
+                        sel
+                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                    >
+                      <span className="min-w-0 truncate">{lbl}</span>
+                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                    </button>
+                  );
+                })}
+                {/* Depois: Aluno (status) */}
+                {statusOptions.map(([id, label]) => {
+                  const lbl = String(label ?? id ?? "").trim() || String(id);
+                  const sel = draftFilters.statusList.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggle("statusList", id)}
+                      className={[
+                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
+                        sel
+                          ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.10)] text-[var(--app-text-85)]"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                    >
+                      <span className="min-w-0 truncate">{lbl}</span>
+                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
