@@ -82,7 +82,7 @@ function buildChargeLocalDate(charge: DebtorChargeRow) {
 
 function scheduleReferenceLocalDate(row: DebtorScheduleStatusRow, timeZone: string) {
   return scheduleLocalDate(
-    row.charge_due_at ?? row.first_sent_at ?? row.last_sent_at ?? row.data_envio ?? null,
+    row.data_envio ?? row.charge_due_at ?? row.first_sent_at ?? row.last_sent_at ?? null,
     timeZone,
   );
 }
@@ -380,23 +380,71 @@ export function deriveReferenceMonthDebtorStatus(
 
     const overdueCharges = referenceCharges.some((charge) => {
       const chargeLocalDate = buildChargeLocalDate(charge);
-      if (!chargeLocalDate || chargeLocalDate >= currentLocalDate) return false;
+      if (!chargeLocalDate) return false;
+      if (chargeLocalDate >= currentLocalDate) return false;
       const matchingSchedules = getMatchingSchedulesForCharge({
         charge,
         schedules: openSchedules,
         scheduleTimeZone,
       });
       if (!matchingSchedules.length) return true;
-      return !matchingSchedules.some((row) =>
-        isAgendarExecutedPaidForReferenceMonth({
+      const unpaids = matchingSchedules.filter((row) => {
+        if (
+          isAgendarExecutedPaidForReferenceMonth({
+            row,
+            referenceYearMonth,
+            scheduleTimeZone,
+          })
+        ) {
+          return false;
+        }
+        const tz = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+        const scheduledFor = String(row.data_envio ?? row.charge_due_at ?? "").trim();
+        const scheduledMs = scheduleTimestampMs(scheduledFor);
+        const nowMs = scheduleTimestampMs(nowUtcIso);
+        if (scheduledMs != null && nowMs != null && scheduledMs > nowMs) return false;
+        const dueDate = scheduleReferenceLocalDate(row, tz);
+        if (dueDate && dueDate >= currentLocalDate) return false;
+        const status = deriveOpenUnpaidScheduleStatus({
           row,
-          referenceYearMonth,
-          scheduleTimeZone,
-        }),
-      );
+          nowUtcIso,
+          scheduleTimeZone: tz,
+        });
+        return status !== "agendado";
+      });
+      return unpaids.length > 0;
     });
 
     if (overdueCharges) return "atrasado";
+
+    const anyScheduledFuture = referenceCharges.some((charge) => {
+      const matchingSchedules = getMatchingSchedulesForCharge({
+        charge,
+        schedules: openSchedules,
+        scheduleTimeZone,
+      });
+      if (!matchingSchedules.length) return false;
+      return matchingSchedules.some((row) => {
+        if (
+          isAgendarExecutedPaidForReferenceMonth({
+            row,
+            referenceYearMonth,
+            scheduleTimeZone,
+          })
+        ) {
+          return false;
+        }
+        const tz = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+        const scheduledFor = String(row.data_envio ?? row.charge_due_at ?? "").trim();
+        const scheduledMs = scheduleTimestampMs(scheduledFor);
+        const nowMs = scheduleTimestampMs(nowUtcIso);
+        if (scheduledMs != null && nowMs != null && scheduledMs > nowMs) return true;
+        const dueDate = scheduleReferenceLocalDate(row, tz);
+        return Boolean(dueDate && dueDate > currentLocalDate);
+      });
+    });
+    if (anyScheduledFuture) return "agendado";
+
     return "agendado";
   }
 
@@ -441,12 +489,8 @@ export function deriveReferenceMonthDebtorStatus(
     if (isAgendarExecutedPaidForReferenceMonth({ row, referenceYearMonth, scheduleTimeZone })) {
       return false;
     }
-    const referenceLocalDate = scheduleReferenceLocalDate(row, timeZone);
-    return Boolean(
-      referenceLocalDate &&
-        referenceLocalDate.slice(0, 7) === referenceYearMonth &&
-        referenceLocalDate < currentLocalDate,
-    );
+    const status = deriveOpenUnpaidScheduleStatus({ row, nowUtcIso, scheduleTimeZone: timeZone });
+    return status === "atrasado";
   });
 
   if (hasReferenceMonthOverdue) return "atrasado";
