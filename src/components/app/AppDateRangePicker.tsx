@@ -249,11 +249,15 @@ export function AppDateRangePicker({
             >
               <ChevronRight className="h-4 w-4" />
             </button>
+            {/* X (close) → fecha popover E LIMPA filtro de data, voltando a mostrar todos (exatamente o que o usuário pediu) */}
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                clearAll();
+                setOpen(false);
+              }}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-              aria-label="Fechar"
+              aria-label="Fechar e limpar filtro"
             >
               <X className="h-4 w-4" />
             </button>
@@ -325,19 +329,6 @@ export function AppDateRangePicker({
               : "Selecione até"}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const hj = new Date();
-                const hjStr = toISODate(hj);
-                setViewDate(hj);
-                onChange({ from: hjStr, to: hjStr });
-                setPickingFirst(true);
-              }}
-              className="inline-flex h-8 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 text-[12px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)]"
-            >
-              Hoje
-            </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
