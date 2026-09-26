@@ -2352,25 +2352,9 @@ export function AtendimentoClient() {
           <div className="mt-4 grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((it) => {
               const toneClasses =
-                it.tone === "success"
-                  ? "border-emerald-500/35 bg-emerald-500/10"
-                  : it.tone === "warning"
-                  ? "border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.10)]"
-                  : it.tone === "info"
-                  ? "border-sky-500/35 bg-sky-500/10"
-                  : it.tone === "danger"
-                  ? "border-rose-500/35 bg-rose-500/10"
-                  : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)]";
+                "border-[var(--app-border)] bg-[var(--app-solid-surface-2)]";
               const iconTone =
-                it.tone === "success"
-                  ? "text-emerald-700"
-                  : it.tone === "warning"
-                  ? "text-[#9a3412]"
-                  : it.tone === "info"
-                  ? "text-sky-700"
-                  : it.tone === "danger"
-                  ? "text-rose-700"
-                  : "text-[var(--app-text-70)]";
+                "text-[var(--app-text-70)]";
               return (
                 <div
                   key={it.label}
