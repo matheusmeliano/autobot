@@ -695,15 +695,15 @@ export function AppDateRangePicker({
                                     {/* Resumo compacto 1 linha */}
                                     <div className="flex shrink-0 items-center gap-1.5">
                                       {ocupados > 0 ? (
-                                        <div className="inline-flex h-7 items-center gap-1 rounded-lg bg-[rgba(22,163,74,0.08)] px-2 ring-1 ring-inset ring-[rgba(22,163,74,0.18)]">
-                                          <CheckCircle2 className="h-3 w-3 text-[#15803d]" />
-                                          <span className="text-[11px] font-bold leading-none text-[#166534]">
+                                        <div className="inline-flex h-7 items-center gap-1 rounded-[10px] bg-[rgba(234,88,12,0.10)] px-2 ring-1 ring-inset ring-[rgba(234,88,12,0.18)]">
+                                          <CheckCircle2 className="h-3 w-3 text-[#c2410c]" />
+                                          <span className="text-[11px] font-bold leading-none text-[#9a3412]">
                                             {ocupados}
                                           </span>
                                         </div>
                                       ) : null}
                                       {cancel > 0 ? (
-                                        <div className="inline-flex h-7 items-center gap-1 rounded-lg bg-[rgba(107,114,128,0.08)] px-2 ring-1 ring-inset ring-[rgba(107,114,128,0.18)]">
+                                        <div className="inline-flex h-7 items-center gap-1 rounded-[10px] bg-[rgba(107,114,128,0.08)] px-2 ring-1 ring-inset ring-[rgba(107,114,128,0.18)]">
                                           <Ban className="h-3 w-3 text-[#4b5563]" />
                                           <span className="text-[11px] font-bold leading-none text-[#374151]">
                                             {cancel}
@@ -711,7 +711,7 @@ export function AppDateRangePicker({
                                         </div>
                                       ) : null}
                                       {livres > 0 ? (
-                                        <div className="inline-flex h-7 items-center gap-1 rounded-lg bg-[var(--app-solid-surface-2)] px-2 ring-1 ring-inset ring-[var(--app-border)]">
+                                        <div className="inline-flex h-7 items-center gap-1 rounded-[10px] bg-[var(--app-solid-surface-2)] px-2 ring-1 ring-inset ring-[var(--app-border)]">
                                           <Clock className="h-3 w-3 text-[var(--app-text-55)]" />
                                           <span className="text-[11px] font-bold leading-none text-[var(--app-text-75)]">
                                             {livres}
@@ -723,7 +723,7 @@ export function AppDateRangePicker({
 
                                   {/* Apenas aulas marcadas / canceladas (horários livres NÃO listados — poluição) */}
                                   {temAlgo ? (
-                                    <div className="flex flex-col gap-1 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
+                                    <div className="flex flex-col gap-1.5 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
                                       {ocupadosList.map((slot, sIdx) => {
                                         const ocupado = slot.status === "ocupado";
                                         const cancelado = slot.status === "cancelado";
@@ -731,19 +731,19 @@ export function AppDateRangePicker({
                                           <div
                                             key={sIdx}
                                             className={[
-                                              "flex items-center justify-between gap-2 rounded-xl px-2.5 py-2",
+                                              "flex items-center justify-between gap-2 rounded-[14px] px-3 py-2.5",
                                               ocupado
-                                                ? "bg-white ring-1 ring-inset ring-[var(--app-border)]"
-                                                : "bg-[var(--app-solid-surface-2)] ring-1 ring-inset ring-[var(--app-border)] opacity-80",
+                                                ? "bg-white ring-1 ring-inset ring-[var(--app-border)] shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+                                                : "bg-[var(--app-solid-surface-2)] ring-1 ring-inset ring-[var(--app-border)]",
                                             ].join(" ")}
                                           >
-                                            <div className="flex min-w-0 items-center gap-2.5">
+                                            <div className="flex min-w-0 items-center gap-3">
                                               <div
                                                 className={[
-                                                  "flex h-8 w-12 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold tabular-nums",
+                                                  "flex h-9 w-[52px] shrink-0 items-center justify-center rounded-[10px] text-[12.5px] font-bold tabular-nums",
                                                   ocupado
-                                                    ? "bg-[#0f172a] text-white"
-                                                    : "bg-[var(--app-solid-surface-3)] text-[var(--app-text-55)] line-through",
+                                                    ? "bg-[#0f172a] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+                                                    : "bg-[var(--app-solid-surface-3)] text-[var(--app-text-50)] line-through",
                                                 ].join(" ")}
                                               >
                                                 {slot.professorTime}
@@ -751,10 +751,10 @@ export function AppDateRangePicker({
                                               <div className="min-w-0">
                                                 {ocupado && slot.aluno ? (
                                                   <>
-                                                    <div className="truncate text-[12.5px] font-semibold text-[var(--app-text-92)]">
+                                                    <div className="truncate text-[13px] font-semibold text-[var(--app-text-95)] leading-tight">
                                                       {slot.aluno.displayName}
                                                     </div>
-                                                    <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-55)]">
+                                                    <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-50)] leading-tight">
                                                       {slot.aluno.phone
                                                         ? slot.aluno.phone
                                                         : "—"}
@@ -772,7 +772,7 @@ export function AppDateRangePicker({
                                             </div>
 
                                             {ocupado ? (
-                                              <span className="shrink-0 rounded-lg bg-[rgba(22,163,74,0.10)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[#15803d] ring-1 ring-inset ring-[rgba(22,163,74,0.18)]">
+                                              <span className="shrink-0 rounded-[10px] bg-[#ea580c] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em] text-white shadow-[0_1px_2px_rgba(234,88,12,0.30)]">
                                                 Marcada
                                               </span>
                                             ) : null}
@@ -782,7 +782,7 @@ export function AppDateRangePicker({
                                     </div>
                                   ) : (
                                     <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4">
-                                      <div className="rounded-xl bg-[var(--app-solid-surface-2)] px-3 py-2.5 text-[11.5px] font-medium text-[var(--app-text-55)] ring-1 ring-inset ring-[var(--app-border)]">
+                                      <div className="rounded-[14px] bg-[var(--app-solid-surface-2)] px-3 py-2.5 text-[11.5px] font-medium text-[var(--app-text-55)] ring-1 ring-inset ring-[var(--app-border)]">
                                         Sem aulas para {teacher.name.split(" ")[0]} neste dia
                                       </div>
                                     </div>
