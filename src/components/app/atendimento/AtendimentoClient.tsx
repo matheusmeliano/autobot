@@ -2499,7 +2499,7 @@ export function AtendimentoClient() {
                 Status
               </div>
               <div className="mt-2 grid grid-cols-1 gap-1.5">
-                {/* Primeiro: Aula Experimental Agendada (stage) */}
+                {/* Primeiro: Aula Experimental Agendada (stage). COMPORTAMENTO RADIO: clicar aqui LIMPA statusList (Aluno), garante só 1 selecionado */}
                 {stageOptions.map(([id, label]) => {
                   const lbl = String(label ?? id ?? "").trim() || String(id);
                   const sel = draftFilters.stageList.includes(id);
@@ -2507,7 +2507,15 @@ export function AtendimentoClient() {
                     <button
                       key={id}
                       type="button"
-                      onClick={() => toggle("stageList", id)}
+                      onClick={() => {
+                        const jaSelecionado = draftFilters.stageList.includes(id);
+                        setDraftFilters((p) => ({
+                          ...p,
+                          // RADIO: selecionei Aula Experimental => apaga ALUNO (statusList) sempre
+                          statusList: [],
+                          stageList: jaSelecionado ? [] : [id],
+                        }));
+                      }}
                       className={[
                         "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
                         sel
@@ -2520,7 +2528,7 @@ export function AtendimentoClient() {
                     </button>
                   );
                 })}
-                {/* Depois: Aluno (status) */}
+                {/* Depois: Aluno (status). COMPORTAMENTO RADIO: clicar aqui LIMPA stageList (Aula Experimental) */}
                 {statusOptions.map(([id, label]) => {
                   const lbl = String(label ?? id ?? "").trim() || String(id);
                   const sel = draftFilters.statusList.includes(id);
@@ -2528,7 +2536,15 @@ export function AtendimentoClient() {
                     <button
                       key={id}
                       type="button"
-                      onClick={() => toggle("statusList", id)}
+                      onClick={() => {
+                        const jaSelecionado = draftFilters.statusList.includes(id);
+                        setDraftFilters((p) => ({
+                          ...p,
+                          // RADIO: selecionei Aluno => apaga AULA EXPERIMENTAL (stageList) sempre
+                          stageList: [],
+                          statusList: jaSelecionado ? [] : [id],
+                        }));
+                      }}
                       className={[
                         "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium text-left shadow-none",
                         sel
