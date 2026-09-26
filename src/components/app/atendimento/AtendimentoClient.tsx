@@ -2405,6 +2405,7 @@ export function AtendimentoClient() {
     // STATUS: foco em status do processo de matricula (pagamento, contrato, aluno, encerrado, etc)
     const STATUS_ALLOWLIST = new Set([
       "aluno",
+      "novo_lead",
     ]);
     // ETAPA DO FUNIL: foco no caminho do aluno (convidado → agendada → pré-cadastro etc); REMOVIDOS que ja aparecem em STATUS acima
     const STAGE_ALLOWLIST = new Set([
