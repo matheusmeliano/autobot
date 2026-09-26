@@ -37,6 +37,10 @@ type AppDateRangePickerProps = {
   showLabel?: boolean;
   clearable?: boolean;
   id?: string;
+  /** default: "full" (botão largo com label/texto). "icon": botão redondo pequeno h-10 w-10 só com ícone, igual os botões do header */
+  size?: "full" | "icon";
+  /** cor do anel ativador (padrão: cinza neutro igual refresh. Passar true para laranja quando há filtro ativo. Default: só se tiver from/to preenchido */
+  iconActive?: boolean | "auto";
 };
 
 function parseToDate(s: string | null): Date | null {
@@ -69,6 +73,8 @@ export function AppDateRangePicker({
   showLabel = true,
   clearable = true,
   id,
+  size = "full",
+  iconActive = "auto",
 }: AppDateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<PopoverCoords>({
@@ -365,32 +371,56 @@ export function AppDateRangePicker({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={[
-          "flex w-full items-center justify-between gap-2",
-          "rounded-xl border border-[var(--app-border)] bg-white px-3.5 py-2.5 text-[13px] font-medium text-[var(--app-text-85)]",
-          "focus:outline-none focus:border-[rgba(234,88,12,0.35)]",
-          "hover:bg-[var(--app-solid-surface-2)]",
-          "transition-colors shadow-none",
-        ].join(" ")}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <span className="flex min-w-0 items-center gap-2.5 text-left">
-          <CalendarDays className="h-4 w-4 shrink-0 text-[var(--app-text-60)]" />
-          <span className={twMerge("truncate", (!value.from && !value.to) ? "text-[var(--app-text-45)]" : "")}>
-            {summaryText}
+      {/* SWITCH VISUAL DO TRIGGER (botão que abre calendario):
+        - size="full" → botão largo default w-full com texto + chevron (usado em modal filtros etc)
+        - size="icon" → botão redondo pequeno h-10 w-10 igual os outros botões do header (Refresh, +Adicionar etc)
+      */}
+      {size === "icon" ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={placeholder}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          className={[
+            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+            "border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)]",
+            "hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none",
+            iconActive === true || (iconActive === "auto" && Boolean(value.from || value.to))
+              ? "!border-[rgba(234,88,12,0.4)] !bg-[rgba(234,88,12,0.08)] !text-[#c2410c]"
+              : "",
+          ].join(" ")}
+        >
+          <CalendarDays className="h-4 w-4" aria-hidden="true" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className={[
+            "flex w-full items-center justify-between gap-2",
+            "rounded-xl border border-[var(--app-border)] bg-white px-3.5 py-2.5 text-[13px] font-medium text-[var(--app-text-85)]",
+            "focus:outline-none focus:border-[rgba(234,88,12,0.35)]",
+            "hover:bg-[var(--app-solid-surface-2)]",
+            "transition-colors shadow-none",
+          ].join(" ")}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+        >
+          <span className="flex min-w-0 items-center gap-2.5 text-left">
+            <CalendarDays className="h-4 w-4 shrink-0 text-[var(--app-text-60)]" />
+            <span className={twMerge("truncate", (!value.from && !value.to) ? "text-[var(--app-text-45)]" : "")}>
+              {summaryText}
+            </span>
           </span>
-        </span>
-        <ChevronRight
-          className={twMerge(
-            "h-4 w-4 shrink-0 text-[var(--app-text-55)] transition-transform duration-150",
-            open ? "rotate-90" : "",
-          )}
-        />
-      </button>
+          <ChevronRight
+            className={twMerge(
+              "h-4 w-4 shrink-0 text-[var(--app-text-55)] transition-transform duration-150",
+              open ? "rotate-90" : "",
+            )}
+          />
+        </button>
+      )}
 
       {/* POPOVER CALENDARIO: Portal fixed z-9999 (nunca mais overflow corta!) */}
       {open && rendered && typeof document !== "undefined" && document.body

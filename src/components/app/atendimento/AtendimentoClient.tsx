@@ -2712,8 +2712,8 @@ export function AtendimentoClient() {
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             </button>
-            {/* DATA DE CADASTRO no header (acesso direto, nao precisa abrir filtros) */}
-            <div className="w-full max-w-[360px]">
+            {/* DATA DE CADASTRO no header (acesso direto, nao precisa abrir filtros) - botão pequeno redondo IGUAL OS OUTROS ali (Refresh, SlidersHorizontal etc) */}
+            <div className="">
               <AppDateRangePicker
                 placeholder="Selecione o período de cadastro..."
                 value={{
@@ -2728,6 +2728,8 @@ export function AtendimentoClient() {
                   }));
                 }}
                 showLabel={false}
+                size="icon"
+                iconActive="auto"
               />
             </div>
             {/* FILTROS AVANCADOS: ao lado ESQUERDO de Adicionar registro (+) */}
