@@ -462,6 +462,7 @@ export function SchedulesClient({
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const recurrenceUntilInputRef = useRef<HTMLInputElement | null>(null);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [monthlyExtras, setMonthlyExtras] = useState<Array<{ date: string; time: string }>>([]);
   const extraDateInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const extraTimeInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -842,52 +843,17 @@ export function SchedulesClient({
     return occupied;
   }, [editing, rows, selectedDebtorId]);
   const selectableDebtorIds = useMemo(() => {
-    const occupiedDatesByDebtor = new Map<string, Set<string>>();
-    const occupiedChargeIdsByDebtor = new Map<string, Set<string>>();
-    const openSchedulesCountByDebtor = new Map<string, number>();
-    for (const row of rows) {
-      if (editing && String(row.id ?? "") === String(editing.id ?? "")) continue;
-      const debtorId = String(row.debtor_id ?? "").trim();
-      if (!debtorId) continue;
-      openSchedulesCountByDebtor.set(debtorId, (openSchedulesCountByDebtor.get(debtorId) ?? 0) + 1);
-      const date = scheduleReferenceLocalDate(row, effectiveTimeZone);
-      if (date) {
-        const current = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
-        current.add(date);
-        occupiedDatesByDebtor.set(debtorId, current);
-      }
-      const chargeId = String(row.charge_id ?? "").trim();
-      if (chargeId) {
-        const currentChargeIds = occupiedChargeIdsByDebtor.get(debtorId) ?? new Set<string>();
-        currentChargeIds.add(chargeId);
-        occupiedChargeIdsByDebtor.set(debtorId, currentChargeIds);
-      }
-    }
-
-    const selectable = new Set<string>();
+    const all = new Set<string>();
     for (const debtor of debtors) {
       const debtorId = String(debtor.id ?? "").trim();
       if (!debtorId) continue;
-      const options = debtorReferenceDateOptions(debtor);
-      if (!options.length) continue;
-      const openSchedulesCount = openSchedulesCountByDebtor.get(debtorId) ?? 0;
-      if (openSchedulesCount >= options.length) continue;
-      const occupied = occupiedDatesByDebtor.get(debtorId) ?? new Set<string>();
-      const occupiedChargeIds = occupiedChargeIdsByDebtor.get(debtorId) ?? new Set<string>();
-      const hasAvailableDate = options.some((option) =>
-        option.chargeId ? !occupiedChargeIds.has(option.chargeId) : !occupied.has(option.value),
-      );
-      if (hasAvailableDate) {
-        selectable.add(debtorId);
-      }
+      all.add(debtorId);
     }
-
     if (editing?.debtor_id) {
-      selectable.add(String(editing.debtor_id));
+      all.add(String(editing.debtor_id));
     }
-
-    return selectable;
-  }, [debtors, editing, effectiveTimeZone, rows]);
+    return all;
+  }, [debtors, editing]);
   const selectableDebtors = useMemo(
     () => debtors.filter((debtor) => selectableDebtorIds.has(String(debtor.id ?? ""))),
     [debtors, selectableDebtorIds],
@@ -935,12 +901,7 @@ export function SchedulesClient({
 
   useEffect(() => {
     if (!open) return;
-    setValue("data_envio_date", selectedDebtorReferenceDate, { shouldDirty: false, shouldTouch: false });
-    setValue("charge_id", selectedDebtorReferenceOption?.chargeId ?? "", {
-      shouldDirty: false,
-      shouldTouch: false,
-    });
-  }, [open, selectedDebtorId, selectedDebtorReferenceDate, selectedDebtorReferenceOption, setValue]);
+  }, [open]);
 
   const currentTimeForPicker = useMemo(() => {
     if (!timePickerTarget) return "";
@@ -1100,12 +1061,13 @@ export function SchedulesClient({
       modalToast.warning("Selecione o template atrasado.");
       return;
     }
-    if (!selectedDebtorReferenceDate) {
-      modalToast.warning(
-        noAvailableReferenceDates
-          ? "Todas as datas desse cliente já estão em uso em Agendar."
-          : "Esse cliente não possui data cadastrada para o agendamento.",
-      );
+    if (!values.data_envio_date) {
+      modalToast.warning("Selecione a data.");
+      return;
+    }
+    const normalizedEditDate = normalizeDateOnly(values.data_envio_date);
+    if (!normalizedEditDate || normalizedEditDate < scheduleDateMin) {
+      modalToast.warning("Escolha uma data válida igual ou posterior a hoje.");
       return;
     }
     if (!values.data_envio_time) {
@@ -1126,8 +1088,6 @@ export function SchedulesClient({
         }
       }
     }
-
-    const normalizedEditDate = selectedDebtorReferenceDate;
     const normalizedRecurrenceUntil = normalizeDateOnly(values.recurrence_until);
     const effectiveRecurrenceUntil =
       values.recurrence === "yearly"
@@ -2000,50 +1960,25 @@ export function SchedulesClient({
             <div className="grid gap-4">
               <div>
                 <div className="text-xs font-semibold text-[var(--app-text-60)]">Data do cliente</div>
-                {selectedDebtorReferenceOptions.length > 1 ? (
-                  <select
-                    className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&>option]:bg-white [&>option]:text-[var(--app-text-85)]"
-                    value={selectedDebtorReferenceKey}
-                    onChange={(e) => {
-                      const option =
-                        selectedDebtorReferenceOptions.find(
-                          (item) => debtorReferenceOptionKey(item) === e.target.value,
-                        ) ?? null;
-                      setValue("data_envio_date", option?.value ?? "", {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                        shouldValidate: true,
-                      });
-                      setValue("charge_id", option?.chargeId ?? "", {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                        shouldValidate: true,
-                      });
-                    }}
+                <div className="relative mt-2">
+                  <input
+                    type="date"
+                    min={scheduleDateMin}
+                    {...register("data_envio_date", { required: true })}
+                    onFocus={() => dateInputRef.current?.showPicker?.()}
+                    onClick={() => dateInputRef.current?.showPicker?.()}
+                    ref={dateInputRef}
+                    className="w-full rounded-xl border border-[var(--app-border)] bg-white py-2.5 pl-4 pr-10 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => dateInputRef.current?.showPicker?.()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--app-text-55)] hover:text-[var(--app-text-85)]"
+                    aria-label="Selecionar data"
                   >
-                    {selectedDebtorReferenceOptions.map((option) => (
-                      <option key={debtorReferenceOptionKey(option)} value={debtorReferenceOptionKey(option)}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div
-                    className="mt-2 flex min-h-[44px] items-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-2.5 text-[0.95rem] text-[var(--app-text-70)]"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {selectedDebtorReferenceDate ? (
-                      localDateBR(selectedDebtorReferenceDate)
-                    ) : (
-                      <span className="text-[var(--app-text-45)]">
-                        {noAvailableReferenceDates
-                          ? "Todas as datas deste cliente já estão em uso."
-                          : "Selecione um cliente com data cadastrada."}
-                      </span>
-                    )}
-                  </div>
-                )}
+                    <Calendar className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <div>
                 <div className="text-xs font-semibold text-[var(--app-text-60)]">Hora</div>
@@ -2051,10 +1986,10 @@ export function SchedulesClient({
                   <input
                     type="time"
                     step={60}
-                    disabled={!selectedDebtorReferenceDate}
+                    disabled={!scheduleDateValue}
                     className="w-full rounded-xl border border-[var(--app-border)] bg-white px-4 py-2.5 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:light]"
                     onClick={(e) => {
-                      if (!selectedDebtorReferenceDate) return;
+                      if (!scheduleDateValue) return;
                       e.currentTarget.showPicker?.();
                     }}
                     {...timeField}

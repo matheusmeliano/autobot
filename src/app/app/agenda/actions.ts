@@ -768,6 +768,10 @@ async function resolveScheduleLocalDate(params: {
   const providedDate = String(params.providedDate ?? "").trim();
   const providedChargeId = String(params.chargeId ?? "").trim();
 
+  if (/^\d{4}-\d{2}-\d{2}$/.test(providedDate)) {
+    return { ok: true as const, localDate: providedDate, chargeId: providedChargeId || null };
+  }
+
   const { data, error } = await params.supabase
     .from("debtors")
     .select("vencimento, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)")
@@ -802,10 +806,6 @@ async function resolveScheduleLocalDate(params: {
       localDate: chargeLocalDate,
       chargeId: String(resolvedCharge?.id ?? "").trim() || null,
     };
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(providedDate)) {
-    return { ok: true as const, localDate: providedDate, chargeId: null };
   }
 
   const legacyDueDate = String((data as any)?.vencimento ?? "").trim();
