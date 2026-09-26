@@ -2309,8 +2309,7 @@ export function AtendimentoClient() {
     const items: Array<{ label: string; value: number; icon: React.ReactNode; tone: "default" | "success" | "warning" | "info" | "danger" }> = [
       { label: "Total de registros", value: summary.totalLeads, icon: <UserRound className="h-5 w-5" />, tone: "default" },
       { label: "Aulas experimentais agendadas", value: summary.aulasExperimentaisAgendadas, icon: <CalendarIcon className="h-5 w-5" />, tone: "success" },
-      { label: "Matrículas pendentes", value: summary.matriculasPendentes, icon: <ExternalLink className="h-5 w-5" />, tone: "warning" },
-      { label: "Matriculados", value: summary.matriculados, icon: <ExternalLink className="h-5 w-5" />, tone: "success" },
+      { label: "Alunos", value: summary.matriculados, icon: <ExternalLink className="h-5 w-5" />, tone: "success" },
     ];
     return (
       <AppModal
