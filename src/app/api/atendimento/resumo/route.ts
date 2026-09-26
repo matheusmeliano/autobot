@@ -67,10 +67,10 @@ export async function GET() {
         if (!leadId) continue;
         const status = String((bk as any)?.status ?? "").trim().toLowerCase();
         const startMs = parseStartMs((bk as any)?.professor_start_at ?? (bk as any)?.lead_start_at);
+        if (!mainBookingByLeadId.has(leadId)) {
+          mainBookingByLeadId.set(leadId, bk);
+        }
         if (status !== "cancelled") {
-          if (!mainBookingByLeadId.has(leadId)) {
-            mainBookingByLeadId.set(leadId, bk);
-          }
           if (startMs >= nowMs) {
             const cur = futureBookingByLeadId.get(leadId);
             const curMs = cur ? parseStartMs(cur?.professor_start_at ?? cur?.lead_start_at) : 0;
@@ -89,8 +89,11 @@ export async function GET() {
 
     const hasAnyExperimentalBooking = (row: any) => {
       const id = String(row?.id ?? "");
+      const st = String(row?.status ?? "").trim().toLowerCase();
+      const fs = String(row?.funnel_stage ?? "").trim().toLowerCase();
       return Boolean(
-        row.funnel_stage === "aula_experimental_agendada" ||
+        st === "aula_experimental_agendada" ||
+          fs === "aula_experimental_agendada" ||
           (row.experimental_class_booking_id && mainBookingByLeadId.has(id)) ||
           futureBookingByLeadId.has(id) ||
           latestBookingByLeadId.has(id) ||
