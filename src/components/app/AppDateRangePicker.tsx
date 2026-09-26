@@ -793,9 +793,14 @@ export function AppDateRangePicker({
                                                 className={[
                                                   "flex h-9 w-[52px] shrink-0 items-center justify-center rounded-[12px] text-[12.5px] font-bold tabular-nums",
                                                   ocupado
-                                                    ? "bg-[#ea580c] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
-                                                    : "bg-[var(--app-solid-surface-3)] text-[var(--app-text-50)] line-through",
+                                                    ? "bg-[#ea580c] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]"
+                                                    : "bg-[var(--app-solid-surface-3)] line-through",
                                                 ].join(" ")}
+                                                style={
+                                                  ocupado
+                                                    ? { color: "#ffffff", backgroundColor: "#ea580c", fontWeight: 700 }
+                                                    : undefined
+                                                }
                                               >
                                                 {slot.professorTime}
                                               </div>
@@ -825,9 +830,10 @@ export function AppDateRangePicker({
                                             {ocupado ? (
                                               <span
                                                 className={[
-                                                  "shrink-0 rounded-[12px] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em] text-white",
+                                                  "shrink-0 rounded-[12px] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em]",
                                                   "bg-[#0f172a] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]",
                                                 ].join(" ")}
+                                                style={{ color: "#ffffff", backgroundColor: "#0f172a", fontWeight: 700 }}
                                               >
                                                 Marcada
                                               </span>
