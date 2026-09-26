@@ -946,8 +946,38 @@ export function AtendimentoClient() {
       Array.isArray(v) ? v.length > 0 : Boolean(v),
     );
     if (!hasAnyFilter) return leads;
+    const statusMatches = (statusId: string, l: AtendimentoLeadListItem): boolean => {
+      const st = String(l.status ?? "").trim().toLowerCase();
+      const fs = String(l.funnel_stage ?? "").trim().toLowerCase();
+      const rcs = String((l as any)?.recurring_class_status ?? "").trim().toLowerCase();
+      const sid = String(statusId ?? "").trim().toLowerCase();
+      if (!sid) return false;
+      if (sid === "aluno") {
+        return (
+          st === "matriculado" ||
+          fs === "matriculado" ||
+          st === "aluno" ||
+          fs === "aluno" ||
+          fs === "aluno_recorrente_cadastrado" ||
+          st === "aluno_recorrente_cadastrado" ||
+          st === "cadastro_recorrente_pendente_plataforma" ||
+          fs === "cadastro_recorrente_pendente_plataforma" ||
+          st === "contrato_assinado" ||
+          fs === "contrato_assinado" ||
+          st === "contrato_aguardando_aceite" ||
+          fs === "contrato_aguardando_aceite" ||
+          st === "contrato_coletando_dados" ||
+          fs === "contrato_coletando_dados" ||
+          st === "matricula_confirmada" ||
+          fs === "matricula_confirmada" ||
+          rcs === "confirmado" ||
+          rcs === "cadastro_plataforma_pendente"
+        );
+      }
+      return st === sid || fs === sid;
+    };
     return leads.filter((l) => {
-      if (f.statusList.length > 0 && !f.statusList.includes(String(l.status ?? ""))) return false;
+      if (f.statusList.length > 0 && !f.statusList.some((sid) => statusMatches(sid, l))) return false;
       if (f.stageList.length > 0 && !f.stageList.includes(String(l.funnel_stage ?? ""))) return false;
       if (f.countries.length > 0 && !f.countries.includes(String(l.country ?? "").trim())) return false;
       if (f.states.length > 0 && !f.states.includes(String(l.state ?? "").trim())) return false;
