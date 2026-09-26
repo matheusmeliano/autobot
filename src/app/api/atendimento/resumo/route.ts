@@ -39,6 +39,9 @@ export async function GET() {
     const futureBookingByLeadId = new Map<string, any>();
     const latestBookingByLeadId = new Map<string, any>();
     const mainBookingByLeadId = new Map<string, any>();
+    const draftDateByLeadId = new Map<string, any>();
+    const draftTimeByLeadId = new Map<string, any>();
+    const cancelledByHistoryLeadIds = new Set<string>();
 
     if (leadIds.length > 0) {
       const parseStartMs = (v: any) => {
@@ -85,19 +88,92 @@ export async function GET() {
           }
         }
       }
+
+      let historyEvents: any[] | null = null;
+      try {
+        const he = await admin
+          .from("atendimento_history_events")
+          .select("id, lead_id, event_type, created_at, details")
+          .in("lead_id", leadIds)
+          .in("event_type", [
+            "experimental_class_date_selected",
+            "experimental_class_time_selected",
+            "experimental_class_scheduled",
+            "experimental_class_cancelled",
+          ])
+          .order("created_at", { ascending: false });
+        if (!he.error) historyEvents = he.data as any[];
+      } catch {
+        historyEvents = null;
+      }
+
+      for (const event of historyEvents ?? []) {
+        const leadId = String((event as any)?.lead_id ?? "");
+        if (!leadId) continue;
+        const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+        const eca = String((event as any)?.created_at ?? "").trim() || null;
+        const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+        if (eventType === "experimental_class_cancelled") {
+          cancelledByHistoryLeadIds.add(leadId);
+        }
+        if (eventType === "experimental_class_date_selected") {
+          if (!draftDateByLeadId.has(leadId)) {
+            const pd = String(details?.professor_date ?? "").trim();
+            const ld = String(details?.lead_date ?? "").trim();
+            const label = String(details?.label ?? "").trim() || null;
+            if (pd || ld) {
+              draftDateByLeadId.set(leadId, {
+                professor_date: pd,
+                lead_date: ld,
+                label,
+                at: eca,
+              });
+            }
+          }
+        }
+        if (eventType === "experimental_class_time_selected") {
+          if (!draftTimeByLeadId.has(leadId)) {
+            const pd = String(details?.professor_date ?? "").trim();
+            const pt = String(details?.professor_time ?? "").trim();
+            const ld = String(details?.lead_date ?? "").trim();
+            const lt = String(details?.lead_time ?? "").trim();
+            const psa = String(details?.professor_start_at ?? "").trim();
+            const lsa = String(details?.lead_start_at ?? "").trim();
+            if ((pd && pt) || (ld && lt) || psa || lsa) {
+              draftTimeByLeadId.set(leadId, {
+                professor_date: pd,
+                professor_time: pt,
+                lead_date: ld,
+                lead_time: lt,
+                professor_start_at: psa,
+                lead_start_at: lsa,
+                at: eca,
+              });
+            }
+          }
+        }
+      }
     }
 
     const hasAnyExperimentalBooking = (row: any) => {
       const id = String(row?.id ?? "");
       const st = String(row?.status ?? "").trim().toLowerCase();
       const fs = String(row?.funnel_stage ?? "").trim().toLowerCase();
+      const cleanDraftDate = cancelledByHistoryLeadIds.has(id) ? null : draftDateByLeadId.get(id) ?? null;
+      const cleanDraftTime = cancelledByHistoryLeadIds.has(id) ? null : draftTimeByLeadId.get(id) ?? null;
       return Boolean(
         st === "aula_experimental_agendada" ||
           fs === "aula_experimental_agendada" ||
           (row.experimental_class_booking_id && mainBookingByLeadId.has(id)) ||
           futureBookingByLeadId.has(id) ||
           latestBookingByLeadId.has(id) ||
-          mainBookingByLeadId.has(id),
+          mainBookingByLeadId.has(id) ||
+          (cleanDraftDate && (cleanDraftDate.professor_date || cleanDraftDate.lead_date)) ||
+          (cleanDraftTime &&
+            ((cleanDraftTime.professor_date && cleanDraftTime.professor_time) ||
+              (cleanDraftTime.lead_date && cleanDraftTime.lead_time) ||
+              cleanDraftTime.professor_start_at ||
+              cleanDraftTime.lead_start_at)),
       );
     };
 
