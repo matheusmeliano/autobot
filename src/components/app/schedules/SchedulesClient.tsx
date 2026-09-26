@@ -463,6 +463,7 @@ export function SchedulesClient({
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const recurrenceUntilInputRef = useRef<HTMLInputElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const timeInputRef = useRef<HTMLInputElement | null>(null);
   const [monthlyExtras, setMonthlyExtras] = useState<Array<{ date: string; time: string }>>([]);
   const extraDateInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const extraTimeInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -902,6 +903,34 @@ export function SchedulesClient({
   useEffect(() => {
     if (!open) return;
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dateEl = dateInputRef.current;
+    const timeEl = timeInputRef.current;
+    if (!dateEl) return;
+    const handleDateChange = () => {
+      const v = dateEl.value;
+      if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        setValue("data_envio_date", v, { shouldDirty: true, shouldTouch: true });
+      }
+    };
+    const handleTimeChange = () => {
+      if (!timeEl) return;
+      const v = timeEl.value;
+      if (typeof v === "string" && v.length > 0) {
+        setValue("data_envio_time", v, { shouldDirty: true, shouldTouch: true });
+      }
+    };
+    dateEl.addEventListener("change", handleDateChange);
+    timeEl?.addEventListener("change", handleTimeChange);
+    handleDateChange();
+    handleTimeChange();
+    return () => {
+      dateEl.removeEventListener("change", handleDateChange);
+      timeEl?.removeEventListener("change", handleTimeChange);
+    };
+  }, [open, setValue]);
 
   const currentTimeForPicker = useMemo(() => {
     if (!timePickerTarget) return "";
@@ -1406,6 +1435,7 @@ export function SchedulesClient({
   };
 
   const timeField = register("data_envio_time", { required: true });
+  const dateField = register("data_envio_date", { required: true });
   const recurrenceUntilField = register("recurrence_until");
   const openExtraDatePicker = (index: number) => {
     extraDateInputRefs.current[index]?.showPicker?.();
@@ -1964,10 +1994,18 @@ export function SchedulesClient({
                   <input
                     type="date"
                     min={scheduleDateMin}
-                    {...register("data_envio_date", { required: true })}
                     onFocus={() => dateInputRef.current?.showPicker?.()}
                     onClick={() => dateInputRef.current?.showPicker?.()}
-                    ref={dateInputRef}
+                    ref={(node: HTMLInputElement | null) => {
+                      dateInputRef.current = node;
+                      if (typeof (dateField as any).ref === "function") {
+                        (dateField as any).ref(node);
+                      }
+                    }}
+                    name={dateField.name}
+                    onChange={dateField.onChange}
+                    onBlur={dateField.onBlur}
+                    required
                     className="w-full rounded-xl border border-[var(--app-border)] bg-white py-2.5 pl-4 pr-10 text-[0.95rem] text-[var(--app-text-85)] outline-none focus:border-[var(--app-accent-color)]/35 focus:ring-0 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-0"
                   />
                   <button
@@ -1992,7 +2030,15 @@ export function SchedulesClient({
                       if (!scheduleDateValue) return;
                       e.currentTarget.showPicker?.();
                     }}
-                    {...timeField}
+                    ref={(node: HTMLInputElement | null) => {
+                      timeInputRef.current = node;
+                      if (typeof (timeField as any).ref === "function") {
+                        (timeField as any).ref(node);
+                      }
+                    }}
+                    name={timeField.name}
+                    onChange={timeField.onChange}
+                    onBlur={timeField.onBlur}
                   />
                 </div>
               </div>
