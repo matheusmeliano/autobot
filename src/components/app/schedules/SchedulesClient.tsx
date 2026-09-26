@@ -509,15 +509,11 @@ export function SchedulesClient({
     return rows
       .filter((r) => (!q ? true : r.debtor_nome.toLowerCase().includes(q)))
       .slice()
-      .sort((a, b) => {
-        const debtorCompare = String(a.debtor_nome ?? "").localeCompare(String(b.debtor_nome ?? ""), "pt-BR", {
-          sensitivity: "base",
-        });
-        if (debtorCompare !== 0) return debtorCompare;
-        return String(a.operational_due_at ?? a.charge_due_at ?? a.data_envio).localeCompare(
+      .sort((a, b) =>
+        String(a.operational_due_at ?? a.charge_due_at ?? a.data_envio).localeCompare(
           String(b.operational_due_at ?? b.charge_due_at ?? b.data_envio),
-        );
-      });
+        ),
+      );
   }, [query, rows]);
   const operationalMonthKey = useMemo(
     () => yearMonthKey(new Date().toISOString(), effectiveTimeZone),
