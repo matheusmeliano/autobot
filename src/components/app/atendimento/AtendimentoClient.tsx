@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, SlidersHorizontal, Trash2, UserRound, X, Zap } from "lucide-react";
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, SlidersHorizontal, Trash2, UserRound, X, Zap } from "lucide-react";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { resolveTimeZoneFromCityInput, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -2712,14 +2712,19 @@ export function AtendimentoClient() {
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             </button>
-            {/* MÉTRICAS: Ao lado ESQUERDO do "+ Adicionar" (usuário pediu) */}
+            {/* MÉTRICAS: estilo botão calendário (igual "Selecione período") em vez de botão circular pequeno */}
             <button
               type="button"
               onClick={() => setShowMetricsModal(true)}
-              aria-label="Métricas e resumo de registros"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--app-border)] bg-white px-3.5 py-2.5 text-[13px] font-medium text-[var(--app-text-85)] focus:outline-none focus:border-[rgba(234,88,12,0.35)] hover:bg-[var(--app-solid-surface-2)] transition-colors shadow-none"
+              aria-haspopup="dialog"
+              aria-expanded="false"
             >
-              <BarChart3 className="h-4 w-4" />
+              <span className="flex min-w-0 items-center gap-2.5 text-left">
+                <CalendarDays className="h-4 w-4 shrink-0 text-[var(--app-text-60)]" aria-hidden="true" />
+                <span className="truncate text-[var(--app-text-45)]">Métricas e resumo</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[var(--app-text-55)] transition-transform duration-150" aria-hidden="true" />
             </button>
             {/* FILTROS AVANCADOS: ao lado ESQUERDO de Adicionar registro (+) */}
             <button
