@@ -2662,7 +2662,7 @@ export function AtendimentoClient() {
             </div>
 
             {/* Resumo filtros ativos (compacto) */}
-            {isFilled ? (
+            {false ? (
               <div className="rounded-2xl border border-[rgba(234,88,12,0.3)] bg-[rgba(234,88,12,0.08)] p-3 shadow-none">
                 <div className="flex flex-col gap-2">
                   {headerPill("Status", draftFilters.statusList, "statusList")}
