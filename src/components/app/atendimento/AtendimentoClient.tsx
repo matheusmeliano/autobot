@@ -974,6 +974,13 @@ export function AtendimentoClient() {
           rcs === "cadastro_plataforma_pendente"
         );
       }
+      if (sid === "contrato_assinado") {
+        return (
+          st === "contrato_assinado" ||
+          fs === "contrato_assinado" ||
+          Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status)
+        );
+      }
       return st === sid || fs === sid;
     };
     return leads.filter((l) => {
