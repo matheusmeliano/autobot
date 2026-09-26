@@ -162,6 +162,26 @@ function normalizeDateOnly(v: unknown) {
   return "";
 }
 
+function resolveScheduleSendDateAutoNextMonth(rawValue: unknown, todayLocalDate: string): string {
+  const normalized = normalizeDateOnly(rawValue);
+  if (!normalized) return "";
+  if (normalized >= todayLocalDate) return normalized;
+  const [rawY, rawM, rawD] = normalized.split("-");
+  const y = Number(rawY);
+  const m = Number(rawM);
+  const d = Number(rawD);
+  if (!y || !m || !d) return "";
+  const [todayY, todayM, todayD] = todayLocalDate.split("-").map(Number) as [number, number, number];
+  let nextY = todayY;
+  let nextM = todayM + 1;
+  if (nextM > 12) {
+    nextM = 1;
+    nextY += 1;
+  }
+  const safeDay = Math.max(1, Math.min(d, lastDayOfMonth(nextY, nextM)));
+  return `${String(nextY).padStart(4, "0")}-${String(nextM).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
 function localDateBR(v: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
   const d = new Date(`${v}T00:00:00`);
@@ -487,7 +507,7 @@ export function SchedulesClient({
     () => localDateInTimeZone(new Date().toISOString(), effectiveTimeZone),
     [effectiveTimeZone],
   );
-  const scheduleDateMin = todayMinDate;
+  const scheduleDateMin = "";
 
   const prereqMessage = (context: "criar/editar" | "disparar") => {
     const actionLabel = context === "disparar" ? "disparar agora" : "criar ou editar agendamentos";
@@ -1065,10 +1085,14 @@ export function SchedulesClient({
       modalToast.warning("Selecione a data.");
       return;
     }
-    const normalizedEditDate = normalizeDateOnly(values.data_envio_date);
-    if (!normalizedEditDate || normalizedEditDate < scheduleDateMin) {
-      modalToast.warning("Escolha uma data válida igual ou posterior a hoje.");
+    const autoNextDate = resolveScheduleSendDateAutoNextMonth(values.data_envio_date, todayMinDate);
+    const normalizedEditDate = normalizeDateOnly(autoNextDate || values.data_envio_date);
+    if (!normalizedEditDate) {
+      modalToast.warning("Selecione uma data válida.");
       return;
+    }
+    if (autoNextDate && autoNextDate !== String(values.data_envio_date).trim()) {
+      setValue("data_envio_date", autoNextDate, { shouldDirty: true, shouldTouch: true });
     }
     if (!values.data_envio_time) {
       modalToast.warning("Selecione a hora.");

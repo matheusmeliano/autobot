@@ -719,6 +719,32 @@ function validateFutureScheduleDateTime(params: {
   return { ok: true as const, scheduledIso };
 }
 
+function resolveProvidedScheduleSendDateAutoNextMonth(params: {
+  providedDate: unknown;
+  timeZone: string;
+}): string {
+  const normalized = String(params.providedDate ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  try {
+    const now = new Date();
+    const todayStr = localDateInTimeZone(now.toISOString(), params.timeZone);
+    if (normalized >= todayStr) return normalized;
+    const [y, m, d] = normalized.split("-").map(Number) as [number, number, number];
+    if (!y || !m || !d) return normalized;
+    const nowParts = todayStr.split("-").map(Number) as [number, number, number];
+    let nextY = nowParts[0];
+    let nextM = nowParts[1] + 1;
+    if (nextM > 12) {
+      nextM = 1;
+      nextY += 1;
+    }
+    const safeDay = Math.max(1, Math.min(d, referenceLastDayOfMonth(nextY, nextM)));
+    return `${String(nextY).padStart(4, "0")}-${String(nextM).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+  } catch {
+    return normalized;
+  }
+}
+
 type DebtorScheduleChargeRow = {
   id?: string | null;
   due_day?: number | null;
@@ -958,7 +984,10 @@ export async function createScheduleAction(input: unknown) {
     supabase,
     debtorId: parsed.data.debtor_id,
     chargeId: parsed.data.charge_id,
-    providedDate: parsed.data.data_envio_date,
+    providedDate: resolveProvidedScheduleSendDateAutoNextMonth({
+      providedDate: parsed.data.data_envio_date,
+      timeZone: String(timeZone ?? "America/Sao_Paulo"),
+    }),
   });
   if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
   const scheduleLocalDate = scheduleLocalDateResult.localDate;
@@ -1081,7 +1110,10 @@ export async function updateScheduleAction(input: unknown) {
     supabase,
     debtorId: data.debtor_id,
     chargeId: data.charge_id,
-    providedDate: data.data_envio_date,
+    providedDate: resolveProvidedScheduleSendDateAutoNextMonth({
+      providedDate: data.data_envio_date,
+      timeZone: String(timeZone ?? "America/Sao_Paulo"),
+    }),
   });
   if (!scheduleLocalDateResult.ok) return { ok: false, error: scheduleLocalDateResult.error };
   const scheduleLocalDate = scheduleLocalDateResult.localDate;
