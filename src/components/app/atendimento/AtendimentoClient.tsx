@@ -2476,10 +2476,15 @@ export function AtendimentoClient() {
                 </div>
               </div>
             </div>
+            {/* X (close): fecha modal E LIMPA todos filtros (draftFilters + activeFilters) + volta mostrar todos */}
             <button
               type="button"
-              onClick={() => setShowFiltersModal(false)}
-              aria-label="Fechar filtros"
+              onClick={() => {
+                setDraftFilters(EMPTY_FILTERS);
+                setActiveFilters(EMPTY_FILTERS);
+                setShowFiltersModal(false);
+              }}
+              aria-label="Fechar e limpar filtros"
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
             >
               <X className="h-4 w-4" />
@@ -2567,30 +2572,20 @@ export function AtendimentoClient() {
             ) : null}
           </div>
 
-          {/* Rodapé ações (reduzir espaco em branco) */}
+          {/* Rodapé ações: só "Resultado filtrado" + Aplicar (botao Limpar REMOVIDO, agora é X do modal que limpa) */}
           <div className="mt-3 flex shrink-0 flex-col gap-2 py-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-[12px] text-[var(--app-text-55)]">
               Resultado filtrado: <strong className="text-[var(--app-text-85)]">{liveFilteredCount}</strong>{" "}
               {liveFilteredCount === 1 ? "registro" : "registros"}
             </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setDraftFilters(EMPTY_FILTERS);
-                  setActiveFilters(EMPTY_FILTERS);
-                }}
-                className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-              >
-                Limpar
-              </button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
                   setActiveFilters(draftFilters);
                   setShowFiltersModal(false);
                 }}
-                className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors"
+                className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
               >
                 Aplicar
               </button>
