@@ -2393,17 +2393,7 @@ export function AtendimentoClient() {
     // OPCOES ESSENCIAIS (ENXUGADAS): remove duplicadas/repetidas/menos usadas
     // STATUS: foco em status do processo de matricula (pagamento, contrato, aluno, encerrado, etc)
     const STATUS_ALLOWLIST = new Set([
-      "novo_lead",
-      "em_atendimento",
-      "matricula_pendente",
-      "contrato_aguardando_aceite",
-      "contrato_assinado",
-      "pagamento_pendente_confirmacao",
-      "pagamento_nao_realizado",
-      "matricula_confirmada",
-      "matriculado",
       "aluno",
-      "encerrado",
     ]);
     // ETAPA DO FUNIL: foco no caminho do aluno (convidado → agendada → pré-cadastro etc); REMOVIDOS que ja aparecem em STATUS acima
     const STAGE_ALLOWLIST = new Set([
