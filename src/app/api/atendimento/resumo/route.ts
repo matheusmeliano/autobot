@@ -18,7 +18,7 @@ export async function GET() {
     const { data: leads, error } = await admin
       .from("atendimento_leads")
       .select(
-        "status, funnel_stage, unread_count, phone, last_interaction_at, created_at, updated_at, recurring_class_status, future_experimental_class_booking, latest_experimental_class_booking, experimental_class_booking, contract_signed_at, contract_status",
+        "id, status, funnel_stage, unread_count, phone, last_interaction_at, created_at, updated_at, recurring_class_status, experimental_class_booking_id, contract_signed_at, contract_status",
       )
       .eq("assigned_user_email", "atendimento.usa.music@gmail.com");
 
@@ -35,11 +35,66 @@ export async function GET() {
         return true;
       }) as any[];
 
+    const leadIds = rows.map((row: any) => String(row?.id ?? "")).filter(Boolean);
+    const futureBookingByLeadId = new Map<string, any>();
+    const latestBookingByLeadId = new Map<string, any>();
+    const mainBookingByLeadId = new Map<string, any>();
+
+    if (leadIds.length > 0) {
+      const parseStartMs = (v: any) => {
+        const s = String(v ?? "").trim();
+        if (!s) return 0;
+        const t = new Date(s).getTime();
+        return Number.isFinite(t) && t > 0 ? t : 0;
+      };
+      const nowMs = Date.now();
+
+      const bookingSelect =
+        "id, lead_id, status, professor_start_at, lead_start_at, professor_date, lead_date, created_at, updated_at";
+      let bookingData: any[] | null = null;
+      try {
+        const bk = await admin
+          .from("atendimento_experimental_class_bookings")
+          .select(bookingSelect)
+          .in("lead_id", leadIds);
+        if (!bk.error) bookingData = bk.data as any[];
+      } catch {
+        bookingData = null;
+      }
+
+      for (const bk of bookingData ?? []) {
+        const leadId = String((bk as any)?.lead_id ?? "").trim();
+        if (!leadId) continue;
+        const status = String((bk as any)?.status ?? "").trim().toLowerCase();
+        const startMs = parseStartMs((bk as any)?.professor_start_at ?? (bk as any)?.lead_start_at);
+        if (status !== "cancelled") {
+          if (!mainBookingByLeadId.has(leadId)) {
+            mainBookingByLeadId.set(leadId, bk);
+          }
+          if (startMs >= nowMs) {
+            const cur = futureBookingByLeadId.get(leadId);
+            const curMs = cur ? parseStartMs(cur?.professor_start_at ?? cur?.lead_start_at) : 0;
+            if (curMs <= 0 || (startMs > 0 && startMs < curMs)) {
+              futureBookingByLeadId.set(leadId, bk);
+            }
+          }
+          if (startMs > 0 && startMs < nowMs) {
+            const cur = latestBookingByLeadId.get(leadId);
+            const curMs = cur ? parseStartMs(cur?.professor_start_at ?? cur?.lead_start_at) : 0;
+            if (startMs > curMs) latestBookingByLeadId.set(leadId, bk);
+          }
+        }
+      }
+    }
+
     const hasAnyExperimentalBooking = (row: any) => {
+      const id = String(row?.id ?? "");
       return Boolean(
-        row.future_experimental_class_booking ||
-          row.latest_experimental_class_booking ||
-          row.experimental_class_booking,
+        row.funnel_stage === "aula_experimental_agendada" ||
+          (row.experimental_class_booking_id && mainBookingByLeadId.has(id)) ||
+          futureBookingByLeadId.has(id) ||
+          latestBookingByLeadId.has(id) ||
+          mainBookingByLeadId.has(id),
       );
     };
 
@@ -77,9 +132,7 @@ export async function GET() {
       totalLeads: rows.length,
       novosLeads: rows.filter((row) => row.status === "novo_lead").length,
       emAtendimento: rows.filter((row) => row.status === "em_atendimento").length,
-      aulasExperimentaisAgendadas: rows.filter(
-        (row) => row.funnel_stage === "aula_experimental_agendada" || hasAnyExperimentalBooking(row),
-      ).length,
+      aulasExperimentaisAgendadas: rows.filter(hasAnyExperimentalBooking).length,
       matriculasPendentes: rows.filter((row) => row.status === "matricula_pendente").length,
       matriculados: rows.filter(isAluno).length,
       conversasNaoLidas: rows.reduce((total, row) => total + Number(row.unread_count ?? 0), 0),
