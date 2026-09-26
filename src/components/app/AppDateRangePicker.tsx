@@ -582,26 +582,21 @@ export function AppDateRangePicker({
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Header (sticky, nunca some com scroll) */}
-                    <div className="relative flex shrink-0 items-start justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3.5 sm:px-5 sm:py-4">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgba(234,88,12,0.10)] text-[#c2410c] ring-1 ring-inset ring-[rgba(234,88,12,0.18)]">
-                          <CalendarRange className="h-5 w-5" />
+                    <div className="relative flex shrink-0 items-start justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 sm:px-5 sm:py-3.5">
+                      <div className="min-w-0">
+                        <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[var(--app-text-55)]">
+                          Programação do Dia
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-[11px] font-bold uppercase tracking-[0.10em] text-[var(--app-text-55)]">
-                            Programação do Dia
-                          </div>
-                          <div className="mt-0.5 truncate text-[15.5px] font-semibold text-[var(--app-text-95)] leading-tight">
-                            {isValid(dateObj)
-                              ? format(dateObj, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                              : scheduleDate}
-                          </div>
-                          {isValid(dateObj) ? (
-                            <div className="mt-0.5 text-[11.5px] font-medium text-[var(--app-text-55)]">
-                              {format(dateObj, "dd/MM/yyyy")}
-                            </div>
-                          ) : null}
+                        <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-95)] leading-tight">
+                          {isValid(dateObj)
+                            ? format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                            : scheduleDate}
                         </div>
+                        {isValid(dateObj) ? (
+                          <div className="mt-0.5 text-[11px] font-medium text-[var(--app-text-55)]">
+                            {format(dateObj, "EEEE", { locale: ptBR })} · {format(dateObj, "dd/MM/yyyy")}
+                          </div>
+                        ) : null}
                       </div>
 
                       <button
@@ -646,77 +641,40 @@ export function AppDateRangePicker({
                         </button>
                       </div>
                     ) : (
-                      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-5 sm:py-4.5">
-                        {/* Resumo diário (chips) */}
-                        {sum ? (
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            <div className="rounded-xl bg-[var(--app-solid-surface-2)] px-3 py-2.5 ring-1 ring-inset ring-[var(--app-border)]">
-                              <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-55)]">
-                                <Users className="h-3.5 w-3.5" />
-                                <span>Prof</span>
-                              </div>
-                              <div className="mt-0.5 text-[18px] font-bold leading-none text-[var(--app-text-95)]">
-                                {sum.totalTeachers}
-                              </div>
-                            </div>
-                            <div className="rounded-xl bg-[rgba(22,163,74,0.06)] px-3 py-2.5 ring-1 ring-inset ring-[rgba(22,163,74,0.16)]">
-                              <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#166534]">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                <span>Aulas</span>
-                              </div>
-                              <div className="mt-0.5 text-[18px] font-bold leading-none text-[#15803d]">
-                                {sum.totalBookings}
-                              </div>
-                            </div>
-                            <div className="rounded-xl bg-[rgba(234,88,12,0.06)] px-3 py-2.5 ring-1 ring-inset ring-[rgba(234,88,12,0.16)]">
-                              <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#9a3412]">
-                                <Clock className="h-3.5 w-3.5" />
-                                <span>Livres</span>
-                              </div>
-                              <div className="mt-0.5 text-[18px] font-bold leading-none text-[#c2410c]">
-                                {sum.totalAvailable}
-                              </div>
-                            </div>
-                            <div className="rounded-xl bg-[var(--app-solid-surface-2)] px-3 py-2.5 ring-1 ring-inset ring-[var(--app-border)]">
-                              <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-55)]">
-                                <Ban className="h-3.5 w-3.5" />
-                                <span>Canceladas</span>
-                              </div>
-                              <div className="mt-0.5 text-[18px] font-bold leading-none text-[var(--app-text-75)]">
-                                {sum.totalCancelled}
-                              </div>
-                            </div>
-                          </div>
-                        ) : null}
-
+                      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5 sm:px-5 sm:py-4">
                         {/* Cards por professor */}
                         {teacherList.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 py-14 text-center">
-                            <CalendarDays className="h-9 w-9 text-[var(--app-text-45)]" />
+                          <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 py-10 text-center">
+                            <CalendarDays className="h-8 w-8 text-[var(--app-text-45)]" />
                             <div className="text-[13.5px] font-semibold text-[var(--app-text-85)]">
-                              Nenhuma aula programada para este dia
-                            </div>
-                            <div className="max-w-[32ch] text-[12px] text-[var(--app-text-55)]">
-                              A grade de horários de todos os professores aparece aqui para a data selecionada.
+                              Nenhuma aula programada
                             </div>
                           </div>
                         ) : (
-                          <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-2.5">
                             {teacherList.map((teacher, tIdx) => {
-                              const hasAny = teacher.slots.some((s) => s.status !== "passado");
-                              const ocupados = teacher.slots.filter((s) => s.status === "ocupado").length;
-                              const livres = teacher.slots.filter((s) => s.status === "disponivel").length;
-                              const cancel = teacher.slots.filter((s) => s.status === "cancelado").length;
-                              const totalSlots = teacher.slots.length;
+                              const ocupadosList = teacher.slots.filter(
+                                (s) => s.status === "ocupado" || s.status === "cancelado",
+                              );
+                              const ocupados = teacher.slots.filter(
+                                (s) => s.status === "ocupado",
+                              ).length;
+                              const livres = teacher.slots.filter(
+                                (s) => s.status === "disponivel",
+                              ).length;
+                              const cancel = teacher.slots.filter(
+                                (s) => s.status === "cancelado",
+                              ).length;
+                              const temAlgo = ocupadosList.length > 0;
                               return (
                                 <div
                                   key={tIdx}
-                                  className="overflow-hidden rounded-2xl bg-white ring-1 ring-inset ring-[var(--app-border)]"
+                                  className="overflow-hidden rounded-2xl bg-[var(--app-solid-surface)] ring-1 ring-inset ring-[var(--app-border)]"
                                 >
                                   {/* Card header professor */}
-                                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3">
+                                  <div className="flex items-center justify-between gap-3 px-3.5 py-3 sm:px-4">
                                     <div className="flex min-w-0 items-center gap-3">
-                                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ea580c] to-[#fb923c] text-[12.5px] font-bold uppercase text-white shadow-[0_6px_14px_-4px_rgba(234,88,12,0.45)]">
+                                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgba(234,88,12,0.10)] text-[12px] font-bold uppercase text-[#c2410c] ring-1 ring-inset ring-[rgba(234,88,12,0.18)]">
                                         {teacher.name
                                           .split(" ")
                                           .map((x) => x[0])
@@ -725,7 +683,7 @@ export function AppDateRangePicker({
                                           .join("")}
                                       </div>
                                       <div className="min-w-0">
-                                        <div className="truncate text-[14px] font-semibold text-[var(--app-text-95)]">
+                                        <div className="truncate text-[13.5px] font-semibold text-[var(--app-text-95)] leading-tight">
                                           {teacher.name}
                                         </div>
                                         <div className="mt-0.5 truncate text-[11.5px] text-[var(--app-text-55)]">
@@ -734,142 +692,101 @@ export function AppDateRangePicker({
                                       </div>
                                     </div>
 
-                                    <div className="flex shrink-0 items-center gap-2">
-                                      <div className="flex h-8 items-center gap-1.5 rounded-xl bg-[rgba(22,163,74,0.08)] px-2.5 ring-1 ring-inset ring-[rgba(22,163,74,0.16)]">
-                                        <CheckCircle2 className="h-3.5 w-3.5 text-[#15803d]" />
-                                        <span className="text-[11.5px] font-bold leading-none text-[#166534]">
-                                          {teacher.totalBookings}
-                                        </span>
-                                        <span className="text-[10.5px] font-semibold leading-none text-[#15803d]">
-                                          aula{teacher.totalBookings === 1 ? "" : "s"}
-                                        </span>
-                                      </div>
-                                      <div className="flex h-8 items-center gap-1.5 rounded-xl bg-[var(--app-solid-surface-2)] px-2.5 ring-1 ring-inset ring-[var(--app-border)]">
-                                        <Clock className="h-3.5 w-3.5 text-[var(--app-text-55)]" />
-                                        <span className="text-[11.5px] font-bold leading-none text-[var(--app-text-75)]">
-                                          {totalSlots}
-                                        </span>
-                                        <span className="text-[10.5px] font-semibold leading-none text-[var(--app-text-55)]">
-                                          slots
-                                        </span>
-                                      </div>
+                                    {/* Resumo compacto 1 linha */}
+                                    <div className="flex shrink-0 items-center gap-1.5">
+                                      {ocupados > 0 ? (
+                                        <div className="inline-flex h-7 items-center gap-1 rounded-lg bg-[rgba(22,163,74,0.08)] px-2 ring-1 ring-inset ring-[rgba(22,163,74,0.18)]">
+                                          <CheckCircle2 className="h-3 w-3 text-[#15803d]" />
+                                          <span className="text-[11px] font-bold leading-none text-[#166534]">
+                                            {ocupados}
+                                          </span>
+                                        </div>
+                                      ) : null}
+                                      {cancel > 0 ? (
+                                        <div className="inline-flex h-7 items-center gap-1 rounded-lg bg-[rgba(107,114,128,0.08)] px-2 ring-1 ring-inset ring-[rgba(107,114,128,0.18)]">
+                                          <Ban className="h-3 w-3 text-[#4b5563]" />
+                                          <span className="text-[11px] font-bold leading-none text-[#374151]">
+                                            {cancel}
+                                          </span>
+                                        </div>
+                                      ) : null}
+                                      {livres > 0 ? (
+                                        <div className="inline-flex h-7 items-center gap-1 rounded-lg bg-[var(--app-solid-surface-2)] px-2 ring-1 ring-inset ring-[var(--app-border)]">
+                                          <Clock className="h-3 w-3 text-[var(--app-text-55)]" />
+                                          <span className="text-[11px] font-bold leading-none text-[var(--app-text-75)]">
+                                            {livres}
+                                          </span>
+                                        </div>
+                                      ) : null}
                                     </div>
                                   </div>
 
-                                  {/* Barra de ocupação visual */}
-                                  <div className="px-4 pt-3">
-                                    <div className="mb-1.5 flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-55)]">
-                                      <span>Ocupação do dia</span>
-                                      <span>
-                                        {ocupados} marcadas · {livres} livres
-                                        {cancel > 0 ? ` · ${cancel} cancelada${cancel === 1 ? "" : "s"}` : ""}
-                                      </span>
-                                    </div>
-                                    <div
-                                      className="h-1.5 gap-[2px] overflow-hidden rounded-full bg-[var(--app-solid-surface-2)] grid"
-                                      style={{ gridTemplateColumns: "repeat(15, minmax(0, 1fr))" }}
-                                    >
-                                      {teacher.slots.slice(0, 15).map((s, sIdx) => (
-                                        <div
-                                          key={sIdx}
-                                          className={[
-                                            "h-full rounded-full",
-                                            s.status === "ocupado"
-                                              ? "bg-[#16a34a]"
-                                              : s.status === "cancelado"
-                                                ? "bg-[#a3a3a3]"
-                                                : s.status === "passado"
-                                                  ? "bg-[#d4d4d4]"
-                                                  : "bg-[rgba(234,88,12,0.35)]",
-                                          ].join(" ")}
-                                        />
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Lista de slots (horários) */}
-                                  <div className="px-4 py-3">
-                                    {!hasAny && teacher.totalBookings === 0 ? (
-                                      <div className="py-2 text-[12px] text-[var(--app-text-55)]">
-                                        Nenhuma aula ou horário disponível para {teacher.name.split(" ")[0]} neste dia.
-                                      </div>
-                                    ) : (
-                                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                                        {teacher.slots.map((slot, sIdx) => {
-                                          if (slot.status === "passado") return null;
-                                          const ocupado = slot.status === "ocupado";
-                                          const cancelado = slot.status === "cancelado";
-                                          return (
-                                            <div
-                                              key={sIdx}
-                                              className={[
-                                                "group relative flex items-start justify-between gap-2 rounded-xl px-2.5 py-2 ring-1 ring-inset",
-                                                ocupado
-                                                  ? "bg-[rgba(22,163,74,0.055)] ring-[rgba(22,163,74,0.18)]"
-                                                  : cancelado
-                                                    ? "bg-[var(--app-solid-surface-2)] ring-[var(--app-border)] opacity-70"
-                                                    : "bg-white ring-[var(--app-border)]",
-                                              ].join(" ")}
-                                            >
-                                              <div className="flex min-w-0 items-center gap-2">
-                                                <div
-                                                  className={[
-                                                    "flex h-8 w-12 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold tabular-nums",
-                                                    ocupado
-                                                      ? "bg-[#16a34a] text-white"
-                                                      : cancelado
-                                                        ? "bg-[var(--app-solid-surface-3)] text-[var(--app-text-55)] line-through"
-                                                        : "bg-[rgba(234,88,12,0.08)] text-[#9a3412]",
-                                                  ].join(" ")}
-                                                >
-                                                  {slot.professorTime}
-                                                </div>
-                                                <div className="min-w-0">
-                                                  {ocupado && slot.aluno ? (
-                                                    <>
-                                                      <div className="truncate text-[12.5px] font-semibold text-[var(--app-text-92)]">
-                                                        {slot.aluno.displayName}
-                                                      </div>
-                                                      <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-55)]">
-                                                        {slot.aluno.phone ? slot.aluno.phone : "—"}
-                                                        {slot.aluno.status && slot.aluno.status !== "lead"
-                                                          ? ` · ${slot.aluno.status}`
-                                                          : ""}
-                                                      </div>
-                                                    </>
-                                                  ) : cancelado ? (
-                                                    <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--app-text-55)]">
-                                                      <Ban className="h-3.5 w-3.5" />
-                                                      <span className="font-medium">Cancelado</span>
-                                                    </div>
-                                                  ) : (
-                                                    <div className="text-[11.5px] font-medium text-[var(--app-text-55)]">
-                                                      Horário disponível
-                                                    </div>
-                                                  )}
-                                                </div>
+                                  {/* Apenas aulas marcadas / canceladas (horários livres NÃO listados — poluição) */}
+                                  {temAlgo ? (
+                                    <div className="flex flex-col gap-1 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
+                                      {ocupadosList.map((slot, sIdx) => {
+                                        const ocupado = slot.status === "ocupado";
+                                        const cancelado = slot.status === "cancelado";
+                                        return (
+                                          <div
+                                            key={sIdx}
+                                            className={[
+                                              "flex items-center justify-between gap-2 rounded-xl px-2.5 py-2",
+                                              ocupado
+                                                ? "bg-white ring-1 ring-inset ring-[var(--app-border)]"
+                                                : "bg-[var(--app-solid-surface-2)] ring-1 ring-inset ring-[var(--app-border)] opacity-80",
+                                            ].join(" ")}
+                                          >
+                                            <div className="flex min-w-0 items-center gap-2.5">
+                                              <div
+                                                className={[
+                                                  "flex h-8 w-12 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold tabular-nums",
+                                                  ocupado
+                                                    ? "bg-[#0f172a] text-white"
+                                                    : "bg-[var(--app-solid-surface-3)] text-[var(--app-text-55)] line-through",
+                                                ].join(" ")}
+                                              >
+                                                {slot.professorTime}
                                               </div>
-
-                                              {/* Badge status (direita) */}
-                                              {ocupado ? (
-                                                <div className="shrink-0 rounded-lg bg-[#16a34a] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-white">
-                                                  Marcada
-                                                </div>
-                                              ) : cancelado ? (
-                                                <div className="shrink-0 rounded-lg bg-[var(--app-solid-surface-3)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--app-text-55)]">
-                                                  Cancelada
-                                                </div>
-                                              ) : (
-                                                <div className="shrink-0 rounded-lg bg-[rgba(234,88,12,0.10)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-[#9a3412] ring-1 ring-inset ring-[rgba(234,88,12,0.18)]">
-                                                  Livre
-                                                </div>
-                                              )}
+                                              <div className="min-w-0">
+                                                {ocupado && slot.aluno ? (
+                                                  <>
+                                                    <div className="truncate text-[12.5px] font-semibold text-[var(--app-text-92)]">
+                                                      {slot.aluno.displayName}
+                                                    </div>
+                                                    <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-55)]">
+                                                      {slot.aluno.phone
+                                                        ? slot.aluno.phone
+                                                        : "—"}
+                                                    </div>
+                                                  </>
+                                                ) : (
+                                                  <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--app-text-55)]">
+                                                    <Ban className="h-3.5 w-3.5" />
+                                                    <span className="font-medium">
+                                                      Cancelada
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </div>
                                             </div>
-                                          );
-                                        })}
+
+                                            {ocupado ? (
+                                              <span className="shrink-0 rounded-lg bg-[rgba(22,163,74,0.10)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[#15803d] ring-1 ring-inset ring-[rgba(22,163,74,0.18)]">
+                                                Marcada
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div className="px-3.5 pb-3.5 sm:px-4 sm:pb-4">
+                                      <div className="rounded-xl bg-[var(--app-solid-surface-2)] px-3 py-2.5 text-[11.5px] font-medium text-[var(--app-text-55)] ring-1 ring-inset ring-[var(--app-border)]">
+                                        Sem aulas para {teacher.name.split(" ")[0]} neste dia
                                       </div>
-                                    )}
-                                  </div>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -877,29 +794,6 @@ export function AppDateRangePicker({
                         )}
                       </div>
                     )}
-
-                    {/* Footer (só legenda/status discreto) */}
-                    <div className="shrink-0 border-t border-[var(--app-border)] px-4 py-2.5 sm:px-5">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-[10.5px] font-medium text-[var(--app-text-55)]">
-                        <div className="flex items-center gap-3">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded-full bg-[#16a34a]" />
-                            Ocupada
-                          </span>
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded-full bg-[rgba(234,88,12,0.55)]" />
-                            Livre
-                          </span>
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded-full bg-[#a3a3a3]" />
-                            Cancelada
-                          </span>
-                        </div>
-                        <div className="text-[10.5px] text-[var(--app-text-45)]">
-                          {isValid(dateObj) ? format(dateObj, "EEEE", { locale: ptBR }) : ""}
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               );
