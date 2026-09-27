@@ -92,97 +92,27 @@ export async function GET(req: Request) {
   const admin = createSupabaseAdminClient();
 
   // 1) Buscar TODOS os bookings desse dia (professor_date === targetDate)
-  // Tenta JOIN com lead_id FK EXPLÍCITA primeiro (Supabase reclama de ambiguidade quando há >1 FK entre as 2 tabelas).
-  // Fallback: tentar outras FKs comuns. Fallback final: SEM join (usa leadMap).
-  let bookings: Array<Record<string, unknown>> = [];
+  // NÃO FAZ JOIN inline com atendimento_leads na mesma query.
+  // Erros frequentes: "more than one relationship" e "could not find a relationship in the schema cache"
+  // (pois existem 2+ FKs e/ou PostgREST cache não reconhece a relação).
+  // Fazer 2 selects separados SEMPRE (bookings + leads WHERE lead_id IN (...) — método que sempre funcionou.
+  const bookings: Array<Record<string, unknown>> = [];
   const baseSelect =
     "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at";
-  const leadProjection =
-    "id, full_name, student_full_name, display_name, phone, status, funnel_stage, recurring_class_status";
-  const fkCandidates = [
-    // FK padrão gerada pelo Supabase: tablename_column_fkey
-    "atendimento_experimental_class_bookings_lead_id_fkey",
-    // Variantes comuns
-    "bookings_lead_id_fkey",
-    "experimental_bookings_lead_id_fkey",
-    "atendimento_exp_bookings_lead_id_fkey",
-    // Se houver FK via attendance ou outra coluna
-    "atendimento_experimental_class_bookings_attendance_lead_id_fkey",
-  ];
-
-  let bookingsData: Array<Record<string, unknown>> | null = null;
-  let bError: any | null = null;
-
-  for (let i = -1; i < fkCandidates.length; i++) {
-    let fullSel = baseSelect;
-    // i === -1 → join implicito (só pra testar)
-    if (i === -1) {
-      fullSel = `${baseSelect}, al:atendimento_leads(${leadProjection})`;
-    } else {
-      fullSel = `${baseSelect}, al:atendimento_leads!${fkCandidates[i]}(${leadProjection})`;
+  {
+    const { data, error } = await admin
+      .from("atendimento_experimental_class_bookings")
+      .select(baseSelect)
+      .eq("professor_date", targetDate);
+    if (error && !isBookingsMissing(error)) {
+      return Response.json(
+        { ok: false, error: error.message ?? String(error) },
+        { status: 500 },
+      );
     }
-    try {
-      const { data, error } = await admin
-        .from("atendimento_experimental_class_bookings")
-        .select(fullSel)
-        .eq("professor_date", targetDate);
-      if (!error) {
-        bookingsData =
-          ((data as unknown) as Array<Record<string, unknown>> | null) ??
-          [];
-        bError = null;
-        break;
-      }
-      bError = error;
-      const msg = String(error.message ?? "").toLowerCase();
-      const isAmbiguousOrMissing =
-        msg.includes("more than one relationship") ||
-        msg.includes("could not find the") ||
-        msg.includes("column ") ||
-        msg.includes("does not exist") ||
-        msg.includes("ambiguous") ||
-        msg.includes("unknown");
-      if (!isAmbiguousOrMissing) break;
-      // Continua tentando próximo candidato
-    } catch (e: any) {
-      bError = e;
+    if (data && !isBookingsMissing(error)) {
+      for (const b of data as Array<Record<string, unknown>>) bookings.push(b);
     }
-  }
-
-  // Se falhou todos os joins, usa query SEM join e vai de leadMap separado.
-  if (bError) {
-    const msg = String(bError.message ?? "").toLowerCase();
-    const looksLikeJoinFkError =
-      msg.includes("more than one relationship") ||
-      msg.includes("could not find the") ||
-      msg.includes("column ") ||
-      msg.includes("does not exist") ||
-      msg.includes("unexpected");
-    if (looksLikeJoinFkError) {
-      try {
-        const q2 = admin
-          .from("atendimento_experimental_class_bookings")
-          .select(baseSelect)
-          .eq("professor_date", targetDate);
-        const r2 = await q2;
-        if (!r2.error) {
-          bookingsData =
-            (((r2.data as unknown) as Array<Record<string, unknown>>) ??
-              null) ?? [];
-          bError = null;
-        } else {
-          bError = r2.error;
-        }
-      } catch (e: any) {
-        bError = e;
-      }
-    }
-  }
-  if (bError && !isBookingsMissing(bError)) {
-    return Response.json({ ok: false, error: String(bError.message ?? bError) }, { status: 500 });
-  }
-  if (bookingsData && !isBookingsMissing(bError)) {
-    bookings = bookingsData.map((b) => b as Record<string, unknown>);
   }
 
   // 2) Buscar leads vinculados (nome, telefone, status)
@@ -191,14 +121,29 @@ export async function GET(req: Request) {
     .filter(Boolean);
   const leadMap = new Map<string, Record<string, unknown>>();
   if (leadIds.length > 0) {
+    const uniqIds = Array.from(new Set(leadIds));
     const { data: leadsRows, error: lError } = await admin
       .from("atendimento_leads")
       .select(
         "id, full_name, student_full_name, display_name, phone, status, funnel_stage, recurring_class_status",
       )
-      .in("id", Array.from(new Set(leadIds)));
-    if (!lError || isLeadsMissing(lError) === false) {
-      // ignoramos erro "tabela não existe" só no sentido de não quebrar; se erro diferente, continua sem leads.
+      .in("id", uniqIds);
+    if (lError && isLeadsMissing(lError) === false) {
+      // Erro diferente de tabela não existe, tenta buscar INDIVIDUALMENTE (as vezes .in tem limite/cache ruim).
+      try {
+        const rows: Array<Record<string, unknown>> = [];
+        for (const id of uniqIds) {
+          const { data: one, error: oneErr } = await admin
+            .from("atendimento_leads")
+            .select(
+              "id, full_name, student_full_name, display_name, phone, status, funnel_stage, recurring_class_status",
+            )
+            .eq("id", id)
+            .maybeSingle();
+          if (!oneErr && one) rows.push(one as Record<string, unknown>);
+        }
+        for (const r of rows) leadMap.set(String(r.id ?? ""), r);
+      } catch {}
     }
     if (leadsRows) {
       for (const r of leadsRows as Array<Record<string, unknown>>) {
@@ -242,7 +187,9 @@ export async function GET(req: Request) {
         return (nm ? nm === p.name : true) && (ph ? ph === p.phone : true);
       }
       // Sem assigned nenhum: atribui ao 1o professor da allowlist (fallback Lucas Brum)
-      return p.phone === EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0]?.phone;
+      return (
+        p.phone === EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0]?.phone
+      );
     });
     const pbByTime = new Map<string, Array<Record<string, unknown>>>();
     for (const b of pb) {
@@ -255,111 +202,123 @@ export async function GET(req: Request) {
     let totalBookings = 0;
     let totalPast = 0;
     let totalScheduled = 0;
-    const slots = daySlotsRaw.map((s) => {
-      const time = s.professorTime;
-      const bkList = pbByTime.get(time) ?? [];
-      // Pega o booking ativo: prioridade scheduled > confirmed > attended > outros > cancelled
-      const order: Record<string, number> = {
-        scheduled: 6,
-        confirmed: 5,
-        attended: 4,
-        pending: 3,
-        rescheduled: 2,
-        missed: 1,
-        cancelled: 0,
-      };
-      const sorted = [...bkList].sort((a, b) => {
-        const sa = order[String(a.status ?? "").toLowerCase()] ?? -1;
-        const sb = order[String(b.status ?? "").toLowerCase()] ?? -1;
-        if (sa !== sb) return sb - sa;
-        const ua = String(a.updated_at ?? a.created_at ?? "");
-        const ub = String(b.updated_at ?? b.created_at ?? "");
-        return ub.localeCompare(ua);
-      });
-      const active = sorted[0] ?? null;
-      const bookingStatus = String(active?.status ?? "").trim().toLowerCase() || null;
-      const isCancelled = bookingStatus === "cancelled";
+    const slots = await Promise.all(
+      daySlotsRaw.map(async (s) => {
+        const time = s.professorTime;
+        const bkList = pbByTime.get(time) ?? [];
+        const order: Record<string, number> = {
+          scheduled: 6,
+          confirmed: 5,
+          attended: 4,
+          pending: 3,
+          rescheduled: 2,
+          missed: 1,
+          cancelled: 0,
+        };
+        const sorted = [...bkList].sort((a, b) => {
+          const sa = order[String(a.status ?? "").toLowerCase()] ?? -1;
+          const sb = order[String(b.status ?? "").toLowerCase()] ?? -1;
+          if (sa !== sb) return sb - sa;
+          const ua = String(a.updated_at ?? a.created_at ?? "");
+          const ub = String(b.updated_at ?? b.created_at ?? "");
+          return ub.localeCompare(ua);
+        });
+        const active = sorted[0] ?? null;
+        const bookingStatus =
+          String(active?.status ?? "").trim().toLowerCase() || null;
+        const isCancelled = bookingStatus === "cancelled";
 
-      // Detectar passado: se slot já passou E o status não tá mais scheduled.
-      const iso = s.professorStartAtIso;
-      const isPastByTime =
-        !!iso &&
-        isAfter(parseISO(nowUtc), parseISO(iso)) &&
-        bookingStatus !== "scheduled";
+        const iso = s.professorStartAtIso;
+        const isPastByTime =
+          !!iso &&
+          isAfter(parseISO(nowUtc), parseISO(iso)) &&
+          bookingStatus !== "scheduled";
 
-      let slotStatus: "disponivel" | "ocupado" | "passado" | "cancelado" =
-        "disponivel";
-      if (isCancelled) slotStatus = "cancelado";
-      else if (active) slotStatus = "ocupado";
-      else if (s.isPast || isPastByTime) slotStatus = "passado";
+        let slotStatus: "disponivel" | "ocupado" | "passado" | "cancelado" =
+          "disponivel";
+        if (isCancelled) slotStatus = "cancelado";
+        else if (active) slotStatus = "ocupado";
+        else if (s.isPast || isPastByTime) slotStatus = "passado";
 
-      if (active && !isCancelled) {
-        totalBookings += 1;
-        if (isPastByTime || s.isPast) totalPast += 1;
-        else totalScheduled += 1;
-      }
-
-      let aluno = null as {
-        id: string;
-        displayName: string;
-        phone: string;
-        status: string;
-      } | null;
-      if (active && (active.lead_id || active.al)) {
-        // 1) Pegar o lead DO JOIN no booking (al:) — sempre preferência 1, traz nome REAL.
-        const alJoin = (active.al as Record<string, unknown> | undefined) ?? null;
-        // 2) Fallback: leadMap separado (se o join falhou na query, usamos o select separado).
-        let lr = alJoin;
-        if (!lr && active.lead_id) {
-          lr = leadMap.get(String(active.lead_id ?? "")) ?? null;
+        if (active && !isCancelled) {
+          totalBookings += 1;
+          if (isPastByTime || s.isPast) totalPast += 1;
+          else totalScheduled += 1;
         }
-        if (lr) {
-          const names = [
-            String((lr as any).student_full_name ?? "").trim(),
-            String((lr as any).full_name ?? "").trim(),
-            String((lr as any).display_name ?? "").trim(),
-          ].filter(Boolean);
-          const phone = String((lr as any).phone ?? "").trim();
-          const funnel = String(
-            (lr as any).funnel_stage ??
-              (lr as any).status ??
-              (lr as any).recurring_class_status ??
-              "",
-          ).trim();
-          aluno = {
-            id: String((lr as any).id ?? active.lead_id ?? active.id ?? ""),
-            displayName:
-              names[0] ??
-              (active.id
-                ? `Agendamento ${String(active.id ?? "").slice(0, 6).toUpperCase()}`
-                : "Agendamento"),
-            phone,
-            status: funnel || "lead",
-          };
-        } else {
-          // Nenhum lead encontrado, mas booking existe. Usar o id do booking como referência visível.
-          const idShort = String(active.id ?? active.lead_id ?? "")
-            .slice(0, 6)
-            .toUpperCase();
-          aluno = {
-            id: String(active.lead_id ?? active.id ?? ""),
-            displayName: idShort ? `Agendamento ${idShort}` : "Agendamento",
-            phone: "",
-            status: "",
-          };
-        }
-      }
 
-      return {
-        professorTime: time,
-        status: slotStatus,
-        bookingId: active
-          ? String(active.id ?? "").trim() || null
-          : null,
-        bookingStatus,
-        aluno,
-      };
-    });
+        let aluno = null as {
+          id: string;
+          displayName: string;
+          phone: string;
+          status: string;
+        } | null;
+        if (active && active.lead_id) {
+          let lr: Record<string, unknown> | null =
+            leadMap.get(String(active.lead_id ?? "")) ?? null;
+          if (!lr) {
+            try {
+              const { data: one, error: oneErr } = await admin
+                .from("atendimento_leads")
+                .select(
+                  "id, full_name, student_full_name, display_name, phone, status, funnel_stage, recurring_class_status",
+                )
+                .eq("id", String(active.lead_id ?? ""))
+                .maybeSingle();
+              if (!oneErr && one) {
+                lr = one as Record<string, unknown>;
+                leadMap.set(String(active.lead_id ?? ""), lr);
+              }
+            } catch {}
+          }
+          if (lr) {
+            const names = [
+              String((lr as any).student_full_name ?? "").trim(),
+              String((lr as any).full_name ?? "").trim(),
+              String((lr as any).display_name ?? "").trim(),
+            ].filter(Boolean);
+            const phone = String((lr as any).phone ?? "").trim();
+            const funnel = String(
+              (lr as any).funnel_stage ??
+                (lr as any).status ??
+                (lr as any).recurring_class_status ??
+                "",
+            ).trim();
+            aluno = {
+              id: String(
+                (lr as any).id ?? active.lead_id ?? active.id ?? "",
+              ),
+              displayName:
+                names[0] ??
+                (active.id
+                  ? `Agendamento ${String(active.id ?? "").slice(0, 6).toUpperCase()}`
+                  : "Agendamento"),
+              phone,
+              status: funnel || "lead",
+            };
+          } else {
+            const idShort = String(active.id ?? active.lead_id ?? "")
+              .slice(0, 6)
+              .toUpperCase();
+            aluno = {
+              id: String(active.lead_id ?? active.id ?? ""),
+              displayName: idShort ? `Agendamento ${idShort}` : "Agendamento",
+              phone: "",
+              status: "",
+            };
+          }
+        }
+
+        return {
+          professorTime: time,
+          status: slotStatus,
+          bookingId: active
+            ? String(active.id ?? "").trim() || null
+            : null,
+          bookingStatus,
+          aluno,
+        };
+      }),
+    );
 
     teachers.push({
       name: p.name,
