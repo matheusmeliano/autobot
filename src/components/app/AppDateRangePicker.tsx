@@ -810,11 +810,11 @@ export function AppDateRangePicker({
                                                     <div className="truncate text-[13px] font-semibold text-[var(--app-text-95)] leading-tight">
                                                       {slot.aluno.displayName}
                                                     </div>
-                                                    <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-55)] leading-tight">
-                                                      {slot.aluno.phone
-                                                        ? slot.aluno.phone
-                                                        : "—"}
-                                                    </div>
+                                                    {slot.aluno.phone ? (
+                                                      <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-55)] leading-tight">
+                                                        {slot.aluno.phone}
+                                                      </div>
+                                                    ) : null}
                                                   </>
                                                 ) : (
                                                   <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--app-text-55)]">

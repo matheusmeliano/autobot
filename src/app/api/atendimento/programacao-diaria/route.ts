@@ -92,14 +92,43 @@ export async function GET(req: Request) {
   const admin = createSupabaseAdminClient();
 
   // 1) Buscar TODOS os bookings desse dia (professor_date === targetDate)
+  // Faz LEFT JOIN com atendimento_leads DIRETO na query, p/ pegar nome/telefone DO PRÓPRIO booking
+  // sem depender do leadMap separado (evita "Lead" hardcoded quando leadMap vazio ou erro).
   let bookings: Array<Record<string, unknown>> = [];
-  const query = admin
-    .from("atendimento_experimental_class_bookings")
-    .select(
-      "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at",
-    )
-    .eq("professor_date", targetDate);
-  const { data: bookingsData, error: bError } = await query;
+  const buildQ = () => {
+    const q = admin
+      .from("atendimento_experimental_class_bookings")
+      .select(
+        `id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at,
+         al:atendimento_leads(id, full_name, student_full_name, display_name, phone, status, funnel_stage, recurring_class_status)`,
+      )
+      .eq("professor_date", targetDate);
+    return q;
+  };
+  let qr = await buildQ();
+  let bookingsData = (qr.data ?? null) as Array<Record<string, unknown>> | null;
+  let bError = qr.error ?? null;
+  // Supabase as vezes erra "could not find column X" no alias de LEFT JOIN.
+  // Se falhou, fallback para query SEM join (apenas bookings), usando o leadMap de baixo.
+  if (bError && !isBookingsMissing(bError)) {
+    const msg = String(bError.message ?? "").toLowerCase();
+    const looksLikeJoinError =
+      msg.includes("could not find the") ||
+      msg.includes("column ") ||
+      msg.includes("does not exist") ||
+      msg.includes("unexpected");
+    if (looksLikeJoinError) {
+      const q2 = admin
+        .from("atendimento_experimental_class_bookings")
+        .select(
+          "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at",
+        )
+        .eq("professor_date", targetDate);
+      const r2 = await q2;
+      bookingsData = (r2.data ?? null) as Array<Record<string, unknown>> | null;
+      bError = r2.error ?? null;
+    }
+  }
   if (bError && !isBookingsMissing(bError)) {
     return Response.json({ ok: false, error: bError.message }, { status: 500 });
   }
@@ -227,30 +256,45 @@ export async function GET(req: Request) {
         phone: string;
         status: string;
       } | null;
-      if (active && active.lead_id) {
-        const lr = leadMap.get(String(active.lead_id ?? "")) ?? null;
+      if (active && (active.lead_id || active.al)) {
+        // 1) Pegar o lead DO JOIN no booking (al:) — sempre preferência 1, traz nome REAL.
+        const alJoin = (active.al as Record<string, unknown> | undefined) ?? null;
+        // 2) Fallback: leadMap separado (se o join falhou na query, usamos o select separado).
+        let lr = alJoin;
+        if (!lr && active.lead_id) {
+          lr = leadMap.get(String(active.lead_id ?? "")) ?? null;
+        }
         if (lr) {
           const names = [
-            String(lr.student_full_name ?? "").trim(),
-            String(lr.full_name ?? "").trim(),
-            String(lr.display_name ?? "").trim(),
+            String((lr as any).student_full_name ?? "").trim(),
+            String((lr as any).full_name ?? "").trim(),
+            String((lr as any).display_name ?? "").trim(),
           ].filter(Boolean);
+          const phone = String((lr as any).phone ?? "").trim();
+          const funnel = String(
+            (lr as any).funnel_stage ??
+              (lr as any).status ??
+              (lr as any).recurring_class_status ??
+              "",
+          ).trim();
           aluno = {
-            id: String(lr.id ?? ""),
-            displayName: names[0] ?? "Sem nome",
-            phone: String(lr.phone ?? "").trim(),
-            status:
-              String(
-                lr.funnel_stage ??
-                  lr.status ??
-                  lr.recurring_class_status ??
-                  "",
-              ).trim() || "lead",
+            id: String((lr as any).id ?? active.lead_id ?? active.id ?? ""),
+            displayName:
+              names[0] ??
+              (active.id
+                ? `Agendamento ${String(active.id ?? "").slice(0, 6).toUpperCase()}`
+                : "Agendamento"),
+            phone,
+            status: funnel || "lead",
           };
         } else {
+          // Nenhum lead encontrado, mas booking existe. Usar o id do booking como referência visível.
+          const idShort = String(active.id ?? active.lead_id ?? "")
+            .slice(0, 6)
+            .toUpperCase();
           aluno = {
-            id: String(active.lead_id ?? ""),
-            displayName: "Lead",
+            id: String(active.lead_id ?? active.id ?? ""),
+            displayName: idShort ? `Agendamento ${idShort}` : "Agendamento",
             phone: "",
             status: "",
           };
