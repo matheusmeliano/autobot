@@ -92,45 +92,94 @@ export async function GET(req: Request) {
   const admin = createSupabaseAdminClient();
 
   // 1) Buscar TODOS os bookings desse dia (professor_date === targetDate)
-  // Faz LEFT JOIN com atendimento_leads DIRETO na query, p/ pegar nome/telefone DO PRÓPRIO booking
-  // sem depender do leadMap separado (evita "Lead" hardcoded quando leadMap vazio ou erro).
+  // Tenta JOIN com lead_id FK EXPLÍCITA primeiro (Supabase reclama de ambiguidade quando há >1 FK entre as 2 tabelas).
+  // Fallback: tentar outras FKs comuns. Fallback final: SEM join (usa leadMap).
   let bookings: Array<Record<string, unknown>> = [];
-  const buildQ = () => {
-    const q = admin
-      .from("atendimento_experimental_class_bookings")
-      .select(
-        `id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at,
-         al:atendimento_leads(id, full_name, student_full_name, display_name, phone, status, funnel_stage, recurring_class_status)`,
-      )
-      .eq("professor_date", targetDate);
-    return q;
-  };
-  let qr = await buildQ();
-  let bookingsData = (qr.data ?? null) as Array<Record<string, unknown>> | null;
-  let bError = qr.error ?? null;
-  // Supabase as vezes erra "could not find column X" no alias de LEFT JOIN.
-  // Se falhou, fallback para query SEM join (apenas bookings), usando o leadMap de baixo.
-  if (bError && !isBookingsMissing(bError)) {
+  const baseSelect =
+    "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at";
+  const leadProjection =
+    "id, full_name, student_full_name, display_name, phone, status, funnel_stage, recurring_class_status";
+  const fkCandidates = [
+    // FK padrão gerada pelo Supabase: tablename_column_fkey
+    "atendimento_experimental_class_bookings_lead_id_fkey",
+    // Variantes comuns
+    "bookings_lead_id_fkey",
+    "experimental_bookings_lead_id_fkey",
+    "atendimento_exp_bookings_lead_id_fkey",
+    // Se houver FK via attendance ou outra coluna
+    "atendimento_experimental_class_bookings_attendance_lead_id_fkey",
+  ];
+
+  let bookingsData: Array<Record<string, unknown>> | null = null;
+  let bError: any | null = null;
+
+  for (let i = -1; i < fkCandidates.length; i++) {
+    let fullSel = baseSelect;
+    // i === -1 → join implicito (só pra testar)
+    if (i === -1) {
+      fullSel = `${baseSelect}, al:atendimento_leads(${leadProjection})`;
+    } else {
+      fullSel = `${baseSelect}, al:atendimento_leads!${fkCandidates[i]}(${leadProjection})`;
+    }
+    try {
+      const { data, error } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .select(fullSel)
+        .eq("professor_date", targetDate);
+      if (!error) {
+        bookingsData =
+          ((data as unknown) as Array<Record<string, unknown>> | null) ??
+          [];
+        bError = null;
+        break;
+      }
+      bError = error;
+      const msg = String(error.message ?? "").toLowerCase();
+      const isAmbiguousOrMissing =
+        msg.includes("more than one relationship") ||
+        msg.includes("could not find the") ||
+        msg.includes("column ") ||
+        msg.includes("does not exist") ||
+        msg.includes("ambiguous") ||
+        msg.includes("unknown");
+      if (!isAmbiguousOrMissing) break;
+      // Continua tentando próximo candidato
+    } catch (e: any) {
+      bError = e;
+    }
+  }
+
+  // Se falhou todos os joins, usa query SEM join e vai de leadMap separado.
+  if (bError) {
     const msg = String(bError.message ?? "").toLowerCase();
-    const looksLikeJoinError =
+    const looksLikeJoinFkError =
+      msg.includes("more than one relationship") ||
       msg.includes("could not find the") ||
       msg.includes("column ") ||
       msg.includes("does not exist") ||
       msg.includes("unexpected");
-    if (looksLikeJoinError) {
-      const q2 = admin
-        .from("atendimento_experimental_class_bookings")
-        .select(
-          "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at",
-        )
-        .eq("professor_date", targetDate);
-      const r2 = await q2;
-      bookingsData = (r2.data ?? null) as Array<Record<string, unknown>> | null;
-      bError = r2.error ?? null;
+    if (looksLikeJoinFkError) {
+      try {
+        const q2 = admin
+          .from("atendimento_experimental_class_bookings")
+          .select(baseSelect)
+          .eq("professor_date", targetDate);
+        const r2 = await q2;
+        if (!r2.error) {
+          bookingsData =
+            (((r2.data as unknown) as Array<Record<string, unknown>>) ??
+              null) ?? [];
+          bError = null;
+        } else {
+          bError = r2.error;
+        }
+      } catch (e: any) {
+        bError = e;
+      }
     }
   }
   if (bError && !isBookingsMissing(bError)) {
-    return Response.json({ ok: false, error: bError.message }, { status: 500 });
+    return Response.json({ ok: false, error: String(bError.message ?? bError) }, { status: 500 });
   }
   if (bookingsData && !isBookingsMissing(bError)) {
     bookings = bookingsData.map((b) => b as Record<string, unknown>);
