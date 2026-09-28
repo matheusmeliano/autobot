@@ -127,7 +127,22 @@ export async function GET(req: Request) {
       );
     }
     if (data && !isBookingsMissing(error)) {
-      for (const b of data as Array<Record<string, unknown>>) bookings.push(b);
+      for (const bRaw of data as Array<Record<string, unknown>>) {
+        const b = { ...(bRaw as any) } as Record<string, unknown>;
+        // ===== INJEÇÃO DE __noProfessor PARA EXPERIMENTAIS COMPOSITE SEM PROFESSOR (ROOT CAUSE 23/09) =====
+        // Antes: experimentais da tabela com assigned_professor_name=null & phone=null
+        //        caíam no FALLBACK LINHA 637 (Lucas Brum!) — card PN nunca aparecia,
+        //        e 3 badges viravam só 1~2 no modal.
+        // Agora: se NÃO TEM NOME NEM TELEFONE de professor atribuído → marco __noProfessor=true
+        //        para ir pro card "Professor não atribuído" (igual recorrentes sem professor).
+        const hasProf = Boolean(
+          String((b as any).assigned_professor_name ?? "").trim() ||
+          String((b as any).assigned_professor_phone ?? "").trim(),
+        );
+        (b as any).__type = "experimental_composite";
+        (b as any).__noProfessor = !hasProf;
+        bookings.push(b);
+      }
     }
   }
 
@@ -173,6 +188,7 @@ export async function GET(req: Request) {
           if (bkId && alreadySeenBookingIds.has(bkId)) continue;
           const pName = String((r as any).experimental_class_professor_name ?? "").trim();
           const pPhone = String((r as any).experimental_class_professor_phone ?? "").trim();
+          const flatHasProf = Boolean(pName || pPhone);
           const pseudoBooking: Record<string, unknown> = {
             id: `flat-exp-${String(r.id ?? "x")}`,
             lead_id: r.id ?? null,
@@ -187,6 +203,7 @@ export async function GET(req: Request) {
             professor_timezone: (r as any).experimental_class_professor_timezone ?? null,
             assigned_professor_name: pName || null,
             assigned_professor_phone: pPhone || null,
+            __noProfessor: !flatHasProf,
             link: (r as any).experimental_class_link ?? null,
             __type: "experimental_flat",
             __lead_full_name: r.full_name ?? null,
@@ -558,17 +575,25 @@ export async function GET(req: Request) {
     }>;
   }> = [];
 
-  // ===== PROFESSORES ADICIONAIS: card "Professor não atribuído" (para recorrentes sem professor) =====
+  // ===== PROFESSORES ADICIONAIS: card "Professor não atribuído" (TANTO recorrentes QUANTO experimentais) =====
   // Nos prints do usuário (Gisele, Carlos Peta, Edison Nicodemos, Marcela, Aline Faustino), a recorrência
-  // existe mas NÃO TEM professor associado (campos vazios). Criamos um card ESPECIAL para exibir esses
-  // registros SEM jogá-los no fallback errado do Lucas Brum.
+  // OU experimental composite (ex: Marcela 23/09 13:00 tabela com assigned null) existe mas NÃO TEM professor
+  // associado. Criamos um card ESPECIAL para exibir esses registros SEM jogá-los no fallback errado Lucas Brum.
   const PROF_NO_ATRIBUIDO_PHONE = "__no_assigned_professor__";
+  // ===== ATENÇÃO: hasAnyNoProfessor (PROFESSOR NÃO ATRIBUÍDO) agora TAMBÉM considera EXPERIMENTAIS (composite & flat)
+  //                com nome/phone vazios (caso Marcela 13:00 composite 23/09 que estava caindo em Lucas Brum fallback)
   const hasAnyNoProfessor = bookings.some(
     (b) =>
       String((b as any).__noProfessor ?? "false").toLowerCase() === "true" ||
-      String((b as any).assigned_professor_name ?? "").trim() === "" &&
+      (
+        String((b as any).assigned_professor_name ?? "").trim() === "" &&
         String((b as any).assigned_professor_phone ?? "").trim() === "" &&
-        String((b as any).__type ?? "").toLowerCase() === "recurring",
+        (
+          String((b as any).__type ?? "").toLowerCase() === "recurring" ||
+          String((b as any).__type ?? "").toLowerCase().startsWith("experimental") ||
+          !(b as any).__type
+        )
+      ),
   );
   type ProfListItem = { name: string; phone: string; short?: string };
   const teachersList: ProfListItem[] = [
@@ -603,12 +628,18 @@ export async function GET(req: Request) {
     // Filtrar bookings designados para ESTE professor
     const pb = bookings.filter((bk) => {
       const noProf =
-        String((bk as any).__noProfessor ?? "false").toLowerCase() === "true";
-      // CASO ESPECIAL: Card "não atribuído" = todos bookings marcados __noProfessor=true
+        String((bk as any).__noProfessor ?? "false").toLowerCase() === "true" ||
+        (
+          String((bk as any).assigned_professor_name ?? "").trim() === "" &&
+          String((bk as any).assigned_professor_phone ?? "").trim() === ""
+        );
+      // CASO ESPECIAL: Card "não atribuído" = todos bookings SEM professor (__noProfessor=true ou
+      // NOME+PHONE ambos vazios, não importa se experimental ou recorrente).
       if (isNoProfessorCard) {
         return noProf;
       }
-      // Booking SEM professor (recorrente novo estilo) NÃO cai em Lucas/Nathan NUNCA MAIS.
+      // Booking SEM professor (QUALQUER TIPO: experimental composite, flat, ou recorrente)
+      // NÃO cai mais em Lucas Brum por fallback! Vai pro card PN.
       if (noProf) return false;
       const nm = String(bk.assigned_professor_name ?? "").trim();
       const ph = String(bk.assigned_professor_phone ?? "").trim();
@@ -631,17 +662,20 @@ export async function GET(req: Request) {
         if (pIsLB && bkIsLB) return true;
         if (pIsNC && bkIsNC) return true;
         // Se não for nem LB nem NC (professor novo não cadastrado?), NÃO cai aqui.
-        // (será pego no card "Professor não atribuído" via __noProfessor abaixo)
+        // (será pego no card "Professor não atribuído" via noProf acima)
         return false;
       }
-      // Sem assigned nenhum (experimental antigo, sem nome nem telefone): fallback 1º professor (Lucas Brum)
-      return (
-        p.phone === EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0]?.phone
-      );
+      // Fallback NUNCA MAIS. Se chegou aqui, é booking sem info de professor → noProf=true teria capturado.
+      return false;
     });
     const pbByTime = new Map<string, Array<Record<string, unknown>>>();
     for (const b of pb) {
-      const t = String(b.professor_time ?? "").trim();
+      // ===== NORMALIZAÇÃO DE HORÁRIO HH:MM:SS → HH:MM (ROOT CAUSE Aline 01:00:00, Marcela 13:00:00) =====
+      // Antes: "13:00:00" não batia com o slot key "13:00" — booking NUNCA aparecia no card,
+      //        pois pbByTime.get(time) retornava undefined para o horário do slot.
+      // Agora: sempre extrai apenas HH:MM (5 primeiros chars). Tanto "13:00:00" quanto "13:00" viram "13:00".
+      const tRaw = String(b.professor_time ?? "").trim();
+      const t = /^(\d{2}:\d{2})/.exec(tRaw)?.[1] ?? tRaw.slice(0, 5);
       const arr = pbByTime.get(t) ?? [];
       arr.push(b);
       pbByTime.set(t, arr);
@@ -652,7 +686,7 @@ export async function GET(req: Request) {
     let totalScheduled = 0;
     const slots: any[] = [];
     for (const s of daySlotsRaw) {
-      const time = s.professorTime;
+      const time = s.professorTime; // sempre HH:MM (5 chars)
       const bkList = pbByTime.get(time) ?? [];
       const order: Record<string, number> = {
         scheduled: 6,
