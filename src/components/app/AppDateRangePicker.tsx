@@ -67,7 +67,7 @@ type PopoverCoords = {
 export function AppDateRangePicker({
   value,
   onChange,
-  placeholder = "Selecione o período",
+  placeholder = "Calendário",
   className,
   labelDe = "De",
   labelAte = "Até",
@@ -91,14 +91,33 @@ export function AppDateRangePicker({
   }, []);
   const rootRef = useRef<HTMLDivElement>(null);
   const [viewDate, setViewDate] = useState<Date>(() => {
-    const fromDate = parseToDate(value.from);
-    if (fromDate) return fromDate;
+    const fromDateInit = parseToDate(value.from);
+    if (fromDateInit) return fromDateInit;
     return new Date();
   });
 
+  const fromDate = useMemo(() => parseToDate(value.from), [value.from]);
+  const toDate = useMemo(() => parseToDate(value.to), [value.to]);
+
+  // Dias do calendario (6 semanas = 42 dias)
+  const days = useMemo<Date[]>(() => {
+    const monthStart = startOfMonth(viewDate);
+    const start = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const monthEnd = endOfMonth(viewDate);
+    const end = endOfWeek(monthEnd, { weekStartsOn: 0 });
+
+    const out: Date[] = [];
+    let cur = start;
+    while (isBefore(cur, end) || isSameDay(cur, end)) {
+      out.push(cur);
+      cur = addDays(cur, 1);
+    }
+    return out;
+  }, [viewDate]);
+
   // ============================================================
   // MODAL DE PROGRAMAÇÃO DO DIA (Professor por horário)
-  // Abre em: desktop = onDoubleClick day | mobile = long-press ~450ms
+  // Abre em: desktop = clique SIMPLES no dia (número) | mobile = long-press ~450ms
   // ============================================================
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState<string | null>(null);
@@ -141,6 +160,37 @@ export function AppDateRangePicker({
   const longPressMovedRef = useRef(false);
   const longPressTriggeredRef = useRef(false);
   const LONG_PRESS_MS = 450;
+
+  // =============== BADGES MÊS INTEIRO (LB / NC / Pn) ===============
+  const [badgeMap, setBadgeMap] = useState<Record<string, { LB: boolean; NC: boolean; PN: boolean }>>({});
+  const [badgeLoading, setBadgeLoading] = useState(false);
+  const fetchBadges = useCallback(async (daysArr: Date[]) => {
+    if (!daysArr || daysArr.length === 0) return;
+    const first = daysArr[0];
+    const last = daysArr[daysArr.length - 1];
+    const fromIso = format(first, "yyyy-MM-dd");
+    const toIso = format(last, "yyyy-MM-dd");
+    setBadgeLoading(true);
+    try {
+      const resp = await fetch(
+        `/api/atendimento/programacao-diaria/badges?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`,
+        { cache: "no-store" },
+      );
+      const payload = (await resp.json().catch(() => null)) as any;
+      if (payload && payload.ok && payload.badgeMap && typeof payload.badgeMap === "object") {
+        setBadgeMap(payload.badgeMap as Record<string, { LB: boolean; NC: boolean; PN: boolean }>);
+      }
+    } catch {
+      // silently ignore (badge é opcional visual)
+    } finally {
+      setBadgeLoading(false);
+    }
+  }, []);
+  // Recarrega badges sempre que a grade de dias mudar (mudança de mês / viewDate)
+  useEffect(() => {
+    if (!open) return; // só busca quando popover está aberto (economiza request)
+    void fetchBadges(days);
+  }, [days, open, fetchBadges]);
 
   const fetchScheduleFor = useCallback(async (isoDate: string) => {
     setScheduleLoading(true);
@@ -251,105 +301,40 @@ export function AppDateRangePicker({
     };
   }, [open]);
 
-  // Estados para range selecao (hover preview between clicks)
-  const [pickingFirst, setPickingFirst] = useState<boolean>(!value.from);
-  const [hoverDay, setHoverDay] = useState<Date | null>(null);
-
-  const fromDate = useMemo(() => parseToDate(value.from), [value.from]);
-  const toDate = useMemo(() => parseToDate(value.to), [value.to]);
-
-  // Dias do calendario (6 semanas = 42 dias)
-  const days = useMemo<Date[]>(() => {
-    const monthStart = startOfMonth(viewDate);
-    const start = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const monthEnd = endOfMonth(viewDate);
-    const end = endOfWeek(monthEnd, { weekStartsOn: 0 });
-
-    const out: Date[] = [];
-    let cur = start;
-    while (isBefore(cur, end) || isSameDay(cur, end)) {
-      out.push(cur);
-      cur = addDays(cur, 1);
-    }
-    return out;
-  }, [viewDate]);
+  // Estados para range selecao (desativados — não há mais seleção De/Até)
+  // const [pickingFirst, setPickingFirst] = useState<boolean>(!value.from);
+  // const [hoverDay, setHoverDay] = useState<Date | null>(null);
+  // fromDate/toDate/days já declarados ACIMA (antes useEffect badges)
+  void 0;
 
   function handleDayClick(day: Date) {
-    // === REGRA NOVA: clique DUAS VEZES no MESMO dia (ou qualquer dia já selecionado como from/to)
-    //     ===> DESMARCA A SELEÇÃO (remove from/to). Exatamente como pediu o usuário.
-    // Detecta se o dia clicado já está marcado atualmente como início ou fim do range:
-    const dayAlreadyFrom = Boolean(fromDate && isSameDay(day, fromDate) && !toDate);
-    const dayIsEndpoint = Boolean(
-      (fromDate && isSameDay(day, fromDate)) || (toDate && isSameDay(day, toDate)),
-    );
-    // Caso A: primeiro clique (fromDate/todoDate indefinido) OU dia já está marcado como INICIO sem to
-    // (range iniciado solto). Clicar novamente no mesmo => limpar tudo, desmarca.
-    if (dayAlreadyFrom) {
-      onChange({ from: null, to: null });
-      setPickingFirst(true);
-      return;
-    }
-    // Caso B: range FECHADO (from e to setados) e cliquei NOVAMENTE em qualquer um dos 2 extremos
-    // (11 ou 18 do print) => desmarca TUDO.
-    if (toDate && fromDate && dayIsEndpoint) {
-      // Se clicou no MESMO end-point duas vezes (ex: 11 quando 11 é from OU 18 quando 18 é to).
-      // Vamos ser simples: qualquer clique nos extremos do range já fechado => desmarca o range inteiro
-      // (usuário quer "desmarcar a seleção").
-      onChange({ from: null, to: null });
-      setPickingFirst(true);
-      return;
-    }
-    if (pickingFirst || !fromDate) {
-      onChange({ from: toISODate(day), to: null });
-      setPickingFirst(false);
-      return;
-    }
-    // Segundo clique: se vier ANTES do from, inverte
-    if (isBefore(day, fromDate)) {
-      onChange({ from: toISODate(day), to: toISODate(fromDate) });
-      setPickingFirst(true);
-      return;
-    }
-    onChange({ from: toISODate(fromDate), to: toISODate(day) });
-    setPickingFirst(true);
+    // Agenda NÃO MAIS faz seleção de período (De/Até).
+    // Clique no dia (desktop) = abre o modal de programação do dia.
+    void clearAll();
+    openScheduleModal(day);
   }
 
   function isInRangePreview(d: Date): boolean {
-    if (!fromDate) return false;
-    const end = toDate ?? hoverDay;
-    if (!end) return false;
-    const [a, b] = isBefore(fromDate, end) ? [fromDate, end] : [end, fromDate];
-    return (isAfter(d, a) || isSameDay(d, a)) && (isBefore(d, b) || isSameDay(d, b));
+    void d;
+    return false;
   }
   function isStart(d: Date): boolean {
-    if (!fromDate) return false;
-    const realEnd = toDate ?? hoverDay;
-    if (!realEnd) return isSameDay(d, fromDate);
-    const [a] = isBefore(fromDate, realEnd) ? [fromDate, realEnd] : [realEnd, fromDate];
-    return isSameDay(d, a);
+    void d;
+    return false;
   }
   function isEnd(d: Date): boolean {
-    const end = toDate ?? hoverDay;
-    if (!fromDate || !end) return false;
-    const [, b] = isBefore(fromDate, end) ? [fromDate, end] : [end, fromDate];
-    return isSameDay(d, b);
+    void d;
+    return false;
   }
 
   const summaryText = useMemo(() => {
-    if (!value.from && !value.to) return placeholder;
-    if (value.from && !value.to) {
-      const d = parseToDate(value.from);
-      return d ? `${labelDe}: ${format(d, "dd/MM/yyyy")}` : placeholder;
-    }
-    const d1 = parseToDate(value.from);
-    const d2 = parseToDate(value.to);
-    if (d1 && d2) return `${format(d1, "dd/MM")} — ${format(d2, "dd/MM/yyyy")}`;
+    void value;
     return placeholder;
-  }, [value.from, value.to, placeholder, labelDe]);
+  }, [placeholder]);
 
   function clearAll() {
     onChange({ from: null, to: null });
-    setPickingFirst(true);
+    void 0;
   }
 
   const pickerJSX = (
@@ -443,96 +428,65 @@ export function AppDateRangePicker({
           {days.map((d, idx) => {
             const outMonth = !isSameMonth(d, viewDate);
             const today = isToday(d);
-            const inRange = isInRangePreview(d);
-            const start = isStart(d);
-            const end = isEnd(d);
-            const picked = start || end;
+            const iso = format(d, "yyyy-MM-dd");
+            const badges = (badgeMap as any)?.[iso] as { LB?: boolean; NC?: boolean; PN?: boolean } | undefined;
+            const hasLB = Boolean(badges?.LB);
+            const hasNC = Boolean(badges?.NC);
+            const hasPN = Boolean(badges?.PN);
             return (
               <button
                 key={idx}
                 type="button"
                 onClick={() => handleDayClick(d)}
-                onMouseEnter={() => setHoverDay(d)}
-                onMouseLeave={() => setHoverDay(null)}
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  openScheduleModal(d);
-                }}
                 onTouchStart={longPressStart(d)}
                 onTouchEnd={longPressCancel}
                 onTouchMove={longPressMove}
                 onTouchCancel={longPressCancel}
                 onContextMenu={(e) => {
-                  // Bloqueia menu contexto em cima de celula de dia (evita misturar long-press nativo)
                   e.preventDefault();
                 }}
                 className={[
-                  "relative inline-flex h-9 w-full items-center justify-center rounded-xl text-[12.5px] font-medium transition-colors select-none",
+                  "relative inline-flex w-full flex-col items-center justify-start gap-1 rounded-xl py-1.5 text-[12.5px] font-medium transition-colors select-none",
                   "focus:outline-none",
-                  "touch-manipulation",
+                  "touch-manipulation min-h-[72px]",
                   outMonth ? "text-[var(--app-text-35)]" : "text-[var(--app-text-80)]",
-                  inRange && !picked ? "bg-[rgba(234,88,12,0.08)] text-[#9a3412] rounded-none" : "",
-                  start ? "rounded-l-xl rounded-r-none" : "",
-                  end ? "rounded-r-xl rounded-l-none" : "",
-                  picked
-                    ? [
-                        "bg-[#ea580c] !text-white",
-                        "hover:bg-[#c2410c]",
-                        "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]",
-                      ].join(" ")
-                    : !inRange
-                      ? "hover:bg-[var(--app-solid-surface-2)] active:bg-[rgba(234,88,12,0.08)]"
-                      : "",
-                  today && !picked
+                  "hover:bg-[var(--app-solid-surface-2)] active:bg-[rgba(234,88,12,0.08)]",
+                  today
                     ? "ring-1 ring-inset ring-[rgba(234,88,12,0.45)] font-bold text-[#9a3412]"
                     : "",
                 ].join(" ")}
                 style={{ WebkitTapHighlightColor: "rgba(234,88,12,0.18)" }}
               >
-                <span className="relative z-10">{d.getDate()}</span>
+                <span className="relative z-10 leading-none">{d.getDate()}</span>
+                {(hasLB || hasNC || hasPN) && (
+                  <div className="flex items-center gap-1 flex-wrap justify-center z-10">
+                    {hasLB && (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]">
+                        LB
+                      </div>
+                    )}
+                    {hasNC && (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]">
+                        NC
+                      </div>
+                    )}
+                    {hasPN && (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]">
+                        Pn
+                      </div>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* Barra inferior: Hoje + Selecionar + Limpar */}
-        <div className="mt-3 flex items-center justify-between gap-2 pt-3 border-t border-[var(--app-border)]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-55)]">
-            Consulta personalizada
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="inline-flex h-8 items-center justify-center rounded-xl px-4 text-[12px] font-bold !text-white shadow-none bg-[#ea580c] hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors"
-            >
-              OK
-            </button>
-          </div>
-        </div>
       </div>
   );
 
   return (
     <div ref={rootRef} className={twMerge("relative w-full", className)} id={id}>
-      {/* Trigger Button (input fake, clica abre calendar) */}
-      {showLabel && (
-        <div className="mb-1.5 flex items-center justify-between">
-          <div className="text-xs font-semibold text-[var(--app-text-60)]">
-            Período ({labelDe} / {labelAte})
-          </div>
-          {clearable && (value.from || value.to) ? (
-            <button
-              type="button"
-              onClick={clearAll}
-              className="flex h-6 items-center gap-1 rounded-lg border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2 text-[11px] font-medium text-[var(--app-text-60)] hover:bg-[var(--app-hover)]"
-            >
-              <X className="h-3 w-3" />
-              Limpar
-            </button>
-          ) : null}
-        </div>
-      )}
 
       {/* SWITCH VISUAL DO TRIGGER (botão que abre calendario):
         - size="full" → botão largo default w-full com texto + chevron (usado em modal filtros etc)
@@ -590,7 +544,7 @@ export function AppDateRangePicker({
         ? createPortal(pickerJSX, document.body)
         : null}
 
-      {/* MODAL PROGRAMAÇÃO DO DIA: (abre em double-click desktop / long-press mobile) */}
+      {/* MODAL PROGRAMAÇÃO DO DIA: (abre em click desktop / long-press mobile) */}
       {scheduleModalOpen &&
       scheduleDate &&
       rendered &&
