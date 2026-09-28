@@ -567,6 +567,15 @@ export function AtendimentoClient() {
       const bookingProfQ = String(searchParams?.get("bookingProfessor") ?? searchParams?.get("teacher") ?? searchParams?.get("prof") ?? "").trim();
       const bookingPhoneQ = String(searchParams?.get("bookingPhone") ?? searchParams?.get("phone") ?? "").trim();
       const bookingPNQ = String(searchParams?.get("bookingPN") ?? "").trim().toLowerCase() === "1";
+      // ===== NOVO PARAM EXATO (conjunto explícito do botão Ver do modal programação) =====
+      // Evita bugs de falsos positivos/negativos do includesProf client-side:
+      //   - Aline Faustino (LB) aparecendo no Ver de "Professor não atribuído" (23/09);
+      //   - José Marcos (composite PN) não aparecendo no Ver do PN (26/09, colunas físicas não tem booking composite);
+      //   - Marcela (PN rec) aparecendo no Ver de NC (26/09).
+      const bookingLeadIdsRaw = String(searchParams?.get("bookingLeadIds") ?? searchParams?.get("leadIds") ?? searchParams?.get("ids") ?? "").trim();
+      const bookingLeadIdsQ: string[] = bookingLeadIdsRaw
+        ? Array.from(new Set(bookingLeadIdsRaw.split(",").map((s) => s.trim()).filter(Boolean)))
+        : [];
       const nextActive = { ...EMPTY_FILTERS };
       const nextDraft = { ...EMPTY_FILTERS };
       let changed = false;
@@ -602,15 +611,12 @@ export function AtendimentoClient() {
         /^\d{4}-\d{2}-\d{2}$/.test(bookingToQ) ||
         Boolean(bookingProfQ) ||
         Boolean(bookingPhoneQ) ||
-        Boolean(bookingPNQ);
+        Boolean(bookingPNQ) ||
+        Boolean(bookingLeadIdsQ.length);
       if (hasBookingFilter) {
         if (/^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ)) nextActive.bookingDateFrom = bookingFromQ;
         if (/^\d{4}-\d{2}-\d{2}$/.test(bookingToQ)) nextActive.bookingDateTo = bookingToQ;
         if (bookingProfQ) nextActive.bookingProfessorName = bookingProfQ;
-        // bookingPN=1 → força target "Professor não atribuído" (key PN).
-        // Salvamos em bookingProfessorName mesmo (para ser lido no includesProf):
-        // se bookingPNQ=true → setamos bookingProfessorName = "Professor não atribuído"
-        // detectTeacherKey retorna PN e match key=PN ocorre perfeitamente.
         if (bookingPNQ) nextActive.bookingProfessorName = "Professor não atribuído";
         nextDraft.bookingDateFrom = nextActive.bookingDateFrom;
         nextDraft.bookingDateTo = nextActive.bookingDateTo;
@@ -620,6 +626,11 @@ export function AtendimentoClient() {
         (nextDraft as any).bookingPhone = bookingPhoneQ;
         (nextActive as any).bookingPN = bookingPNQ;
         (nextDraft as any).bookingPN = bookingPNQ;
+        // ===== bookingLeadIdsQ: array explícito de ids alvo MAIOR PRIORIDADE que includesProf client-side =====
+        // Lista exata enviada pelo botão Ver do modal programação-do-dia (ocupadosList[].aluno.id).
+        // 100% match com o que aparece no card, sem falsos positivos/negativos por colunas faltantes.
+        (nextActive as any).bookingLeadIds = bookingLeadIdsQ;
+        (nextDraft as any).bookingLeadIds = bookingLeadIdsQ;
         changed = true;
         // ⚠️ ATENÇÃO: NÃO setar stageList=["aula_experimental_agendada"] automaticamente aqui.
         // No mesmo dia/professor pode ter EXPERIMENTAIS (agendados) E RECORRENTES (Aluno).
@@ -1420,44 +1431,47 @@ export function AtendimentoClient() {
         const hasContract = Boolean(l.contract_status ?? l.contract_signed_at ?? l.contract_pdf_url);
         if (!hasContract) return false;
       }
-      // ============== FILTRO DE PERÍODO (De / Até) — EXATO SOBRE AULAS ==============
-      // Semântica FINAL (corrigida inconsistência anterior):
-      //   Só mostra registros QUE TEM AULA (experimental OU recorrente) DENTRO do período.
-      //   NÃO trazer updated_at / mensagens / contrato / histórico / nada que não seja AULA.
-      //   Se não tiver nenhuma aula registrada, cai no fallback data de cadastro para não sumir
-      //   leads recém criados.
-      // Resolve bug do print: 25/09 → 26/09, anteriormente trazia aulas EXPERIMENTAIS E RECORRENTES
-      // DE FORA DO MÊS por causa de updated_at etc — agora SÓ APARECE SE AULA CAI NO RANGE.
-      const wantsPeriodFilter = Boolean(f.createdFrom || f.createdTo);
-      if (wantsPeriodFilter) {
-        const aulaDates = extractAulaDatesOnly(l);
-        const periodMatches = aulaDates.some((d) => dateInRange(d, f.createdFrom, f.createdTo));
-        if (!periodMatches) return false;
-      }
-      // NOVO: filtro de aula experimental do dia + professor (exatamente os bookings do modal)
-      const wantsBookingFilter = Boolean(
-        f.bookingDateFrom ||
-          f.bookingDateTo ||
-          (f as any)?.bookingPhone ||
-          (f as any)?.bookingPhoneDigits ||
-          f.bookingProfessorName,
-      );
-      if (wantsBookingFilter) {
-        const list = getAulaProfDateList(l, f.bookingDateFrom || null, f.bookingDateTo || null);
-        if (list.length === 0) return false;
-        const profFilter = {
-          name: String(f.bookingProfessorName ?? "").trim(),
-          phone: String((f as any)?.bookingPhone ?? "").trim(),
-          phoneDigitsOnly: normPhone(String((f as any)?.bookingPhone ?? (f as any)?.bookingPhoneDigits ?? "")),
-        };
-        const needsProf = Boolean(profFilter.name || profFilter.phone || profFilter.phoneDigitsOnly);
-        const match = list.some((row) => {
-          const needsDate = Boolean(f.bookingDateFrom || f.bookingDateTo);
-          if (needsDate && !dateInRange(row.date, f.bookingDateFrom, f.bookingDateTo)) return false;
-          if (needsProf && !includesProf(row, profFilter)) return false;
-          return true;
-        });
-        if (!match) return false;
+      // ===== bookingLeadIds (LISTA EXATA DE IDS do botão Ver do modal programação) =====
+      // Maior prioridade: se veio conjunto explícito de ids (comma-separado),
+      // SÓ retorna leads cujo id ESTÁ nesse conjunto. 100% match com o que aparece no card.
+      // Elimina TODOS os falsos positivos/negativos do includesProf client-side.
+      const leadIds = (f as any)?.bookingLeadIds as string[] | null | undefined;
+      if (leadIds && leadIds.length > 0) {
+        if (!leadIds.includes(String(l.id ?? "").trim())) return false;
+        // ⚠️ IMPORTANTE: se bookingLeadIds está presente, PULA (não aplica) wantsBookingFilter abaixo.
+        // A lista exata de ids do modal já é suficiente e correta. Apenas queremos manter
+        // os outros filtros (status/stage/country etc — que não conflitam).
+      } else {
+        const wantsPeriodFilter = Boolean(f.createdFrom || f.createdTo);
+        if (wantsPeriodFilter) {
+          const aulaDates = extractAulaDatesOnly(l);
+          const periodMatches = aulaDates.some((d) => dateInRange(d, f.createdFrom, f.createdTo));
+          if (!periodMatches) return false;
+        }
+        const wantsBookingFilter = Boolean(
+          f.bookingDateFrom ||
+            f.bookingDateTo ||
+            (f as any)?.bookingPhone ||
+            (f as any)?.bookingPhoneDigits ||
+            f.bookingProfessorName,
+        );
+        if (wantsBookingFilter) {
+          const list = getAulaProfDateList(l, f.bookingDateFrom || null, f.bookingDateTo || null);
+          if (list.length === 0) return false;
+          const profFilter = {
+            name: String(f.bookingProfessorName ?? "").trim(),
+            phone: String((f as any)?.bookingPhone ?? "").trim(),
+            phoneDigitsOnly: normPhone(String((f as any)?.bookingPhone ?? (f as any)?.bookingPhoneDigits ?? "")),
+          };
+          const needsProf = Boolean(profFilter.name || profFilter.phone || profFilter.phoneDigitsOnly);
+          const match = list.some((row) => {
+            const needsDate = Boolean(f.bookingDateFrom || f.bookingDateTo);
+            if (needsDate && !dateInRange(row.date, f.bookingDateFrom, f.bookingDateTo)) return false;
+            if (needsProf && !includesProf(row, profFilter)) return false;
+            return true;
+          });
+          if (!match) return false;
+        }
       }
       return true;
     });

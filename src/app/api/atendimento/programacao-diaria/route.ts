@@ -545,8 +545,54 @@ export async function GET(req: Request) {
     for (const id of uniqIds) await fetchLeadById(id);
   }
 
-  // 3) Gerar slots da grade para o dia (08:00-22:00)
+  // 3) Gerar slots da grade para o dia (08:00-22:00 PADRÃO)
+  //    ===== INJEÇÃO DE SLOTS EXTRA (FORA DA GRADE PADRÃO) =====
+  //    Motivo: usuário clica em dia que tem aula no SÁBADO / madrugada (ex: Aline
+  //    23/09 01:00:00 madrugada, ou 23:30, ou ainda horários antigos de migração).
+  //    A grade padrão EXPERIMENTAL_CLASS_SLOT_TIMES = 08..22. Aula com horário
+  //    fora disso: aparece NOS BADGES (que não olham horário) mas NUNCA no card
+  //    do modal (pois daySlotsRaw não tem slot para aquele horário → pbByTime.get
+  //    nunca encontra → ocupados=0, professor não aparece no modal).
+  //    Resultado: usuário vê "3 badges no calendário, clique modal mostra 2".
+  //
+  //    Solução: pega TODOS os horários de TODO booking do dia (pbByTime keys,
+  //    já normalizados para HH:MM) e gera slots extras para qualquer horário
+  //    QUE JÁ NÃO EXISTE na grade. Ordena daySlotsRaw por horário no final.
   const daySlotsRaw = buildSlotsForDay(targetDate, nowUtc);
+  {
+    // Primeiro coleta TODOS os horários que existem em bookings (3 fontes).
+    const allTimes = new Set<string>();
+    for (const b of bookings) {
+      const tRaw = String(b.professor_time ?? "").trim();
+      const t = /^(\d{2}:\d{2})/.exec(tRaw)?.[1] ?? tRaw.slice(0, 5);
+      if (t) allTimes.add(t);
+    }
+    // Os que não estão na grade padrão: cria slot fake (isPast calculado).
+    const existingTimes = new Set(daySlotsRaw.map(s => s.professorTime));
+    for (const t of Array.from(allTimes)) {
+      if (existingTimes.has(t)) continue;
+      let iso = "";
+      try {
+        iso = zonedDateTimeToUtcIso({
+          date: targetDate,
+          time: t,
+          timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        });
+      } catch {
+        continue;
+      }
+      const ms = Number.isFinite(new Date(iso).getTime()) ? new Date(iso).getTime() : NaN;
+      const nowMs = new Date(nowUtc).getTime();
+      daySlotsRaw.push({
+        professorTime: t,
+        professorStartAtIso: iso,
+        isPast: Number.isFinite(ms) && ms <= nowMs,
+      });
+      existingTimes.add(t);
+    }
+    // Ordena slots por horário (garante ordem cronológica no modal mesmo com slots extras).
+    daySlotsRaw.sort((a, b) => a.professorTime.localeCompare(b.professorTime));
+  }
 
   // 4) Para cada professor do allowlist: montar grade
   const teachers: Array<{

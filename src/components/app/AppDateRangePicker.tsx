@@ -825,8 +825,7 @@ export function AppDateRangePicker({
                                       </div>
                                     </div>
 
-                                    {/* Botão Ver = atalho para a lista de atendimento / registros.
-                                        SÓ RENDERIZA se houver aulas ocupadas (com aluno) neste dia. */}
+                                    {/* Botão Ver = atalho para a lista de atendimento / registros. */}
                                     {showVerButton && (
                                       <button
                                         type="button"
@@ -834,11 +833,12 @@ export function AppDateRangePicker({
                                           e.stopPropagation();
                                           e.preventDefault();
                                           const params = new URLSearchParams();
-                                          // OBS: NAO setar stage HARDCODED = aula_experimental_agendada.
-                                          // No mesmo dia/professor pode ter EXPERIMENTAIS (agendados) e RECORRENTES (Aluno).
-                                          // O filtro de bookingDateFrom/To + professor name/phone já é restritivo o suficiente
-                                          // (garante exatamente o conjunto de aulas que aparece NO MODAL).
-                                          // Stage causava o bug "recorrentes nao aparecem" ao clicar em Ver.
+                                          const leadIdsUnordered = ocupadosList
+                                            .filter((s) => s.status === "ocupado" && s.aluno?.id)
+                                            .map((s) => String(s.aluno!.id).trim())
+                                            .filter(Boolean);
+                                          const leadIds = Array.from(new Set(leadIdsUnordered));
+                                          if (leadIds.length) params.set("bookingLeadIds", leadIds.join(","));
                                           const isUnassigned =
                                             !teacher?.name ||
                                             String(teacher.name ?? "").trim() === "Professor não atribuído" ||
@@ -847,9 +847,6 @@ export function AppDateRangePicker({
                                             if (teacher?.name) params.set("bookingProfessor", String(teacher.name));
                                             if (teacher?.phone) params.set("bookingPhone", String(teacher.phone));
                                           } else {
-                                            // Professor NÃO atribuído (PN) → marcamos flag bookingPN=1 para o filtro
-                                            // na página de atendimento poder filtrar exatamente a key "PN"
-                                            // (caso contrário, outros LB/NC do mesmo dia também viriam e poluiriam a lista).
                                             params.set("bookingPN", "1");
                                           }
                                           if (scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
