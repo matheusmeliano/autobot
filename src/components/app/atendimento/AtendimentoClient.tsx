@@ -1135,125 +1135,70 @@ export function AtendimentoClient() {
       if (to && d > to) return false;
       return true;
     };
-    // Extrai TODAS as datas ISO YYYY-MM-DD RELEVANTES de um lead para o filtro De/Até.
-    // O usuário quer: "01/09 até 30/09 = exibir TUDO que tem algo acontecendo dentro desse período, SEM OMITIR".
-    // Então compõe um MATCH POR OR amplo: qualquer data relevante dentro do range mantém o lead.
-    // Lista de fontes: created_at | updated_at | last_interaction_at |
-    //                  experimental bookings (professor_date/lead_date, scheduled_at, cancelled_at) |
-    //                  contract (signed_at, sent_at, coleta_dados_at) |
-    //                  history events (created_at) | messages (last_msg_at) |
-    //                  recurring (next class, any payment dates).
-    const extractAllRelevantDates = (l: AtendimentoLeadListItem): string[] => {
+    // ==== CORREÇÃO: filtro De/Até do calendário AGORA É SÓ SOBRE AULAS (experimental + recorrente)
+    // = OU, SE NÃO TIVER AULA NENHUMA, data de cadastro do lead (fallback).
+    // (A versão anterior era WIDE DEMAIS: updated_at, mensagens, histórico, tudo entrava → trazia aulas FORA do período.)
+    // Semântica exata do usuário (print: 25/09 → 26/09):
+    //   "Só registros QUE TEM AULA DENTRO desse intervalo. Não trazer aulas de FORA."
+    const extractAulaDatesOnly = (l: AtendimentoLeadListItem): string[] => {
       const rawDates: string[] = [];
-      const tryIsoDate = (iso: unknown): string => {
-        const s = String(iso ?? "").trim();
-        if (!s) return "";
-        const d = new Date(s);
-        if (Number.isNaN(d.getTime())) return "";
-        try {
-          const yyyy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, "0");
-          const dd = String(d.getDate()).padStart(2, "0");
-          return `${yyyy}-${mm}-${dd}`;
-        } catch {
-          return "";
-        }
-      };
       const push = (v: string | undefined | null) => {
         const s = String(v ?? "").trim();
         if (!s) return;
         if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-          // Pode ser YYYY-MM-DD puro, ou ISO com tempo. Só primeiros 10 chars
           rawDates.push(s.slice(0, 10));
-          return;
+        } else {
+          const d = new Date(s);
+          if (!Number.isNaN(d.getTime())) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            rawDates.push(`${yyyy}-${mm}-${dd}`);
+          }
         }
-        const iso = tryIsoDate(s);
-        if (iso) rawDates.push(iso);
       };
-      // Datas básicas do lead
-      push(l.created_at);
-      push(l.updated_at);
-      push((l as any)?.last_interaction_at);
-      push((l as any)?.last_seen_at);
-      push((l as any)?.first_seen_at);
-      push((l as any)?.converted_at);
-      push((l as any)?.funnel_updated_at);
-      push((l as any)?.status_updated_at);
-      push((l as any)?.next_follow_up_at);
-      push((l as any)?.last_follow_up_at);
-
-      // Aulas experimentais (todas fontes)
+      // 1) AULAS EXPERIMENTAIS: data que FOI ou VAI SER DADA A AULA (professor_date = data real daula)
       const bookingsArr: unknown[] = [];
       if ((l as any)?.experimental_class_booking) bookingsArr.push((l as any).experimental_class_booking);
       if ((l as any)?.latest_experimental_class_booking) bookingsArr.push((l as any).latest_experimental_class_booking);
       if ((l as any)?.future_experimental_class_booking) bookingsArr.push((l as any).future_experimental_class_booking);
       for (const b of bookingsArr) {
         const bb = b as any;
-        push(bb?.professor_date);
-        push(bb?.lead_date);
-        push(bb?.created_at);
-        push(bb?.updated_at);
-        push(bb?.scheduled_at);
+        push(bb?.professor_date);      // ⭐ PRINCIPAL: data da aula para o professor (America/Cuiabá)
+        push(bb?.lead_date);           // ⭐ Data da aula para o aluno (se tz diferente)
+        push(bb?.scheduled_at);        // Data/hora agendado (fallback)
         push(bb?.rescheduled_at);
-        push(bb?.cancelled_at);
-        push(bb?.completed_at);
-        push(bb?.attendance_marked_at);
-        push(bb?.student_start_notification_sent_at);
-        push(bb?.attendant_start_notification_sent_at);
-        push(bb?.post_attendance_message_sent_at);
-        push(bb?.professor_start_at);
-        push(bb?.lead_start_at);
+        push(bb?.completed_at);        // Aula concluída
+        push(bb?.attendance_marked_at); // Presença marcada
+        push(bb?.professor_start_at);  // start ISO (fallback)
+        push(bb?.lead_start_at);       // start ISO aluno
       }
-      // Flat aulas experimentais
+      // Flat experimental
       push((l as any)?.experimental_class_professor_date);
       push((l as any)?.experimental_class_lead_date);
       push((l as any)?.experimental_class_lead_date_scheduled_at);
       push((l as any)?.experimental_class_scheduled_at);
-      push((l as any)?.experimental_class_cancelled_at);
-      push((l as any)?.experimental_class_student_notification_sent_at);
-      push((l as any)?.experimental_class_attendant_notification_sent_at);
-      push((l as any)?.experimental_class_post_attendance_message_sent_at);
+      push((l as any)?.experimental_class_attendance_marked_at);
       push((l as any)?.experimental_class_professor_start_at);
       push((l as any)?.experimental_class_lead_start_at);
-      push((l as any)?.experimental_class_attendance_marked_at);
 
-      // Contratos
-      push((l as any)?.contract_created_at);
-      push((l as any)?.contract_updated_at);
-      push((l as any)?.contract_sent_at);
-      push((l as any)?.contract_signed_at);
-      push((l as any)?.contract_expires_at);
-      push((l as any)?.contract_collecting_data_at);
-      push((l as any)?.contract_payment_receipt_seen_at);
-      push((l as any)?.contract_accepted_at);
-      push((l as any)?.enrollment_confirmation_sent_at);
-
-      // Pagamentos / débitos / recorrentes
+      // 2) AULAS RECORRENTES (aulas de aluno matriculado) — data das aulas recorrentes
+      push((l as any)?.recurring_class_next_date);
+      push((l as any)?.recurring_class_last_date);
+      push((l as any)?.recurring_payment_next_date);
+      push((l as any)?.recurring_payment_last_date);
       push((l as any)?.next_charge_date);
       push((l as any)?.last_charge_date);
       push((l as any)?.schedule_charge_at);
-      push((l as any)?.recurring_class_signed_at);
-      push((l as any)?.recurring_class_updated_at);
-      push((l as any)?.recurring_class_cancelled_at);
-      push((l as any)?.recurring_class_next_date);
-      push((l as any)?.recurring_payment_next_date);
-      push((l as any)?.recurring_payment_last_date);
-      push((l as any)?.debtor_status_updated_at);
       push((l as any)?.next_renewal_at);
 
-      // Convites / Conversas
-      push((l as any)?.conversation_created_at);
-      push((l as any)?.conversation_updated_at);
-      push((l as any)?.conversation_last_message_at);
-      push((l as any)?.last_message_at);
-      push((l as any)?.last_unread_at);
-      push((l as any)?.whatsapp_invite_sent_at);
-      push((l as any)?.email_invite_sent_at);
-
-      // Histórico (caso existam campos flat)
-      push((l as any)?.first_history_at);
-      push((l as any)?.last_history_at);
-      push((l as any)?.latest_event_at);
+      // FALLBACK (se não tiver NENHUMA data de aula registrada): cai em data de cadastro do lead
+      // Assim, recém-lead sem agendamento ainda aparece se a data de cadastro for no período.
+      let hasAnyAula = rawDates.length > 0;
+      if (!hasAnyAula) {
+        push(l.created_at);
+        push((l as any)?.converted_at);
+      }
 
       return Array.from(
         new Set(
@@ -1284,14 +1229,18 @@ export function AtendimentoClient() {
         const hasContract = Boolean(l.contract_status ?? l.contract_signed_at ?? l.contract_pdf_url);
         if (!hasContract) return false;
       }
-      // NOVO: FILTRO PRINCIPAL "De / Até" do calendário (01/09 até 30/09).
-      // Semântica USUÁRIO: "qualquer registro que teve QUALQUER ATIVIDADE / EVENTO / DATA RELEVANTE
-      // no período selecionado." Match POR OR entre TODAS datas relevantes do lead.
-      // NÃO é mais restrito só a created_at (isso que era o root cause de "resultados incompletos / omitindo info").
+      // ============== FILTRO DE PERÍODO (De / Até) — EXATO SOBRE AULAS ==============
+      // Semântica FINAL (corrigida inconsistência anterior):
+      //   Só mostra registros QUE TEM AULA (experimental OU recorrente) DENTRO do período.
+      //   NÃO trazer updated_at / mensagens / contrato / histórico / nada que não seja AULA.
+      //   Se não tiver nenhuma aula registrada, cai no fallback data de cadastro para não sumir
+      //   leads recém criados.
+      // Resolve bug do print: 25/09 → 26/09, anteriormente trazia aulas EXPERIMENTAIS E RECORRENTES
+      // DE FORA DO MÊS por causa de updated_at etc — agora SÓ APARECE SE AULA CAI NO RANGE.
       const wantsPeriodFilter = Boolean(f.createdFrom || f.createdTo);
       if (wantsPeriodFilter) {
-        const dates = extractAllRelevantDates(l);
-        const periodMatches = dates.some((d) => dateInRange(d, f.createdFrom, f.createdTo));
+        const aulaDates = extractAulaDatesOnly(l);
+        const periodMatches = aulaDates.some((d) => dateInRange(d, f.createdFrom, f.createdTo));
         if (!periodMatches) return false;
       }
       // NOVO: filtro de aula experimental do dia + professor (exatamente os bookings do modal)
