@@ -519,6 +519,22 @@ export async function GET(req: Request) {
 
   for (const p of teachersList) {
     const isNoProfessorCard = p.phone === PROF_NO_ATRIBUIDO_PHONE;
+    // ===== DETECÇÃO FORTALECIDA DE PROFESSOR (idêntica a /badges, NÃO perde parciais) =====
+    const allowPName = String(p.name ?? "").trim().toUpperCase();
+    const allowPDigits = String(p.phone ?? "").replace(/\D+/g, "");
+    const allowPLast4 = allowPDigits.length >= 4 ? allowPDigits.slice(-4) : "";
+    const pIsLB =
+      p.phone === PROF_NO_ATRIBUIDO_PHONE
+        ? false
+        : allowPName.includes("LUCAS") && allowPName.includes("BRUM")
+          ? true
+          : allowPLast4 === "9407";
+    const pIsNC =
+      p.phone === PROF_NO_ATRIBUIDO_PHONE
+        ? false
+        : allowPName.includes("NATHAN") || allowPName.includes("NATAN") || allowPName.includes("NATHAM")
+          ? true
+          : allowPLast4 === "0166";
     // Filtrar bookings designados para ESTE professor
     const pb = bookings.filter((bk) => {
       const noProf =
@@ -531,8 +547,27 @@ export async function GET(req: Request) {
       if (noProf) return false;
       const nm = String(bk.assigned_professor_name ?? "").trim();
       const ph = String(bk.assigned_professor_phone ?? "").trim();
+
       if (nm || ph) {
-        return (nm ? nm === p.name : true) && (ph ? ph === p.phone : true);
+        const nmUp = nm.toUpperCase();
+        const phDigits = ph.replace(/\D+/g, "");
+        const phLast4 = phDigits.length >= 4 ? phDigits.slice(-4) : "";
+        // 1) Match exato por nome OU telefone (completo)
+        if ((nm && nm === p.name) || (ph && ph === p.phone)) return true;
+        // 2) Match FORTALEZA (evita perder nomes parciais):
+        //    Ex: "Lucas" ou "Lucas Brum Silva" → LB; "Nathan C." → NC; "(65) 9807-9407" (sem +55) → LB
+        const bkIsLB =
+          (nmUp.includes("LUCAS") && nmUp.includes("BRUM")) || phLast4 === "9407";
+        const bkIsNC =
+          nmUp.includes("NATHAN") ||
+          nmUp.includes("NATAN") ||
+          nmUp.includes("NATHAM") ||
+          phLast4 === "0166";
+        if (pIsLB && bkIsLB) return true;
+        if (pIsNC && bkIsNC) return true;
+        // Se não for nem LB nem NC (professor novo não cadastrado?), NÃO cai aqui.
+        // (será pego no card "Professor não atribuído" via __noProfessor abaixo)
+        return false;
       }
       // Sem assigned nenhum (experimental antigo, sem nome nem telefone): fallback 1º professor (Lucas Brum)
       return (

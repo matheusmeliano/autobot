@@ -98,7 +98,17 @@ export async function GET(req: Request) {
     if (noProfessor) return "PN";
     const name = String(nameRaw ?? "").trim().toUpperCase();
     const phone = String(phoneRaw ?? "").trim();
-    // 1) Match por nome completo allowlist
+    const pDigits = phone.replace(/\D+/g, "");
+    const last4Phone = pDigits.length >= 4 ? pDigits.slice(-4) : "";
+    // Match por telefone MATCH (ou exato, ou últimos 4 dígitos — independente de máscara +55 65)
+    const LB_LAST4 = "9407";
+    const NC_LAST4 = "0166";
+    const isLBPhone = last4Phone === LB_LAST4;
+    const isNCPhone = last4Phone === NC_LAST4;
+    // Match por NOME (não precisa ser exato — substring Lucas Brum / Nathan)
+    const isLBName = name.includes("LUCAS") && name.includes("BRUM");
+    const isNCName = name.includes("NATHAN") || name.includes("NATAN") || name.includes("NATHAM");
+    // 1) Tentar match completo allowlist (nome exato / phone exato)
     for (const t of EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST ?? []) {
       const tName = String(t?.name ?? "").trim().toUpperCase();
       if (tName && name && tName === name) {
@@ -106,16 +116,18 @@ export async function GET(req: Request) {
         if (tName.includes("NATHAN")) return "NC";
       }
       const tPhone = String(t?.phone ?? "").replace(/\D+/g, "");
-      const pDigits = phone.replace(/\D+/g, "");
       if (tPhone && pDigits && tPhone === pDigits) {
         if (String(t?.name ?? "").toUpperCase().includes("LUCAS BRUM")) return "LB";
         if (String(t?.name ?? "").toUpperCase().includes("NATHAN")) return "NC";
       }
     }
+    // 2) Fallback FORTALEZA para evitar perder parciais
+    if (isLBPhone || isLBName) return "LB";
+    if (isNCPhone || isNCName) return "NC";
     if (!name && !phone) return "PN";
-    if (name.includes("LUCAS BRUM")) return "LB";
-    if (name.includes("NATHAN")) return "NC";
-    return null;
+    // Se TEM nome/telefone mas não reconhece (professor novo não cadastrado?) → cai em PN
+    // (motivo: é um lead sem prof associado no allowlist; para não sumir, trata como "Prof não atribuído")
+    return "PN";
   }
 
   const admin = createSupabaseAdminClient();
