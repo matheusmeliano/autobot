@@ -2834,14 +2834,16 @@ export function AtendimentoClient() {
               >
                 Limpar
               </button>
-              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples) */}
+              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples)
+                   OBS: NAO usar className text-white, pq globals.css tem ".app-theme .text-white { color: var(--app-fg) !important }"
+                        que pinta tudo de PRETO no tema light. Usa só style inline color white (SEM classe text-white!) */}
               <button
                 type="button"
                 onClick={() => {
                   setActiveFilters(draftFilters);
                   setShowFiltersModal(false);
                 }}
-                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold text-white hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
+                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
                 style={{ color: "#ffffff" }}
               >
                 Aplicar
