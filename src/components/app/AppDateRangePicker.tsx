@@ -388,7 +388,9 @@ export function AppDateRangePicker({
       className={[
         "fixed z-[9999]",
         coords.fullscreen
-          ? "overflow-hidden rounded-none border-0 bg-[var(--app-solid-surface)] p-3 sm:p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+          // TELA CHEIA (< 768px): padding INTERNO 20px (p-5) em TODOS OS LADOS → NÃO encosta em borda nenhuma.
+          // DESKTOP (≥768px): popup normal com p-5 / sm:p-6
+          ? "overflow-hidden rounded-none border-0 bg-[var(--app-solid-surface)] p-5 md:p-0"
           : "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 sm:p-6",
         "shadow-[0_14px_44px_-8px_rgba(0,0,0,0.22)]",
       ].join(" ")}
@@ -432,7 +434,10 @@ export function AppDateRangePicker({
         </div>
 
         {/* Header dias semana */}
-        <div className="mb-2 grid grid-cols-7 gap-1.5 px-1.5">
+        <div className={[
+          "mb-2 grid grid-cols-7 gap-1.5",
+          coords.fullscreen ? "px-4" : "px-1.5",
+        ].join(" ")}>
           {WEEKDAYS_SHORT.map((w) => (
             <div
               key={w}
@@ -444,7 +449,10 @@ export function AppDateRangePicker({
         </div>
 
         {/* Grid de dias */}
-        <div className="grid grid-cols-7 gap-1.5 px-1.5">
+        <div className={[
+          "grid grid-cols-7 gap-1.5",
+          coords.fullscreen ? "px-4" : "px-1.5",
+        ].join(" ")}>
           {days.map((d, idx) => {
             const outMonth = !isSameMonth(d, viewDate);
             const today = isToday(d);
@@ -666,7 +674,8 @@ export function AppDateRangePicker({
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Header (sticky, nunca some com scroll) */}
+                    {/* Header (sticky, nunca some com scroll)
+                        Mobile < 768px: px-5 py-4. Desktop sm+: px-6 */}
                     <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--app-border)] px-5 py-4 sm:px-6 sm:py-4.5">
                       {/* Botão VOLTAR = fecha o modal de programação E ABRE de volta o POPOVER CALENDÁRIO
                           (grade de dias com "setembro de 2026" no topo, exatamente o print do usuário). */}
