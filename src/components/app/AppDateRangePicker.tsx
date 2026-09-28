@@ -274,6 +274,30 @@ export function AppDateRangePicker({
   }, [viewDate]);
 
   function handleDayClick(day: Date) {
+    // === REGRA NOVA: clique DUAS VEZES no MESMO dia (ou qualquer dia já selecionado como from/to)
+    //     ===> DESMARCA A SELEÇÃO (remove from/to). Exatamente como pediu o usuário.
+    // Detecta se o dia clicado já está marcado atualmente como início ou fim do range:
+    const dayAlreadyFrom = Boolean(fromDate && isSameDay(day, fromDate) && !toDate);
+    const dayIsEndpoint = Boolean(
+      (fromDate && isSameDay(day, fromDate)) || (toDate && isSameDay(day, toDate)),
+    );
+    // Caso A: primeiro clique (fromDate/todoDate indefinido) OU dia já está marcado como INICIO sem to
+    // (range iniciado solto). Clicar novamente no mesmo => limpar tudo, desmarca.
+    if (dayAlreadyFrom) {
+      onChange({ from: null, to: null });
+      setPickingFirst(true);
+      return;
+    }
+    // Caso B: range FECHADO (from e to setados) e cliquei NOVAMENTE em qualquer um dos 2 extremos
+    // (11 ou 18 do print) => desmarca TUDO.
+    if (toDate && fromDate && dayIsEndpoint) {
+      // Se clicou no MESMO end-point duas vezes (ex: 11 quando 11 é from OU 18 quando 18 é to).
+      // Vamos ser simples: qualquer clique nos extremos do range já fechado => desmarca o range inteiro
+      // (usuário quer "desmarcar a seleção").
+      onChange({ from: null, to: null });
+      setPickingFirst(true);
+      return;
+    }
     if (pickingFirst || !fromDate) {
       onChange({ from: toISODate(day), to: null });
       setPickingFirst(false);
