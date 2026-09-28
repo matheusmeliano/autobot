@@ -62,6 +62,8 @@ type PopoverCoords = {
   left: number;
   width: number;
   wMax: number;
+  fullscreen?: boolean;
+  height?: number;
 };
 
 export function AppDateRangePicker({
@@ -263,20 +265,30 @@ export function AppDateRangePicker({
   }, [longPressCancel]);
 
 
-  // 1) Posiciona popover NO CENTRO EXATO da viewport. Fixo, move nunca.
-  // NÃO usa mais recalc em scroll/resize (isso causava a PISCADA FORTE bug!)
+  // 1) Popover: FULLSCREEN em telas menores, POPUP centralizado só no desktop SM+
+  //    Regra que user pediu: quando layout quebrar (celulares/tablets pequenos < 768px) → TELA CHEIA.
+  //    Largura usada pra decisão = vw (innerWidth). Desktop SM+ continua popup centralizado.
   useEffect(() => {
     if (!open) return;
     const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
-    const isMobile = vw < 640;
-    const w = isMobile
-      ? Math.min(420, vw - 16)       // mobile: até 420px (antes 320/360)
-      : Math.min(680, vw - 48);      // desktop: 680px (antes 360)
+    const isTiny = vw < 768;
+    const isSmall = vw < 1024;
+    const w = isTiny
+      ? vw // FULLSCREEN LARGURA TOTAL (vw - 0, ocupa 100% da tela)
+      : isSmall
+        ? Math.min(720, vw - 32)
+        : Math.min(680, vw - 48);
+    const h = isTiny
+      ? typeof window !== "undefined" ? window.innerHeight : 900
+      : undefined;
     setCoords({
       top: 0,
       left: 0,
       width: w,
       wMax: w,
+      // Para telas pequenas (fullscreen) a altura é a viewport toda, descontando safe area
+      fullscreen: isTiny,
+      height: h ?? 0,
     });
   }, [open]);
 
@@ -342,11 +354,17 @@ export function AppDateRangePicker({
     <div
       id="app-date-range-popover-inner"
       style={{
-        top: "50vh",
-        left: "50vw",
-        width: coords.width,
-        maxWidth: coords.wMax,
-        transform: "translate(-50%, -50%)",
+        // Fullscreen em telas pequenas (<768px) → cobre viewport toda.
+        // Popover centralizado em telas grandes/desktop.
+        ...(coords.fullscreen
+          ? { top: 0, left: 0, right: 0, bottom: 0, width: "100vw", height: "100dvh", maxWidth: "100vw", transform: "none", borderRadius: 0 }
+          : {
+              top: "50vh",
+              left: "50vw",
+              width: coords.width,
+              maxWidth: coords.wMax,
+              transform: "translate(-50%, -50%)",
+            }),
         // Reset vars CSS para tema LIGHT padrão do sistema (não herdar laranja do trigger iconActive)
         ["--app-solid-surface" as any]: "#ffffff",
         ["--app-solid-surface-2" as any]: "#f5f3f0",
@@ -369,7 +387,9 @@ export function AppDateRangePicker({
       }}
       className={[
         "fixed z-[9999]",
-        "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 sm:p-6",
+        coords.fullscreen
+          ? "overflow-hidden rounded-none border-0 bg-[var(--app-solid-surface)] p-3 sm:p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+          : "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 sm:p-6",
         "shadow-[0_14px_44px_-8px_rgba(0,0,0,0.22)]",
       ].join(" ")}
       role="dialog"
@@ -593,7 +613,12 @@ export function AppDateRangePicker({
               const teacherList = hasData ? (scheduleData.teachers ?? []) : [];
               return (
                 <div
-                  className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6"
+                  className={[
+                    "fixed inset-0 z-[10000] flex items-center justify-center",
+                    // Fullscreen em telas < 768px (0 padding, cobre tudo)
+                    // Desktop sm+ continua com p-6 + centro
+                    "p-0 sm:p-4 md:p-6",
+                  ].join(" ")}
                   role="dialog"
                   aria-modal="true"
                   aria-label="Programação do dia"
@@ -604,13 +629,19 @@ export function AppDateRangePicker({
                     onClick={closeScheduleModal}
                   />
 
-                  {/* Container do modal */}
+                  {/* Container do modal — FULLSCREEN no mobile < 768px */}
                   <div
                     className={[
-                      "relative w-full sm:max-w-[820px] max-h-[94vh] overflow-hidden",
-                      "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)]",
-                      "shadow-[0_25px_60px_-12px_rgba(0,0,0,0.30)]",
-                      "flex flex-col animate-in zoom-in-95 duration-150",
+                      // Mobile: TELA CHEIA (w-full + h-full + rounded-none + border-0 + sem max-w)
+                      // Desktop: popup clássico (max-w-[820px], rounded-2xl, max-h 94vh, centralizado)
+                      "relative flex flex-col animate-in zoom-in-95 duration-150",
+                      "w-full h-full sm:h-auto sm:w-full sm:max-w-[820px]",
+                      "rounded-none sm:rounded-2xl",
+                      "border-0 sm:border sm:border-[var(--app-border)]",
+                      "bg-[var(--app-solid-surface)]",
+                      "max-h-none sm:max-h-[94vh]",
+                      "shadow-none sm:shadow-[0_25px_60px_-12px_rgba(0,0,0,0.30)]",
+                      "overflow-hidden",
                     ].join(" ")}
                     style={{
                       // Reset vars CSS para tema LIGHT padrão do sistema (não herdar laranja do trigger iconActive)
