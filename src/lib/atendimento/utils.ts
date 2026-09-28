@@ -211,6 +211,13 @@ export function leadMatchesSearchQuery(
     String(lead?.experimental_class_lead_time ?? ""),
     String(lead?.email ?? ""),
     String(lead?.student_email ?? ""),
+    // Permite buscar por NOME do professor atribuído no experimental (Lucas Brum / Nathan Camargo)
+    // Necessário pois botão "Ver" do modal programação-do-dia passa ?q=Lucas Brum
+    String((lead as any)?.experimental_class_professor_name ?? ""),
+    String((lead as any)?.experimental_class_professor_phone ?? ""),
+    String((lead as any)?.latest_experimental_class_booking?.assigned_professor_name ?? ""),
+    String((lead as any)?.future_experimental_class_booking?.assigned_professor_name ?? ""),
+    String((lead as any)?.experimental_class_booking?.assigned_professor_name ?? ""),
   ];
   for (const raw of haystacks) {
     const s = String(raw ?? "").toLowerCase();

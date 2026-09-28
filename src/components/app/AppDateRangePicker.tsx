@@ -748,11 +748,29 @@ export function AppDateRangePicker({
                                     {/* Botão Ver = atalho para a lista de atendimento / registros */}
                                     <button
                                       type="button"
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        const params = new URLSearchParams();
+                                        // Pré-aplica o filtro Rádio "Aula Experimental Agendada" (stageList)
+                                        params.set("stage", "aula_experimental_agendada");
+                                        // Nome professor para filtrar pelo registro no search
+                                        if (teacher?.name) {
+                                          params.set("q", String(teacher.name));
+                                        }
+                                        // Data do modal (day): pré-preenche período cadastro
+                                        if (scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
+                                          params.set("from", scheduleDate);
+                                          params.set("to", scheduleDate);
+                                        }
                                         try {
                                           setScheduleModalOpen(false);
                                         } catch {}
-                                        router.push("/app/atendimento");
+                                        // NAVEGAÇÃO HARD (window.location.href) GARANTIDA
+                                        // router.push() em createPortal dentro do AppDateRangePicker as vezes falhava.
+                                        // Location.href NUNCA falha, sempre vai.
+                                        const dest = `/app/atendimento${params.toString() ? "?" + params.toString() : ""}`;
+                                        window.location.assign(dest);
                                       }}
                                       className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11.5px] font-bold uppercase tracking-[0.04em] text-[#0f172a] shadow-[inset_0_0_0_1px_var(--app-border)] transition-colors hover:bg-[var(--app-solid-surface-2)] active:bg-[var(--app-solid-surface-3)]"
                                     >

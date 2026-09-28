@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, SlidersHorizontal, Trash2, UserRound, X, Zap } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { resolveTimeZoneFromCityInput, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -431,6 +432,7 @@ function isLeadMatriculaConcluida(lead: AtendimentoLeadListItem): boolean {
 
 export function AtendimentoClient() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const searchParams = useSearchParams();
   const [summary, setSummary] = useState<AtendimentoSummary>(EMPTY_SUMMARY);
   const [panelLeads, setPanelLeads] = useState<AtendimentoLeadListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -537,6 +539,58 @@ export function AtendimentoClient() {
     window.addEventListener("resize", updateViewport);
     return () => window.removeEventListener("resize", updateViewport);
   }, []);
+
+  // HIDRATA FILTROS INICIAIS a partir dos query params (botão "Ver" do modal programação-do-dia):
+  //   ?stage=aula_experimental_agendada&q=Lucas%20Brum&from=YYYY-MM-DD&to=YYYY-MM-DD
+  // Roda UMA VEZ no mount (initialUrlFiltersAppliedRef), nunca mais depois.
+  const initialUrlFiltersAppliedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (initialUrlFiltersAppliedRef.current) return;
+    try {
+      const stageQ = String(searchParams?.get("stage") ?? searchParams?.get("stageList") ?? "").trim();
+      const statusQ = String(searchParams?.get("status") ?? searchParams?.get("statusList") ?? "").trim();
+      const qQ = String(searchParams?.get("q") ?? searchParams?.get("query") ?? searchParams?.get("search") ?? "").trim();
+      const fromQ = String(searchParams?.get("from") ?? searchParams?.get("createdFrom") ?? "").trim().slice(0, 10);
+      const toQ = String(searchParams?.get("to") ?? searchParams?.get("createdTo") ?? "").trim().slice(0, 10);
+      const nextActive = { ...EMPTY_FILTERS };
+      const nextDraft = { ...EMPTY_FILTERS };
+      let changed = false;
+      if (stageQ) {
+        const candidates = stageQ.split(",").map((s) => s.trim()).filter(Boolean);
+        if (candidates.length) {
+          nextActive.stageList = candidates;
+          nextDraft.stageList = candidates;
+          changed = true;
+        }
+      }
+      if (statusQ) {
+        const candidates = statusQ.split(",").map((s) => s.trim()).filter(Boolean);
+        if (candidates.length) {
+          nextActive.statusList = candidates;
+          nextDraft.statusList = candidates;
+          changed = true;
+        }
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(fromQ)) {
+        nextActive.createdFrom = fromQ;
+        nextDraft.createdFrom = fromQ;
+        changed = true;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(toQ)) {
+        nextActive.createdTo = toQ;
+        nextDraft.createdTo = toQ;
+        changed = true;
+      }
+      if (changed) {
+        setActiveFilters(nextActive);
+        setDraftFilters(nextDraft);
+      }
+      if (qQ) {
+        setSearchQuery(qQ);
+      }
+    } catch {}
+    initialUrlFiltersAppliedRef.current = true;
+  }, [searchParams]);
 
   // Quando troca pra desktop, fecha modal (nao precisa mais, section esta visivel!)
   useEffect(() => {
