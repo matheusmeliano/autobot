@@ -132,7 +132,7 @@ export async function GET(req: Request) {
 
   const admin = createSupabaseAdminClient();
 
-  // =============== 1) EXPERIMENTAIS (professor_date IN [from..to]) ===============
+  // =============== 1) EXPERIMENTAIS (tabela atendimento_experimental_class_bookings, professor_date IN [from..to]) ===============
   try {
     const baseSelect =
       "professor_date,assigned_professor_name,assigned_professor_phone,status";
@@ -146,6 +146,8 @@ export async function GET(req: Request) {
         "scheduled","confirmed","marcada","marcado","confirmada","confirmado",
         "concluido","concluído","completed","done","finished","realizada","realizado",
         "agendada","agendado","presente","attended",
+        "time_selected","lead_selected","professor_selected","professor_confirmed",
+        "lead_confirmed","aula_marcada","aula_agendada","reagendada","reagendado",
       ]);
       for (const b of data as Array<Record<string, unknown>>) {
         const d = String(b?.professor_date ?? "").trim().slice(0, 10);
@@ -157,6 +159,53 @@ export async function GET(req: Request) {
           String(b?.assigned_professor_phone ?? ""),
           false,
         );
+        if (!key) continue;
+        (badgeMap[d] as any)[key] = true;
+      }
+    }
+  } catch {}
+
+  // =============== 1.5) EXPERIMENTAIS FONTE 2 (colunas flat EM ATENDIMENTO_LEADS: experimental_class_professor_date etc.) ===============
+  // IMPORTANTE (ROOT CAUSE 26/09 Sábado): algumas aulas experimentais (José Marcos 26/09 08:00 Lucas Brum, Marcela 23/09 13:00 Nathan)
+  // NÃO ESTÃO na tabela atendimento_experimental_class_bookings — existem SOMENTE nas colunas flat experimental_class_* de atendimento_leads.
+  // Esquecer essa fonte = BADGES ERRADOS (diz 2 badges, modal mostra 3).
+  try {
+    const selFlat = [
+      "experimental_class_status",
+      "experimental_class_professor_date",
+      "experimental_class_professor_time",
+      "experimental_class_professor_name",
+      "experimental_class_professor_phone",
+      "experimental_class_lead_date",
+      "experimental_class_lead_time",
+    ].join(",");
+    const { data, error } = await admin
+      .from("atendimento_leads")
+      .select(selFlat)
+      .or(
+        "experimental_class_professor_date.not.is.null,experimental_class_status.not.is.null,experimental_class_professor_name.not.is.null,experimental_class_lead_date.not.is.null",
+      )
+      .limit(2000);
+    if (data && !error) {
+      const validFlatExpStatus = new Set([
+        "scheduled","confirmed","marcada","marcado","confirmada","confirmado",
+        "concluido","concluído","completed","done","finished","realizada","realizado",
+        "agendada","agendado","presente","attended",
+        "time_selected","lead_selected","professor_selected","professor_confirmed",
+        "lead_confirmed","aula_marcada","aula_agendada","reagendada","reagendado",
+      ]);
+      for (const r of data as unknown as Array<Record<string, unknown>>) {
+        const st = String((r as any).experimental_class_status ?? "").trim().toLowerCase();
+        const pDate = String((r as any).experimental_class_professor_date ?? "").trim().slice(0, 10);
+        const lDate = String((r as any).experimental_class_lead_date ?? "").trim().slice(0, 10);
+        const d = pDate || lDate;
+        if (!d || !badgeMap[d]) continue;
+        if (d < from || d > to) continue;
+        if (st && !validFlatExpStatus.has(st)) continue;
+        const pName = String((r as any).experimental_class_professor_name ?? "").trim();
+        const pPhone = String((r as any).experimental_class_professor_phone ?? "").trim();
+        const hasProf = Boolean(pName || pPhone);
+        const key = detectTeacherKey(pName, pPhone, !hasProf);
         if (!key) continue;
         (badgeMap[d] as any)[key] = true;
       }

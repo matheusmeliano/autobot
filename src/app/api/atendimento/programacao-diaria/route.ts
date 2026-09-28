@@ -99,6 +99,22 @@ export async function GET(req: Request) {
   const bookings: Array<Record<string, unknown>> = [];
   const baseSelect =
     "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at";
+
+  // ========== CONSTANTES REST (SUPABASE SERVICE ROLE) - DECLARADAS Cedo pois passo 1.2 precisa ==========
+  // IMPORTANTE sobre como buscar: SDK admin.from("atendimento_leads") estava silenciosamente
+  // retornando NULL em runtime (try/catch engolia) e nome nunca aparecia. Solução: FETCH REST
+  // DIRETO (service_role key no header), exatamente como no debug manual que retornava:
+  //   José Marcos (08:00) / Rito Pereira (09:00)
+  // Headers GET SÓ apikey + Authorization (Content-Type/Accept/Prefer só para POST/PATCH,
+  // causam HTTP 400 silencioso em GET).
+  const SUPABASE_URL = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "https://wancechxapezliwiwlke.supabase.co").replace(/\/$/, "");
+  const SUPABASE_SERVICE_ROLE_KEY =
+    String(process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbmNlY2h4YXBlemxpd2l3bGtlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTY2OTY5MCwiZXhwIjoyMDkxMjQ1NjkwfQ.8kQv54DQOQscolOiS5NW_XYXzjPYjut3pCj5uLPbYWw").trim();
+  const restHeaders: Record<string, string> = {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+  // ================================================================
   {
     const { data, error } = await admin
       .from("atendimento_experimental_class_bookings")
@@ -114,6 +130,75 @@ export async function GET(req: Request) {
       for (const b of data as Array<Record<string, unknown>>) bookings.push(b);
     }
   }
+
+  // 1.2) EXPERIMENTAIS FONTE 2: colunas flat em atendimento_leads
+  //      (experimental_class_professor_date, experimental_class_status, etc)
+  //      IMPORTANTE (ROOT CAUSE 26/09): José Marcos 26/09 08:00 Lucas Brum status=time_selected
+  //      NÃO ESTAVA na tabela atendimento_experimental_class_bookings — existia SOMENTE nas colunas flat.
+  //      Esquecer essa fonte = MODAL mostra 3 mas BADGES mostra 2 (ou vice versa).
+  try {
+    const selFlat = [
+      "id","full_name","phone","funnel_stage","status",
+      "experimental_class_status","experimental_class_professor_date","experimental_class_professor_time",
+      "experimental_class_professor_timezone","experimental_class_professor_name","experimental_class_professor_phone",
+      "experimental_class_lead_date","experimental_class_lead_time","experimental_class_lead_timezone",
+      "experimental_class_lead_start_at","experimental_class_professor_start_at","experimental_class_link",
+      "experimental_class_booking_id",
+    ].join(",");
+    const validFlatExpStatus = new Set([
+      "scheduled","confirmed","marcada","marcado","confirmada","confirmado",
+      "concluido","concluído","completed","done","finished","realizada","realizado",
+      "agendada","agendado","presente","attended",
+      "time_selected","lead_selected","professor_selected","professor_confirmed",
+      "lead_confirmed","aula_marcada","aula_agendada","reagendada","reagendado",
+    ]);
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(experimental_class_professor_date.not.is.null,experimental_class_status.not.is.null,experimental_class_professor_name.not.is.null,experimental_class_lead_date.not.is.null)&select=${selFlat}`,
+      { method: "GET", headers: restHeaders, cache: "no-store" },
+    );
+    if (res.ok) {
+      const arr = (await res.json()) as Array<Record<string, unknown>> | null;
+      if (Array.isArray(arr) && arr.length > 0) {
+        const alreadySeenBookingIds = new Set(
+          bookings.map((bk) => String((bk as any).id ?? "").trim()).filter(Boolean),
+        );
+        for (const r of arr) {
+          const st = String((r as any).experimental_class_status ?? "").trim().toLowerCase();
+          const pDate = String((r as any).experimental_class_professor_date ?? "").trim().slice(0, 10);
+          const lDate = String((r as any).experimental_class_lead_date ?? "").trim().slice(0, 10);
+          const d = pDate || lDate;
+          if (d !== targetDate) continue;
+          if (st && !validFlatExpStatus.has(st)) continue;
+          const bkId = String((r as any).experimental_class_booking_id ?? "").trim();
+          if (bkId && alreadySeenBookingIds.has(bkId)) continue;
+          const pName = String((r as any).experimental_class_professor_name ?? "").trim();
+          const pPhone = String((r as any).experimental_class_professor_phone ?? "").trim();
+          const pseudoBooking: Record<string, unknown> = {
+            id: `flat-exp-${String(r.id ?? "x")}`,
+            lead_id: r.id ?? null,
+            conversation_id: null,
+            status: st || "scheduled",
+            professor_date: d,
+            professor_time: (r as any).experimental_class_professor_time ?? null,
+            professor_start_at: (r as any).experimental_class_professor_start_at ?? null,
+            lead_date: lDate || d,
+            lead_time: (r as any).experimental_class_lead_time ?? null,
+            lead_timezone: (r as any).experimental_class_lead_timezone ?? null,
+            professor_timezone: (r as any).experimental_class_professor_timezone ?? null,
+            assigned_professor_name: pName || null,
+            assigned_professor_phone: pPhone || null,
+            link: (r as any).experimental_class_link ?? null,
+            __type: "experimental_flat",
+            __lead_full_name: r.full_name ?? null,
+            __lead_phone: r.phone ?? null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          bookings.push(pseudoBooking);
+        }
+      }
+    }
+  } catch {}
 
   // Util: formatação de telefone p/ exibição no modal (sempre com +<codigo pais> (area) 9XXXX-XXXX
   const digitsOnly = (s: string | null | undefined): string => String(s ?? "").replace(/\D+/g, "");
@@ -147,26 +232,6 @@ export async function GET(req: Request) {
     return raw;
   };
   //
-  // ================= IMPORTANTE SOBRE COMO BUSCAR LEAD: =================
-  // O cliente admin.from("atendimento_leads") do nosso SDK estava SILENCIOSAMENTE falhando
-  // em runtime (try/catch) e SEMPRE retornava null → nome não aparecia no modal ("Agendado" sozinho).
-  // Solução DEFINITIVA: usar FETCH REST DIRETO ao endpoint do Supabase (service_role key no header),
-  // exatamente como a query de debug que rodei manualmente e retornou os nomes REAIS:
-  //   José Marcos (08:00) / Rito Pereira (09:00)
-  // Isso remove camada de SDK que poderia ter RLS/cache/coluna ambigua engolindo erro.
-  const SUPABASE_URL = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "https://wancechxapezliwiwlke.supabase.co").replace(/\/$/, "");
-  const SUPABASE_SERVICE_ROLE_KEY =
-    String(process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbmNlY2h4YXBlemxpd2l3bGtlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTY2OTY5MCwiZXhwIjoyMDkxMjQ1NjkwfQ.8kQv54DQOQscolOiS5NW_XYXzjPYjut3pCj5uLPbYWw").trim();
-  // ================== MUITO IMPORTANTE SOBRE HEADERS ==================
-  // Headers permitidos no GET REST do Supabase/PostgREST:
-  //   SÓ apikey + Authorization Bearer.
-  // NÃO enviar em GET: 'Content-Type: application/json' / 'Accept' / 'Prefer: return=representation'.
-  // Esses 3 headers são para POST/PATCH/PUT (mutações), e em GET causam **HTTP 400 Bad Request** silencioso
-  // → try/catch engolia → nome nunca aparecia no modal!
-  const restHeaders: Record<string, string> = {
-    apikey: SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-  };
   const leadIds = bookings
     .map((b) => String(b.lead_id ?? "").trim())
     .filter(Boolean);
