@@ -127,6 +127,9 @@ export function AppDateRangePicker({
         status: "disponivel" | "ocupado" | "passado" | "cancelado";
         bookingId?: string | null;
         bookingStatus?: string | null;
+        badgeLabel?: string | null;
+        badgeBg?: string | null;
+        badgeText?: string | null;
         aluno?: { id: string; displayName: string; phone: string; status: string } | null;
       }>;
     }>;
@@ -827,15 +830,20 @@ export function AppDateRangePicker({
                                               </div>
                                             </div>
 
-                                            {ocupado ? (
+                                            {ocupado && slot.badgeLabel ? (
                                               <span
                                                 className={[
                                                   "shrink-0 rounded-[12px] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em]",
-                                                  "bg-[#0f172a] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]",
+                                                  "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]",
                                                 ].join(" ")}
-                                                style={{ color: "#ffffff", backgroundColor: "#0f172a", fontWeight: 700 }}
+                                                style={{
+                                                  color: slot.badgeText || "#ffffff",
+                                                  backgroundColor:
+                                                    slot.badgeBg || "#0f172a",
+                                                  fontWeight: 700,
+                                                }}
                                               >
-                                                Marcada
+                                                {slot.badgeLabel}
                                               </span>
                                             ) : null}
                                           </div>

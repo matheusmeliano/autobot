@@ -349,6 +349,35 @@ export async function GET(req: Request) {
         phone: string;
         status: string;
       } | null;
+      // ===== BADGE Dinâmico (Concluído verde / Agendado amarelo) =====
+      // Aula experimental = duração 60 minutos.
+      // Usamos professor_start_at (ISO UTC) + 3600s para horário fim.
+      // Se horário fim < agora => Concluído (verde texto branco). Senão => Agendado (amarelo texto branco).
+      // Cancelado: sem badge Marcada (client mostra "Cancelada" com ícone Ban)
+      let badgeLabel: string | null = null;
+      let badgeBg: string | null = null;
+      let badgeText: string | null = null;
+      if (active && !isCancelled) {
+        const startIso =
+          (active ? String(active.professor_start_at ?? "").trim() : "") ||
+          s.professorStartAtIso ||
+          "";
+        const startMs = startIso
+          ? new Date(startIso).getTime()
+          : Number.NaN;
+        const nowMs = new Date(nowUtc).getTime();
+        const endMs = Number.isFinite(startMs) ? startMs + 60 * 60 * 1000 : Number.NaN;
+        const isCompleted = Number.isFinite(endMs) && endMs <= nowMs;
+        if (isCompleted) {
+          badgeLabel = "Concluído";
+          badgeBg = "#16a34a"; // green-600 (fundo verde, texto branco - acessível WCAG AA)
+          badgeText = "#ffffff";
+        } else {
+          badgeLabel = "Agendado";
+          badgeBg = "#ca8a04"; // amber-600 (fundo amarelo, texto branco - acessível WCAG AA)
+          badgeText = "#ffffff";
+        }
+      }
       if (active && active.lead_id) {
         const { row: lr, nameFromHistory } = await fetchLeadById(
           String(active.lead_id ?? ""),
@@ -402,6 +431,9 @@ export async function GET(req: Request) {
           ? String(active.id ?? "").trim() || null
           : null,
         bookingStatus,
+        badgeLabel,
+        badgeBg,
+        badgeText,
         aluno,
       });
     }
