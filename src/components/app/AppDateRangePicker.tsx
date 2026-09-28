@@ -497,11 +497,7 @@ export function AppDateRangePicker({
         {/* Barra inferior: Hoje + Selecionar + Limpar */}
         <div className="mt-3 flex items-center justify-between gap-2 pt-3 border-t border-[var(--app-border)]">
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-55)]">
-            {pickingFirst
-              ? fromDate && !toDate
-                ? "Selecione até"
-                : "Selecione de"
-              : "Selecione até"}
+            Consulta personalizada
           </div>
           <div className="flex items-center gap-2">
             <button
