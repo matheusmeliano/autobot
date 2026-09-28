@@ -267,16 +267,17 @@ export function AppDateRangePicker({
   // NÃO usa mais recalc em scroll/resize (isso causava a PISCADA FORTE bug!)
   useEffect(() => {
     if (!open) return;
-    // Define coords FIXAS no CENTRO:
-    const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
-    const w = vw < 640 ? Math.min(320, vw - 16) : 360;
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const isMobile = vw < 640;
+    const w = isMobile
+      ? Math.min(420, vw - 16)       // mobile: até 420px (antes 320/360)
+      : Math.min(680, vw - 48);      // desktop: 680px (antes 360)
     setCoords({
-      top: 0, // ignorado por style inline (usa 50vh + translate)
+      top: 0,
       left: 0,
       width: w,
       wMax: w,
     });
-    // cleanup (nada) — events de scroll/resized REMOVIDOS para PARAR DE PISCAR
   }, [open]);
 
   // 2) Fechar popover ao clicar FORA ou ESC
@@ -368,55 +369,54 @@ export function AppDateRangePicker({
       }}
       className={[
         "fixed z-[9999]",
-        "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4",
+        "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 sm:p-6",
         "shadow-[0_14px_44px_-8px_rgba(0,0,0,0.22)]",
       ].join(" ")}
       role="dialog"
-      aria-label="Selecionar período"
+      aria-label="Calendário de aulas"
     >
         {/* Header: mês/ano + setas + X fechar */}
-        <div className="flex items-center justify-between gap-2 pb-3">
+        <div className="flex items-center justify-between gap-3 pb-4">
           <button
             type="button"
             onClick={() => setViewDate((v) => addMonths(v, -1))}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
             aria-label="Mês anterior"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5" />
           </button>
-          <div className="flex-1 text-center text-[14px] font-bold text-[var(--app-text-85)] tracking-tight">
+          <div className="flex-1 text-center text-[17px] font-extrabold text-[var(--app-text-90)] tracking-tight">
             {format(viewDate, "MMMM 'de' yyyy", { locale: ptBR })}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setViewDate((v) => addMonths(v, 1))}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
               aria-label="Próximo mês"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-5 w-5" />
             </button>
-            {/* X (close) → fecha popover E LIMPA filtro de data, voltando a mostrar todos (exatamente o que o usuário pediu) */}
             <button
               type="button"
               onClick={() => {
                 clearAll();
                 setOpen(false);
               }}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
               aria-label="Fechar e limpar filtro"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
         {/* Header dias semana */}
-        <div className="mb-1 grid grid-cols-7 gap-1 px-1">
+        <div className="mb-2 grid grid-cols-7 gap-1.5 px-1.5">
           {WEEKDAYS_SHORT.map((w) => (
             <div
               key={w}
-              className="py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-55)]"
+              className="py-2 text-center text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--app-text-55)]"
             >
               {w}
             </div>
@@ -424,7 +424,7 @@ export function AppDateRangePicker({
         </div>
 
         {/* Grid de dias */}
-        <div className="grid grid-cols-7 gap-1 px-1">
+        <div className="grid grid-cols-7 gap-1.5 px-1.5">
           {days.map((d, idx) => {
             const outMonth = !isSameMonth(d, viewDate);
             const today = isToday(d);
@@ -434,12 +434,17 @@ export function AppDateRangePicker({
             const hasNC = Boolean(badges?.NC);
             const hasPN = Boolean(badges?.PN);
             const hasAny = hasLB || hasNC || hasPN;
-            const badgeList: Array<{ key: string; label: string; offset: number }> = [];
-            if (hasLB) badgeList.push({ key: "LB", label: "LB", offset: 0 });
-            if (hasNC) badgeList.push({ key: "NC", label: "NC", offset: 1 });
-            if (hasPN) badgeList.push({ key: "PN", label: "Pn", offset: 2 });
+            const badgeList: Array<{ key: string; label: string }> = [];
+            if (hasLB) badgeList.push({ key: "LB", label: "LB" });
+            if (hasNC) badgeList.push({ key: "NC", label: "NC" });
+            if (hasPN) badgeList.push({ key: "PN", label: "Pn" });
+            // Círculo BADGE = 40px (h-10 w-10) — tamanho da imagem de referência.
+            // Sobreposição VENN: ~18px (45% overlap) para exatamente igual diagrama Venn do user.
+            const BS = 40;                // badge size px
+            const OVER = 18;                // overlap px entre badges
+            const STEP = BS - OVER;         // distância entre centros
             const badgeBaseClass =
-              "absolute flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]";
+              "absolute flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12.5px] font-extrabold uppercase text-[#c2410c]";
             return (
               <button
                 key={idx}
@@ -453,50 +458,47 @@ export function AppDateRangePicker({
                   e.preventDefault();
                 }}
                 className={[
-                  "relative inline-flex w-full flex-col items-center justify-center rounded-xl py-1.5 text-[13px] font-semibold transition-colors select-none",
+                  "relative inline-flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[15px] font-semibold transition-colors select-none",
                   "focus:outline-none",
-                  "touch-manipulation min-h-[68px]",
+                  "touch-manipulation min-h-[92px]",
                   outMonth ? "text-[var(--app-text-35)]" : "text-[var(--app-text-80)]",
                   "hover:bg-[var(--app-solid-surface-2)] active:bg-[rgba(234,88,12,0.08)]",
-                  today
-                    ? "ring-1 ring-inset ring-[rgba(234,88,12,0.45)]"
-                    : "",
                 ].join(" ")}
                 style={{ WebkitTapHighlightColor: "rgba(234,88,12,0.18)" }}
               >
-                {!hasAny ? (
-                  <span className="relative z-10 leading-none">{d.getDate()}</span>
-                ) : (
-                  <div className="relative flex items-center justify-center h-9 w-full min-h-[36px] z-10 mb-1">
+                {hasAny ? (
+                  <div className="relative w-full flex items-center justify-center z-10" style={{ minHeight: BS, height: BS }}>
                     {badgeList.map((b, i) => {
                       const N = badgeList.length;
-                      const L = 9;
-                      const step = 36 - L;
-                      // Center group at 50% of cell width.
-                      // Center of circle i relative to group center =  (i - (N - 1)/2) * step
-                      // px from cell left edge of circle (left):
-                      //   50% (cell center) + relative_center_i - 18px (half circle)
-                      const relativeCenter = (i - (N - 1) / 2) * step;
-                      const leftPx = relativeCenter - 18;
+                      const rel = (i - (N - 1) / 2) * STEP; // center of badge i rel to cell center
+                      const leftCalc = `calc(50% + ${rel - BS / 2}px)`;
                       return (
                         <div
-                          key={b.key}
-                          className={badgeBaseClass}
-                          style={{
-                            left: `calc(50% + ${leftPx}px)`,
-                            top: "0",
-                            zIndex: 10 + i,
-                          }}
-                        >
-                          {b.label}
-                        </div>
+                        key={b.key}
+                        className={badgeBaseClass}
+                        style={{
+                          left: leftCalc,
+                          top: "0",
+                          zIndex: 10 + (N - Math.abs(i - Math.floor((N - 1) / 2))),
+                          boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255,255,255,0.6)",
+                        }}
+                      >
+                        {b.label}
+                      </div>
                       );
                     })}
                   </div>
-                )}
-                {hasAny ? (
-                  <span className="relative z-[5] leading-none mt-1 text-[13px] font-semibold">{d.getDate()}</span>
                 ) : null}
+                {/* Número do dia: sempre ABAIXO dos badges. Número em célula sem badge centralizado! */}
+                {today ? (
+                  <span className="relative z-[5] mt-2 inline-flex h-7 min-w-[28px] items-center justify-center rounded-full ring-1 ring-inset ring-[rgba(234,88,12,0.5)] bg-[rgba(234,88,12,0.08)] px-2 text-[14px] font-extrabold text-[#9a3412]">
+                    {d.getDate()}
+                  </span>
+                ) : (
+                  <span className="relative z-[5] leading-none mt-2 text-[15px] font-semibold">
+                    {d.getDate()}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -592,7 +594,7 @@ export function AppDateRangePicker({
                   {/* Container do modal */}
                   <div
                     className={[
-                      "relative w-full sm:max-w-[560px] max-h-[92vh] overflow-hidden",
+                      "relative w-full sm:max-w-[820px] max-h-[94vh] overflow-hidden",
                       "rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)]",
                       "shadow-[0_25px_60px_-12px_rgba(0,0,0,0.30)]",
                       "flex flex-col animate-in zoom-in-95 duration-150",
@@ -621,7 +623,7 @@ export function AppDateRangePicker({
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Header (sticky, nunca some com scroll) */}
-                    <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 sm:px-5 sm:py-3.5">
+                    <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--app-border)] px-5 py-4 sm:px-6 sm:py-4.5">
                       {/* Botão VOLTAR = fecha o modal de programação E ABRE de volta o POPOVER CALENDÁRIO
                           (grade de dias com "setembro de 2026" no topo, exatamente o print do usuário). */}
                       <button
@@ -629,16 +631,10 @@ export function AppDateRangePicker({
                         aria-label="Voltar ao calendário"
                         onClick={(e) => {
                           e.stopPropagation();
-                          // 1) Fecha o modal "Programação do Dia" (este)
                           closeScheduleModal();
-                          // 2) ABRE de volta o popover do calendário (grade de dias)
-                          //    usando o useState interno setOpen(true) do AppDateRangePicker.
-                          //    É exatamente a interface do print: setembro/2026, setas < >, X.
                           try {
                             setOpen(true);
                           } catch {}
-                          // 3) Garante foco visual no botão trigger do calendário (icon laranja CalendarDays)
-                          //    para ter feedback visual claro que voltamos para a tela certa.
                           try {
                             const triggers = document.querySelectorAll<HTMLButtonElement>(
                               'button[aria-haspopup="dialog"][aria-label],button[data-app-calendar-trigger="true"]',
@@ -650,19 +646,19 @@ export function AppDateRangePicker({
                           } catch {}
                         }}
                         className={[
-                          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                          "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
                           "bg-transparent text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
                           "transition-colors",
                         ].join(" ")}
                       >
-                        <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2.25} />
+                        <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
                       </button>
 
                       <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center min-w-0">
-                        <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[var(--app-text-55)]">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--app-text-55)]">
                           Programação do Dia
                         </div>
-                        <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-95)] leading-tight max-w-[64vw]">
+                        <div className="mt-1 truncate text-[17px] font-bold text-[var(--app-text-95)] leading-tight max-w-[72vw]">
                           {isValid(dateObj)
                             ? format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
                             : scheduleDate}
@@ -674,12 +670,12 @@ export function AppDateRangePicker({
                         aria-label="Fechar programação do dia"
                         onClick={closeScheduleModal}
                         className={[
-                          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                          "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
                           "bg-transparent text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
                           "transition-colors",
                         ].join(" ")}
                       >
-                        <X className="h-[18px] w-[18px]" />
+                        <X className="h-5 w-5" />
                       </button>
                     </div>
 
@@ -711,7 +707,7 @@ export function AppDateRangePicker({
                         </button>
                       </div>
                     ) : (
-                      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5 sm:px-5 sm:py-4">
+                      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
                         {/* Cards por professor */}
                         {teacherList.length === 0 ? (
                           <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 py-10 text-center">
@@ -721,7 +717,7 @@ export function AppDateRangePicker({
                             </div>
                           </div>
                         ) : (
-                          <div className="flex flex-col gap-2.5">
+                          <div className="flex flex-col gap-3.5">
                             {teacherList.map((teacher, tIdx) => {
                               const ocupadosList = teacher.slots.filter(
                                 (s) => s.status === "ocupado" || s.status === "cancelado",
@@ -748,13 +744,13 @@ export function AppDateRangePicker({
                                   ].join(" ")}
                                 >
                                   {/* Card header professor */}
-                                  <div className="flex items-center justify-between gap-3 px-3.5 py-3 sm:px-4">
-                                    <div className="flex min-w-0 items-center gap-3">
+                                  <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5">
+                                    <div className="flex min-w-0 items-center gap-3.5">
                                       <div
                                         className={[
-                                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
                                           "border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)]",
-                                          "text-[12px] font-bold uppercase text-[#c2410c]",
+                                          "text-[13px] font-extrabold uppercase text-[#c2410c]",
                                         ].join(" ")}
                                       >
                                         {teacher.name
@@ -764,11 +760,11 @@ export function AppDateRangePicker({
                                           .slice(0, 2)
                                           .join("")}
                                       </div>
-                                      <div className="min-w-0">
-                                        <div className="truncate text-[13.5px] font-semibold text-[var(--app-text-95)] leading-tight">
+                                      <div className="flex min-w-0 flex-col gap-1.5">
+                                        <div className="truncate text-[16px] font-semibold text-[var(--app-text-95)] leading-tight">
                                           {teacher.name}
                                         </div>
-                                        <div className="mt-0.5 truncate text-[11.5px] text-[var(--app-text-55)]">
+                                        <div className="mt-0.5 truncate text-[13px] text-[var(--app-text-55)]">
                                           {String(teacher.phone ?? "").trim() === "__no_assigned_professor__"
                                             ? "Número indisponível"
                                             : teacher.phone}
@@ -802,33 +798,33 @@ export function AppDateRangePicker({
                                           const dest = `/app/atendimento${params.toString() ? "?" + params.toString() : ""}`;
                                           window.location.assign(dest);
                                         }}
-                                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11.5px] font-bold uppercase tracking-[0.04em] text-[#0f172a] shadow-[inset_0_0_0_1px_var(--app-border)] transition-colors hover:bg-[var(--app-solid-surface-2)] active:bg-[var(--app-solid-surface-3)]"
+                                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[12px] bg-white px-3.5 text-[12px] font-bold uppercase tracking-[0.04em] text-[#0f172a] shadow-[inset_0_0_0_1px_var(--app-border)] transition-colors hover:bg-[var(--app-solid-surface-2)] active:bg-[var(--app-solid-surface-3)]"
                                       >
                                         Ver
-                                        <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+                                        <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
                                       </button>
                                     )}
                                   </div>
 
                                   {/* Apenas aulas marcadas / canceladas (horários livres NÃO listados — poluição) */}
                                   {temAlgo ? (
-                                    <div className="flex flex-col gap-1.5 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
+                                    <div className="flex flex-col gap-2 px-4 pb-4 sm:px-5 sm:pb-5">
                                       {ocupadosList.map((slot, sIdx) => {
                                         const ocupado = slot.status === "ocupado";
                                         return (
                                           <div
                                             key={sIdx}
                                             className={[
-                                              "flex items-center justify-between gap-2 rounded-2xl px-3 py-2.5",
+                                              "flex items-center justify-between gap-3 rounded-2xl px-3.5 py-3",
                                               ocupado
                                                 ? "border border-[var(--app-border)] bg-[var(--app-solid-surface-2)]"
                                                 : "border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] opacity-80",
                                             ].join(" ")}
                                           >
-                                            <div className="flex min-w-0 items-center gap-3">
+                                            <div className="flex min-w-0 items-center gap-3.5">
                                               <div
                                                 className={[
-                                                  "flex h-9 w-[52px] shrink-0 items-center justify-center rounded-[12px] text-[12.5px] font-bold tabular-nums",
+                                                  "flex h-10 w-[60px] shrink-0 items-center justify-center rounded-[12px] text-[13px] font-extrabold tabular-nums",
                                                   ocupado
                                                     ? "bg-[#ea580c] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]"
                                                     : "bg-[var(--app-solid-surface-3)] line-through",
@@ -844,18 +840,18 @@ export function AppDateRangePicker({
                                               <div className="min-w-0">
                                                 {ocupado && slot.aluno ? (
                                                   <>
-                                                    <div className="truncate text-[13px] font-semibold text-[var(--app-text-95)] leading-tight">
+                                                    <div className="truncate text-[14.5px] font-semibold text-[var(--app-text-95)] leading-tight">
                                                       {slot.aluno.displayName}
                                                     </div>
                                                     {slot.aluno.phone ? (
-                                                      <div className="mt-0.5 truncate text-[11px] text-[var(--app-text-55)] leading-tight">
+                                                      <div className="mt-0.5 truncate text-[12px] text-[var(--app-text-55)] leading-tight">
                                                         {slot.aluno.phone}
                                                       </div>
                                                     ) : null}
                                                   </>
                                                 ) : (
-                                                  <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--app-text-55)]">
-                                                    <Ban className="h-3.5 w-3.5" />
+                                                  <div className="flex items-center gap-1.5 text-[12.5px] text-[var(--app-text-55)]">
+                                                    <Ban className="h-4 w-4" />
                                                     <span className="font-medium">
                                                       Cancelada
                                                     </span>
