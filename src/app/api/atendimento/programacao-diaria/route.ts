@@ -314,13 +314,12 @@ export async function GET(req: Request) {
           // Filtrar STATUS aceitos de recorrência em memória (evitar inconsistência enum)
           const st = String((r as any).recurring_class_status ?? "").trim();
           if (!st) continue;
-          const ok = [
-            "confirmado",
-            "cadastro_plataforma_pendente",
-            "ativo",
-            "matriculado",
-          ].includes(st.toLowerCase());
-          if (!ok) continue;
+          const validRecStatus = new Set([
+            "confirmado","confirmada","cadastro_plataforma_pendente","cadastro_pendente","ativo","ativa",
+            "matriculado","matriculada","matricula_concluida","matrícula_concluída","renovacao","renovação",
+            "pagamento_pendente","aguardando_pagamento","reagendado","reagendada","em_andamento",
+          ]);
+          if (!validRecStatus.has(st.toLowerCase())) continue;
           // ===== MATCH WEEKDAY (SEMPRE EM MEMÓRIA por causa de NULL) =====
           const colWeekday = String((r as any).recurring_class_weekday ?? "").trim().toLowerCase();
           const colLabel = String((r as any).recurring_class_weekday_label ?? "").trim();

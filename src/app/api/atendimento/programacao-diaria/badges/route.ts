@@ -130,11 +130,16 @@ export async function GET(req: Request) {
       .gte("professor_date", from)
       .lte("professor_date", to);
     if (data && !error) {
+      const validExpStatus = new Set([
+        "scheduled","confirmed","marcada","marcado","confirmada","confirmado",
+        "concluido","concluído","completed","done","finished","realizada","realizado",
+        "agendada","agendado","presente","attended",
+      ]);
       for (const b of data as Array<Record<string, unknown>>) {
         const d = String(b?.professor_date ?? "").trim().slice(0, 10);
         if (!d || !badgeMap[d]) continue;
         const st = String(b?.status ?? "").toLowerCase();
-        if (!["scheduled", "confirmed", "marcada", "confirmado", "concluido", "concluído"].includes(st)) continue;
+        if (!validExpStatus.has(st)) continue;
         const key = detectTeacherKey(
           String(b?.assigned_professor_name ?? ""),
           String(b?.assigned_professor_phone ?? ""),
@@ -168,9 +173,14 @@ export async function GET(req: Request) {
       )
       .limit(2000);
     if (data && !error) {
+      const validRecStatus = new Set([
+        "confirmado","confirmada","cadastro_plataforma_pendente","cadastro_pendente","ativo","ativa",
+        "matriculado","matriculada","matricula_concluida","matrícula_concluída","renovacao","renovação",
+        "pagamento_pendente","aguardando_pagamento","reagendado","reagendada","em_andamento",
+      ]);
       for (const r of data as unknown as Array<Record<string, unknown>>) {
         const st = String((r as any).recurring_class_status ?? "").trim().toLowerCase();
-        if (!["confirmado", "cadastro_plataforma_pendente", "ativo", "matriculado"].includes(st)) continue;
+        if (!validRecStatus.has(st)) continue;
         const colWeekday = String((r as any).recurring_class_weekday ?? "").trim().toLowerCase();
         const colLabel = String((r as any).recurring_class_weekday_label ?? "").trim();
         let effective: string | null = null;

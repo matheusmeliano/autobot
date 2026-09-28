@@ -438,13 +438,15 @@ export function AppDateRangePicker({
             if (hasLB) badgeList.push({ key: "LB", label: "LB" });
             if (hasNC) badgeList.push({ key: "NC", label: "NC" });
             if (hasPN) badgeList.push({ key: "PN", label: "Pn" });
-            // Círculo BADGE = 40px (h-10 w-10) — tamanho da imagem de referência.
-            // Sobreposição VENN: ~18px (45% overlap) para exatamente igual diagrama Venn do user.
-            const BS = 40;                // badge size px
-            const OVER = 18;                // overlap px entre badges
-            const STEP = BS - OVER;         // distância entre centros
+            const N = badgeList.length;
+            // TAMANHO + OVERLAP ADAPTATIVOS por quantidade badges (garante TODOS visíveis / não corta em mobile)
+            // N=1: 40px (grande), N=2: 34px overlap 14, N=3: 30px overlap 18 (total grupo 54px, cabe em ~51px de célula mobile)
+            const BS = N === 1 ? 40 : N === 2 ? 34 : 30;
+            const OVER = N === 1 ? 0 : N === 2 ? 14 : 18;
+            const STEP = BS - OVER;
+            const badgeFontPx = N === 1 ? 12.5 : N === 2 ? 12 : 11;
             const badgeBaseClass =
-              "absolute flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12.5px] font-extrabold uppercase text-[#c2410c]";
+              "absolute flex shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] font-extrabold uppercase text-[#c2410c]";
             return (
               <button
                 key={idx}
@@ -469,7 +471,6 @@ export function AppDateRangePicker({
                 {hasAny ? (
                   <div className="relative w-full flex items-center justify-center z-10" style={{ minHeight: BS, height: BS }}>
                     {badgeList.map((b, i) => {
-                      const N = badgeList.length;
                       const rel = (i - (N - 1) / 2) * STEP; // center of badge i rel to cell center
                       const leftCalc = `calc(50% + ${rel - BS / 2}px)`;
                       return (
@@ -479,6 +480,9 @@ export function AppDateRangePicker({
                         style={{
                           left: leftCalc,
                           top: "0",
+                          width: BS,
+                          height: BS,
+                          fontSize: badgeFontPx,
                           zIndex: 10 + (N - Math.abs(i - Math.floor((N - 1) / 2))),
                           boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255,255,255,0.6)",
                         }}
