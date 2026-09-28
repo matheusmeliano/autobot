@@ -433,6 +433,11 @@ export function AppDateRangePicker({
             const hasLB = Boolean(badges?.LB);
             const hasNC = Boolean(badges?.NC);
             const hasPN = Boolean(badges?.PN);
+            const hasAny = hasLB || hasNC || hasPN;
+            const badgeList: Array<{ key: string; label: string }> = [];
+            if (hasLB) badgeList.push({ key: "LB", label: "LB" });
+            if (hasNC) badgeList.push({ key: "NC", label: "NC" });
+            if (hasPN) badgeList.push({ key: "PN", label: "Pn" });
             return (
               <button
                 key={idx}
@@ -446,9 +451,9 @@ export function AppDateRangePicker({
                   e.preventDefault();
                 }}
                 className={[
-                  "relative inline-flex w-full flex-col items-center justify-start gap-1 rounded-xl py-1.5 text-[12.5px] font-medium transition-colors select-none",
+                  "relative inline-flex w-full flex-col items-center justify-start gap-1 rounded-xl py-1.5 text-[13px] font-semibold transition-colors select-none",
                   "focus:outline-none",
-                  "touch-manipulation min-h-[72px]",
+                  "touch-manipulation min-h-[58px]",
                   outMonth ? "text-[var(--app-text-35)]" : "text-[var(--app-text-80)]",
                   "hover:bg-[var(--app-solid-surface-2)] active:bg-[rgba(234,88,12,0.08)]",
                   today
@@ -457,24 +462,17 @@ export function AppDateRangePicker({
                 ].join(" ")}
                 style={{ WebkitTapHighlightColor: "rgba(234,88,12,0.18)" }}
               >
-                <span className="relative z-10 leading-none">{d.getDate()}</span>
-                {(hasLB || hasNC || hasPN) && (
-                  <div className="flex items-center gap-1 flex-wrap justify-center z-10">
-                    {hasLB && (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]">
-                        LB
-                      </div>
-                    )}
-                    {hasNC && (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]">
-                        NC
-                      </div>
-                    )}
-                    {hasPN && (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]">
-                        Pn
-                      </div>
-                    )}
+                <span className="relative z-10 leading-none pt-0.5">{d.getDate()}</span>
+                {hasAny && (
+                  <div className="flex items-center justify-center gap-1 z-10 w-full px-0.5 min-w-0">
+                    {badgeList.map((b) => (
+                      <span
+                        key={b.key}
+                        className="inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] px-1.5 text-[10px] font-bold uppercase tracking-tight text-[#c2410c]"
+                      >
+                        {b.label}
+                      </span>
+                    ))}
                   </div>
                 )}
               </button>
