@@ -2834,7 +2834,7 @@ export function AtendimentoClient() {
               >
                 Limpar
               </button>
-              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples, sem sombra forte) */}
+              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples) */}
               <button
                 type="button"
                 onClick={() => {
@@ -2842,6 +2842,7 @@ export function AtendimentoClient() {
                   setShowFiltersModal(false);
                 }}
                 className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold text-white hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
+                style={{ color: "#ffffff" }}
               >
                 Aplicar
               </button>
