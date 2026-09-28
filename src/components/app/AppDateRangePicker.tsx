@@ -754,7 +754,7 @@ export function AppDateRangePicker({
                                         } catch {}
                                         router.push("/app/atendimento");
                                       }}
-                                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[12px] bg-[#ea580c] px-3 text-[11.5px] font-bold uppercase tracking-[0.04em] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] transition-colors hover:bg-[#c2410c] active:bg-[#9a3412]"
+                                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11.5px] font-bold uppercase tracking-[0.04em] text-[#0f172a] shadow-[inset_0_0_0_1px_var(--app-border)] transition-colors hover:bg-[var(--app-solid-surface-2)] active:bg-[var(--app-solid-surface-3)]"
                                     >
                                       Ver
                                       <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.25} />
