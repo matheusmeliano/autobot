@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, CalendarDays, X, CalendarRange, CheckCircle2, Clock, Users, Ban } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, CalendarDays, X, CalendarRange, CheckCircle2, Clock, Users, Ban, ArrowUpRight } from "lucide-react";
 import {
   addDays,
   addMonths,
@@ -76,6 +77,7 @@ export function AppDateRangePicker({
   size = "full",
   iconActive = "auto",
 }: AppDateRangePickerProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<PopoverCoords>({
     top: 0,
@@ -743,37 +745,20 @@ export function AppDateRangePicker({
                                       </div>
                                     </div>
 
-                                    {/* Resumo compacto 1 linha */}
-                                    <div className="flex shrink-0 items-center gap-1.5">
-                                      {ocupados > 0 ? (
-                                        <div
-                                          className={[
-                                            "inline-flex h-7 items-center gap-1 rounded-xl border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] px-2",
-                                          ].join(" ")}
-                                        >
-                                          <CheckCircle2 className="h-3 w-3 text-[#c2410c]" />
-                                          <span className="text-[11px] font-bold leading-none text-[#9a3412]">
-                                            {ocupados}
-                                          </span>
-                                        </div>
-                                      ) : null}
-                                      {cancel > 0 ? (
-                                        <div className="inline-flex h-7 items-center gap-1 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-2">
-                                          <Ban className="h-3 w-3 text-[var(--app-text-65)]" />
-                                          <span className="text-[11px] font-bold leading-none text-[var(--app-text-75)]">
-                                            {cancel}
-                                          </span>
-                                        </div>
-                                      ) : null}
-                                      {livres > 0 ? (
-                                        <div className="inline-flex h-7 items-center gap-1 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-2">
-                                          <Clock className="h-3 w-3 text-[var(--app-text-55)]" />
-                                          <span className="text-[11px] font-bold leading-none text-[var(--app-text-75)]">
-                                            {livres}
-                                          </span>
-                                        </div>
-                                      ) : null}
-                                    </div>
+                                    {/* Botão Ver = atalho para a lista de atendimento / registros */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        try {
+                                          setScheduleModalOpen(false);
+                                        } catch {}
+                                        router.push("/app/atendimento");
+                                      }}
+                                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[12px] bg-[#ea580c] px-3 text-[11.5px] font-bold uppercase tracking-[0.04em] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] transition-colors hover:bg-[#c2410c] active:bg-[#9a3412]"
+                                    >
+                                      Ver
+                                      <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+                                    </button>
                                   </div>
 
                                   {/* Apenas aulas marcadas / canceladas (horários livres NÃO listados — poluição) */}
