@@ -3037,13 +3037,27 @@ export function AtendimentoClient() {
               >
                 Limpar
               </button>
-              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples)
-                   OBS: NAO usar className text-white, pq globals.css tem ".app-theme .text-white { color: var(--app-fg) !important }"
-                        que pinta tudo de PRETO no tema light. Usa só style inline color white (SEM classe text-white!) */}
+              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples) */}
               <button
                 type="button"
                 onClick={() => {
-                  setActiveFilters(draftFilters);
+                  // ====== FILTROS AVANÇADOS (modal SlidersHorizontal) APLICADOS ======
+                  // Intenção EXPLÍCITA do usuário. Limpeza do booking filter (do botão Ver
+                  // do modal programação) é obrigatória para INDEPENDÊNCIA TOTAL entre os
+                  // dois filtros (calendario cadastro / filtros avançados / botão Ver).
+                  //
+                  // Sem esse reset: usuário clica "Ver" em 23/09 (bookingLeadIds=[X,Y])
+                  // depois abre filtros avançados, troca só o stage de "aula_experimental_agendada"
+                  // → "Aluno", clica Aplicar → lista continua vindo SÓ X,Y (pois bookingLeadIds
+                  // tinha mais prioridade que tudo) → aparente bug "filtro não aplica nada".
+                  const cleansed: any = { ...draftFilters };
+                  cleansed.bookingDateFrom = "";
+                  cleansed.bookingDateTo = "";
+                  cleansed.bookingProfessorName = "";
+                  cleansed.bookingPhone = "";
+                  cleansed.bookingPN = false;
+                  cleansed.bookingLeadIds = [];
+                  setActiveFilters(cleansed);
                   setShowFiltersModal(false);
                 }}
                 className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
@@ -3085,11 +3099,41 @@ export function AtendimentoClient() {
                   to: (activeFilters.createdTo ?? null) as string | null,
                 }}
                 onChange={(next: AppDateRange) => {
-                  setActiveFilters((p) => ({
-                    ...p,
-                    createdFrom: next.from ?? "",
-                    createdTo: next.to ?? "",
-                  }));
+                  setActiveFilters((p) => {
+                    // ================================================================
+                    // FILTRO DE PERÍODO DE CADASTRO (icone calendario header):
+                    //  ESCOLHA EXPLÍCITA do usuário → deve agir DE FORMA INDEPENDENTE
+                    //  do filtro de AULA (bookingFrom/bookingProfessor/bookingLeadIds etc)
+                    //  que veio do botão "Ver" do modal programação.
+                    //
+                    // Cenário bug: usuário clica "Ver" em um card do dia 23/09 → navegou
+                    // com ?bookingLeadIds=abc123,xyz → bookingLeadIds fica persistido em
+                    // activeFilters. Depois usuário altera o período de cadastro no ícone
+                    // (seta createdFrom/To mas NÃO toca em bookingLeadIds) → a lista
+                    // continua MOSTRANDO SÓ OS 2 REGISTROS do clique Ver anterior,
+                    // parecendo que o período de cadastro "não fez nada" ou "está bugado".
+                    //
+                    // Solução: SEMPRE que o usuário interage EXPLICITAMENTE com um dos
+                    // dois botões (período cadastro OU filtros avançados), LIMPA todo
+                    // o booking filter (bookingLeadIds, bookingDateFrom/To, bookingProfessor
+                    // bookingPhone, bookingPN) — pois o que vale agora é a intenção ATUAL
+                    // do usuário, não um clique "Ver" do passado. Os dois botões passam
+                    // a agir 100% independentes.
+                    // ================================================================
+                    const nextRaw: any = {
+                      ...p,
+                      createdFrom: next.from ?? "",
+                      createdTo: next.to ?? "",
+                    };
+                    // Limpa todo filtro de aula herdado do botão Ver do modal programação
+                    nextRaw.bookingDateFrom = "";
+                    nextRaw.bookingDateTo = "";
+                    nextRaw.bookingProfessorName = "";
+                    nextRaw.bookingPhone = "";
+                    nextRaw.bookingPN = false;
+                    nextRaw.bookingLeadIds = [];
+                    return nextRaw;
+                  });
                 }}
                 showLabel={false}
                 size="icon"
