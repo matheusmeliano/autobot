@@ -627,20 +627,32 @@ export function AppDateRangePicker({
                   >
                     {/* Header (sticky, nunca some com scroll) */}
                     <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 sm:px-5 sm:py-3.5">
-                      {/* Botão VOLTAR = fecha o modal e retorna para a grade do calendário (abaixo) */}
+                      {/* Botão VOLTAR = fecha o modal de programação E ABRE de volta o POPOVER CALENDÁRIO
+                          (grade de dias com "setembro de 2026" no topo, exatamente o print do usuário). */}
                       <button
                         type="button"
                         aria-label="Voltar ao calendário"
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Primeiro foca no trigger do calendário (o botão que abriu) para voltar o contexto
-                          try {
-                            const btn = document.querySelector<HTMLButtonElement>(
-                              'button[data-app-calendar-trigger="true"]',
-                            );
-                            if (btn) btn.focus({ preventScroll: true });
-                          } catch {}
+                          // 1) Fecha o modal "Programação do Dia" (este)
                           closeScheduleModal();
+                          // 2) ABRE de volta o popover do calendário (grade de dias)
+                          //    usando o useState interno setOpen(true) do AppDateRangePicker.
+                          //    É exatamente a interface do print: setembro/2026, setas < >, X.
+                          try {
+                            setOpen(true);
+                          } catch {}
+                          // 3) Garante foco visual no botão trigger do calendário (icon laranja CalendarDays)
+                          //    para ter feedback visual claro que voltamos para a tela certa.
+                          try {
+                            const triggers = document.querySelectorAll<HTMLButtonElement>(
+                              'button[aria-haspopup="dialog"][aria-label],button[data-app-calendar-trigger="true"]',
+                            );
+                            if (triggers?.length) {
+                              const t = triggers[triggers.length - 1] as HTMLButtonElement;
+                              t.focus({ preventScroll: true });
+                            }
+                          } catch {}
                         }}
                         className={[
                           "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
