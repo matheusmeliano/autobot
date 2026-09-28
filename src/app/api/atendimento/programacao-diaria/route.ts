@@ -116,9 +116,27 @@ export async function GET(req: Request) {
   }
 
   // 2) Buscar leads vinculados (nome, telefone, status)
-  // CACHE por lead_id. Método 100% igual attendance/send-student-notification:
-  // admin.from('atendimento_leads').select('id, full_name, student_full_name, display_name, phone, funnel_stage, status').eq('id', leadId).maybeSingle()
-  // Depois tenta atendimento_history_events do lead_id P/ CASOS onde full_name não está preenchido no leads (nome em details scheduled/registered).
+  //
+  // ================= IMPORTANTE SOBRE COMO BUSCAR LEAD: =================
+  // O cliente admin.from("atendimento_leads") do nosso SDK estava SILENCIOSAMENTE falhando
+  // em runtime (try/catch) e SEMPRE retornava null → nome não aparecia no modal ("Agendado" sozinho).
+  // Solução DEFINITIVA: usar FETCH REST DIRETO ao endpoint do Supabase (service_role key no header),
+  // exatamente como a query de debug que rodei manualmente e retornou os nomes REAIS:
+  //   José Marcos (08:00) / Rito Pereira (09:00)
+  // Isso remove camada de SDK que poderia ter RLS/cache/coluna ambigua engolindo erro.
+  const SUPABASE_URL = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "https://wancechxapezliwiwlke.supabase.co").replace(/\/$/, "");
+  const SUPABASE_SERVICE_ROLE_KEY =
+    String(process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbmNlY2h4YXBlemxpd2l3bGtlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTY2OTY5MCwiZXhwIjoyMDkxMjQ1NjkwfQ.8kQv54DQOQscolOiS5NW_XYXzjPYjut3pCj5uLPbYWw").trim();
+  // ================== MUITO IMPORTANTE SOBRE HEADERS ==================
+  // Headers permitidos no GET REST do Supabase/PostgREST:
+  //   SÓ apikey + Authorization Bearer.
+  // NÃO enviar em GET: 'Content-Type: application/json' / 'Accept' / 'Prefer: return=representation'.
+  // Esses 3 headers são para POST/PATCH/PUT (mutações), e em GET causam **HTTP 400 Bad Request** silencioso
+  // → try/catch engolia → nome nunca aparecia no modal!
+  const restHeaders: Record<string, string> = {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  };
   const leadIds = bookings
     .map((b) => String(b.lead_id ?? "").trim())
     .filter(Boolean);
@@ -134,45 +152,63 @@ export async function GET(req: Request) {
     if (!id) return { row: null, nameFromHistory: null };
     if (leadCache.has(id)) return leadCache.get(id)!;
     let row: Record<string, unknown> | null = null;
+
+    // ====== PASSO 1: BUSCA LEAD EM REST/V1/ATENDIMENTO_LEADS (sem SDK, puro fetch) ======
+    // ATENÇÃO: student_full_name e display_name NÃO SÃO COLUNAS FÍSICAS da tabela atendimento_leads!
+    // Eles são gerados em memória no client da rota /api/atendimento/leads (composite build).
+    // Se colocar esses nomes no select, PostgREST retorna HTTP 400 (erro 42703: column does not exist).
+    // Colunas que EXISTEM DE VERDADE (confirmado via debug SQL direto):
+    //   id, full_name, phone, funnel_stage, status, recurring_class_status
     try {
-      const { data, error } = await admin
-        .from("atendimento_leads")
-        .select(
-          "id, full_name, student_full_name, display_name, phone, funnel_stage, status, recurring_class_status",
-        )
-        .eq("id", id)
-        .maybeSingle();
-      if (!error && data) {
-        row = data as Record<string, unknown>;
+      const sel = "id,full_name,phone,funnel_stage,status,recurring_class_status";
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/atendimento_leads?id=eq.${encodeURIComponent(id)}&select=${sel}`, {
+        method: "GET",
+        headers: restHeaders,
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const arr = (await res.json()) as Array<Record<string, unknown>> | null;
+        if (Array.isArray(arr) && arr.length > 0 && arr[0] && typeof arr[0] === "object") {
+          row = arr[0] as Record<string, unknown>;
+        }
       }
     } catch {}
+
+    // ====== PASSO 2: HISTORY EVENTS POR REST (caso full_name ainda vazio) ======
     let historyName: string | null = null;
     try {
-      const { data } = await admin
-        .from("atendimento_history_events")
-        .select("id, event_type, details, created_at")
-        .eq("lead_id", id)
-        .order("created_at", { ascending: false });
-      if (data && Array.isArray(data)) {
-        for (const ev of data as unknown as any[]) {
-          const details = (ev.details ?? {}) as any;
-          const candidates = [
-            String(details?.full_name ?? "").trim(),
-            String(details?.student_full_name ?? "").trim(),
-            String(details?.student_name ?? "").trim(),
-            String(details?.nome ?? "").trim(),
-            String(details?.aluno_name ?? "").trim(),
-            String(details?.aluno_nome ?? "").trim(),
-            String(details?.name ?? "").trim(),
-            String(details?.display_name ?? "").trim(),
-          ].filter(Boolean);
-          if (candidates[0]) {
-            historyName = candidates[0];
-            break;
+      const sel2 = "id,event_type,details,created_at";
+      const ord = "created_at.desc";
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/atendimento_history_events?lead_id=eq.${encodeURIComponent(id)}&select=${sel2}&order=${ord}&limit=20`, {
+        method: "GET",
+        headers: restHeaders,
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = (await res.json()) as Array<Record<string, unknown>> | null;
+        if (Array.isArray(data)) {
+          for (const ev of data) {
+            const details = ((ev.details ?? {}) as Record<string, unknown> | null);
+            if (!details || typeof details !== "object") continue;
+            const candidates = [
+              String((details as any).full_name ?? "").trim(),
+              String((details as any).student_full_name ?? "").trim(),
+              String((details as any).student_name ?? "").trim(),
+              String((details as any).nome ?? "").trim(),
+              String((details as any).aluno_name ?? "").trim(),
+              String((details as any).aluno_nome ?? "").trim(),
+              String((details as any).name ?? "").trim(),
+              String((details as any).display_name ?? "").trim(),
+            ].filter(Boolean);
+            if (candidates[0]) {
+              historyName = candidates[0];
+              break;
+            }
           }
         }
       }
     } catch {}
+
     const entry = { row, nameFromHistory: historyName };
     leadCache.set(id, entry);
     return entry;
@@ -288,10 +324,11 @@ export async function GET(req: Request) {
           String(active.lead_id ?? ""),
         );
         if (lr || nameFromHistory) {
+          // ATENÇÃO: atendimento_leads NÃO TEM student_full_name / display_name como colunas FÍSICAS
+          // (essas são geradas em memória no composite do /api/atendimento/leads/route.ts).
+          // Então só pegamos full_name (real), phone real, e nameFromHistory como fallback.
           const names = [
             lr ? String((lr as any).full_name ?? "").trim() : "",
-            lr ? String((lr as any).student_full_name ?? "").trim() : "",
-            lr ? String((lr as any).display_name ?? "").trim() : "",
             nameFromHistory ?? "",
           ].filter(Boolean);
           const phone = lr
