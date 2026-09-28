@@ -252,6 +252,18 @@ export async function GET(req: Request) {
   // recurring_class_professor_phone, recurring_class_professor_time, recurring_class_professor_timezone,
   // recurring_class_first_class_at, recurring_class_created_at, full_name, phone, id, funnel_stage, status.
   const weekdayTarget = weekdayShort(targetDate);
+  const weekdayFromLabel = (wdl: unknown): "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | null => {
+    const s = String(wdl ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (!s) return null;
+    if (s.startsWith("domingo") || s.startsWith("dom ")) return "sun";
+    if (s.startsWith("segunda") || s.startsWith("seg ")) return "mon";
+    if (s.startsWith("terca") || s.startsWith("ter ")) return "tue";
+    if (s.startsWith("quarta") || s.startsWith("qua ")) return "wed";
+    if (s.startsWith("quinta") || s.startsWith("qui ")) return "thu";
+    if (s.startsWith("sexta") || s.startsWith("sex ")) return "fri";
+    if (s.startsWith("sabado") || s.startsWith("sab ")) return "sat";
+    return null;
+  };
   const recurringBookings: Array<Record<string, unknown>> = [];
   try {
     // Colunas SÓ QUE EXISTEM FISICAMENTE em atendimento_leads, NÃO colunas composite
@@ -275,28 +287,14 @@ export async function GET(req: Request) {
       "recurring_class_professor_date",
       "recurring_class_created_at",
       "contract_status",
+      "recurring_registration_step",
     ].join(",");
-    const whereInStatus = [
-      "confirmado",
-      "Confirmado",
-      "CONFIRMADO",
-      "cadastro_plataforma_pendente",
-      "Cadastro_plataforma_pendente",
-      "CADASTRO_PLATAFORMA_PENDENTE",
-      "ativo",
-      "Ativo",
-      "ATIVO",
-      "matriculado",
-      "Matriculado",
-      "MATRICULADO",
-    ];
-    const eqClause = whereInStatus
-      .map((s) => `recurring_class_status.eq.${encodeURIComponent(s)}`)
-      .join(",");
-    // Usar query or() é melhor mas para evitar ambiguidade, vamos fetch SEM filtro de status no
-    // URL (puxar todos leads com weekday batendo) e filtrar status EM MEMÓRIA post fetch.
+    // BUSCAR TODOS leads QUE TEM ALGUMA recorrência cadastrada (sem filtro de weekday no URL).
+    // Motivo: recurring_class_weekday PODE ESTAR NULL na tabela (apenas recurring_class_weekday_label
+    // preenchido, como nos prints Gisele/Aline/Marcela). A comparação weekday é feita EM MEMÓRIA ABAIXO
+    // (recurring_class_weekday OU weekdayFromLabel(recurring_class_weekday_label)).
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/atendimento_leads?recurring_class_weekday=eq.${encodeURIComponent(weekdayTarget)}&select=${sel}`,
+      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(recurring_class_status.not.is.null,recurring_class_weekday.not.is.null,recurring_class_weekday_label.not.is.null,recurring_class_professor_time.not.is.null)&select=${sel}`,
       {
         method: "GET",
         headers: restHeaders,
@@ -322,8 +320,19 @@ export async function GET(req: Request) {
             "matriculado",
           ].includes(st.toLowerCase());
           if (!ok) continue;
+          // ===== MATCH WEEKDAY (SEMPRE EM MEMÓRIA por causa de NULL) =====
+          const colWeekday = String((r as any).recurring_class_weekday ?? "").trim().toLowerCase();
+          const colLabel = String((r as any).recurring_class_weekday_label ?? "").trim();
+          const effectiveWeekday: string | null = (() => {
+            const ALLOWED = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+            if (colWeekday && ALLOWED.includes(colWeekday)) return colWeekday;
+            const fromLabel = weekdayFromLabel(colLabel);
+            if (fromLabel) return fromLabel;
+            return null;
+          })();
+          if (!effectiveWeekday) continue;
+          if (effectiveWeekday !== weekdayTarget) continue;
           // Regra: NÃO MOSTRAR RECORRENTE SE PRIMEIRA AULA AINDA NÃO ACONTECEU
-          // (ex: matrícula feita em setembro, primeira aula é outubro → dia 24/09 não aparece).
           let firstClassBeforeOrEqual = true;
           const candidatesFirstClass = [
             (r as any).recurring_class_first_class_at,
@@ -332,47 +341,62 @@ export async function GET(req: Request) {
           ]
             .map((s) => String(s ?? "").trim())
             .filter(Boolean);
-          for (const fc of candidatesFirstClass) {
-            const dt = new Date(fc);
-            if (!Number.isFinite(dt.getTime())) continue;
-            // Converter a "data de primeira aula" para YYYY-MM-DD NO FUSO DO PROFESSOR (America/Cuiabá default)
-            const tz =
-              String((r as any).recurring_class_professor_timezone ?? "").trim() ||
-              ATENDIMENTO_PROFESSOR_TIME_ZONE;
-            const localYYYYMMDD = (() => {
-              try {
-                const yyyy = new Intl.DateTimeFormat("en-CA", {
-                  timeZone: tz,
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                }).format(dt);
-                return yyyy;
-              } catch {
-                const yyyy = dt.getUTCFullYear();
-                const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
-                const dd = String(dt.getUTCDate()).padStart(2, "0");
-                return `${yyyy}-${mm}-${dd}`;
+          if (candidatesFirstClass.length > 0) {
+            for (const fc of candidatesFirstClass) {
+              const dt = new Date(fc);
+              if (!Number.isFinite(dt.getTime())) continue;
+              const tz =
+                String((r as any).recurring_class_professor_timezone ?? "").trim() ||
+                ATENDIMENTO_PROFESSOR_TIME_ZONE;
+              const localYYYYMMDD = (() => {
+                try {
+                  const yyyy = new Intl.DateTimeFormat("en-CA", {
+                    timeZone: tz,
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                  }).format(dt);
+                  return yyyy;
+                } catch {
+                  const yyyy = dt.getUTCFullYear();
+                  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+                  const dd = String(dt.getUTCDate()).padStart(2, "0");
+                  return `${yyyy}-${mm}-${dd}`;
+                }
+              })();
+              const [y, mo, d] = localYYYYMMDD.split("-").map((n) => Number(n));
+              const firstMs = Date.UTC(y, mo - 1, d, 12, 0, 0);
+              if (firstMs > targetMsLocalNoon) {
+                firstClassBeforeOrEqual = false;
+                break;
               }
-            })();
-            const [y, mo, d] = localYYYYMMDD.split("-").map((n) => Number(n));
-            const firstMs = Date.UTC(y, mo - 1, d, 12, 0, 0);
-            if (firstMs > targetMsLocalNoon) {
-              firstClassBeforeOrEqual = false;
               break;
             }
-            break;
           }
           if (!firstClassBeforeOrEqual) continue;
-          // Precisa ter horário da aula e pelo menos professor ou não é recorrente válida
-          const pTime = String((r as any).recurring_class_professor_time ?? "").trim();
-          if (!pTime || !/^\d{2}:\d{2}$/.test(pTime)) continue;
-          // Precisamos de um professor (nome OU telefone) senão não sabemos em qual card colocar
+          // Horário obrigatório
+          const pTimeRaw =
+            String((r as any).recurring_class_professor_time ?? "").trim() ||
+            String((r as any).recurring_class_lead_time ?? "").trim();
+          const pTime = (() => {
+            const m = pTimeRaw.match(/(\d{1,2}):(\d{2})/);
+            if (!m) return "";
+            const hh = String(Number(m[1])).padStart(2, "0");
+            const mm = String(Number(m[2])).padStart(2, "0");
+            return `${hh}:${mm}`;
+          })();
+          if (!pTime) continue;
+          // ======== PROFESSOR (NÃO MAIS OBRIGATÓRIO) ========
+          // Nos prints do usuário (Gisele, Carlos Peta, Edison Nicodemos, Marcela, Aline Faustino),
+          // NÃO EXISTE professor associado ao card da recorrência (campos vazios).
+          // Antigo código dava continue aqui! → BUG, nunca aparecia.
+          // Solução: se NÃO tem professor (nem name nem phone), atribuímos a um card especial
+          // "Professor não atribuído" (criado ao final do unify teachers abaixo). Para identificar
+          // esse caso, marcamos __noProfessor=true e assigned_professor_name/phone = null (não vazio).
           const pName = String((r as any).recurring_class_professor_name ?? "").trim();
           const pPhone = String((r as any).recurring_class_professor_phone ?? "").trim();
-          if (!pName && !pPhone) continue;
-          // Montar objeto que simula a mesma interface de experimental_class_booking,
-          // para reaproveitar 100% do código de slot/match professor/tempo.
+          const hasProfessor = Boolean(pName || pPhone);
+          // Montar objeto com mesma interface do experimental para reaproveitar slot code.
           let startIso = "";
           try {
             startIso = zonedDateTimeToUtcIso({
@@ -386,7 +410,7 @@ export async function GET(req: Request) {
           const entry: Record<string, unknown> = {
             id: `recurring-${String(r.id ?? "")}`,
             lead_id: String(r.id ?? ""),
-            status: "scheduled", // recorrente sempre ativa (se passou o start em nowUtc, badge 'Concluído')
+            status: "scheduled",
             professor_date: targetDate,
             professor_time: pTime,
             professor_start_at: startIso || null,
@@ -396,8 +420,9 @@ export async function GET(req: Request) {
               String((r as any).recurring_class_lead_timezone ?? "").trim() || null,
             professor_timezone:
               String((r as any).recurring_class_professor_timezone ?? "").trim() || null,
-            assigned_professor_name: pName || null,
-            assigned_professor_phone: pPhone || null,
+            assigned_professor_name: hasProfessor ? (pName || null) : null,
+            assigned_professor_phone: hasProfessor ? (pPhone || null) : null,
+            __noProfessor: !hasProfessor,
             created_at: String((r as any).recurring_class_created_at ?? "").trim() || null,
             updated_at: String((r as any).recurring_class_created_at ?? "").trim() || null,
             __type: "recurring",
@@ -453,15 +478,48 @@ export async function GET(req: Request) {
     }>;
   }> = [];
 
-  for (const p of EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST) {
+  // ===== PROFESSORES ADICIONAIS: card "Professor não atribuído" (para recorrentes sem professor) =====
+  // Nos prints do usuário (Gisele, Carlos Peta, Edison Nicodemos, Marcela, Aline Faustino), a recorrência
+  // existe mas NÃO TEM professor associado (campos vazios). Criamos um card ESPECIAL para exibir esses
+  // registros SEM jogá-los no fallback errado do Lucas Brum.
+  const PROF_NO_ATRIBUIDO_PHONE = "__no_assigned_professor__";
+  const hasAnyNoProfessor = bookings.some(
+    (b) =>
+      String((b as any).__noProfessor ?? "false").toLowerCase() === "true" ||
+      String((b as any).assigned_professor_name ?? "").trim() === "" &&
+        String((b as any).assigned_professor_phone ?? "").trim() === "" &&
+        String((b as any).__type ?? "").toLowerCase() === "recurring",
+  );
+  type ProfListItem = { name: string; phone: string; short?: string };
+  const teachersList: ProfListItem[] = [
+    ...EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST,
+  ];
+  if (hasAnyNoProfessor) {
+    teachersList.push({
+      name: "Professor não atribuído",
+      phone: PROF_NO_ATRIBUIDO_PHONE,
+      short: "S/Prof",
+    });
+  }
+
+  for (const p of teachersList) {
+    const isNoProfessorCard = p.phone === PROF_NO_ATRIBUIDO_PHONE;
     // Filtrar bookings designados para ESTE professor
     const pb = bookings.filter((bk) => {
+      const noProf =
+        String((bk as any).__noProfessor ?? "false").toLowerCase() === "true";
+      // CASO ESPECIAL: Card "não atribuído" = todos bookings marcados __noProfessor=true
+      if (isNoProfessorCard) {
+        return noProf;
+      }
+      // Booking SEM professor (recorrente novo estilo) NÃO cai em Lucas/Nathan NUNCA MAIS.
+      if (noProf) return false;
       const nm = String(bk.assigned_professor_name ?? "").trim();
       const ph = String(bk.assigned_professor_phone ?? "").trim();
       if (nm || ph) {
         return (nm ? nm === p.name : true) && (ph ? ph === p.phone : true);
       }
-      // Sem assigned nenhum: atribui ao 1o professor da allowlist (fallback Lucas Brum)
+      // Sem assigned nenhum (experimental antigo, sem nome nem telefone): fallback 1º professor (Lucas Brum)
       return (
         p.phone === EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0]?.phone
       );
@@ -620,7 +678,7 @@ export async function GET(req: Request) {
     teachers.push({
       name: p.name,
       phone: p.phone,
-      short: p.short,
+      short: p.short && p.short.length > 0 ? p.short : p.name.slice(0, 2).toUpperCase(),
       totalSlots: daySlotsRaw.length,
       totalBookings,
       totalPast,
