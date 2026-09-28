@@ -283,7 +283,6 @@ export async function GET(req: Request) {
       "recurring_class_professor_timezone",
       "recurring_class_lead_time",
       "recurring_class_lead_timezone",
-      "recurring_class_professor_date",
       "recurring_class_created_at",
       "contract_status",
       "recurring_registration_step",
@@ -292,10 +291,11 @@ export async function GET(req: Request) {
     // Motivo: recurring_class_weekday PODE ESTAR NULL na tabela (apenas recurring_class_weekday_label
     // preenchido, como nos prints Gisele/Aline/Marcela). A comparação weekday é feita EM MEMÓRIA ABAIXO
     // (recurring_class_weekday OU weekdayFromLabel(recurring_class_weekday_label)).
-    // IMPORTANTE: colunas NO select devem ser as colunas FÍSICAS REAIS do debug SQL anterior.
-    // EXCLUÍMOS recurring_class_first_class_at pois ela NÃO EXISTE (debug 42703 "column does not exist").
+    // IMPORTANTE: colunas NO select SÓ colunas FÍSICAS REAIS, CONFIRMADAS por debug SQL "teste coluna por coluna":
+    //   ❌ NÃO EXISTEM (causam 42703 HTTP 400 silencioso): recurring_class_professor_date / recurring_class_first_class_at
+    //   ✅ EXISTEM: recurring_class_created_at / recurring_class_professor_time etc.
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(recurring_class_status.not.is.null,recurring_class_weekday.not.is.null,recurring_class_weekday_label.not.is.null,recurring_class_professor_time.not.is.null,recurring_class_lead_time.not.is.null,recurring_class_created_at.not.is.null,recurring_class_professor_date.not.is.null)&select=${sel}`,
+      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(recurring_class_status.not.is.null,recurring_class_weekday.not.is.null,recurring_class_weekday_label.not.is.null,recurring_class_professor_time.not.is.null,recurring_class_lead_time.not.is.null,recurring_class_created_at.not.is.null)&select=${sel}`,
       {
         method: "GET",
         headers: restHeaders,
@@ -334,11 +334,27 @@ export async function GET(req: Request) {
           if (!effectiveWeekday) continue;
           if (effectiveWeekday !== weekdayTarget) continue;
           // Regra: NÃO MOSTRAR RECORRENTE SE PRIMEIRA AULA AINDA NÃO ACONTECEU
+          // IMPORTANTE (confirmado debug Supabase 28/09): coluna recurring_class_professor_date NÃO
+          // EXISTE NA TABELA FÍSICA (42703 column does not exist). Então a PRIMEIRA DATA é calculada
+          // APENAS por recurring_class_created_at.
+          // Depois: não filtrar por firstClassBeforeOrEqual enquanto não tivermos um campo físico
+          // real de data de primeira aula. Motivo: recurring_class_created_at as vezes é a data de
+          // cadastro do usuário dias ANTES da primeira recorrência começar (ex: created em 22/09, mas
+          // primeira aula sábado 03/10 Marcela) - nesse caso created_at <= target de 28/09 vai estar
+          // true e a recorrência VAI APARECER ANTES DA PRIMEIRA AULA? Marcela sáb 03/10 aparece 28/09 seg?
+          // Para evitar MOSTRAR ANTES do dia da primeira aula (ex: Marcela 03/10 aparece no sábado ANTES
+          // de 03/10 = ok? sábado 26/09 NÃO deve aparecer sábado 03/10 é a primeira recorrência. Como
+          // resolver SEM campo físico? Solução realista: usar a DATA de hoje (targetDate) como a data
+          // corrente. Se a recorrência existe (weekday e status ok) E created_at <= hoje → EXIBE (em todos
+          // dias do weekday a partir de hoje ou depois). Se created_at > hoje (futuro) → NÃO EXIBE (ainda
+          // não foi criada a recorrência). Ajuste: trocar fallback para "sempre mostra" se created_at
+          // passar ou não existir (candidatesFirstClass empty = mostra sempre).
           let firstClassBeforeOrEqual = true;
-          const candidatesFirstClass = [
-            (r as any).recurring_class_professor_date,
-            (r as any).recurring_class_created_at,
-          ]
+          const candidatesFirstClass: string[] = (
+            [
+              (r as any).recurring_class_created_at,
+            ] as unknown[]
+          )
             .map((s) => String(s ?? "").trim())
             .filter(Boolean);
           if (candidatesFirstClass.length > 0) {
