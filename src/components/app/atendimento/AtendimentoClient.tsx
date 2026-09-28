@@ -566,6 +566,7 @@ export function AtendimentoClient() {
       const bookingToQ = String(searchParams?.get("bookingTo") ?? searchParams?.get("bookingDate") ?? "").trim().slice(0, 10);
       const bookingProfQ = String(searchParams?.get("bookingProfessor") ?? searchParams?.get("teacher") ?? searchParams?.get("prof") ?? "").trim();
       const bookingPhoneQ = String(searchParams?.get("bookingPhone") ?? searchParams?.get("phone") ?? "").trim();
+      const bookingPNQ = String(searchParams?.get("bookingPN") ?? "").trim().toLowerCase() === "1";
       const nextActive = { ...EMPTY_FILTERS };
       const nextDraft = { ...EMPTY_FILTERS };
       let changed = false;
@@ -600,17 +601,25 @@ export function AtendimentoClient() {
         /^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ) ||
         /^\d{4}-\d{2}-\d{2}$/.test(bookingToQ) ||
         Boolean(bookingProfQ) ||
-        Boolean(bookingPhoneQ);
+        Boolean(bookingPhoneQ) ||
+        Boolean(bookingPNQ);
       if (hasBookingFilter) {
         if (/^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ)) nextActive.bookingDateFrom = bookingFromQ;
         if (/^\d{4}-\d{2}-\d{2}$/.test(bookingToQ)) nextActive.bookingDateTo = bookingToQ;
         if (bookingProfQ) nextActive.bookingProfessorName = bookingProfQ;
+        // bookingPN=1 → força target "Professor não atribuído" (key PN).
+        // Salvamos em bookingProfessorName mesmo (para ser lido no includesProf):
+        // se bookingPNQ=true → setamos bookingProfessorName = "Professor não atribuído"
+        // detectTeacherKey retorna PN e match key=PN ocorre perfeitamente.
+        if (bookingPNQ) nextActive.bookingProfessorName = "Professor não atribuído";
         nextDraft.bookingDateFrom = nextActive.bookingDateFrom;
         nextDraft.bookingDateTo = nextActive.bookingDateTo;
         nextDraft.bookingProfessorName = nextActive.bookingProfessorName;
         // Phone passa por casting pois não está no tipo principal (não exposto na UI, só via URL)
         (nextActive as any).bookingPhone = bookingPhoneQ;
         (nextDraft as any).bookingPhone = bookingPhoneQ;
+        (nextActive as any).bookingPN = bookingPNQ;
+        (nextDraft as any).bookingPN = bookingPNQ;
         changed = true;
         // ⚠️ ATENÇÃO: NÃO setar stageList=["aula_experimental_agendada"] automaticamente aqui.
         // No mesmo dia/professor pode ter EXPERIMENTAIS (agendados) E RECORRENTES (Aluno).
@@ -1089,74 +1098,193 @@ export function AtendimentoClient() {
       return st === sid || fs === sid;
     };
 
-    // Helper: extrai TODOS os professores/datas de AULA (TANTO EXPERIMENTAIS — composite/flat — QUANTO RECORRENTES).
-    // IMPORTANTE: função usada pelo filtro de "Ver" do modal programação-do-dia. Se faltar recorrentes aqui,
-    // leads "Aluno" (recorrentes) NUNCA aparecem no clique do botão Ver (resultado = 0 registros).
-    // Interface de retorno NÃO foi trocada de propósito (p/ não quebrar uso no includesProf/dateInRange abaixo).
-    const getAulaProfDateList = (l: AtendimentoLeadListItem): Array<{ date: string; profName: string; profPhone: string; status: string }> => {
-      const out: Array<{ date: string; profName: string; profPhone: string; status: string }> = [];
-      // ========== FONTE 1A: EXPERIMENTAIS (composite bookings — tabela atendimento_experimental_class_bookings)
+    // ===== DETECT TEACHER KEY (MESMO ALGORITMO do endpoint /programacao-diaria L520-L576) =====
+    // Match robusto por NOME SUBSTRING (lucas brum / nathan camargo / variantes) OU
+    // 4 ÚLTIMOS DÍGITOS do TELEFONE (9407 = LB, 0166 = NC). Fallback "PN" = professor não atribuído.
+    // Essa função garante alinhamento EXATO entre "o que o modal mostra" e "o que o filtro encontra".
+    const detectTeacherKeyFromRow = (nameRaw: string | null | undefined, phoneRaw: string | null | undefined): "LB" | "NC" | "PN" => {
+      const name = String(nameRaw ?? "").trim().toUpperCase();
+      const phone = String(phoneRaw ?? "").replace(/\D/g, "");
+      const last4 = phone.length >= 4 ? phone.slice(-4) : "";
+
+      // 4 últimos dígitos (MAIS ROBUSTO, telefone não tem typos)
+      if (last4 === "9407") return "LB"; // Lucas Brum
+      if (last4 === "0166") return "NC"; // Nathan Camargo
+
+      // Nome substring (contra typos "LUCAS BRUM", "LUCAS B.", "NATHAM", "NATAN" etc)
+      if (name.includes("LUCAS") && name.includes("BRUM")) return "LB";
+      if (name.includes("LUCAS BRUM")) return "LB";
+      if (name.includes("LUCAS")) {
+        // Evita falso positivo "Lucas XYZ" — se tem só "Lucas" sem outro sobrenome forte, pede também não ter "Camargo"
+        if (!name.includes("CAMARGO")) return "LB";
+      }
+      if (name.includes("NATHAN") || name.includes("NATAN") || name.includes("NATHAM")) return "NC";
+      if (name.includes("CAMARGO")) return "NC";
+
+      // Nenhum match → Professor Não Atribuído (PN).
+      // IMPORTANTE: NÃO retorna null. Toda aula no modal tem UM professor (mesmo que "não atribuído").
+      return "PN";
+    };
+    const PROF_NAMES: Record<"LB" | "NC" | "PN", string> = {
+      LB: "Lucas Brum",
+      NC: "Nathan Camargo",
+      PN: "Professor não atribuído",
+    };
+    const PROF_PHONES: Record<"LB" | "NC" | "PN", string> = {
+      LB: "+55 65 9807-9407",
+      NC: "+55 65 9952-0166",
+      PN: "Número indisponível",
+    };
+
+    // Helper: gera TODAS as datas YYYY-MM-DD no intervalo [from, to] (inclusivo) cujo weekday bate (se weekday != null)
+    // Usa a norma: 0 = sun, 1 = mon, 2 = tue, 3 = wed, 4 = thu, 5 = fri, 6 = sat
+    const datesInRangeByWeekday = (fromISO: string, toISO: string, weekdayNumber: number | null): string[] => {
+      const startStr = String(fromISO ?? "").slice(0, 10);
+      const endStr = String(toISO ?? "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startStr) || !/^\d{4}-\d{2}-\d{2}$/.test(endStr)) return [];
+      const out: string[] = [];
+      const [ys, ms, ds] = startStr.split("-").map(Number);
+      const [ye, me, de] = endStr.split("-").map(Number);
+      let d = new Date(ys, ms - 1, ds);
+      const endD = new Date(ye, me - 1, de);
+      if (Number.isNaN(d.getTime()) || Number.isNaN(endD.getTime())) return [];
+      // Safe-loop: máximo de 365 iterações (1 ano)
+      let guard = 0;
+      while (d <= endD && guard++ < 366) {
+        const wd = d.getDay();
+        if (weekdayNumber === null || wd === weekdayNumber) {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          out.push(`${yyyy}-${mm}-${dd}`);
+        }
+        d.setDate(d.getDate() + 1);
+      }
+      return out;
+    };
+    const weekdayToNum = (w: string | null | undefined): number | null => {
+      const s = String(w ?? "").trim().toLowerCase();
+      if (!s) return null;
+      if (s.startsWith("sun") || s.startsWith("dom")) return 0;
+      if (s.startsWith("mon") || s.startsWith("seg")) return 1;
+      if (s.startsWith("tue") || s.startsWith("ter")) return 2;
+      if (s.startsWith("wed") || s.startsWith("qua")) return 3;
+      if (s.startsWith("thu") || s.startsWith("qui")) return 4;
+      if (s.startsWith("fri") || s.startsWith("sex")) return 5;
+      if (s.startsWith("sat") || s.startsWith("sab")) return 6;
+      return null;
+    };
+
+    // Helper: extrai TODOS os professores/datas de AULA (TANTO EXPERIMENTAIS composite/flat QUANTO RECORRENTES).
+    // Agora também:
+    //  - Recebe bookingFrom / bookingTo para CALCULAR datas semanais recorrentes (weekday) DENTRO do intervalo
+    //    → resolve o bug que "recorrente com weekday sat não tinha nenhuma data no 26/09 e o filtro rejeitava".
+    //  - Usa detectTeacherKeyFromRow para MESMO algoritmo do modal programação-do-dia
+    //    → resolve bug de "nome vazio (null) vira PN" e match por 4 dígitos/variações de nome
+    //  - Experimental tabela (composite) com assigned_professor_name=null também cai corretamente em PN.
+    const getAulaProfDateList = (
+      l: AtendimentoLeadListItem,
+      rangeFrom?: string | null,
+      rangeTo?: string | null,
+    ): Array<{ date: string; profName: string; profPhone: string; status: string; key: "LB" | "NC" | "PN" }> => {
+      const out: Array<{ date: string; profName: string; profPhone: string; status: string; key: "LB" | "NC" | "PN" }> = [];
+      const push = (dateStr: string, nm: string | null | undefined, ph: string | null | undefined, status: string | null | undefined) => {
+        const key = detectTeacherKeyFromRow(nm, ph);
+        const dateClean = String(dateStr ?? "").trim().slice(0, 10);
+        out.push({
+          date: dateClean,
+          profName: nm && String(nm).trim() ? String(nm).trim() : PROF_NAMES[key],
+          profPhone: ph && String(ph).trim() ? String(ph).trim() : PROF_PHONES[key],
+          status: String(status ?? "").trim().toLowerCase(),
+          key,
+        });
+      };
+
+      // ========== FONTE 1A: EXPERIMENTAIS COMPOSITE (tabela atendimento_experimental_class_bookings) ==========
       const b1 = (l as any)?.experimental_class_booking as any;
       const b2 = (l as any)?.latest_experimental_class_booking as any;
       const b3 = (l as any)?.future_experimental_class_booking as any;
       for (const b of [b1, b2, b3]) {
         if (!b) continue;
         const dt = String(b?.professor_date ?? b?.lead_date ?? "").trim().slice(0, 10);
-        const nm = String(b?.assigned_professor_name ?? "").trim();
-        const ph = String(b?.assigned_professor_phone ?? "").trim();
-        const st = String(b?.status ?? "").trim().toLowerCase();
-        if (dt || nm || ph) out.push({ date: dt, profName: nm, profPhone: ph, status: st });
+        const nm = String(b?.assigned_professor_name ?? "").trim() || null;
+        const ph = String(b?.assigned_professor_phone ?? "").trim() || null;
+        const st = String(b?.status ?? "").trim();
+        if (dt) push(dt, nm, ph, st);
+        else if (nm || ph) push("", nm, ph, st);
       }
-      // ========== FONTE 1B: EXPERIMENTAIS FLAT (colunas experimental_class_* direto em atendimento_leads)
-      const flatDate = String((l as any)?.experimental_class_professor_date ?? "").trim().slice(0, 10);
-      const flatProfN = String((l as any)?.experimental_class_professor_name ?? "").trim();
-      const flatProfP = String((l as any)?.experimental_class_professor_phone ?? "").trim();
-      const flatStatus = String((l as any)?.experimental_class_booking_status ?? (l as any)?.funnel_stage ?? "").trim().toLowerCase();
-      if (flatDate || flatProfN || flatProfP) out.push({ date: flatDate, profName: flatProfN, profPhone: flatProfP, status: flatStatus });
 
-      // ========== FONTE 2: RECORRENTES (Aluno) — colunas recurring_class_* flat em atendimento_leads.
-      // Programação do dia (endpoint /programacao-diaria) mostra recorrentes calculando "aula ocorre no dia targetDate"
-      // a partir de recurring_class_weekday (ex: mon/sat) + recurring_class_created_at (primeira aula) +
-      // recurring_class_next_date / recurring_class_last_date.
-      // Aqui NÃO temos um único targetDate — queremos saber SE PARA O RANGE DE DATAS PASSADO NO FILTRO
-      // (bookingDateFrom / bookingDateTo) essa recorrência CAI ALGUMA VEZ no intervalo. Então basta extrair
-      // as datas de LAST / NEXT (pré-calculadas no lead), o WEEKDAY (para validação futura) e deixar que o
-      // dateInRange do filtro bata EXATAMENTE o dia que veio do botão Ver (ex: 26/09 sábado).
-      const rProfN = String((l as any)?.recurring_class_professor_name ?? "").trim();
-      const rProfP = String((l as any)?.recurring_class_professor_phone ?? "").trim();
-      const rStatus = String((l as any)?.recurring_class_status ?? (l as any)?.funnel_stage ?? (l as any)?.status ?? "").trim().toLowerCase();
-      const rHasAnyProfOrWeekday =
-        Boolean(rProfN || rProfP) ||
-        Boolean(String((l as any)?.recurring_class_weekday ?? (l as any)?.recurring_class_weekday_label ?? "").trim());
-      if (rHasAnyProfOrWeekday) {
-        const rDates: string[] = [];
-        const pushR = (v: string | undefined | null) => {
-          const s = String(v ?? "").trim();
-          if (!s) return;
-          if (/^\d{4}-\d{2}-\d{2}/.test(s)) rDates.push(s.slice(0, 10));
-          else {
-            const d = new Date(s);
-            if (!Number.isNaN(d.getTime())) {
-              const yyyy = d.getFullYear();
-              const mm = String(d.getMonth() + 1).padStart(2, "0");
-              const dd = String(d.getDate()).padStart(2, "0");
-              rDates.push(`${yyyy}-${mm}-${dd}`);
-            }
-          }
-        };
-        pushR((l as any)?.recurring_class_next_date);
-        pushR((l as any)?.recurring_class_last_date);
-        pushR((l as any)?.recurring_class_created_at);
-        pushR((l as any)?.next_charge_date);
-        pushR((l as any)?.recurring_payment_next_date);
-        const uniqDates = Array.from(new Set(rDates.filter(Boolean)));
-        // Se tem data(s) → uma entrada POR data (para dateInRange bater o exato dia do filtro).
-        if (uniqDates.length > 0) {
-          for (const dt of uniqDates) out.push({ date: dt, profName: rProfN, profPhone: rProfP, status: rStatus });
+      // ========== FONTE 1B: EXPERIMENTAIS FLAT (colunas experimental_class_* direto no atendimento_leads) ==========
+      {
+        const dt = String((l as any)?.experimental_class_professor_date ?? (l as any)?.experimental_class_lead_date ?? "").trim().slice(0, 10);
+        const nm = String((l as any)?.experimental_class_professor_name ?? "").trim() || null;
+        const ph = String((l as any)?.experimental_class_professor_phone ?? "").trim() || null;
+        const st = String((l as any)?.experimental_class_status ?? l?.funnel_stage ?? "").trim();
+        if (dt || nm || ph) push(dt, nm, ph, st);
+      }
+
+      // ========== FONTE 2: RECORRENTES (Aluno) ==========
+      {
+        const nmRaw = String((l as any)?.recurring_class_professor_name ?? "").trim() || null;
+        const phRaw = String((l as any)?.recurring_class_professor_phone ?? "").trim() || null;
+        const st = String((l as any)?.recurring_class_status ?? l?.funnel_stage ?? "").trim();
+        const weekdayNum = weekdayToNum((l as any)?.recurring_class_weekday ?? (l as any)?.recurring_class_weekday_label);
+        const hasRec = Boolean(
+          nmRaw || phRaw || weekdayNum !== null ||
+          (l.funnel_stage && ["aluno", "matriculado", "matricula_confirmada", "aluno_recorrente_cadastrado", "pagamento_pendente_confirmacao"].includes(l.funnel_stage)),
+        );
+        if (!hasRec) {
+          // ok
         } else {
-          // Sem datas NUNCA vai bater dateInRange — MAS SE o filtro NÃO tiver data (só professor) ainda
-          // queremos que o lead apareça (ex: botão Ver sem scheduleDate). Então push com data vazio.
-          out.push({ date: "", profName: rProfN, profPhone: rProfP, status: rStatus });
+          // Coleta datas FIXAS (as que existem como colunas)
+          const fixedDates: string[] = [];
+          const pushD = (v: unknown) => {
+            const s = String(v ?? "").trim();
+            if (!s) return;
+            let dstr = "";
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) dstr = s.slice(0, 10);
+            else {
+              const d = new Date(s);
+              if (!Number.isNaN(d.getTime())) {
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                const dd = String(d.getDate()).padStart(2, "0");
+                dstr = `${yyyy}-${mm}-${dd}`;
+              }
+            }
+            if (dstr) fixedDates.push(dstr);
+          };
+          // Colunas FÍSICAS EXISTENTES (confirmadas no Supabase query):
+          pushD((l as any)?.recurring_class_created_at);
+          // Tenta pushD também nas colunas que podem ou não existir (sem try/catch, só acessa como any — ignora null/undefined)
+          pushD((l as any)?.recurring_class_next_date);
+          pushD((l as any)?.recurring_class_last_date);
+          pushD((l as any)?.next_charge_date);
+          pushD((l as any)?.recurring_payment_next_date);
+
+          const uniqFixed = Array.from(new Set(fixedDates.filter(Boolean)));
+
+          // ===== INJEÇÃO SEMANAL: calcula dias do rangeFrom..rangeTo (se vierem) que batem com weekday =====
+          // Esse é o PONTO CRÍTICO do bug: recorrente weekday=sat criada em 24/09 (quinta) para começar em 26/09 (sábado)
+          // — NÃO tinha nenhuma data fixa igual a 26/09, então o dateInRange sempre falhava.
+          // Agora, se tiver bookingFrom/To e weekday, geramos TODAS as datas do intervalo com aquele weekday.
+          if (rangeFrom && rangeTo && weekdayNum !== null) {
+            const weekly = datesInRangeByWeekday(rangeFrom, rangeTo, weekdayNum);
+            for (const d of weekly) uniqFixed.push(d);
+          }
+          // Fallback: se tiver rangeFrom/To mas SEM weekday (improvável mas seguro), puxa TUDO do intervalo
+          else if (rangeFrom && rangeTo && weekdayNum === null && uniqFixed.length === 0) {
+            const all = datesInRangeByWeekday(rangeFrom, rangeTo, null);
+            for (const d of all) uniqFixed.push(d);
+          }
+
+          const uniq = Array.from(new Set(uniqFixed.filter(Boolean)));
+          if (uniq.length > 0) {
+            for (const dt of uniq) push(dt, nmRaw, phRaw, st);
+          } else {
+            // Sem datas — pode ser que o filtro não tenha from/to (só filtra professor). Push date vazio.
+            push("", nmRaw, phRaw, st);
+          }
         }
       }
 
@@ -1165,16 +1293,27 @@ export function AtendimentoClient() {
     const normName = (s: string) => String(s ?? "").trim().toLowerCase();
     const normPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
     const includesProf = (
-      profRow: { profName: string; profPhone: string },
+      profRow: { profName: string; profPhone: string; key?: "LB" | "NC" | "PN" },
       target: { name: string; phone: string; phoneDigitsOnly: string },
     ): boolean => {
-      // Match POR TELEFONE (digits only) se tiver → MELHOR MÉTODO, pois nome pode ser ambíguo
-      // (ex: Nathan Camargo vs Lucas Brum substring não pega). Phone único por professor.
+      // === FASE 1: detectTeacherKey IGUAL no ROW e no TARGET (robusto e MESMO algorítmo do modal)
+      // Essa é a MELHOR camada. Se o professor é LB no ROW e LB no TARGET → match imediato (mesmo se nomes/phones
+      // forem formatados de forma diferente ou um lado for vazio e tivermos apenas key via fallback).
+      const rowKey: "LB" | "NC" | "PN" =
+        profRow.key && ["LB", "NC", "PN"].includes(profRow.key)
+          ? profRow.key
+          : detectTeacherKeyFromRow(profRow.profName, profRow.profPhone);
+      const tgtKey: "LB" | "NC" | "PN" = target.name || target.phone || target.phoneDigitsOnly
+        ? detectTeacherKeyFromRow(target.name, target.phone || target.phoneDigitsOnly)
+        : "PN";
+      if (rowKey === tgtKey) return true;
+
+      // === FASE 2 (fallback): match por telefone digits only (melhor que nome)
       if (target.phoneDigitsOnly) {
         const rp = normPhone(profRow?.profPhone ?? "");
         if (rp && (rp.includes(target.phoneDigitsOnly) || target.phoneDigitsOnly.includes(rp))) return true;
       }
-      // Match por nome (fallback): tem que conter o nome target INTEIRO ou vice-versa
+      // === FASE 3 (fallback): match por nome substring
       const tn = normName(target.name);
       const rn = normName(profRow?.profName ?? "");
       if (tn && rn && (rn === tn || rn.includes(tn) || tn.includes(rn))) return true;
@@ -1304,7 +1443,7 @@ export function AtendimentoClient() {
           f.bookingProfessorName,
       );
       if (wantsBookingFilter) {
-        const list = getAulaProfDateList(l);
+        const list = getAulaProfDateList(l, f.bookingDateFrom || null, f.bookingDateTo || null);
         if (list.length === 0) return false;
         const profFilter = {
           name: String(f.bookingProfessorName ?? "").trim(),
@@ -1313,10 +1452,8 @@ export function AtendimentoClient() {
         };
         const needsProf = Boolean(profFilter.name || profFilter.phone || profFilter.phoneDigitsOnly);
         const match = list.some((row) => {
-          // Data obrigatória se tiver date from/to
           const needsDate = Boolean(f.bookingDateFrom || f.bookingDateTo);
           if (needsDate && !dateInRange(row.date, f.bookingDateFrom, f.bookingDateTo)) return false;
-          // Professor obrigatório se tiver nome/phone
           if (needsProf && !includesProf(row, profFilter)) return false;
           return true;
         });

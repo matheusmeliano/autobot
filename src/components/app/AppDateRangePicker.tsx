@@ -839,11 +839,18 @@ export function AppDateRangePicker({
                                           // O filtro de bookingDateFrom/To + professor name/phone já é restritivo o suficiente
                                           // (garante exatamente o conjunto de aulas que aparece NO MODAL).
                                           // Stage causava o bug "recorrentes nao aparecem" ao clicar em Ver.
-                                          if (teacher?.name) {
-                                            params.set("bookingProfessor", String(teacher.name));
-                                          }
-                                          if (teacher?.phone) {
-                                            params.set("bookingPhone", String(teacher.phone));
+                                          const isUnassigned =
+                                            !teacher?.name ||
+                                            String(teacher.name ?? "").trim() === "Professor não atribuído" ||
+                                            String(teacher.phone ?? "").trim() === "__no_assigned_professor__";
+                                          if (!isUnassigned) {
+                                            if (teacher?.name) params.set("bookingProfessor", String(teacher.name));
+                                            if (teacher?.phone) params.set("bookingPhone", String(teacher.phone));
+                                          } else {
+                                            // Professor NÃO atribuído (PN) → marcamos flag bookingPN=1 para o filtro
+                                            // na página de atendimento poder filtrar exatamente a key "PN"
+                                            // (caso contrário, outros LB/NC do mesmo dia também viriam e poluiriam a lista).
+                                            params.set("bookingPN", "1");
                                           }
                                           if (scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
                                             params.set("bookingFrom", scheduleDate);
