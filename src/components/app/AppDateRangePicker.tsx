@@ -795,7 +795,9 @@ export function AppDateRangePicker({
                                           {teacher.name}
                                         </div>
                                         <div className="mt-0.5 truncate text-[11.5px] text-[var(--app-text-55)]">
-                                          {teacher.phone}
+                                          {String(teacher.phone ?? "").trim() === "__no_assigned_professor__"
+                                            ? "Número indisponível"
+                                            : teacher.phone}
                                         </div>
                                       </div>
                                     </div>
