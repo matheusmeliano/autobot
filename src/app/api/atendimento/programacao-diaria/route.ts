@@ -266,6 +266,10 @@ export async function GET(req: Request) {
       status: "disponivel" | "ocupado" | "passado" | "cancelado";
       bookingId?: string | null;
       bookingStatus?: string | null;
+      classTypeLabel?: "Experimental" | "Recorrente" | null;
+      badgeLabel?: string | null;
+      badgeBg?: string | null;
+      badgeText?: string | null;
       aluno?: {
         id: string;
         displayName: string;
@@ -349,14 +353,14 @@ export async function GET(req: Request) {
         phone: string;
         status: string;
       } | null;
-      // ===== BADGE Dinâmico (Concluído verde / Agendado amarelo) =====
-      // Aula experimental = duração 60 minutos.
-      // Usamos professor_start_at (ISO UTC) + 3600s para horário fim.
-      // Se horário fim < agora => Concluído (verde texto branco). Senão => Agendado (amarelo texto branco).
-      // Cancelado: sem badge Marcada (client mostra "Cancelada" com ícone Ban)
+      // ===== BADGE DINÂMICO + TIPO AULA (Experimental / Recorrente) =====
       let badgeLabel: string | null = null;
       let badgeBg: string | null = null;
       let badgeText: string | null = null;
+      // Tipo da aula: DEFAULT = "Experimental" (pois modal programa só aulas experimentais por enquanto).
+      // No futuro, se integrarmos atendimento_recurring_class no modal, detectar e trocar p/ "Recorrente".
+      // Atualmente todos slots do EXPERIMENTAL_CLASS_SLOT_TIMES vêm da grade experimental, então é SEMPRE experimental.
+      const classTypeLabel: "Experimental" | "Recorrente" = "Experimental";
       if (active && !isCancelled) {
         const startIso =
           (active ? String(active.professor_start_at ?? "").trim() : "") ||
@@ -431,6 +435,7 @@ export async function GET(req: Request) {
           ? String(active.id ?? "").trim() || null
           : null,
         bookingStatus,
+        classTypeLabel,
         badgeLabel,
         badgeBg,
         badgeText,

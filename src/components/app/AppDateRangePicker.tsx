@@ -129,6 +129,7 @@ export function AppDateRangePicker({
         status: "disponivel" | "ocupado" | "passado" | "cancelado";
         bookingId?: string | null;
         bookingStatus?: string | null;
+        classTypeLabel?: "Experimental" | "Recorrente" | null;
         badgeLabel?: string | null;
         badgeBg?: string | null;
         badgeText?: string | null;
@@ -887,22 +888,29 @@ export function AppDateRangePicker({
                                               </div>
                                             </div>
 
-                                            {ocupado && slot.badgeLabel ? (
-                                              <span
-                                                className={[
-                                                  "shrink-0 rounded-[12px] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em]",
-                                                  "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]",
-                                                ].join(" ")}
-                                                style={{
-                                                  color: slot.badgeText || "#ffffff",
-                                                  backgroundColor:
-                                                    slot.badgeBg || "#0f172a",
-                                                  fontWeight: 700,
-                                                }}
-                                              >
-                                                {slot.badgeLabel}
-                                              </span>
-                                            ) : null}
+                                            <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                              {ocupado && slot.classTypeLabel ? (
+                                                <span className="shrink-0 rounded-[10px] px-2 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-70)] bg-[rgba(148,163,184,0.12)] shadow-[inset_0_0_0_1px_rgba(148,163,184,0.22)]">
+                                                  {String(slot.classTypeLabel ?? "")}
+                                                </span>
+                                              ) : null}
+                                              {ocupado && slot.badgeLabel ? (
+                                                <span
+                                                  className={[
+                                                    "shrink-0 rounded-[12px] px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.06em]",
+                                                    "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]",
+                                                  ].join(" ")}
+                                                  style={{
+                                                    color: slot.badgeText || "#ffffff",
+                                                    backgroundColor:
+                                                      slot.badgeBg || "#0f172a",
+                                                    fontWeight: 700,
+                                                  }}
+                                                >
+                                                  {slot.badgeLabel}
+                                                </span>
+                                              ) : null}
+                                            </div>
                                           </div>
                                         );
                                       })}
