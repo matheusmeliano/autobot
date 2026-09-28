@@ -890,7 +890,7 @@ export function AppDateRangePicker({
 
                                             <div className="flex shrink-0 flex-col items-end gap-1.5">
                                               {ocupado && slot.classTypeLabel ? (
-                                                <span className="shrink-0 rounded-[10px] px-2 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-70)] bg-[rgba(148,163,184,0.12)] shadow-[inset_0_0_0_1px_rgba(148,163,184,0.22)]">
+                                                <span className="shrink-0 px-2 py-[3px] text-[10px] font-bold uppercase tracking-[0.08em] text-[#0f172a]">
                                                   {String(slot.classTypeLabel ?? "")}
                                                 </span>
                                               ) : null}
