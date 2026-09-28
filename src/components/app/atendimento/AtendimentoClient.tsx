@@ -565,6 +565,7 @@ export function AtendimentoClient() {
       const bookingFromQ = String(searchParams?.get("bookingFrom") ?? searchParams?.get("bookingDate") ?? "").trim().slice(0, 10);
       const bookingToQ = String(searchParams?.get("bookingTo") ?? searchParams?.get("bookingDate") ?? "").trim().slice(0, 10);
       const bookingProfQ = String(searchParams?.get("bookingProfessor") ?? searchParams?.get("teacher") ?? searchParams?.get("prof") ?? "").trim();
+      const bookingPhoneQ = String(searchParams?.get("bookingPhone") ?? searchParams?.get("phone") ?? "").trim();
       const nextActive = { ...EMPTY_FILTERS };
       const nextDraft = { ...EMPTY_FILTERS };
       let changed = false;
@@ -595,7 +596,11 @@ export function AtendimentoClient() {
         changed = true;
       }
       // NOVO: filtro de aula experimental do dia + professor (mais restritivo que from/to cadastro)
-      const hasBookingFilter = /^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ) || /^\d{4}-\d{2}-\d{2}$/.test(bookingToQ) || Boolean(bookingProfQ);
+      const hasBookingFilter =
+        /^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ) ||
+        /^\d{4}-\d{2}-\d{2}$/.test(bookingToQ) ||
+        Boolean(bookingProfQ) ||
+        Boolean(bookingPhoneQ);
       if (hasBookingFilter) {
         if (/^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ)) nextActive.bookingDateFrom = bookingFromQ;
         if (/^\d{4}-\d{2}-\d{2}$/.test(bookingToQ)) nextActive.bookingDateTo = bookingToQ;
@@ -603,6 +608,9 @@ export function AtendimentoClient() {
         nextDraft.bookingDateFrom = nextActive.bookingDateFrom;
         nextDraft.bookingDateTo = nextActive.bookingDateTo;
         nextDraft.bookingProfessorName = nextActive.bookingProfessorName;
+        // Phone passa por casting pois não está no tipo principal (não exposto na UI, só via URL)
+        (nextActive as any).bookingPhone = bookingPhoneQ;
+        (nextDraft as any).bookingPhone = bookingPhoneQ;
         changed = true;
         // Quando usuario aperta "Ver" do modal, a intenção é "VER OS REGISTROS QUE ESTÃO AQUI NO MODAL"
         // Então PRÉ-APLICA o rádio "Aula Experimental Agendada" para garantir exibição correta (se não tiver sido passado)
@@ -1103,11 +1111,21 @@ export function AtendimentoClient() {
       return out;
     };
     const normName = (s: string) => String(s ?? "").trim().toLowerCase();
-    const includesProf = (profRow: { profName: string; profPhone: string }, target: string): boolean => {
-      const t = normName(target);
-      if (!t) return true;
-      if (normName(profRow?.profName ?? "").includes(t) || t.includes(normName(profRow?.profName ?? ""))) return true;
-      if (String(profRow?.profPhone ?? "").replace(/\D+/g, "").includes(String(target ?? "").replace(/\D+/g, ""))) return true;
+    const normPhone = (s: string) => String(s ?? "").replace(/\D+/g, "");
+    const includesProf = (
+      profRow: { profName: string; profPhone: string },
+      target: { name: string; phone: string; phoneDigitsOnly: string },
+    ): boolean => {
+      // Match POR TELEFONE (digits only) se tiver → MELHOR MÉTODO, pois nome pode ser ambíguo
+      // (ex: Nathan Camargo vs Lucas Brum substring não pega). Phone único por professor.
+      if (target.phoneDigitsOnly) {
+        const rp = normPhone(profRow?.profPhone ?? "");
+        if (rp && (rp.includes(target.phoneDigitsOnly) || target.phoneDigitsOnly.includes(rp))) return true;
+      }
+      // Match por nome (fallback): tem que conter o nome target INTEIRO ou vice-versa
+      const tn = normName(target.name);
+      const rn = normName(profRow?.profName ?? "");
+      if (tn && rn && (rn === tn || rn.includes(tn) || tn.includes(rn))) return true;
       return false;
     };
     const dateInRange = (dt: string, from: string, to: string): boolean => {
@@ -1148,18 +1166,29 @@ export function AtendimentoClient() {
         const leadMs = new Date(String(l.created_at ?? "")).getTime();
         if (!Number.isNaN(toMs) && leadMs > toMs) return false;
       }
-      // FILTRO NOVO: aula experimental do dia + professor (exatamente os bookings do modal)
-      const wantsBookingFilter = Boolean(f.bookingDateFrom || f.bookingDateTo || f.bookingProfessorName);
+      // NOVO: filtro de aula experimental do dia + professor (exatamente os bookings do modal)
+      const wantsBookingFilter = Boolean(
+        f.bookingDateFrom ||
+          f.bookingDateTo ||
+          (f as any)?.bookingPhone ||
+          (f as any)?.bookingPhoneDigits ||
+          f.bookingProfessorName,
+      );
       if (wantsBookingFilter) {
         const list = getExperimentalProfDateList(l);
         if (list.length === 0) return false;
+        const profFilter = {
+          name: String(f.bookingProfessorName ?? "").trim(),
+          phone: String((f as any)?.bookingPhone ?? "").trim(),
+          phoneDigitsOnly: normPhone(String((f as any)?.bookingPhone ?? (f as any)?.bookingPhoneDigits ?? "")),
+        };
+        const needsProf = Boolean(profFilter.name || profFilter.phone || profFilter.phoneDigitsOnly);
         const match = list.some((row) => {
           // Data obrigatória se tiver date from/to
           const needsDate = Boolean(f.bookingDateFrom || f.bookingDateTo);
           if (needsDate && !dateInRange(row.date, f.bookingDateFrom, f.bookingDateTo)) return false;
-          // Professor obrigatório se tiver nome
-          const needsProf = Boolean(f.bookingProfessorName);
-          if (needsProf && !includesProf(row, f.bookingProfessorName)) return false;
+          // Professor obrigatório se tiver nome/phone
+          if (needsProf && !includesProf(row, profFilter)) return false;
           return true;
         });
         if (!match) return false;

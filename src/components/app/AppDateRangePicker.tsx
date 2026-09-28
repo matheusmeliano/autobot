@@ -710,6 +710,9 @@ export function AppDateRangePicker({
                                 (s) => s.status === "cancelado",
                               ).length;
                               const temAlgo = ocupadosList.length > 0;
+                              // Botão "Ver" SÓ aparece se houver pelo menos 1 aula OCUPADA (com aluno) marcada
+                              // para este professor neste dia. Se não há nada (tudo livre / "Sem aulas...") → não mostrar.
+                              const showVerButton = ocupados > 0;
                               return (
                                 <div
                                   key={tIdx}
@@ -745,42 +748,38 @@ export function AppDateRangePicker({
                                       </div>
                                     </div>
 
-                                    {/* Botão Ver = atalho para a lista de atendimento / registros */}
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        const params = new URLSearchParams();
-                                        // QUEREMOS: EXATAMENTE os registros que APARECEM NO MODAL.
-                                        // O usuário vê: 18:00 Anderson Desousa, 19:00 Marlucio Lima, 20:00 Kennedy Muniz.
-                                        // Isso é: (a) professor = Nathan Camargo (header do card) + (b) dia do modal = 24/09/2026.
-                                        // Então NÃO USA mais from/to (data de cadastro) nem search q=nome_professor
-                                        // (esses eram o root cause de "Nenhum registro ainda").
-                                        // Ao invés disso, USA OS NOVOS PARAMS DE FILTRO DO LADO DO BOOKING (aula), que batem
-                                        // com o professor_date do experimental_class_bookings.
-                                        params.set("stage", "aula_experimental_agendada");
-                                        if (teacher?.name) {
-                                          params.set("bookingProfessor", String(teacher.name));
-                                        }
-                                        if (teacher?.phone) {
-                                          params.set("bookingPhone", String(teacher.phone));
-                                        }
-                                        if (scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
-                                          params.set("bookingFrom", scheduleDate);
-                                          params.set("bookingTo", scheduleDate);
-                                        }
-                                        try {
-                                          setScheduleModalOpen(false);
-                                        } catch {}
-                                        const dest = `/app/atendimento${params.toString() ? "?" + params.toString() : ""}`;
-                                        window.location.assign(dest);
-                                      }}
-                                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11.5px] font-bold uppercase tracking-[0.04em] text-[#0f172a] shadow-[inset_0_0_0_1px_var(--app-border)] transition-colors hover:bg-[var(--app-solid-surface-2)] active:bg-[var(--app-solid-surface-3)]"
-                                    >
-                                      Ver
-                                      <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.25} />
-                                    </button>
+                                    {/* Botão Ver = atalho para a lista de atendimento / registros.
+                                        SÓ RENDERIZA se houver aulas ocupadas (com aluno) neste dia. */}
+                                    {showVerButton && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          const params = new URLSearchParams();
+                                          params.set("stage", "aula_experimental_agendada");
+                                          if (teacher?.name) {
+                                            params.set("bookingProfessor", String(teacher.name));
+                                          }
+                                          if (teacher?.phone) {
+                                            params.set("bookingPhone", String(teacher.phone));
+                                          }
+                                          if (scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
+                                            params.set("bookingFrom", scheduleDate);
+                                            params.set("bookingTo", scheduleDate);
+                                          }
+                                          try {
+                                            setScheduleModalOpen(false);
+                                          } catch {}
+                                          const dest = `/app/atendimento${params.toString() ? "?" + params.toString() : ""}`;
+                                          window.location.assign(dest);
+                                        }}
+                                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11.5px] font-bold uppercase tracking-[0.04em] text-[#0f172a] shadow-[inset_0_0_0_1px_var(--app-border)] transition-colors hover:bg-[var(--app-solid-surface-2)] active:bg-[var(--app-solid-surface-3)]"
+                                      >
+                                        Ver
+                                        <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+                                      </button>
+                                    )}
                                   </div>
 
                                   {/* Apenas aulas marcadas / canceladas (horários livres NÃO listados — poluição) */}
