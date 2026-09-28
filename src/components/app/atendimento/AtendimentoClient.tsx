@@ -2707,22 +2707,22 @@ export function AtendimentoClient() {
         fullScreenOnMobile={true}
       >
         <div className="h-full max-h-full flex w-full flex-col gap-0 overflow-hidden">
-          {/* Header: mais espaçamento, hierarquia forte, separador inferior */}
-          <div className="flex shrink-0 items-center justify-between gap-4 px-5 pt-5 pb-4 border-b border-[var(--app-border)] bg-gradient-to-b from-[var(--app-solid-surface)] to-transparent">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] text-[#ea580c] shadow-[0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.6)]">
-                <SlidersHorizontal className="h-6 w-6" strokeWidth={2.15} />
+          {/* Header: MINIMALISTA igual calendário grade (mês/ano + setas + X) */}
+          <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-[var(--app-border)]">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]">
+                <SlidersHorizontal className="h-5 w-5" strokeWidth={2} />
               </div>
               <div className="min-w-0">
-                <h3 className="truncate text-[18.5px] font-extrabold leading-tight text-[var(--app-text-95)] tracking-[-0.01em]">
+                <h3 className="truncate text-[17px] font-bold leading-tight text-[var(--app-text-95)]">
                   Filtros avançados
                 </h3>
-                <div className="mt-1 text-[12.5px] leading-snug text-[var(--app-text-60)]">
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
                   Filtre a lista por status, etapa, localização e data.
                 </div>
               </div>
             </div>
-            {/* X (close): fecha modal E LIMPA todos filtros (draftFilters + activeFilters) + volta mostrar todos */}
+            {/* X (close): IGUAL botão X do calendário — h-11 w-11 rounded-full simples, sem sombra */}
             <button
               type="button"
               onClick={() => {
@@ -2731,153 +2731,119 @@ export function AtendimentoClient() {
                 setShowFiltersModal(false);
               }}
               aria-label="Fechar e limpar filtros"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-95)] transition-colors shadow-[0_1px_2px_0_rgba(0,0,0,0.04)]"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)] transition-colors"
             >
-              <X className="h-5 w-5" strokeWidth={2.15} />
+              <X className="h-5 w-5" strokeWidth={2} />
             </button>
           </div>
 
-          {/* Conteudo filtros: padding lateral maior (px-5), respiro vertical (pt-4 pb-2), gap maior entre blocos */}
-          <div className="flex flex-1 min-h-0 w-full flex-col gap-5 overflow-y-auto overscroll-contain px-5 pt-4 pb-3">
-            {/* BLOCO 1: Status unificado (sem secao separada de etapa do funil). Ordem: Aula Experimental Agendada PRIMEIRO, depois Aluno. */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 pl-0.5">
-                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[#ea580c]" />
-                <div className="text-[11.5px] font-extrabold uppercase tracking-[0.14em] text-[var(--app-text-75)]">
-                  Status
-                </div>
+          {/* Conteudo filtros: MINIMALISTA — padding igual calendário (px-5), gap médio, sem fundos especiais */}
+          <div className="flex flex-1 min-h-0 w-full flex-col gap-4 overflow-y-auto overscroll-contain px-5 pt-4 pb-3">
+            {/* BLOCO 1: Status (igual header dias semana do calendário) */}
+            <div className="flex flex-col gap-2.5">
+              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--app-text-55)] pl-0.5">
+                Status
               </div>
-              {/* Grupo: fundo levemente diferente, borda suave, padding interno maior */}
-              <div className="rounded-2xl border border-[var(--app-border)] bg-[rgba(24,24,27,0.025)] p-2.5 shadow-[0_1px_2px_0_rgba(0,0,0,0.04)]">
-                <div className="grid grid-cols-1 gap-2">
-                  {/* Primeiro: Aula Experimental Agendada (stage). COMPORTAMENTO RADIO: clicar aqui LIMPA statusList (Aluno), garante só 1 selecionado */}
-                  {stageOptions.map(([id, label]) => {
-                    const lbl = String(label ?? id ?? "").trim() || String(id);
-                    const sel = draftFilters.stageList.includes(id);
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => {
-                          const jaSelecionado = draftFilters.stageList.includes(id);
-                          setDraftFilters((p) => ({
-                            ...p,
-                            // RADIO: selecionei Aula Experimental => apaga ALUNO (statusList) sempre
-                            statusList: [],
-                            stageList: jaSelecionado ? [] : [id],
-                          }));
-                        }}
-                        className={[
-                          "group flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-[13.5px] font-semibold text-left transition-all duration-100",
-                          sel
-                            // SELECIONADO: fundo LARANJA forte, texto branco, borda laranja escura, sombra sutil
-                            ? "border-[#ea580c] bg-[#ea580c] text-white shadow-[0_1px_3px_0_rgba(234,88,12,0.25),inset_0_0_0_1px_rgba(255,255,255,0.18)]"
-                            : // NÃO SELECIONADO: fundo branco, borda cinza, hover = elevação leve + borda laranja clara
-                            "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[rgba(234,88,12,0.35)] hover:bg-[#FFF7ED] hover:text-[#9a3412]",
-                        ].join(" ")}
-                      >
-                        <span className="min-w-0 truncate flex items-center gap-2">
-                          <span className={[
-                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                            sel ? "border-white bg-white" : "border-[var(--app-border-strong)] group-hover:border-[#ea580c]",
-                          ].join(" ")}>
-                            {sel ? <span className="h-1.5 w-1.5 rounded-full bg-[#ea580c]" /> : null}
-                          </span>
-                          {lbl}
-                        </span>
-                        {sel ? (
-                          <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-white" strokeWidth={2.4} />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                  {/* Depois: Aluno (status). COMPORTAMENTO RADIO: clicar aqui LIMPA stageList (Aula Experimental) */}
-                  {statusOptions.map(([id, label]) => {
-                    const lbl = String(label ?? id ?? "").trim() || String(id);
-                    const sel = draftFilters.statusList.includes(id);
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => {
-                          const jaSelecionado = draftFilters.statusList.includes(id);
-                          setDraftFilters((p) => ({
-                            ...p,
-                            // RADIO: selecionei Aluno => apaga AULA EXPERIMENTAL (stageList) sempre
-                            stageList: [],
-                            statusList: jaSelecionado ? [] : [id],
-                          }));
-                        }}
-                        className={[
-                          "group flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-[13.5px] font-semibold text-left transition-all duration-100",
-                          sel
-                            ? "border-[#ea580c] bg-[#ea580c] text-white shadow-[0_1px_3px_0_rgba(234,88,12,0.25),inset_0_0_0_1px_rgba(255,255,255,0.18)]"
-                            : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[rgba(234,88,12,0.35)] hover:bg-[#FFF7ED] hover:text-[#9a3412]",
-                        ].join(" ")}
-                      >
-                        <span className="min-w-0 truncate flex items-center gap-2">
-                          <span className={[
-                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                            sel ? "border-white bg-white" : "border-[var(--app-border-strong)] group-hover:border-[#ea580c]",
-                          ].join(" ")}>
-                            {sel ? <span className="h-1.5 w-1.5 rounded-full bg-[#ea580c]" /> : null}
-                          </span>
-                          {lbl}
-                        </span>
-                        {sel ? (
-                          <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-white" strokeWidth={2.4} />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Grupo: fundo TRANSPARENTE (igual grid dias), padding minimo, borda IGUAL calendário */}
+              <div className="flex flex-col gap-1.5">
+                {/* Aula Experimental Agendada (stage) — RADIO */}
+                {stageOptions.map(([id, label]) => {
+                  const lbl = String(label ?? id ?? "").trim() || String(id);
+                  const sel = draftFilters.stageList.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        const jaSelecionado = draftFilters.stageList.includes(id);
+                        setDraftFilters((p) => ({
+                          ...p,
+                          statusList: [],
+                          stageList: jaSelecionado ? [] : [id],
+                        }));
+                      }}
+                      className={[
+                        // MINIMALISTA IGUAL BADGE calendário (LB/NC/Pn):
+                        // - selecionado: bg rgba(234,88,12,0.08) + border rgba(234,88,12,0.35) + texto laranja
+                        // - normal: bg branco, borda cinza, hover leve.
+                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium text-left transition-colors",
+                        sel
+                          ? "border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                    >
+                      <span className="min-w-0 truncate">{lbl}</span>
+                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                    </button>
+                  );
+                })}
+                {/* Aluno (status) — RADIO */}
+                {statusOptions.map(([id, label]) => {
+                  const lbl = String(label ?? id ?? "").trim() || String(id);
+                  const sel = draftFilters.statusList.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        const jaSelecionado = draftFilters.statusList.includes(id);
+                        setDraftFilters((p) => ({
+                          ...p,
+                          stageList: [],
+                          statusList: jaSelecionado ? [] : [id],
+                        }));
+                      }}
+                      className={[
+                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium text-left transition-colors",
+                        sel
+                          ? "border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                    >
+                      <span className="min-w-0 truncate">{lbl}</span>
+                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          {/* Rodapé ações: separador topo (border), padding maior, Limpar + Aplicar lado a lado */}
-          <div className="mt-1 flex shrink-0 flex-col gap-0 border-t border-[var(--app-border)] bg-gradient-to-t from-[var(--app-solid-surface)] to-transparent px-5 pt-4 pb-5">
-            {/* Linha 1: Resultado filtrado (ESQUERDA) + dica (DIREITA, opcional) */}
+          {/* Rodapé: MINIMALISTA igual calendário — separador simples, botões quadrados sem sombra nem gradiente */}
+          <div className="flex shrink-0 flex-col gap-0 border-t border-[var(--app-border)] px-5 pt-4 pb-5">
+            {/* Linha 1: resultado filtrado (simples) */}
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-[12.5px] text-[var(--app-text-65)]">
-                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[rgba(24,24,27,0.35)]" />
-                <span>
-                  Resultado filtrado:{" "}
-                  <strong className="text-[var(--app-text-95)] font-bold tabular-nums">
-                    {liveFilteredCount}
-                  </strong>{" "}
-                  {liveFilteredCount === 1 ? "registro" : "registros"}
-                </span>
-              </div>
-              <div className="hidden sm:block text-[11.5px] text-[var(--app-text-50)]">
-                Pressione <kbd className="rounded-md border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--app-text-70)]">Enter</kbd> para aplicar
+              <div className="text-[12px] text-[var(--app-text-55)]">
+                Resultado filtrado:{" "}
+                <strong className="text-[var(--app-text-85)] font-semibold tabular-nums">
+                  {liveFilteredCount}
+                </strong>{" "}
+                {liveFilteredCount === 1 ? "registro" : "registros"}
               </div>
             </div>
-            {/* Linha 2: Botões de ação (Limpar → Aplicar) */}
-            <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-end w-full">
-              {/* Botão Limpar (secundário) */}
+            {/* Linha 2: Ações — 2 botões minimalistas, mobile full-width empilhados (aplicar primeiro embaixo, limpar em cima = mobile layout natural) */}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end w-full sm:w-auto self-end sm:self-auto">
+              {/* Limpar (secundário minimalista — IGUAL botão X do header do calendário) */}
               <button
                 type="button"
                 onClick={() => {
                   setDraftFilters(EMPTY_FILTERS);
                   setActiveFilters(EMPTY_FILTERS);
                 }}
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-bold text-[var(--app-text-80)] shadow-[0_1px_2px_0_rgba(0,0,0,0.04)] hover:bg-[var(--app-solid-surface-2)] hover:text-[var(--app-text-95)] active:bg-[var(--app-solid-surface-3)] transition-colors w-full sm:w-auto"
+                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-95)] transition-colors w-full sm:w-auto"
               >
-                <Eraser className="h-4 w-4" strokeWidth={2.15} />
-                Limpar tudo
+                Limpar
               </button>
-              {/* Botão Aplicar (primário) */}
+              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples, sem sombra forte) */}
               <button
                 type="button"
                 onClick={() => {
                   setActiveFilters(draftFilters);
                   setShowFiltersModal(false);
                 }}
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-transparent bg-[#ea580c] px-6 text-[13.5px] font-extrabold text-white shadow-[0_2px_5px_0_rgba(234,88,12,0.30),0_1px_2px_0_rgba(234,88,12,0.20)] hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
+                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold text-white hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
               >
-                <Sparkles className="h-4.5 w-4.5" strokeWidth={2.3} />
-                Aplicar filtros
+                Aplicar
               </button>
             </div>
           </div>
