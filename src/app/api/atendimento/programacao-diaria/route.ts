@@ -283,7 +283,6 @@ export async function GET(req: Request) {
       "recurring_class_professor_timezone",
       "recurring_class_lead_time",
       "recurring_class_lead_timezone",
-      "recurring_class_first_class_at",
       "recurring_class_professor_date",
       "recurring_class_created_at",
       "contract_status",
@@ -293,8 +292,10 @@ export async function GET(req: Request) {
     // Motivo: recurring_class_weekday PODE ESTAR NULL na tabela (apenas recurring_class_weekday_label
     // preenchido, como nos prints Gisele/Aline/Marcela). A comparação weekday é feita EM MEMÓRIA ABAIXO
     // (recurring_class_weekday OU weekdayFromLabel(recurring_class_weekday_label)).
+    // IMPORTANTE: colunas NO select devem ser as colunas FÍSICAS REAIS do debug SQL anterior.
+    // EXCLUÍMOS recurring_class_first_class_at pois ela NÃO EXISTE (debug 42703 "column does not exist").
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(recurring_class_status.not.is.null,recurring_class_weekday.not.is.null,recurring_class_weekday_label.not.is.null,recurring_class_professor_time.not.is.null)&select=${sel}`,
+      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(recurring_class_status.not.is.null,recurring_class_weekday.not.is.null,recurring_class_weekday_label.not.is.null,recurring_class_professor_time.not.is.null,recurring_class_lead_time.not.is.null,recurring_class_created_at.not.is.null,recurring_class_professor_date.not.is.null)&select=${sel}`,
       {
         method: "GET",
         headers: restHeaders,
@@ -335,7 +336,6 @@ export async function GET(req: Request) {
           // Regra: NÃO MOSTRAR RECORRENTE SE PRIMEIRA AULA AINDA NÃO ACONTECEU
           let firstClassBeforeOrEqual = true;
           const candidatesFirstClass = [
-            (r as any).recurring_class_first_class_at,
             (r as any).recurring_class_professor_date,
             (r as any).recurring_class_created_at,
           ]
