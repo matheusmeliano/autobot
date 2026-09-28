@@ -3150,7 +3150,34 @@ export function AtendimentoClient() {
               aria-label="Filtros avançados de registros"
               className={[
                 "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all shadow-none",
-                Object.values(activeFilters).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v))
+                // ===== INDEPENDÊNCIA VISUAL: botão SlidersHorizontal AVANÇADOS só fica "ACESO" (laranja) quando
+                // o usuário REALMENTE usou os filtros AVANÇADOS (modal SlidersHorizontal — stage, status, country,
+                // state, onlyWithX). Os campos: createdFrom/createdTo (calendário do período de cadastro) e
+                // bookingDateFrom/bookingDateTo/bookingProfessorName + bookingLeadIds (botão Ver do modal programação)
+                // NÃO SÃO contabilizados aqui — pois eles têm SEUS PRÓPRIOS botões no header.
+                //
+                // CENÁRIO BUG REPORTADO: usuário selecionava período de cadastro no calendário (AppDateRangePicker
+                // header), que setava createdFrom/To → Object.values(activeFilters).some() retornava true
+                // → botão SlidersHorizontal FICAVA LARANJA/SELECIONADO COMO "filtros avançados usados"
+                // mesmo que o usuário NUNCA TENHA ABERTO o modal de filtros avançados.
+                // ================================================================
+                (() => {
+                  // SOMENTE os campos do modal de filtros avançados (stage, status, país, estado, onlyWithX).
+                  const advancedOnly: Record<string, unknown> = {
+                    statusList: (activeFilters as any).statusList,
+                    stageList: (activeFilters as any).stageList,
+                    countries: (activeFilters as any).countries,
+                    states: (activeFilters as any).states,
+                    onlyWithUnread: (activeFilters as any).onlyWithUnread,
+                    onlyWithPhone: (activeFilters as any).onlyWithPhone,
+                    onlyWithEmail: (activeFilters as any).onlyWithEmail,
+                    onlyWithScheduledClass: (activeFilters as any).onlyWithScheduledClass,
+                    onlyWithContract: (activeFilters as any).onlyWithContract,
+                  };
+                  return Object.values(advancedOnly).some((v) =>
+                    Array.isArray(v) ? v.length > 0 : Boolean(v),
+                  );
+                })()
                   ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.12)] text-[#9a3412] hover:bg-[rgba(234,88,12,0.18)]"
                   : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60",
               ].join(" ")}
