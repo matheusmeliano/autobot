@@ -243,6 +243,180 @@ export async function GET(req: Request) {
     leadCache.set(id, entry);
     return entry;
   };
+  // 1.5) BUSCAR AULAS RECORRENTES (alunos matriculados, contratados) que caem NO DIA targetDate
+  // Diferente de experimental (booking específico por dia), recorrente é armazenado em colunas
+  // na tabela atendimento_leads com dia da semana fixo (recurring_class_weekday = mon/tue/.../sat).
+  // Regras de validação: status recorrente confirmado OU cadastro_plataforma_pendente E data da 1a aula
+  // recurring_class_first_class_at (ou created_at) <= targetDate.
+  // Colunas usadas: recurring_class_status, recurring_class_weekday, recurring_class_professor_name,
+  // recurring_class_professor_phone, recurring_class_professor_time, recurring_class_professor_timezone,
+  // recurring_class_first_class_at, recurring_class_created_at, full_name, phone, id, funnel_stage, status.
+  const weekdayTarget = weekdayShort(targetDate);
+  const recurringBookings: Array<Record<string, unknown>> = [];
+  try {
+    // Colunas SÓ QUE EXISTEM FISICAMENTE em atendimento_leads, NÃO colunas composite
+    // (student_full_name / display_name não existem, confirmado debug SQL!).
+    const sel = [
+      "id",
+      "full_name",
+      "phone",
+      "funnel_stage",
+      "status",
+      "recurring_class_status",
+      "recurring_class_weekday",
+      "recurring_class_weekday_label",
+      "recurring_class_professor_name",
+      "recurring_class_professor_phone",
+      "recurring_class_professor_time",
+      "recurring_class_professor_timezone",
+      "recurring_class_lead_time",
+      "recurring_class_lead_timezone",
+      "recurring_class_first_class_at",
+      "recurring_class_professor_date",
+      "recurring_class_created_at",
+      "contract_status",
+    ].join(",");
+    const whereInStatus = [
+      "confirmado",
+      "Confirmado",
+      "CONFIRMADO",
+      "cadastro_plataforma_pendente",
+      "Cadastro_plataforma_pendente",
+      "CADASTRO_PLATAFORMA_PENDENTE",
+      "ativo",
+      "Ativo",
+      "ATIVO",
+      "matriculado",
+      "Matriculado",
+      "MATRICULADO",
+    ];
+    const eqClause = whereInStatus
+      .map((s) => `recurring_class_status.eq.${encodeURIComponent(s)}`)
+      .join(",");
+    // Usar query or() é melhor mas para evitar ambiguidade, vamos fetch SEM filtro de status no
+    // URL (puxar todos leads com weekday batendo) e filtrar status EM MEMÓRIA post fetch.
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/atendimento_leads?recurring_class_weekday=eq.${encodeURIComponent(weekdayTarget)}&select=${sel}`,
+      {
+        method: "GET",
+        headers: restHeaders,
+        cache: "no-store",
+      },
+    );
+    if (res.ok) {
+      const arr = (await res.json()) as Array<Record<string, unknown>> | null;
+      if (Array.isArray(arr) && arr.length > 0) {
+        const targetMsLocalNoon =
+          (() => {
+            const [y, mo, d] = targetDate.split("-").map((n) => Number(n));
+            return Date.UTC(y, mo - 1, d, 12, 0, 0, 0);
+          })();
+        for (const r of arr) {
+          // Filtrar STATUS aceitos de recorrência em memória (evitar inconsistência enum)
+          const st = String((r as any).recurring_class_status ?? "").trim();
+          if (!st) continue;
+          const ok = [
+            "confirmado",
+            "cadastro_plataforma_pendente",
+            "ativo",
+            "matriculado",
+          ].includes(st.toLowerCase());
+          if (!ok) continue;
+          // Regra: NÃO MOSTRAR RECORRENTE SE PRIMEIRA AULA AINDA NÃO ACONTECEU
+          // (ex: matrícula feita em setembro, primeira aula é outubro → dia 24/09 não aparece).
+          let firstClassBeforeOrEqual = true;
+          const candidatesFirstClass = [
+            (r as any).recurring_class_first_class_at,
+            (r as any).recurring_class_professor_date,
+            (r as any).recurring_class_created_at,
+          ]
+            .map((s) => String(s ?? "").trim())
+            .filter(Boolean);
+          for (const fc of candidatesFirstClass) {
+            const dt = new Date(fc);
+            if (!Number.isFinite(dt.getTime())) continue;
+            // Converter a "data de primeira aula" para YYYY-MM-DD NO FUSO DO PROFESSOR (America/Cuiabá default)
+            const tz =
+              String((r as any).recurring_class_professor_timezone ?? "").trim() ||
+              ATENDIMENTO_PROFESSOR_TIME_ZONE;
+            const localYYYYMMDD = (() => {
+              try {
+                const yyyy = new Intl.DateTimeFormat("en-CA", {
+                  timeZone: tz,
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                }).format(dt);
+                return yyyy;
+              } catch {
+                const yyyy = dt.getUTCFullYear();
+                const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+                const dd = String(dt.getUTCDate()).padStart(2, "0");
+                return `${yyyy}-${mm}-${dd}`;
+              }
+            })();
+            const [y, mo, d] = localYYYYMMDD.split("-").map((n) => Number(n));
+            const firstMs = Date.UTC(y, mo - 1, d, 12, 0, 0);
+            if (firstMs > targetMsLocalNoon) {
+              firstClassBeforeOrEqual = false;
+              break;
+            }
+            break;
+          }
+          if (!firstClassBeforeOrEqual) continue;
+          // Precisa ter horário da aula e pelo menos professor ou não é recorrente válida
+          const pTime = String((r as any).recurring_class_professor_time ?? "").trim();
+          if (!pTime || !/^\d{2}:\d{2}$/.test(pTime)) continue;
+          // Precisamos de um professor (nome OU telefone) senão não sabemos em qual card colocar
+          const pName = String((r as any).recurring_class_professor_name ?? "").trim();
+          const pPhone = String((r as any).recurring_class_professor_phone ?? "").trim();
+          if (!pName && !pPhone) continue;
+          // Montar objeto que simula a mesma interface de experimental_class_booking,
+          // para reaproveitar 100% do código de slot/match professor/tempo.
+          let startIso = "";
+          try {
+            startIso = zonedDateTimeToUtcIso({
+              date: targetDate,
+              time: pTime,
+              timeZone:
+                String((r as any).recurring_class_professor_timezone ?? "").trim() ||
+                ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            });
+          } catch {}
+          const entry: Record<string, unknown> = {
+            id: `recurring-${String(r.id ?? "")}`,
+            lead_id: String(r.id ?? ""),
+            status: "scheduled", // recorrente sempre ativa (se passou o start em nowUtc, badge 'Concluído')
+            professor_date: targetDate,
+            professor_time: pTime,
+            professor_start_at: startIso || null,
+            lead_date: targetDate,
+            lead_time: String((r as any).recurring_class_lead_time ?? "").trim() || null,
+            lead_timezone:
+              String((r as any).recurring_class_lead_timezone ?? "").trim() || null,
+            professor_timezone:
+              String((r as any).recurring_class_professor_timezone ?? "").trim() || null,
+            assigned_professor_name: pName || null,
+            assigned_professor_phone: pPhone || null,
+            created_at: String((r as any).recurring_class_created_at ?? "").trim() || null,
+            updated_at: String((r as any).recurring_class_created_at ?? "").trim() || null,
+            __type: "recurring",
+          };
+          recurringBookings.push(entry);
+        }
+      }
+    }
+  } catch {}
+  // Incluir lead IDs recorrentes no warmup (para prefetch de history / nomes iguais experimentais)
+  for (const b of recurringBookings) {
+    const lid = String(b.lead_id ?? "").trim();
+    if (lid && !leadIds.includes(lid)) leadIds.push(lid);
+  }
+  // JUNTAR AS DUAS LISTAS (experimentais + recorrentes). Mesma estrutura, mesmo código slot abaixo.
+  if (recurringBookings.length > 0) {
+    for (const rb of recurringBookings) bookings.push(rb);
+  }
+
   // Warmup: prefetch todos os lead ids (evita múltiplas chamadas no loop).
   if (leadIds.length > 0) {
     const uniqIds = Array.from(new Set(leadIds));
@@ -357,10 +531,10 @@ export async function GET(req: Request) {
       let badgeLabel: string | null = null;
       let badgeBg: string | null = null;
       let badgeText: string | null = null;
-      // Tipo da aula: DEFAULT = "Experimental" (pois modal programa só aulas experimentais por enquanto).
-      // No futuro, se integrarmos atendimento_recurring_class no modal, detectar e trocar p/ "Recorrente".
-      // Atualmente todos slots do EXPERIMENTAL_CLASS_SLOT_TIMES vêm da grade experimental, então é SEMPRE experimental.
-      const classTypeLabel: "Experimental" | "Recorrente" = "Experimental";
+      // Tipo da aula: DEFINE baseado no booking __type.
+      // Se experimental (default): "Experimental". Se recorrente (busca em atendimento_leads com weekday) → "Recorrente".
+      const isRecurringRow = active && String((active as any).__type ?? "").toLowerCase() === "recurring";
+      const classTypeLabel: "Experimental" | "Recorrente" = isRecurringRow ? "Recorrente" : "Experimental";
       if (active && !isCancelled) {
         const startIso =
           (active ? String(active.professor_start_at ?? "").trim() : "") ||
