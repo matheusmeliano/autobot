@@ -636,11 +636,6 @@ export function AppDateRangePicker({
                             ? format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
                             : scheduleDate}
                         </div>
-                        {isValid(dateObj) ? (
-                          <div className="mt-0.5 text-[11px] font-medium text-[var(--app-text-55)]">
-                            {format(dateObj, "EEEE", { locale: ptBR })} · {format(dateObj, "dd/MM/yyyy")}
-                          </div>
-                        ) : null}
                       </div>
 
                       <button
