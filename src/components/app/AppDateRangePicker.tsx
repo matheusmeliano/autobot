@@ -449,7 +449,7 @@ export function AppDateRangePicker({
             const STEP = BS - OVER; // distância entre centros dos badges adjacentes
             const badgeFontPx = N === 1 ? 11.5 : N === 2 ? 10.5 : 10;
             const badgeBaseClass =
-              "absolute flex shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] font-extrabold uppercase text-[#c2410c]";
+              "absolute flex shrink-0 items-center justify-center rounded-full border font-extrabold uppercase";
             return (
               <button
                 key={idx}
@@ -490,6 +490,9 @@ export function AppDateRangePicker({
                           height: BS,
                           fontSize: badgeFontPx,
                           zIndex: z,
+                          backgroundColor: "#FFF7ED",
+                          borderColor: "#FED7AA",
+                          color: "#9A3412",
                           boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255,255,255,0.6)",
                         }}
                       >
