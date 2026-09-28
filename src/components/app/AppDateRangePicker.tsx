@@ -439,12 +439,18 @@ export function AppDateRangePicker({
             if (hasNC) badgeList.push({ key: "NC", label: "NC" });
             if (hasPN) badgeList.push({ key: "PN", label: "Pn" });
             const N = badgeList.length;
-            // TAMANHO + OVERLAP ADAPTATIVOS por quantidade badges (garante TODOS visíveis / não corta em mobile)
-            // N=1: 40px (grande), N=2: 34px overlap 14, N=3: 30px overlap 18 (total grupo 54px, cabe em ~51px de célula mobile)
-            const BS = N === 1 ? 40 : N === 2 ? 34 : 30;
-            const OVER = N === 1 ? 0 : N === 2 ? 14 : 18;
-            const STEP = BS - OVER;
-            const badgeFontPx = N === 1 ? 12.5 : N === 2 ? 12 : 11;
+            // TAMANHO MENOR + MENOS OVERLAP (user pediu reorganizar / deixar menor)
+            // N=1: 28px pequeno. N=2: 26px, 4px de GAP (sem sobreposição — leitura muito melhor)
+            // N=3: 25px, 2px GAP — lado a lado, NÃO SOBREPOSTO (todos 3 visíveis SEM enrolação)
+            // Largura total N=3: 3*25 + 2*2 = 79px. Desktop celula ≈ largura ok; mobile:
+            // (calculado em step) em vez de sobrepor, reduzimos se N=3 ainda ficar grande.
+            const BS = N === 1 ? 28 : N === 2 ? 26 : 25;
+            // Em vez de overlap VENN (letras um no meio do outro como no print),
+            // user pediu "reorganize os badges" → GRID: lado a lado com GAP pequeno.
+            const GAP = N === 1 ? 0 : N === 2 ? 4 : 2;
+            const STEP = BS + GAP; // distância entre centros dos badges adjacentes
+            const badgeFontPx = N === 1 ? 11.5 : N === 2 ? 10.5 : 10;
+            // z-index: agora badges NÃO se sobrepõem → não precisa de z crescente/decrescente
             const badgeBaseClass =
               "absolute flex shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] font-extrabold uppercase text-[#c2410c]";
             return (
@@ -471,7 +477,8 @@ export function AppDateRangePicker({
                 {hasAny ? (
                   <div className="relative w-full flex items-center justify-center z-10" style={{ minHeight: BS, height: BS }}>
                     {badgeList.map((b, i) => {
-                      const rel = (i - (N - 1) / 2) * STEP; // center of badge i rel to cell center
+                      // Distância centro badge[i] para centro do grupo:
+                      const rel = (i - (N - 1) / 2) * STEP;
                       const leftCalc = `calc(50% + ${rel - BS / 2}px)`;
                       return (
                         <div
@@ -483,7 +490,7 @@ export function AppDateRangePicker({
                           width: BS,
                           height: BS,
                           fontSize: badgeFontPx,
-                          zIndex: 10 + (N - Math.abs(i - Math.floor((N - 1) / 2))),
+                          zIndex: 12,
                           boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255,255,255,0.6)",
                         }}
                       >
