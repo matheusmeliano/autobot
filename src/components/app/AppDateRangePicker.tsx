@@ -626,12 +626,36 @@ export function AppDateRangePicker({
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Header (sticky, nunca some com scroll) */}
-                    <div className="relative flex shrink-0 items-start justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 sm:px-5 sm:py-3.5">
-                      <div className="min-w-0">
+                    <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3 sm:px-5 sm:py-3.5">
+                      {/* Botão VOLTAR = fecha o modal e retorna para a grade do calendário (abaixo) */}
+                      <button
+                        type="button"
+                        aria-label="Voltar ao calendário"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Primeiro foca no trigger do calendário (o botão que abriu) para voltar o contexto
+                          try {
+                            const btn = document.querySelector<HTMLButtonElement>(
+                              'button[data-app-calendar-trigger="true"]',
+                            );
+                            if (btn) btn.focus({ preventScroll: true });
+                          } catch {}
+                          closeScheduleModal();
+                        }}
+                        className={[
+                          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                          "bg-transparent text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                          "transition-colors",
+                        ].join(" ")}
+                      >
+                        <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2.25} />
+                      </button>
+
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center min-w-0">
                         <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-[var(--app-text-55)]">
                           Programação do Dia
                         </div>
-                        <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-95)] leading-tight">
+                        <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-95)] leading-tight max-w-[64vw]">
                           {isValid(dateObj)
                             ? format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
                             : scheduleDate}
