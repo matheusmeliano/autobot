@@ -834,7 +834,11 @@ export function AppDateRangePicker({
                                           e.stopPropagation();
                                           e.preventDefault();
                                           const params = new URLSearchParams();
-                                          params.set("stage", "aula_experimental_agendada");
+                                          // OBS: NAO setar stage HARDCODED = aula_experimental_agendada.
+                                          // No mesmo dia/professor pode ter EXPERIMENTAIS (agendados) e RECORRENTES (Aluno).
+                                          // O filtro de bookingDateFrom/To + professor name/phone já é restritivo o suficiente
+                                          // (garante exatamente o conjunto de aulas que aparece NO MODAL).
+                                          // Stage causava o bug "recorrentes nao aparecem" ao clicar em Ver.
                                           if (teacher?.name) {
                                             params.set("bookingProfessor", String(teacher.name));
                                           }

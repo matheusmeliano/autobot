@@ -595,7 +595,7 @@ export function AtendimentoClient() {
         nextDraft.createdTo = toQ;
         changed = true;
       }
-      // NOVO: filtro de aula experimental do dia + professor (mais restritivo que from/to cadastro)
+      // NOVO: filtro de aula (experimental OU recorrente) do dia + professor (exatamente os bookings do modal)
       const hasBookingFilter =
         /^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ) ||
         /^\d{4}-\d{2}-\d{2}$/.test(bookingToQ) ||
@@ -612,12 +612,12 @@ export function AtendimentoClient() {
         (nextActive as any).bookingPhone = bookingPhoneQ;
         (nextDraft as any).bookingPhone = bookingPhoneQ;
         changed = true;
-        // Quando usuario aperta "Ver" do modal, a intenção é "VER OS REGISTROS QUE ESTÃO AQUI NO MODAL"
-        // Então PRÉ-APLICA o rádio "Aula Experimental Agendada" para garantir exibição correta (se não tiver sido passado)
-        if (!nextActive.stageList.includes("aula_experimental_agendada")) {
-          nextActive.stageList = ["aula_experimental_agendada"];
-          nextDraft.stageList = ["aula_experimental_agendada"];
-        }
+        // ⚠️ ATENÇÃO: NÃO setar stageList=["aula_experimental_agendada"] automaticamente aqui.
+        // No mesmo dia/professor pode ter EXPERIMENTAIS (agendados) E RECORRENTES (Aluno).
+        // O filtro de bookingDateFrom/To + professor name/phone já é restritivo o suficiente para
+        // retornar exatamente os leads das aulas que aparecem NO MODAL "Programação do dia".
+        // Setar stage hardcoded causava o bug "Aparece X aulas no modal mas Ver leva pra 0 registros"
+        // quando alguma aula era RECORRENTE (Aluno).
       }
       if (changed) {
         setActiveFilters(nextActive);
@@ -1089,9 +1089,13 @@ export function AtendimentoClient() {
       return st === sid || fs === sid;
     };
 
-    // Helper: extrai TODOS os professores/datas de AULA EXPERIMENTAL (todas as fontes do composite)
-    const getExperimentalProfDateList = (l: AtendimentoLeadListItem): Array<{ date: string; profName: string; profPhone: string; status: string }> => {
+    // Helper: extrai TODOS os professores/datas de AULA (TANTO EXPERIMENTAIS — composite/flat — QUANTO RECORRENTES).
+    // IMPORTANTE: função usada pelo filtro de "Ver" do modal programação-do-dia. Se faltar recorrentes aqui,
+    // leads "Aluno" (recorrentes) NUNCA aparecem no clique do botão Ver (resultado = 0 registros).
+    // Interface de retorno NÃO foi trocada de propósito (p/ não quebrar uso no includesProf/dateInRange abaixo).
+    const getAulaProfDateList = (l: AtendimentoLeadListItem): Array<{ date: string; profName: string; profPhone: string; status: string }> => {
       const out: Array<{ date: string; profName: string; profPhone: string; status: string }> = [];
+      // ========== FONTE 1A: EXPERIMENTAIS (composite bookings — tabela atendimento_experimental_class_bookings)
       const b1 = (l as any)?.experimental_class_booking as any;
       const b2 = (l as any)?.latest_experimental_class_booking as any;
       const b3 = (l as any)?.future_experimental_class_booking as any;
@@ -1103,11 +1107,59 @@ export function AtendimentoClient() {
         const st = String(b?.status ?? "").trim().toLowerCase();
         if (dt || nm || ph) out.push({ date: dt, profName: nm, profPhone: ph, status: st });
       }
+      // ========== FONTE 1B: EXPERIMENTAIS FLAT (colunas experimental_class_* direto em atendimento_leads)
       const flatDate = String((l as any)?.experimental_class_professor_date ?? "").trim().slice(0, 10);
       const flatProfN = String((l as any)?.experimental_class_professor_name ?? "").trim();
       const flatProfP = String((l as any)?.experimental_class_professor_phone ?? "").trim();
       const flatStatus = String((l as any)?.experimental_class_booking_status ?? (l as any)?.funnel_stage ?? "").trim().toLowerCase();
       if (flatDate || flatProfN || flatProfP) out.push({ date: flatDate, profName: flatProfN, profPhone: flatProfP, status: flatStatus });
+
+      // ========== FONTE 2: RECORRENTES (Aluno) — colunas recurring_class_* flat em atendimento_leads.
+      // Programação do dia (endpoint /programacao-diaria) mostra recorrentes calculando "aula ocorre no dia targetDate"
+      // a partir de recurring_class_weekday (ex: mon/sat) + recurring_class_created_at (primeira aula) +
+      // recurring_class_next_date / recurring_class_last_date.
+      // Aqui NÃO temos um único targetDate — queremos saber SE PARA O RANGE DE DATAS PASSADO NO FILTRO
+      // (bookingDateFrom / bookingDateTo) essa recorrência CAI ALGUMA VEZ no intervalo. Então basta extrair
+      // as datas de LAST / NEXT (pré-calculadas no lead), o WEEKDAY (para validação futura) e deixar que o
+      // dateInRange do filtro bata EXATAMENTE o dia que veio do botão Ver (ex: 26/09 sábado).
+      const rProfN = String((l as any)?.recurring_class_professor_name ?? "").trim();
+      const rProfP = String((l as any)?.recurring_class_professor_phone ?? "").trim();
+      const rStatus = String((l as any)?.recurring_class_status ?? (l as any)?.funnel_stage ?? (l as any)?.status ?? "").trim().toLowerCase();
+      const rHasAnyProfOrWeekday =
+        Boolean(rProfN || rProfP) ||
+        Boolean(String((l as any)?.recurring_class_weekday ?? (l as any)?.recurring_class_weekday_label ?? "").trim());
+      if (rHasAnyProfOrWeekday) {
+        const rDates: string[] = [];
+        const pushR = (v: string | undefined | null) => {
+          const s = String(v ?? "").trim();
+          if (!s) return;
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) rDates.push(s.slice(0, 10));
+          else {
+            const d = new Date(s);
+            if (!Number.isNaN(d.getTime())) {
+              const yyyy = d.getFullYear();
+              const mm = String(d.getMonth() + 1).padStart(2, "0");
+              const dd = String(d.getDate()).padStart(2, "0");
+              rDates.push(`${yyyy}-${mm}-${dd}`);
+            }
+          }
+        };
+        pushR((l as any)?.recurring_class_next_date);
+        pushR((l as any)?.recurring_class_last_date);
+        pushR((l as any)?.recurring_class_created_at);
+        pushR((l as any)?.next_charge_date);
+        pushR((l as any)?.recurring_payment_next_date);
+        const uniqDates = Array.from(new Set(rDates.filter(Boolean)));
+        // Se tem data(s) → uma entrada POR data (para dateInRange bater o exato dia do filtro).
+        if (uniqDates.length > 0) {
+          for (const dt of uniqDates) out.push({ date: dt, profName: rProfN, profPhone: rProfP, status: rStatus });
+        } else {
+          // Sem datas NUNCA vai bater dateInRange — MAS SE o filtro NÃO tiver data (só professor) ainda
+          // queremos que o lead apareça (ex: botão Ver sem scheduleDate). Então push com data vazio.
+          out.push({ date: "", profName: rProfN, profPhone: rProfP, status: rStatus });
+        }
+      }
+
       return out;
     };
     const normName = (s: string) => String(s ?? "").trim().toLowerCase();
@@ -1252,7 +1304,7 @@ export function AtendimentoClient() {
           f.bookingProfessorName,
       );
       if (wantsBookingFilter) {
-        const list = getExperimentalProfDateList(l);
+        const list = getAulaProfDateList(l);
         if (list.length === 0) return false;
         const profFilter = {
           name: String(f.bookingProfessorName ?? "").trim(),
