@@ -434,10 +434,12 @@ export function AppDateRangePicker({
             const hasNC = Boolean(badges?.NC);
             const hasPN = Boolean(badges?.PN);
             const hasAny = hasLB || hasNC || hasPN;
-            const badgeList: Array<{ key: string; label: string }> = [];
-            if (hasLB) badgeList.push({ key: "LB", label: "LB" });
-            if (hasNC) badgeList.push({ key: "NC", label: "NC" });
-            if (hasPN) badgeList.push({ key: "PN", label: "Pn" });
+            const badgeList: Array<{ key: string; label: string; offset: number }> = [];
+            if (hasLB) badgeList.push({ key: "LB", label: "LB", offset: 0 });
+            if (hasNC) badgeList.push({ key: "NC", label: "NC", offset: 1 });
+            if (hasPN) badgeList.push({ key: "PN", label: "Pn", offset: 2 });
+            const badgeBaseClass =
+              "absolute flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[12px] font-bold uppercase text-[#c2410c]";
             return (
               <button
                 key={idx}
@@ -451,30 +453,50 @@ export function AppDateRangePicker({
                   e.preventDefault();
                 }}
                 className={[
-                  "relative inline-flex w-full flex-col items-center justify-start gap-1 rounded-xl py-1.5 text-[13px] font-semibold transition-colors select-none",
+                  "relative inline-flex w-full flex-col items-center justify-center rounded-xl py-1.5 text-[13px] font-semibold transition-colors select-none",
                   "focus:outline-none",
-                  "touch-manipulation min-h-[58px]",
+                  "touch-manipulation min-h-[68px]",
                   outMonth ? "text-[var(--app-text-35)]" : "text-[var(--app-text-80)]",
                   "hover:bg-[var(--app-solid-surface-2)] active:bg-[rgba(234,88,12,0.08)]",
                   today
-                    ? "ring-1 ring-inset ring-[rgba(234,88,12,0.45)] font-bold text-[#9a3412]"
+                    ? "ring-1 ring-inset ring-[rgba(234,88,12,0.45)]"
                     : "",
                 ].join(" ")}
                 style={{ WebkitTapHighlightColor: "rgba(234,88,12,0.18)" }}
               >
-                <span className="relative z-10 leading-none pt-0.5">{d.getDate()}</span>
-                {hasAny && (
-                  <div className="flex items-center justify-center gap-1 z-10 w-full px-0.5 min-w-0">
-                    {badgeList.map((b) => (
-                      <span
-                        key={b.key}
-                        className="inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] px-1.5 text-[10px] font-bold uppercase tracking-tight text-[#c2410c]"
-                      >
-                        {b.label}
-                      </span>
-                    ))}
+                {!hasAny ? (
+                  <span className="relative z-10 leading-none">{d.getDate()}</span>
+                ) : (
+                  <div className="relative flex items-center justify-center h-9 w-full min-h-[36px] z-10 mb-1">
+                    {badgeList.map((b, i) => {
+                      const N = badgeList.length;
+                      const L = 9;
+                      const step = 36 - L;
+                      // Center group at 50% of cell width.
+                      // Center of circle i relative to group center =  (i - (N - 1)/2) * step
+                      // px from cell left edge of circle (left):
+                      //   50% (cell center) + relative_center_i - 18px (half circle)
+                      const relativeCenter = (i - (N - 1) / 2) * step;
+                      const leftPx = relativeCenter - 18;
+                      return (
+                        <div
+                          key={b.key}
+                          className={badgeBaseClass}
+                          style={{
+                            left: `calc(50% + ${leftPx}px)`,
+                            top: "0",
+                            zIndex: 10 + i,
+                          }}
+                        >
+                          {b.label}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
+                {hasAny ? (
+                  <span className="relative z-[5] leading-none mt-1 text-[13px] font-semibold">{d.getDate()}</span>
+                ) : null}
               </button>
             );
           })}
