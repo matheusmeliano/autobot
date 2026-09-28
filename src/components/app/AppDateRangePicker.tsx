@@ -752,23 +752,27 @@ export function AppDateRangePicker({
                                         e.stopPropagation();
                                         e.preventDefault();
                                         const params = new URLSearchParams();
-                                        // Pré-aplica o filtro Rádio "Aula Experimental Agendada" (stageList)
+                                        // QUEREMOS: EXATAMENTE os registros que APARECEM NO MODAL.
+                                        // O usuário vê: 18:00 Anderson Desousa, 19:00 Marlucio Lima, 20:00 Kennedy Muniz.
+                                        // Isso é: (a) professor = Nathan Camargo (header do card) + (b) dia do modal = 24/09/2026.
+                                        // Então NÃO USA mais from/to (data de cadastro) nem search q=nome_professor
+                                        // (esses eram o root cause de "Nenhum registro ainda").
+                                        // Ao invés disso, USA OS NOVOS PARAMS DE FILTRO DO LADO DO BOOKING (aula), que batem
+                                        // com o professor_date do experimental_class_bookings.
                                         params.set("stage", "aula_experimental_agendada");
-                                        // Nome professor para filtrar pelo registro no search
                                         if (teacher?.name) {
-                                          params.set("q", String(teacher.name));
+                                          params.set("bookingProfessor", String(teacher.name));
                                         }
-                                        // Data do modal (day): pré-preenche período cadastro
+                                        if (teacher?.phone) {
+                                          params.set("bookingPhone", String(teacher.phone));
+                                        }
                                         if (scheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) {
-                                          params.set("from", scheduleDate);
-                                          params.set("to", scheduleDate);
+                                          params.set("bookingFrom", scheduleDate);
+                                          params.set("bookingTo", scheduleDate);
                                         }
                                         try {
                                           setScheduleModalOpen(false);
                                         } catch {}
-                                        // NAVEGAÇÃO HARD (window.location.href) GARANTIDA
-                                        // router.push() em createPortal dentro do AppDateRangePicker as vezes falhava.
-                                        // Location.href NUNCA falha, sempre vai.
                                         const dest = `/app/atendimento${params.toString() ? "?" + params.toString() : ""}`;
                                         window.location.assign(dest);
                                       }}

@@ -507,6 +507,12 @@ export function AtendimentoClient() {
     onlyWithContract: boolean;
     createdFrom: string;
     createdTo: string;
+    // Filtro NOVO (botão Ver do modal programação-do-dia):
+    // mostra SÓ os leads cuja AULA EXPERIMENTAL aconteceu no dia escolhido (professor_date do booking)
+    // e professor escolhido (qualquer match nome/telefone). Exatamente a lista do modal.
+    bookingDateFrom: string;
+    bookingDateTo: string;
+    bookingProfessorName: string;
   };
   const EMPTY_FILTERS: LeadFilters = {
     statusList: [],
@@ -520,6 +526,9 @@ export function AtendimentoClient() {
     onlyWithContract: false,
     createdFrom: "",
     createdTo: "",
+    bookingDateFrom: "",
+    bookingDateTo: "",
+    bookingProfessorName: "",
   };
   const [activeFilters, setActiveFilters] = useState<LeadFilters>(EMPTY_FILTERS);
   const [draftFilters, setDraftFilters] = useState<LeadFilters>(EMPTY_FILTERS);
@@ -541,7 +550,7 @@ export function AtendimentoClient() {
   }, []);
 
   // HIDRATA FILTROS INICIAIS a partir dos query params (botão "Ver" do modal programação-do-dia):
-  //   ?stage=aula_experimental_agendada&q=Lucas%20Brum&from=YYYY-MM-DD&to=YYYY-MM-DD
+  //   ?stage=aula_experimental_agendada&bookingProfessor=Nathan+Camargo&bookingFrom=YYYY-MM-DD&bookingTo=YYYY-MM-DD
   // Roda UMA VEZ no mount (initialUrlFiltersAppliedRef), nunca mais depois.
   const initialUrlFiltersAppliedRef = useRef<boolean>(false);
   useEffect(() => {
@@ -552,6 +561,10 @@ export function AtendimentoClient() {
       const qQ = String(searchParams?.get("q") ?? searchParams?.get("query") ?? searchParams?.get("search") ?? "").trim();
       const fromQ = String(searchParams?.get("from") ?? searchParams?.get("createdFrom") ?? "").trim().slice(0, 10);
       const toQ = String(searchParams?.get("to") ?? searchParams?.get("createdTo") ?? "").trim().slice(0, 10);
+      // NOVOS params do botão Ver (filtrar POR AULA do dia/professor, não por data de cadastro):
+      const bookingFromQ = String(searchParams?.get("bookingFrom") ?? searchParams?.get("bookingDate") ?? "").trim().slice(0, 10);
+      const bookingToQ = String(searchParams?.get("bookingTo") ?? searchParams?.get("bookingDate") ?? "").trim().slice(0, 10);
+      const bookingProfQ = String(searchParams?.get("bookingProfessor") ?? searchParams?.get("teacher") ?? searchParams?.get("prof") ?? "").trim();
       const nextActive = { ...EMPTY_FILTERS };
       const nextDraft = { ...EMPTY_FILTERS };
       let changed = false;
@@ -581,11 +594,30 @@ export function AtendimentoClient() {
         nextDraft.createdTo = toQ;
         changed = true;
       }
+      // NOVO: filtro de aula experimental do dia + professor (mais restritivo que from/to cadastro)
+      const hasBookingFilter = /^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ) || /^\d{4}-\d{2}-\d{2}$/.test(bookingToQ) || Boolean(bookingProfQ);
+      if (hasBookingFilter) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(bookingFromQ)) nextActive.bookingDateFrom = bookingFromQ;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(bookingToQ)) nextActive.bookingDateTo = bookingToQ;
+        if (bookingProfQ) nextActive.bookingProfessorName = bookingProfQ;
+        nextDraft.bookingDateFrom = nextActive.bookingDateFrom;
+        nextDraft.bookingDateTo = nextActive.bookingDateTo;
+        nextDraft.bookingProfessorName = nextActive.bookingProfessorName;
+        changed = true;
+        // Quando usuario aperta "Ver" do modal, a intenção é "VER OS REGISTROS QUE ESTÃO AQUI NO MODAL"
+        // Então PRÉ-APLICA o rádio "Aula Experimental Agendada" para garantir exibição correta (se não tiver sido passado)
+        if (!nextActive.stageList.includes("aula_experimental_agendada")) {
+          nextActive.stageList = ["aula_experimental_agendada"];
+          nextDraft.stageList = ["aula_experimental_agendada"];
+        }
+      }
       if (changed) {
         setActiveFilters(nextActive);
         setDraftFilters(nextDraft);
       }
-      if (qQ) {
+      if (qQ && !hasBookingFilter) {
+        // Q search só mantemos se NÃO temos booking filter (booking filter já garante o conjunto certo,
+        // o search q=NomeProfessor estava bagunçando e mostrando "nenhum registro ainda")
         setSearchQuery(qQ);
       }
     } catch {}
@@ -1048,6 +1080,44 @@ export function AtendimentoClient() {
       }
       return st === sid || fs === sid;
     };
+
+    // Helper: extrai TODOS os professores/datas de AULA EXPERIMENTAL (todas as fontes do composite)
+    const getExperimentalProfDateList = (l: AtendimentoLeadListItem): Array<{ date: string; profName: string; profPhone: string; status: string }> => {
+      const out: Array<{ date: string; profName: string; profPhone: string; status: string }> = [];
+      const b1 = (l as any)?.experimental_class_booking as any;
+      const b2 = (l as any)?.latest_experimental_class_booking as any;
+      const b3 = (l as any)?.future_experimental_class_booking as any;
+      for (const b of [b1, b2, b3]) {
+        if (!b) continue;
+        const dt = String(b?.professor_date ?? b?.lead_date ?? "").trim().slice(0, 10);
+        const nm = String(b?.assigned_professor_name ?? "").trim();
+        const ph = String(b?.assigned_professor_phone ?? "").trim();
+        const st = String(b?.status ?? "").trim().toLowerCase();
+        if (dt || nm || ph) out.push({ date: dt, profName: nm, profPhone: ph, status: st });
+      }
+      const flatDate = String((l as any)?.experimental_class_professor_date ?? "").trim().slice(0, 10);
+      const flatProfN = String((l as any)?.experimental_class_professor_name ?? "").trim();
+      const flatProfP = String((l as any)?.experimental_class_professor_phone ?? "").trim();
+      const flatStatus = String((l as any)?.experimental_class_booking_status ?? (l as any)?.funnel_stage ?? "").trim().toLowerCase();
+      if (flatDate || flatProfN || flatProfP) out.push({ date: flatDate, profName: flatProfN, profPhone: flatProfP, status: flatStatus });
+      return out;
+    };
+    const normName = (s: string) => String(s ?? "").trim().toLowerCase();
+    const includesProf = (profRow: { profName: string; profPhone: string }, target: string): boolean => {
+      const t = normName(target);
+      if (!t) return true;
+      if (normName(profRow?.profName ?? "").includes(t) || t.includes(normName(profRow?.profName ?? ""))) return true;
+      if (String(profRow?.profPhone ?? "").replace(/\D+/g, "").includes(String(target ?? "").replace(/\D+/g, ""))) return true;
+      return false;
+    };
+    const dateInRange = (dt: string, from: string, to: string): boolean => {
+      const d = String(dt ?? "").trim().slice(0, 10);
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    };
+
     return leads.filter((l) => {
       if (f.statusList.length > 0 && !f.statusList.some((sid) => statusMatches(sid, l))) return false;
       if (f.stageList.length > 0 && !f.stageList.some((sid) => statusMatches(sid, l))) return false;
@@ -1077,6 +1147,22 @@ export function AtendimentoClient() {
         const toMs = new Date(`${f.createdTo}T23:59:59`).getTime();
         const leadMs = new Date(String(l.created_at ?? "")).getTime();
         if (!Number.isNaN(toMs) && leadMs > toMs) return false;
+      }
+      // FILTRO NOVO: aula experimental do dia + professor (exatamente os bookings do modal)
+      const wantsBookingFilter = Boolean(f.bookingDateFrom || f.bookingDateTo || f.bookingProfessorName);
+      if (wantsBookingFilter) {
+        const list = getExperimentalProfDateList(l);
+        if (list.length === 0) return false;
+        const match = list.some((row) => {
+          // Data obrigatória se tiver date from/to
+          const needsDate = Boolean(f.bookingDateFrom || f.bookingDateTo);
+          if (needsDate && !dateInRange(row.date, f.bookingDateFrom, f.bookingDateTo)) return false;
+          // Professor obrigatório se tiver nome
+          const needsProf = Boolean(f.bookingProfessorName);
+          if (needsProf && !includesProf(row, f.bookingProfessorName)) return false;
+          return true;
+        });
+        if (!match) return false;
       }
       return true;
     });
