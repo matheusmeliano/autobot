@@ -518,6 +518,43 @@ export function AtendimentoClient() {
 
   const LIST_PAGE_SIZE = 20;
   const [leadListPage, setLeadListPage] = useState(1);
+  // ==================== FORÇADOR DE QUICK FILTER POR URL ====================
+  // User confirmou: "funcionava em filtros avançados" e "muda a url, faz alguma coisa".
+  // Motivo: SEMPRE que o usuário clicar no GraduationCap, atualizamos a URL.
+  // O applyFiltersToLeads agora LER SEMPRE a URL atual (window.location.search)
+  // independentemente do que chegar no objeto f — assim se f.quickStatusList for
+  // apagado por qualquer reset/Spread acidental, o quick ainda funciona.
+  // Além disso, mantemos state `quickUrlForceTick` como dependência extra do
+  // useMemo de filteredLeads para garantir re-execução.
+  const [quickUrlForceTick, setQuickUrlForceTick] = useState(0);
+  const bumpQuickUrlForceTick = useCallback(() => {
+    setQuickUrlForceTick((x) => x + 1);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    bumpQuickUrlForceTick();
+    const handler = () => bumpQuickUrlForceTick();
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, [bumpQuickUrlForceTick]);
+  // Leitor de quick SEMPRE VIVO (direto de window.location.search — independe de searchParams e f):
+  const currentUrlQuickIdsDirect = (): string[] => {
+    const out: string[] = [];
+    if (typeof window === "undefined") return out;
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const raw = qs.get("quickStatusList") ?? qs.get("quick") ?? qs.get("qs") ?? "";
+      if (!raw) return out;
+      const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      for (const p of parts) {
+        if (!p) continue;
+        if (p.startsWith("quick__")) out.push(p);
+        else out.push(`quick__${p}`);
+      }
+    } catch {}
+    return Array.from(new Set(out));
+  };
+  // =========================================================================
 
   // Campos 100% CONTROLADOS PELO MODAL DE FILTROS AVANÇADOS.
   // Estes são os ÚNICOS campos que o modal de filtros avançados tem permissão de
@@ -657,9 +694,27 @@ export function AtendimentoClient() {
       const bookingLeadIdsQ: string[] = bookingLeadIdsRaw
         ? Array.from(new Set(bookingLeadIdsRaw.split(",").map((s) => s.trim()).filter(Boolean)))
         : [];
+      // Quick filter por URL (bypass: ?quickStatusList=quick__matriculado ou ?quick=matriculado)
+      const quickRaw = String(searchParams?.get("quickStatusList") ?? searchParams?.get("quick") ?? searchParams?.get("qs") ?? "").trim();
+      const quickStatusListQ: string[] = quickRaw
+        ? Array.from(
+            new Set(
+              quickRaw
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((p) => (p.startsWith("quick__") ? p : `quick__${p}`)),
+            ),
+          )
+        : [];
       const nextActive = { ...EMPTY_FILTERS };
       const nextDraft = { ...EMPTY_FILTERS };
       let changed = false;
+      if (quickStatusListQ.length > 0) {
+        nextActive.quickStatusList = quickStatusListQ;
+        nextDraft.quickStatusList = quickStatusListQ;
+        changed = true;
+      }
       if (stageQ) {
         const candidates = stageQ.split(",").map((s) => s.trim()).filter(Boolean);
         if (candidates.length) {
@@ -1137,6 +1192,29 @@ export function AtendimentoClient() {
     leads: AtendimentoLeadListItem[],
     f: LeadFilters,
   ): AtendimentoLeadListItem[] => {
+    // ================== FONTE 0 DA VERDADE: DIRETO DA URL (window.location) ==================
+    // User pediu explicitamente: "Muda a url, força o registro a aparecer".
+    // Essa é a garantia NUCLEAR. Mesmo que f.quickStatusList seja apagado por
+    // spread/reset acidental, SE A URL TIVER ?quickStatusList=quick__matriculado
+    // OU ?quick=matriculado, o filtro FUNCIONA MESMO ASSIM.
+    // ----------------------------------------------------------------------------------------
+    let urlQuickIds: string[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const qs = new URLSearchParams(window.location.search);
+        const raw = qs.get("quickStatusList") ?? qs.get("quick") ?? qs.get("qs") ?? "";
+        if (raw) {
+          const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+          for (const p of parts) {
+            if (!p) continue;
+            if (p.startsWith("quick__")) urlQuickIds.push(p);
+            else urlQuickIds.push(`quick__${p}`);
+          }
+          urlQuickIds = Array.from(new Set(urlQuickIds));
+        }
+      } catch {}
+    }
+    const hasQuickUrl = urlQuickIds.length > 0;
     const hasAnyFilter = (() => {
       const vals = [
         f.statusList.length,
@@ -1157,6 +1235,7 @@ export function AtendimentoClient() {
         f.bookingPhoneDigits ?? "",
         Array.isArray(f.bookingLeadIds) ? f.bookingLeadIds.length : 0,
         Array.isArray((f as any).quickStatusList) ? (f as any).quickStatusList.length : 0,
+        urlQuickIds.length,
       ];
       return vals.some((v) => (typeof v === "number" ? v > 0 : typeof v === "boolean" ? v : Boolean(String(v ?? "").trim())));
     })();
@@ -1501,7 +1580,11 @@ export function AtendimentoClient() {
       }
       return out;
     };
+    // FONTE 0 DA VERDADE (URL): injeta diretamente no quickSet, independente de tudo.
     const quickSet = new Set<string>();
+    if (hasQuickUrl) {
+      for (const id of urlQuickIds) quickSet.add(id);
+    }
     // FONTE 1: propriedade plana do objeto (mais seguro)
     const directArr = Array.isArray((f as any)?.quickStatusList) ? (f as any).quickStatusList as unknown[] : null;
     if (directArr && directArr.length) {
@@ -1882,10 +1965,39 @@ export function AtendimentoClient() {
 
   const filteredLeads = useMemo<AtendimentoLeadListItem[]>(() => {
     const q = searchQuery.trim().toLowerCase();
-    let out = applyFiltersToLeads(panelLeads, activeFilters);
+    // Força a injetar a leitura da URL DENTRO do objeto f também, além da leitura
+    // interna do applyFiltersToLeads. Dupla garantia.
+    const filtersWithQuickInjected: LeadFilters = { ...activeFilters };
+    if (typeof window !== "undefined") {
+      try {
+        const qs = new URLSearchParams(window.location.search);
+        const raw = qs.get("quickStatusList") ?? qs.get("quick") ?? qs.get("qs") ?? "";
+        if (raw) {
+          const parts = raw
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const ids: string[] = [];
+          for (const p of parts) {
+            if (!p) continue;
+            if (p.startsWith("quick__")) ids.push(p);
+            else ids.push(`quick__${p}`);
+          }
+          if (ids.length > 0) {
+            (filtersWithQuickInjected as any).quickStatusList = Array.from(new Set([
+              ...(Array.isArray((filtersWithQuickInjected as any).quickStatusList)
+                ? ((filtersWithQuickInjected as any).quickStatusList as string[])
+                : []),
+              ...ids,
+            ]));
+          }
+        }
+      } catch {}
+    }
+    let out = applyFiltersToLeads(panelLeads, filtersWithQuickInjected);
     if (!q) return out;
     return out.filter((l) => leadMatchesSearchQuery(l, q));
-  }, [panelLeads, searchQuery, activeFilters]);
+  }, [panelLeads, searchQuery, activeFilters, quickUrlForceTick]);
 
   useEffect(() => {
     setLeadListPage(1);
@@ -3728,16 +3840,18 @@ export function AtendimentoClient() {
             <button
               type="button"
               onClick={() => {
+                const currentQuickArr = Array.isArray((activeFilters as any).quickStatusList)
+                  ? ((activeFilters as any).quickStatusList as string[])
+                  : [];
+                const isAlunosJaLigado =
+                  currentQuickArr.length === 1 &&
+                  currentQuickArr[0] === "quick__matriculado";
+
+                let nextQuick: string[] = isAlunosJaLigado
+                  ? []
+                  : ["quick__matriculado"];
+
                 setActiveFilters((prev) => {
-                  const isAlunosJaLigado =
-                    Array.isArray((prev as any).quickStatusList) &&
-                    (prev as any).quickStatusList.length === 1 &&
-                    (prev as any).quickStatusList[0] === "quick__matriculado";
-
-                  let nextQuick: string[] = isAlunosJaLigado
-                    ? []
-                    : ["quick__matriculado"];
-
                   const next: LeadFilters = {
                     ...prev,
                     quickStatusList: nextQuick,
@@ -3761,19 +3875,88 @@ export function AtendimentoClient() {
                   next.createdFrom = prev.createdFrom;
                   next.createdTo = prev.createdTo;
                   next.quickStatusList = nextQuick;
-
-                  if (!hasAnyFilterActive(next)) {
-                    router.replace("/app/atendimento", { scroll: false });
-                  }
                   return next;
                 });
+
+                // =================== FORÇADOR NUCLEAR POR URL ===================
+                // User pediu explicitamente: "Muda a url, força o registro a aparecer, faz alguma coisa".
+                // O applyFiltersToLeads agora LER DIRETO de window.location.search também,
+                // então mesmo que algo apague o activeFilters.quickStatusList, se a URL
+                // tiver ?quickStatusList=quick__matriculado, ele filtra.
+                // Atualiza URL e chama handleRefresh + bump tick dupla garantia.
+                setTimeout(() => {
+                  if (typeof window === "undefined") return;
+                  const existing = new URLSearchParams(window.location.search);
+                  // Sempre remove params de filtro avançado rápido (evita cruzamento):
+                  existing.delete("stage");
+                  existing.delete("status");
+                  existing.delete("stageList");
+                  existing.delete("statusList");
+                  existing.delete("bookingLeadIds");
+                  existing.delete("bookingFrom");
+                  existing.delete("bookingTo");
+                  existing.delete("bookingProfessor");
+                  existing.delete("bookingPhone");
+                  existing.delete("bookingPN");
+                  existing.delete("from");
+                  existing.delete("to");
+                  if (nextQuick.length > 0) {
+                    existing.set("quickStatusList", nextQuick.join(","));
+                    existing.set("quick", nextQuick.map((q) => q.replace(/^quick__/, "")).join(","));
+                  } else {
+                    existing.delete("quickStatusList");
+                    existing.delete("quick");
+                    existing.delete("qs");
+                  }
+                  const qs = existing.toString();
+                  const nextHref = qs
+                    ? `/app/atendimento?${qs}`
+                    : "/app/atendimento";
+                  if (window.location.pathname + window.location.search !== nextHref) {
+                    router.replace(nextHref, { scroll: false });
+                  }
+                  // Bump imediato (não espera pelo useEffect de popstate):
+                  bumpQuickUrlForceTick();
+                }, 0);
+
+                // Força refetch da lista (refresh endpoint → novas renderizações
+                // → useMemo filteredLeads re-roda com o quickUrlForceTick novo):
+                setTimeout(() => {
+                  void handleRefresh();
+                }, 10);
+
+                // Se depois de tudo NÃO tem nenhum filtro ativo,
+                // garante volta pra URL base (já feito acima, segunda garantia):
+                if (nextQuick.length === 0) {
+                  setTimeout(() => {
+                    bumpQuickUrlForceTick();
+                  }, 20);
+                }
               }}
               aria-label="Mostrar apenas Alunos (matriculados na plataforma)"
               className={[
                 "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all shadow-none",
-                Array.isArray((activeFilters as any).quickStatusList) &&
-                (activeFilters as any).quickStatusList.length === 1 &&
-                (activeFilters as any).quickStatusList[0] === "quick__matriculado"
+                (() => {
+                  // Class ACTIVE também confere a URL (além do activeFilters):
+                  let activeQuick: string[] = [];
+                  if (typeof window !== "undefined") {
+                    try {
+                      const qs = new URLSearchParams(window.location.search);
+                      const raw = qs.get("quickStatusList") ?? qs.get("quick") ?? "";
+                      if (raw) {
+                        activeQuick = raw.split(",").map((s) => s.trim()).filter(Boolean).map((p) => p.startsWith("quick__") ? p : `quick__${p}`);
+                      }
+                    } catch {}
+                  }
+                  const fromState =
+                    Array.isArray((activeFilters as any).quickStatusList) &&
+                    (activeFilters as any).quickStatusList.length === 1 &&
+                    (activeFilters as any).quickStatusList[0] === "quick__matriculado";
+                  const fromUrl =
+                    activeQuick.length === 1 &&
+                    activeQuick[0] === "quick__matriculado";
+                  return fromState || fromUrl;
+                })()
                   ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.12)] text-[#9a3412] hover:bg-[rgba(234,88,12,0.18)]"
                   : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60",
               ].join(" ")}
