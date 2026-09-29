@@ -3279,6 +3279,33 @@ export function AtendimentoClient() {
                 showLabel={false}
                 size="icon"
                 iconActive="auto"
+                onClearButtonClick={() => {
+                  // ================================================================
+                  // BOTÃO "Limpar" DENTRO DO POPOVER DO CALENDÁRIO DE CADASTRO
+                  // (ao lado direito da seta "mês anterior").
+                  //
+                  // AÇÃO OBRIGATÓRIA DO USUÁRIO:
+                  //  (1) Limpar TODO o histórico e filtros relacionados à busca por
+                  //      período de cadastro. (Isso já foi feito no onChange({from:null,
+                  //      to:null}) do botão Limpar do AppDateRangePicker, que chama o
+                  //      handler onChange acima setando createdFrom/To vazios e limpando
+                  //      booking*.)
+                  //
+                  //  (2) Voltar a URL para o estado PADRÃO, sem query params, sem
+                  //      filtros, sem informações da busca anterior:
+                  //      → https://www.autobot.business/app/atendimento
+                  //
+                  // OBS: a sequencia de disparos no onclick do botao Limpar dentro
+                  // do AppDateRangePicker e':
+                  //   onChange({from:null,to:null})  → limpa created + booking*
+                  //   setOpen(false)                 → fecha popover
+                  //   onClearButtonClick()           → (AQUI) router.replace
+                  // Por isso NAO precisamos tocar em setActiveFilters aqui de novo,
+                  // o onChange acima ja cuidou de tudo e manteve 9 campos avançados
+                  // intactos, com garantia redundante for (k of ADVANCED_FILTER_KEYS).
+                  // ================================================================
+                  router.replace("/app/atendimento", { scroll: false });
+                }}
               />
             </div>
             {/* FILTROS AVANCADOS: ao lado ESQUERDO de Adicionar registro (+) */}

@@ -42,6 +42,19 @@ type AppDateRangePickerProps = {
   size?: "full" | "icon";
   /** cor do anel ativador (padrão: cinza neutro igual refresh. Passar true para laranja quando há filtro ativo. Default: só se tiver from/to preenchido */
   iconActive?: boolean | "auto";
+  /**
+   * Chamado quando o usuário clica no botão "Limpar" DENTRO do popover
+   * (ao lado direito da seta "mês anterior").
+   *
+   * Responsabilidade dessa callback (implementada pelo componente PAI):
+   *  - Limpar TODO o histórico de busca / filtros do calendario.
+   *  - Voltar a URL para /app/atendimento (sem params).
+   *
+   * Quando esta prop NÃO existir → o botão "Limpar" NÃO É renderizado.
+   * Ex: calendario de aulas (size=full, programacao diaria) NAO passa
+   * essa prop → nao aparece o botao.
+   */
+  onClearButtonClick?: () => void;
 };
 
 function parseToDate(s: string | null): Date | null {
@@ -78,6 +91,7 @@ export function AppDateRangePicker({
   id,
   size = "full",
   iconActive = "auto",
+  onClearButtonClick,
 }: AppDateRangePickerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -399,14 +413,43 @@ export function AppDateRangePicker({
     >
         {/* Header: mês/ano + setas + X fechar */}
         <div className="flex items-center justify-between gap-3 pb-4">
-          <button
-            type="button"
-            onClick={() => setViewDate((v) => addMonths(v, -1))}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
-            aria-label="Mês anterior"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setViewDate((v) => addMonths(v, -1))}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            {/* Botão "Limpar" — SÓ aparece se o componente PAI passar
+                a prop onClearButtonClick. Ou seja: calendario de periodo
+                de cadastro (size="icon") passa; calendario de aulas
+                (size="full" programacao diaria) NÃO passa → NÃO mostra. */}
+            {typeof onClearButtonClick === "function" && (
+              <button
+                type="button"
+                onClick={() => {
+                  // 1) Limpa seleção do popover e dispara onChange vazio
+                  //    para sincronizar o estado do componente pai.
+                  onChange({ from: null, to: null });
+                  // 2) Fecha o popover.
+                  setOpen(false);
+                  // 3) Dispara callback do PAI que:
+                  //    - limpa TODO historico/filtros relacionados ao calendario
+                  //    - faz router.replace('/app/atendimento')
+                  onClearButtonClick();
+                }}
+                // Estilo pill minimalista do projeto (13px font-semibold,
+                // h-11 igual ao das setas, borda, bg hover sutil).
+                // Tamanho: 13px, semibold, bordas arredondadas generosas mas
+                // nao full. Alinhamento horizontal com o chevron.
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold tracking-tight text-[var(--app-text-80)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-95)] transition-colors"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
           <div className="flex-1 text-center text-[17px] font-extrabold text-[var(--app-text-90)] tracking-tight">
             {format(viewDate, "MMMM 'de' yyyy", { locale: ptBR })}
           </div>
