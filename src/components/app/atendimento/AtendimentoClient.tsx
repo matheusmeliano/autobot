@@ -3132,12 +3132,54 @@ export function AtendimentoClient() {
               <button
                 type="button"
                 onClick={() => {
-                  // "Limpar" SÓ TOCA NO DRAFT (estados visuais do modal).
-                  // NUNCA toca em setActiveFilters — a lista ATIVA NÃO é
-                  // alterada. Para aplicar a limpeza, o usuário deve clicar
-                  // no botão "Aplicar" em seguida (que lê o draft vazio e
-                  // então altera activeFilters).
+                  // ================================================================
+                  // BOTÃO "Limpar" DO RODAPÉ DO MODAL DE FILTROS AVANÇADOS.
+                  // REGRA NOVA DO USUÁRIO: NÃO DEPENDE MAIS DE "Aplicar".
+                  // A limpeza é APLICADA IMEDIATAMENTE — ao clicar em Limpar,
+                  // a lista atualiza NA HORA, o draft também é limpo e o
+                  // modal fecha.
+                  //
+                  // AÇÕES:
+                  //   (1) Limpa SÓ OS 9 CAMPOS do filtro avançado (suas áreas)
+                  //       + Limpa booking* (filtro "Ver" do modal programação).
+                  //   (2) PRESERVA createdFrom/createdTo (período de cadastro
+                  //       selecionado no calendário header) — com GARANTIA
+                  //       REDUNDANTE de reassinatura.
+                  //   (3) Limpa draftFilters também (estado visual do modal,
+                  //       caso reabra os toggles/selects estão limpos).
+                  //   (4) Fecha o modal imediatamente após o clique.
+                  //   (5) Se após a limpeza NÃO HOUVER NENHUM filtro ativo
+                  //       em NENHUMA área (nem created, nem booking, nem 9
+                  //       avançados) → volta URL para /app/atendimento.
+                  // ================================================================
+                  setActiveFilters((prev) => {
+                    const next: LeadFilters = {
+                      ...prev,
+                      ...EMPTY_ADVANCED_FILTERS,
+                      bookingDateFrom: "",
+                      bookingDateTo: "",
+                      bookingProfessorName: "",
+                      bookingPhone: "",
+                      bookingPN: false,
+                      bookingLeadIds: [],
+                    };
+                    // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
+                    next.createdFrom = prev.createdFrom;
+                    next.createdTo = prev.createdTo;
+                    // ---------------------------------------------------------
+                    // Se nada mais estiver ativo, volta para a URL base
+                    if (!hasAnyFilterActive(next)) {
+                      router.replace("/app/atendimento", { scroll: false });
+                    }
+                    return next;
+                  });
+                  // Reseta também o estado visual DRAFT do modal (campos internos)
+                  // para quando reabrir não ficar nenhum toggle marcado residual.
                   setDraftFilters({ ...EMPTY_FILTERS });
+                  // Fecha o modal IMEDIATAMENTE — limpar já é aplicado, não
+                  // precisa permanecer aberto (equivalente a clicar em Aplicar
+                  // com todos os campos limpos).
+                  setShowFiltersModal(false);
                 }}
                 className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-95)] transition-colors w-full sm:w-auto"
               >
