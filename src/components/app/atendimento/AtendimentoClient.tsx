@@ -1478,13 +1478,68 @@ export function AtendimentoClient() {
     // - quick__matricula_incompleta   : iniciou matrícula (stage/status pré-matrícula) mas NÃO concluída
     // - quick__matriculado            : matrícula CONCLUÍDA (aluno / contrato assinado / enrollment etc)
     // ================================================================================================
-    const quickRaw = (f as any)?.quickStatusList as string[] | string | undefined;
-    const quickArr: string[] = quickRaw
-      ? Array.isArray(quickRaw)
-        ? (quickRaw as string[])
-        : [String(quickRaw)]
-      : [];
-    const quickSet = new Set(quickArr.map((s) => String(s ?? "").trim()).filter(Boolean));
+    //
+    // BUILD DIRETO SEM CASTS AMBÍGUOS.
+    // hasAnyFilter acima lê (f as any).quickStatusList diretamente e dá true mesmo quando o quickSet
+    // (antes construído por cast string[]|string) ficava size=0. Isso causava o bug "botão laranja mas
+    // lista continuava igual" — pipeline não retornava cedo, filter body não entrava no quick pois
+    // quickSet.size === 0, e todos os outros filtros estavam vazios → todo mundo passava.
+    // Agora: 3 camadas de fallback + re-check dentro do filter body.
+    const buildQuickSetFromSource = (src: unknown): Set<string> => {
+      const out = new Set<string>();
+      if (!src) return out;
+      if (Array.isArray(src)) {
+        for (const raw of src) {
+          const k = String(raw ?? "").trim();
+          if (k) out.add(k);
+        }
+        if (out.size > 0) return out;
+      }
+      if (typeof src === "string") {
+        const k = src.trim();
+        if (k) out.add(k);
+      }
+      return out;
+    };
+    const quickSet = new Set<string>();
+    // FONTE 1: propriedade plana do objeto (mais seguro)
+    const directArr = Array.isArray((f as any)?.quickStatusList) ? (f as any).quickStatusList as unknown[] : null;
+    if (directArr && directArr.length) {
+      for (const raw of directArr) {
+        const k = String(raw ?? "").trim();
+        if (k) quickSet.add(k);
+      }
+    }
+    // FONTE 2: fallback por Object.getOwnPropertyDescriptor (caso spread perca a propriedade mas o objeto ainda a tenha — só segurança)
+    if (quickSet.size === 0 && f && typeof f === "object") {
+      try {
+        const ownDesc = Object.prototype.hasOwnProperty.call(f, "quickStatusList");
+        if (ownDesc) {
+          const src2 = (f as Record<string, unknown>)["quickStatusList"];
+          const tmp = buildQuickSetFromSource(src2);
+          tmp.forEach((k) => quickSet.add(k));
+        }
+      } catch {}
+    }
+    // FONTE 3: fallback cast antigo (redundante, segurança)
+    if (quickSet.size === 0) {
+      try {
+        const quickRaw = (f as any)?.quickStatusList as string[] | string | undefined;
+        const tmp = buildQuickSetFromSource(quickRaw);
+        tmp.forEach((k) => quickSet.add(k));
+      } catch {}
+    }
+    // FONTE 4: ÚLTIMA GARANTIA — checa keys "quick__*" em Object.keys(f) e values (nunca se sabe — catch-all total)
+    if (quickSet.size === 0 && f && typeof f === "object") {
+      try {
+        for (const [k, v] of Object.entries(f as Record<string, unknown>)) {
+          if (k.startsWith("quick")) {
+            const tmp = buildQuickSetFromSource(v);
+            tmp.forEach((x) => quickSet.add(x));
+          }
+        }
+      } catch {}
+    }
 
     const stageAndStatusNorm = (l: AtendimentoLeadListItem) => {
       const s1 = String(l.funnel_stage ?? "").trim().toLowerCase();
@@ -1667,14 +1722,45 @@ export function AtendimentoClient() {
     };
 
     return leads.filter((l) => {
-      if (quickSet.size > 0) {
+      // ===== GARANTIA DE ÚLTIMA INSTÂNCIA (ANTES DE CADA LEAD) =====
+      // Se o build inicial do quickSet deu 0 mas a propriedade quickStatusList TEM CONTEÚDO
+      // (bug do cast ambíguo → tem que já estar resolvido com as 4 fontes acima),
+      // reconstruímos o quickSet AGORA antes de avaliar o lead.
+      // Depois de tudo, se quickSet ainda for 0 MAS tem algo em quickStatusList →
+      // CAI FORA (return false) p/ evitar cair no bug "todo mundo passa pq stageList/statusList vazios".
+      const hasQuickDirect = (() => {
+        try {
+          const arr = Array.isArray((f as any).quickStatusList) ? (f as any).quickStatusList as unknown[] : null;
+          if (arr && arr.length > 0) return true;
+          const s = String((f as any).quickStatusList ?? "").trim();
+          return Boolean(s);
+        } catch {
+          return false;
+        }
+      })();
+      if (quickSet.size === 0 && hasQuickDirect) {
+        try {
+          const arr = Array.isArray((f as any).quickStatusList) ? (f as any).quickStatusList as unknown[] : null;
+          if (arr && arr.length) {
+            for (const raw of arr) {
+              const k = String(raw ?? "").trim();
+              if (k) quickSet.add(k);
+            }
+          } else {
+            const s = String((f as any).quickStatusList ?? "").trim();
+            if (s) quickSet.add(s);
+          }
+        } catch {}
+      }
+      const quickActive = quickSet.size > 0 || hasQuickDirect;
+      if (quickActive) {
         let ok = false;
         const [st, fs] = stageAndStatusNorm(l);
-        if (quickSet.has("quick__experimental_agendada")) {
+        if (quickSet.has("quick__experimental_agendada") || (hasQuickDirect && String((f as any).quickStatusList ?? "").includes("quick__experimental_agendada"))) {
           const flatAgendada = st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
           if (hasValidExperimentalBooking(l) || flatAgendada) ok = true;
         }
-        if (quickSet.has("quick__experimental_incompleta")) {
+        if (quickSet.has("quick__experimental_incompleta") || (hasQuickDirect && String((f as any).quickStatusList ?? "").includes("quick__experimental_incompleta"))) {
           const ehAgendada = (() => {
             const flatAgendada =
               st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
@@ -1716,10 +1802,10 @@ export function AtendimentoClient() {
             ok = true;
           }
         }
-        if (quickSet.has("quick__matricula_incompleta")) {
+        if (quickSet.has("quick__matricula_incompleta") || (hasQuickDirect && String((f as any).quickStatusList ?? "").includes("quick__matricula_incompleta"))) {
           if (isMatriculaIncompleta(l) && !isMatriculado(l)) ok = true;
         }
-        if (quickSet.has("quick__matriculado")) {
+        if (quickSet.has("quick__matriculado") || (hasQuickDirect && String((f as any).quickStatusList ?? "").includes("quick__matriculado"))) {
           if (isMatriculado(l)) ok = true;
         }
         if (!ok) return false;
