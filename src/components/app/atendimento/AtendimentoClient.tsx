@@ -525,6 +525,7 @@ export function AtendimentoClient() {
   // aula (booking*) são COMPARTILHADOS com outros componentes e NUNCA devem ser
   // tocados pelo filtro avançado — garante independência TOTAL entre eles.
   const ADVANCED_FILTER_KEYS = [
+    "quickStatusList",
     "statusList",
     "stageList",
     "countries",
@@ -538,6 +539,7 @@ export function AtendimentoClient() {
   type AdvancedFilterKey = (typeof ADVANCED_FILTER_KEYS)[number];
 
   type LeadFilters = {
+    quickStatusList?: string[];
     statusList: string[];
     stageList: string[];
     countries: string[];
@@ -558,8 +560,10 @@ export function AtendimentoClient() {
     bookingPhone?: string;
     bookingPN?: boolean;
     bookingLeadIds?: string[];
+    bookingPhoneDigits?: string;
   };
   const EMPTY_FILTERS: LeadFilters = {
+    quickStatusList: [],
     statusList: [],
     stageList: [],
     countries: [],
@@ -577,10 +581,12 @@ export function AtendimentoClient() {
     bookingPhone: "",
     bookingPN: false,
     bookingLeadIds: [],
+    bookingPhoneDigits: "",
   };
-  // EMPTY_ADVANCED_FILTERS: objeto com SÓ os 9 campos do filtro avançado, todos vazios.
+  // EMPTY_ADVANCED_FILTERS: objeto com SÓ os 9+1 campos do filtro avançado, todos vazios.
   // Usado para iniciar um draft novo SEM herdar valores do calendário (createdFrom/createdTo etc).
   const EMPTY_ADVANCED_FILTERS: Pick<LeadFilters, AdvancedFilterKey> = {
+    quickStatusList: [],
     statusList: [],
     stageList: [],
     countries: [],
@@ -1138,183 +1144,8 @@ export function AtendimentoClient() {
     const statusMatches = (statusId: string, l: AtendimentoLeadListItem): boolean => {
       const st = String(l.status ?? "").trim().toLowerCase();
       const fs = String(l.funnel_stage ?? "").trim().toLowerCase();
-      const rcs = String((l as any)?.recurring_class_status ?? "").trim().toLowerCase();
       const sid = String(statusId ?? "").trim().toLowerCase();
       if (!sid) return false;
-      if (sid === "aluno") {
-        return (
-          st === "matriculado" ||
-          fs === "matriculado" ||
-          st === "aluno" ||
-          fs === "aluno" ||
-          fs === "aluno_recorrente_cadastrado" ||
-          st === "aluno_recorrente_cadastrado" ||
-          st === "cadastro_recorrente_pendente_plataforma" ||
-          fs === "cadastro_recorrente_pendente_plataforma" ||
-          st === "contrato_assinado" ||
-          fs === "contrato_assinado" ||
-          st === "contrato_aguardando_aceite" ||
-          fs === "contrato_aguardando_aceite" ||
-          st === "contrato_coletando_dados" ||
-          fs === "contrato_coletando_dados" ||
-          st === "matricula_confirmada" ||
-          fs === "matricula_confirmada" ||
-          rcs === "confirmado" ||
-          rcs === "cadastro_plataforma_pendente"
-        );
-      }
-      if (sid === "contrato_assinado") {
-        return (
-          st === "contrato_assinado" ||
-          fs === "contrato_assinado" ||
-          Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status)
-        );
-      }
-      if (sid === "aula_experimental_agendada") {
-        return (
-          st === "aula_experimental_agendada" ||
-          fs === "aula_experimental_agendada" ||
-          Boolean(
-            (l as any)?.future_experimental_class_booking ??
-              (l as any)?.latest_experimental_class_booking ??
-              (l as any)?.experimental_class_booking,
-          )
-        );
-      }
-      if (sid === "experimental_class_incomplete") {
-        const debug: Record<string, unknown> = { id: String((l as any)?.id ?? "?") };
-        const EXCLUDE_STAGES = new Set([
-          "pre_cadastro_concluido",
-          "matricula_pendente",
-          "matricula_pendente_recusada",
-          "cadastro_recorrente_pendente_plataforma",
-          "contrato_coletando_dados",
-          "contrato_aguardando_aceite",
-          "contrato_assinado",
-          "aluno_recorrente_cadastrado",
-          "pagamento_pendente_confirmacao",
-          "pagamento_nao_realizado",
-          "matricula_confirmada",
-          "matriculado",
-          "aluno",
-          "encerrado",
-          "repescagem",
-        ]);
-        const stNorm = String(st ?? "").trim().toLowerCase();
-        const fsNorm = String(fs ?? "").trim().toLowerCase();
-        debug.st = stNorm || "(vazio)";
-        debug.fs = fsNorm || "(vazio)";
-        if (EXCLUDE_STAGES.has(stNorm) || EXCLUDE_STAGES.has(fsNorm)) {
-          debug.excluded = "stage_post";
-          console.debug("[incompletas] OUT:", debug);
-          return false;
-        }
-
-        const isAluno =
-          Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status) ||
-          Boolean((l as any)?.enrollment_number);
-        if (isAluno) {
-          debug.excluded = "is_aluno_marker";
-          console.debug("[incompletas] OUT:", debug);
-          return false;
-        }
-
-        const hasValidRealBooking = (() => {
-          if ((l as any)?.future_experimental_class_booking) {
-            const fsB = String(((l as any)?.future_experimental_class_booking as any)?.status ?? "")
-              .trim()
-              .toLowerCase();
-            if (fsB && fsB !== "cancelled") return true;
-          }
-          const booking =
-            (l as any)?.latest_experimental_class_booking ??
-            (l as any)?.experimental_class_booking;
-          if (!booking) return false;
-          const bStatus = String(booking?.status ?? "").trim().toLowerCase();
-          const attendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
-          const sourceOk = String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
-          const isBookedValid = ["booked", "confirmed", "professor_confirmed", "lead_confirmed"].includes(
-            bStatus,
-          );
-          const isAttended = attendance === "attended";
-          const isCancelledOrDraft =
-            bStatus === "cancelled" ||
-            bStatus === "draft" ||
-            attendance === "no_show" ||
-            bStatus === "date_selected" ||
-            bStatus === "time_selected" ||
-            !sourceOk;
-          if (isCancelledOrDraft) return false;
-          return isBookedValid || isAttended;
-        })();
-        const isExplicitlyAgendada =
-          stNorm === "aula_experimental_agendada" || fsNorm === "aula_experimental_agendada";
-        if (hasValidRealBooking || isExplicitlyAgendada) {
-          debug.excluded = "valid_booking_ou_agendada";
-          debug.hasValidRealBooking = hasValidRealBooking;
-          debug.isExplicitlyAgendada = isExplicitlyAgendada;
-          console.debug("[incompletas] OUT:", debug);
-          return false;
-        }
-
-        try {
-          const expMeta = buildExperimentalMetaForList(l as any);
-          const recMeta = buildRecurringMetaForVisaoGeral(l as any);
-          const anyWarning = expMeta?.tone === "warning" || recMeta?.tone === "warning";
-          if (anyWarning) {
-            debug.included = "tone_warning";
-            debug.expLabel = expMeta?.label;
-            debug.recTitle = recMeta?.title;
-            console.debug("[incompletas] IN:", debug);
-            return true;
-          }
-        } catch {
-          // fallback abaixo
-        }
-
-        const missingName = !String((l as any)?.full_name ?? (l as any)?.name ?? "").trim();
-        const missingLocation =
-          !String((l as any)?.country ?? "").trim() ||
-          !String((l as any)?.state ?? "").trim() ||
-          !String((l as any)?.city ?? "").trim();
-        const missingContact =
-          !String((l as any)?.phone ?? "").trim() && !String((l as any)?.email ?? "").trim();
-        const missingExperimental =
-          !String((l as any)?.experimental_class_date ?? (l as any)?.experimental_class_professor_date ?? (l as any)?.experimental_class_lead_date ?? "").trim() ||
-          !String((l as any)?.experimental_class_time ?? (l as any)?.experimental_class_professor_time ?? (l as any)?.experimental_class_lead_time ?? "").trim() ||
-          !String((l as any)?.experimental_class_teacher ?? (l as any)?.experimental_class_professor_name ?? (l as any)?.experimental_class_teacher_name ?? "").trim();
-        const hasExperimentalJourneyMarker =
-          Boolean((l as any)?.time_selected_at) ||
-          Boolean((l as any)?.lead_selected_at) ||
-          Boolean((l as any)?.professor_confirmed_at) ||
-          Boolean((l as any)?.teacher_selected_at) ||
-          Boolean((l as any)?.experimental_class_status) ||
-          stNorm.startsWith("aula_experimental") ||
-          fsNorm.startsWith("aula_experimental");
-        const earlyFunnel = new Set([
-          "novo_lead",
-          "em_atendimento",
-          "metodologia_apresentada",
-          "aula_experimental_convidada",
-          "",
-        ]);
-        const hasEarlyStage = earlyFunnel.has(stNorm) || earlyFunnel.has(fsNorm);
-        if (hasEarlyStage || missingName || missingLocation || missingContact || missingExperimental || hasExperimentalJourneyMarker) {
-          debug.included = "marker";
-          debug.hasEarlyStage = hasEarlyStage;
-          debug.missingName = missingName;
-          debug.missingLocation = missingLocation;
-          debug.missingContact = missingContact;
-          debug.missingExperimental = missingExperimental;
-          debug.hasExperimentalJourneyMarker = hasExperimentalJourneyMarker;
-          console.debug("[incompletas] IN:", debug);
-          return true;
-        }
-
-        debug.included = "fallback_final";
-        console.debug("[incompletas] IN:", debug);
-        return true;
-      }
       return st === sid || fs === sid;
     };
 
@@ -1620,7 +1451,116 @@ export function AtendimentoClient() {
       );
     };
 
+    // ==================== NOVA REGRA DO ZERO: STATUS QUICK (4 opções sintéticas) ====================
+    // - quick__experimental_agendada  : tem aula experimental válida agendada (não cancelada)
+    // - quick__experimental_incompleta: NÃO É (agendada válida / matrícula incompleta / matriculado)
+    //                                   → todo lead do funil que ainda não concluiu experimental
+    // - quick__matricula_incompleta   : iniciou matrícula (stage/status pré-matrícula) mas NÃO concluída
+    // - quick__matriculado            : matrícula CONCLUÍDA (aluno / contrato assinado / enrollment etc)
+    // ================================================================================================
+    const quickRaw = (f as any)?.quickStatusList as string[] | string | undefined;
+    const quickArr: string[] = quickRaw
+      ? Array.isArray(quickRaw)
+        ? (quickRaw as string[])
+        : [String(quickRaw)]
+      : [];
+    const quickSet = new Set(quickArr.map((s) => String(s ?? "").trim()).filter(Boolean));
+
+    const stageAndStatusNorm = (l: AtendimentoLeadListItem) => {
+      const s1 = String(l.funnel_stage ?? "").trim().toLowerCase();
+      const s2 = String((l as any)?.status ?? "").trim().toLowerCase();
+      return [s1, s2];
+    };
+    const hasValidExperimentalBooking = (l: AtendimentoLeadListItem): boolean => {
+      const fb = (l as any)?.future_experimental_class_booking as any;
+      if (fb) {
+        const s = String(fb?.status ?? "").trim().toLowerCase();
+        if (s && s !== "cancelled") return true;
+      }
+      const booking =
+        ((l as any)?.latest_experimental_class_booking as any) ??
+        ((l as any)?.experimental_class_booking as any);
+      if (!booking) return false;
+      const bStatus = String(booking?.status ?? "").trim().toLowerCase();
+      const attendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
+      const source = String(booking?.source ?? "draft").trim().toLowerCase();
+      if (source === "draft" || !bStatus || bStatus === "draft") return false;
+      if (bStatus === "cancelled" || attendance === "no_show") return false;
+      if (["booked", "confirmed", "professor_confirmed", "lead_confirmed"].includes(bStatus)) return true;
+      if (attendance === "attended") return true;
+      return false;
+    };
+    const isMatriculado = (l: AtendimentoLeadListItem): boolean => {
+      const [st, fs] = stageAndStatusNorm(l);
+      const terminalStage = new Set([
+        "matricula_confirmada",
+        "matriculado",
+        "aluno",
+        "aluno_recorrente_cadastrado",
+        "contrato_assinado",
+      ]);
+      if (terminalStage.has(st) || terminalStage.has(fs)) return true;
+      if (
+        Boolean((l as any)?.enrollment_number) ||
+        Boolean((l as any)?.contract_signed_at) ||
+        String((l as any)?.contract_status ?? "").trim()
+      ) {
+        return true;
+      }
+      return false;
+    };
+    const isMatriculaIncompleta = (l: AtendimentoLeadListItem): boolean => {
+      const [st, fs] = stageAndStatusNorm(l);
+      const incompletos = new Set([
+        "pre_cadastro_concluido",
+        "matricula_pendente",
+        "matricula_pendente_recusada",
+        "cadastro_recorrente_pendente_plataforma",
+        "contrato_coletando_dados",
+        "contrato_aguardando_aceite",
+        "pagamento_pendente_confirmacao",
+        "pagamento_nao_realizado",
+      ]);
+      if (incompletos.has(st) || incompletos.has(fs)) return true;
+      const hasStartMarker =
+        Boolean((l as any)?.contract_created_at) ||
+        Boolean((l as any)?.proposta_aceita_em) ||
+        Boolean((l as any)?.pre_cadastro_completed_at) ||
+        Boolean((l as any)?.pagamento_pendente_valor);
+      if (hasStartMarker && !isMatriculado(l)) return true;
+      return false;
+    };
+
     return leads.filter((l) => {
+      if (quickSet.size > 0) {
+        let ok = false;
+        const [st, fs] = stageAndStatusNorm(l);
+        if (quickSet.has("quick__experimental_agendada")) {
+          const flatAgendada = st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
+          if (hasValidExperimentalBooking(l) || flatAgendada) ok = true;
+        }
+        if (quickSet.has("quick__experimental_incompleta")) {
+          const ehAgendada = (() => {
+            const flatAgendada =
+              st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
+            return hasValidExperimentalBooking(l) || flatAgendada;
+          })();
+          const ehMatriculadoFinal = isMatriculado(l);
+          const ehMatriculaIncompletaAgora = isMatriculaIncompleta(l);
+          const terminalFora = new Set(["encerrado", "repescagem"]);
+          const isTerminalFora = terminalFora.has(st) || terminalFora.has(fs);
+          if (!isTerminalFora && !ehAgendada && !ehMatriculadoFinal && !ehMatriculaIncompletaAgora) {
+            ok = true;
+          }
+        }
+        if (quickSet.has("quick__matricula_incompleta")) {
+          if (isMatriculaIncompleta(l) && !isMatriculado(l)) ok = true;
+        }
+        if (quickSet.has("quick__matriculado")) {
+          if (isMatriculado(l)) ok = true;
+        }
+        if (!ok) return false;
+      }
       if (f.statusList.length > 0 && !f.statusList.some((sid) => statusMatches(sid, l))) return false;
       if (f.stageList.length > 0 && !f.stageList.some((sid) => statusMatches(sid, l))) return false;
       if (f.countries.length > 0 && !f.countries.includes(String(l.country ?? "").trim())) return false;
@@ -3039,31 +2979,73 @@ export function AtendimentoClient() {
   }
 
   function renderFiltersModal() {
-    // Opcoes dinâmicas a partir dos leads carregados
-    // OPCOES ESSENCIAIS (ENXUGADAS): remove duplicadas/repetidas/menos usadas
-    // STATUS: foco em status do processo de matricula (pagamento, contrato, aluno, encerrado, etc)
-    const STATUS_ALLOWLIST = new Set([
-      "aluno",
-    ]);
-    // ETAPA DO FUNIL: foco no caminho do aluno (convidado → agendada → pré-cadastro etc); REMOVIDOS que ja aparecem em STATUS acima
-    const STAGE_ALLOWLIST = new Set([
-      "aula_experimental_agendada",
-    ]);
+    // ==================== NOVO SISTEMA DE STATUS (RECRIADO DO ZERO) ====================
+    // 4 opções sintéticas, divididas em 2 grupos visuais.
+    //
+    // GRUPO 1 — Aulas Experimentais:
+    //   (1) Aulas Experimentais Agendadas
+    //   (2) Aulas Experimentais Incompletas
+    //
+    // GRUPO 2 — Matrícula:
+    //   (3) Matrículas Incompletas
+    //   (4) Matriculados
+    //
+    // RADIO: só uma opção selecionada por vez (exclusivo).
+    // Nenhum reuso do stageOptions/statusOptions antigo.
+    // ==================================================================================
+    const STATUS_QUICK_OPTIONS: Array<{
+      id: string;
+      label: string;
+      group: "Aulas Experimentais" | "Matrícula";
+    }> = [
+      { id: "quick__experimental_agendada", label: "Aulas Experimentais Agendadas", group: "Aulas Experimentais" },
+      { id: "quick__experimental_incompleta", label: "Aulas Experimentais Incompletas", group: "Aulas Experimentais" },
+      { id: "quick__matricula_incompleta", label: "Matrículas Incompletas", group: "Matrícula" },
+      { id: "quick__matriculado", label: "Matriculados", group: "Matrícula" },
+    ];
+    const quickSelected: string = (() => {
+      const raw = (draftFilters as any)?.quickStatusList as string[] | string | undefined;
+      if (!raw) return "";
+      const arr = Array.isArray(raw) ? raw : [String(raw)];
+      return arr[0] ?? "";
+    })();
+    const toggleQuickStatus = (id: string) => {
+      setDraftFilters((p) => {
+        const prevRaw = (p as any)?.quickStatusList as string[] | string | undefined;
+        const prevArr: string[] = prevRaw
+          ? Array.isArray(prevRaw)
+            ? prevRaw
+            : [String(prevRaw)]
+          : [];
+        const jaSelecionado = prevArr.includes(id);
+        const nextArr = jaSelecionado ? [] : [id];
+        return {
+          ...p,
+          quickStatusList: nextArr as any,
+          statusList: [],
+          stageList: [],
+          bookingLeadIds: undefined as any,
+          bookingDateFrom: undefined as any,
+          bookingDateTo: undefined as any,
+          bookingProfessorName: undefined as any,
+          bookingPhone: undefined as any,
+          bookingPhoneDigits: undefined as any,
+        };
+      });
+    };
+    const quickGroups = new Map<string, Array<{ id: string; label: string }>>();
+    for (const opt of STATUS_QUICK_OPTIONS) {
+      const arr = quickGroups.get(opt.group) ?? [];
+      arr.push({ id: opt.id, label: opt.label });
+      quickGroups.set(opt.group, arr);
+    }
+
     const countryOptions = Array.from(
       new Set(panelLeads.map((l) => String(l.country ?? "").trim()).filter(Boolean)),
     ).sort();
     const stateOptions = Array.from(
       new Set(panelLeads.map((l) => String(l.state ?? "").trim()).filter(Boolean)),
     ).sort();
-    const statusOptions = Object.entries(STATUS_LABELS)
-      .filter(([id, label]) => STATUS_ALLOWLIST.has(id) && Boolean(id) && Boolean(String(label ?? "").trim()))
-      .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR"));
-    const stageOptions = [
-      ...Object.entries(STAGE_LABELS)
-        .filter(([id, label]) => STAGE_ALLOWLIST.has(id) && Boolean(id) && Boolean(String(label ?? "").trim()))
-        .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR")),
-      ["experimental_class_incomplete", "Aulas Experimentais Incompletas"] as const,
-    ];
 
     const toggle = (key: keyof LeadFilters, value: string) => {
       setDraftFilters((prev) => {
@@ -3080,6 +3062,12 @@ export function AtendimentoClient() {
     );
 
     function headerPill(title: string, items: string[], key: keyof LeadFilters) {
+      const quickLabels: Record<string, string> = {
+        quick__experimental_agendada: "Aulas Experimentais Agendadas",
+        quick__experimental_incompleta: "Aulas Experimentais Incompletas",
+        quick__matricula_incompleta: "Matrículas Incompletas",
+        quick__matriculado: "Matriculados",
+      };
       return (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--app-text-60)] mr-1">
@@ -3090,18 +3078,24 @@ export function AtendimentoClient() {
           ) : (
             items.map((v) => {
               const label =
-                key === "statusList"
+                key === "quickStatusList"
+                  ? quickLabels[v] ?? v
+                  : key === "statusList"
                   ? STATUS_LABELS[v] ?? v
                   : key === "stageList"
                   ? v === "experimental_class_incomplete"
                     ? "Aulas Experimentais Incompletas"
                     : STAGE_LABELS[v] ?? v
                   : v;
+              const toggleFn =
+                key === "quickStatusList"
+                  ? () => toggleQuickStatus(v)
+                  : () => toggle(key, v);
               return (
                 <button
                   key={v}
                   type="button"
-                  onClick={() => toggle(key, v)}
+                  onClick={toggleFn}
                   className="inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                 >
                   {label}
@@ -3170,88 +3164,38 @@ export function AtendimentoClient() {
             </button>
           </div>
 
-          {/* Conteudo filtros: MINIMALISTA — padding igual calendário (px-5), gap médio, sem fundos especiais */}
-          <div className="flex flex-1 min-h-0 w-full flex-col gap-4 overflow-y-auto overscroll-contain px-5 pt-4 pb-3">
-            {/* BLOCO 1: Status (igual header dias semana do calendário) */}
-            <div className="flex flex-col gap-2.5">
-              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--app-text-55)] pl-0.5">
-                Status
-              </div>
-              {/* Grupo: fundo TRANSPARENTE (igual grid dias), padding minimo, borda IGUAL calendário */}
-              <div className="flex flex-col gap-1.5">
-                {/* Aula Experimental Agendada (stage) — RADIO */}
-                {stageOptions.map(([id, label]) => {
-                  const lbl = String(label ?? id ?? "").trim() || String(id);
-                  const sel = draftFilters.stageList.includes(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        const jaSelecionado = draftFilters.stageList.includes(id);
-                        setDraftFilters((p) => ({
-                          ...p,
-                          statusList: [],
-                          stageList: jaSelecionado ? [] : [id],
-                          bookingLeadIds: undefined as any,
-                          bookingDateFrom: undefined as any,
-                          bookingDateTo: undefined as any,
-                          bookingProfessorName: undefined as any,
-                          bookingPhone: undefined as any,
-                          bookingPhoneDigits: undefined as any,
-                        }));
-                      }}
-                      className={[
-                        // MINIMALISTA IGUAL BADGE calendário (LB/NC/Pn):
-                        // - selecionado: bg rgba(234,88,12,0.08) + border rgba(234,88,12,0.35) + texto laranja
-                        // - normal: bg branco, borda cinza, hover leve.
-                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium text-left transition-colors",
-                        sel
-                          ? "border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                    >
-                      <span className="min-w-0 truncate">{lbl}</span>
-                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
-                    </button>
-                  );
-                })}
-                {/* Aluno (status) — RADIO */}
-                {statusOptions.map(([id, label]) => {
-                  const lbl = String(label ?? id ?? "").trim() || String(id);
-                  const sel = draftFilters.statusList.includes(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        const jaSelecionado = draftFilters.statusList.includes(id);
-                        setDraftFilters((p) => ({
-                          ...p,
-                          stageList: [],
-                          statusList: jaSelecionado ? [] : [id],
-                          bookingLeadIds: undefined as any,
-                          bookingDateFrom: undefined as any,
-                          bookingDateTo: undefined as any,
-                          bookingProfessorName: undefined as any,
-                          bookingPhone: undefined as any,
-                          bookingPhoneDigits: undefined as any,
-                        }));
-                      }}
-                      className={[
-                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium text-left transition-colors",
-                        sel
-                          ? "border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                    >
-                      <span className="min-w-0 truncate">{lbl}</span>
-                      {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          {/* Conteudo filtros: MINIMALISTA — 2 grupos visuais, espaçamento uniforme, sem fundos desnecessários */}
+          <div className="flex flex-1 min-h-0 w-full flex-col gap-6 overflow-y-auto overscroll-contain px-5 pt-4 pb-3">
+            {Array.from(quickGroups.entries()).map(([groupName, opts]) => {
+              return (
+                <div key={String(groupName)} className="flex flex-col gap-3">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--app-text-55)] pl-0.5">
+                    {String(groupName)}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {opts.map((o) => {
+                      const sel = quickSelected === o.id;
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => toggleQuickStatus(o.id)}
+                          className={[
+                            "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium text-left transition-colors",
+                            sel
+                              ? "border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]"
+                              : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]",
+                          ].join(" ")}
+                        >
+                          <span className="min-w-0 truncate">{o.label}</span>
+                          {sel ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ea580c]" /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Rodapé: MINIMALISTA igual calendário — separador simples, botões quadrados sem sombra nem gradiente */}
@@ -3538,8 +3482,9 @@ export function AtendimentoClient() {
                 // mesmo que o usuário NUNCA TENHA ABERTO o modal de filtros avançados.
                 // ================================================================
                 (() => {
-                  // SOMENTE os campos do modal de filtros avançados (stage, status, país, estado, onlyWithX).
+                  // SOMENTE os campos do modal de filtros avançados (quickStatusList, stage, status, país, estado, onlyWithX).
                   const advancedOnly: Record<string, unknown> = {
+                    quickStatusList: (activeFilters as any).quickStatusList,
                     statusList: (activeFilters as any).statusList,
                     stageList: (activeFilters as any).stageList,
                     countries: (activeFilters as any).countries,
