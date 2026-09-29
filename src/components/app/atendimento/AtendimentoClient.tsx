@@ -1182,12 +1182,30 @@ export function AtendimentoClient() {
         );
       }
       if (sid === "experimental_class_incomplete") {
+        const EXCLUDE_STAGES = new Set([
+          "pre_cadastro_concluido",
+          "matricula_pendente",
+          "matricula_pendente_recusada",
+          "cadastro_recorrente_pendente_plataforma",
+          "contrato_coletando_dados",
+          "contrato_aguardando_aceite",
+          "contrato_assinado",
+          "aluno_recorrente_cadastrado",
+          "pagamento_pendente_confirmacao",
+          "pagamento_nao_realizado",
+          "matricula_confirmada",
+          "matriculado",
+          "aluno",
+          "encerrado",
+          "repescagem",
+        ]);
+        const stNorm = String(st ?? "").trim().toLowerCase();
+        const fsNorm = String(fs ?? "").trim().toLowerCase();
+        if (EXCLUDE_STAGES.has(stNorm) || EXCLUDE_STAGES.has(fsNorm)) return false;
+
         const isAluno =
-          st === "aluno" ||
-          fs === "aluno" ||
-          st === "contrato_assinado" ||
-          fs === "contrato_assinado" ||
-          Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status);
+          Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status) ||
+          Boolean((l as any)?.enrollment_number);
         if (isAluno) return false;
 
         const hasFutureOrValidBooking = Boolean(
@@ -1198,7 +1216,28 @@ export function AtendimentoClient() {
         const isExplicitlyAgendada = st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
         if (hasFutureOrValidBooking || isExplicitlyAgendada) return false;
 
-        return true;
+        const EARLY_JOURNEY = new Set([
+          "novo_lead",
+          "em_atendimento",
+          "metodologia_apresentada",
+          "aula_experimental_convidada",
+          "",
+        ]);
+        const hasEarlyStage = EARLY_JOURNEY.has(stNorm) || EARLY_JOURNEY.has(fsNorm);
+
+        const hasPartialExperimental =
+          (typeof stNorm === "string" && stNorm.startsWith("aula_experimental")) ||
+          (typeof fsNorm === "string" && fsNorm.startsWith("aula_experimental")) ||
+          Boolean((l as any)?.experimental_class_date) ||
+          Boolean((l as any)?.experimental_class_time) ||
+          Boolean((l as any)?.experimental_class_teacher) ||
+          Boolean((l as any)?.experimental_class_status) ||
+          Boolean((l as any)?.time_selected_at) ||
+          Boolean((l as any)?.lead_selected_at) ||
+          Boolean((l as any)?.professor_confirmed_at) ||
+          Boolean((l as any)?.teacher_selected_at);
+
+        return hasEarlyStage || hasPartialExperimental;
       }
       return st === sid || fs === sid;
     };
