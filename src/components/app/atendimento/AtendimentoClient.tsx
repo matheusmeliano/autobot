@@ -1209,13 +1209,19 @@ export function AtendimentoClient() {
         if (isAluno) return false;
 
         const hasValidRealBooking = (() => {
-          if ((l as any)?.future_experimental_class_booking) return true;
+          if ((l as any)?.future_experimental_class_booking) {
+            const fs = String(((l as any)?.future_experimental_class_booking as any)?.status ?? "")
+              .trim()
+              .toLowerCase();
+            if (fs && fs !== "cancelled") return true;
+          }
           const booking =
             (l as any)?.latest_experimental_class_booking ??
             (l as any)?.experimental_class_booking;
           if (!booking) return false;
           const bStatus = String(booking?.status ?? "").trim().toLowerCase();
           const attendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
+          const sourceOk = String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
           const isBookedValid = ["booked", "confirmed", "professor_confirmed", "lead_confirmed"].includes(
             bStatus,
           );
@@ -1225,13 +1231,23 @@ export function AtendimentoClient() {
             bStatus === "draft" ||
             attendance === "no_show" ||
             bStatus === "date_selected" ||
-            bStatus === "time_selected";
+            bStatus === "time_selected" ||
+            !sourceOk;
           if (isCancelledOrDraft) return false;
           return isBookedValid || isAttended;
         })();
         const isExplicitlyAgendada =
           stNorm === "aula_experimental_agendada" || fsNorm === "aula_experimental_agendada";
         if (hasValidRealBooking || isExplicitlyAgendada) return false;
+
+        try {
+          const expMeta = buildExperimentalMetaForList(l as any);
+          const recMeta = buildRecurringMetaForVisaoGeral(l as any);
+          const anyWarning = expMeta?.tone === "warning" || recMeta?.tone === "warning";
+          if (anyWarning) return true;
+        } catch {
+          // fallback abaixo
+        }
 
         const missingName = !String((l as any)?.full_name ?? (l as any)?.name ?? "").trim();
         const missingLocation =
@@ -1260,15 +1276,16 @@ export function AtendimentoClient() {
           "",
         ]);
         const hasEarlyStage = earlyFunnel.has(stNorm) || earlyFunnel.has(fsNorm);
-
-        const hasIncompleteMarker =
+        if (
           hasEarlyStage ||
           missingName ||
           missingLocation ||
           missingContact ||
           missingExperimental ||
-          hasExperimentalJourneyMarker;
-        if (hasIncompleteMarker) return true;
+          hasExperimentalJourneyMarker
+        ) {
+          return true;
+        }
 
         return true;
       }
