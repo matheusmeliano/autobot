@@ -2977,16 +2977,25 @@ export function AtendimentoClient() {
               </div>
             </div>
             {/* X (close): IGUAL botão X do calendário — h-11 w-11 rounded-full simples, sem sombra.
-                INDEPENDÊNCIA: NÃO TOCA em createdFrom/createdTo (calendário de cadastro) — LIMPA SÓ os 9
-                campos do filtro avançado e também limpa campos booking* (botão Ver anterior). */}
+                ================================================================
+                REGRAS OBRIGATÓRIAS — NÃO ALTERAR:
+                 (1) TOCA SÓ NA SUA ÁREA: este X NUNCA apaga, altera ou interfere
+                     em createdFrom / createdTo (período de cadastro do calendário).
+                     Esses campos permanecem EXATAMENTE iguais ao valor de `prev`.
+                 (2) Limpa APENAS: os 9 campos do FILTRO AVANÇADO via
+                     EMPTY_ADVANCED_FILTERS (statusList, stageList, countries,
+                     states, onlyWithX).
+                 (3) Limpa também booking* (filtro "Ver" do modal programação),
+                     pois o usuário agora EXPRESSAMENTE quer limpar os filtros e
+                     recomeçar — ids específicos do clique "Ver" anterior não
+                     devem mais ter prioridade.
+                ================================================================ */}
             <button
               type="button"
               onClick={() => {
-                // Draft só zera os 9 campos do modal avançado (resto EMPTY_FILTERS).
-                const clearedDraft: LeadFilters = {
-                  ...EMPTY_FILTERS,
-                };
-                // Active: preserva createdFrom/createdTo do calendário de cadastro intactos.
+                // Draft do modal: volta para EMPTY_FILTERS inteiro (só afeta o
+                // estado do modal aberto; o activeFilters é tratado abaixo).
+                const clearedDraft: LeadFilters = { ...EMPTY_FILTERS };
                 setActiveFilters((prev) => {
                   const next: LeadFilters = {
                     ...prev,
@@ -2998,10 +3007,14 @@ export function AtendimentoClient() {
                     bookingPN: false,
                     bookingLeadIds: [],
                   };
-                  // Garante createdFrom/createdTo do calendário continuam iguais ao valor
-                  // ANTERIOR (prev) — filtro avançado fechar NÃO APAGA a seleção do calendário.
+                  // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
+                  // Reforço EXPLÍCITO: createdFrom/createdTo do calendário de
+                  // cadastro NÃO SÃO ALTERADOS. Mesmo que alguém um dia coloque
+                  // algo acima que venha a tocar nesses campos, esta linha
+                  // impede que o filtro avançado apague a seleção de data.
                   next.createdFrom = prev.createdFrom;
                   next.createdTo = prev.createdTo;
+                  // ---------------------------------------------------------
                   return next;
                 });
                 setDraftFilters(clearedDraft);
@@ -3101,19 +3114,38 @@ export function AtendimentoClient() {
             {/* Linha 2: Ações — 2 botões minimalistas, mobile full-width empilhados (aplicar primeiro embaixo, limpar em cima = mobile layout natural) */}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end w-full sm:w-auto self-end sm:self-auto">
               {/* Limpar (secundário minimalista — IGUAL botão X do header do calendário).
-                  INDEPENDÊNCIA: limpa SÓ os 9 campos do filtro avançado nos dois states,
-                  NÃO toca em createdFrom/createdTo (calendário) que fica intacto. */}
+                  ================================================================
+                  REGRAS OBRIGATÓRIAS — NÃO ALTERAR:
+                   (1) TOCA SÓ NA SUA ÁREA: NUNCA apaga createdFrom/createdTo
+                       (período de cadastro do calendário).
+                   (2) Limpa APENAS: os 9 campos do filtro avançado via
+                       EMPTY_ADVANCED_FILTERS.
+                   (3) Limpa também booking* (filtro "Ver" do modal programação),
+                       pois o usuário quer limpar e recomeçar.
+                  ================================================================ */}
               <button
                 type="button"
                 onClick={() => {
-                  // Draft: volta para EMPTY (só 9 campos avançados vazios, resto vazio também).
+                  // Draft do modal: volta para EMPTY.
                   const clearedDraft: LeadFilters = { ...EMPTY_FILTERS };
                   setDraftFilters(clearedDraft);
-                  // Active: preserva createdFrom/createdTo do calendário + limpa só os 9 avançados.
+                  // Active: limpa só os 9 campos avançados + booking*; preserva calendário.
                   setActiveFilters((prev) => {
-                    const next: LeadFilters = { ...prev, ...EMPTY_ADVANCED_FILTERS };
+                    const next: LeadFilters = {
+                      ...prev,
+                      ...EMPTY_ADVANCED_FILTERS,
+                      bookingDateFrom: "",
+                      bookingDateTo: "",
+                      bookingProfessorName: "",
+                      bookingPhone: "",
+                      bookingPN: false,
+                      bookingLeadIds: [],
+                    };
+                    // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
+                    // Reforço: createdFrom/createdTo NÃO SÃO ALTERADOS.
                     next.createdFrom = prev.createdFrom;
                     next.createdTo = prev.createdTo;
+                    // ---------------------------------------------------------
                     return next;
                   });
                 }}
@@ -3122,39 +3154,37 @@ export function AtendimentoClient() {
                 Limpar
               </button>
               {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples).
-                  INDEPENDÊNCIA TOTAL: mescla SÓ os 9 campos avançados do draft em activeFilters, PRESERVANDO
-                  createdFrom/createdTo do calendário de cadastro. Apenas limpa booking* (botão Ver anterior
-                  do modal programação) porque esse filtro tem que ser independente do avançado. */}
+                  ================================================================
+                  REGRAS OBRIGATÓRIAS — NÃO ALTERAR:
+                   (1) TOCA SÓ NA SUA ÁREA: NUNCA altera createdFrom/createdTo do
+                       calendário de cadastro (valor vem de `prev`).
+                   (2) Aplica APENAS: os 9 campos do filtro avançado vindos do
+                       draft (pickAdvancedOnly + mergeAdvancedOnly).
+                   (3) Limpa também booking* (filtro "Ver" do modal programação),
+                       pois o usuário AGORA quer usar o filtro avançado e não
+                       mais os ids específicos do clique "Ver" anterior.
+                  ================================================================ */}
               <button
                 type="button"
                 onClick={() => {
-                  // ====== FILTROS AVANÇADOS (modal SlidersHorizontal) APLICADOS ======
-                  // Intenção EXPLÍCITA do usuário. Limpeza do booking filter (do botão Ver
-                  // do modal programação) é obrigatória para INDEPENDÊNCIA TOTAL entre os
-                  // dois filtros (calendario cadastro / filtros avançados / botão Ver).
-                  //
-                  // Sem esse reset: usuário clica "Ver" em 23/09 (bookingLeadIds=[X,Y])
-                  // depois abre filtros avançados, troca só o stage de "aula_experimental_agendada"
-                  // → "Aluno", clica Aplicar → lista continua vindo SÓ X,Y (pois bookingLeadIds
-                  // tinha mais prioridade que tudo) → aparente bug "filtro não aplica nada".
                   setActiveFilters((prev) => {
-                    // 1. Pega SÓ os 9 campos avançados do draft.
+                    // 1. Pega SÓ os 9 campos avançados do draft (ignora createdFrom/To etc).
                     const advFromDraft = pickAdvancedOnly(draftFilters);
-                    // 2. Mescla SÓ esses 9 no active, PRESERVANDO createdFrom/createdTo do
-                    //    calendário de cadastro — o filtro avançado NÃO ALTERA a data.
+                    // 2. Mescla SÓ esses 9 no active. Preserva createdFrom/createdTo.
                     let next: LeadFilters = mergeAdvancedOnly(prev, advFromDraft);
-                    // 3. Limpa booking* (filtro de aula), pois o usuário agora QUER o filtro
-                    //    avançado e não mais um clique "Ver" do passado.
+                    // 3. Limpa booking* (filtro de aula do botão Ver anterior).
                     (next as any).bookingDateFrom = "";
                     (next as any).bookingDateTo = "";
                     (next as any).bookingProfessorName = "";
                     (next as any).bookingPhone = "";
                     (next as any).bookingPN = false;
                     (next as any).bookingLeadIds = [];
-                    // 4. Garante redundante: createdFrom/createdTo vieram de prev, garantindo que
-                    //    o calendário de cadastro permaneceu EXATAMENTE como estava.
+                    // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
+                    // createdFrom/createdTo do calendário de cadastro são COPIADOS
+                    // EXPLICITAMENTE de prev → NÃO sofrem alteração.
                     next.createdFrom = prev.createdFrom;
                     next.createdTo = prev.createdTo;
+                    // ---------------------------------------------------------
                     return next;
                   });
                   setShowFiltersModal(false);
@@ -3200,30 +3230,38 @@ export function AtendimentoClient() {
                 onChange={(next: AppDateRange) => {
                   setActiveFilters((p) => {
                     // ================================================================
-                    // FILTRO DE PERÍODO DE CADASTRO (icone calendario header):
-                    //  ESCOLHA EXPLÍCITA do usuário → deve agir DE FORMA INDEPENDENTE
-                    //  do filtro de AULA (bookingFrom/bookingProfessor/bookingLeadIds etc)
-                    //  que veio do botão "Ver" do modal programação.
+                    // X / onCHANGE do CALENDÁRIO DE PERÍODO DE CADASTRO (icone calendário header).
+                    // REGRAS OBRIGATÓRIAS — NÃO ALTERAR:
                     //
-                    // Cenário bug: usuário clica "Ver" em um card do dia 23/09 → navegou
-                    // com ?bookingLeadIds=abc123,xyz → bookingLeadIds fica persistido em
-                    // activeFilters. Depois usuário altera o período de cadastro no ícone
-                    // (seta createdFrom/To mas NÃO toca em bookingLeadIds) → a lista
-                    // continua MOSTRANDO SÓ OS 2 REGISTROS do clique Ver anterior,
-                    // parecendo que o período de cadastro "não fez nada" ou "está bugado".
+                    //  (1) TOCA SÓ NA SUA ÁREA: este handler NUNCA apaga, altera ou
+                    //      interfere nos 9 campos do FILTRO AVANÇADO (statusList,
+                    //      stageList, countries, states, onlyWithX). Eles permanecem
+                    //      EXATAMENTE como estavam em `p` (estado anterior).
                     //
-                    // Solução: SEMPRE que o usuário interage EXPLICITAMENTE com um dos
-                    // dois botões (período cadastro OU filtros avançados), LIMPA todo
-                    // o booking filter (bookingLeadIds, bookingDateFrom/To, bookingProfessor
-                    // bookingPhone, bookingPN) — pois o que vale agora é a intenção ATUAL
-                    // do usuário, não um clique "Ver" do passado. Os dois botões passam
-                    // a agir 100% independentes.
+                    //  (2) Limpa APENAS: createdFrom / createdTo quando o X do
+                    //      calendário dispara onChange({ from: null, to: null }).
+                    //      Para clique normal em datas, atualiza createdFrom/To.
+                    //
+                    //  (3) Limpa também booking* (filtro "Ver" do modal programação),
+                    //      pois o usuário agora EXPRESSAMENTE quer filtrar por
+                    //      período de cadastro, não mais por ids específicos do
+                    //      clique "Ver" anterior. booking* NUNCA deve ter prioridade
+                    //      sobre uma ação EXPLÍCITA do usuário em um dos filtros.
                     // ================================================================
                     const nextRaw: any = {
                       ...p,
                       createdFrom: next.from ?? "",
                       createdTo: next.to ?? "",
                     };
+
+                    // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
+                    // Reatribui EXPLICITAMENTE os 9 campos do filtro avançado com
+                    // o valor de `p` (antes da alteração). Mesmo que alguém um dia
+                    // coloque algo acima acidentalmente, esta linha impede que os
+                    // filtros avançados sejam apagados ao interagir com o calendário.
+                    for (const k of ADVANCED_FILTER_KEYS) nextRaw[k] = (p as any)[k];
+                    // ---------------------------------------------------------
+
                     // Limpa todo filtro de aula herdado do botão Ver do modal programação
                     nextRaw.bookingDateFrom = "";
                     nextRaw.bookingDateTo = "";
