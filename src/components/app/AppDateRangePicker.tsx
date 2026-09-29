@@ -461,23 +461,8 @@ export function AppDateRangePicker({
             const hasLB = Boolean(badges?.LB);
             const hasNC = Boolean(badges?.NC);
             const hasPN = Boolean(badges?.PN);
+            // hasAny: qualquer registro (LB OU NC OU PN). Bolinha aparece SEMPRE que houver 1+, sem exceção.
             const hasAny = hasLB || hasNC || hasPN;
-            const badgeList: Array<{ key: string; label: string }> = [];
-            if (hasLB) badgeList.push({ key: "LB", label: "LB" });
-            if (hasNC) badgeList.push({ key: "NC", label: "NC" });
-            if (hasPN) badgeList.push({ key: "PN", label: "Pn" });
-            const N = badgeList.length;
-            // TAMANHO PEQUENO FIXO (user disse: NÃO AUMENTE!) — sobreposição PARCIAL tipo VENN
-            // N=1: 28px pequeno (sem sobreposição)
-            // N=2: 27px pequeno, OVERLAP PARCIAL 40% ~11px → interseção visível igual a imagem do user
-            // N=3: 25px pequeno, OVERLAP 44% ~11px entre cada par adjacente → 3 círculos VENN
-            // Largura total N=3: 25 + 2*14 = 53px ← cabe em célula mobile (~51px)
-            const BS = N === 1 ? 28 : N === 2 ? 27 : 25;
-            const OVER = N === 1 ? 0 : N === 2 ? 11 : 11; // px de sobreposição (VENN parcial)
-            const STEP = BS - OVER; // distância entre centros dos badges adjacentes
-            const badgeFontPx = N === 1 ? 11.5 : N === 2 ? 10.5 : 10;
-            const badgeBaseClass =
-              "absolute flex shrink-0 items-center justify-center rounded-full border font-extrabold uppercase";
             return (
               <button
                 key={idx}
@@ -499,38 +484,24 @@ export function AppDateRangePicker({
                 ].join(" ")}
                 style={{ WebkitTapHighlightColor: "rgba(234,88,12,0.18)" }}
               >
-                {hasAny ? (
-                  <div className="relative w-full flex items-center justify-center z-10" style={{ minHeight: BS, height: BS }}>
-                    {badgeList.map((b, i) => {
-                      // Distância centro badge[i] para centro do grupo:
-                      const rel = (i - (N - 1) / 2) * STEP;
-                      const leftCalc = `calc(50% + ${rel - BS / 2}px)`;
-                      // Sobreposição VENN: badge DA DIREITA fica em CIMA no cruzamento (igual referência)
-                      const z = 10 + i;
-                      return (
-                        <div
-                        key={b.key}
-                        className={badgeBaseClass}
-                        style={{
-                          left: leftCalc,
-                          top: "0",
-                          width: BS,
-                          height: BS,
-                          fontSize: badgeFontPx,
-                          zIndex: z,
-                          backgroundColor: "#FFF7ED",
-                          borderColor: "#FED7AA",
-                          color: "#9A3412",
-                          boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255,255,255,0.6)",
-                        }}
-                      >
-                        {b.label}
-                      </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
-                {/* Número do dia: sempre ABAIXO dos badges. Número em célula sem badge centralizado! */}
+                {/* Espaço reservado no topo, igual altura da bolinha + margem, para não
+                    desalinhar o número do dia entre células com/sem indicador. */}
+                <div aria-hidden className="relative z-10 flex h-[30px] w-full shrink-0 items-end justify-center">
+                  {hasAny ? (
+                    // Bolinha laranja SÓLIDA, sem borda externa (círculo preenchido laranja padrão).
+                    // Aparece SEMPRE que hasAny for true (>= 1 registro, qualquer professor/tipo).
+                    <span
+                      className="shrink-0 rounded-full"
+                      style={{
+                        width: 8,
+                        height: 8,
+                        backgroundColor: "#ea580c",
+                        marginBottom: 2,
+                      }}
+                    />
+                  ) : null}
+                </div>
+                {/* Número do dia: centralizado! */}
                 {today ? (
                   <span className="relative z-[5] mt-2 inline-flex h-7 min-w-[28px] items-center justify-center rounded-full ring-1 ring-inset ring-[rgba(234,88,12,0.5)] bg-[rgba(234,88,12,0.08)] px-2 text-[14px] font-extrabold text-[#9a3412]">
                     {d.getDate()}
