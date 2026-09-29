@@ -1519,7 +1519,23 @@ export function AtendimentoClient() {
         "aluno_recorrente_cadastrado",
         "contrato_assinado",
       ]);
-      if (terminalStage.has(st) || terminalStage.has(fs)) return true;
+      const terminalStatusFlat = new Set([
+        "matricula_confirmada",
+        "matriculado",
+        "aluno",
+        "aluno_recorrente_cadastrado",
+        "contrato_assinado",
+      ]);
+      const sRaw = String(l.status ?? "").trim().toLowerCase();
+      const fsRaw = String(l.funnel_stage ?? "").trim().toLowerCase();
+      if (
+        terminalStage.has(fsRaw) ||
+        terminalStatusFlat.has(sRaw) ||
+        terminalStage.has(st) ||
+        terminalStatusFlat.has(fs)
+      ) {
+        return true;
+      }
 
       if (
         Boolean((l as any)?.enrollment_number) ||
