@@ -1182,6 +1182,7 @@ export function AtendimentoClient() {
         );
       }
       if (sid === "experimental_class_incomplete") {
+        const debug: Record<string, unknown> = { id: String((l as any)?.id ?? "?") };
         const EXCLUDE_STAGES = new Set([
           "pre_cadastro_concluido",
           "matricula_pendente",
@@ -1201,19 +1202,29 @@ export function AtendimentoClient() {
         ]);
         const stNorm = String(st ?? "").trim().toLowerCase();
         const fsNorm = String(fs ?? "").trim().toLowerCase();
-        if (EXCLUDE_STAGES.has(stNorm) || EXCLUDE_STAGES.has(fsNorm)) return false;
+        debug.st = stNorm || "(vazio)";
+        debug.fs = fsNorm || "(vazio)";
+        if (EXCLUDE_STAGES.has(stNorm) || EXCLUDE_STAGES.has(fsNorm)) {
+          debug.excluded = "stage_post";
+          console.debug("[incompletas] OUT:", debug);
+          return false;
+        }
 
         const isAluno =
           Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status) ||
           Boolean((l as any)?.enrollment_number);
-        if (isAluno) return false;
+        if (isAluno) {
+          debug.excluded = "is_aluno_marker";
+          console.debug("[incompletas] OUT:", debug);
+          return false;
+        }
 
         const hasValidRealBooking = (() => {
           if ((l as any)?.future_experimental_class_booking) {
-            const fs = String(((l as any)?.future_experimental_class_booking as any)?.status ?? "")
+            const fsB = String(((l as any)?.future_experimental_class_booking as any)?.status ?? "")
               .trim()
               .toLowerCase();
-            if (fs && fs !== "cancelled") return true;
+            if (fsB && fsB !== "cancelled") return true;
           }
           const booking =
             (l as any)?.latest_experimental_class_booking ??
@@ -1238,13 +1249,25 @@ export function AtendimentoClient() {
         })();
         const isExplicitlyAgendada =
           stNorm === "aula_experimental_agendada" || fsNorm === "aula_experimental_agendada";
-        if (hasValidRealBooking || isExplicitlyAgendada) return false;
+        if (hasValidRealBooking || isExplicitlyAgendada) {
+          debug.excluded = "valid_booking_ou_agendada";
+          debug.hasValidRealBooking = hasValidRealBooking;
+          debug.isExplicitlyAgendada = isExplicitlyAgendada;
+          console.debug("[incompletas] OUT:", debug);
+          return false;
+        }
 
         try {
           const expMeta = buildExperimentalMetaForList(l as any);
           const recMeta = buildRecurringMetaForVisaoGeral(l as any);
           const anyWarning = expMeta?.tone === "warning" || recMeta?.tone === "warning";
-          if (anyWarning) return true;
+          if (anyWarning) {
+            debug.included = "tone_warning";
+            debug.expLabel = expMeta?.label;
+            debug.recTitle = recMeta?.title;
+            console.debug("[incompletas] IN:", debug);
+            return true;
+          }
         } catch {
           // fallback abaixo
         }
@@ -1276,17 +1299,20 @@ export function AtendimentoClient() {
           "",
         ]);
         const hasEarlyStage = earlyFunnel.has(stNorm) || earlyFunnel.has(fsNorm);
-        if (
-          hasEarlyStage ||
-          missingName ||
-          missingLocation ||
-          missingContact ||
-          missingExperimental ||
-          hasExperimentalJourneyMarker
-        ) {
+        if (hasEarlyStage || missingName || missingLocation || missingContact || missingExperimental || hasExperimentalJourneyMarker) {
+          debug.included = "marker";
+          debug.hasEarlyStage = hasEarlyStage;
+          debug.missingName = missingName;
+          debug.missingLocation = missingLocation;
+          debug.missingContact = missingContact;
+          debug.missingExperimental = missingExperimental;
+          debug.hasExperimentalJourneyMarker = hasExperimentalJourneyMarker;
+          console.debug("[incompletas] IN:", debug);
           return true;
         }
 
+        debug.included = "fallback_final";
+        console.debug("[incompletas] IN:", debug);
         return true;
       }
       return st === sid || fs === sid;
@@ -3167,6 +3193,12 @@ export function AtendimentoClient() {
                           ...p,
                           statusList: [],
                           stageList: jaSelecionado ? [] : [id],
+                          bookingLeadIds: undefined as any,
+                          bookingDateFrom: undefined as any,
+                          bookingDateTo: undefined as any,
+                          bookingProfessorName: undefined as any,
+                          bookingPhone: undefined as any,
+                          bookingPhoneDigits: undefined as any,
                         }));
                       }}
                       className={[
@@ -3198,6 +3230,12 @@ export function AtendimentoClient() {
                           ...p,
                           stageList: [],
                           statusList: jaSelecionado ? [] : [id],
+                          bookingLeadIds: undefined as any,
+                          bookingDateFrom: undefined as any,
+                          bookingDateTo: undefined as any,
+                          bookingProfessorName: undefined as any,
+                          bookingPhone: undefined as any,
+                          bookingPhoneDigits: undefined as any,
                         }));
                       }}
                       className={[
