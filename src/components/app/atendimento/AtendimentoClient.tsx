@@ -1196,7 +1196,7 @@ export function AtendimentoClient() {
             (l as any)?.experimental_class_booking,
         );
         const isExplicitlyAgendada = st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
-        if (hasFutureOrValidBooking && isExplicitlyAgendada) return false;
+        if (hasFutureOrValidBooking || isExplicitlyAgendada) return false;
 
         return true;
       }
