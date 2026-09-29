@@ -1181,6 +1181,41 @@ export function AtendimentoClient() {
           )
         );
       }
+      if (sid === "experimental_class_incomplete") {
+        const isAluno =
+          st === "aluno" ||
+          fs === "aluno" ||
+          st === "contrato_assinado" ||
+          fs === "contrato_assinado" ||
+          Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status);
+        if (isAluno) return false;
+
+        const hasValidAgendada =
+          st === "aula_experimental_agendada" ||
+          fs === "aula_experimental_agendada" ||
+          Boolean(
+            (l as any)?.future_experimental_class_booking ??
+              (l as any)?.latest_experimental_class_booking ??
+              (l as any)?.experimental_class_booking,
+          );
+        if (hasValidAgendada) return false;
+
+        const hasExperimentalJourney =
+          (typeof st === "string" && st.startsWith("aula_experimental")) ||
+          (typeof fs === "string" && fs.startsWith("aula_experimental")) ||
+          Boolean((l as any)?.experimental_class_booking) ||
+          Boolean((l as any)?.latest_experimental_class_booking) ||
+          Boolean((l as any)?.experimental_class_date) ||
+          Boolean((l as any)?.experimental_class_time) ||
+          Boolean((l as any)?.experimental_class_teacher) ||
+          Boolean((l as any)?.experimental_class_status) ||
+          Boolean((l as any)?.time_selected_at) ||
+          Boolean((l as any)?.lead_selected_at) ||
+          Boolean((l as any)?.professor_confirmed_at) ||
+          Boolean((l as any)?.teacher_selected_at);
+
+        return hasExperimentalJourney;
+      }
       return st === sid || fs === sid;
     };
 
@@ -2924,9 +2959,12 @@ export function AtendimentoClient() {
     const statusOptions = Object.entries(STATUS_LABELS)
       .filter(([id, label]) => STATUS_ALLOWLIST.has(id) && Boolean(id) && Boolean(String(label ?? "").trim()))
       .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR"));
-    const stageOptions = Object.entries(STAGE_LABELS)
-      .filter(([id, label]) => STAGE_ALLOWLIST.has(id) && Boolean(id) && Boolean(String(label ?? "").trim()))
-      .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR"));
+    const stageOptions = [
+      ...Object.entries(STAGE_LABELS)
+        .filter(([id, label]) => STAGE_ALLOWLIST.has(id) && Boolean(id) && Boolean(String(label ?? "").trim()))
+        .sort((a, b) => String(a[1]).localeCompare(String(b[1]), "pt-BR")),
+      ["experimental_class_incomplete", "Aulas Experimentais Incompletas"] as const,
+    ];
 
     const toggle = (key: keyof LeadFilters, value: string) => {
       setDraftFilters((prev) => {
@@ -2956,7 +2994,9 @@ export function AtendimentoClient() {
                 key === "statusList"
                   ? STATUS_LABELS[v] ?? v
                   : key === "stageList"
-                  ? STAGE_LABELS[v] ?? v
+                  ? v === "experimental_class_incomplete"
+                    ? "Aulas Experimentais Incompletas"
+                    : STAGE_LABELS[v] ?? v
                   : v;
               return (
                 <button
