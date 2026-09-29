@@ -3326,14 +3326,23 @@ export function AtendimentoClient() {
                       bookingDateTo: "",
                       bookingProfessorName: "",
                       bookingPhone: "",
+                      bookingPhoneDigits: "",
                       bookingPN: false,
                       bookingLeadIds: [],
                     };
-                    // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
                     next.createdFrom = prev.createdFrom;
                     next.createdTo = prev.createdTo;
-                    // ---------------------------------------------------------
-                    // Se nada mais estiver ativo, volta para a URL base
+                    next.quickStatusList = [];
+                    next.statusList = [];
+                    next.stageList = [];
+                    next.countries = [];
+                    next.states = [];
+                    next.onlyWithUnread = false;
+                    next.onlyWithPhone = false;
+                    next.onlyWithEmail = false;
+                    next.onlyWithScheduledClass = false;
+                    next.onlyWithContract = false;
+                    next.bookingLeadIds = [];
                     if (!hasAnyFilterActive(next)) {
                       router.replace("/app/atendimento", { scroll: false });
                     }
@@ -3341,7 +3350,28 @@ export function AtendimentoClient() {
                   });
                   // Reseta também o estado visual DRAFT do modal (campos internos)
                   // para quando reabrir não ficar nenhum toggle marcado residual.
-                  setDraftFilters({ ...EMPTY_FILTERS });
+                  setDraftFilters({
+                    ...EMPTY_FILTERS,
+                    quickStatusList: [],
+                    statusList: [],
+                    stageList: [],
+                    countries: [],
+                    states: [],
+                    onlyWithUnread: false,
+                    onlyWithPhone: false,
+                    onlyWithEmail: false,
+                    onlyWithScheduledClass: false,
+                    onlyWithContract: false,
+                    bookingDateFrom: "",
+                    bookingDateTo: "",
+                    bookingProfessorName: "",
+                    bookingPhone: "",
+                    bookingPhoneDigits: "",
+                    bookingPN: false,
+                    bookingLeadIds: [],
+                    createdFrom: "",
+                    createdTo: "",
+                  });
                   // Fecha o modal IMEDIATAMENTE — limpar já é aplicado, não
                   // precisa permanecer aberto (equivalente a clicar em Aplicar
                   // com todos os campos limpos).
