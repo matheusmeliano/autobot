@@ -488,16 +488,13 @@ export function AppDateRangePicker({
                     desalinhar o número do dia entre células com/sem indicador. */}
                 <div aria-hidden className="relative z-10 flex h-[30px] w-full shrink-0 items-end justify-center">
                   {hasAny ? (
-                    // Bolinha laranja SÓLIDA, sem borda externa (círculo preenchido laranja padrão).
+                    // Bolinha laranja SÓLIDA.
+                    // MOBILE (< 768px): 8x8 px (padrão discreto)
+                    // DESKTOP (>= 768px): aumentada para 11x11 px — visibilidade maior sem exagero
                     // Aparece SEMPRE que hasAny for true (>= 1 registro, qualquer professor/tipo).
                     <span
-                      className="shrink-0 rounded-full"
-                      style={{
-                        width: 8,
-                        height: 8,
-                        backgroundColor: "#ea580c",
-                        marginBottom: 2,
-                      }}
+                      className="shrink-0 rounded-full mb-[2px] h-2 w-2 sm:h-[11px] sm:w-[11px]"
+                      style={{ backgroundColor: "#ea580c" }}
                     />
                   ) : null}
                 </div>
