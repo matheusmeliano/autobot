@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, GraduationCap, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -3193,7 +3193,7 @@ export function AtendimentoClient() {
           <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-[var(--app-border)]">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]">
-                <SlidersHorizontal className="h-5 w-5" strokeWidth={2} />
+                <GraduationCap className="h-5 w-5" strokeWidth={2} />
               </div>
               <div className="min-w-0">
                 <h3 className="truncate text-[17px] font-bold leading-tight text-[var(--app-text-95)]">
@@ -3546,65 +3546,61 @@ export function AtendimentoClient() {
                 }}
               />
             </div>
-            {/* FILTROS AVANCADOS: ao lado ESQUERDO de Adicionar registro (+) */}
+            {/* BOTÃO ALUNOS: ao clicar, FILTRA a lista para MOSTRAR SOMENTE MATRICULADOS (alunos reais da plataforma). Toggle: se já estiver filtrando alunos, desliga (volta sem filtro). */}
             <button
               type="button"
               onClick={() => {
-                // ====================================================================
-                // INDEPENDÊNCIA TOTAL: o filtro avançado NÃO HERDA datas/estado do
-                // calendário de cadastro (createdFrom/createdTo) nem do botão Ver do
-                // modal de programação (booking*).
-                // ANTES: setDraftFilters(activeFilters) → copiava TUDO e as datas do
-                //        calendário apareciam lá dentro, e vice-versa ao fechar/limpar
-                //        o filtro avançado apagava o período de cadastro selecionado.
-                // AGORA: iniciamos o draft SOMENTE com os 9 campos do modal avançado
-                //        (statusList, stageList, countries, states, onlyWithX). O resto
-                //        (createdFrom/createdTo e booking*) NUNCA toca no draft.
-                // ====================================================================
-                const advOnly: LeadFilters = {
-                  ...EMPTY_FILTERS,
-                  ...pickAdvancedOnly(activeFilters),
-                };
-                setDraftFilters(advOnly);
-                setShowFiltersModal(true);
+                setActiveFilters((prev) => {
+                  const isAlunosJaLigado =
+                    Array.isArray((prev as any).quickStatusList) &&
+                    (prev as any).quickStatusList.length === 1 &&
+                    (prev as any).quickStatusList[0] === "quick__matriculado";
+
+                  let nextQuick: string[] = isAlunosJaLigado
+                    ? []
+                    : ["quick__matriculado"];
+
+                  const next: LeadFilters = {
+                    ...prev,
+                    quickStatusList: nextQuick,
+                    statusList: [],
+                    stageList: [],
+                    countries: [],
+                    states: [],
+                    onlyWithUnread: false,
+                    onlyWithPhone: false,
+                    onlyWithEmail: false,
+                    onlyWithScheduledClass: false,
+                    onlyWithContract: false,
+                    bookingDateFrom: "",
+                    bookingDateTo: "",
+                    bookingProfessorName: "",
+                    bookingPhone: "",
+                    bookingPhoneDigits: "",
+                    bookingPN: false,
+                    bookingLeadIds: [],
+                  };
+                  next.createdFrom = prev.createdFrom;
+                  next.createdTo = prev.createdTo;
+                  next.quickStatusList = nextQuick;
+
+                  if (!hasAnyFilterActive(next)) {
+                    router.replace("/app/atendimento", { scroll: false });
+                  }
+                  return next;
+                });
               }}
-              aria-label="Filtros avançados de registros"
+              aria-label="Mostrar apenas Alunos (matriculados na plataforma)"
               className={[
                 "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all shadow-none",
-                // ===== INDEPENDÊNCIA VISUAL: botão SlidersHorizontal AVANÇADOS só fica "ACESO" (laranja) quando
-                // o usuário REALMENTE usou os filtros AVANÇADOS (modal SlidersHorizontal — stage, status, country,
-                // state, onlyWithX). Os campos: createdFrom/createdTo (calendário do período de cadastro) e
-                // bookingDateFrom/bookingDateTo/bookingProfessorName + bookingLeadIds (botão Ver do modal programação)
-                // NÃO SÃO contabilizados aqui — pois eles têm SEUS PRÓPRIOS botões no header.
-                //
-                // CENÁRIO BUG REPORTADO: usuário selecionava período de cadastro no calendário (AppDateRangePicker
-                // header), que setava createdFrom/To → Object.values(activeFilters).some() retornava true
-                // → botão SlidersHorizontal FICAVA LARANJA/SELECIONADO COMO "filtros avançados usados"
-                // mesmo que o usuário NUNCA TENHA ABERTO o modal de filtros avançados.
-                // ================================================================
-                (() => {
-                  // SOMENTE os campos do modal de filtros avançados (quickStatusList, stage, status, país, estado, onlyWithX).
-                  const advancedOnly: Record<string, unknown> = {
-                    quickStatusList: (activeFilters as any).quickStatusList,
-                    statusList: (activeFilters as any).statusList,
-                    stageList: (activeFilters as any).stageList,
-                    countries: (activeFilters as any).countries,
-                    states: (activeFilters as any).states,
-                    onlyWithUnread: (activeFilters as any).onlyWithUnread,
-                    onlyWithPhone: (activeFilters as any).onlyWithPhone,
-                    onlyWithEmail: (activeFilters as any).onlyWithEmail,
-                    onlyWithScheduledClass: (activeFilters as any).onlyWithScheduledClass,
-                    onlyWithContract: (activeFilters as any).onlyWithContract,
-                  };
-                  return Object.values(advancedOnly).some((v) =>
-                    Array.isArray(v) ? v.length > 0 : Boolean(v),
-                  );
-                })()
+                Array.isArray((activeFilters as any).quickStatusList) &&
+                (activeFilters as any).quickStatusList.length === 1 &&
+                (activeFilters as any).quickStatusList[0] === "quick__matriculado"
                   ? "border-[rgba(234,88,12,0.4)] bg-[rgba(234,88,12,0.12)] text-[#9a3412] hover:bg-[rgba(234,88,12,0.18)]"
                   : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60",
               ].join(" ")}
             >
-              <SlidersHorizontal className="h-4 w-4" />
+              <GraduationCap className="h-4 w-4" />
             </button>
             <button
               type="button"
