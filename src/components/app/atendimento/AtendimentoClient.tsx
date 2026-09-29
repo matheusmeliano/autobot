@@ -1137,9 +1137,29 @@ export function AtendimentoClient() {
     leads: AtendimentoLeadListItem[],
     f: LeadFilters,
   ): AtendimentoLeadListItem[] => {
-    const hasAnyFilter = Object.values(f).some((v) =>
-      Array.isArray(v) ? v.length > 0 : Boolean(v),
-    );
+    const hasAnyFilter = (() => {
+      const vals = [
+        f.statusList.length,
+        f.stageList.length,
+        f.countries.length,
+        f.states.length,
+        f.onlyWithUnread,
+        f.onlyWithPhone,
+        f.onlyWithEmail,
+        f.onlyWithScheduledClass,
+        f.onlyWithContract,
+        f.createdFrom,
+        f.createdTo,
+        f.bookingDateFrom,
+        f.bookingDateTo,
+        f.bookingProfessorName,
+        f.bookingPhone ?? "",
+        f.bookingPhoneDigits ?? "",
+        Array.isArray(f.bookingLeadIds) ? f.bookingLeadIds.length : 0,
+        Array.isArray((f as any).quickStatusList) ? (f as any).quickStatusList.length : 0,
+      ];
+      return vals.some((v) => (typeof v === "number" ? v > 0 : typeof v === "boolean" ? v : Boolean(String(v ?? "").trim())));
+    })();
     if (!hasAnyFilter) return leads;
     const statusMatches = (statusId: string, l: AtendimentoLeadListItem): boolean => {
       const st = String(l.status ?? "").trim().toLowerCase();
