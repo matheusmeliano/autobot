@@ -2979,48 +2979,28 @@ export function AtendimentoClient() {
             {/* X (close): IGUAL botão X do calendário — h-11 w-11 rounded-full simples, sem sombra.
                 ================================================================
                 REGRAS OBRIGATÓRIAS — NÃO ALTERAR:
-                 (1) TOCA SÓ NA SUA ÁREA: este X NUNCA apaga, altera ou interfere
-                     em createdFrom / createdTo (período de cadastro do calendário).
-                     Esses campos permanecem EXATAMENTE iguais ao valor de `prev`.
-                 (2) Limpa APENAS: os 9 campos do FILTRO AVANÇADO via
-                     EMPTY_ADVANCED_FILTERS (statusList, stageList, countries,
-                     states, onlyWithX).
-                 (3) Limpa também booking* (filtro "Ver" do modal programação),
-                     pois o usuário agora EXPRESSAMENTE quer limpar os filtros e
-                     recomeçar — ids específicos do clique "Ver" anterior não
-                     devem mais ter prioridade.
+                 (1) ESTE X É APENAS FECHAR. NÃO LIMPA NENHUM FILTRO.
+                     - NÃO toca nos 9 campos do filtro avançado (eles
+                       permanecem como estavam no activeFilters / draftFilters).
+                     - NÃO toca em createdFrom / createdTo do calendário de
+                       cadastro (permanece INTACTO — esse era o bug!).
+                     - NÃO toca em booking*.
+
+                 (2) O ÚNICO botão que LIMPA os filtros avançados é o botão
+                     "Limpar" no RODAPÉ do modal. Aplicar vazio também limpa.
+
+                 (3) O draftFilters NÃO É apagado para o caso do usuário reabrir
+                     o modal logo depois — ele continua enxergando os campos
+                     selecionados da última vez que abriu (antes de fechar).
                 ================================================================ */}
             <button
               type="button"
               onClick={() => {
-                // Draft do modal: volta para EMPTY_FILTERS inteiro (só afeta o
-                // estado do modal aberto; o activeFilters é tratado abaixo).
-                const clearedDraft: LeadFilters = { ...EMPTY_FILTERS };
-                setActiveFilters((prev) => {
-                  const next: LeadFilters = {
-                    ...prev,
-                    ...EMPTY_ADVANCED_FILTERS,
-                    bookingDateFrom: "",
-                    bookingDateTo: "",
-                    bookingProfessorName: "",
-                    bookingPhone: "",
-                    bookingPN: false,
-                    bookingLeadIds: [],
-                  };
-                  // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
-                  // Reforço EXPLÍCITO: createdFrom/createdTo do calendário de
-                  // cadastro NÃO SÃO ALTERADOS. Mesmo que alguém um dia coloque
-                  // algo acima que venha a tocar nesses campos, esta linha
-                  // impede que o filtro avançado apague a seleção de data.
-                  next.createdFrom = prev.createdFrom;
-                  next.createdTo = prev.createdTo;
-                  // ---------------------------------------------------------
-                  return next;
-                });
-                setDraftFilters(clearedDraft);
+                // SÓ FECHA. NEM TOCA em activeFilters, em createdFrom/To,
+                // nem em nenhum campo. Zero side effects.
                 setShowFiltersModal(false);
               }}
-              aria-label="Fechar e limpar filtros"
+              aria-label="Fechar"
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)] transition-colors"
             >
               <X className="h-5 w-5" strokeWidth={2} />
