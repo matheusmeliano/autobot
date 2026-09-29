@@ -14,6 +14,7 @@ import {
   VALID_RECURRING_CLASS_STATUS,
   VALID_RECURRING_FUNNEL_STAGE_FALLBACK,
   detectTeacherKey,
+  experimentalHasTime,
   flatExpDedupId,
   recurringFirstLocalDate,
   recurringHasTime,
@@ -91,14 +92,22 @@ export async function GET(req: Request) {
         if (isSunday(d)) continue; // MESMA regra do modal: domingo SEM grade.
         const st = String(b?.status ?? "").toLowerCase();
         if (!VALID_EXPERIMENTAL_COMPOSITE_STATUS.has(st)) continue;
+        // ===== HORÁRIO OBRIGATÓRIO COMPOSITE (sincronizado com modal) =====
+        // Sem horário: não existe slot no modal → badges também NÃO marca.
+        if (
+          !experimentalHasTime(
+            String((b as any).professor_time ?? ""),
+            String((b as any).lead_time ?? ""),
+          )
+        )
+          continue;
         const id = String((b as any).id ?? "").trim();
         if (id && seenComposite.has(id)) continue;
         if (id) seenComposite.add(id);
-        const key = detectTeacherKey(
-          String(b?.assigned_professor_name ?? ""),
-          String(b?.assigned_professor_phone ?? ""),
-          false,
-        );
+        const pName = String((b as any).assigned_professor_name ?? "");
+        const pPhone = String((b as any).assigned_professor_phone ?? "");
+        const hasProf = Boolean(pName.trim() || pPhone.trim());
+        const key = detectTeacherKey(pName, pPhone, !hasProf);
         (badgeMap[d] as any)[key] = true;
       }
     }
@@ -158,6 +167,14 @@ export async function GET(req: Request) {
         if (!d || !badgeMap[d]) continue;
         if (d < from || d > to) continue;
         if (isSunday(d)) continue;
+        // ===== HORÁRIO OBRIGATÓRIO FLAT EXP (sincronizado com modal) =====
+        if (
+          !experimentalHasTime(
+            String((r as any).experimental_class_professor_time ?? ""),
+            String((r as any).experimental_class_lead_time ?? ""),
+          )
+        )
+          continue;
         const pName = String((r as any).experimental_class_professor_name ?? "").trim();
         const pPhone = String((r as any).experimental_class_professor_phone ?? "").trim();
         const hasProf = Boolean(pName || pPhone);

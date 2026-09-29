@@ -15,6 +15,7 @@ import {
   VALID_RECURRING_CLASS_STATUS,
   VALID_RECURRING_FUNNEL_STAGE_FALLBACK,
   detectTeacherKey,
+  experimentalHasTime,
   flatExpDedupId,
   normalizeSlotHHMM,
   recurringFirstLocalDate,
@@ -143,6 +144,15 @@ export async function GET(req: Request) {
         // apareciam no modal mas badges não contavam → "badges mostra 3, modal mostra 4".
         const st = String((b as any).status ?? "").trim().toLowerCase();
         if (st && !VALID_EXPERIMENTAL_COMPOSITE_STATUS.has(st)) continue;
+        // ===== HORÁRIO OBRIGATÓRIO COMPOSITE (sincronizado com /badges) =====
+        // Sem horário: badges não marca → modal também não adiciona booking.
+        if (
+          !experimentalHasTime(
+            String((b as any).professor_time ?? ""),
+            String((b as any).lead_time ?? ""),
+          )
+        )
+          continue;
         const hasProf = Boolean(
           String((b as any).assigned_professor_name ?? "").trim() ||
           String((b as any).assigned_professor_phone ?? "").trim(),
@@ -191,6 +201,14 @@ export async function GET(req: Request) {
           const lDate = String((r as any).experimental_class_lead_date ?? "").trim().slice(0, 10);
           const d = pDate || lDate;
           if (d !== targetDate) continue;
+          // ===== HORÁRIO OBRIGATÓRIO FLAT EXP (sincronizado com /badges) =====
+          if (
+            !experimentalHasTime(
+              String((r as any).experimental_class_professor_time ?? ""),
+              String((r as any).experimental_class_lead_time ?? ""),
+            )
+          )
+            continue;
           const bkId = flatExpDedupId(String(r.id ?? ""), (r as any).experimental_class_booking_id);
           if (alreadySeenBookingIds.has(bkId)) continue;
           alreadySeenBookingIds.add(bkId);

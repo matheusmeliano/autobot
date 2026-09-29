@@ -65,6 +65,19 @@ export function recurringHasTime(pTimeRaw: string | null | undefined): boolean {
   return /\d{1,2}:\d{2}/.test(String(pTimeRaw ?? "").trim());
 }
 
+// Experimentais (composite E flat): tem horário?
+// ANTES: badges marcava aula com status válido mas professor_time nulo →
+//        modal não encontrava slot → "3 badges, modal mostra 2".
+// AGORA:  os dois validam, sempre sincronizado.
+export function experimentalHasTime(
+  professorTimeRaw: string | null | undefined,
+  leadTimeRaw?: string | null | undefined,
+): boolean {
+  const p = String(professorTimeRaw ?? "").trim();
+  const l = String(leadTimeRaw ?? "").trim();
+  return /\d{1,2}:\d{2}/.test(p) || /\d{1,2}:\d{2}/.test(l);
+}
+
 // ====================================================================
 // B. DETECÇÃO DE PROFESSOR KEY (LB / NC / PN) — UNIFICADA.
 // ====================================================================
