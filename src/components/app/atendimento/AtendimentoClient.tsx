@@ -655,6 +655,12 @@ export function AtendimentoClient() {
   const initialLoadCompletedRef = useRef(false);
   const suppressAutoSelectUntilRef = useRef<number>(0);
   const explicitSelectLockRef = useRef<boolean>(false);
+  // Lock para PROTEGER o setLeadListPage() do handleDeleteSelected de ser
+  // ZERADO (para 1) pelo useEffect() L2002 que roda ao panelLeads.length mudar.
+  // Sempre que excluirmos um registro, setamos o safePageAfter manualmente e
+  // travamos esse lock por ~50ms → o useEffect pula o reset. Depois expira e
+  // tudo volta ao normal (reset page=1 ao mudar filtro/busca continua OK).
+  const preventResetPageUntilRef = useRef<number>(0);
 
   // Detecta viewport <1201px (tamanho MOBILE para layout atendimento)
   useEffect(() => {
@@ -2000,6 +2006,11 @@ export function AtendimentoClient() {
   }, [panelLeads, searchQuery, activeFilters, quickUrlForceTick]);
 
   useEffect(() => {
+    // PREVINE BUG: "excluí registro, voltou tela vazia" — se temos o lock
+    // preventResetPageUntilRef (do handleDeleteSelected), NÃO resetamos
+    // a página para 1 (pois handleDeleteSelected já setou safePageAfter
+    // correta e queremos manter o nextId visível na tela).
+    if (Date.now() < preventResetPageUntilRef.current) return;
     setLeadListPage(1);
   }, [searchQuery, activeFilters, panelLeads.length]);
 
@@ -3034,18 +3045,48 @@ export function AtendimentoClient() {
         // Fallback (raro): idxInVisible não encontrado mas tem gente → primeiro da página.
         nextId = visibleListAfter[0]?.id ?? filteredAfter[0].id ?? null;
       }
+      // Garantia FINAL: nextId só é válido se EXISTIR em filteredAfter.
+      // Se por algum motivo o visibleListAfter não contiver o nextId (ex: página
+      // mudou, filtro mudou no meio tempo), pega o primeiro de filteredAfter.
+      if (nextId != null && !filteredAfter.some((l) => l.id === nextId)) {
+        nextId = filteredAfter[0]?.id ?? null;
+      }
 
-      // ========== PASSO 4: aplica seleção ==========
+      // ========== PASSO 4: aplica seleção + TRAVA contra reset de página ==========
+      // (ROOT CAUSE ACHADO: o useEffect L2008 roda ao panelLeads.length mudar
+      //  e seta leadListPage = 1. Isso apaga o nextId que estava na página 2+
+      //  e a tela volta para "Selecione um registro". Solução: TRAVAR o
+      //  preventResetPageUntilRef por ~50ms + SEMPRE setar safePageAfter MANUAL
+      //  logo antes de setSelectedLeadId.)
+      preventResetPageUntilRef.current = Date.now() + 80;
+
+      // Garante que a página atual é a safePageAfter SEMPRE (mesmo que igual):
+      setLeadListPage(safePageAfter);
+
       if (nextId != null) {
+        // Aplica o setState VÁRIAS vezes em micro/novos eventos para
+        // sobreviver ao React StrictMode batching (que às vezes perde o
+        // primeiro setState em flows com await + múltiplos setters).
+        // Ordem: rAF (antes do paint) → setTimeout 0 → setTimeout 50ms.
         setSelectedLeadId(nextId);
-        // Se precisou reduzir a página (último item de página cheia apagado),
-        // atualiza a página também para o usuário ver o item selecionado na tela.
-        if (safePageAfter !== safePageBefore && totalPagesAfter > 0) {
-          setLeadListPage(safePageAfter);
-        }
+        requestAnimationFrame(() => setSelectedLeadId(nextId));
+        setTimeout(() => setSelectedLeadId(nextId), 0);
+        setTimeout(() => {
+          setSelectedLeadId(nextId);
+          // Libera o lock de seleção explícita DEPOIS dos setters, para
+          // garantir que nenhum useEffect "consertou" de volta para null.
+          explicitSelectLockRef.current = false;
+        }, 60);
+        setTimeout(() => {
+          preventResetPageUntilRef.current = 0;
+        }, 200);
       } else {
         // 0 registros restantes → AQUI SIM pode ir para null (era o único registro do user).
         setSelectedLeadId(null);
+        setTimeout(() => {
+          explicitSelectLockRef.current = false;
+          preventResetPageUntilRef.current = 0;
+        }, 60);
       }
 
       setShowMobileLeadModal(false);
