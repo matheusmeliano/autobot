@@ -1589,7 +1589,6 @@ export function AtendimentoClient() {
             return hasValidExperimentalBooking(l) || flatAgendada;
           })();
           const ehMatriculadoFinal = isMatriculado(l);
-          const ehMatriculaIncompletaAgora = isMatriculaIncompleta(l);
           const terminalFora = new Set(["encerrado", "repescagem"]);
           const isTerminalFora = terminalFora.has(st) || terminalFora.has(fs);
 
@@ -1612,7 +1611,7 @@ export function AtendimentoClient() {
             return !ehAgendada && (!temQualquerData || !temQualquerHorario);
           })();
 
-          if (!isTerminalFora && !ehAgendada && !ehMatriculadoFinal && !ehMatriculaIncompletaAgora) {
+          if (!isTerminalFora && !ehAgendada && !ehMatriculadoFinal) {
             ok = true;
           }
           if (
@@ -1620,7 +1619,6 @@ export function AtendimentoClient() {
             !isTerminalFora &&
             !ehAgendada &&
             !ehMatriculadoFinal &&
-            !ehMatriculaIncompletaAgora &&
             (semNome || semEstadoOuCidade || semDiaOuHorario)
           ) {
             ok = true;
