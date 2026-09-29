@@ -1536,12 +1536,39 @@ export function AtendimentoClient() {
       ) {
         return true;
       }
+      if (
+        fsRaw.includes("aluno") ||
+        fsRaw.includes("matriculado") ||
+        fsRaw.includes("matricula_confirmada") ||
+        fsRaw.includes("contrato_assinado") ||
+        sRaw.includes("aluno") ||
+        sRaw.includes("matriculado") ||
+        sRaw.includes("matricula_confirmada") ||
+        sRaw.includes("contrato_assinado") ||
+        st.includes("aluno") ||
+        st.includes("matriculado") ||
+        fs.includes("aluno") ||
+        fs.includes("matriculado")
+      ) {
+        return true;
+      }
 
       if (
         Boolean((l as any)?.enrollment_number) ||
         Boolean((l as any)?.contract_signed_at) ||
         String((l as any)?.contract_status ?? "").trim() === "assinado" ||
         Boolean((l as any)?.contract_pdf_url)
+      ) {
+        return true;
+      }
+      const contractStatusNorm = String((l as any)?.contract_status ?? "").trim().toLowerCase();
+      if (
+        contractStatusNorm === "assinado" ||
+        contractStatusNorm === "confirmado" ||
+        contractStatusNorm === "ativo" ||
+        contractStatusNorm.includes("assina") ||
+        contractStatusNorm.includes("matricula") ||
+        contractStatusNorm.includes("confirmad")
       ) {
         return true;
       }
@@ -1554,6 +1581,24 @@ export function AtendimentoClient() {
       const rca = String((l as any)?.recurring_class_created_at ?? "").trim();
       const hasRecurringClass = Boolean(rcs || rw || rwl || rpt || rlt || rca);
       if (hasRecurringClass) return true;
+      if (
+        rcs === "ativo" ||
+        rcs === "confirmado" ||
+        rcs === "agendado" ||
+        rcs.includes("ativ") ||
+        rcs.includes("cadastrad") ||
+        rcs.includes("aluno") ||
+        rcs.includes("matriculad")
+      ) {
+        return true;
+      }
+      if (Number.isFinite(Number((l as any)?.recurring_registration_step))) {
+        const step = Number((l as any)?.recurring_registration_step);
+        if (step > 0) return true;
+      }
+      if (String((l as any)?.recurring_registration_step ?? "").trim()) {
+        return true;
+      }
 
       const rpn = String((l as any)?.recurring_class_professor_name ?? "").trim();
       const rpp = String((l as any)?.recurring_class_professor_phone ?? "").trim();
@@ -1565,6 +1610,37 @@ export function AtendimentoClient() {
         Boolean(lrd) ||
         Boolean((l as any)?.alunos_entered_at);
       if (hasRecurringPlataforma) return true;
+
+      const pStatus = String((l as any)?.payment_status ?? "").trim().toLowerCase();
+      if (
+        pStatus === "confirmado" ||
+        pStatus === "pago" ||
+        pStatus === "matriculado" ||
+        pStatus === "assinado" ||
+        pStatus === "ativo" ||
+        pStatus.includes("confirmad") ||
+        pStatus.includes("pag") ||
+        pStatus.includes("matriculad") ||
+        pStatus.includes("assina") ||
+        pStatus.includes("ativ")
+      ) {
+        return true;
+      }
+      const planoRaw = String(
+        (l as any)?.plano ??
+          (l as any)?.recurring_plan ??
+          (l as any)?.plano_aluno ??
+          (l as any)?.selected_plan ??
+          "",
+      ).trim();
+      if (planoRaw) return true;
+      const turmaRaw = String(
+        (l as any)?.turma ??
+          (l as any)?.class_code ??
+          (l as any)?.turma_aluno ??
+          "",
+      ).trim();
+      if (turmaRaw) return true;
 
       return false;
     };
