@@ -3152,11 +3152,9 @@ export function AtendimentoClient() {
                     next.createdFrom = prev.createdFrom;
                     next.createdTo = prev.createdTo;
                     // ---------------------------------------------------------
-                    // Se NÃO HOUVER NENHUM filtro ativo, volta URL para a base
-                    // /app/atendimento (remover query params sujos).
-                    if (!hasAnyFilterActive(next)) {
-                      router.replace("/app/atendimento", { scroll: false });
-                    }
+                    // NÃO navega. Apenas o botão "Aplicar" pode voltar a URL para
+                    // /app/atendimento (se o resultado for SEM filtros). Limpar
+                    // só reseta os campos do estado.
                     return next;
                   });
                 }}
@@ -3291,11 +3289,9 @@ export function AtendimentoClient() {
                     nextRaw.bookingPN = false;
                     nextRaw.bookingLeadIds = [];
 
-                    // Se NÃO HOUVER NENHUM filtro ativo, volta URL para a base
-                    // /app/atendimento (remover query params sujos de cliques anteriores).
-                    if (!hasAnyFilterActive(nextRaw as LeadFilters)) {
-                      router.replace("/app/atendimento", { scroll: false });
-                    }
+                    // NÃO navega. Apenas o botão "Aplicar" do filtro avançado pode
+                    // voltar a URL para /app/atendimento. Interação com o calendário
+                    // de cadastro só atualiza estado, sem tocar na URL.
                     return nextRaw;
                   });
                 }}
