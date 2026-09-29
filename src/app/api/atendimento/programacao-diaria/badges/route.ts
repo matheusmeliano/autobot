@@ -61,39 +61,45 @@ export async function GET(req: Request) {
     badgeMap[d] = { LB: false, NC: false, PN: false };
   }
 
-  // ================================================================
-  // PIPELINE SINCRONIZADO — PASSO A PASSO IGUAL AO /programacao-diaria.
-  //   (mesmas 3 fontes, mesmos sets válidos, mesma detecção de professor,
-  //    mesma regra de dom/horário obrigatório, mesmo dedup flat/composite)
-  //
-  // 0) Pré-condição: para RECORRÊNCIAS e HORÁRIOS — usamos a mesma regra
-  //    do modal buildSlotsForDay: DOMINGO NÃO TEM GRADE (retorna vazio)
-  //    → badges também NÃO MARCA NADA em DOMINGO.
-  // ================================================================
   const isSunday = (localDateYYYYMMDD: string): boolean => weekdayShortIso(localDateYYYYMMDD) === "sun";
+
+  // ================================================================================
+  // REST FETCH DIRETO (MESMO MÉTODO DO /programacao-diaria — NÃO USA SDK ADMIN.FROM).
+  // SDK admin.from() estava retornando NULL silenciosamente no try/catch, flat e
+  // recorrentes não carregavam → badges mostrava 2, modal mostrava 3.
+  // ================================================================================
+  const SUPABASE_URL = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "https://wancechxapezliwiwlke.supabase.co").replace(/\/$/, "");
+  const SUPABASE_SERVICE_ROLE_KEY =
+    String(process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbmNlY2h4YXBlemxpd2l3bGtlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTY2OTY5MCwiZXhwIjoyMDkxMjQ1NjkwfQ.8kQv54DQOQscolOiS5NW_XYXzjPYjut3pCj5uLPbYWw").trim();
+  const restHeaders: Record<string, string> = {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  };
 
   const admin = createSupabaseAdminClient();
 
   // =============== 1) EXPERIMENTAIS COMPOSITE (tabela atendimento_experimental_class_bookings) ===============
+  // Obs: continuamos SDK aqui (por enquanto, gte/lte date range funciona), mas AGORA select INCLUI
+  // professor_time e lead_time — antes faltavam! experimentalHasTime sempre retornava false.
+  const compositeBookings: Array<Record<string, unknown>> = [];
   try {
     const baseSelect =
-      "professor_date,assigned_professor_name,assigned_professor_phone,status,id";
+      "id,lead_id,status,professor_date,professor_time,lead_time,assigned_professor_name,assigned_professor_phone";
     const { data, error } = await admin
       .from("atendimento_experimental_class_bookings")
       .select(baseSelect)
       .gte("professor_date", from)
       .lte("professor_date", to);
     if (data && !error) {
-      // Dedup ids já vistos (para evitar badge extra por composite duplicado rare)
       const seenComposite = new Set<string>();
       for (const b of data as Array<Record<string, unknown>>) {
         const d = String(b?.professor_date ?? "").trim().slice(0, 10);
         if (!d || !badgeMap[d]) continue;
-        if (isSunday(d)) continue; // MESMA regra do modal: domingo SEM grade.
+        if (isSunday(d)) continue;
         const st = String(b?.status ?? "").toLowerCase();
         if (!VALID_EXPERIMENTAL_COMPOSITE_STATUS.has(st)) continue;
-        // ===== HORÁRIO OBRIGATÓRIO COMPOSITE (sincronizado com modal) =====
-        // Sem horário: não existe slot no modal → badges também NÃO marca.
+        // ---- HORÁRIO OBRIGATÓRIO COMPOSITE ----
+        // AGORA TEMOS professor_time/lead_time no select.
         if (
           !experimentalHasTime(
             String((b as any).professor_time ?? ""),
@@ -104,6 +110,7 @@ export async function GET(req: Request) {
         const id = String((b as any).id ?? "").trim();
         if (id && seenComposite.has(id)) continue;
         if (id) seenComposite.add(id);
+        compositeBookings.push(b);
         const pName = String((b as any).assigned_professor_name ?? "");
         const pPhone = String((b as any).assigned_professor_phone ?? "");
         const hasProf = Boolean(pName.trim() || pPhone.trim());
@@ -114,9 +121,7 @@ export async function GET(req: Request) {
   } catch {}
 
   // =============== 1.5) EXPERIMENTAIS FLAT (colunas flat EM ATENDIMENTO_LEADS: experimental_class_*) ===============
-  // Regra de dedup FLAT ↔ COMPOSITE: se experimental_class_booking_id existir
-  // E já tiver sido carregado como composite → PULA (mesmo booking, não duplica).
-  // Usado no modal (programacao-diaria/route.ts L187) e aqui IGUALMENTE.
+  // 🔴 TROCADO SDK admin.from() → FETCH REST DIRETO (igual MODAL).
   try {
     const selFlat = [
       "id",
@@ -130,63 +135,52 @@ export async function GET(req: Request) {
       "experimental_class_booking_id",
       "funnel_stage",
     ].join(",");
-    const { data, error } = await admin
-      .from("atendimento_leads")
-      .select(selFlat)
-      .or(
-        "experimental_class_professor_date.not.is.null,experimental_class_status.not.is.null,experimental_class_professor_name.not.is.null,experimental_class_lead_date.not.is.null",
-      )
-      .limit(2000);
-    if (data && !error) {
-      // Flat exp dedup: usa a MESMA regra do modal.
-      // Passo 1: pegar todos composite ids que aparecem em ALGUM dia do período
-      // (se eu só pegar por dia, flat em outro dia não dedup composite duplicado do mesmo lead em dia diferente)
-      const alreadySeenBookingIdsPeriodo = (() => {
-        const s = new Set<string>();
-        // Composite não tem bookingsPeriod global aqui (passo 1), então fazemos varredura
-        // pela data já marcada no badgeMap. (Para evitar double load, carregamos agora o resto dos campos composite.
-        // Como já carregamos no passo 1, mas baseSelect inclui "id", e vamos dedup flatExp por id composite.)
-        // Solução simples: neste passo, usar os dados JÁ carregados do passo 1 → no try/catch temos `data` do passo 1
-        // que não está visível fora do try. Então varremos composite NOVAMENTE (leve, 30 dias 2000 rows max) para pegar ids.
-        return s;
-      })();
-      // (Para performance, não nos preocupamos com ids vistos no passo 1 em período todo. O importante é
-      //  flatExpDedupId bater a regra do modal: bookingId se existe, senão flat-exp-{lead_id})
-      for (const r of data as unknown as Array<Record<string, unknown>>) {
-        const stExpFlat = String((r as any).experimental_class_status ?? "").trim().toLowerCase();
-        const stFunnel = String((r as any).funnel_stage ?? "").trim().toLowerCase();
-        // Mesma regra do modal: (st se existir tem que estar em VALID_FLAT) OU
-        // (st vazio e funnel_stage válido)
-        let ok = false;
-        if (stExpFlat && VALID_EXPERIMENTAL_FLAT_STATUS.has(stExpFlat)) ok = true;
-        else if (!stExpFlat && VALID_RECURRING_FUNNEL_STAGE_FALLBACK.has(stFunnel)) ok = true;
-        if (!ok) continue;
-        const pDate = String((r as any).experimental_class_professor_date ?? "").trim().slice(0, 10);
-        const lDate = String((r as any).experimental_class_lead_date ?? "").trim().slice(0, 10);
-        const d = pDate || lDate;
-        if (!d || !badgeMap[d]) continue;
-        if (d < from || d > to) continue;
-        if (isSunday(d)) continue;
-        // ===== HORÁRIO OBRIGATÓRIO FLAT EXP (sincronizado com modal) =====
-        if (
-          !experimentalHasTime(
-            String((r as any).experimental_class_professor_time ?? ""),
-            String((r as any).experimental_class_lead_time ?? ""),
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(experimental_class_professor_date.not.is.null,experimental_class_status.not.is.null,experimental_class_professor_name.not.is.null,experimental_class_lead_date.not.is.null)&select=${selFlat}&limit=5000`,
+      { method: "GET", headers: restHeaders, cache: "no-store" },
+    );
+    if (res.ok) {
+      const data = (await res.json()) as Array<Record<string, unknown>> | null;
+      if (Array.isArray(data) && data.length > 0) {
+        const alreadySeenBookingIdsPeriodo = new Set<string>(
+          compositeBookings.map((bk) => String((bk as any).id ?? "").trim()).filter(Boolean),
+        );
+        for (const r of data) {
+          const stExpFlat = String((r as any).experimental_class_status ?? "").trim().toLowerCase();
+          const stFunnel = String((r as any).funnel_stage ?? "").trim().toLowerCase();
+          let ok = false;
+          if (stExpFlat && VALID_EXPERIMENTAL_FLAT_STATUS.has(stExpFlat)) ok = true;
+          else if (!stExpFlat && VALID_RECURRING_FUNNEL_STAGE_FALLBACK.has(stFunnel)) ok = true;
+          if (!ok) continue;
+          const pDate = String((r as any).experimental_class_professor_date ?? "").trim().slice(0, 10);
+          const lDate = String((r as any).experimental_class_lead_date ?? "").trim().slice(0, 10);
+          const d = pDate || lDate;
+          if (!d || !badgeMap[d]) continue;
+          if (d < from || d > to) continue;
+          if (isSunday(d)) continue;
+          // ---- HORÁRIO OBRIGATÓRIO FLAT EXP ----
+          if (
+            !experimentalHasTime(
+              String((r as any).experimental_class_professor_time ?? ""),
+              String((r as any).experimental_class_lead_time ?? ""),
+            )
           )
-        )
-          continue;
-        const pName = String((r as any).experimental_class_professor_name ?? "").trim();
-        const pPhone = String((r as any).experimental_class_professor_phone ?? "").trim();
-        const hasProf = Boolean(pName || pPhone);
-        const key = detectTeacherKey(pName, pPhone, !hasProf);
-        (badgeMap[d] as any)[key] = true;
+            continue;
+          const pName = String((r as any).experimental_class_professor_name ?? "").trim();
+          const pPhone = String((r as any).experimental_class_professor_phone ?? "").trim();
+          const hasProf = Boolean(pName || pPhone);
+          const bkId = flatExpDedupId(String(r.id ?? ""), (r as any).experimental_class_booking_id);
+          if (bkId && alreadySeenBookingIdsPeriodo.has(bkId)) continue;
+          alreadySeenBookingIdsPeriodo.add(bkId);
+          const key = detectTeacherKey(pName, pPhone, !hasProf);
+          (badgeMap[d] as any)[key] = true;
+        }
       }
     }
   } catch {}
 
   // =============== 2) RECORRENTES (leads flat) ===============
-  // Regra: para cada dia no período (d), se o status é válido, e weekday match com effectiveWeekday, e created_at <= d → marcar.
-  // (usa VALID_RECURRING_CLASS_STATUS + VALID_RECURRING_FUNNEL_STAGE_FALLBACK (fallback) — IGUAL ao modal)
+  // 🔴 TROCADO SDK admin.from() → FETCH REST DIRETO (igual MODAL).
   try {
     const sel = [
       "id",
@@ -201,60 +195,60 @@ export async function GET(req: Request) {
       "recurring_class_professor_timezone",
       "funnel_stage",
     ].join(",");
-    const { data, error } = await admin
-      .from("atendimento_leads")
-      .select(sel)
-      .or(
-        "recurring_class_status.not.is.null,recurring_class_weekday.not.is.null,recurring_class_weekday_label.not.is.null,recurring_class_professor_time.not.is.null,recurring_class_lead_time.not.is.null,recurring_class_created_at.not.is.null",
-      )
-      .limit(2000);
-    if (data && !error) {
-      for (const r of data as unknown as Array<Record<string, unknown>>) {
-        const stRec = String((r as any).recurring_class_status ?? "").trim().toLowerCase();
-        const stFunnel = String((r as any).funnel_stage ?? "").trim().toLowerCase();
-        let recOk = false;
-        if (stRec && VALID_RECURRING_CLASS_STATUS.has(stRec)) recOk = true;
-        else if (!stRec && VALID_RECURRING_FUNNEL_STAGE_FALLBACK.has(stFunnel)) recOk = true;
-        if (!recOk) continue;
-        const colWeekday = String((r as any).recurring_class_weekday ?? "").trim().toLowerCase();
-        const colLabel = String((r as any).recurring_class_weekday_label ?? "").trim();
-        let effective: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | null = null;
-        const ALLOWED_WD = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
-        if (ALLOWED_WD.includes(colWeekday as any)) effective = colWeekday as any;
-        else {
-          const fromLabel = weekdayFromLabel(colLabel);
-          if (fromLabel) effective = fromLabel;
-        }
-        if (!effective) continue;
-        // horário obrigatório (mesma regra do modal)
-        const pTimeRaw =
-          String((r as any).recurring_class_professor_time ?? "").trim() ||
-          String((r as any).recurring_class_lead_time ?? "").trim();
-        if (!recurringHasTime(pTimeRaw)) continue;
-        if (effective === "sun") continue; // domingo SEM grade (mesma regra do modal)
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(recurring_class_status.not.is.null,recurring_class_weekday.not.is.null,recurring_class_weekday_label.not.is.null,recurring_class_professor_time.not.is.null,recurring_class_lead_time.not.is.null,recurring_class_created_at.not.is.null)&select=${sel}&limit=5000`,
+      { method: "GET", headers: restHeaders, cache: "no-store" },
+    );
+    if (res.ok) {
+      const data = (await res.json()) as Array<Record<string, unknown>> | null;
+      if (Array.isArray(data) && data.length > 0) {
+        for (const r of data) {
+          const stRec = String((r as any).recurring_class_status ?? "").trim().toLowerCase();
+          const stFunnel = String((r as any).funnel_stage ?? "").trim().toLowerCase();
+          let recOk = false;
+          if (stRec && VALID_RECURRING_CLASS_STATUS.has(stRec)) recOk = true;
+          else if (!stRec && VALID_RECURRING_FUNNEL_STAGE_FALLBACK.has(stFunnel)) recOk = true;
+          if (!recOk) continue;
+          const colWeekday = String((r as any).recurring_class_weekday ?? "").trim().toLowerCase();
+          const colLabel = String((r as any).recurring_class_weekday_label ?? "").trim();
+          let effective: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | null = null;
+          const ALLOWED_WD = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+          if (ALLOWED_WD.includes(colWeekday as any)) effective = colWeekday as any;
+          else {
+            const fromLabel = weekdayFromLabel(colLabel);
+            if (fromLabel) effective = fromLabel;
+          }
+          if (!effective) continue;
+          // horário obrigatório (mesma regra do modal)
+          const pTimeRaw =
+            String((r as any).recurring_class_professor_time ?? "").trim() ||
+            String((r as any).recurring_class_lead_time ?? "").trim();
+          if (!recurringHasTime(pTimeRaw)) continue;
+          if (effective === "sun") continue; // domingo SEM grade (mesma regra do modal)
 
-        // teacher key
-        const pName = String((r as any).recurring_class_professor_name ?? "").trim();
-        const pPhone = String((r as any).recurring_class_professor_phone ?? "").trim();
-        const hasProf = Boolean(pName || pPhone);
-        const tKey = detectTeacherKey(pName, pPhone, !hasProf);
+          // teacher key
+          const pName = String((r as any).recurring_class_professor_name ?? "").trim();
+          const pPhone = String((r as any).recurring_class_professor_phone ?? "").trim();
+          const hasProf = Boolean(pName || pPhone);
+          const tKey = detectTeacherKey(pName, pPhone, !hasProf);
 
-        // primeira data (created_at convertido no tz do professor) — MESMA lógica do modal
-        const tz =
-          String((r as any).recurring_class_professor_timezone ?? "").trim() ||
-          ATENDIMENTO_PROFESSOR_TIME_ZONE;
-        const firstLocalYYYYMMDD = recurringFirstLocalDate(
-          (r as any).recurring_class_created_at,
-          tz,
-        );
+          // primeira data (created_at convertido no tz do professor) — MESMA lógica do modal
+          const tz =
+            String((r as any).recurring_class_professor_timezone ?? "").trim() ||
+            ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const firstLocalYYYYMMDD = recurringFirstLocalDate(
+            (r as any).recurring_class_created_at,
+            tz,
+          );
 
-        // Iterar todos os dias do período e marcar se weekday == effective
-        for (const d of dayList) {
-          if (isSunday(d)) continue;
-          if (firstLocalYYYYMMDD && d < firstLocalYYYYMMDD) continue;
-          const wd = weekdayShortIso(d);
-          if (wd !== effective) continue;
-          (badgeMap[d] as any)[tKey] = true;
+          // Iterar todos os dias do período e marcar se weekday == effective
+          for (const d of dayList) {
+            if (isSunday(d)) continue;
+            if (firstLocalYYYYMMDD && d < firstLocalYYYYMMDD) continue;
+            const wd = weekdayShortIso(d);
+            if (wd !== effective) continue;
+            (badgeMap[d] as any)[tKey] = true;
+          }
         }
       }
     }
