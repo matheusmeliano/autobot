@@ -2908,6 +2908,60 @@ export function AtendimentoClient() {
     if (!window.confirm(`Excluir Registro?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
       return;
     }
+
+    // ================ REGRA DE SELEÇÃO APÓS EXCLUIR ================
+    // User pediu: "Quando excluir um registro deve ir para o registro
+    // de baixo! e não voltar mais para: Selecione um registro".
+    //
+    // Estratégia:
+    //   [1] Calcula a LISTA VISÍVEL ATUAL (filtered + página atual)
+    //       ANTES da exclusão → é a que o usuário VÊ na tela (pagedFilteredLeads).
+    //   [2] Acha o índice do selecionado NESSA lista visível.
+    //   [3] Após remover, a "lista visível nova" terá o item de BAIXO
+    //       do excluído exatamente no MESMO ÍNDICE.
+    //   [4] Se era o ÚLTIMO item da página → pega o novo último da página
+    //       (que passa a ser o anterior do excluído, se a página não
+    //       reduziu; ou reduz página para safePage-1 se safePage>1).
+    //   [5] Se ficou vazio (0) → null.
+    const q = searchQuery.trim().toLowerCase();
+    const filtersWithQuickInjectedPre: LeadFilters = { ...activeFilters };
+    if (typeof window !== "undefined") {
+      try {
+        const qsPre = new URLSearchParams(window.location.search);
+        const raw = qsPre.get("quickStatusList") ?? qsPre.get("quick") ?? qsPre.get("qs") ?? "";
+        if (raw) {
+          const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+          const ids: string[] = [];
+          for (const p of parts) {
+            if (!p) continue;
+            if (p.startsWith("quick__")) ids.push(p);
+            else ids.push(`quick__${p}`);
+          }
+          if (ids.length > 0) {
+            (filtersWithQuickInjectedPre as any).quickStatusList = Array.from(new Set([
+              ...(Array.isArray((filtersWithQuickInjectedPre as any).quickStatusList)
+                ? ((filtersWithQuickInjectedPre as any).quickStatusList as string[])
+                : []),
+              ...ids,
+            ]));
+          }
+        }
+      } catch {}
+    }
+    let filteredBefore = applyFiltersToLeads(panelLeads, filtersWithQuickInjectedPre);
+    if (q) filteredBefore = filteredBefore.filter((l) => leadMatchesSearchQuery(l, q));
+
+    // Página antes (usa safePage para compatibilidade com a página que o usuário vê):
+    const totalBefore = filteredBefore.length;
+    const totalPagesBefore = Math.max(1, Math.ceil(totalBefore / LIST_PAGE_SIZE));
+    const safePageBefore = Math.min(safePage, totalPagesBefore);
+    const pagedStartBefore = (safePageBefore - 1) * LIST_PAGE_SIZE;
+    const pagedEndBefore = pagedStartBefore + LIST_PAGE_SIZE;
+    const visibleListBefore = filteredBefore.slice(pagedStartBefore, pagedEndBefore);
+
+    // Índice do selecionado NA LISTA VISÍVEL (0-based):
+    const idxInVisible = visibleListBefore.findIndex((l) => l.id === sl.id);
+
     try {
       setDeletingSelectedLoading(true);
       const response = await fetch(`/api/atendimento/leads/${sl.id}`, { method: "DELETE" });
@@ -2918,9 +2972,82 @@ export function AtendimentoClient() {
       }
       suppressAutoSelectUntilRef.current = Date.now() + 10000;
       explicitSelectLockRef.current = true;
-      setPanelLeads((current) => current.filter((item) => item.id !== sl.id));
+
+      // ========== PASSO 1: remove de panelLeads (igual antes) ==========
+      const panelLeadsAfter = panelLeads.filter((item) => item.id !== sl.id);
+      setPanelLeads(panelLeadsAfter);
       setSummary((current) => ({ ...current, totalLeads: Math.max(0, (current.totalLeads ?? 0) - 1) }));
-      setSelectedLeadId(null);
+
+      // ========== PASSO 2: calcula "lista visível DEPOIS" ==========
+      // Aplica os MESMOS filtros + search no panelLeadsAfter:
+      const filtersWithQuickInjectedPost: LeadFilters = { ...activeFilters };
+      if (typeof window !== "undefined") {
+        try {
+          const qsPost = new URLSearchParams(window.location.search);
+          const raw = qsPost.get("quickStatusList") ?? qsPost.get("quick") ?? qsPost.get("qs") ?? "";
+          if (raw) {
+            const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+            const ids: string[] = [];
+            for (const p of parts) {
+              if (!p) continue;
+              if (p.startsWith("quick__")) ids.push(p);
+              else ids.push(`quick__${p}`);
+            }
+            if (ids.length > 0) {
+              (filtersWithQuickInjectedPost as any).quickStatusList = Array.from(new Set([
+                ...(Array.isArray((filtersWithQuickInjectedPost as any).quickStatusList)
+                  ? ((filtersWithQuickInjectedPost as any).quickStatusList as string[])
+                  : []),
+                ...ids,
+              ]));
+            }
+          }
+        } catch {}
+      }
+      let filteredAfter = applyFiltersToLeads(panelLeadsAfter, filtersWithQuickInjectedPost);
+      if (q) filteredAfter = filteredAfter.filter((l) => leadMatchesSearchQuery(l, q));
+
+      const totalAfter = filteredAfter.length;
+      const totalPagesAfter = Math.max(1, Math.ceil(totalAfter / LIST_PAGE_SIZE));
+
+      // Página depois: tenta manter safePageBefore; se a página foi apagada
+      // (o totalPages reduziu e safePageBefore > totalPagesAfter), cai para
+      // a nova última página.
+      const safePageAfter = Math.min(safePageBefore, totalPagesAfter);
+      const pagedStartAfter = (safePageAfter - 1) * LIST_PAGE_SIZE;
+      const pagedEndAfter = pagedStartAfter + LIST_PAGE_SIZE;
+      const visibleListAfter = filteredAfter.slice(pagedStartAfter, pagedEndAfter);
+
+      // ========== PASSO 3: escolhe próximo selecionado ==========
+      let nextId: string | null = null;
+      if (visibleListAfter.length > 0 && idxInVisible >= 0) {
+        // 3a) Tem item no MESMO índice (excluído não era o último da página)?
+        if (idxInVisible < visibleListAfter.length) {
+          nextId = visibleListAfter[idxInVisible].id;
+        }
+        // 3b) Senão, excluído era o último item da lista visível → pega NOVO ÚLTIMO
+        //     (que é o item de CIMA, porque o último foi apagado):
+        else {
+          nextId = visibleListAfter[visibleListAfter.length - 1].id;
+        }
+      } else if (filteredAfter.length > 0) {
+        // Fallback (raro): idxInVisible não encontrado mas tem gente → primeiro da página.
+        nextId = visibleListAfter[0]?.id ?? filteredAfter[0].id ?? null;
+      }
+
+      // ========== PASSO 4: aplica seleção ==========
+      if (nextId != null) {
+        setSelectedLeadId(nextId);
+        // Se precisou reduzir a página (último item de página cheia apagado),
+        // atualiza a página também para o usuário ver o item selecionado na tela.
+        if (safePageAfter !== safePageBefore && totalPagesAfter > 0) {
+          setLeadListPage(safePageAfter);
+        }
+      } else {
+        // 0 registros restantes → AQUI SIM pode ir para null (era o único registro do user).
+        setSelectedLeadId(null);
+      }
+
       setShowMobileLeadModal(false);
       modalToast.success("Registro excluído com sucesso.");
     } catch (error) {
