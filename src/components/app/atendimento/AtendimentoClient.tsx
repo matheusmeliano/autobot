@@ -3132,31 +3132,12 @@ export function AtendimentoClient() {
               <button
                 type="button"
                 onClick={() => {
-                  // Draft do modal: volta para EMPTY.
-                  const clearedDraft: LeadFilters = { ...EMPTY_FILTERS };
-                  setDraftFilters(clearedDraft);
-                  // Active: limpa só os 9 campos avançados + booking*; preserva calendário.
-                  setActiveFilters((prev) => {
-                    const next: LeadFilters = {
-                      ...prev,
-                      ...EMPTY_ADVANCED_FILTERS,
-                      bookingDateFrom: "",
-                      bookingDateTo: "",
-                      bookingProfessorName: "",
-                      bookingPhone: "",
-                      bookingPN: false,
-                      bookingLeadIds: [],
-                    };
-                    // ---------- GARANTIA REDUNDANTE de INDEPENDÊNCIA ----------
-                    // Reforço: createdFrom/createdTo NÃO SÃO ALTERADOS.
-                    next.createdFrom = prev.createdFrom;
-                    next.createdTo = prev.createdTo;
-                    // ---------------------------------------------------------
-                    // NÃO navega. Apenas o botão "Aplicar" pode voltar a URL para
-                    // /app/atendimento (se o resultado for SEM filtros). Limpar
-                    // só reseta os campos do estado.
-                    return next;
-                  });
+                  // "Limpar" SÓ TOCA NO DRAFT (estados visuais do modal).
+                  // NUNCA toca em setActiveFilters — a lista ATIVA NÃO é
+                  // alterada. Para aplicar a limpeza, o usuário deve clicar
+                  // no botão "Aplicar" em seguida (que lê o draft vazio e
+                  // então altera activeFilters).
+                  setDraftFilters({ ...EMPTY_FILTERS });
                 }}
                 className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-95)] transition-colors w-full sm:w-auto"
               >
