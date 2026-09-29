@@ -1213,31 +1213,46 @@ export function AtendimentoClient() {
             (l as any)?.latest_experimental_class_booking ??
             (l as any)?.experimental_class_booking,
         );
-        const isExplicitlyAgendada = st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
+        const isExplicitlyAgendada =
+          stNorm === "aula_experimental_agendada" || fsNorm === "aula_experimental_agendada";
         if (hasFutureOrValidBooking || isExplicitlyAgendada) return false;
 
-        const EARLY_JOURNEY = new Set([
+        const missingName = !String((l as any)?.full_name ?? (l as any)?.name ?? "").trim();
+        const missingLocation =
+          !String((l as any)?.country ?? "").trim() ||
+          !String((l as any)?.state ?? "").trim() ||
+          !String((l as any)?.city ?? "").trim();
+        const missingContact =
+          !String((l as any)?.phone ?? "").trim() && !String((l as any)?.email ?? "").trim();
+        const missingExperimental =
+          !String((l as any)?.experimental_class_date ?? (l as any)?.experimental_class_professor_date ?? (l as any)?.experimental_class_lead_date ?? "").trim() ||
+          !String((l as any)?.experimental_class_time ?? (l as any)?.experimental_class_professor_time ?? (l as any)?.experimental_class_lead_time ?? "").trim() ||
+          !String((l as any)?.experimental_class_teacher ?? (l as any)?.experimental_class_professor_name ?? (l as any)?.experimental_class_teacher_name ?? "").trim();
+        const hasExperimentalJourneyMarker =
+          Boolean((l as any)?.time_selected_at) ||
+          Boolean((l as any)?.lead_selected_at) ||
+          Boolean((l as any)?.professor_confirmed_at) ||
+          Boolean((l as any)?.teacher_selected_at) ||
+          Boolean((l as any)?.experimental_class_status) ||
+          stNorm.startsWith("aula_experimental") ||
+          fsNorm.startsWith("aula_experimental");
+        const earlyFunnel = new Set([
           "novo_lead",
           "em_atendimento",
           "metodologia_apresentada",
           "aula_experimental_convidada",
           "",
         ]);
-        const hasEarlyStage = EARLY_JOURNEY.has(stNorm) || EARLY_JOURNEY.has(fsNorm);
+        const hasEarlyStage = earlyFunnel.has(stNorm) || earlyFunnel.has(fsNorm);
 
-        const hasPartialExperimental =
-          (typeof stNorm === "string" && stNorm.startsWith("aula_experimental")) ||
-          (typeof fsNorm === "string" && fsNorm.startsWith("aula_experimental")) ||
-          Boolean((l as any)?.experimental_class_date) ||
-          Boolean((l as any)?.experimental_class_time) ||
-          Boolean((l as any)?.experimental_class_teacher) ||
-          Boolean((l as any)?.experimental_class_status) ||
-          Boolean((l as any)?.time_selected_at) ||
-          Boolean((l as any)?.lead_selected_at) ||
-          Boolean((l as any)?.professor_confirmed_at) ||
-          Boolean((l as any)?.teacher_selected_at);
-
-        return hasEarlyStage || hasPartialExperimental;
+        return (
+          hasEarlyStage ||
+          missingName ||
+          missingLocation ||
+          missingContact ||
+          missingExperimental ||
+          hasExperimentalJourneyMarker
+        );
       }
       return st === sid || fs === sid;
     };
