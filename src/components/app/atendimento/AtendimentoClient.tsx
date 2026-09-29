@@ -3664,86 +3664,86 @@ export function AtendimentoClient() {
                       </button>
                     );
                   })}
-                  {totalPages > 1 ? (
-                    <div className="flex shrink-0 items-center justify-center gap-2 px-4 pt-3 pb-0 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/45 sm:px-5 sm:pt-3.5 sm:pb-0">
-                      <div className="flex shrink-0 items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setLeadListPage((p) => Math.max(1, p - 1))}
-                          disabled={safePage <= 1}
-                          className="inline-flex h-9 items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] pl-2.5 pr-3 text-[12px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label="Página anterior"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                          <span className="hidden sm:inline">Anterior</span>
-                        </button>
-                        <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-1.5 py-1">
-                          {(() => {
-                            const out: (number | "dots")[] = [];
-                            const add = (n: number | "dots") => out.push(n);
-                            const has = (n: number) => out.includes(n as any);
-                            const cur = safePage;
-                            const N = totalPages;
-                            add(1);
-                            if (N === 2) add(2);
-                            if (N >= 3) {
-                              if (cur - 1 > 1) add("dots");
-                              const left = Math.max(2, cur);
-                              const right = Math.min(N - 1, cur);
-                              for (let p = left; p <= right; p++) add(p);
-                              if (N - cur > 1) add("dots");
-                              if (!has(N)) add(N);
-                            }
-                            return out.map((x, idx) => {
-                              if (x === "dots") {
-                                return (
-                                  <span
-                                    key={`dot-${idx}`}
-                                    className="px-1 text-[11px] font-bold text-[var(--app-text-40)] tabular-nums"
-                                  >
-                                    ···
-                                  </span>
-                                );
-                              }
-                              const p = x as number;
-                              const isCur = p === safePage;
-                              return (
-                                <button
-                                  key={p}
-                                  type="button"
-                                  onClick={() => setLeadListPage(p)}
-                                  disabled={isCur}
-                                  className={
-                                    "inline-flex h-7 min-w-[28px] items-center justify-center rounded-full px-2 text-[12px] font-bold tabular-nums transition-colors " +
-                                    (isCur
-                                      ? "!bg-[#ea580c] !text-white shadow-[0_1px_2px_rgba(234,88,12,0.25)] disabled:opacity-100"
-                                      : "text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
-                                  }
-                                  aria-label={`Página ${p}`}
-                                >
-                                  {p}
-                                </button>
-                              );
-                            });
-                          })()}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setLeadListPage((p) => Math.min(totalPages, p + 1))}
-                          disabled={safePage >= totalPages}
-                          className="inline-flex h-9 items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] pl-3 pr-2.5 text-[12px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label="Próxima página"
-                        >
-                          <span className="hidden sm:inline">Próxima</span>
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
                 </>
               )}
             </div>
           </div>
+          {totalPages > 1 ? (
+            <div className="flex shrink-0 items-center justify-center gap-2 px-4 pt-3 pb-3 border-t border-[var(--app-border)] bg-[var(--app-solid-surface-2)]/45 sm:px-5 sm:pt-3.5 sm:pb-3.5">
+              <div className="flex shrink-0 items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLeadListPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  className="inline-flex h-9 items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] pl-2.5 pr-3 text-[12px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Anterior</span>
+                </button>
+                <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-1.5 py-1">
+                  {(() => {
+                    const out: (number | "dots")[] = [];
+                    const add = (n: number | "dots") => out.push(n);
+                    const has = (n: number) => out.includes(n as any);
+                    const cur = safePage;
+                    const N = totalPages;
+                    add(1);
+                    if (N === 2) add(2);
+                    if (N >= 3) {
+                      if (cur - 1 > 1) add("dots");
+                      const left = Math.max(2, cur);
+                      const right = Math.min(N - 1, cur);
+                      for (let p = left; p <= right; p++) add(p);
+                      if (N - cur > 1) add("dots");
+                      if (!has(N)) add(N);
+                    }
+                    return out.map((x, idx) => {
+                      if (x === "dots") {
+                        return (
+                          <span
+                            key={`dot-${idx}`}
+                            className="px-1 text-[11px] font-bold text-[var(--app-text-40)] tabular-nums"
+                          >
+                            ···
+                          </span>
+                        );
+                      }
+                      const p = x as number;
+                      const isCur = p === safePage;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setLeadListPage(p)}
+                          disabled={isCur}
+                          className={
+                            "inline-flex h-7 min-w-[28px] items-center justify-center rounded-full px-2 text-[12px] font-bold tabular-nums transition-colors " +
+                            (isCur
+                              ? "!bg-[#ea580c] !text-white shadow-[0_1px_2px_rgba(234,88,12,0.25)] disabled:opacity-100"
+                              : "text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
+                          }
+                          aria-label={`Página ${p}`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLeadListPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  className="inline-flex h-9 items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] pl-3 pr-2.5 text-[12px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Próxima página"
+                >
+                  <span className="hidden sm:inline">Próxima</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </aside>
 
         {/* ========================================================= */}
