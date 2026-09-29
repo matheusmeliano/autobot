@@ -1592,7 +1592,37 @@ export function AtendimentoClient() {
           const ehMatriculaIncompletaAgora = isMatriculaIncompleta(l);
           const terminalFora = new Set(["encerrado", "repescagem"]);
           const isTerminalFora = terminalFora.has(st) || terminalFora.has(fs);
+
+          const semNome = !String(l.full_name ?? "").trim();
+          const semEstadoOuCidade =
+            !String(l.state ?? "").trim() || !String(l.city ?? "").trim();
+          const semDiaOuHorario = (() => {
+            const temQualquerData = Boolean(
+              String((l as any)?.experimental_class_lead_date ?? "").trim() ||
+                String((l as any)?.experimental_class_professor_date ?? "").trim() ||
+                String((l as any)?.experimental_class_lead_start_at ?? "").trim() ||
+                String((l as any)?.experimental_class_professor_start_at ?? "").trim() ||
+                String((l as any)?.latest_past_class_meta?.date ?? "").trim(),
+            );
+            const temQualquerHorario = Boolean(
+              String((l as any)?.experimental_class_lead_time ?? "").trim() ||
+                String((l as any)?.experimental_class_professor_time ?? "").trim() ||
+                String((l as any)?.latest_past_class_meta?.time ?? "").trim(),
+            );
+            return !ehAgendada && (!temQualquerData || !temQualquerHorario);
+          })();
+
           if (!isTerminalFora && !ehAgendada && !ehMatriculadoFinal && !ehMatriculaIncompletaAgora) {
+            ok = true;
+          }
+          if (
+            !ok &&
+            !isTerminalFora &&
+            !ehAgendada &&
+            !ehMatriculadoFinal &&
+            !ehMatriculaIncompletaAgora &&
+            (semNome || semEstadoOuCidade || semDiaOuHorario)
+          ) {
             ok = true;
           }
         }
