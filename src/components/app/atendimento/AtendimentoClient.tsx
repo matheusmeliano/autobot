@@ -1520,13 +1520,36 @@ export function AtendimentoClient() {
         "contrato_assinado",
       ]);
       if (terminalStage.has(st) || terminalStage.has(fs)) return true;
+
       if (
         Boolean((l as any)?.enrollment_number) ||
         Boolean((l as any)?.contract_signed_at) ||
-        String((l as any)?.contract_status ?? "").trim()
+        String((l as any)?.contract_status ?? "").trim() === "assinado" ||
+        Boolean((l as any)?.contract_pdf_url)
       ) {
         return true;
       }
+
+      const rcs = String((l as any)?.recurring_class_status ?? "").trim().toLowerCase();
+      const rw = String((l as any)?.recurring_class_weekday ?? "").trim();
+      const rwl = String((l as any)?.recurring_class_weekday_label ?? "").trim();
+      const rpt = String((l as any)?.recurring_class_professor_time ?? "").trim();
+      const rlt = String((l as any)?.recurring_class_lead_time ?? "").trim();
+      const rca = String((l as any)?.recurring_class_created_at ?? "").trim();
+      const hasRecurringClass = Boolean(rcs || rw || rwl || rpt || rlt || rca);
+      if (hasRecurringClass) return true;
+
+      const rpn = String((l as any)?.recurring_class_professor_name ?? "").trim();
+      const rpp = String((l as any)?.recurring_class_professor_phone ?? "").trim();
+      const nrn = String((l as any)?.recurring_payment_next_date ?? (l as any)?.next_charge_date ?? (l as any)?.next_renewal_at ?? "").trim();
+      const lrd = String((l as any)?.recurring_payment_last_date ?? (l as any)?.last_charge_date ?? "").trim();
+      const hasRecurringPlataforma =
+        Boolean(rpn || rpp) ||
+        Boolean(nrn) ||
+        Boolean(lrd) ||
+        Boolean((l as any)?.alunos_entered_at);
+      if (hasRecurringPlataforma) return true;
+
       return false;
     };
     const isMatriculaIncompleta = (l: AtendimentoLeadListItem): boolean => {
