@@ -1208,14 +1208,30 @@ export function AtendimentoClient() {
           Boolean((l as any)?.enrollment_number);
         if (isAluno) return false;
 
-        const hasFutureOrValidBooking = Boolean(
-          (l as any)?.future_experimental_class_booking ??
+        const hasValidRealBooking = (() => {
+          if ((l as any)?.future_experimental_class_booking) return true;
+          const booking =
             (l as any)?.latest_experimental_class_booking ??
-            (l as any)?.experimental_class_booking,
-        );
+            (l as any)?.experimental_class_booking;
+          if (!booking) return false;
+          const bStatus = String(booking?.status ?? "").trim().toLowerCase();
+          const attendance = String(booking?.attendance_status ?? "").trim().toLowerCase();
+          const isBookedValid = ["booked", "confirmed", "professor_confirmed", "lead_confirmed"].includes(
+            bStatus,
+          );
+          const isAttended = attendance === "attended";
+          const isCancelledOrDraft =
+            bStatus === "cancelled" ||
+            bStatus === "draft" ||
+            attendance === "no_show" ||
+            bStatus === "date_selected" ||
+            bStatus === "time_selected";
+          if (isCancelledOrDraft) return false;
+          return isBookedValid || isAttended;
+        })();
         const isExplicitlyAgendada =
           stNorm === "aula_experimental_agendada" || fsNorm === "aula_experimental_agendada";
-        if (hasFutureOrValidBooking || isExplicitlyAgendada) return false;
+        if (hasValidRealBooking || isExplicitlyAgendada) return false;
 
         const missingName = !String((l as any)?.full_name ?? (l as any)?.name ?? "").trim();
         const missingLocation =
@@ -1245,14 +1261,16 @@ export function AtendimentoClient() {
         ]);
         const hasEarlyStage = earlyFunnel.has(stNorm) || earlyFunnel.has(fsNorm);
 
-        return (
+        const hasIncompleteMarker =
           hasEarlyStage ||
           missingName ||
           missingLocation ||
           missingContact ||
           missingExperimental ||
-          hasExperimentalJourneyMarker
-        );
+          hasExperimentalJourneyMarker;
+        if (hasIncompleteMarker) return true;
+
+        return true;
       }
       return st === sid || fs === sid;
     };
