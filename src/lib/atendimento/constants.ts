@@ -149,7 +149,7 @@ export const STAGE_LABELS: Record<string, string> = {
   em_atendimento: "Em Atendimento",
   metodologia_apresentada: "Metodologia Apresentada",
   aula_experimental_convidada: "Aula Experimental Convidada",
-  aula_experimental_agendada: "Aula Experimental Agendada",
+  aula_experimental_agendada: "Aulas Experimentais Agendadas",
   pre_cadastro_concluido: "Pré-Cadastro Concluído",
   matricula_pendente: "Matrícula Pendente",
   matricula_pendente_recusada: "Matrícula Pendente (Recusada)",
