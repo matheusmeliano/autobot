@@ -3840,97 +3840,140 @@ export function AtendimentoClient() {
             <button
               type="button"
               onClick={() => {
-                const currentQuickArr = Array.isArray((activeFilters as any).quickStatusList)
-                  ? ((activeFilters as any).quickStatusList as string[])
+                // =================== LÊ ESTADO ATUAL SÍNCRONO ===================
+                const prevQuick: string[] = Array.isArray((activeFilters as any).quickStatusList)
+                  ? ((activeFilters as any).quickStatusList as string[]).filter(Boolean)
                   : [];
                 const isAlunosJaLigado =
-                  currentQuickArr.length === 1 &&
-                  currentQuickArr[0] === "quick__matriculado";
-
-                let nextQuick: string[] = isAlunosJaLigado
+                  prevQuick.length === 1 && prevQuick[0] === "quick__matriculado";
+                const nextQuick: string[] = isAlunosJaLigado
                   ? []
                   : ["quick__matriculado"];
 
-                setActiveFilters((prev) => {
-                  const next: LeadFilters = {
-                    ...prev,
-                    quickStatusList: nextQuick,
-                    statusList: [],
-                    stageList: [],
-                    countries: [],
-                    states: [],
-                    onlyWithUnread: false,
-                    onlyWithPhone: false,
-                    onlyWithEmail: false,
-                    onlyWithScheduledClass: false,
-                    onlyWithContract: false,
-                    bookingDateFrom: "",
-                    bookingDateTo: "",
-                    bookingProfessorName: "",
-                    bookingPhone: "",
-                    bookingPhoneDigits: "",
-                    bookingPN: false,
-                    bookingLeadIds: [],
-                  };
-                  next.createdFrom = prev.createdFrom;
-                  next.createdTo = prev.createdTo;
-                  next.quickStatusList = nextQuick;
-                  return next;
-                });
+                // ===== MONTA nextFilters SÍNCRONO (sem updater function) =====
+                // Evita bugs de batching / StrictMode onde o setState updater
+                // function é chamado 2x ou cancelado e o setTimeout de baixo
+                // lê nextQuick correto mas o router.replace subsequente é
+                // cancelado por outro router.replace que executa junto.
+                const next: LeadFilters = {
+                  ...activeFilters,
+                  quickStatusList: nextQuick,
+                  statusList: [],
+                  stageList: [],
+                  countries: [],
+                  states: [],
+                  onlyWithUnread: false,
+                  onlyWithPhone: false,
+                  onlyWithEmail: false,
+                  onlyWithScheduledClass: false,
+                  onlyWithContract: false,
+                  bookingDateFrom: "",
+                  bookingDateTo: "",
+                  bookingProfessorName: "",
+                  bookingPhone: "",
+                  bookingPhoneDigits: "",
+                  bookingPN: false,
+                  bookingLeadIds: [],
+                };
+                // Preserva período de cadastro (garantia redundante)
+                next.createdFrom = activeFilters.createdFrom;
+                next.createdTo = activeFilters.createdTo;
+                next.quickStatusList = nextQuick;
 
-                // =================== FORÇADOR NUCLEAR POR URL ===================
-                // User pediu explicitamente: "Muda a url, força o registro a aparecer, faz alguma coisa".
-                // O applyFiltersToLeads agora LER DIRETO de window.location.search também,
-                // então mesmo que algo apague o activeFilters.quickStatusList, se a URL
-                // tiver ?quickStatusList=quick__matriculado, ele filtra.
-                // Atualiza URL e chama handleRefresh + bump tick dupla garantia.
-                setTimeout(() => {
-                  if (typeof window === "undefined") return;
-                  const existing = new URLSearchParams(window.location.search);
-                  // Sempre remove params de filtro avançado rápido (evita cruzamento):
-                  existing.delete("stage");
-                  existing.delete("status");
-                  existing.delete("stageList");
-                  existing.delete("statusList");
-                  existing.delete("bookingLeadIds");
-                  existing.delete("bookingFrom");
-                  existing.delete("bookingTo");
-                  existing.delete("bookingProfessor");
-                  existing.delete("bookingPhone");
-                  existing.delete("bookingPN");
-                  existing.delete("from");
-                  existing.delete("to");
-                  if (nextQuick.length > 0) {
-                    existing.set("quickStatusList", nextQuick.join(","));
-                    existing.set("quick", nextQuick.map((q) => q.replace(/^quick__/, "")).join(","));
-                  } else {
-                    existing.delete("quickStatusList");
-                    existing.delete("quick");
-                    existing.delete("qs");
-                  }
-                  const qs = existing.toString();
-                  const nextHref = qs
-                    ? `/app/atendimento?${qs}`
-                    : "/app/atendimento";
-                  if (window.location.pathname + window.location.search !== nextHref) {
-                    router.replace(nextHref, { scroll: false });
-                  }
-                  // Bump imediato (não espera pelo useEffect de popstate):
+                setActiveFilters(next);
+
+                // =================== MONTA E APLICA URL SÍNCRONO ===================
+                // NÃO usa setTimeout (era a causa raiz do cancelamento).
+                // NÃO depende de router.replace → usa window.history.replaceState
+                // DIRETO como FORÇADOR PRINCIPAL, e router.replace só como
+                // fallback caso o history falhe.
+                if (typeof window !== "undefined") {
+                  try {
+                    const existing = new URLSearchParams(window.location.search);
+                    // 1) Limpa qualquer param de filtro conflitante
+                    existing.delete("stage");
+                    existing.delete("status");
+                    existing.delete("stageList");
+                    existing.delete("statusList");
+                    existing.delete("bookingLeadIds");
+                    existing.delete("bookingFrom");
+                    existing.delete("bookingTo");
+                    existing.delete("bookingProfessor");
+                    existing.delete("bookingPhone");
+                    existing.delete("bookingPN");
+                    existing.delete("from");
+                    existing.delete("to");
+                    existing.delete("search");
+                    existing.delete("query");
+                    existing.delete("q");
+
+                    // 2) Escreve quick (chaves DUPLAS para leitura em qualquer lugar)
+                    if (nextQuick.length > 0) {
+                      existing.set("quickStatusList", nextQuick.join(","));
+                      existing.set("quick", nextQuick.map((q) => q.replace(/^quick__/, "")).join(","));
+                    } else {
+                      existing.delete("quickStatusList");
+                      existing.delete("quick");
+                      existing.delete("qs");
+                    }
+
+                    // 3) Preserva createdFrom/createdTo do calendário na URL tb
+                    const cf = String(next.createdFrom ?? "").trim();
+                    const ct = String(next.createdTo ?? "").trim();
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(cf)) existing.set("from", cf);
+                    else existing.delete("from");
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(ct)) existing.set("to", ct);
+                    else existing.delete("to");
+
+                    const qs = existing.toString();
+                    const nextHref = qs ? `/app/atendimento?${qs}` : `/app/atendimento`;
+                    const currentHref = window.location.pathname + window.location.search;
+
+                    if (currentHref !== nextHref) {
+                      // FORÇADOR NUCLEAR: history.replaceState DIRETO.
+                      // Isso altera window.location.search SEM recarregar, SEM
+                      // passar por router do Next. applyFiltersToLeads lê
+                      // window.location diretamente, então imediatamente na
+                      // próxima render do useMemo filteredLeads (bump tick
+                      // logo abaixo) ele já PICKUP os quickIds da URL.
+                      try {
+                        const nextUrl = new URL(nextHref, window.location.origin);
+                        window.history.replaceState(
+                          { ...window.history.state, as: nextHref, url: nextHref },
+                          "",
+                          nextUrl.toString(),
+                        );
+                      } catch {}
+                      // Fallback: router.replace para manter sincronia com Next
+                      router.replace(nextHref, { scroll: false });
+                    }
+                  } catch {}
+                }
+
+                // =================== Bump tick SÍNCRONO ===================
+                // Força o useMemo filteredLeads a re-executar imediatamente
+                // (tem quickUrlForceTick nas deps).
+                bumpQuickUrlForceTick();
+
+                // =================== Refresh SÍNCRONO ===================
+                // Não usa setTimeout também. Refaz a chamada de API → novas
+                // renders → useMemo re-roda com quick + URL nova.
+                void handleRefresh();
+
+                // =================== Última garantia: se desligou e sem filtro ===================
+                if (nextQuick.length === 0 && !hasAnyFilterActive(next)) {
+                  try {
+                    if (window.location.pathname + window.location.search !== "/app/atendimento") {
+                      window.history.replaceState(
+                        { ...window.history.state, as: "/app/atendimento", url: "/app/atendimento" },
+                        "",
+                        "/app/atendimento",
+                      );
+                      router.replace("/app/atendimento", { scroll: false });
+                    }
+                  } catch {}
+                  // Bump adicional tick para forçar re-render memo
                   bumpQuickUrlForceTick();
-                }, 0);
-
-                // Força refetch da lista (refresh endpoint → novas renderizações
-                // → useMemo filteredLeads re-roda com o quickUrlForceTick novo):
-                setTimeout(() => {
-                  void handleRefresh();
-                }, 10);
-
-                // Se depois de tudo NÃO tem nenhum filtro ativo,
-                // garante volta pra URL base (já feito acima, segunda garantia):
-                if (nextQuick.length === 0) {
-                  setTimeout(() => {
-                    bumpQuickUrlForceTick();
-                  }, 20);
                 }
               }}
               aria-label="Mostrar apenas Alunos (matriculados na plataforma)"
@@ -3944,7 +3987,11 @@ export function AtendimentoClient() {
                       const qs = new URLSearchParams(window.location.search);
                       const raw = qs.get("quickStatusList") ?? qs.get("quick") ?? "";
                       if (raw) {
-                        activeQuick = raw.split(",").map((s) => s.trim()).filter(Boolean).map((p) => p.startsWith("quick__") ? p : `quick__${p}`);
+                        activeQuick = raw
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .map((p) => (p.startsWith("quick__") ? p : `quick__${p}`));
                       }
                     } catch {}
                   }
