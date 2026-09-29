@@ -422,11 +422,14 @@ export function AppDateRangePicker({
             <button
               type="button"
               onClick={() => {
-                clearAll();
+                // X do popover do calendario: SÓ FECHA.
+                // NÃO limpa selecao, NÃO dispara onChange, NÃO apaga
+                // historico de busca. O usuario pode reabrir e a selecao
+                // de periodo ou dia continua exatamente como estava.
                 setOpen(false);
               }}
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-60)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-85)]"
-              aria-label="Fechar e limpar filtro"
+              aria-label="Fechar"
             >
               <X className="h-5 w-5" />
             </button>
