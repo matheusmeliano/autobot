@@ -414,14 +414,6 @@ export function AppDateRangePicker({
         {/* Header: mês/ano + setas + X fechar */}
         <div className="flex items-center justify-between gap-3 pb-4">
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setViewDate((v) => addMonths(v, -1))}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
-              aria-label="Mês anterior"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
             {/* Botão "Limpar" — SÓ aparece se o componente PAI passar
                 a prop onClearButtonClick. Ou seja: calendario de periodo
                 de cadastro (size="icon") passa; calendario de aulas
@@ -449,6 +441,14 @@ export function AppDateRangePicker({
                 Limpar
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setViewDate((v) => addMonths(v, -1))}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
           </div>
           <div className="flex-1 text-center text-[17px] font-extrabold text-[var(--app-text-90)] tracking-tight">
             {format(viewDate, "MMMM 'de' yyyy", { locale: ptBR })}
