@@ -495,6 +495,24 @@ export function AtendimentoClient() {
   const LIST_PAGE_SIZE = 20;
   const [leadListPage, setLeadListPage] = useState(1);
 
+  // Campos 100% CONTROLADOS PELO MODAL DE FILTROS AVANÇADOS.
+  // Estes são os ÚNICOS campos que o modal de filtros avançados tem permissão de
+  // ler/escrever. Os campos de calendário (createdFrom/createdTo) e de filtro de
+  // aula (booking*) são COMPARTILHADOS com outros componentes e NUNCA devem ser
+  // tocados pelo filtro avançado — garante independência TOTAL entre eles.
+  const ADVANCED_FILTER_KEYS = [
+    "statusList",
+    "stageList",
+    "countries",
+    "states",
+    "onlyWithUnread",
+    "onlyWithPhone",
+    "onlyWithEmail",
+    "onlyWithScheduledClass",
+    "onlyWithContract",
+  ] as const;
+  type AdvancedFilterKey = (typeof ADVANCED_FILTER_KEYS)[number];
+
   type LeadFilters = {
     statusList: string[];
     stageList: string[];
@@ -513,6 +531,9 @@ export function AtendimentoClient() {
     bookingDateFrom: string;
     bookingDateTo: string;
     bookingProfessorName: string;
+    bookingPhone?: string;
+    bookingPN?: boolean;
+    bookingLeadIds?: string[];
   };
   const EMPTY_FILTERS: LeadFilters = {
     statusList: [],
@@ -529,6 +550,36 @@ export function AtendimentoClient() {
     bookingDateFrom: "",
     bookingDateTo: "",
     bookingProfessorName: "",
+    bookingPhone: "",
+    bookingPN: false,
+    bookingLeadIds: [],
+  };
+  // EMPTY_ADVANCED_FILTERS: objeto com SÓ os 9 campos do filtro avançado, todos vazios.
+  // Usado para iniciar um draft novo SEM herdar valores do calendário (createdFrom/createdTo etc).
+  const EMPTY_ADVANCED_FILTERS: Pick<LeadFilters, AdvancedFilterKey> = {
+    statusList: [],
+    stageList: [],
+    countries: [],
+    states: [],
+    onlyWithUnread: false,
+    onlyWithPhone: false,
+    onlyWithEmail: false,
+    onlyWithScheduledClass: false,
+    onlyWithContract: false,
+  };
+
+  // Extrai de um filters SÓ os 9 campos do filtro avançado (ignora resto).
+  const pickAdvancedOnly = (f: LeadFilters): Pick<LeadFilters, AdvancedFilterKey> => {
+    const out = { ...EMPTY_ADVANCED_FILTERS };
+    for (const k of ADVANCED_FILTER_KEYS) out[k] = (f as any)[k] ?? EMPTY_ADVANCED_FILTERS[k];
+    return out;
+  };
+  // Mescla apenas os 9 campos avançados do draft em activeFilters — PRESERVA intactos
+  // createdFrom/createdTo (calendário de cadastro) e booking* (botão Ver, limpo separadamente).
+  const mergeAdvancedOnly = (active: LeadFilters, advancedDraft: Pick<LeadFilters, AdvancedFilterKey>): LeadFilters => {
+    const next: any = { ...active };
+    for (const k of ADVANCED_FILTER_KEYS) next[k] = (advancedDraft as any)[k];
+    return next;
   };
   const [activeFilters, setActiveFilters] = useState<LeadFilters>(EMPTY_FILTERS);
   const [draftFilters, setDraftFilters] = useState<LeadFilters>(EMPTY_FILTERS);
@@ -2925,12 +2976,35 @@ export function AtendimentoClient() {
                 </div>
               </div>
             </div>
-            {/* X (close): IGUAL botão X do calendário — h-11 w-11 rounded-full simples, sem sombra */}
+            {/* X (close): IGUAL botão X do calendário — h-11 w-11 rounded-full simples, sem sombra.
+                INDEPENDÊNCIA: NÃO TOCA em createdFrom/createdTo (calendário de cadastro) — LIMPA SÓ os 9
+                campos do filtro avançado e também limpa campos booking* (botão Ver anterior). */}
             <button
               type="button"
               onClick={() => {
-                setDraftFilters(EMPTY_FILTERS);
-                setActiveFilters(EMPTY_FILTERS);
+                // Draft só zera os 9 campos do modal avançado (resto EMPTY_FILTERS).
+                const clearedDraft: LeadFilters = {
+                  ...EMPTY_FILTERS,
+                };
+                // Active: preserva createdFrom/createdTo do calendário de cadastro intactos.
+                setActiveFilters((prev) => {
+                  const next: LeadFilters = {
+                    ...prev,
+                    ...EMPTY_ADVANCED_FILTERS,
+                    bookingDateFrom: "",
+                    bookingDateTo: "",
+                    bookingProfessorName: "",
+                    bookingPhone: "",
+                    bookingPN: false,
+                    bookingLeadIds: [],
+                  };
+                  // Garante createdFrom/createdTo do calendário continuam iguais ao valor
+                  // ANTERIOR (prev) — filtro avançado fechar NÃO APAGA a seleção do calendário.
+                  next.createdFrom = prev.createdFrom;
+                  next.createdTo = prev.createdTo;
+                  return next;
+                });
+                setDraftFilters(clearedDraft);
                 setShowFiltersModal(false);
               }}
               aria-label="Fechar e limpar filtros"
@@ -3026,18 +3100,31 @@ export function AtendimentoClient() {
             </div>
             {/* Linha 2: Ações — 2 botões minimalistas, mobile full-width empilhados (aplicar primeiro embaixo, limpar em cima = mobile layout natural) */}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end w-full sm:w-auto self-end sm:self-auto">
-              {/* Limpar (secundário minimalista — IGUAL botão X do header do calendário) */}
+              {/* Limpar (secundário minimalista — IGUAL botão X do header do calendário).
+                  INDEPENDÊNCIA: limpa SÓ os 9 campos do filtro avançado nos dois states,
+                  NÃO toca em createdFrom/createdTo (calendário) que fica intacto. */}
               <button
                 type="button"
                 onClick={() => {
-                  setDraftFilters(EMPTY_FILTERS);
-                  setActiveFilters(EMPTY_FILTERS);
+                  // Draft: volta para EMPTY (só 9 campos avançados vazios, resto vazio também).
+                  const clearedDraft: LeadFilters = { ...EMPTY_FILTERS };
+                  setDraftFilters(clearedDraft);
+                  // Active: preserva createdFrom/createdTo do calendário + limpa só os 9 avançados.
+                  setActiveFilters((prev) => {
+                    const next: LeadFilters = { ...prev, ...EMPTY_ADVANCED_FILTERS };
+                    next.createdFrom = prev.createdFrom;
+                    next.createdTo = prev.createdTo;
+                    return next;
+                  });
                 }}
                 className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-80)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-95)] transition-colors w-full sm:w-auto"
               >
                 Limpar
               </button>
-              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples) */}
+              {/* Aplicar (primário — IGUAL tom do botão Atualizar/Adicionar no header da lista: LARANJA simples).
+                  INDEPENDÊNCIA TOTAL: mescla SÓ os 9 campos avançados do draft em activeFilters, PRESERVANDO
+                  createdFrom/createdTo do calendário de cadastro. Apenas limpa booking* (botão Ver anterior
+                  do modal programação) porque esse filtro tem que ser independente do avançado. */}
               <button
                 type="button"
                 onClick={() => {
@@ -3050,14 +3137,26 @@ export function AtendimentoClient() {
                   // depois abre filtros avançados, troca só o stage de "aula_experimental_agendada"
                   // → "Aluno", clica Aplicar → lista continua vindo SÓ X,Y (pois bookingLeadIds
                   // tinha mais prioridade que tudo) → aparente bug "filtro não aplica nada".
-                  const cleansed: any = { ...draftFilters };
-                  cleansed.bookingDateFrom = "";
-                  cleansed.bookingDateTo = "";
-                  cleansed.bookingProfessorName = "";
-                  cleansed.bookingPhone = "";
-                  cleansed.bookingPN = false;
-                  cleansed.bookingLeadIds = [];
-                  setActiveFilters(cleansed);
+                  setActiveFilters((prev) => {
+                    // 1. Pega SÓ os 9 campos avançados do draft.
+                    const advFromDraft = pickAdvancedOnly(draftFilters);
+                    // 2. Mescla SÓ esses 9 no active, PRESERVANDO createdFrom/createdTo do
+                    //    calendário de cadastro — o filtro avançado NÃO ALTERA a data.
+                    let next: LeadFilters = mergeAdvancedOnly(prev, advFromDraft);
+                    // 3. Limpa booking* (filtro de aula), pois o usuário agora QUER o filtro
+                    //    avançado e não mais um clique "Ver" do passado.
+                    (next as any).bookingDateFrom = "";
+                    (next as any).bookingDateTo = "";
+                    (next as any).bookingProfessorName = "";
+                    (next as any).bookingPhone = "";
+                    (next as any).bookingPN = false;
+                    (next as any).bookingLeadIds = [];
+                    // 4. Garante redundante: createdFrom/createdTo vieram de prev, garantindo que
+                    //    o calendário de cadastro permaneceu EXATAMENTE como estava.
+                    next.createdFrom = prev.createdFrom;
+                    next.createdTo = prev.createdTo;
+                    return next;
+                  });
                   setShowFiltersModal(false);
                 }}
                 className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold hover:bg-[#c2410c] active:bg-[#9a3412] transition-colors w-full sm:w-auto"
@@ -3144,7 +3243,22 @@ export function AtendimentoClient() {
             <button
               type="button"
               onClick={() => {
-                setDraftFilters(activeFilters);
+                // ====================================================================
+                // INDEPENDÊNCIA TOTAL: o filtro avançado NÃO HERDA datas/estado do
+                // calendário de cadastro (createdFrom/createdTo) nem do botão Ver do
+                // modal de programação (booking*).
+                // ANTES: setDraftFilters(activeFilters) → copiava TUDO e as datas do
+                //        calendário apareciam lá dentro, e vice-versa ao fechar/limpar
+                //        o filtro avançado apagava o período de cadastro selecionado.
+                // AGORA: iniciamos o draft SOMENTE com os 9 campos do modal avançado
+                //        (statusList, stageList, countries, states, onlyWithX). O resto
+                //        (createdFrom/createdTo e booking*) NUNCA toca no draft.
+                // ====================================================================
+                const advOnly: LeadFilters = {
+                  ...EMPTY_FILTERS,
+                  ...pickAdvancedOnly(activeFilters),
+                };
+                setDraftFilters(advOnly);
                 setShowFiltersModal(true);
               }}
               aria-label="Filtros avançados de registros"
