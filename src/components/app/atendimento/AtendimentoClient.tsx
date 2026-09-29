@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, SlidersHorizontal, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { resolveTimeZoneFromCityInput, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -432,7 +432,31 @@ function isLeadMatriculaConcluida(lead: AtendimentoLeadListItem): boolean {
 
 export function AtendimentoClient() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Retorna TRUE se houver QUALQUER filtro ativo (qualquer tipo).
+  // Quando === FALSE (tudo vazio), a URL deve ser a base /app/atendimento (sem query params).
+  // Usado pelos handlers de Limpar e Aplicar do filtro avançado e do onChange do calendário.
+  const hasAnyFilterActive = useCallback((f: LeadFilters): boolean => {
+    if (f.createdFrom || f.createdTo) return true;
+    if (
+      f.bookingDateFrom ||
+      f.bookingDateTo ||
+      f.bookingProfessorName ||
+      f.bookingPhone ||
+      f.bookingPN ||
+      Array.isArray(f.bookingLeadIds) && f.bookingLeadIds.length > 0
+    ) {
+      return true;
+    }
+    for (const k of ADVANCED_FILTER_KEYS) {
+      const v = (f as any)[k];
+      if (Array.isArray(v) && v.length > 0) return true;
+      if (typeof v === "boolean" && v === true) return true;
+    }
+    return false;
+  }, []);
   const [summary, setSummary] = useState<AtendimentoSummary>(EMPTY_SUMMARY);
   const [panelLeads, setPanelLeads] = useState<AtendimentoLeadListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3102,6 +3126,8 @@ export function AtendimentoClient() {
                        EMPTY_ADVANCED_FILTERS.
                    (3) Limpa também booking* (filtro "Ver" do modal programação),
                        pois o usuário quer limpar e recomeçar.
+                   (4) Se após limpar NÃO EXISTIR FILTRO ATIVO NENHUM (tudo
+                       vazio), volta a URL para /app/atendimento (sem query).
                   ================================================================ */}
               <button
                 type="button"
@@ -3126,6 +3152,11 @@ export function AtendimentoClient() {
                     next.createdFrom = prev.createdFrom;
                     next.createdTo = prev.createdTo;
                     // ---------------------------------------------------------
+                    // Se NÃO HOUVER NENHUM filtro ativo, volta URL para a base
+                    // /app/atendimento (remover query params sujos).
+                    if (!hasAnyFilterActive(next)) {
+                      router.replace("/app/atendimento", { scroll: false });
+                    }
                     return next;
                   });
                 }}
@@ -3143,6 +3174,8 @@ export function AtendimentoClient() {
                    (3) Limpa também booking* (filtro "Ver" do modal programação),
                        pois o usuário AGORA quer usar o filtro avançado e não
                        mais os ids específicos do clique "Ver" anterior.
+                   (4) Se após aplicar NÃO EXISTIR FILTRO ATIVO NENHUM (tudo
+                       vazio), volta a URL para /app/atendimento (sem query).
                   ================================================================ */}
               <button
                 type="button"
@@ -3165,6 +3198,11 @@ export function AtendimentoClient() {
                     next.createdFrom = prev.createdFrom;
                     next.createdTo = prev.createdTo;
                     // ---------------------------------------------------------
+                    // Se NÃO HOUVER NENHUM filtro ativo, volta URL para a base
+                    // /app/atendimento (remover query params sujos).
+                    if (!hasAnyFilterActive(next)) {
+                      router.replace("/app/atendimento", { scroll: false });
+                    }
                     return next;
                   });
                   setShowFiltersModal(false);
@@ -3227,6 +3265,9 @@ export function AtendimentoClient() {
                     //      período de cadastro, não mais por ids específicos do
                     //      clique "Ver" anterior. booking* NUNCA deve ter prioridade
                     //      sobre uma ação EXPLÍCITA do usuário em um dos filtros.
+                    //
+                    //  (4) Se após a mudança NÃO EXISTIR FILTRO ATIVO NENHUM (tudo
+                    //      vazio), volta URL para /app/atendimento (sem query).
                     // ================================================================
                     const nextRaw: any = {
                       ...p,
@@ -3249,6 +3290,12 @@ export function AtendimentoClient() {
                     nextRaw.bookingPhone = "";
                     nextRaw.bookingPN = false;
                     nextRaw.bookingLeadIds = [];
+
+                    // Se NÃO HOUVER NENHUM filtro ativo, volta URL para a base
+                    // /app/atendimento (remover query params sujos de cliques anteriores).
+                    if (!hasAnyFilterActive(nextRaw as LeadFilters)) {
+                      router.replace("/app/atendimento", { scroll: false });
+                    }
                     return nextRaw;
                   });
                 }}
