@@ -3677,14 +3677,58 @@ export function AtendimentoClient() {
                           <ChevronLeft className="h-4 w-4" />
                           <span className="hidden sm:inline">Anterior</span>
                         </button>
-                        <div className="inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-1.5 py-1">
+                        <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-1.5 py-1">
                           {(() => {
-                            const pages: number[] = [];
-                            const startP = Math.max(1, Math.min(totalPages - 2, safePage - 1));
-                            const endP = Math.min(totalPages, startP + 2);
-                            const firstAdj = Math.max(1, endP - 2);
-                            for (let p = firstAdj; p <= endP; p++) pages.push(p);
-                            return pages.map((p) => {
+                            const MAX_DIRECT = 7;
+                            if (totalPages <= MAX_DIRECT) {
+                              const arr: (number | "dots")[] = [];
+                              for (let p = 1; p <= totalPages; p++) arr.push(p);
+                              return arr.map((x) => {
+                                if (x === "dots") return null;
+                                const p = x as number;
+                                const isCur = p === safePage;
+                                return (
+                                  <button
+                                    key={p}
+                                    type="button"
+                                    onClick={() => setLeadListPage(p)}
+                                    disabled={isCur}
+                                    className={
+                                      "inline-flex h-7 min-w-[28px] items-center justify-center rounded-full px-2 text-[12px] font-bold tabular-nums transition-colors " +
+                                      (isCur
+                                        ? "!bg-[#ea580c] !text-white shadow-[0_1px_2px_rgba(234,88,12,0.25)] disabled:opacity-100"
+                                        : "text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
+                                    }
+                                    aria-label={`Página ${p}`}
+                                  >
+                                    {p}
+                                  </button>
+                                );
+                              });
+                            }
+                            const WINDOW = 1;
+                            const out: (number | "dots")[] = [];
+                            const add = (n: number | "dots") => out.push(n);
+                            const has = (n: number) => out.includes(n as any);
+                            add(1);
+                            const leftEdge = Math.max(2, safePage - WINDOW);
+                            const rightEdge = Math.min(totalPages - 1, safePage + WINDOW);
+                            if (leftEdge > 2) add("dots");
+                            for (let p = leftEdge; p <= rightEdge; p++) add(p);
+                            if (rightEdge < totalPages - 1) add("dots");
+                            if (!has(totalPages)) add(totalPages);
+                            return out.map((x, idx) => {
+                              if (x === "dots") {
+                                return (
+                                  <span
+                                    key={`dot-${idx}`}
+                                    className="px-1 text-[11px] font-bold text-[var(--app-text-40)] tabular-nums"
+                                  >
+                                    ···
+                                  </span>
+                                );
+                              }
+                              const p = x as number;
                               const isCur = p === safePage;
                               return (
                                 <button
@@ -3705,11 +3749,6 @@ export function AtendimentoClient() {
                               );
                             });
                           })()}
-                          {totalPages > 3 ? (
-                            <span className="px-1 text-[11px] font-bold text-[var(--app-text-40)] tabular-nums">
-                              · {totalPages}
-                            </span>
-                          ) : null}
                         </div>
                         <button
                           type="button"
