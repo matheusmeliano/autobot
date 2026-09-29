@@ -1190,31 +1190,15 @@ export function AtendimentoClient() {
           Boolean((l as any)?.contract_signed_at ?? (l as any)?.contract_status);
         if (isAluno) return false;
 
-        const hasValidAgendada =
-          st === "aula_experimental_agendada" ||
-          fs === "aula_experimental_agendada" ||
-          Boolean(
-            (l as any)?.future_experimental_class_booking ??
-              (l as any)?.latest_experimental_class_booking ??
-              (l as any)?.experimental_class_booking,
-          );
-        if (hasValidAgendada) return false;
+        const hasFutureOrValidBooking = Boolean(
+          (l as any)?.future_experimental_class_booking ??
+            (l as any)?.latest_experimental_class_booking ??
+            (l as any)?.experimental_class_booking,
+        );
+        const isExplicitlyAgendada = st === "aula_experimental_agendada" || fs === "aula_experimental_agendada";
+        if (hasFutureOrValidBooking && isExplicitlyAgendada) return false;
 
-        const hasExperimentalJourney =
-          (typeof st === "string" && st.startsWith("aula_experimental")) ||
-          (typeof fs === "string" && fs.startsWith("aula_experimental")) ||
-          Boolean((l as any)?.experimental_class_booking) ||
-          Boolean((l as any)?.latest_experimental_class_booking) ||
-          Boolean((l as any)?.experimental_class_date) ||
-          Boolean((l as any)?.experimental_class_time) ||
-          Boolean((l as any)?.experimental_class_teacher) ||
-          Boolean((l as any)?.experimental_class_status) ||
-          Boolean((l as any)?.time_selected_at) ||
-          Boolean((l as any)?.lead_selected_at) ||
-          Boolean((l as any)?.professor_confirmed_at) ||
-          Boolean((l as any)?.teacher_selected_at);
-
-        return hasExperimentalJourney;
+        return true;
       }
       return st === sid || fs === sid;
     };
