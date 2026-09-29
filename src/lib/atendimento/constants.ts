@@ -180,7 +180,7 @@ export const STATUS_LABELS: Record<string, string> = {
   pagamento_nao_realizado: "Pagamento Não Realizado",
   matricula_confirmada: "Matrícula Confirmada",
   matriculado: "Matrícula Concluída",
-  aluno: "Aluno",
+  aluno: "Alunos",
   repescagem: "",
   encerrado: "Encerrado",
 };
