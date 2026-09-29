@@ -2483,6 +2483,31 @@ export async function POST(req: Request) {
     experimentalClassBotDisabled = false;
   }
 
+  // ================================================================
+  // BLOQUEIO GLOBAL DE BOT DESATIVADO — FLUXO NORMAL DE CONVERSA.
+  // REGRA DO USUÁRIO: quando o BOT está DESATIVADO GLOBALMENTE
+  // (app_settings.key = "experimental_class_bot_disabled" = true),
+  // ele NÃO DEVE ENVIAR NENHUMA MENSAGEM AUTOMÁTICA DURANTE O FLUXO
+  // NORMAL DA CONVERSA (respostas do fluxo de cadastro, validação
+  // WhatsApp, pós-atendimento, etc).
+  //
+  // EXCLUI expressamente:
+  //  - NOTIFICAÇÕES AGENDADAS (lembretes / cron jobs) — rodam em
+  //    rotas SEPARADAS em src/app/api/cron/* e NUNCA passam por aqui.
+  //  - Eventos NÃO são mensagem inbound real (delivery, lido, fromMe
+  //    etc) — já são ignorados no fluxo normal mesmo bot ativado.
+  //
+  // Early return SEM criar lead, SEM gravar nada em atendimento_*,
+  // SEM enviar NADA via WhatsApp. Silencioso.
+  // ================================================================
+  if (isRealInboundMessage && experimentalClassBotDisabled) {
+    return Response.json({
+      ok: true,
+      ignored: true,
+      reason: "global_bot_disabled_no_auto_reply",
+    });
+  }
+
   if (normalizedFrom && !validatedFrom.valid) {
     return Response.json({
       ok: true,
@@ -4488,117 +4513,47 @@ export async function POST(req: Request) {
         }
 
         if (!conversation.bot_enabled) {
-          if (isBookingWaitingAttendance || handledByPosAttendanceFlow) {
-            return Response.json({
-              ok: true,
-              ignored: true,
-              reason: isBookingWaitingAttendance
-                ? "conversation_blocked_waiting_attendance_no_reply"
-                : "conversation_blocked_pos_attendance_handled_above",
-              booking_id: currentBookingId,
-            });
-          }
+          // ================================================================
+          // BOT DESATIVADO POR CONVERSA (bot_enabled = false).
+          // REGRA DO USUÁRIO: NÃO ENVIAR NENHUMA MENSAGEM AUTOMÁTICA no
+          // fluxo normal da conversa. Silencioso.
+          //
+          //  - NÃO envia echo de agendamento marcado
+          //  - NÃO envia mensagem de SUPPORT_FINAL_MESSAGE
+          //  - NÃO envia mensagem de cancelamento (a mensagem de
+          //    cancelamento automático L4513-L4512 já foi enviada ACIMA
+          //    desta checagem, durante a leitura do status do booking
+          //    — pois ela é tratada como confirmação de estado e não como
+          //    resposta do fluxo. Se no futuro quiser silenciar também,
+          //    basta mover aquele bloco para ABAIXO desta checagem.)
+          //  - NÃO grava insertWhatsAppBotTextMessage
+          //
+          // Exclui expressamente: NOTIFICAÇÕES AGENDADAS em /api/cron/*
+          // (lembretes de aula), que NÃO passam por este webhook.
+          //
+          // Apenas atualiza last_interaction do lead (para o painel de
+          // atendimento ver atividade recente) e retorna ignored.
+          // ================================================================
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                last_interaction_at: nowIso,
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
           let finalReason = "conversation_blocked";
-          let responseMessage: string | null = null;
-          const hasBooking =
-            currentBookingId && currentBooking && String(currentBooking?.status ?? "").trim().toLowerCase() !== "cancelled"
-              ? currentBooking
-              : null;
-          if (hasBooking?.id && !handledByPosAttendanceFlow && effectiveWaitMessage) {
-            finalReason = "conversation_blocked_echo_booking_scheduled";
-            responseMessage = effectiveWaitMessage;
-          } else {
-            const histFinal = await admin
-              .from("atendimento_history_events")
-              .select("event_type, created_at")
-              .eq("lead_id", leadId)
-              .eq("conversation_id", conversationId)
-              .in("event_type", [
-                "experimental_class_scheduled",
-                "whatsapp_flow_concluded_bot_disabled",
-                "whatsapp_flow_blocked_max_attempts",
-              ])
-              .order("created_at", { ascending: false })
-              .limit(5);
-            const events = (histFinal.data ?? []) as Array<{ event_type: string; created_at?: string | null }>;
-            const latestCancelledBookingCreatedAt = await (async () => {
-              try {
-                const { data: cancelledBooking } = await admin
-                  .from("atendimento_experimental_class_bookings")
-                  .select("updated_at, created_at")
-                  .eq("lead_id", leadId)
-                  .eq("status", "cancelled")
-                  .order("updated_at", { ascending: false })
-                  .limit(1)
-                  .maybeSingle();
-                if ((cancelledBooking as any)?.updated_at) return (cancelledBooking as any).updated_at;
-                if ((cancelledBooking as any)?.created_at) return (cancelledBooking as any).created_at;
-                return null;
-              } catch (_e) {
-                return null;
-              }
-            })();
-            const anyActiveBookingCancelled = Boolean(
-              String(currentBooking?.status ?? "").trim().toLowerCase() === "cancelled" ||
-                latestCancelledBookingCreatedAt,
-            );
-            if (anyActiveBookingCancelled) {
-              finalReason = "conversation_blocked_cancelled_booking";
-              responseMessage = CANCELLED_BOOKING_AUTO_REPLY_MSG;
-            } else {
-              const scheduledDates = events.filter((e) => e.event_type === "experimental_class_scheduled");
-              const scheduledOlderThanCancel = scheduledDates.some((ev) => {
-                if (!ev?.created_at) return false;
-                if (!latestCancelledBookingCreatedAt) return false;
-                return new Date(ev.created_at).getTime() <= new Date(latestCancelledBookingCreatedAt).getTime();
-              });
-              const safeHasScheduled = events.some(
-                (e) =>
-                  e.event_type === "experimental_class_scheduled" ||
-                  e.event_type === "whatsapp_flow_concluded_bot_disabled",
-              ) && !scheduledOlderThanCancel && !latestCancelledBookingCreatedAt;
-              const hasScheduled = safeHasScheduled;
-              const hasBlockedMaxAttempts = events.some(
-                (e) => e.event_type === "whatsapp_flow_blocked_max_attempts",
-              );
-              if (hasScheduled && !handledByPosAttendanceFlow && effectiveWaitMessage) {
-                finalReason = "conversation_blocked_echo_scheduled_by_history";
-                responseMessage = effectiveWaitMessage;
-              } else if (hasBlockedMaxAttempts) {
-                const lastBotMsg = await getLastBotMessage({ admin, conversationId });
-                const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
-                finalReason = "conversation_blocked_support_max_attempts";
-                if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
-                  responseMessage = SUPPORT_FINAL_MESSAGE;
-                }
-              } else {
-                const lastBotMsg = await getLastBotMessage({ admin, conversationId });
-                const lastBotText = String(lastBotMsg?.content_text ?? "").trim();
-                if (!lastBotText || lastBotText !== SUPPORT_FINAL_MESSAGE) {
-                  responseMessage = SUPPORT_FINAL_MESSAGE;
-                }
-              }
-            }
-          }
-          if (responseMessage && !isBookingWaitingAttendance && !handledByPosAttendanceFlow) {
-            try {
-              await insertWhatsAppBotTextMessage({
-                admin,
-                conversationId,
-                contentText: responseMessage,
-              });
-            } catch (_e) {}
-            try {
-              await sendAtendimentoWhatsAppText({
-                phone: normalizedPhoneOnly,
-                message: responseMessage,
-              });
-            } catch (_e) {}
+          if (isBookingWaitingAttendance) {
+            finalReason = "conversation_blocked_waiting_attendance_no_reply";
+          } else if (handledByPosAttendanceFlow) {
+            finalReason = "conversation_blocked_pos_attendance_handled_above";
           }
           return Response.json({
             ok: true,
             ignored: true,
             reason: finalReason,
+            booking_id: currentBookingId ?? null,
           });
         }
 

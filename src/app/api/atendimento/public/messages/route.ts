@@ -956,6 +956,35 @@ export async function POST(req: Request) {
     experimentalClassBotDisabled = false;
   }
 
+  // ================================================================
+  // BLOQUEIO GLOBAL DE BOT DESATIVADO — CHAT PÚBLICO WEB (fluxo normal).
+  // REGRA DO USUÁRIO: BOT GLOBAL DESATIVADO → NÃO RESPONDE NENHUMA
+  // MENSAGEM AUTOMÁTICA NO FLUXO NORMAL DE CONVERSA.
+  //
+  // EXCLUI expressamente: NOTIFICAÇÕES AGENDADAS (cron em src/app/api/cron/*
+  // atendimento-experimental-class-reminders etc), que rodam em rotas
+  // SEPARADAS e NÃO passam por aqui.
+  //
+  // Early return: grava a mensagem do usuário? NÃO grava, para ficar 100%
+  // consistente com o bloqueio do webhook zapi (que é early return antes
+  // de criar/registrar qualquer coisa). Silencioso, sem side effects.
+  // ================================================================
+  if (experimentalClassBotDisabled) {
+    return Response.json({
+      ok: true,
+      inbound: null,
+      outbound: null,
+      blocked: true,
+      bot_disabled: true,
+      code: "global_bot_disabled_no_auto_reply",
+      should_reload: false,
+      conversation: {
+        id: String(conversation.id),
+        bot_enabled: conversation.bot_enabled,
+      },
+    }, { status: 200 });
+  }
+
   const { data: inbound, error: inboundError } = await admin
     .from("atendimento_messages")
     .insert({
