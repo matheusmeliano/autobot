@@ -267,21 +267,77 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         })?.[0]?.id ?? null) as string | null;
 
     // ============================================================
-    // REGRA ALTERADA (user: 'podera sim!' 2026-09-29):
-    //   A aula experimental PODE ser editada mesmo após CANCELADA.
-    //   Os bloqueios que PERMANECEM:
-    //     · hasAttendance (comparecimento marcado: attended / no_show)
-    //     · notifications disparadas (rotina de email e zap ja roda, não desfaz)
-    //   REMOVIDOS:
-    //     · Bloqueio por evento experimental_class_cancelled (history events)
-    //     · Bloqueio isCancelled (status booking === cancelled)
+    // REGRA NOVA: Auto-herdar PROFESSOR atribuído quando reagendar
+    // uma aula que havia sido CANCELADA (ou quando o payload da
+    // chamada não incluir explicitamente assigned_professor_name/phone).
+    //
+    // Cenário de bug original (user reportou 'missing_experimental_professor'
+    // no disparar após reagendar cancelada):
+    //   1) Aula cancelada no passado TEM assigned_professor no booking e
+    //      flat experimental_class_professor_name/phone.
+    //   2) 'activeId' ignora cancelados → cai no INSERT de um booking
+    //      NOVO (insertOrUpdateData NÃO tem assigned_professor_*).
+    //   3) Novo booking criado SEM assigned professor.
+    //   4) Rota send-student-notification lê booking ASSIM → null.
+    //
+    // Fontes de fallback (em ORDEM):
+    //   [1] Último booking CANCELADO do lead (mais recente), se tiver
+    //       assigned_professor_name/phone preenchidos → preferimos esse
+    //       pois foi o último atrib feito manualmente via dropdown.
+    //   [2] Colunas flat do lead: experimental_class_professor_name e
+    //       experimental_class_professor_phone (garantia redundante).
+    //
+    // Após criar/atualizar booking, também GRAVAMOS as colunas flat do
+    // lead para garantir consistência futura.
     // ============================================================
+    let fallbackProfName: string | null = null;
+    let fallbackProfPhone: string | null = null;
+    try {
+      const { data: lastBookings } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .select("id, status, assigned_professor_name, assigned_professor_phone, created_at")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      const list = Array.isArray(lastBookings) ? lastBookings : [];
+      const lastCancelledWithProf = list.find((b) => {
+        const status = String((b as any)?.status ?? "").trim().toLowerCase();
+        if (status !== "cancelled") return false;
+        const name = String((b as any)?.assigned_professor_name ?? "").trim();
+        const phone = String((b as any)?.assigned_professor_phone ?? "").trim();
+        return Boolean(name) || Boolean(phone);
+      });
+      if (lastCancelledWithProf) {
+        fallbackProfName = String((lastCancelledWithProf as any).assigned_professor_name ?? "").trim() || null;
+        fallbackProfPhone = String((lastCancelledWithProf as any).assigned_professor_phone ?? "").trim() || null;
+      }
+    } catch {
+      fallbackProfName = null;
+      fallbackProfPhone = null;
+    }
+    if (!fallbackProfName && !fallbackProfPhone) {
+      // Fallback 2: colunas flat do lead (se disponíveis)
+      try {
+        const { data: leadFlatProf } = await admin
+          .from("atendimento_leads")
+          .select("experimental_class_professor_name, experimental_class_professor_phone")
+          .eq("id", leadId)
+          .maybeSingle();
+        if (leadFlatProf) {
+          fallbackProfName = String((leadFlatProf as any).experimental_class_professor_name ?? "").trim() || null;
+          fallbackProfPhone = String((leadFlatProf as any).experimental_class_professor_phone ?? "").trim() || null;
+        }
+      } catch {
+        fallbackProfName = null;
+        fallbackProfPhone = null;
+      }
+    }
 
     if (activeId) {
       const { data: activeBookingState, error: stateErr } = await admin
         .from("atendimento_experimental_class_bookings")
         .select(
-          "id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, lead_start_at, professor_start_at",
+          "id, status, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, lead_start_at, professor_start_at, assigned_professor_name, assigned_professor_phone",
         )
         .eq("id", activeId)
         .maybeSingle();
@@ -300,6 +356,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
             { ok: false, error: "A aula experimental não pode ser editada após comparecimento marcado." },
             { status: 409 },
           );
+        }
+        // Pega o professor do active booking (prioridade máxima pois é o agendamento "vivo")
+        const activeName = String((activeBookingState as any).assigned_professor_name ?? "").trim() || null;
+        const activePhone = String((activeBookingState as any).assigned_professor_phone ?? "").trim() || null;
+        if ((activeName || activePhone) && !fallbackProfName && !fallbackProfPhone) {
+          fallbackProfName = activeName;
+          fallbackProfPhone = activePhone;
         }
       }
     }
@@ -340,6 +403,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     if (leadConversationId) insertOrUpdateData.conversation_id = leadConversationId;
     if (safeLessonLink !== undefined) insertOrUpdateData.lesson_link = safeLessonLink;
     if (safeAttendance !== undefined) insertOrUpdateData.attendance_status = safeAttendance;
+
+    // ============================================================
+    // GRAVA FALLBACK assigned_professor no booking (resolves o bug de
+    // missing_experimental_professor após reagendar cancelada):
+    // Se o payload não mandou explicitamente assigned_professor_* (o
+    // normal no reagendar por Reagendar), usamos o fallbackProfName
+    // /Phone calculado acima (último cancelado ou flat do lead).
+    // ============================================================
+    if (fallbackProfName) insertOrUpdateData.assigned_professor_name = fallbackProfName;
+    if (fallbackProfPhone) insertOrUpdateData.assigned_professor_phone = fallbackProfPhone;
 
     if (bookingHadAnyNotification) {
       insertOrUpdateData.student_start_notification_sent_at = null;
@@ -621,9 +694,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       }
     }
 
-    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null; experimental_class_booking_id?: string | null; experimental_class_link?: string | null; experimental_class_student_notification_sent_at?: string | null; experimental_class_attendant_notification_sent_at?: string | null; experimental_class_registered_attendant_notification_sent_at?: string | null } | null = null;
+    let leadUpdate: { funnel_stage?: string | null; experimental_class_status?: string | null; updated_at?: string; experimental_class_lead_date?: string | null; experimental_class_lead_time?: string | null; experimental_class_professor_date?: string | null; experimental_class_professor_time?: string | null; experimental_class_lead_start_at?: string | null; experimental_class_professor_start_at?: string | null; experimental_class_booking_id?: string | null; experimental_class_link?: string | null; experimental_class_professor_name?: string | null; experimental_class_professor_phone?: string | null; experimental_class_student_notification_sent_at?: string | null; experimental_class_attendant_notification_sent_at?: string | null; experimental_class_registered_attendant_notification_sent_at?: string | null } | null = null;
     {
       const bookingIdStr = bookingOut?.id != null ? String(bookingOut.id) : null;
+      // Decide qual prof gravar no flat do lead:
+      //   · Se user enviou algum (payload não vazio no endpoint atual) — futuramente.
+      //   · Agora: usa o fallbackProfName/Phone (último cancelado ou booking
+      //     ativo ou flat anterior).
+      const effectiveProfNameSave =
+        fallbackProfName && fallbackProfName.trim() ? fallbackProfName.trim() : null;
+      const effectiveProfPhoneSave =
+        fallbackProfPhone && fallbackProfPhone.trim() ? fallbackProfPhone.trim() : null;
       const fullUpdateData: Record<string, any> = {
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
@@ -635,6 +716,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         experimental_class_lead_start_at: leadStartAt,
         experimental_class_professor_start_at: professorStartAt,
         ...(safeLessonLink ? { experimental_class_link: safeLessonLink } : {}),
+        ...(effectiveProfNameSave ? { experimental_class_professor_name: effectiveProfNameSave } : {}),
+        ...(effectiveProfPhoneSave ? { experimental_class_professor_phone: effectiveProfPhoneSave } : {}),
         updated_at: new Date().toISOString(),
       };
       if (bookingHadAnyNotification) {
@@ -642,12 +725,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         fullUpdateData.experimental_class_attendant_notification_sent_at = null;
         fullUpdateData.experimental_class_registered_attendant_notification_sent_at = null;
       }
-      const selectFull = "id, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at" + (bookingHadAnyNotification ? ", experimental_class_student_notification_sent_at, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at" : "");
+      const selectFull = "id, funnel_stage, experimental_class_status, experimental_class_booking_id, experimental_class_link, experimental_class_professor_name, experimental_class_professor_phone, updated_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at" + (bookingHadAnyNotification ? ", experimental_class_student_notification_sent_at, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at" : "");
       const fallback = () => ({
         funnel_stage: "aula_experimental_agendada",
         experimental_class_status: safeStatus,
         experimental_class_booking_id: bookingIdStr,
         experimental_class_link: safeLessonLink || null,
+        ...(effectiveProfNameSave ? { experimental_class_professor_name: effectiveProfNameSave } : {}),
+        ...(effectiveProfPhoneSave ? { experimental_class_professor_phone: effectiveProfPhoneSave } : {}),
         updated_at: new Date().toISOString(),
         experimental_class_lead_date: safeLeadDate,
         experimental_class_lead_time: safeLeadTime,
@@ -681,6 +766,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           experimental_class_status: String((leadRow as any).experimental_class_status ?? safeStatus).trim() || null,
           experimental_class_booking_id: String((leadRow as any).experimental_class_booking_id ?? bookingIdStr ?? "").trim() || bookingIdStr,
           experimental_class_link: String((leadRow as any).experimental_class_link ?? safeLessonLink ?? "").trim() || safeLessonLink || null,
+          ...(effectiveProfNameSave ? { experimental_class_professor_name: effectiveProfNameSave } : (leadRow as any)?.experimental_class_professor_name !== undefined ? { experimental_class_professor_name: String((leadRow as any).experimental_class_professor_name ?? "").trim() || null } : {}),
+          ...(effectiveProfPhoneSave ? { experimental_class_professor_phone: effectiveProfPhoneSave } : (leadRow as any)?.experimental_class_professor_phone !== undefined ? { experimental_class_professor_phone: String((leadRow as any).experimental_class_professor_phone ?? "").trim() || null } : {}),
           updated_at: String((leadRow as any).updated_at ?? new Date().toISOString()),
           experimental_class_lead_date: String((leadRow as any).experimental_class_lead_date ?? safeLeadDate ?? "").trim() || safeLeadDate,
           experimental_class_lead_time: String((leadRow as any).experimental_class_lead_time ?? safeLeadTime ?? "").trim() || safeLeadTime,
@@ -740,9 +827,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         try {
           const { data: fb } = await (admin
             .from("atendimento_leads")
-            .select("id, updated_at, funnel_stage")
+            .select("id, updated_at, funnel_stage, experimental_class_professor_name, experimental_class_professor_phone")
             .eq("id", leadId)
             .maybeSingle()) as any;
+          const fbProfName = String((fb as any)?.experimental_class_professor_name ?? "").trim() || null;
+          const fbProfPhone = String((fb as any)?.experimental_class_professor_phone ?? "").trim() || null;
           leadUpdate = {
             funnel_stage: String((fb as any)?.funnel_stage ?? "aula_experimental_agendada").trim() || null,
             experimental_class_status: safeStatus,
@@ -753,6 +842,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
             experimental_class_professor_time: safeProfessorTime,
             experimental_class_lead_start_at: leadStartAt,
             experimental_class_professor_start_at: professorStartAt,
+            experimental_class_professor_name: effectiveProfNameSave ?? fbProfName,
+            experimental_class_professor_phone: effectiveProfPhoneSave ?? fbProfPhone,
             ...(bookingHadAnyNotification ? {
               experimental_class_student_notification_sent_at: null,
               experimental_class_attendant_notification_sent_at: null,
