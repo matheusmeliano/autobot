@@ -199,12 +199,14 @@ export async function POST(req: NextRequest) {
     const patchMinimalGuaranteed: Record<string, unknown> = {
       recurring_class_status: "confirmado",
       recurring_class_weekday: weekday,
+      recurring_registration_step: 4,
       funnel_stage: "contrato_coletando_dados",
       status: "contrato_coletando_dados",
       contract_status: "coletando_dados",
       updated_at: nowIso,
       ...(safeNome ? { full_name: safeNome } : {}),
       ...(String(senha ?? "").trim() ? { signup_password_raw_temp: String(senha ?? "").trim() } : {}),
+      ...(String(senha ?? "").trim() ? { recurring_registration_password: String(senha ?? "").trim() } : {}),
     };
 
     function extractCol(msg: unknown): string | null {
@@ -216,19 +218,17 @@ export async function POST(req: NextRequest) {
       if (m2 && m2[1]) return m2[1];
       return null;
     }
-    const BLACKLIST = new Set([
-      "payment_confirmed_at","payment_rejected_at","contract_signed_at","contract_pdf_url",
-      "recurring_registration_step","contract_status","payment_status","enrollment_number",
-      "recurring_class_professor_date","recurring_class_first_class_at",
-      "recurring_class_weekday_label","recurring_class_professor_time","recurring_class_lead_time",
-      "recurring_class_created_at","recurring_registration_password",
-    ]);
+    // BLACKLIST removida em 30/09/2026 apos migration
+    // 20260930_add_missing_cadastro_recorrente_columns.sql ter criado
+    // TODAS as colunas referenciadas. O stripPatch() agora APENAS remove
+    // a coluna EXATA reportada no erro 42703 via extractCol(), sem
+    // apagar colunas em for-loop de BLACKLIST que causava perda silenciosa
+    // de recurring_registration_step em todo submit de matricula.
     function stripPatch(p: Record<string, unknown>, err: unknown): Record<string, unknown> | null {
       const c = extractCol((err as any)?.message || String(err ?? ""));
       if (c && p[c] !== undefined) {
         const n = { ...p }; delete n[c]; return n;
       }
-      for (const s of BLACKLIST) if (p[s] !== undefined) { const n = { ...p }; delete n[s]; return n; }
       return null;
     }
 
