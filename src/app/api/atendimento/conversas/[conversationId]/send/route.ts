@@ -30,54 +30,8 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
   const { admin, auth, conversation } = access;
 
   const nowIso = new Date().toISOString();
-  const { data, error } = await admin
-    .from("atendimento_messages")
-    .insert({
-      conversation_id: conversationId,
-      sender_role: "attendant",
-      content_text: contentText || null,
-      media_type: mediaType,
-      media_url: mediaUrl,
-      mime_type: mimeType,
-      file_name: fileName,
-      file_size_bytes: fileSizeBytes,
-      status: "entregue",
-      sent_at: nowIso,
-      delivered_at: nowIso,
-    })
-    .select("*")
-    .maybeSingle();
 
-  if (error) {
-    return Response.json({ ok: false, error: error.message }, { status: 500 });
-  }
-
-  await syncConversationPreview({
-    conversationId,
-    contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
-    createdAt: nowIso,
-  });
-  await admin
-    .from("atendimento_leads")
-    .update({ last_interaction_at: nowIso, updated_at: nowIso })
-    .eq("id", String(conversation.lead_id));
-  await appendHistoryEvent({
-    leadId: String(conversation.lead_id),
-    conversationId,
-    eventType: "message_sent",
-    title: "Mensagem enviada pelo atendente",
-    details: {
-      content_text: contentText || null,
-      media_type: mediaType,
-      media_url: mediaUrl,
-      mime_type: mimeType,
-      file_name: fileName,
-      file_size_bytes: fileSizeBytes,
-    },
-    actorType: "attendant",
-    actorEmail: auth.user.email ?? null,
-  });
-
+  // CARREGA O LEAD ANTES, POIS O BLOCO DE ENVIO DE WHATSAPP PRECISA DELE.
   const { data: lead } = await admin
     .from("atendimento_leads")
     .select("id, full_name, phone")
@@ -109,6 +63,72 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
         .eq("id", String(conversation.lead_id));
     }
   }
+
+  const { data, error } = await admin
+    .from("atendimento_messages")
+    .insert({
+      conversation_id: conversationId,
+      sender_role: "attendant",
+      content_text: contentText || null,
+      media_type: mediaType,
+      media_url: mediaUrl,
+      mime_type: mimeType,
+      file_name: fileName,
+      file_size_bytes: fileSizeBytes,
+      status: "entregue",
+      sent_at: nowIso,
+      delivered_at: nowIso,
+    })
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    return Response.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  // ENVIA A MENSAGEM PARA O WHATSAPP DE FATO (não apenas grava no banco).
+  // allowNoInbound=true porque o atendente clicou EXPLICITAMENTE no botão
+  // para enviar; não quer bloqueios de "lead ainda não mandou mensagem".
+  try {
+    if (contentText && !mediaUrl && leadPhone) {
+      await sendAtendimentoWhatsAppText({
+        phone: leadPhone,
+        message: contentText,
+        baseUrl: null,
+        allowNoInbound: true,
+        admin,
+        conversationId,
+      });
+    }
+  } catch (_whatsErr) {
+    // Falha de envio não deve impedir que a mensagem fique registrada no histórico.
+  }
+
+  await syncConversationPreview({
+    conversationId,
+    contentText: getAtendimentoConversationPreviewText({ contentText, mediaType, fileName }),
+    createdAt: nowIso,
+  });
+  await admin
+    .from("atendimento_leads")
+    .update({ last_interaction_at: nowIso, updated_at: nowIso })
+    .eq("id", String(conversation.lead_id));
+  await appendHistoryEvent({
+    leadId: String(conversation.lead_id),
+    conversationId,
+    eventType: "message_sent",
+    title: "Mensagem enviada pelo atendente",
+    details: {
+      content_text: contentText || null,
+      media_type: mediaType,
+      media_url: mediaUrl,
+      mime_type: mimeType,
+      file_name: fileName,
+      file_size_bytes: fileSizeBytes,
+    },
+    actorType: "attendant",
+    actorEmail: auth.user.email ?? null,
+  });
 
   const activePresenceCount = await getAtendimentoActivePresenceCount(conversationId);
   if (activePresenceCount === 0) {
