@@ -23,6 +23,7 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
   const fileName = String(body?.file_name ?? "").trim() || null;
   const fileSizeBytesRaw = Number(body?.file_size_bytes ?? 0);
   const fileSizeBytes = Number.isFinite(fileSizeBytesRaw) && fileSizeBytesRaw > 0 ? fileSizeBytesRaw : null;
+  const isPostAttendanceMatriculaMessage = Boolean(body?.is_post_attendance_matricula_message);
 
   if (!contentText && !mediaUrl) {
     return Response.json({ ok: false, error: "empty_message" }, { status: 400 });
@@ -170,6 +171,70 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
     .from("atendimento_leads")
     .update({ last_interaction_at: nowIso, updated_at: nowIso })
     .eq("id", String(conversation.lead_id));
+
+  // =====================================================================
+  // Se o initiator foi o BOTAO VERDE CHECK de pos-aula (flag enviada),
+  // marca o sent_at tanto NO LEAD FLAT quanto NO BOOKING vinculado para
+  // o disabled do botao funcionar (1 clique e fica indisponivel).
+  //
+  // Acha o booking por: lead.experimental_class_booking_id OU busca a
+  // linha mais recente da tabela bookings para esse lead. Atualiza
+  // todas as fontes possiveis para o state do frontend nao ficar
+  // divergente (flat lead + 2 colunas do booking aninhado).
+  // =====================================================================
+  if (isPostAttendanceMatriculaMessage) {
+    const leadIdForBooking = String(conversation.lead_id);
+    try {
+      const { data: leadFlat } = await admin
+        .from("atendimento_leads")
+        .select("id, experimental_class_booking_id, experimental_class_post_attendance_message_sent_at")
+        .eq("id", leadIdForBooking)
+        .maybeSingle();
+
+      const bookingIdsToTouch = new Set<string>();
+      const flatBookingId = String((leadFlat as any)?.experimental_class_booking_id ?? "").trim();
+      if (flatBookingId) bookingIdsToTouch.add(flatBookingId);
+
+      try {
+        const { data: latestBookings } = await admin
+          .from("atendimento_experimental_class_bookings")
+          .select("id")
+          .eq("lead_id", leadIdForBooking)
+          .order("created_at", { ascending: false })
+          .limit(3);
+        if (Array.isArray(latestBookings)) {
+          for (const row of latestBookings) {
+            const id = String((row as any)?.id ?? "").trim();
+            if (id) bookingIdsToTouch.add(id);
+          }
+        }
+      } catch (_bk) { void _bk; }
+
+      const bookingIdList = Array.from(bookingIdsToTouch);
+      if (bookingIdList.length > 0) {
+        try {
+          await admin
+            .from("atendimento_experimental_class_bookings")
+            .update({
+              post_attendance_message_sent_at: nowIso,
+              updated_at: nowIso,
+            } as any)
+            .in("id", bookingIdList);
+        } catch (_eUpdBk) { void _eUpdBk; }
+      }
+
+      try {
+        await admin
+          .from("atendimento_leads")
+          .update({
+            experimental_class_post_attendance_message_sent_at: nowIso,
+            updated_at: nowIso,
+          } as any)
+          .eq("id", leadIdForBooking);
+      } catch (_eUpdLead) { void _eUpdLead; }
+    } catch (_e) { void _e; }
+  }
+
   await appendHistoryEvent({
     leadId: String(conversation.lead_id),
     conversationId,

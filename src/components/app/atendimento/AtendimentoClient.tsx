@@ -1259,7 +1259,10 @@ export function AtendimentoClient() {
       const res = await fetch(`/api/atendimento/conversas/${encodeURIComponent(conversationIdRaw)}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content_text: String(message ?? "").trim() }),
+        body: JSON.stringify({
+          content_text: String(message ?? "").trim(),
+          is_post_attendance_matricula_message: true,
+        }),
       });
       const payload = (await res.json().catch(() => null)) as
         | { ok?: boolean; error?: string; message?: Record<string, unknown> | null }
