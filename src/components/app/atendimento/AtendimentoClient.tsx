@@ -461,29 +461,44 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
 }
 
 function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title: string; body: string; tone: "warning" | "success" | "default" | "info" } | null {
-  const st = String(lead.status ?? "").trim().toLowerCase();
 
   // ============================================================
-  // GUARD: RODAR NOVA SEQUENCIA ESTRITA RECORRENTE SÓ SE O CADASTRO
-  // DE MATRICULA REALMENTE FOI INICIADO.
-  // SE O USUARIO AINDA ESTÁ 100% NA FASE EXPERIMENTAL (nunca
-  // abriu o link, nem criou senha, nem salvou step/dia/contrato/
-  // pagamento), ENTAO NAO MOSTRAR STATUS DE ETAPA RECORRENTE.
-  // DEIXA O COMPORTAMENTO ORIGINAL (experimental) FUNCIONAR.
+  // GUARD: RODAR NOVA SEQUENCIA ESTRITA RECORRENTE SÓ SE O
+  // CADASTRO DE MATRICULA REALMENTE FOI INICIADO PELO USUARIO.
+  //
+  // "Iniciado pelo usuário" = PASSOU PELO REGISTRO INICIAL do link
+  // de matrícula (etapa CONTA / criar senha / passo 1 de 7), o que
+  // significa que ELE MESMO preencheu a senha e Clicou em AVANÇAR.
+  //
+  // SINAIS EXATOS e NÃO AMBÍGUOS disso são (AMBOS confirmam que ele
+  // chegou ao menos no Passo 1 e confirmou registro inicial):
+  //   - recurring_registration_step >= 1
+  //   - recurring_registration_password OU signup_password_raw_temp
+  //     gravados.
+  //
+  // NÃO USAR NENHUM OUTRO SINAL (dia, horário, recurring_class_status,
+  // contrato, pagamento). Esses outros campos podem estar vazios ou
+  // preenchidos por FLUXOS ANTIGOS (atendimento manual, booking, etc)
+  // que NÃO REPRESENTAM o aluno ter passado pelo registro inicial
+  // do link de matrícula. Com eles no gate, leads EM FASE EXPERIMENTAL
+  // (como Alexandre Meneses do print) eram erroneamente jogados na
+  // view recorrente e aparecia "Falta Dia e Horário Recorrentes" azul
+  // sem ele nunca ter sequer criado uma senha no link.
+  //
+  // Se NENHUM dos dois sinais acima estiver presente:
+  //   -> FASE EXPERIMENTAL PURA / NUNCA ABRIU O LINK DE MATRICULA.
+  //   -> Comportamento 100% IGUAL a como era ANTES de qualquer uma
+  //      dessas ultimas alteracoes. Nada de etapas novas, nada de
+  //      cores novas, nada de recorrente.
   // ============================================================
   const stepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
   const hasStep = Number.isFinite(stepRaw) && stepRaw >= 1;
   const hasPass = Boolean((lead as any)?.recurring_registration_password) || Boolean(String((lead as any)?.signup_password_raw_temp ?? "").trim());
   const wdRaw = String((lead as any)?.recurring_class_weekday ?? "").trim();
-  const hasWd = ["mon","tue","wed","thu","fri","sat","sun"].includes(wdRaw.toLowerCase());
-  const hasTime = Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) || Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
-  const hasRcStatus = Boolean(String((lead as any)?.recurring_class_status ?? "").trim());
-  const hasContract = Boolean(String((lead as any)?.contract_status ?? "").trim()) || Boolean(String((lead as any)?.contract_signed_at ?? "").trim()) || Boolean(String((lead as any)?.contract_pdf_url ?? "").trim());
-  const hasPayment = Boolean(String((lead as any)?.payment_status ?? "").trim()) || Boolean(String((lead as any)?.payment_confirmed_at ?? "").trim());
-  const recurringTrulyStarted = hasStep || hasPass || hasWd || hasTime || hasRcStatus || hasContract || hasPayment;
 
   const ps = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
   const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const st = String(lead.status ?? "").trim().toLowerCase();
   const payConfirmedGlobal =
     ps === "confirmado" ||
     ps === "matriculado" ||
@@ -492,7 +507,16 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
     st === "aluno" ||
     Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
 
-  if (!recurringTrulyStarted && !payConfirmedGlobal) {
+  // GATE ESTRITO. Só entra na view nova de recorrente se:
+  //   (a) usuario realmente passou pelo registro inicial do link
+  //       (step >= 1 OU senha recorrente salva)
+  //   OU
+  //   (b) pagamento/matricula ja foi confirmada de qualquer forma
+  //       (neste caso, independente de step/senha, devemos mostrar
+  //       pelo menos 'Matricula concluída' na view nova).
+  const recurringTrulyStarted = hasStep || hasPass || payConfirmedGlobal;
+
+  if (!recurringTrulyStarted) {
     // =============================
     // FASE EXPERIMENTAL PURA.
     // AINDA NÃO MEXEU NO LINK DE MATRICULA.
