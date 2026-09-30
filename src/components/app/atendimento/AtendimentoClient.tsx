@@ -4014,7 +4014,7 @@ export function AtendimentoClient() {
               aria-label="Atualizar lista"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
             </button>
             {/* DATA DE CADASTRO no header (acesso direto, nao precisa abrir filtros) - botão pequeno redondo IGUAL OS OUTROS ali (Refresh, SlidersHorizontal etc) */}
             <div className="">
