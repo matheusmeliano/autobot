@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, GraduationCap, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, FileText, GraduationCap, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -88,7 +88,7 @@ type LeadDetailsTab = "visao_geral" | "agendamentos" | "historico" | "observacoe
 const LEAD_DETAILS_TABS: ReadonlyArray<{ id: LeadDetailsTab; label: string; icon: JSX.Element }> = [
   { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
   { id: "agendamentos", label: "Agendamentos", icon: <CalendarIcon className="h-4 w-4" /> },
-  { id: "historico", label: "Contrato", icon: <RefreshCw className="h-4 w-4" /> },
+  { id: "historico", label: "Contrato", icon: <FileText className="h-4 w-4" /> },
   { id: "observacoes", label: "Observações", icon: <Pencil className="h-4 w-4" /> },
 ];
 
@@ -5242,7 +5242,7 @@ export function AtendimentoClient() {
                   {activeTab === "historico" ? (
                     <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
                       <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
-                        Esse aluno ainda não possui nenhum contrato de matrícula assinado.
+                        Esse registro ainda não possui nenhum contrato de matrícula assinado.
                       </div>
                     </div>
                   ) : null}
