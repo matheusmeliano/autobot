@@ -4777,6 +4777,17 @@ export function AtendimentoClient() {
                           </div>
                           {(() => {
                             const lead = selectedLead as any;
+                            const rrcs = String((lead as any)?.recurring_registration_step ?? "").trim();
+                            const rrcsNum = rrcs !== "" && !Number.isNaN(Number(rrcs)) ? Number(rrcs) : (((lead as any)?.recurring_registration_step as number) ?? 0);
+                            const isRecurringConcluded = isLeadMatriculaConcluida(lead);
+                            const matriculaEmProcesso = (
+                              typeof rrcsNum === "number" && rrcsNum > 0 && !isRecurringConcluded
+                            ) || (
+                              String((lead as any)?.recurring_class_status ?? "").trim().length > 0 &&
+                              !isRecurringConcluded
+                            ) || (
+                              Boolean((lead as any)?.recurring_registration_password) && !isRecurringConcluded
+                            );
                             const hasExp = Boolean(
                               lead?.future_experimental_class_booking ||
                                 lead?.experimental_class_booking ||
@@ -4787,6 +4798,14 @@ export function AtendimentoClient() {
                             const timeRaw = String(lead?.recurring_start_time ?? "").trim();
                             const freqRaw = String(lead?.recurring_frequency ?? "").trim();
                             const hasRec = Boolean(weekdayRaw || timeRaw || freqRaw);
+                            // REGRA DE PRECEDENCIA: MATRICULA EM PROCESSO SEMPRE PRIMEIRO = AZUL "Recorrente"
+                            if (matriculaEmProcesso) {
+                              return (
+                                <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.12)] px-3 text-[11px] font-bold uppercase tracking-wide text-[#1d4ed8]">
+                                  Recorrente
+                                </div>
+                              );
+                            }
                             const isExpFirst = !hasRec && hasExp;
                             const isRecFirst = hasRec && !hasExp;
                             if (isExpFirst) return (
