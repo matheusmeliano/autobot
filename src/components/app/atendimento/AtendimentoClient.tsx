@@ -460,43 +460,75 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   return { label: "Novo registro", tone: "default" };
 }
 
-function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title: string; body: string; tone: "warning" | "success" | "default" } | null {
+function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title: string; body: string; tone: "warning" | "success" | "default" | "info" } | null {
   const st = String(lead.status ?? "").trim().toLowerCase();
+
+  // ===== PASSO 0: LOCALIZACAO (Estado + Cidade) =====
   const stateRaw = String((lead as any)?.state ?? "").trim();
   const cityRaw = String((lead as any)?.city ?? "").trim();
   const locationOk = Boolean(stateRaw) && Boolean(cityRaw);
+
+  if (!locationOk) {
+    if (!stateRaw && !cityRaw) {
+      return { title: "Falta Estado e Cidade", body: "O aluno ainda não preencheu a etapa de localização no link de matrícula.", tone: "info" };
+    }
+    if (stateRaw && !cityRaw) {
+      return { title: "Falta Cidade", body: "O estado foi preenchido mas ainda falta a cidade no link de matrícula.", tone: "info" };
+    }
+    // !stateRaw && cityRaw
+    return { title: "Falta Estado", body: "A cidade foi preenchida mas ainda falta o estado no link de matrícula.", tone: "info" };
+  }
+
+  // ===== PASSO 1: DIA E HORARIO RECORRENTE =====
+  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String((lead as any)?.recurring_class_weekday ?? "").trim().toLowerCase());
+  const professorTimeRaw = String((lead as any)?.recurring_class_professor_time ?? "").trim();
+  const leadTimeRaw = String((lead as any)?.recurring_class_lead_time ?? "").trim();
+  const recurringTimeOk = Boolean(professorTimeRaw) || Boolean(leadTimeRaw);
+  const scheduleOk = recurringWeekdayOk && recurringTimeOk;
+
+  if (!scheduleOk) {
+    if (recurringWeekdayOk && !recurringTimeOk) {
+      return { title: "Falta horário recorrente", body: "Dia da semana definido, mas horário da aula ainda não foi escolhido no link de matrícula.", tone: "info" };
+    }
+    if (!recurringWeekdayOk && recurringTimeOk) {
+      return { title: "Falta dia da semana recorrente", body: "Horário definido, mas dia da semana ainda não foi escolhido no link de matrícula.", tone: "info" };
+    }
+    return { title: "Falta Dia e Horário Recorrentes", body: "O aluno ainda não definiu dia da semana e horário das aulas recorrentes no link de matrícula.", tone: "info" };
+  }
+
+  // ===== PASSO 2: CONTRATO =====
+  const contractStatusRaw = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+  const contractSignedAtRaw = String((lead as any)?.contract_signed_at ?? "").trim();
+  const contractPdfRaw = String((lead as any)?.contract_pdf_url ?? "").trim();
+  const contractAceito =
+    contractStatusRaw === "aceito" ||
+    contractStatusRaw === "assinado" ||
+    contractStatusRaw === "concluido" ||
+    contractStatusRaw === "confirmado" ||
+    Boolean(contractSignedAtRaw && contractSignedAtRaw !== "null") ||
+    Boolean(contractPdfRaw && contractPdfRaw !== "null");
+
+  if (!contractAceito) {
+    return { title: "Falta aceitar contrato", body: "Dia e horário definidos. O aluno agora precisa aceitar os termos do contrato no link de matrícula.", tone: "info" };
+  }
+
+  // ===== PASSO 3: PAGAMENTO =====
   const ps = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
-  const payConfirmed = ps === "confirmado" || ps === "matriculado" || st === "matriculado" || st === "aluno";
-  if (payConfirmed) return { title: "Matrícula concluída", body: "Todos os dados foram confirmados.", tone: "success" };
-  if (!stateRaw && !cityRaw) {
-    return { title: "Falta estado e cidade", body: "Clique em Editar no card Informações para preencher.", tone: "warning" };
+  const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const payConfirmed =
+    ps === "confirmado" ||
+    ps === "matriculado" ||
+    ps === "pago" ||
+    st === "matriculado" ||
+    st === "aluno" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
+
+  if (!payConfirmed) {
+    return { title: "Falta confirmar pagamento", body: "Contrato aceito. Agora é necessário confirmar o pagamento para a matrícula ser considerada concluída.", tone: "info" };
   }
-  if (stateRaw && !cityRaw) {
-    return { title: "Falta cidade", body: "Clique em Editar no card Informações para preencher a cidade.", tone: "warning" };
-  }
-  if (!stateRaw && cityRaw) {
-    return { title: "Falta estado", body: "Clique em Editar no card Informações para preencher o estado.", tone: "warning" };
-  }
-  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
-  const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
-  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
-  const rcsRaw = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
-  const rec = recurringWeekdayOk || recurringTimeOk || regStepOk || Boolean(rcsRaw);
-  if (rec && !recurringWeekdayOk && !recurringTimeOk) {
-    return { title: "Falta dia e horário recorrentes", body: "Defina dia e horário para continuar.", tone: "warning" };
-  }
-  if (rec && recurringWeekdayOk && !recurringTimeOk) {
-    return { title: "Falta horário recorrente", body: "Defina o horário da aula recorrente.", tone: "warning" };
-  }
-  if (rec && !recurringWeekdayOk && recurringTimeOk) {
-    return { title: "Falta dia recorrente", body: "Defina o dia da semana da aula recorrente.", tone: "warning" };
-  }
-  const expMeta = buildExperimentalMetaForList(lead);
-  if (!rec && expMeta.tone === "warning") {
-    return { title: expMeta.label, body: "Complete os dados para agendar a aula experimental.", tone: "warning" };
-  }
-  return null;
+
+  // ===== PASSO 4: CONCLUIDA =====
+  return { title: "Matrícula concluída", body: "Todos os dados foram confirmados.", tone: "success" };
 }
 
 function buildRecurringClassUrl(lead: AtendimentoLeadListItem): string {
@@ -4724,41 +4756,51 @@ export function AtendimentoClient() {
                             Status
                           </div>
                         </div>
-                        {!statusMeta ? (
-                          <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
-                            <div className="font-semibold text-emerald-800">
-                              Dados básicos coletados
-                            </div>
-                            <div className="mt-0.5 text-[13px] text-emerald-700/90">
-                              Nenhum passo pendente nessa etapa.
-                            </div>
-                          </div>
-                        ) : statusMeta.tone === "success" ? (
-                          <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
-                            <div className="font-semibold text-emerald-800">
-                              {statusMeta.title}
-                            </div>
-                            <div className="mt-0.5 text-[13px] text-emerald-700/90">
-                              {statusMeta.body}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
-                            <div className="flex items-start gap-3">
-                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/20">
-                                <AlertCircle className="h-5 w-5 text-[#9a3412]" />
+                        {(() => {
+                          if (!statusMeta) {
+                            return (
+                              <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                <div className="font-semibold text-[#1e3a8a]">
+                                  Cadastro não iniciado
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                  O aluno ainda não acessou o link de matrícula ou ainda não completou o registro inicial.
+                                </div>
                               </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold !text-[#9a3412]">
+                            );
+                          }
+                          // Todos os casos de matricula (info = em processo | success = concluida)
+                          // sao AZUIS para manter consistencia de cor com o avatar e o badge.
+                          if (statusMeta.tone === "success" || statusMeta.tone === "info" || statusMeta.tone === "default") {
+                            return (
+                              <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                <div className="font-semibold text-[#1e3a8a]">
                                   {statusMeta.title}
                                 </div>
-                                <div className="mt-0.5 text-[13px] text-[#9a3412]/80">
+                                <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
                                   {statusMeta.body}
                                 </div>
                               </div>
+                            );
+                          }
+                          return (
+                            <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/20">
+                                  <AlertCircle className="h-5 w-5 text-[#9a3412]" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold !text-[#9a3412]">
+                                    {statusMeta.title}
+                                  </div>
+                                  <div className="mt-0.5 text-[13px] text-[#9a3412]/80">
+                                    {statusMeta.body}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
 
                       {/* CARD 4: Próxima aula */}
@@ -5840,41 +5882,49 @@ export function AtendimentoClient() {
                           Status
                         </div>
                       </div>
-                      {!statusMeta ? (
-                        <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
-                          <div className="font-semibold text-emerald-800">
-                            Dados básicos coletados
-                          </div>
-                          <div className="mt-0.5 text-[13px] text-emerald-700/90">
-                            Nenhum passo pendente nessa etapa.
-                          </div>
-                        </div>
-                      ) : statusMeta.tone === "success" ? (
-                        <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
-                          <div className="font-semibold text-emerald-800">
-                            {statusMeta.title}
-                          </div>
-                          <div className="mt-0.5 text-[13px] text-emerald-700/90">
-                            {statusMeta.body}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
-                          <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/20">
-                              <AlertCircle className="h-5 w-5 text-[#9a3412]" />
+                      {(() => {
+                        if (!statusMeta) {
+                          return (
+                            <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                              <div className="font-semibold text-[#1e3a8a]">
+                                Cadastro não iniciado
+                              </div>
+                              <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                O aluno ainda não acessou o link de matrícula ou ainda não completou o registro inicial.
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <div className="font-semibold !text-[#9a3412]">
+                          );
+                        }
+                        if (statusMeta.tone === "success" || statusMeta.tone === "info" || statusMeta.tone === "default") {
+                          return (
+                            <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                              <div className="font-semibold text-[#1e3a8a]">
                                 {statusMeta.title}
                               </div>
-                              <div className="mt-0.5 text-[13px] text-[#9a3412]/80">
+                              <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
                                 {statusMeta.body}
                               </div>
                             </div>
+                          );
+                        }
+                        return (
+                          <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea580c]/20">
+                                <AlertCircle className="h-5 w-5 text-[#9a3412]" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold !text-[#9a3412]">
+                                  {statusMeta.title}
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-[#9a3412]/80">
+                                  {statusMeta.body}
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
 
                     {/* CARD 4: Próxima aula */}
