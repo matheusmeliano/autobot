@@ -2899,7 +2899,7 @@ export function AtendimentoClient() {
               >
                 <div
                   className={[
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold text-white transition-none shadow-[0_2px_6px_rgba(15,23,42,0.18)]",
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold !text-white transition-none shadow-[0_2px_6px_rgba(15,23,42,0.18)]",
                     it.cor,
                     it.ring ?? "",
                   ].join(" ")}
