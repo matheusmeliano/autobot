@@ -5242,7 +5242,7 @@ export function AtendimentoClient() {
                   {activeTab === "historico" ? (
                     <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
                       <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
-                        Esse registro não possuí nenhum contrato acordado em aberto.
+                        Esse aluno ainda não possui nenhum contrato de matrícula assinado.
                       </div>
                     </div>
                   ) : null}
@@ -6293,7 +6293,7 @@ export function AtendimentoClient() {
                 {activeTab === "historico" ? (
                   <div className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 text-center shadow-none">
                     <div className="text-[13px] text-[var(--app-text-60)]">
-                      Contratos e acordos do registro — em integração.
+                      Contrato de matrícula do aluno — em integração.
                     </div>
                   </div>
                 ) : null}
