@@ -1216,6 +1216,7 @@ export function AtendimentoClient() {
               attendance: "attended",
               leadId: String(lead.id ?? "").trim() || null,
               conversationId: conversationIdRaw,
+              skipPostAttendanceMessage: true,
             }),
           });
           if (resAtt.ok) {
@@ -5061,16 +5062,8 @@ export function AtendimentoClient() {
                                     <button
                                       type="button"
                                       onClick={() => handleOpenExperimentalBooking(sl)}
-                                      disabled={(() => {
-                                        if (Boolean(expEffectiveAttendance)) return true;
-                                        return false;
-                                      })()}
-                                      title={(() => {
-                                        if (Boolean(expEffectiveAttendance)) {
-                                          return "Aula experimental não pode ser reagendada após comparecimento marcado.";
-                                        }
-                                        return "Reagendar esta aula experimental.";
-                                      })()}
+                                      disabled={false}
+                                      title="Reagendar esta aula experimental."
                                       className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     >
                                       <Plus className="h-4 w-4" />
@@ -6103,15 +6096,11 @@ export function AtendimentoClient() {
                                     onClick={() => handleOpenExperimentalBooking(sl)}
                                     disabled={(() => {
                                         if (expBookingIsCancelled) return true;
-                                        if (Boolean(expEffectiveAttendance)) return true;
                                         return false;
                                       })()}
                                       title={(() => {
                                         if (expBookingIsCancelled) {
                                           return "Aula experimental cancelada. Não é possível reagendar.";
-                                        }
-                                        if (Boolean(expEffectiveAttendance)) {
-                                          return "Aula experimental não pode ser reagendada após comparecimento marcado.";
                                         }
                                         return "Reagendar esta aula experimental.";
                                       })()}

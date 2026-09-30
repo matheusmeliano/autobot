@@ -129,6 +129,7 @@ export async function POST(
         attendance?: "attended" | "no_show" | null;
         leadId?: string | null;
         conversationId?: string | null;
+        skipPostAttendanceMessage?: boolean | null;
       }
     | null;
 
@@ -136,6 +137,7 @@ export async function POST(
   if (attendance !== "attended" && attendance !== "no_show") {
     return Response.json({ ok: false, error: "invalid_attendance" }, { status: 400 });
   }
+  const skipPostAttendanceMessage = Boolean(payload?.skipPostAttendanceMessage);
 
   const admin = createSupabaseAdminClient();
   const bookingWithLessonLinkResult = await admin
@@ -483,7 +485,8 @@ export async function POST(
     const sentMessages: string[] = [];
     let lastError: unknown = null;
 
-    if (!alreadySentPostAttendanceMessages) {
+    let actuallySentMessages = false;
+    if (!skipPostAttendanceMessage && !alreadySentPostAttendanceMessages) {
       for (let i = 0; i < messages.length; i += 1) {
         const message = messages[i];
         try {
@@ -506,6 +509,9 @@ export async function POST(
           break;
         }
       }
+      actuallySentMessages = sentMessages.length > 0;
+    } else if (skipPostAttendanceMessage) {
+      messagesAlreadySent = 0;
     } else {
       messagesAlreadySent = messages.length;
     }
@@ -570,21 +576,25 @@ export async function POST(
       actorEmail: auth.user.email,
     });
 
-    await appendHistoryEvent({
-      leadId,
-      conversationId,
-      eventType: "experimental_class_attendance_confirmation_message_sent",
-      title: "Mensagens de continuidade enviadas ao aluno apos o comparecimento na aula experimental",
-      details: {
-        booking_id: normalizedBookingId,
-        phone: leadPhone,
-        total_messages: messages.length,
-        message_contents: messages,
-        lead_funnel_stage: nextLeadFunnelStage,
-        lead_status: nextLeadStatus,
-      },
-      actorType: "system",
-    });
+    if (actuallySentMessages) {
+      await appendHistoryEvent({
+        leadId,
+        conversationId,
+        eventType: "experimental_class_attendance_confirmation_message_sent",
+        title: "Mensagens de continuidade enviadas ao aluno apos o comparecimento na aula experimental",
+        details: {
+          booking_id: normalizedBookingId,
+          phone: leadPhone,
+          total_messages: messages.length,
+          message_contents: messages,
+          sent_messages: sentMessages,
+          skipped_by_flag: skipPostAttendanceMessage,
+          lead_funnel_stage: nextLeadFunnelStage,
+          lead_status: nextLeadStatus,
+        },
+        actorType: "system",
+      });
+    }
   } else {
     if (!leadPhone) {
       await appendHistoryEvent({
