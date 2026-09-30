@@ -4138,13 +4138,13 @@ export function AtendimentoClient() {
 
                               if (dadosBasicosOkNadaPendente) {
                                 return isSelected
-                                  // SELECIONADO → MESMO FUNDO AMARELO (#facc15) do unselected,
-                                  // NÃO deixa mais escuro. A seleção é marcada só por anel grosso
-                                  // (ring-[3px] #a16207) + sombra mais forte. Sem hover.
-                                  ? "!bg-[#facc15] !text-white ring-[3px] ring-[#a16207] shadow-[0_2px_6px_rgba(161,98,7,0.45)] transition-none hover:!bg-[#facc15] hover:!ring-[#a16207]"
-                                  // NÃO SELECIONADO → amarelo #facc15 (exato do print "MP").
-                                  // Sem hover, sem anel, sem tom escuro.
-                                  : "!bg-[#facc15] !text-white transition-none hover:!bg-[#facc15]";
+                                  // SELECIONADO → MESMO FUNDO AMARELO um pouco mais escuro (#eab308)
+                                  // do unselected, NÃO deixa mais escuro ainda. A seleção é marcada
+                                  // só por anel grosso (ring-[3px] #ca8a04) + sombra. Sem hover.
+                                  ? "!bg-[#eab308] !text-white ring-[3px] ring-[#ca8a04] shadow-[0_2px_6px_rgba(202,138,4,0.5)] transition-none hover:!bg-[#eab308] hover:!ring-[#ca8a04]"
+                                  // NÃO SELECIONADO → amarelo #eab308 (um pouco mais escuro que o antigo #facc15).
+                                  // Sem hover, sem anel, sem tom escuro extra.
+                                  : "!bg-[#eab308] !text-white transition-none hover:!bg-[#eab308]";
                               }
 
                               // Qualquer OUTRO status (matricula concluida / warning de falta
