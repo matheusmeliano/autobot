@@ -4105,11 +4105,12 @@ export function AtendimentoClient() {
 
                               if (dadosBasicosOkNadaPendente) {
                                 return isSelected
-                                  // SELECIONADO → tom AMARELO MAIS ESCURO (yellow-600), sem hover,
-                                  // sem transit, anel mais forte e sombra para marcar seleção.
-                                  ? "!bg-[#ca8a04] !text-black ring-2 ring-[#a16207] shadow-[0_2px_4px_rgba(202,138,4,0.4)] transition-none hover:!bg-[#ca8a04] hover:!ring-[#a16207]"
-                                  // NÃO SELECIONADO → amarelo base (yellow-400). REMOVIDO HOVER
-                                  // (não responde a hover em nenhum tom, como solicitado).
+                                  // SELECIONADO → MESMO FUNDO AMARELO (#facc15) do unselected,
+                                  // NÃO deixa mais escuro. A seleção é marcada só por anel grosso
+                                  // (ring-[3px] #a16207) + sombra mais forte. Sem hover.
+                                  ? "!bg-[#facc15] !text-black ring-[3px] ring-[#a16207] shadow-[0_2px_6px_rgba(161,98,7,0.45)] transition-none hover:!bg-[#facc15] hover:!ring-[#a16207]"
+                                  // NÃO SELECIONADO → amarelo #facc15 (exato do print "MP").
+                                  // Sem hover, sem anel, sem tom escuro.
                                   : "!bg-[#facc15] !text-black transition-none hover:!bg-[#facc15]";
                               }
 
