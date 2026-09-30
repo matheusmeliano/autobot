@@ -463,6 +463,80 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
 function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title: string; body: string; tone: "warning" | "success" | "default" | "info" } | null {
   const st = String(lead.status ?? "").trim().toLowerCase();
 
+  // ============================================================
+  // GUARD: RODAR NOVA SEQUENCIA ESTRITA RECORRENTE SÓ SE O CADASTRO
+  // DE MATRICULA REALMENTE FOI INICIADO.
+  // SE O USUARIO AINDA ESTÁ 100% NA FASE EXPERIMENTAL (nunca
+  // abriu o link, nem criou senha, nem salvou step/dia/contrato/
+  // pagamento), ENTAO NAO MOSTRAR STATUS DE ETAPA RECORRENTE.
+  // DEIXA O COMPORTAMENTO ORIGINAL (experimental) FUNCIONAR.
+  // ============================================================
+  const stepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+  const hasStep = Number.isFinite(stepRaw) && stepRaw >= 1;
+  const hasPass = Boolean((lead as any)?.recurring_registration_password) || Boolean(String((lead as any)?.signup_password_raw_temp ?? "").trim());
+  const wdRaw = String((lead as any)?.recurring_class_weekday ?? "").trim();
+  const hasWd = ["mon","tue","wed","thu","fri","sat","sun"].includes(wdRaw.toLowerCase());
+  const hasTime = Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) || Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
+  const hasRcStatus = Boolean(String((lead as any)?.recurring_class_status ?? "").trim());
+  const hasContract = Boolean(String((lead as any)?.contract_status ?? "").trim()) || Boolean(String((lead as any)?.contract_signed_at ?? "").trim()) || Boolean(String((lead as any)?.contract_pdf_url ?? "").trim());
+  const hasPayment = Boolean(String((lead as any)?.payment_status ?? "").trim()) || Boolean(String((lead as any)?.payment_confirmed_at ?? "").trim());
+  const recurringTrulyStarted = hasStep || hasPass || hasWd || hasTime || hasRcStatus || hasContract || hasPayment;
+
+  const ps = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const payConfirmedGlobal =
+    ps === "confirmado" ||
+    ps === "matriculado" ||
+    ps === "pago" ||
+    st === "matriculado" ||
+    st === "aluno" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
+
+  if (!recurringTrulyStarted && !payConfirmedGlobal) {
+    // =============================
+    // FASE EXPERIMENTAL PURA.
+    // AINDA NÃO MEXEU NO LINK DE MATRICULA.
+    // MANTER COMPORTAMENTO ANTIGO: só avisos basicos + experimental
+    // (não forçar etapas recorrentes que o user não iniciou)
+    // =============================
+    const stateRaw = String((lead as any)?.state ?? "").trim();
+    const cityRaw = String((lead as any)?.city ?? "").trim();
+    if (!stateRaw && !cityRaw) {
+      return { title: "Falta estado e cidade", body: "Clique em Editar no card Informações para preencher.", tone: "warning" };
+    }
+    if (stateRaw && !cityRaw) {
+      return { title: "Falta cidade", body: "Clique em Editar no card Informações para preencher a cidade.", tone: "warning" };
+    }
+    if (!stateRaw && cityRaw) {
+      return { title: "Falta estado", body: "Clique em Editar no card Informações para preencher o estado.", tone: "warning" };
+    }
+    const recurringWeekdayOkOld = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(wdRaw.toLowerCase()));
+    const recurringTimeOkOld = Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) || Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
+    const regStepOld = stepRaw;
+    const regStepOkOld = Number.isFinite(regStepOld) && regStepOld >= 1 && regStepOld <= 12;
+    const rcsRawOld = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
+    const recOld = recurringWeekdayOkOld || recurringTimeOkOld || regStepOkOld || Boolean(rcsRawOld);
+    if (recOld && !recurringWeekdayOkOld && !recurringTimeOkOld) {
+      return { title: "Falta dia e horário recorrentes", body: "Defina dia e horário para continuar.", tone: "warning" };
+    }
+    if (recOld && recurringWeekdayOkOld && !recurringTimeOkOld) {
+      return { title: "Falta horário recorrente", body: "Defina o horário da aula recorrente.", tone: "warning" };
+    }
+    if (recOld && !recurringWeekdayOkOld && recurringTimeOkOld) {
+      return { title: "Falta dia recorrente", body: "Defina o dia da semana da aula recorrente.", tone: "warning" };
+    }
+    const expMeta = buildExperimentalMetaForList(lead);
+    if (!recOld && expMeta.tone === "warning") {
+      return { title: expMeta.label, body: "Complete os dados para agendar a aula experimental.", tone: "warning" };
+    }
+    return null;
+  }
+
+  // ============================================================
+  // A PARTIR DAQUI: RECORRENTE REALMENTE INICIADO OU PAGAMENTO
+  // CONFIRMADO. RODAR A NOVA SEQUENCIA ESTRITA OBRIGATORIA.
+  // ============================================================
+
   // ===== PASSO 0: LOCALIZACAO (Estado + Cidade) =====
   const stateRaw = String((lead as any)?.state ?? "").trim();
   const cityRaw = String((lead as any)?.city ?? "").trim();
@@ -475,7 +549,6 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
     if (stateRaw && !cityRaw) {
       return { title: "Falta Cidade", body: "O estado foi preenchido mas ainda falta a cidade no link de matrícula.", tone: "info" };
     }
-    // !stateRaw && cityRaw
     return { title: "Falta Estado", body: "A cidade foi preenchida mas ainda falta o estado no link de matrícula.", tone: "info" };
   }
 
@@ -513,15 +586,7 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
   }
 
   // ===== PASSO 3: PAGAMENTO =====
-  const ps = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
-  const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
-  const payConfirmed =
-    ps === "confirmado" ||
-    ps === "matriculado" ||
-    ps === "pago" ||
-    st === "matriculado" ||
-    st === "aluno" ||
-    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
+  const payConfirmed = payConfirmedGlobal;
 
   if (!payConfirmed) {
     return { title: "Falta confirmar pagamento", body: "Contrato aceito. Agora é necessário confirmar o pagamento para a matrícula ser considerada concluída.", tone: "info" };
