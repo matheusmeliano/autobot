@@ -4082,9 +4082,39 @@ export function AtendimentoClient() {
                         <div
                           className={[
                             "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold",
-                            isSelected
-                              ? "bg-[#ea580c] !text-white"
-                              : "bg-[var(--app-active)] text-[#9a3412]",
+                            (() => {
+                              // =============== REGRA NOVA: FUNDO AMARELO ===============
+                              // User pediu: "Quando o professor ainda não foi selecionado
+                              //              E o link da aula experimental também não foi
+                              //              registrado! → fundo amarelo."
+                              //
+                              // Implementação: a regra tem PRECEDÊNCIA SOBRE a cor normal:
+                              //   - Checa PROFESSOR: experimentalAssignedProfessorForLead
+                              //     (leva em conta flat lead + booking) retorna null?
+                              //   - Checa LINK: experimentalLessonLinkForLead
+                              //     (lead.experimental_class_link OU booking.lesson_link)
+                              //     retorna ""?
+                              //   - AMBOS verdadeiros → Fundo AMARELO.
+                              //
+                              // Se estiver selecionado (isSelected) → amarelo mais escuro
+                              // (amarelo 500 #eab308) para diferenciar do unselected.
+                              const prof = experimentalAssignedProfessorForLead(lead);
+                              const link = experimentalLessonLinkForLead(lead);
+                              const semProfessor = prof === null || prof === undefined;
+                              const semLink = !link;
+                              const avisarAmarelo = semProfessor && semLink;
+
+                              if (avisarAmarelo) {
+                                return isSelected
+                                  ? "!bg-[#eab308] !text-black ring-2 ring-[#ca8a04] shadow-[0_1px_2px_rgba(234,179,8,0.35)]"
+                                  : "!bg-[#fde047] !text-black";
+                              }
+
+                              // Caso normal (tinha professor OU tem link):
+                              return isSelected
+                                ? "bg-[#ea580c] !text-white"
+                                : "bg-[var(--app-active)] text-[#9a3412]";
+                            })(),
                           ].join(" ")}
                         >
                           {buildInitials(lead.full_name)}
